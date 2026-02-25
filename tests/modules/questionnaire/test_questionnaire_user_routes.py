@@ -1,0 +1,757 @@
+"""Integration tests for user-facing questionnaire endpoints."""
+
+from __future__ import annotations
+
+from datetime import timedelta
+
+import pytest
+
+from core.config import settings
+from core.security import create_jwt_token
+from modules.assessments.models import AssessmentInstance, AssessmentPackage, AssessmentPackageQuestion
+from modules.engagements.models import Engagement
+from modules.questionnaire.models import QuestionnaireDefinition, QuestionnaireResponse
+from modules.users.models import User
+
+
+def _auth_header(user_id: int) -> dict[str, str]:
+    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def _seed_user(test_db_session, *, user_id: int):
+    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000000", status="active"))
+    await test_db_session.commit()
+
+
+async def _ensure_test_engagement(test_db_session, *, engagement_id: int = 1):
+    """Ensure a test engagement exists for foreign key constraint.
+    
+    Also creates required packages and diagnostic packages.
+    """
+    from sqlalchemy import select
+    from modules.diagnostics.models import DiagnosticPackage
+    
+    result = await test_db_session.execute(
+        select(Engagement).where(Engagement.engagement_id == engagement_id)
+    )
+    existing = result.scalar_one_or_none()
+    
+    if existing is None:
+        # Create test assessment package if needed
+        pkg_result = await test_db_session.execute(
+            select(AssessmentPackage).where(AssessmentPackage.package_id == 1)
+        )
+        if pkg_result.scalar_one_or_none() is None:
+            test_pkg = AssessmentPackage(
+                package_id=1,
+                package_code="TEST_PKG",
+                display_name="Test Package",
+                status="active"
+            )
+            test_db_session.add(test_pkg)
+        
+        # Create test diagnostic package if needed
+        diag_result = await test_db_session.execute(
+            select(DiagnosticPackage).where(DiagnosticPackage.diagnostic_package_id == 1)
+        )
+        if diag_result.scalar_one_or_none() is None:
+            test_diag = DiagnosticPackage(
+                diagnostic_package_id=1,
+                reference_id="TEST_DIAG",
+                package_name="Test Diagnostic",
+                diagnostic_provider="Test Provider",
+                no_of_tests=0,
+                status="active"
+            )
+            test_db_session.add(test_diag)
+        
+        engagement = Engagement(
+            engagement_id=engagement_id,
+            engagement_name="Test Engagement",
+            engagement_code="TEST001",
+            engagement_type="test",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            slot_duration=20,
+            status="active",
+            participant_count=0,
+        )
+        test_db_session.add(engagement)
+        await test_db_session.commit()
+
+
+# ==================== GET /questionnaire/{assessment_instance_id} Tests ====================
+
+
+@pytest.mark.asyncio
+async def test_get_questionnaire_requires_auth(async_client):
+    """Test that authentication is required."""
+    response = await async_client.get("/questionnaire/1")
+    assert response.status_code == 401
+    assert response.json()["error_code"] == "AUTH_FAILED"
+
+
+@pytest.mark.asyncio
+async def test_get_questionnaire_returns_404_when_assessment_not_found(async_client, test_db_session):
+    """Test 404 when assessment instance does not exist."""
+    await _seed_user(test_db_session, user_id=5001)
+
+    response = await async_client.get("/questionnaire/99999", headers=_auth_header(5001))
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "ASSESSMENT_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_get_questionnaire_returns_403_when_not_owner(async_client, test_db_session):
+    """Test 403 when user tries to access another user's assessment."""
+    await _seed_user(test_db_session, user_id=5002)
+    await _seed_user(test_db_session, user_id=5003)
+    await _ensure_test_engagement(test_db_session)
+
+    # Create package
+    package = AssessmentPackage(package_id=1001, package_code="PKG001", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+
+    # Create assessment instance for user 5003
+    instance = AssessmentInstance(
+        assessment_instance_id=2001,
+        user_id=5003,
+        package_id=1001,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    # User 5002 tries to access user 5003's assessment
+    response = await async_client.get("/questionnaire/2001", headers=_auth_header(5002))
+    assert response.status_code == 403
+    assert response.json()["error_code"] == "FORBIDDEN"
+
+
+@pytest.mark.asyncio
+async def test_get_questionnaire_returns_empty_questions_when_no_package_questions(async_client, test_db_session):
+    """Test empty questions list when package has no questions."""
+    await _seed_user(test_db_session, user_id=5004)
+    await _ensure_test_engagement(test_db_session)
+
+    package = AssessmentPackage(package_id=1002, package_code="PKG002", display_name="Empty Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+
+    instance = AssessmentInstance(
+        assessment_instance_id=2002,
+        user_id=5004,
+        package_id=1002,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    response = await async_client.get("/questionnaire/2002", headers=_auth_header(5004))
+    assert response.status_code == 200
+
+    data = response.json()["data"]
+    assert data["assessment_instance_id"] == 2002
+    assert data["status"] == "active"
+    assert data["questions"] == []
+
+
+@pytest.mark.asyncio
+async def test_get_questionnaire_returns_questions_without_answers(async_client, test_db_session):
+    """Test getting questions when no answers exist yet."""
+    await _seed_user(test_db_session, user_id=5005)
+    await _ensure_test_engagement(test_db_session)
+
+    # Create package
+    package = AssessmentPackage(package_id=1003, package_code="PKG003", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    # Create questions
+    q1 = QuestionnaireDefinition(
+        question_id=3001,
+        question_text="What is your age?",
+        question_type="number",
+        options=None,
+        status="active",
+    )
+    q2 = QuestionnaireDefinition(
+        question_id=3002,
+        question_text="Select your gender",
+        question_type="single_choice",
+        options=["Male", "Female", "Other"],
+        status="active",
+    )
+    test_db_session.add_all([q1, q2])
+    await test_db_session.commit()
+    # Link questions to package
+    test_db_session.add_all([
+        AssessmentPackageQuestion(package_id=1003, question_id=3001),
+        AssessmentPackageQuestion(package_id=1003, question_id=3002),
+    ])
+
+    # Create assessment instance
+    instance = AssessmentInstance(
+        assessment_instance_id=2003,
+        user_id=5005,
+        package_id=1003,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    response = await async_client.get("/questionnaire/2003", headers=_auth_header(5005))
+    assert response.status_code == 200
+
+    data = response.json()["data"]
+    assert data["assessment_instance_id"] == 2003
+    assert data["status"] == "active"
+    assert len(data["questions"]) == 2
+
+    # Check first question
+    assert data["questions"][0]["question_id"] == 3001
+    assert data["questions"][0]["question_text"] == "What is your age?"
+    assert data["questions"][0]["question_type"] == "number"
+    assert data["questions"][0]["options"] is None
+    assert data["questions"][0]["answer"] is None
+
+    # Check second question
+    assert data["questions"][1]["question_id"] == 3002
+    assert data["questions"][1]["question_text"] == "Select your gender"
+    assert data["questions"][1]["question_type"] == "single_choice"
+    assert data["questions"][1]["options"] == ["Male", "Female", "Other"]
+    assert data["questions"][1]["answer"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_questionnaire_returns_questions_with_existing_answers(async_client, test_db_session):
+    """Test getting questions with existing draft answers."""
+    await _seed_user(test_db_session, user_id=5006)
+    await _ensure_test_engagement(test_db_session)
+
+    # Create package
+    package = AssessmentPackage(package_id=1004, package_code="PKG004", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    # Create questions
+    q1 = QuestionnaireDefinition(
+        question_id=3003,
+        question_text="What is your age?",
+        question_type="number",
+        options=None,
+        status="active",
+    )
+    test_db_session.add(q1)
+    await test_db_session.commit()
+
+    # Link question to package
+    test_db_session.add(AssessmentPackageQuestion(package_id=1004, question_id=3003))
+
+    # Create assessment instance
+    instance = AssessmentInstance(
+        assessment_instance_id=2004,
+        user_id=5006,
+        package_id=1004,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+
+    # Create existing response
+    response_row = QuestionnaireResponse(
+        assessment_instance_id=2004,
+        question_id=3003,
+        answer=25,
+        submitted_at=None,
+    )
+    test_db_session.add(response_row)
+    await test_db_session.commit()
+
+    response = await async_client.get("/questionnaire/2004", headers=_auth_header(5006))
+    assert response.status_code == 200
+
+    data = response.json()["data"]
+    assert len(data["questions"]) == 1
+    assert data["questions"][0]["question_id"] == 3003
+    assert data["questions"][0]["answer"] == 25
+
+
+@pytest.mark.asyncio
+async def test_get_questionnaire_skips_inactive_questions(async_client, test_db_session):
+    """Test that inactive questions are not returned."""
+    await _seed_user(test_db_session, user_id=5007)
+    await _ensure_test_engagement(test_db_session)
+
+    # Create package
+    package = AssessmentPackage(package_id=1005, package_code="PKG005", display_name="Test Package", status="active")
+    test_db_session.add(package)
+
+    # Create questions (one active, one inactive)
+    q1 = QuestionnaireDefinition(
+        question_id=3004,
+        question_text="Active question",
+        question_type="text",
+        options=None,
+        status="active",
+    )
+    q2 = QuestionnaireDefinition(
+        question_id=3005,
+        question_text="Inactive question",
+        question_type="text",
+        options=None,
+        status="inactive",
+    )
+    test_db_session.add_all([q1, q2])
+    await test_db_session.commit()
+    # Link both questions to package
+    test_db_session.add_all([
+        AssessmentPackageQuestion(package_id=1005, question_id=3004),
+        AssessmentPackageQuestion(package_id=1005, question_id=3005),
+    ])
+
+    # Create assessment instance
+    instance = AssessmentInstance(
+        assessment_instance_id=2005,
+        user_id=5007,
+        package_id=1005,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    response = await async_client.get("/questionnaire/2005", headers=_auth_header(5007))
+    assert response.status_code == 200
+
+    data = response.json()["data"]
+    assert len(data["questions"]) == 1
+    assert data["questions"][0]["question_id"] == 3004
+
+
+# ==================== PUT /questionnaire/{assessment_instance_id}/responses Tests ====================
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_requires_auth(async_client):
+    """Test that authentication is required."""
+    response = await async_client.put("/questionnaire/1/responses", json={"responses": []})
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_validates_payload(async_client, test_db_session):
+    """Test payload validation."""
+    await _seed_user(test_db_session, user_id=5008)
+
+    # Empty responses array
+    response = await async_client.put("/questionnaire/1/responses", headers=_auth_header(5008), json={"responses": []})
+    assert response.status_code == 400
+
+    # Missing responses field
+    response = await async_client.put("/questionnaire/1/responses", headers=_auth_header(5008), json={})
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_returns_404_when_assessment_not_found(async_client, test_db_session):
+    """Test 404 when assessment instance does not exist."""
+    await _seed_user(test_db_session, user_id=5009)
+
+    payload = {"responses": [{"question_id": 1, "answer": "test"}]}
+    response = await async_client.put("/questionnaire/99999/responses", headers=_auth_header(5009), json=payload)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_returns_403_when_not_owner(async_client, test_db_session):
+    """Test 403 when user tries to update another user's assessment."""
+    await _seed_user(test_db_session, user_id=5010)
+    await _seed_user(test_db_session, user_id=5011)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1006, package_code="PKG006", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    instance = AssessmentInstance(
+        assessment_instance_id=2006,
+        user_id=5011,
+        package_id=1006,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    payload = {"responses": [{"question_id": 1, "answer": "test"}]}
+    response = await async_client.put("/questionnaire/2006/responses", headers=_auth_header(5010), json=payload)
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_returns_422_when_assessment_completed(async_client, test_db_session):
+    """Test 422 when trying to update completed assessment."""
+    await _seed_user(test_db_session, user_id=5012)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1007, package_code="PKG007", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    instance = AssessmentInstance(
+        assessment_instance_id=2007,
+        user_id=5012,
+        package_id=1007,
+        engagement_id=1,
+        status="completed",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    payload = {"responses": [{"question_id": 1, "answer": "test"}]}
+    response = await async_client.put("/questionnaire/2007/responses", headers=_auth_header(5012), json=payload)
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "INVALID_STATE"
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_returns_422_when_question_not_in_package(async_client, test_db_session):
+    """Test 422 when question doesn't belong to assessment package."""
+    await _seed_user(test_db_session, user_id=5013)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1008, package_code="PKG008", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    instance = AssessmentInstance(
+        assessment_instance_id=2008,
+        user_id=5013,
+        package_id=1008,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    # Try to answer a question that's not in the package
+    payload = {"responses": [{"question_id": 99999, "answer": "test"}]}
+    response = await async_client.put("/questionnaire/2008/responses", headers=_auth_header(5013), json=payload)
+    assert response.status_code == 422
+    assert "does not belong" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_returns_422_when_question_inactive(async_client, test_db_session):
+    """Test 422 when question is inactive."""
+    await _seed_user(test_db_session, user_id=5014)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1009, package_code="PKG009", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    q1 = QuestionnaireDefinition(
+        question_id=3006,
+        question_text="Inactive question",
+        question_type="text",
+        options=None,
+        status="inactive",
+    )
+    test_db_session.add(q1)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageQuestion(package_id=1009, question_id=3006))
+
+    instance = AssessmentInstance(
+        assessment_instance_id=2009,
+        user_id=5014,
+        package_id=1009,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    payload = {"responses": [{"question_id": 3006, "answer": "test"}]}
+    response = await async_client.put("/questionnaire/2009/responses", headers=_auth_header(5014), json=payload)
+    assert response.status_code == 422
+    assert "not available" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_creates_new_responses(async_client, test_db_session):
+    """Test creating new responses."""
+    await _seed_user(test_db_session, user_id=5015)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1010, package_code="PKG010", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    q1 = QuestionnaireDefinition(
+        question_id=3007,
+        question_text="Question 1",
+        question_type="text",
+        options=None,
+        status="active",
+    )
+    q2 = QuestionnaireDefinition(
+        question_id=3008,
+        question_text="Question 2",
+        question_type="number",
+        options=None,
+        status="active",
+    )
+    test_db_session.add_all([q1, q2])
+    await test_db_session.commit()
+    test_db_session.add_all([
+        AssessmentPackageQuestion(package_id=1010, question_id=3007),
+        AssessmentPackageQuestion(package_id=1010, question_id=3008),
+    ])
+
+    instance = AssessmentInstance(
+        assessment_instance_id=2010,
+        user_id=5015,
+        package_id=1010,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    payload = {
+        "responses": [
+            {"question_id": 3007, "answer": "My answer"},
+            {"question_id": 3008, "answer": 42},
+        ]
+    }
+    response = await async_client.put("/questionnaire/2010/responses", headers=_auth_header(5015), json=payload)
+    assert response.status_code == 200
+    assert "saved successfully" in response.json()["data"]["message"]
+
+    # Verify responses were created
+    from sqlalchemy import select
+    result = await test_db_session.execute(
+        select(QuestionnaireResponse).where(QuestionnaireResponse.assessment_instance_id == 2010)
+    )
+    responses = list(result.scalars().all())
+    assert len(responses) == 2
+    
+    # Verify no submission timestamp (draft mode)
+    for resp in responses:
+        assert resp.submitted_at is None
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_updates_existing_responses(async_client, test_db_session):
+    """Test updating existing draft responses."""
+    await _seed_user(test_db_session, user_id=5016)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1011, package_code="PKG011", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    q1 = QuestionnaireDefinition(
+        question_id=3009,
+        question_text="Question 1",
+        question_type="text",
+        options=None,
+        status="active",
+    )
+    test_db_session.add(q1)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageQuestion(package_id=1011, question_id=3009))
+
+    instance = AssessmentInstance(
+        assessment_instance_id=2011,
+        user_id=5016,
+        package_id=1011,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+
+    # Create existing response
+    existing_response = QuestionnaireResponse(
+        assessment_instance_id=2011,
+        question_id=3009,
+        answer="Old answer",
+        submitted_at=None,
+    )
+    test_db_session.add(existing_response)
+    await test_db_session.commit()
+
+    # Update the response
+    payload = {"responses": [{"question_id": 3009, "answer": "New answer"}]}
+    response = await async_client.put("/questionnaire/2011/responses", headers=_auth_header(5016), json=payload)
+    assert response.status_code == 200
+
+    # Verify response was updated
+    from sqlalchemy import select
+    result = await test_db_session.execute(
+        select(QuestionnaireResponse)
+        .where(QuestionnaireResponse.assessment_instance_id == 2011)
+        .where(QuestionnaireResponse.question_id == 3009)
+    )
+    updated = result.scalar_one()
+    assert updated.answer == "New answer"
+    assert updated.submitted_at is None
+
+
+# ==================== POST /questionnaire/{assessment_instance_id}/submit Tests ====================
+
+
+@pytest.mark.asyncio
+async def test_submit_questionnaire_requires_auth(async_client):
+    """Test that authentication is required."""
+    response = await async_client.post("/questionnaire/1/submit")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_submit_questionnaire_returns_404_when_assessment_not_found(async_client, test_db_session):
+    """Test 404 when assessment instance does not exist."""
+    await _seed_user(test_db_session, user_id=5017)
+
+    response = await async_client.post("/questionnaire/99999/submit", headers=_auth_header(5017))
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_submit_questionnaire_returns_403_when_not_owner(async_client, test_db_session):
+    """Test 403 when user tries to submit another user's assessment."""
+    await _seed_user(test_db_session, user_id=5018)
+    await _seed_user(test_db_session, user_id=5019)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1012, package_code="PKG012", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    instance = AssessmentInstance(
+        assessment_instance_id=2012,
+        user_id=5019,
+        package_id=1012,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    response = await async_client.post("/questionnaire/2012/submit", headers=_auth_header(5018))
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_submit_questionnaire_returns_422_when_already_completed(async_client, test_db_session):
+    """Test 422 when assessment is already completed."""
+    await _seed_user(test_db_session, user_id=5020)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1013, package_code="PKG013", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    instance = AssessmentInstance(
+        assessment_instance_id=2013,
+        user_id=5020,
+        package_id=1013,
+        engagement_id=1,
+        status="completed",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    response = await async_client.post("/questionnaire/2013/submit", headers=_auth_header(5020))
+    assert response.status_code == 422
+    assert "already completed" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_submit_questionnaire_returns_422_when_not_active(async_client, test_db_session):
+    """Test 422 when assessment is not active."""
+    await _seed_user(test_db_session, user_id=5021)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1014, package_code="PKG014", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    instance = AssessmentInstance(
+        assessment_instance_id=2014,
+        user_id=5021,
+        package_id=1014,
+        engagement_id=1,
+        status="inactive",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    response = await async_client.post("/questionnaire/2014/submit", headers=_auth_header(5021))
+    assert response.status_code == 422
+    assert "not active" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_submit_questionnaire_marks_assessment_completed(async_client, test_db_session):
+    """Test successful submission marks assessment as completed."""
+    await _seed_user(test_db_session, user_id=5022)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1015, package_code="PKG015", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    q1 = QuestionnaireDefinition(
+        question_id=3010,
+        question_text="Question 1",
+        question_type="text",
+        options=None,
+        status="active",
+    )
+    test_db_session.add(q1)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageQuestion(package_id=1015, question_id=3010))
+
+    instance = AssessmentInstance(
+        assessment_instance_id=2015,
+        user_id=5022,
+        package_id=1015,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+
+    # Add a response
+    response_row = QuestionnaireResponse(
+        assessment_instance_id=2015,
+        question_id=3010,
+        answer="My answer",
+        submitted_at=None,
+    )
+    test_db_session.add(response_row)
+    await test_db_session.commit()
+
+    response = await async_client.post("/questionnaire/2015/submit", headers=_auth_header(5022))
+    assert response.status_code == 200
+    assert "submitted successfully" in response.json()["data"]["message"]
+
+    # Verify assessment is completed
+    await test_db_session.refresh(instance)
+    assert instance.status == "completed"
+    assert instance.completed_at is not None
+
+    # Verify response has submission timestamp
+    await test_db_session.refresh(response_row)
+    assert response_row.submitted_at is not None
+
+
+@pytest.mark.asyncio
+async def test_submit_questionnaire_with_no_responses(async_client, test_db_session):
+    """Test submission is allowed even with no responses."""
+    await _seed_user(test_db_session, user_id=5023)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1016, package_code="PKG016", display_name="Test Package", status="active")
+    test_db_session.add(package)
+    await test_db_session.commit()
+    instance = AssessmentInstance(
+        assessment_instance_id=2016,
+        user_id=5023,
+        package_id=1016,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    response = await async_client.post("/questionnaire/2016/submit", headers=_auth_header(5023))
+    assert response.status_code == 200
+
+    # Verify assessment is completed
+    await test_db_session.refresh(instance)
+    assert instance.status == "completed"
