@@ -20,6 +20,7 @@ from modules.assessments.schemas import (
     AssessmentPackageCreateRequest,
     AssessmentPackageQuestionsAddRequest,
     AssessmentPackageUpdateRequest,
+    AssessmentStatusUpdateRequest,
 )
 from modules.assessments.packages_service import AssessmentPackagesService
 from modules.employee.dependencies import get_current_employee
@@ -139,6 +140,29 @@ async def update_assessment_package_details(
     await db.commit()
 
     return success_response({"package_id": updated.package_id})
+
+
+@router.patch("/{package_id}/status")
+async def update_assessment_package_status(
+    package_id: int,
+    payload: AssessmentStatusUpdateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    packages_service: AssessmentPackagesService = Depends(get_assessment_packages_service),
+):
+    updated = await packages_service.update_package_status_for_employee(
+        db,
+        employee=employee,
+        package_id=package_id,
+        status=payload.status,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+
+    return success_response({"package_id": updated.package_id, "status": updated.status})
 
 
 @router.get("/{package_id}/questions")

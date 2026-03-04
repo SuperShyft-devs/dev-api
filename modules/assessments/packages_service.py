@@ -128,6 +128,43 @@ class AssessmentPackagesService:
 
         return package
 
+    async def update_package_status_for_employee(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        package_id: int,
+        status: str,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> AssessmentPackage:
+        self._ensure_employee_access(employee)
+
+        status_value = _normalize_status(status)
+        if status_value not in _ALLOWED_PACKAGE_STATUS:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        package = await self._repository.get_package_by_id(db, package_id=package_id)
+        if package is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_PACKAGE_NOT_FOUND", message="Package does not exist")
+
+        package.status = status_value
+        package = await self._repository.update_package(db, package)
+
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_UPDATE_ASSESSMENT_PACKAGE_STATUS",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return package
+
     async def update_package_for_employee(
         self,
         db,
