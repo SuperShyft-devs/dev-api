@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
 from core.exceptions import add_exception_handlers
@@ -25,6 +26,15 @@ app = FastAPI(
 
 add_exception_handlers(app)
 app.middleware("http")(request_id_middleware)
+
+# Apply CORS policy from environment configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include routers
 app.include_router(auth_router)

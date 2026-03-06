@@ -40,10 +40,14 @@ class Settings:
     )
     
     # CORS settings
-    CORS_ORIGINS: list = os.getenv(
-        "CORS_ORIGINS", 
-        "http://localhost:3000,http://localhost:5173"
-    ).split(",")
+    CORS_ORIGINS: list = [
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:3000,http://localhost:5173",
+        ).split(",")
+        if origin.strip()
+    ]
     
     # Logging settings
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
