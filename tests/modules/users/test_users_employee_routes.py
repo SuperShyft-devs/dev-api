@@ -121,3 +121,42 @@ async def test_employee_deactivate_user_sets_inactive(async_client, test_db_sess
     updated = await test_db_session.get(User, 9401)
     assert updated is not None
     assert (updated.status or "").lower() == "inactive"
+
+
+@pytest.mark.asyncio
+async def test_employee_update_user_rejects_inactive_for_employee_one_user(async_client, test_db_session):
+    test_db_session.add(User(user_id=9007, phone="9007000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=6, user_id=9007, role="admin", status="active"))
+
+    test_db_session.add(User(user_id=9411, phone="9411000000", status="active", first_name="Rishi"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=1, user_id=9411, role="admin", status="active"))
+    await test_db_session.commit()
+
+    payload = {"phone": "9411000000", "first_name": "Rishi", "status": "inactive"}
+    response = await async_client.put("/users/9411", headers=_auth_header(9007), json=payload)
+    assert response.status_code == 400
+
+    protected_user = await test_db_session.get(User, 9411)
+    assert protected_user is not None
+    assert (protected_user.status or "").lower() == "active"
+
+
+@pytest.mark.asyncio
+async def test_employee_deactivate_user_rejects_employee_one_user(async_client, test_db_session):
+    test_db_session.add(User(user_id=9008, phone="9008000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=7, user_id=9008, role="admin", status="active"))
+
+    test_db_session.add(User(user_id=9412, phone="9412000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=1, user_id=9412, role="admin", status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.patch("/users/9412/deactivate", headers=_auth_header(9008))
+    assert response.status_code == 400
+
+    protected_user = await test_db_session.get(User, 9412)
+    assert protected_user is not None
+    assert (protected_user.status or "").lower() == "active"

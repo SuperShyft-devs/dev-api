@@ -11,9 +11,11 @@ from typing import Optional
 import logging
 from datetime import time
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
+from modules.employee.models import Employee
 from modules.audit.service import AuditService
 from modules.users.models import User
 from modules.users.repository import UsersRepository
@@ -27,9 +29,15 @@ from modules.users.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+_ALWAYS_ACTIVE_EMPLOYEE_ID = 1
 
 
 class UsersService:
+    async def _is_protected_employee_user(self, db: AsyncSession, user_id: int) -> bool:
+        result = await db.execute(select(Employee.employee_id).where(Employee.user_id == user_id).limit(1))
+        employee_id = result.scalar_one_or_none()
+        return employee_id == _ALWAYS_ACTIVE_EMPLOYEE_ID
+
     """Users service layer."""
 
     def _ensure_employee_access(self, employee) -> None:
@@ -242,6 +250,10 @@ class UsersService:
         if user is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
+        if await self._is_protected_employee_user(db, user_id):
+            if (payload.status or "").strip().lower() != "active":
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="User must remain active")
+
         existing = await self._repository.get_user_by_phone(db, payload.phone)
         if existing is not None and existing.user_id != user_id:
             raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
@@ -286,6 +298,9 @@ class UsersService:
         user = await self._repository.get_user_by_id(db, user_id)
         if user is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        if await self._is_protected_employee_user(db, user_id):
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="User must remain active")
 
         updated = await self._repository.update_user_full(db, user=user, data={"status": "inactive"})
 
