@@ -54,6 +54,7 @@ def _set_test_settings():
     settings.JWT_SECRET_KEY = settings.JWT_SECRET_KEY or "test-secret"
     settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 5
     settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS = 7
+    settings.ALLOW_BYPASS_OTP = False
 
 
 class CapturingOtpSender:

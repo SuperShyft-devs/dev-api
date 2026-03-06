@@ -53,6 +53,10 @@ class Settings:
     
     # OTP settings
     OTP_LOG_TO_TERMINAL: bool = os.getenv("OTP_LOG_TO_TERMINAL", "True").lower() == "true"
+    ALLOW_BYPASS_OTP: bool = os.getenv(
+        "ALLOW_BYPASS_OTP",
+        os.getenv("allow_bypass_otp", "False"),
+    ).lower() == "true"
     
     @classmethod
     def validate(cls) -> None:
