@@ -27,6 +27,7 @@ class EmployeeContext:
 
 _ALLOWED_EMPLOYEE_STATUS = {"active", "inactive", "archived"}
 _ALLOWED_EMPLOYEE_STATUS_UPDATE = {"active", "inactive"}
+_ALWAYS_ACTIVE_EMPLOYEE_ID = 1
 
 
 def _normalize_status(value: str | None) -> str:
@@ -231,6 +232,9 @@ class EmployeeService:
         normalized = _normalize_status(status)
         if normalized not in _ALLOWED_EMPLOYEE_STATUS_UPDATE:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        if row.employee_id == _ALWAYS_ACTIVE_EMPLOYEE_ID and normalized != "active":
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Employee must remain active")
 
         row.status = normalized
         row = await self._repository.update(db, row)

@@ -135,3 +135,24 @@ async def test_update_employee_status_sets_inactive(async_client, test_db_sessio
     updated = await test_db_session.get(Employee, 401)
     assert updated is not None
     assert (updated.status or "").lower() == "inactive"
+
+
+@pytest.mark.asyncio
+async def test_update_employee_status_rejects_inactive_for_employee_one(async_client, test_db_session):
+    await _seed_admin_employee(test_db_session, user_id=8007, employee_id=15)
+
+    test_db_session.add(User(user_id=9402, phone="9402000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=1, user_id=9402, role="ops", status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/employees/1/status",
+        headers=_auth_header(8007),
+        json={"status": "inactive"},
+    )
+    assert response.status_code == 400
+
+    protected = await test_db_session.get(Employee, 1)
+    assert protected is not None
+    assert (protected.status or "").lower() == "active"
