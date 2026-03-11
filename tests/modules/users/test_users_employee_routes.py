@@ -18,18 +18,27 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 
 @pytest.mark.asyncio
-async def test_employee_create_user_requires_auth(async_client):
+async def test_create_user_is_public_without_auth(async_client, test_db_session):
     response = await async_client.post("/users", json={"phone": "1234567890"})
-    assert response.status_code == 401
+    assert response.status_code == 200
+    user_id = response.json()["data"]["user_id"]
+    created = await test_db_session.get(User, user_id)
+    assert created is not None
+    assert created.phone == "1234567890"
 
 
 @pytest.mark.asyncio
-async def test_employee_create_user_requires_employee(async_client, test_db_session):
+async def test_create_user_does_not_require_employee(async_client, test_db_session):
     test_db_session.add(User(user_id=9001, phone="9001000000", status="active"))
     await test_db_session.commit()
 
-    response = await async_client.post("/users", headers=_auth_header(9001), json={"phone": "1234567890"})
-    assert response.status_code == 403
+    payload = {"phone": "1234567891", "first_name": "Public"}
+    response = await async_client.post("/users", headers=_auth_header(9001), json=payload)
+    assert response.status_code == 200
+    user_id = response.json()["data"]["user_id"]
+    created = await test_db_session.get(User, user_id)
+    assert created is not None
+    assert created.first_name == "Public"
 
 
 @pytest.mark.asyncio

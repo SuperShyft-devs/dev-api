@@ -141,14 +141,12 @@ class UsersService:
         self,
         db: AsyncSession,
         *,
-        employee,
+        employee=None,
         payload: EmployeeCreateUserRequest,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> User:
-        self._ensure_employee_access(employee)
-
         existing = await self._repository.get_user_by_phone(db, payload.phone)
         if existing is None and payload.email is not None:
             existing = await self._repository.get_user_by_email(db, str(payload.email))
@@ -178,13 +176,15 @@ class UsersService:
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
 
+        actor_user_id = employee.user_id if employee is not None else None
+        action = "EMPLOYEE_CREATE_USER" if employee is not None else "PUBLIC_CREATE_USER"
         await self._audit_service.log_event(
             db,
-            action="EMPLOYEE_CREATE_USER",
+            action=action,
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=actor_user_id,
             session_id=None,
         )
 

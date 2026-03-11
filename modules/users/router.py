@@ -162,12 +162,10 @@ async def employee_create_user(
     payload: EmployeeCreateUserRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
     users_service: UsersService = Depends(get_users_service),
 ):
     user = await users_service.create_user_by_employee(
         db,
-        employee=employee,
         payload=payload,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
