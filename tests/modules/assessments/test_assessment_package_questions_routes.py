@@ -39,7 +39,7 @@ async def test_list_package_categories_requires_auth(async_client):
 
 
 @pytest.mark.asyncio
-async def test_list_package_categories_allows_authenticated_user(async_client, test_db_session):
+async def test_list_package_categories_requires_employee(async_client, test_db_session):
     test_db_session.add(User(user_id=8101, phone="8101000000", status="active"))
     test_db_session.add(AssessmentPackage(package_id=6101, package_code="PKU", display_name="User Package", status="active"))
     test_db_session.add(
@@ -49,8 +49,23 @@ async def test_list_package_categories_allows_authenticated_user(async_client, t
     test_db_session.add(AssessmentPackageCategory(package_id=6101, category_id=7101))
     await test_db_session.commit()
     response = await async_client.get("/assessment-packages/6101/categories", headers=_auth_header(8101))
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_list_package_categories_allows_employee(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8105, employee_id=55)
+    test_db_session.add(AssessmentPackage(package_id=6105, package_code="PKE", display_name="Employee Package", status="active"))
+    test_db_session.add(
+        QuestionnaireCategory(category_id=7105, category_key="emp_cat", display_name="Emp Cat", status="active")
+    )
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=6105, category_id=7105))
+    await test_db_session.commit()
+
+    response = await async_client.get("/assessment-packages/6105/categories", headers=_auth_header(8105))
     assert response.status_code == 200
-    assert response.json()["data"][0]["category_id"] == 7101
+    assert response.json()["data"][0]["category_id"] == 7105
 
 
 @pytest.mark.asyncio

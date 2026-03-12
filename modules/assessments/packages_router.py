@@ -170,10 +170,14 @@ async def update_assessment_package_status(
 async def list_package_categories(
     package_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user=Depends(get_current_user),
+    employee: EmployeeContext = Depends(get_current_employee),
     service: AssessmentPackageCategoriesService = Depends(get_assessment_package_categories_service),
 ):
-    data = await service.list_categories_for_package_for_user(db, package_id=package_id)
+    data = await service.list_categories_for_package(
+        db,
+        employee=employee,
+        package_id=package_id,
+    )
     return success_response(data)
 
 
