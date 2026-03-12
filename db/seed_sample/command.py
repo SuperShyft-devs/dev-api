@@ -202,6 +202,7 @@ SAMPLE_ORGANIZATIONS: tuple[SeedOrganization, ...] = (
 )
 
 SAMPLE_ASSESSMENT_PACKAGES: tuple[SeedAssessmentPackage, ...] = (
+    SeedAssessmentPackage(1, "METSIGHTS_BASIC", "Metsights Basic", "active"),
     SeedAssessmentPackage(11, "METSIGHTS_CORE", "Metsights Core", "active"),
     SeedAssessmentPackage(12, "METSIGHTS_LEADERSHIP", "Metsights Leadership", "active"),
     SeedAssessmentPackage(13, "METSIGHTS_WELLBEING", "Metsights Wellbeing", "inactive"),
@@ -254,6 +255,8 @@ SAMPLE_QUESTION_OPTIONS: tuple[SeedQuestionOption, ...] = (
 )
 
 SAMPLE_PACKAGE_CATEGORIES: tuple[SeedPackageCategory, ...] = (
+    SeedPackageCategory(600, 1, 701),
+    SeedPackageCategory(606, 1, 703),
     SeedPackageCategory(601, 11, 701),
     SeedPackageCategory(602, 11, 702),
     SeedPackageCategory(603, 12, 701),
