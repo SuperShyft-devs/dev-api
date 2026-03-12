@@ -10,9 +10,8 @@ from modules.audit.service import AuditService
 from modules.assessments.repository import AssessmentsRepository
 from modules.assessments.service import AssessmentsService
 from modules.assessments.packages_service import AssessmentPackagesService
-from modules.assessments.package_questions_service import AssessmentPackageQuestionsService
+from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
 from modules.questionnaire.repository import QuestionnaireRepository
-from modules.questionnaire.service import QuestionnaireService
 
 
 def get_assessments_service() -> AssessmentsService:
@@ -29,14 +28,13 @@ def get_assessment_packages_service() -> AssessmentPackagesService:
     )
 
 
-def get_assessment_package_questions_service() -> AssessmentPackageQuestionsService:
-    """Service used by employee-only assessment package question routes."""
+def get_assessment_package_categories_service() -> AssessmentPackageCategoriesService:
+    """Service used by employee-only assessment package category routes."""
 
     audit_service = AuditService(AuditRepository())
-    questionnaire_service = QuestionnaireService(repository=QuestionnaireRepository(), audit_service=audit_service)
 
-    return AssessmentPackageQuestionsService(
+    return AssessmentPackageCategoriesService(
         repository=AssessmentsRepository(),
-        questionnaire_service=questionnaire_service,
+        questionnaire_repository=QuestionnaireRepository(),
         audit_service=audit_service,
     )

@@ -9,7 +9,7 @@ import pytest
 from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
-from modules.questionnaire.models import QuestionnaireDefinition
+from modules.questionnaire.models import QuestionnaireDefinition, QuestionnaireOption
 from modules.users.models import User
 
 
@@ -29,7 +29,15 @@ async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1,
 async def test_create_question_requires_auth(async_client):
     response = await async_client.post(
         "/questionnaire/questions",
-        json={"question_text": "Q1", "question_type": "single_choice", "options": ["a", "b"]},
+        json={
+            "question_key": "q1_auth",
+            "question_text": "Q1",
+            "question_type": "single_choice",
+            "options": [
+                {"option_value": "a", "display_name": "a", "tooltip_text": None},
+                {"option_value": "b", "display_name": "b", "tooltip_text": None},
+            ],
+        },
     )
     assert response.status_code == 401
 
@@ -42,7 +50,15 @@ async def test_create_question_requires_employee(async_client, test_db_session):
     response = await async_client.post(
         "/questionnaire/questions",
         headers=_auth_header(9001),
-        json={"question_text": "Q1", "question_type": "single_choice", "options": ["a", "b"]},
+        json={
+            "question_key": "q1_employee",
+            "question_text": "Q1",
+            "question_type": "single_choice",
+            "options": [
+                {"option_value": "a", "display_name": "a", "tooltip_text": None},
+                {"option_value": "b", "display_name": "b", "tooltip_text": None},
+            ],
+        },
     )
     assert response.status_code == 403
 
@@ -51,7 +67,15 @@ async def test_create_question_requires_employee(async_client, test_db_session):
 async def test_create_question_creates_row(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9002, employee_id=10)
 
-    payload = {"question_text": "How are you?", "question_type": "single_choice", "options": ["Good", "Bad"]}
+    payload = {
+        "question_key": "how_are_you",
+        "question_text": "How are you?",
+        "question_type": "single_choice",
+        "options": [
+            {"option_value": "Good", "display_name": "Good", "tooltip_text": None},
+            {"option_value": "Bad", "display_name": "Bad", "tooltip_text": None},
+        ],
+    }
     response = await async_client.post("/questionnaire/questions", headers=_auth_header(9002), json=payload)
     assert response.status_code == 201
 
@@ -60,7 +84,11 @@ async def test_create_question_creates_row(async_client, test_db_session):
     assert created is not None
     assert created.question_text == "How are you?"
     assert created.question_type == "single_choice"
-    assert created.options == ["Good", "Bad"]
+    from sqlalchemy import select
+    opts = await test_db_session.execute(
+        select(QuestionnaireOption).where(QuestionnaireOption.question_id == question_id)
+    )
+    assert [o.option_value for o in opts.scalars().all()] == ["Good", "Bad"]
     assert (created.status or "").lower() == "active"
 
 
@@ -70,8 +98,8 @@ async def test_list_questions_paginates_and_filters(async_client, test_db_sessio
 
     test_db_session.add_all(
         [
-            QuestionnaireDefinition(question_id=100, question_text="Q1", question_type="single_choice", options=["a"], status="active"),
-            QuestionnaireDefinition(question_id=101, question_text="Q2", question_type="text", options=None, status="inactive"),
+            QuestionnaireDefinition(question_id=100, question_key="q100", question_text="Q1", question_type="single_choice", category_id=None, status="active"),
+            QuestionnaireDefinition(question_id=101, question_key="q101", question_text="Q2", question_type="text", category_id=None, status="inactive"),
         ]
     )
     await test_db_session.commit()
@@ -96,7 +124,7 @@ async def test_get_question_returns_row(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9004, employee_id=12)
 
     test_db_session.add(
-        QuestionnaireDefinition(question_id=200, question_text="Q1", question_type="text", options=None, status="active")
+        QuestionnaireDefinition(question_id=200, question_key="q200", question_text="Q1", question_type="text", category_id=None, status="active")
     )
     await test_db_session.commit()
 
@@ -110,11 +138,19 @@ async def test_update_question_updates_fields(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9005, employee_id=13)
 
     test_db_session.add(
-        QuestionnaireDefinition(question_id=300, question_text="Old", question_type="text", options=None, status="active")
+        QuestionnaireDefinition(question_id=300, question_key="q300", question_text="Old", question_type="text", category_id=None, status="active")
     )
     await test_db_session.commit()
 
-    payload = {"question_text": "New text", "question_type": "single_choice", "options": ["x", "y"]}
+    payload = {
+        "question_key": "q300_new",
+        "question_text": "New text",
+        "question_type": "single_choice",
+        "options": [
+            {"option_value": "x", "display_name": "x", "tooltip_text": None},
+            {"option_value": "y", "display_name": "y", "tooltip_text": None},
+        ],
+    }
     response = await async_client.put("/questionnaire/questions/300", headers=_auth_header(9005), json=payload)
     assert response.status_code == 200
 
@@ -122,7 +158,11 @@ async def test_update_question_updates_fields(async_client, test_db_session):
     assert updated is not None
     assert updated.question_text == "New text"
     assert updated.question_type == "single_choice"
-    assert updated.options == ["x", "y"]
+    from sqlalchemy import select
+    opts = await test_db_session.execute(
+        select(QuestionnaireOption).where(QuestionnaireOption.question_id == 300)
+    )
+    assert [o.option_value for o in opts.scalars().all()] == ["x", "y"]
 
 
 @pytest.mark.asyncio
@@ -130,7 +170,7 @@ async def test_patch_question_status_sets_inactive(async_client, test_db_session
     await _seed_employee(test_db_session, user_id=9006, employee_id=14)
 
     test_db_session.add(
-        QuestionnaireDefinition(question_id=400, question_text="Q", question_type="text", options=None, status="active")
+        QuestionnaireDefinition(question_id=400, question_key="q400", question_text="Q", question_type="text", category_id=None, status="active")
     )
     await test_db_session.commit()
 

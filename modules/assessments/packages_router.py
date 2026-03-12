@@ -12,13 +12,13 @@ from common.responses import success_response
 from core.exceptions import AppError
 from db.session import get_db
 from modules.assessments.dependencies import (
-    get_assessment_package_questions_service,
+    get_assessment_package_categories_service,
     get_assessment_packages_service,
 )
-from modules.assessments.package_questions_service import AssessmentPackageQuestionsService
+from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
 from modules.assessments.schemas import (
+    AssessmentPackageCategoriesAddRequest,
     AssessmentPackageCreateRequest,
-    AssessmentPackageQuestionsAddRequest,
     AssessmentPackageUpdateRequest,
     AssessmentStatusUpdateRequest,
 )
@@ -165,31 +165,31 @@ async def update_assessment_package_status(
     return success_response({"package_id": updated.package_id, "status": updated.status})
 
 
-@router.get("/{package_id}/questions")
-async def list_package_questions(
+@router.get("/{package_id}/categories")
+async def list_package_categories(
     package_id: int,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
-    service: AssessmentPackageQuestionsService = Depends(get_assessment_package_questions_service),
+    service: AssessmentPackageCategoriesService = Depends(get_assessment_package_categories_service),
 ):
-    data = await service.list_questions_for_package(db, employee=employee, package_id=package_id)
+    data = await service.list_categories_for_package(db, employee=employee, package_id=package_id)
     return success_response(data)
 
 
-@router.post("/{package_id}/questions", status_code=201)
-async def add_questions_to_package(
+@router.post("/{package_id}/categories", status_code=201)
+async def add_categories_to_package(
     package_id: int,
-    payload: AssessmentPackageQuestionsAddRequest,
+    payload: AssessmentPackageCategoriesAddRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
-    service: AssessmentPackageQuestionsService = Depends(get_assessment_package_questions_service),
+    service: AssessmentPackageCategoriesService = Depends(get_assessment_package_categories_service),
 ):
-    data = await service.add_questions_to_package(
+    data = await service.add_categories_to_package(
         db,
         employee=employee,
         package_id=package_id,
-        question_ids=payload.question_ids,
+        category_ids=payload.category_ids,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
@@ -198,20 +198,20 @@ async def add_questions_to_package(
     return success_response(data)
 
 
-@router.delete("/{package_id}/questions/{question_id}")
-async def remove_question_from_package(
+@router.delete("/{package_id}/categories/{category_id}")
+async def remove_category_from_package(
     package_id: int,
-    question_id: int,
+    category_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
-    service: AssessmentPackageQuestionsService = Depends(get_assessment_package_questions_service),
+    service: AssessmentPackageCategoriesService = Depends(get_assessment_package_categories_service),
 ):
-    data = await service.remove_question_from_package(
+    data = await service.remove_category_from_package(
         db,
         employee=employee,
         package_id=package_id,
-        question_id=question_id,
+        category_id=category_id,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),

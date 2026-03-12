@@ -44,8 +44,8 @@ class AssessmentPackageUpdateRequest(BaseModel):
     display_name: str = Field(min_length=1, max_length=200)
 
 
-class AssessmentPackageQuestionsAddRequest(BaseModel):
-    question_ids: list[int] = Field(..., min_length=1)
+class AssessmentPackageCategoriesAddRequest(BaseModel):
+    category_ids: list[int] = Field(..., min_length=1)
 
 
 class AssessmentPackageListItem(BaseModel):

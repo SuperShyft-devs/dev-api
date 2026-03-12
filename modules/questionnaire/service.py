@@ -1,21 +1,18 @@
-"""Questionnaire service.
-
-These endpoints are employee-only.
-
-This module only manages question definitions.
-It does not score answers.
-"""
+"""Questionnaire service."""
 
 from __future__ import annotations
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
-from modules.questionnaire.models import QuestionnaireDefinition
+from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.questionnaire.schemas import (
+    QuestionnaireCategoryCreateRequest,
+    QuestionnaireCategoryUpdateRequest,
     QuestionnaireQuestionCreateRequest,
     QuestionnaireQuestionStatusUpdateRequest,
     QuestionnaireQuestionUpdateRequest,
@@ -23,28 +20,39 @@ from modules.questionnaire.schemas import (
 
 _ALLOWED_STATUS = {"active", "inactive", "archived"}
 _ALLOWED_STATUS_UPDATE = {"active", "inactive"}
+_CHOICE_TYPES = {"single_choice", "multiple_choice"}
 
 
 def _normalize(value: str | None) -> str:
     return (value or "").strip().lower()
 
 
-def _clean_options(options: list[str] | None) -> list[str] | None:
-    if options is None:
-        return None
+def _clean_options(options: list[dict[str, str | None]] | None) -> list[dict[str, str | None]]:
+    if not options:
+        return []
 
-    cleaned: list[str] = []
+    cleaned: list[dict[str, str | None]] = []
+    seen_values: set[str] = set()
     for option in options:
-        value = (option or "").strip()
-        if not value:
+        option_value = (option.get("option_value") or "").strip()
+        display_name = (option.get("display_name") or "").strip()
+        tooltip_text = (option.get("tooltip_text") or "").strip() or None
+        if not option_value or len(option_value) > 200 or len(display_name) > 200:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-        if len(value) > 200:
+        normalized = option_value.lower()
+        if normalized in seen_values:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-        cleaned.append(value)
+        seen_values.add(normalized)
+        cleaned.append(
+            {
+                "option_value": option_value,
+                "display_name": display_name,
+                "tooltip_text": tooltip_text,
+            }
+        )
 
-    if len(cleaned) > 100:
+    if len(cleaned) > 200:
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-
     return cleaned
 
 
@@ -61,6 +69,53 @@ class QuestionnaireService:
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
         return self._audit_service
+
+    async def _ensure_category_exists(self, db: AsyncSession, *, category_id: int) -> None:
+        row = await self._repository.get_category_by_id(db, category_id)
+        if row is None:
+            raise AppError(status_code=404, error_code="QUESTIONNAIRE_CATEGORY_NOT_FOUND", message="Category does not exist")
+
+    async def _get_or_create_default_category_id(self, db: AsyncSession) -> int:
+        row = await self._repository.get_category_by_key(db, category_key="general")
+        if row is None:
+            row = await self._repository.create_category(
+                db,
+                QuestionnaireCategory(category_key="general", display_name="General"),
+            )
+        return int(row.category_id)
+
+    async def _serialize_question(self, db: AsyncSession, row: QuestionnaireDefinition) -> dict:
+        options = await self._repository.list_options_for_question(db, question_id=row.question_id)
+        serialized_options = [
+            {
+                "option_value": opt.option_value,
+                "display_name": opt.display_name,
+                "tooltip_text": opt.tooltip_text,
+            }
+            for opt in options
+        ]
+        return {
+            "question_id": row.question_id,
+            "question_key": row.question_key,
+            "question_text": row.question_text,
+            "question_type": row.question_type,
+            "category_id": row.category_id,
+            "is_required": bool(row.is_required),
+            "is_read_only": bool(row.is_read_only),
+            "help_text": row.help_text,
+            "options": serialized_options if serialized_options else None,
+            "status": row.status,
+            "created_at": row.created_at,
+        }
+
+    async def serialize_question_definition(self, db: AsyncSession, row: QuestionnaireDefinition) -> dict:
+        return await self._serialize_question(db, row)
+
+    def _validate_options_by_type(self, *, question_type: str, options: list[dict[str, str | None]]) -> None:
+        if question_type in _CHOICE_TYPES and len(options) == 0:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        if question_type not in _CHOICE_TYPES and len(options) > 0:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
     async def create_question_definition(
         self,
@@ -82,19 +137,51 @@ class QuestionnaireService:
         if not question_type:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
+        question_key = payload.normalized_question_key()
+        if not question_key:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
         status_value = payload.normalized_status()
         if status_value not in _ALLOWED_STATUS:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
+        category_id = payload.category_id
+        if category_id is None:
+            category_id = await self._get_or_create_default_category_id(db)
+        await self._ensure_category_exists(db, category_id=category_id)
         options = _clean_options(payload.options)
+        self._validate_options_by_type(question_type=question_type, options=options)
+        existing = await self._repository.get_definition_by_key(db, question_key=question_key)
+        if existing is not None:
+            raise AppError(
+                status_code=409,
+                error_code="QUESTIONNAIRE_QUESTION_KEY_EXISTS",
+                message="Question key already exists",
+            )
 
         row = QuestionnaireDefinition(
+            question_key=question_key,
             question_text=question_text,
             question_type=question_type,
-            options=options,
+            category_id=category_id,
+            is_required=payload.is_required,
+            is_read_only=payload.is_read_only,
+            help_text=(payload.help_text or "").strip() or None,
             status=status_value,
         )
-        row = await self._repository.create_definition(db, row)
+        try:
+            row = await self._repository.create_definition(db, row)
+            await self._repository.replace_options_for_question(
+                db,
+                question_id=row.question_id,
+                options=options,
+            )
+        except IntegrityError as exc:
+            raise AppError(
+                status_code=409,
+                error_code="QUESTIONNAIRE_QUESTION_KEY_EXISTS",
+                message="Question key already exists",
+            ) from exc
 
         audit = self._require_audit_service()
         await audit.log_event(
@@ -185,11 +272,44 @@ class QuestionnaireService:
         if not question_type:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-        row.question_text = question_text
-        row.question_type = question_type
-        row.options = _clean_options(payload.options)
+        question_key = payload.normalized_question_key()
+        if not question_key:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        category_id = payload.category_id if payload.category_id is not None else row.category_id
+        if category_id is None:
+            category_id = await self._get_or_create_default_category_id(db)
+        await self._ensure_category_exists(db, category_id=category_id)
+        existing = await self._repository.get_definition_by_key(db, question_key=question_key)
+        if existing is not None and existing.question_id != row.question_id:
+            raise AppError(
+                status_code=409,
+                error_code="QUESTIONNAIRE_QUESTION_KEY_EXISTS",
+                message="Question key already exists",
+            )
 
-        row = await self._repository.update_definition(db, row)
+        row.question_text = question_text
+        row.question_key = question_key
+        row.question_type = question_type
+        row.category_id = category_id
+        row.is_required = payload.is_required
+        row.is_read_only = payload.is_read_only
+        row.help_text = (payload.help_text or "").strip() or None
+
+        cleaned_options = _clean_options(payload.options)
+        self._validate_options_by_type(question_type=question_type, options=cleaned_options)
+        try:
+            row = await self._repository.update_definition(db, row)
+            await self._repository.replace_options_for_question(
+                db,
+                question_id=row.question_id,
+                options=cleaned_options,
+            )
+        except IntegrityError as exc:
+            raise AppError(
+                status_code=409,
+                error_code="QUESTIONNAIRE_QUESTION_KEY_EXISTS",
+                message="Question key already exists",
+            ) from exc
 
         audit = self._require_audit_service()
         await audit.log_event(
@@ -203,6 +323,168 @@ class QuestionnaireService:
         )
 
         return row
+
+    async def create_category(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        payload: QuestionnaireCategoryCreateRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> QuestionnaireCategory:
+        self._ensure_employee_access(employee)
+        category_key = payload.normalized_category_key()
+        display_name = payload.normalized_display_name()
+        if not category_key or not display_name:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        existing = await self._repository.get_category_by_key(db, category_key=category_key)
+        if existing is not None:
+            raise AppError(status_code=409, error_code="QUESTIONNAIRE_CATEGORY_EXISTS", message="Category already exists")
+        row = QuestionnaireCategory(category_key=category_key, display_name=display_name)
+        row = await self._repository.create_category(db, row)
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_CREATE_QUESTIONNAIRE_CATEGORY",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return row
+
+    async def list_categories(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        page: int,
+        limit: int,
+    ) -> tuple[list[QuestionnaireCategory], int]:
+        self._ensure_employee_access(employee)
+        rows = await self._repository.list_categories(db, page=page, limit=limit)
+        total = await self._repository.count_categories(db)
+        return rows, total
+
+    async def get_category(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        category_id: int,
+    ) -> QuestionnaireCategory:
+        self._ensure_employee_access(employee)
+        row = await self._repository.get_category_by_id(db, category_id)
+        if row is None:
+            raise AppError(status_code=404, error_code="QUESTIONNAIRE_CATEGORY_NOT_FOUND", message="Category does not exist")
+        return row
+
+    async def update_category(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        category_id: int,
+        payload: QuestionnaireCategoryUpdateRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> QuestionnaireCategory:
+        self._ensure_employee_access(employee)
+        row = await self.get_category(db, employee=employee, category_id=category_id)
+        category_key = payload.normalized_category_key()
+        display_name = payload.normalized_display_name()
+        existing = await self._repository.get_category_by_key(db, category_key=category_key)
+        if existing is not None and existing.category_id != row.category_id:
+            raise AppError(status_code=409, error_code="QUESTIONNAIRE_CATEGORY_EXISTS", message="Category already exists")
+        row.category_key = category_key
+        row.display_name = display_name
+        row = await self._repository.update_category(db, row)
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_UPDATE_QUESTIONNAIRE_CATEGORY",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return row
+
+    async def list_category_questions(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        category_id: int,
+    ) -> list[dict]:
+        self._ensure_employee_access(employee)
+        await self._ensure_category_exists(db, category_id=category_id)
+        rows = await self._repository.list_questions_by_category(db, category_id=category_id)
+        return [await self._serialize_question(db, row) for row in rows]
+
+    async def assign_category_questions(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        category_id: int,
+        question_ids: list[int],
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+        await self._ensure_category_exists(db, category_id=category_id)
+        if not question_ids:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        normalized = [qid for qid in question_ids if isinstance(qid, int) and qid > 0]
+        if len(normalized) != len(question_ids):
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        await self._repository.assign_questions_to_category(db, category_id=category_id, question_ids=normalized)
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_ASSIGN_QUESTIONNAIRE_CATEGORY_QUESTIONS",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return {"category_id": category_id, "question_ids": normalized}
+
+    async def remove_category_question(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        category_id: int,
+        question_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+        await self._ensure_category_exists(db, category_id=category_id)
+        ok = await self._repository.remove_question_from_category(
+            db,
+            category_id=category_id,
+            question_id=question_id,
+        )
+        if not ok:
+            raise AppError(status_code=404, error_code="QUESTIONNAIRE_CATEGORY_QUESTION_NOT_FOUND", message="Question not mapped")
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_REMOVE_QUESTIONNAIRE_CATEGORY_QUESTION",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return {"category_id": category_id, "question_id": question_id}
 
     async def change_question_status(
         self,
@@ -276,13 +558,10 @@ class QuestionnaireService:
                 message="You do not have permission to perform this action"
             )
         
-        # Get package questions
-        package_questions = await assessments_repo.list_package_questions(
+        question_ids = await assessments_repo.list_question_ids_for_package(
             db,
-            package_id=instance.package_id
+            package_id=instance.package_id,
         )
-        
-        question_ids = [pq.question_id for pq in package_questions]
         
         if not question_ids:
             return {
@@ -313,11 +592,24 @@ class QuestionnaireService:
             if question is None:
                 continue
             
+            serialized_options = [
+                {
+                    "option_value": opt.option_value,
+                    "display_name": opt.display_name,
+                    "tooltip_text": opt.tooltip_text,
+                }
+                for opt in await self._repository.list_options_for_question(db, question_id=question.question_id)
+            ]
             questions_with_answers.append({
                 "question_id": question.question_id,
                 "question_text": question.question_text,
                 "question_type": question.question_type,
-                "options": question.options,
+                "question_key": question.question_key,
+                "category_id": question.category_id,
+                "is_required": bool(question.is_required),
+                "is_read_only": bool(question.is_read_only),
+                "help_text": question.help_text,
+                "options": serialized_options if serialized_options else None,
                 "answer": responses_map.get(question_id)
             })
         
@@ -377,12 +669,9 @@ class QuestionnaireService:
                 message="Assessment is already completed"
             )
         
-        # Get valid question IDs for this package
-        package_questions = await assessments_repo.list_package_questions(
-            db,
-            package_id=instance.package_id
+        valid_question_ids = set(
+            await assessments_repo.list_question_ids_for_package(db, package_id=instance.package_id)
         )
-        valid_question_ids = {pq.question_id for pq in package_questions}
         
         # Validate all question IDs and ensure they're active
         for response_item in responses:

@@ -5,7 +5,7 @@ This module owns the `questionnaire_definitions` table.
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, func, text
 from sqlalchemy.types import JSON
 
 from db.base import Base
@@ -17,11 +17,37 @@ class QuestionnaireDefinition(Base):
     __tablename__ = "questionnaire_definitions"
 
     question_id = Column(Integer, primary_key=True)
+    question_key = Column(String, nullable=False, unique=True)
     question_text = Column(Text, nullable=False)
     question_type = Column(String, nullable=False)
-    options = Column(JSON, nullable=True)
+    category_id = Column(Integer, ForeignKey("questionnaire_categories.category_id"), nullable=True)
+    is_required = Column(Boolean, nullable=False, server_default=text("false"))
+    is_read_only = Column(Boolean, nullable=False, server_default=text("false"))
+    help_text = Column(Text, nullable=True)
     status = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class QuestionnaireOption(Base):
+    """SQLAlchemy model for `questionnaire_options` table."""
+
+    __tablename__ = "questionnaire_options"
+
+    option_id = Column(Integer, primary_key=True)
+    question_id = Column(Integer, ForeignKey("questionnaire_definitions.question_id"), nullable=False)
+    option_value = Column(String, nullable=False)
+    display_name = Column(String, nullable=False)
+    tooltip_text = Column(Text, nullable=True)
+
+
+class QuestionnaireCategory(Base):
+    """SQLAlchemy model for `questionnaire_categories` table."""
+
+    __tablename__ = "questionnaire_categories"
+
+    category_id = Column(Integer, primary_key=True)
+    category_key = Column(String, nullable=False)
+    display_name = Column(String, nullable=False)
 
 
 class QuestionnaireResponse(Base):

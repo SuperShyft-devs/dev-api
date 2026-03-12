@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from core.config import settings
 from modules.assessments.models import AssessmentPackage
+from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireOption
 from modules.employee.models import Employee
 from modules.users.models import User
 
@@ -59,6 +60,35 @@ class SeedAssessmentPackage:
     package_code: str
     display_name: str
     status: str
+
+
+@dataclass(frozen=True)
+class SeedCategory:
+    category_id: int
+    category_key: str
+    display_name: str
+
+
+@dataclass(frozen=True)
+class SeedQuestion:
+    question_id: int
+    question_key: str
+    question_text: str
+    question_type: str
+    category_id: int
+    is_required: bool
+    is_read_only: bool
+    help_text: str | None
+    status: str
+
+
+@dataclass(frozen=True)
+class SeedOption:
+    option_id: int
+    question_id: int
+    option_value: str
+    display_name: str
+    tooltip_text: str | None
 
 
 DEFAULT_USERS: tuple[SeedUser, ...] = (
@@ -99,6 +129,26 @@ DEFAULT_ASSESSMENT_PACKAGES: tuple[SeedAssessmentPackage, ...] = (
         status="active",
     ),
 )
+
+DEFAULT_CATEGORIES: tuple[SeedCategory, ...] = (
+    SeedCategory(category_id=1, category_key="general", display_name="General"),
+)
+
+DEFAULT_QUESTIONS: tuple[SeedQuestion, ...] = (
+    SeedQuestion(
+        question_id=1,
+        question_key="energy_level_weekly",
+        question_text="How would you rate your energy levels this week?",
+        question_type="scale",
+        category_id=1,
+        is_required=True,
+        is_read_only=False,
+        help_text=None,
+        status="active",
+    ),
+)
+
+DEFAULT_OPTIONS: tuple[SeedOption, ...] = ()
 
 
 async def _upsert_users(session: AsyncSession, users: Iterable[SeedUser]) -> None:
@@ -179,6 +229,70 @@ async def _upsert_assessment_packages(
             existing.status = seed.status
 
 
+async def _upsert_categories(session: AsyncSession, categories: Iterable[SeedCategory]) -> None:
+    for seed in categories:
+        existing = await session.get(QuestionnaireCategory, seed.category_id)
+        if existing is None:
+            session.add(
+                QuestionnaireCategory(
+                    category_id=seed.category_id,
+                    category_key=seed.category_key,
+                    display_name=seed.display_name,
+                )
+            )
+        else:
+            existing.category_key = seed.category_key
+            existing.display_name = seed.display_name
+
+
+async def _upsert_questions(session: AsyncSession, questions: Iterable[SeedQuestion]) -> None:
+    for seed in questions:
+        existing = await session.get(QuestionnaireDefinition, seed.question_id)
+        if existing is None:
+            session.add(
+                QuestionnaireDefinition(
+                    question_id=seed.question_id,
+                    question_key=seed.question_key,
+                    question_text=seed.question_text,
+                    question_type=seed.question_type,
+                    category_id=seed.category_id,
+                    is_required=seed.is_required,
+                    is_read_only=seed.is_read_only,
+                    help_text=seed.help_text,
+                    status=seed.status,
+                )
+            )
+        else:
+            existing.question_key = seed.question_key
+            existing.question_text = seed.question_text
+            existing.question_type = seed.question_type
+            existing.category_id = seed.category_id
+            existing.is_required = seed.is_required
+            existing.is_read_only = seed.is_read_only
+            existing.help_text = seed.help_text
+            existing.status = seed.status
+
+
+async def _upsert_options(session: AsyncSession, options: Iterable[SeedOption]) -> None:
+    for seed in options:
+        existing = await session.get(QuestionnaireOption, seed.option_id)
+        if existing is None:
+            session.add(
+                QuestionnaireOption(
+                    option_id=seed.option_id,
+                    question_id=seed.question_id,
+                    option_value=seed.option_value,
+                    display_name=seed.display_name,
+                    tooltip_text=seed.tooltip_text,
+                )
+            )
+        else:
+            existing.question_id = seed.question_id
+            existing.option_value = seed.option_value
+            existing.display_name = seed.display_name
+            existing.tooltip_text = seed.tooltip_text
+
+
 async def _reset_sequences(session: AsyncSession) -> None:
     """Reset PostgreSQL sequences after manual ID insertion.
     
@@ -219,6 +333,35 @@ async def _reset_sequences(session: AsyncSession) -> None:
         """)
     )
 
+    # Reset questionnaire sequences
+    await session.execute(
+        text("""
+        SELECT setval(
+            pg_get_serial_sequence('questionnaire_categories', 'category_id'),
+            COALESCE((SELECT MAX(category_id) FROM questionnaire_categories), 1),
+            true
+        )
+        """)
+    )
+    await session.execute(
+        text("""
+        SELECT setval(
+            pg_get_serial_sequence('questionnaire_definitions', 'question_id'),
+            COALESCE((SELECT MAX(question_id) FROM questionnaire_definitions), 1),
+            true
+        )
+        """)
+    )
+    await session.execute(
+        text("""
+        SELECT setval(
+            pg_get_serial_sequence('questionnaire_options', 'option_id'),
+            COALESCE((SELECT MAX(option_id) FROM questionnaire_options), 1),
+            true
+        )
+        """)
+    )
+
 
 async def seed_reference_data(*, yes: bool) -> None:
     """Seed reference data.
@@ -248,6 +391,9 @@ async def seed_reference_data(*, yes: bool) -> None:
             await _upsert_users(session, DEFAULT_USERS)
             await _upsert_employees(session, DEFAULT_EMPLOYEES)
             await _upsert_assessment_packages(session, DEFAULT_ASSESSMENT_PACKAGES)
+            await _upsert_categories(session, DEFAULT_CATEGORIES)
+            await _upsert_questions(session, DEFAULT_QUESTIONS)
+            await _upsert_options(session, DEFAULT_OPTIONS)
             
             # CRITICAL: Reset sequences after manual ID insertion
             await _reset_sequences(session)

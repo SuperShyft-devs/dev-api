@@ -18,6 +18,9 @@ from modules.questionnaire.dependencies import (
     get_questionnaire_user_service,
 )
 from modules.questionnaire.schemas import (
+    QuestionnaireCategoryCreateRequest,
+    QuestionnaireCategoryQuestionsAssignRequest,
+    QuestionnaireCategoryUpdateRequest,
     QuestionnaireQuestionCreateRequest,
     QuestionnaireQuestionStatusUpdateRequest,
     QuestionnaireQuestionUpdateRequest,
@@ -27,7 +30,9 @@ from modules.questionnaire.service import QuestionnaireService
 from core.dependencies import get_current_user
 
 
-router = APIRouter(prefix="/questionnaire", tags=["questionnaire"])
+router = APIRouter(tags=["questionnaire"])
+management_router = APIRouter(prefix="/questionnaire", tags=["questionnaire"])
+user_router = APIRouter(prefix="/questionnaires", tags=["questionnaire"])
 
 
 def _client_ip(request: Request) -> str:
@@ -41,7 +46,7 @@ def _client_ip(request: Request) -> str:
     return request.client.host
 
 
-@router.post("/questions", status_code=201)
+@management_router.post("/questions", status_code=201)
 async def create_question_definition(
     payload: QuestionnaireQuestionCreateRequest,
     request: Request,
@@ -61,7 +66,7 @@ async def create_question_definition(
     return success_response({"question_id": created.question_id})
 
 
-@router.get("/questions")
+@management_router.get("/questions")
 async def list_questions(
     request: Request,
     page: int = 1,
@@ -84,23 +89,12 @@ async def list_questions(
         question_type=type,
     )
 
-    data = []
-    for row in rows:
-        data.append(
-            {
-                "question_id": row.question_id,
-                "question_text": row.question_text,
-                "question_type": row.question_type,
-                "options": row.options,
-                "status": row.status,
-                "created_at": row.created_at,
-            }
-        )
+    data = [await service.serialize_question_definition(db, row) for row in rows]
 
     return success_response(data, meta={"page": page, "limit": limit, "total": total})
 
 
-@router.get("/questions/{question_id}")
+@management_router.get("/questions/{question_id}")
 async def get_question(
     question_id: int,
     db: AsyncSession = Depends(get_db),
@@ -109,19 +103,10 @@ async def get_question(
 ):
     row = await service.get_question_definition(db, employee=employee, question_id=question_id)
 
-    return success_response(
-        {
-            "question_id": row.question_id,
-            "question_text": row.question_text,
-            "question_type": row.question_type,
-            "options": row.options,
-            "status": row.status,
-            "created_at": row.created_at,
-        }
-    )
+    return success_response(await service.serialize_question_definition(db, row))
 
 
-@router.put("/questions/{question_id}")
+@management_router.put("/questions/{question_id}")
 async def update_question(
     question_id: int,
     payload: QuestionnaireQuestionUpdateRequest,
@@ -143,7 +128,7 @@ async def update_question(
     return success_response({"question_id": updated.question_id})
 
 
-@router.patch("/questions/{question_id}/status")
+@management_router.patch("/questions/{question_id}/status")
 async def update_question_status(
     question_id: int,
     payload: QuestionnaireQuestionStatusUpdateRequest,
@@ -165,9 +150,147 @@ async def update_question_status(
     return success_response({"question_id": updated.question_id, "status": updated.status})
 
 
+# Category CRUD
+@management_router.post("/categories", status_code=201)
+async def create_category(
+    payload: QuestionnaireCategoryCreateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    row = await service.create_category(
+        db,
+        employee=employee,
+        payload=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response({"category_id": row.category_id})
+
+
+@management_router.get("/categories")
+async def list_categories(
+    page: int = 1,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    if page < 1 or limit < 1 or limit > 100:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+    rows, total = await service.list_categories(db, employee=employee, page=page, limit=limit)
+    data = [
+        {
+            "category_id": row.category_id,
+            "category_key": row.category_key,
+            "display_name": row.display_name,
+        }
+        for row in rows
+    ]
+    return success_response(data, meta={"page": page, "limit": limit, "total": total})
+
+
+@management_router.get("/categories/{category_id}")
+async def get_category(
+    category_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    row = await service.get_category(db, employee=employee, category_id=category_id)
+    return success_response(
+        {"category_id": row.category_id, "category_key": row.category_key, "display_name": row.display_name}
+    )
+
+
+@management_router.put("/categories/{category_id}")
+async def update_category(
+    category_id: int,
+    payload: QuestionnaireCategoryUpdateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    row = await service.update_category(
+        db,
+        employee=employee,
+        category_id=category_id,
+        payload=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response({"category_id": row.category_id})
+
+
+@management_router.get("/categories/{category_id}/questions")
+async def list_category_questions(
+    category_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    rows = await service.list_category_questions(
+        db,
+        employee=employee,
+        category_id=category_id,
+    )
+    return success_response(rows)
+
+
+@management_router.post("/categories/{category_id}/questions", status_code=201)
+async def assign_category_questions(
+    category_id: int,
+    payload: QuestionnaireCategoryQuestionsAssignRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    data = await service.assign_category_questions(
+        db,
+        employee=employee,
+        category_id=category_id,
+        question_ids=payload.question_ids,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@management_router.delete("/categories/{category_id}/questions/{question_id}")
+async def remove_category_question(
+    category_id: int,
+    question_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    data = await service.remove_category_question(
+        db,
+        employee=employee,
+        category_id=category_id,
+        question_id=question_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
 # User-facing endpoints for questionnaire responses
 
-@router.get("/{assessment_instance_id}")
+@user_router.get("/{assessment_instance_id}")
+@management_router.get("/{assessment_instance_id}")
 async def get_questionnaire(
     assessment_instance_id: int,
     request: Request,
@@ -188,7 +311,8 @@ async def get_questionnaire(
     return success_response(result)
 
 
-@router.put("/{assessment_instance_id}/responses")
+@user_router.put("/{assessment_instance_id}/responses")
+@management_router.put("/{assessment_instance_id}/responses")
 async def upsert_questionnaire_responses(
     assessment_instance_id: int,
     payload: QuestionnaireResponsesUpsertRequest,
@@ -223,7 +347,8 @@ async def upsert_questionnaire_responses(
     return success_response({"message": "Responses saved successfully"})
 
 
-@router.post("/{assessment_instance_id}/submit")
+@user_router.post("/{assessment_instance_id}/submit")
+@management_router.post("/{assessment_instance_id}/submit")
 async def submit_questionnaire(
     assessment_instance_id: int,
     request: Request,
@@ -248,3 +373,7 @@ async def submit_questionnaire(
     await db.commit()
     
     return success_response({"message": "Questionnaire submitted successfully"})
+
+
+router.include_router(management_router)
+router.include_router(user_router)

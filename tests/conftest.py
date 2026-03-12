@@ -74,7 +74,10 @@ async def _ensure_required_tables(connection) -> None:
 
     We drop everything first so schema changes apply immediately.
     """
-    await connection.run_sync(Base.metadata.drop_all)
+    await connection.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+    await connection.execute(text("CREATE SCHEMA public"))
+    await connection.execute(text("GRANT ALL ON SCHEMA public TO public"))
+    await connection.execute(text("GRANT ALL ON SCHEMA public TO CURRENT_USER"))
     await connection.run_sync(Base.metadata.create_all)
 
 
@@ -205,9 +208,11 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     await test_db_session.execute(text("DELETE FROM assessment_instances"))
     await test_db_session.execute(text("DELETE FROM onboarding_assistant_assignment"))
     await test_db_session.execute(text("DELETE FROM engagements"))
-    await test_db_session.execute(text("DELETE FROM assessment_package_questions"))
+    await test_db_session.execute(text("DELETE FROM assessment_package_categories"))
     await test_db_session.execute(text("DELETE FROM assessment_packages"))
+    await test_db_session.execute(text("DELETE FROM questionnaire_options"))
     await test_db_session.execute(text("DELETE FROM questionnaire_definitions"))
+    await test_db_session.execute(text("DELETE FROM questionnaire_categories"))
     await test_db_session.execute(text("DELETE FROM diagnostic_package"))
     await test_db_session.execute(text("DELETE FROM organizations"))
     await test_db_session.execute(text("DELETE FROM employee"))

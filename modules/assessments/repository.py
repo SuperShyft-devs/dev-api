@@ -8,50 +8,63 @@ from __future__ import annotations
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.assessments.models import AssessmentInstance, AssessmentPackage, AssessmentPackageQuestion
+from modules.assessments.models import AssessmentInstance, AssessmentPackage, AssessmentPackageCategory
+from modules.questionnaire.models import QuestionnaireDefinition
 
 
 class AssessmentsRepository:
     """Assessment database queries."""
 
-    async def list_package_questions(self, db: AsyncSession, *, package_id: int) -> list[AssessmentPackageQuestion]:
+    async def list_package_categories(self, db: AsyncSession, *, package_id: int) -> list[AssessmentPackageCategory]:
         result = await db.execute(
-            select(AssessmentPackageQuestion)
-            .where(AssessmentPackageQuestion.package_id == package_id)
-            .order_by(AssessmentPackageQuestion.id.asc())
+            select(AssessmentPackageCategory)
+            .where(AssessmentPackageCategory.package_id == package_id)
+            .order_by(AssessmentPackageCategory.id.asc())
         )
         return list(result.scalars().all())
 
-    async def get_package_question_link(
+    async def get_package_category_link(
         self,
         db: AsyncSession,
         *,
         package_id: int,
-        question_id: int,
-    ) -> AssessmentPackageQuestion | None:
+        category_id: int,
+    ) -> AssessmentPackageCategory | None:
         result = await db.execute(
-            select(AssessmentPackageQuestion)
-            .where(AssessmentPackageQuestion.package_id == package_id)
-            .where(AssessmentPackageQuestion.question_id == question_id)
+            select(AssessmentPackageCategory)
+            .where(AssessmentPackageCategory.package_id == package_id)
+            .where(AssessmentPackageCategory.category_id == category_id)
         )
         return result.scalar_one_or_none()
 
-    async def create_package_question_link(
+    async def create_package_category_link(
         self,
         db: AsyncSession,
-        link: AssessmentPackageQuestion,
-    ) -> AssessmentPackageQuestion:
+        link: AssessmentPackageCategory,
+    ) -> AssessmentPackageCategory:
         db.add(link)
         await db.flush()
         return link
 
-    async def delete_package_question_link(self, db: AsyncSession, *, package_id: int, question_id: int) -> int:
+    async def delete_package_category_link(self, db: AsyncSession, *, package_id: int, category_id: int) -> int:
         result = await db.execute(
-            delete(AssessmentPackageQuestion)
-            .where(AssessmentPackageQuestion.package_id == package_id)
-            .where(AssessmentPackageQuestion.question_id == question_id)
+            delete(AssessmentPackageCategory)
+            .where(AssessmentPackageCategory.package_id == package_id)
+            .where(AssessmentPackageCategory.category_id == category_id)
         )
         return int(result.rowcount or 0)
+
+    async def list_question_ids_for_package(self, db: AsyncSession, *, package_id: int) -> list[int]:
+        result = await db.execute(
+            select(QuestionnaireDefinition.question_id)
+            .join(
+                AssessmentPackageCategory,
+                AssessmentPackageCategory.category_id == QuestionnaireDefinition.category_id,
+            )
+            .where(AssessmentPackageCategory.package_id == package_id)
+            .order_by(QuestionnaireDefinition.question_id.asc())
+        )
+        return [int(v) for v in result.scalars().all()]
 
     async def get_instance_by_user_engagement_package(
         self,

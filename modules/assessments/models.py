@@ -35,11 +35,11 @@ class AssessmentInstance(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
 
-class AssessmentPackageQuestion(Base):
-    """SQLAlchemy model for `assessment_package_questions` table."""
+class AssessmentPackageCategory(Base):
+    """SQLAlchemy model for `assessment_package_categories` table."""
 
-    __tablename__ = "assessment_package_questions"
+    __tablename__ = "assessment_package_categories"
 
     id = Column(Integer, primary_key=True)
     package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=False)
-    question_id = Column(Integer, ForeignKey("questionnaire_definitions.question_id"), nullable=False)
+    category_id = Column(Integer, nullable=False)

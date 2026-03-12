@@ -8,9 +8,14 @@ import pytest
 
 from core.config import settings
 from core.security import create_jwt_token
-from modules.assessments.models import AssessmentInstance, AssessmentPackage, AssessmentPackageQuestion
+from modules.assessments.models import AssessmentInstance, AssessmentPackage, AssessmentPackageCategory
 from modules.engagements.models import Engagement
-from modules.questionnaire.models import QuestionnaireDefinition, QuestionnaireResponse
+from modules.questionnaire.models import (
+    QuestionnaireCategory,
+    QuestionnaireDefinition,
+    QuestionnaireOption,
+    QuestionnaireResponse,
+)
 from modules.users.models import User
 
 
@@ -168,30 +173,38 @@ async def test_get_questionnaire_returns_questions_without_answers(async_client,
 
     # Create package
     package = AssessmentPackage(package_id=1003, package_code="PKG003", display_name="Test Package", status="active")
+    category = QuestionnaireCategory(category_id=7003, category_key="cat_7003", display_name="Category 7003")
     test_db_session.add(package)
+    test_db_session.add(category)
     await test_db_session.commit()
     # Create questions
     q1 = QuestionnaireDefinition(
         question_id=3001,
+        question_key="q3001",
         question_text="What is your age?",
         question_type="number",
-        options=None,
+        category_id=7003,
         status="active",
     )
     q2 = QuestionnaireDefinition(
         question_id=3002,
+        question_key="q3002",
         question_text="Select your gender",
         question_type="single_choice",
-        options=["Male", "Female", "Other"],
+        category_id=7003,
         status="active",
     )
     test_db_session.add_all([q1, q2])
+    test_db_session.add_all(
+        [
+            QuestionnaireOption(question_id=3002, option_value="Male", display_name="Male", tooltip_text=None),
+            QuestionnaireOption(question_id=3002, option_value="Female", display_name="Female", tooltip_text=None),
+            QuestionnaireOption(question_id=3002, option_value="Other", display_name="Other", tooltip_text=None),
+        ]
+    )
     await test_db_session.commit()
     # Link questions to package
-    test_db_session.add_all([
-        AssessmentPackageQuestion(package_id=1003, question_id=3001),
-        AssessmentPackageQuestion(package_id=1003, question_id=3002),
-    ])
+    test_db_session.add(AssessmentPackageCategory(package_id=1003, category_id=7003))
 
     # Create assessment instance
     instance = AssessmentInstance(
@@ -223,7 +236,11 @@ async def test_get_questionnaire_returns_questions_without_answers(async_client,
     assert data["questions"][1]["question_id"] == 3002
     assert data["questions"][1]["question_text"] == "Select your gender"
     assert data["questions"][1]["question_type"] == "single_choice"
-    assert data["questions"][1]["options"] == ["Male", "Female", "Other"]
+    assert data["questions"][1]["options"] == [
+        {"option_value": "Male", "display_name": "Male", "tooltip_text": None},
+        {"option_value": "Female", "display_name": "Female", "tooltip_text": None},
+        {"option_value": "Other", "display_name": "Other", "tooltip_text": None},
+    ]
     assert data["questions"][1]["answer"] is None
 
 
@@ -235,21 +252,24 @@ async def test_get_questionnaire_returns_questions_with_existing_answers(async_c
 
     # Create package
     package = AssessmentPackage(package_id=1004, package_code="PKG004", display_name="Test Package", status="active")
+    category = QuestionnaireCategory(category_id=7004, category_key="cat_7004", display_name="Category 7004")
     test_db_session.add(package)
+    test_db_session.add(category)
     await test_db_session.commit()
     # Create questions
     q1 = QuestionnaireDefinition(
         question_id=3003,
+        question_key="q3003",
         question_text="What is your age?",
         question_type="number",
-        options=None,
+        category_id=7004,
         status="active",
     )
     test_db_session.add(q1)
     await test_db_session.commit()
 
     # Link question to package
-    test_db_session.add(AssessmentPackageQuestion(package_id=1004, question_id=3003))
+    test_db_session.add(AssessmentPackageCategory(package_id=1004, category_id=7004))
 
     # Create assessment instance
     instance = AssessmentInstance(
@@ -288,30 +308,31 @@ async def test_get_questionnaire_skips_inactive_questions(async_client, test_db_
 
     # Create package
     package = AssessmentPackage(package_id=1005, package_code="PKG005", display_name="Test Package", status="active")
+    category = QuestionnaireCategory(category_id=7005, category_key="cat_7005", display_name="Category 7005")
     test_db_session.add(package)
+    test_db_session.add(category)
 
     # Create questions (one active, one inactive)
     q1 = QuestionnaireDefinition(
         question_id=3004,
+        question_key="q3004",
         question_text="Active question",
         question_type="text",
-        options=None,
+        category_id=7005,
         status="active",
     )
     q2 = QuestionnaireDefinition(
         question_id=3005,
+        question_key="q3005",
         question_text="Inactive question",
         question_type="text",
-        options=None,
+        category_id=7005,
         status="inactive",
     )
     test_db_session.add_all([q1, q2])
     await test_db_session.commit()
     # Link both questions to package
-    test_db_session.add_all([
-        AssessmentPackageQuestion(package_id=1005, question_id=3004),
-        AssessmentPackageQuestion(package_id=1005, question_id=3005),
-    ])
+    test_db_session.add(AssessmentPackageCategory(package_id=1005, category_id=7005))
 
     # Create assessment instance
     instance = AssessmentInstance(
@@ -445,18 +466,21 @@ async def test_upsert_responses_returns_422_when_question_inactive(async_client,
     await _seed_user(test_db_session, user_id=5014)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1009, package_code="PKG009", display_name="Test Package", status="active")
+    category = QuestionnaireCategory(category_id=7009, category_key="cat_7009", display_name="Category 7009")
     test_db_session.add(package)
+    test_db_session.add(category)
     await test_db_session.commit()
     q1 = QuestionnaireDefinition(
         question_id=3006,
+        question_key="q3006",
         question_text="Inactive question",
         question_type="text",
-        options=None,
+        category_id=7009,
         status="inactive",
     )
     test_db_session.add(q1)
     await test_db_session.commit()
-    test_db_session.add(AssessmentPackageQuestion(package_id=1009, question_id=3006))
+    test_db_session.add(AssessmentPackageCategory(package_id=1009, category_id=7009))
 
     instance = AssessmentInstance(
         assessment_instance_id=2009,
@@ -480,28 +504,29 @@ async def test_upsert_responses_creates_new_responses(async_client, test_db_sess
     await _seed_user(test_db_session, user_id=5015)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1010, package_code="PKG010", display_name="Test Package", status="active")
+    category = QuestionnaireCategory(category_id=7010, category_key="cat_7010", display_name="Category 7010")
     test_db_session.add(package)
+    test_db_session.add(category)
     await test_db_session.commit()
     q1 = QuestionnaireDefinition(
         question_id=3007,
+        question_key="q3007",
         question_text="Question 1",
         question_type="text",
-        options=None,
+        category_id=7010,
         status="active",
     )
     q2 = QuestionnaireDefinition(
         question_id=3008,
+        question_key="q3008",
         question_text="Question 2",
         question_type="number",
-        options=None,
+        category_id=7010,
         status="active",
     )
     test_db_session.add_all([q1, q2])
     await test_db_session.commit()
-    test_db_session.add_all([
-        AssessmentPackageQuestion(package_id=1010, question_id=3007),
-        AssessmentPackageQuestion(package_id=1010, question_id=3008),
-    ])
+    test_db_session.add(AssessmentPackageCategory(package_id=1010, category_id=7010))
 
     instance = AssessmentInstance(
         assessment_instance_id=2010,
@@ -542,18 +567,21 @@ async def test_upsert_responses_updates_existing_responses(async_client, test_db
     await _seed_user(test_db_session, user_id=5016)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1011, package_code="PKG011", display_name="Test Package", status="active")
+    category = QuestionnaireCategory(category_id=7011, category_key="cat_7011", display_name="Category 7011")
     test_db_session.add(package)
+    test_db_session.add(category)
     await test_db_session.commit()
     q1 = QuestionnaireDefinition(
         question_id=3009,
+        question_key="q3009",
         question_text="Question 1",
         question_type="text",
-        options=None,
+        category_id=7011,
         status="active",
     )
     test_db_session.add(q1)
     await test_db_session.commit()
-    test_db_session.add(AssessmentPackageQuestion(package_id=1011, question_id=3009))
+    test_db_session.add(AssessmentPackageCategory(package_id=1011, category_id=7011))
 
     instance = AssessmentInstance(
         assessment_instance_id=2011,
@@ -685,18 +713,21 @@ async def test_submit_questionnaire_marks_assessment_completed(async_client, tes
     await _seed_user(test_db_session, user_id=5022)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1015, package_code="PKG015", display_name="Test Package", status="active")
+    category = QuestionnaireCategory(category_id=7015, category_key="cat_7015", display_name="Category 7015")
     test_db_session.add(package)
+    test_db_session.add(category)
     await test_db_session.commit()
     q1 = QuestionnaireDefinition(
         question_id=3010,
+        question_key="q3010",
         question_text="Question 1",
         question_type="text",
-        options=None,
+        category_id=7015,
         status="active",
     )
     test_db_session.add(q1)
     await test_db_session.commit()
-    test_db_session.add(AssessmentPackageQuestion(package_id=1015, question_id=3010))
+    test_db_session.add(AssessmentPackageCategory(package_id=1015, category_id=7015))
 
     instance = AssessmentInstance(
         assessment_instance_id=2015,

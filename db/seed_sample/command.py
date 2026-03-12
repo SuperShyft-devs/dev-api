@@ -15,12 +15,12 @@ from sqlalchemy import and_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from core.config import settings
-from modules.assessments.models import AssessmentPackage, AssessmentPackageQuestion
+from modules.assessments.models import AssessmentPackage, AssessmentPackageCategory
 from modules.diagnostics.models import DiagnosticPackage
 from modules.employee.models import Employee
 from modules.engagements.models import Engagement, EngagementTimeSlot, OnboardingAssistantAssignment
 from modules.organizations.models import Organization
-from modules.questionnaire.models import QuestionnaireDefinition
+from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireOption
 from modules.users.models import User
 
 
@@ -112,17 +112,37 @@ class SeedEngagement:
 @dataclass(frozen=True)
 class SeedQuestion:
     question_id: int
+    question_key: str
     question_text: str
     question_type: str
-    options: list[str] | None
+    category_id: int
+    is_required: bool
+    is_read_only: bool
+    help_text: str | None
     status: str
 
 
 @dataclass(frozen=True)
-class SeedPackageQuestion:
+class SeedQuestionOption:
+    option_id: int
+    question_id: int
+    option_value: str
+    display_name: str
+    tooltip_text: str | None
+
+
+@dataclass(frozen=True)
+class SeedCategory:
+    category_id: int
+    category_key: str
+    display_name: str
+
+
+@dataclass(frozen=True)
+class SeedPackageCategory:
     id: int
     package_id: int
-    question_id: int
+    category_id: int
 
 
 @dataclass(frozen=True)
@@ -189,19 +209,37 @@ SAMPLE_ENGAGEMENTS: tuple[SeedEngagement, ...] = (
     SeedEngagement(406, "Legacy Recall Camp", "METS-406", 304, "LEG-RECALL-2026", "b2b", 11, None, "Kolkata", 30, date(2025, 12, 1), date(2025, 12, 3), "archived", 0),
 )
 
-SAMPLE_QUESTIONS: tuple[SeedQuestion, ...] = (
-    SeedQuestion(501, "How would you rate your energy levels this week?", "scale", None, "active"),
-    SeedQuestion(502, "How many days did you exercise in the last 7 days?", "single_choice", ["0", "1-2", "3-4", "5+"], "active"),
-    SeedQuestion(503, "What health goals are most important to you?", "multiple_choice", ["Weight loss", "Better sleep", "Stress management", "Fitness"], "active"),
-    SeedQuestion(504, "Any health concerns you want to share?", "text", None, "inactive"),
+SAMPLE_CATEGORIES: tuple[SeedCategory, ...] = (
+    SeedCategory(701, "wellbeing", "Wellbeing"),
+    SeedCategory(702, "fitness", "Fitness"),
+    SeedCategory(703, "lifestyle", "Lifestyle"),
 )
 
-SAMPLE_PACKAGE_QUESTIONS: tuple[SeedPackageQuestion, ...] = (
-    SeedPackageQuestion(601, 11, 501),
-    SeedPackageQuestion(602, 11, 502),
-    SeedPackageQuestion(603, 12, 501),
-    SeedPackageQuestion(604, 12, 503),
-    SeedPackageQuestion(605, 13, 504),
+
+SAMPLE_QUESTIONS: tuple[SeedQuestion, ...] = (
+    SeedQuestion(501, "energy_level_weekly", "How would you rate your energy levels this week?", "scale", 701, True, False, "Use your weekly average", "active"),
+    SeedQuestion(502, "exercise_days_weekly", "How many days did you exercise in the last 7 days?", "single_choice", 702, True, False, None, "active"),
+    SeedQuestion(503, "health_goals", "What health goals are most important to you?", "multiple_choice", 703, False, False, None, "active"),
+    SeedQuestion(504, "health_concerns", "Any health concerns you want to share?", "text", 701, False, False, None, "inactive"),
+)
+
+SAMPLE_QUESTION_OPTIONS: tuple[SeedQuestionOption, ...] = (
+    SeedQuestionOption(801, 502, "0", "0", None),
+    SeedQuestionOption(802, 502, "1-2", "1-2", None),
+    SeedQuestionOption(803, 502, "3-4", "3-4", None),
+    SeedQuestionOption(804, 502, "5+", "5+", None),
+    SeedQuestionOption(805, 503, "Weight loss", "Weight loss", None),
+    SeedQuestionOption(806, 503, "Better sleep", "Better sleep", None),
+    SeedQuestionOption(807, 503, "Stress management", "Stress management", None),
+    SeedQuestionOption(808, 503, "Fitness", "Fitness", None),
+)
+
+SAMPLE_PACKAGE_CATEGORIES: tuple[SeedPackageCategory, ...] = (
+    SeedPackageCategory(601, 11, 701),
+    SeedPackageCategory(602, 11, 702),
+    SeedPackageCategory(603, 12, 701),
+    SeedPackageCategory(604, 12, 703),
+    SeedPackageCategory(605, 13, 701),
 )
 
 SAMPLE_ASSIGNMENTS: tuple[SeedOnboardingAssignment, ...] = (
@@ -331,29 +369,92 @@ async def _upsert_engagements(session: AsyncSession, engagements: Iterable[SeedE
         row.participant_count = seed.participant_count
 
 
-async def _upsert_questions(session: AsyncSession, questions: Iterable[SeedQuestion]) -> None:
+async def _upsert_categories(session: AsyncSession, categories: Iterable[SeedCategory]) -> None:
+    for seed in categories:
+        row = await session.get(QuestionnaireCategory, seed.category_id)
+        if row is None:
+            row = QuestionnaireCategory(category_id=seed.category_id)
+            session.add(row)
+        row.category_key = seed.category_key
+        row.display_name = seed.display_name
+
+
+async def _upsert_questions(
+    session: AsyncSession, questions: Iterable[SeedQuestion]
+) -> dict[int, int]:
+    id_map: dict[int, int] = {}
     for seed in questions:
         row = await session.get(QuestionnaireDefinition, seed.question_id)
         if row is None:
-            row = QuestionnaireDefinition(question_id=seed.question_id)
-            session.add(row)
+            with session.no_autoflush:
+                existing = await session.execute(
+                    select(QuestionnaireDefinition).where(
+                        QuestionnaireDefinition.question_key == seed.question_key
+                    )
+                )
+                row = existing.scalar_one_or_none()
+            if row is None:
+                row = QuestionnaireDefinition(question_id=seed.question_id)
+                session.add(row)
+        row.question_key = seed.question_key
         row.question_text = seed.question_text
         row.question_type = seed.question_type
-        row.options = seed.options
+        row.category_id = seed.category_id
+        row.is_required = seed.is_required
+        row.is_read_only = seed.is_read_only
+        row.help_text = seed.help_text
         row.status = seed.status
+        await session.flush()
+        id_map[seed.question_id] = int(row.question_id)
+    return id_map
 
 
-async def _upsert_package_questions(
-    session: AsyncSession, package_questions: Iterable[SeedPackageQuestion]
+async def _upsert_question_options(
+    session: AsyncSession,
+    question_options: Iterable[SeedQuestionOption],
+    question_id_map: dict[int, int],
 ) -> None:
-    for seed in package_questions:
-        row = await session.get(AssessmentPackageQuestion, seed.id)
+    for seed in question_options:
+        resolved_question_id = question_id_map.get(seed.question_id, seed.question_id)
+        row = await session.get(QuestionnaireOption, seed.option_id)
         if row is None:
             existing = await session.execute(
-                select(AssessmentPackageQuestion).where(
+                select(QuestionnaireOption).where(
                     and_(
-                        AssessmentPackageQuestion.package_id == seed.package_id,
-                        AssessmentPackageQuestion.question_id == seed.question_id,
+                        QuestionnaireOption.question_id == resolved_question_id,
+                        QuestionnaireOption.option_value == seed.option_value,
+                    )
+                )
+            )
+            row = existing.scalar_one_or_none()
+        if row is None:
+            session.add(
+                QuestionnaireOption(
+                    option_id=seed.option_id,
+                    question_id=resolved_question_id,
+                    option_value=seed.option_value,
+                    display_name=seed.display_name,
+                    tooltip_text=seed.tooltip_text,
+                )
+            )
+        else:
+            row.question_id = resolved_question_id
+            row.option_value = seed.option_value
+            row.display_name = seed.display_name
+            row.tooltip_text = seed.tooltip_text
+
+
+async def _upsert_package_categories(
+    session: AsyncSession, package_categories: Iterable[SeedPackageCategory]
+) -> None:
+    for seed in package_categories:
+        row = await session.get(AssessmentPackageCategory, seed.id)
+        if row is None:
+            existing = await session.execute(
+                select(AssessmentPackageCategory).where(
+                    and_(
+                        AssessmentPackageCategory.package_id == seed.package_id,
+                        AssessmentPackageCategory.category_id == seed.category_id,
                     )
                 )
             )
@@ -361,15 +462,15 @@ async def _upsert_package_questions(
 
         if row is None:
             session.add(
-                AssessmentPackageQuestion(
+                AssessmentPackageCategory(
                     id=seed.id,
                     package_id=seed.package_id,
-                    question_id=seed.question_id,
+                    category_id=seed.category_id,
                 )
             )
         else:
             row.package_id = seed.package_id
-            row.question_id = seed.question_id
+            row.category_id = seed.category_id
 
 
 async def _upsert_assignments(
@@ -406,8 +507,10 @@ async def _reset_sequences(session: AsyncSession) -> None:
         ("assessment_packages", "package_id"),
         ("diagnostic_package", "diagnostic_package_id"),
         ("engagements", "engagement_id"),
+        ("questionnaire_categories", "category_id"),
         ("questionnaire_definitions", "question_id"),
-        ("assessment_package_questions", "id"),
+        ("questionnaire_options", "option_id"),
+        ("assessment_package_categories", "id"),
         ("onboarding_assistant_assignment", "onboarding_assistant_id"),
         ("engagement_time_slots", "time_slot_id"),
     )
@@ -449,8 +552,10 @@ async def seed_sample_data(*, yes: bool) -> None:
             await _upsert_diagnostic_packages(session, SAMPLE_DIAGNOSTIC_PACKAGES)
             await _upsert_organizations(session, SAMPLE_ORGANIZATIONS)
             await _upsert_engagements(session, SAMPLE_ENGAGEMENTS)
-            await _upsert_questions(session, SAMPLE_QUESTIONS)
-            await _upsert_package_questions(session, SAMPLE_PACKAGE_QUESTIONS)
+            await _upsert_categories(session, SAMPLE_CATEGORIES)
+            question_id_map = await _upsert_questions(session, SAMPLE_QUESTIONS)
+            await _upsert_question_options(session, SAMPLE_QUESTION_OPTIONS, question_id_map)
+            await _upsert_package_categories(session, SAMPLE_PACKAGE_CATEGORIES)
             await _upsert_assignments(session, SAMPLE_ASSIGNMENTS)
             await _upsert_time_slots(session, SAMPLE_TIME_SLOTS)
             await _reset_sequences(session)
