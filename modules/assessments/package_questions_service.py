@@ -99,6 +99,52 @@ class AssessmentPackageCategoriesService:
             )
         return categories
 
+    async def list_categories_for_package_for_me(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        package_id: int,
+    ) -> list[dict]:
+        package_id = _normalize_int(package_id)
+
+        package = await self._repository.get_package_by_id(db, package_id=package_id)
+        if package is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_PACKAGE_NOT_FOUND", message="Package does not exist")
+
+        assessment_instance = await self._repository.get_latest_instance_for_user_package(
+            db,
+            user_id=user_id,
+            package_id=package_id,
+        )
+        if assessment_instance is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+
+        links = await self._repository.list_package_categories(db, package_id=package_id)
+        categories: list[dict] = []
+        for link in links:
+            category = await self._questionnaire_repository.get_category_by_id(db, link.category_id)
+            if category is None:
+                continue
+            progress = await self._repository.get_category_progress(
+                db,
+                assessment_instance_id=assessment_instance.assessment_instance_id,
+                category_id=category.category_id,
+            )
+            status = "incomplete"
+            if progress is not None and (progress.status or "").strip().lower() == "complete":
+                status = "complete"
+            categories.append(
+                {
+                    "id": link.id,
+                    "category_id": category.category_id,
+                    "category_key": category.category_key,
+                    "display_name": category.display_name,
+                    "status": status,
+                }
+            )
+        return categories
+
     async def add_categories_to_package(
         self,
         db: AsyncSession,

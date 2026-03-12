@@ -20,6 +20,7 @@ from modules.questionnaire.dependencies import (
 from modules.questionnaire.schemas import (
     QuestionnaireCategoryCreateRequest,
     QuestionnaireCategoryQuestionsAssignRequest,
+    QuestionnaireCategoryStatusUpdateRequest,
     QuestionnaireCategoryUpdateRequest,
     QuestionnaireQuestionCreateRequest,
     QuestionnaireQuestionStatusUpdateRequest,
@@ -187,6 +188,7 @@ async def list_categories(
             "category_id": row.category_id,
             "category_key": row.category_key,
             "display_name": row.display_name,
+            "status": row.status,
         }
         for row in rows
     ]
@@ -202,7 +204,12 @@ async def get_category(
 ):
     row = await service.get_category(db, employee=employee, category_id=category_id)
     return success_response(
-        {"category_id": row.category_id, "category_key": row.category_key, "display_name": row.display_name}
+        {
+            "category_id": row.category_id,
+            "category_key": row.category_key,
+            "display_name": row.display_name,
+            "status": row.status,
+        }
     )
 
 
@@ -226,6 +233,28 @@ async def update_category(
     )
     await db.commit()
     return success_response({"category_id": row.category_id})
+
+
+@management_router.patch("/categories/{category_id}/status")
+async def update_category_status(
+    category_id: int,
+    payload: QuestionnaireCategoryStatusUpdateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    row = await service.change_category_status(
+        db,
+        employee=employee,
+        category_id=category_id,
+        payload=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response({"category_id": row.category_id, "status": row.status})
 
 
 @management_router.get("/categories/{category_id}/questions")

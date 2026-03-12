@@ -15,7 +15,6 @@ class QuestionnaireQuestionCreateRequest(BaseModel):
     question_key: str = Field(..., min_length=1, max_length=100)
     question_text: str = Field(..., min_length=1, max_length=2000)
     question_type: str = Field(..., min_length=1, max_length=50)
-    category_id: int | None = None
     is_required: bool = False
     is_read_only: bool = False
     help_text: Optional[str] = Field(default=None, max_length=2000)
@@ -39,7 +38,6 @@ class QuestionnaireQuestionUpdateRequest(BaseModel):
     question_key: str = Field(..., min_length=1, max_length=100)
     question_text: str = Field(..., min_length=1, max_length=2000)
     question_type: str = Field(..., min_length=1, max_length=50)
-    category_id: int | None = None
     is_required: bool = False
     is_read_only: bool = False
     help_text: Optional[str] = Field(default=None, max_length=2000)
@@ -67,7 +65,6 @@ class QuestionnaireQuestionResponse(BaseModel):
     question_key: str | None
     question_text: str
     question_type: str
-    category_id: int | None
     is_required: bool
     is_read_only: bool
     help_text: str | None
@@ -134,6 +131,13 @@ class QuestionnaireCategoryUpdateRequest(BaseModel):
 
     def normalized_display_name(self) -> str:
         return _strip(self.display_name)
+
+
+class QuestionnaireCategoryStatusUpdateRequest(BaseModel):
+    status: str = Field(..., min_length=1, max_length=20)
+
+    def normalized_status(self) -> str:
+        return _strip(self.status).lower()
 
 
 class QuestionnaireCategoryQuestionsAssignRequest(BaseModel):

@@ -8,8 +8,13 @@ from __future__ import annotations
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.assessments.models import AssessmentInstance, AssessmentPackage, AssessmentPackageCategory
-from modules.questionnaire.models import QuestionnaireDefinition
+from modules.assessments.models import (
+    AssessmentCategoryProgress,
+    AssessmentInstance,
+    AssessmentPackage,
+    AssessmentPackageCategory,
+)
+from modules.questionnaire.models import QuestionnaireCategoryQuestion
 
 
 class AssessmentsRepository:
@@ -56,13 +61,13 @@ class AssessmentsRepository:
 
     async def list_question_ids_for_package(self, db: AsyncSession, *, package_id: int) -> list[int]:
         result = await db.execute(
-            select(QuestionnaireDefinition.question_id)
+            select(QuestionnaireCategoryQuestion.question_id).distinct()
             .join(
                 AssessmentPackageCategory,
-                AssessmentPackageCategory.category_id == QuestionnaireDefinition.category_id,
+                AssessmentPackageCategory.category_id == QuestionnaireCategoryQuestion.category_id,
             )
             .where(AssessmentPackageCategory.package_id == package_id)
-            .order_by(QuestionnaireDefinition.question_id.asc())
+            .order_by(QuestionnaireCategoryQuestion.question_id.asc())
         )
         return [int(v) for v in result.scalars().all()]
 
@@ -81,6 +86,22 @@ class AssessmentsRepository:
             .where(AssessmentInstance.package_id == package_id)
         )
         result = await db.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_latest_instance_for_user_package(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        package_id: int,
+    ) -> AssessmentInstance | None:
+        result = await db.execute(
+            select(AssessmentInstance)
+            .where(AssessmentInstance.user_id == user_id)
+            .where(AssessmentInstance.package_id == package_id)
+            .order_by(AssessmentInstance.assessment_instance_id.desc())
+            .limit(1)
+        )
         return result.scalar_one_or_none()
 
     async def create_instance(self, db: AsyncSession, instance: AssessmentInstance) -> AssessmentInstance:
@@ -206,3 +227,35 @@ class AssessmentsRepository:
         db.add(instance)
         await db.flush()
         return instance
+
+    async def get_category_progress(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        category_id: int,
+    ) -> AssessmentCategoryProgress | None:
+        result = await db.execute(
+            select(AssessmentCategoryProgress)
+            .where(AssessmentCategoryProgress.assessment_instance_id == assessment_instance_id)
+            .where(AssessmentCategoryProgress.category_id == category_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def create_category_progress(
+        self,
+        db: AsyncSession,
+        row: AssessmentCategoryProgress,
+    ) -> AssessmentCategoryProgress:
+        db.add(row)
+        await db.flush()
+        return row
+
+    async def update_category_progress(
+        self,
+        db: AsyncSession,
+        row: AssessmentCategoryProgress,
+    ) -> AssessmentCategoryProgress:
+        db.add(row)
+        await db.flush()
+        return row

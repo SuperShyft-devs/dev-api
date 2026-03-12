@@ -98,8 +98,8 @@ async def test_list_questions_paginates_and_filters(async_client, test_db_sessio
 
     test_db_session.add_all(
         [
-            QuestionnaireDefinition(question_id=100, question_key="q100", question_text="Q1", question_type="single_choice", category_id=None, status="active"),
-            QuestionnaireDefinition(question_id=101, question_key="q101", question_text="Q2", question_type="text", category_id=None, status="inactive"),
+            QuestionnaireDefinition(question_id=100, question_key="q100", question_text="Q1", question_type="single_choice", status="active"),
+            QuestionnaireDefinition(question_id=101, question_key="q101", question_text="Q2", question_type="text", status="inactive"),
         ]
     )
     await test_db_session.commit()
@@ -124,7 +124,7 @@ async def test_get_question_returns_row(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9004, employee_id=12)
 
     test_db_session.add(
-        QuestionnaireDefinition(question_id=200, question_key="q200", question_text="Q1", question_type="text", category_id=None, status="active")
+        QuestionnaireDefinition(question_id=200, question_key="q200", question_text="Q1", question_type="text", status="active")
     )
     await test_db_session.commit()
 
@@ -138,7 +138,7 @@ async def test_update_question_updates_fields(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9005, employee_id=13)
 
     test_db_session.add(
-        QuestionnaireDefinition(question_id=300, question_key="q300", question_text="Old", question_type="text", category_id=None, status="active")
+        QuestionnaireDefinition(question_id=300, question_key="q300", question_text="Old", question_type="text", status="active")
     )
     await test_db_session.commit()
 
@@ -170,7 +170,7 @@ async def test_patch_question_status_sets_inactive(async_client, test_db_session
     await _seed_employee(test_db_session, user_id=9006, employee_id=14)
 
     test_db_session.add(
-        QuestionnaireDefinition(question_id=400, question_key="q400", question_text="Q", question_type="text", category_id=None, status="active")
+        QuestionnaireDefinition(question_id=400, question_key="q400", question_text="Q", question_type="text", status="active")
     )
     await test_db_session.commit()
 

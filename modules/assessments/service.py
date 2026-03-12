@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
-from modules.assessments.models import AssessmentInstance
+from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance
 from modules.assessments.repository import AssessmentsRepository
 
 
@@ -65,6 +65,24 @@ class AssessmentsService:
             completed_at=None,
         )
         instance = await self._repository.create_instance(db, instance)
+        package_categories = await self._repository.list_package_categories(db, package_id=package_id)
+        for link in package_categories:
+            existing_progress = await self._repository.get_category_progress(
+                db,
+                assessment_instance_id=instance.assessment_instance_id,
+                category_id=link.category_id,
+            )
+            if existing_progress is not None:
+                continue
+            await self._repository.create_category_progress(
+                db,
+                AssessmentCategoryProgress(
+                    assessment_instance_id=instance.assessment_instance_id,
+                    category_id=link.category_id,
+                    status="incomplete",
+                    completed_at=None,
+                ),
+            )
 
         audit = self._require_audit_service()
         await audit.log_event(

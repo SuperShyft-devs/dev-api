@@ -12,6 +12,7 @@ from modules.assessments.models import AssessmentInstance, AssessmentPackage, As
 from modules.engagements.models import Engagement
 from modules.questionnaire.models import (
     QuestionnaireCategory,
+    QuestionnaireCategoryQuestion,
     QuestionnaireDefinition,
     QuestionnaireOption,
     QuestionnaireResponse,
@@ -27,6 +28,16 @@ def _auth_header(user_id: int) -> dict[str, str]:
 async def _seed_user(test_db_session, *, user_id: int):
     test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000000", status="active"))
     await test_db_session.commit()
+
+
+async def _map_question_to_category(test_db_session, *, mapping_id: int, category_id: int, question_id: int):
+    test_db_session.add(
+        QuestionnaireCategoryQuestion(
+            id=mapping_id,
+            category_id=category_id,
+            question_id=question_id,
+        )
+    )
 
 
 async def _ensure_test_engagement(test_db_session, *, engagement_id: int = 1):
@@ -99,7 +110,9 @@ async def test_list_category_questions_requires_auth(async_client):
 @pytest.mark.asyncio
 async def test_list_category_questions_allows_user_and_returns_only_active(async_client, test_db_session):
     await _seed_user(test_db_session, user_id=5098)
-    test_db_session.add(QuestionnaireCategory(category_id=7998, category_key="cat_7998", display_name="Category 7998"))
+    test_db_session.add(
+        QuestionnaireCategory(category_id=7998, category_key="cat_7998", display_name="Category 7998", status="active")
+    )
     test_db_session.add_all(
         [
             QuestionnaireDefinition(
@@ -107,7 +120,6 @@ async def test_list_category_questions_allows_user_and_returns_only_active(async
                 question_key="q8991",
                 question_text="Active question",
                 question_type="text",
-                category_id=7998,
                 status="active",
             ),
             QuestionnaireDefinition(
@@ -115,11 +127,13 @@ async def test_list_category_questions_allows_user_and_returns_only_active(async
                 question_key="q8992",
                 question_text="Inactive question",
                 question_type="text",
-                category_id=7998,
                 status="inactive",
             ),
         ]
     )
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9901, category_id=7998, question_id=8991)
+    await _map_question_to_category(test_db_session, mapping_id=9902, category_id=7998, question_id=8992)
     await test_db_session.commit()
 
     response = await async_client.get("/questionnaire/categories/7998/questions", headers=_auth_header(5098))
@@ -173,8 +187,9 @@ async def test_get_questionnaire_returns_404_when_category_not_mapped_for_user(a
     test_db_session.add(instance)
     await test_db_session.commit()
 
-    category = QuestionnaireCategory(category_id=7001, category_key="cat_7001", display_name="Category 7001")
+    category = QuestionnaireCategory(category_id=7001, category_key="cat_7001", display_name="Category 7001", status="active")
     test_db_session.add(category)
+    await test_db_session.commit()
     test_db_session.add(AssessmentPackageCategory(package_id=1001, category_id=7001))
     await test_db_session.commit()
 
@@ -191,7 +206,7 @@ async def test_get_questionnaire_returns_empty_questions_when_no_package_questio
     await _ensure_test_engagement(test_db_session)
 
     package = AssessmentPackage(package_id=1002, package_code="PKG002", display_name="Empty Package", status="active")
-    category = QuestionnaireCategory(category_id=7002, category_key="cat_7002", display_name="Category 7002")
+    category = QuestionnaireCategory(category_id=7002, category_key="cat_7002", display_name="Category 7002", status="active")
     test_db_session.add(package)
     test_db_session.add(category)
     await test_db_session.commit()
@@ -224,7 +239,7 @@ async def test_get_questionnaire_returns_questions_without_answers(async_client,
 
     # Create package
     package = AssessmentPackage(package_id=1003, package_code="PKG003", display_name="Test Package", status="active")
-    category = QuestionnaireCategory(category_id=7003, category_key="cat_7003", display_name="Category 7003")
+    category = QuestionnaireCategory(category_id=7003, category_key="cat_7003", display_name="Category 7003", status="active")
     test_db_session.add(package)
     test_db_session.add(category)
     await test_db_session.commit()
@@ -234,7 +249,6 @@ async def test_get_questionnaire_returns_questions_without_answers(async_client,
         question_key="q3001",
         question_text="What is your age?",
         question_type="number",
-        category_id=7003,
         status="active",
     )
     q2 = QuestionnaireDefinition(
@@ -242,7 +256,6 @@ async def test_get_questionnaire_returns_questions_without_answers(async_client,
         question_key="q3002",
         question_text="Select your gender",
         question_type="single_choice",
-        category_id=7003,
         status="active",
     )
     test_db_session.add_all([q1, q2])
@@ -253,6 +266,9 @@ async def test_get_questionnaire_returns_questions_without_answers(async_client,
             QuestionnaireOption(question_id=3002, option_value="Other", display_name="Other", tooltip_text=None),
         ]
     )
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9903, category_id=7003, question_id=3001)
+    await _map_question_to_category(test_db_session, mapping_id=9904, category_id=7003, question_id=3002)
     await test_db_session.commit()
     # Link questions to package
     test_db_session.add(AssessmentPackageCategory(package_id=1003, category_id=7003))
@@ -303,7 +319,7 @@ async def test_get_questionnaire_returns_questions_with_existing_answers(async_c
 
     # Create package
     package = AssessmentPackage(package_id=1004, package_code="PKG004", display_name="Test Package", status="active")
-    category = QuestionnaireCategory(category_id=7004, category_key="cat_7004", display_name="Category 7004")
+    category = QuestionnaireCategory(category_id=7004, category_key="cat_7004", display_name="Category 7004", status="active")
     test_db_session.add(package)
     test_db_session.add(category)
     await test_db_session.commit()
@@ -313,10 +329,11 @@ async def test_get_questionnaire_returns_questions_with_existing_answers(async_c
         question_key="q3003",
         question_text="What is your age?",
         question_type="number",
-        category_id=7004,
         status="active",
     )
     test_db_session.add(q1)
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9905, category_id=7004, question_id=3003)
     await test_db_session.commit()
 
     # Link question to package
@@ -336,6 +353,7 @@ async def test_get_questionnaire_returns_questions_with_existing_answers(async_c
     response_row = QuestionnaireResponse(
         assessment_instance_id=2004,
         question_id=3003,
+        category_id=7004,
         answer=25,
         submitted_at=None,
     )
@@ -359,7 +377,7 @@ async def test_get_questionnaire_skips_inactive_questions(async_client, test_db_
 
     # Create package
     package = AssessmentPackage(package_id=1005, package_code="PKG005", display_name="Test Package", status="active")
-    category = QuestionnaireCategory(category_id=7005, category_key="cat_7005", display_name="Category 7005")
+    category = QuestionnaireCategory(category_id=7005, category_key="cat_7005", display_name="Category 7005", status="active")
     test_db_session.add(package)
     test_db_session.add(category)
 
@@ -369,7 +387,6 @@ async def test_get_questionnaire_skips_inactive_questions(async_client, test_db_
         question_key="q3004",
         question_text="Active question",
         question_type="text",
-        category_id=7005,
         status="active",
     )
     q2 = QuestionnaireDefinition(
@@ -377,10 +394,12 @@ async def test_get_questionnaire_skips_inactive_questions(async_client, test_db_
         question_key="q3005",
         question_text="Inactive question",
         question_type="text",
-        category_id=7005,
         status="inactive",
     )
     test_db_session.add_all([q1, q2])
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9906, category_id=7005, question_id=3004)
+    await _map_question_to_category(test_db_session, mapping_id=9907, category_id=7005, question_id=3005)
     await test_db_session.commit()
     # Link both questions to package
     test_db_session.add(AssessmentPackageCategory(package_id=1005, category_id=7005))
@@ -445,7 +464,7 @@ async def test_upsert_responses_returns_404_when_category_not_mapped_for_user(as
     await _seed_user(test_db_session, user_id=5011)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1006, package_code="PKG006", display_name="Test Package", status="active")
-    category = QuestionnaireCategory(category_id=7006, category_key="cat_7006", display_name="Category 7006")
+    category = QuestionnaireCategory(category_id=7006, category_key="cat_7006", display_name="Category 7006", status="active")
     test_db_session.add(package)
     test_db_session.add(category)
     await test_db_session.commit()
@@ -471,7 +490,7 @@ async def test_upsert_responses_returns_422_when_assessment_completed(async_clie
     await _seed_user(test_db_session, user_id=5012)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1007, package_code="PKG007", display_name="Test Package", status="active")
-    category = QuestionnaireCategory(category_id=7007, category_key="cat_7007", display_name="Category 7007")
+    category = QuestionnaireCategory(category_id=7007, category_key="cat_7007", display_name="Category 7007", status="active")
     test_db_session.add(package)
     test_db_session.add(category)
     await test_db_session.commit()
@@ -498,7 +517,7 @@ async def test_upsert_responses_returns_422_when_question_not_in_package(async_c
     await _seed_user(test_db_session, user_id=5013)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1008, package_code="PKG008", display_name="Test Package", status="active")
-    category = QuestionnaireCategory(category_id=7008, category_key="cat_7008", display_name="Category 7008")
+    category = QuestionnaireCategory(category_id=7008, category_key="cat_7008", display_name="Category 7008", status="active")
     test_db_session.add(package)
     test_db_session.add(category)
     await test_db_session.commit()
@@ -526,7 +545,7 @@ async def test_upsert_responses_returns_422_when_question_inactive(async_client,
     await _seed_user(test_db_session, user_id=5014)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1009, package_code="PKG009", display_name="Test Package", status="active")
-    category = QuestionnaireCategory(category_id=7009, category_key="cat_7009", display_name="Category 7009")
+    category = QuestionnaireCategory(category_id=7009, category_key="cat_7009", display_name="Category 7009", status="active")
     test_db_session.add(package)
     test_db_session.add(category)
     await test_db_session.commit()
@@ -535,10 +554,11 @@ async def test_upsert_responses_returns_422_when_question_inactive(async_client,
         question_key="q3006",
         question_text="Inactive question",
         question_type="text",
-        category_id=7009,
         status="inactive",
     )
     test_db_session.add(q1)
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9908, category_id=7009, question_id=3006)
     await test_db_session.commit()
     test_db_session.add(AssessmentPackageCategory(package_id=1009, category_id=7009))
 
@@ -564,7 +584,7 @@ async def test_upsert_responses_creates_new_responses(async_client, test_db_sess
     await _seed_user(test_db_session, user_id=5015)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1010, package_code="PKG010", display_name="Test Package", status="active")
-    category = QuestionnaireCategory(category_id=7010, category_key="cat_7010", display_name="Category 7010")
+    category = QuestionnaireCategory(category_id=7010, category_key="cat_7010", display_name="Category 7010", status="active")
     test_db_session.add(package)
     test_db_session.add(category)
     await test_db_session.commit()
@@ -573,7 +593,6 @@ async def test_upsert_responses_creates_new_responses(async_client, test_db_sess
         question_key="q3007",
         question_text="Question 1",
         question_type="text",
-        category_id=7010,
         status="active",
     )
     q2 = QuestionnaireDefinition(
@@ -581,10 +600,12 @@ async def test_upsert_responses_creates_new_responses(async_client, test_db_sess
         question_key="q3008",
         question_text="Question 2",
         question_type="number",
-        category_id=7010,
         status="active",
     )
     test_db_session.add_all([q1, q2])
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9909, category_id=7010, question_id=3007)
+    await _map_question_to_category(test_db_session, mapping_id=9910, category_id=7010, question_id=3008)
     await test_db_session.commit()
     test_db_session.add(AssessmentPackageCategory(package_id=1010, category_id=7010))
 
@@ -627,7 +648,7 @@ async def test_upsert_responses_updates_existing_responses(async_client, test_db
     await _seed_user(test_db_session, user_id=5016)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1011, package_code="PKG011", display_name="Test Package", status="active")
-    category = QuestionnaireCategory(category_id=7011, category_key="cat_7011", display_name="Category 7011")
+    category = QuestionnaireCategory(category_id=7011, category_key="cat_7011", display_name="Category 7011", status="active")
     test_db_session.add(package)
     test_db_session.add(category)
     await test_db_session.commit()
@@ -636,10 +657,11 @@ async def test_upsert_responses_updates_existing_responses(async_client, test_db
         question_key="q3009",
         question_text="Question 1",
         question_type="text",
-        category_id=7011,
         status="active",
     )
     test_db_session.add(q1)
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9911, category_id=7011, question_id=3009)
     await test_db_session.commit()
     test_db_session.add(AssessmentPackageCategory(package_id=1011, category_id=7011))
 
@@ -656,6 +678,7 @@ async def test_upsert_responses_updates_existing_responses(async_client, test_db
     existing_response = QuestionnaireResponse(
         assessment_instance_id=2011,
         question_id=3009,
+        category_id=7011,
         answer="Old answer",
         submitted_at=None,
     )
@@ -773,7 +796,7 @@ async def test_submit_questionnaire_marks_assessment_completed(async_client, tes
     await _seed_user(test_db_session, user_id=5022)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1015, package_code="PKG015", display_name="Test Package", status="active")
-    category = QuestionnaireCategory(category_id=7015, category_key="cat_7015", display_name="Category 7015")
+    category = QuestionnaireCategory(category_id=7015, category_key="cat_7015", display_name="Category 7015", status="active")
     test_db_session.add(package)
     test_db_session.add(category)
     await test_db_session.commit()
@@ -782,10 +805,11 @@ async def test_submit_questionnaire_marks_assessment_completed(async_client, tes
         question_key="q3010",
         question_text="Question 1",
         question_type="text",
-        category_id=7015,
         status="active",
     )
     test_db_session.add(q1)
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9912, category_id=7015, question_id=3010)
     await test_db_session.commit()
     test_db_session.add(AssessmentPackageCategory(package_id=1015, category_id=7015))
 
@@ -802,6 +826,7 @@ async def test_submit_questionnaire_marks_assessment_completed(async_client, tes
     response_row = QuestionnaireResponse(
         assessment_instance_id=2015,
         question_id=3010,
+        category_id=7015,
         answer="My answer",
         submitted_at=None,
     )

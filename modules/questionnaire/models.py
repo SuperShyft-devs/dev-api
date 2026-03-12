@@ -20,7 +20,6 @@ class QuestionnaireDefinition(Base):
     question_key = Column(String, nullable=False, unique=True)
     question_text = Column(Text, nullable=False)
     question_type = Column(String, nullable=False)
-    category_id = Column(Integer, ForeignKey("questionnaire_categories.category_id"), nullable=True)
     is_required = Column(Boolean, nullable=False, server_default=text("false"))
     is_read_only = Column(Boolean, nullable=False, server_default=text("false"))
     help_text = Column(Text, nullable=True)
@@ -48,6 +47,17 @@ class QuestionnaireCategory(Base):
     category_id = Column(Integer, primary_key=True)
     category_key = Column(String, nullable=False)
     display_name = Column(String, nullable=False)
+    status = Column(String, nullable=False, server_default=text("'active'"))
+
+
+class QuestionnaireCategoryQuestion(Base):
+    """SQLAlchemy model for `questionnaire_category_questions` table."""
+
+    __tablename__ = "questionnaire_category_questions"
+
+    id = Column(Integer, primary_key=True)
+    category_id = Column(Integer, ForeignKey("questionnaire_categories.category_id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("questionnaire_definitions.question_id"), nullable=False)
 
 
 class QuestionnaireResponse(Base):
@@ -64,6 +74,11 @@ class QuestionnaireResponse(Base):
     question_id = Column(
         Integer,
         ForeignKey("questionnaire_definitions.question_id"),
+        nullable=False,
+    )
+    category_id = Column(
+        Integer,
+        ForeignKey("questionnaire_categories.category_id"),
         nullable=False,
     )
     answer = Column(JSON)

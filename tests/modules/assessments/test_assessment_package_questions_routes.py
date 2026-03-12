@@ -8,8 +8,14 @@ import pytest
 
 from core.config import settings
 from core.security import create_jwt_token
-from modules.assessments.models import AssessmentPackage, AssessmentPackageCategory
+from modules.assessments.models import (
+    AssessmentCategoryProgress,
+    AssessmentInstance,
+    AssessmentPackage,
+    AssessmentPackageCategory,
+)
 from modules.employee.models import Employee
+from modules.engagements.models import Engagement
 from modules.questionnaire.models import QuestionnaireCategory
 from modules.users.models import User
 
@@ -36,7 +42,9 @@ async def test_list_package_categories_requires_auth(async_client):
 async def test_list_package_categories_allows_authenticated_user(async_client, test_db_session):
     test_db_session.add(User(user_id=8101, phone="8101000000", status="active"))
     test_db_session.add(AssessmentPackage(package_id=6101, package_code="PKU", display_name="User Package", status="active"))
-    test_db_session.add(QuestionnaireCategory(category_id=7101, category_key="user_cat", display_name="User Cat"))
+    test_db_session.add(
+        QuestionnaireCategory(category_id=7101, category_key="user_cat", display_name="User Cat", status="active")
+    )
     await test_db_session.commit()
     test_db_session.add(AssessmentPackageCategory(package_id=6101, category_id=7101))
     await test_db_session.commit()
@@ -46,10 +54,99 @@ async def test_list_package_categories_allows_authenticated_user(async_client, t
 
 
 @pytest.mark.asyncio
+async def test_list_my_package_categories_returns_incomplete_by_default(async_client, test_db_session):
+    test_db_session.add(User(user_id=8103, phone="8103000000", status="active"))
+    test_db_session.add(AssessmentPackage(package_id=6102, package_code="PKM", display_name="My Package", status="active"))
+    test_db_session.add(
+        QuestionnaireCategory(category_id=7102, category_key="my_cat", display_name="My Cat", status="active")
+    )
+    await test_db_session.commit()
+
+    test_db_session.add(AssessmentPackageCategory(package_id=6102, category_id=7102))
+    test_db_session.add(
+        Engagement(
+            engagement_id=6200,
+            engagement_name="Test Engagement",
+            engagement_code="ENG6200",
+            engagement_type="test",
+            assessment_package_id=6102,
+            diagnostic_package_id=None,
+            status="active",
+            participant_count=1,
+        )
+    )
+    await test_db_session.commit()
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=6201,
+            user_id=8103,
+            package_id=6102,
+            engagement_id=6200,
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get("/assessment-packages/me/6102/categories", headers=_auth_header(8103))
+    assert response.status_code == 200
+    assert response.json()["data"][0]["status"] == "incomplete"
+
+
+@pytest.mark.asyncio
+async def test_list_my_package_categories_returns_complete_from_progress(async_client, test_db_session):
+    test_db_session.add(User(user_id=8104, phone="8104000000", status="active"))
+    test_db_session.add(AssessmentPackage(package_id=6103, package_code="PKC", display_name="Complete Package", status="active"))
+    test_db_session.add(
+        QuestionnaireCategory(category_id=7103, category_key="complete_cat", display_name="Complete Cat", status="active")
+    )
+    await test_db_session.commit()
+
+    test_db_session.add(AssessmentPackageCategory(package_id=6103, category_id=7103))
+    test_db_session.add(
+        Engagement(
+            engagement_id=6300,
+            engagement_name="Test Engagement",
+            engagement_code="ENG6300",
+            engagement_type="test",
+            assessment_package_id=6103,
+            diagnostic_package_id=None,
+            status="active",
+            participant_count=1,
+        )
+    )
+    await test_db_session.commit()
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=6202,
+            user_id=8104,
+            package_id=6103,
+            engagement_id=6300,
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+    test_db_session.add(
+        AssessmentCategoryProgress(
+            assessment_instance_id=6202,
+            category_id=7103,
+            status="complete",
+            completed_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get("/assessment-packages/me/6103/categories", headers=_auth_header(8104))
+    assert response.status_code == 200
+    assert response.json()["data"][0]["status"] == "complete"
+
+
+@pytest.mark.asyncio
 async def test_add_and_list_and_remove_package_categories(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=8102, employee_id=51)
     test_db_session.add(AssessmentPackage(package_id=6001, package_code="PK", display_name="PK", status="active"))
-    test_db_session.add(QuestionnaireCategory(category_id=7001, category_key="wellbeing", display_name="Wellbeing"))
+    test_db_session.add(
+        QuestionnaireCategory(category_id=7001, category_key="wellbeing", display_name="Wellbeing", status="active")
+    )
     await test_db_session.commit()
 
     add_resp = await async_client.post(

@@ -42,4 +42,20 @@ class AssessmentPackageCategory(Base):
 
     id = Column(Integer, primary_key=True)
     package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=False)
-    category_id = Column(Integer, nullable=False)
+    category_id = Column(Integer, ForeignKey("questionnaire_categories.category_id"), nullable=False)
+
+
+class AssessmentCategoryProgress(Base):
+    """SQLAlchemy model for `assessment_category_progress` table."""
+
+    __tablename__ = "assessment_category_progress"
+
+    id = Column(Integer, primary_key=True)
+    assessment_instance_id = Column(
+        Integer,
+        ForeignKey("assessment_instances.assessment_instance_id"),
+        nullable=False,
+    )
+    category_id = Column(Integer, ForeignKey("questionnaire_categories.category_id"), nullable=False)
+    status = Column(String, nullable=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)

@@ -20,7 +20,12 @@ from modules.diagnostics.models import DiagnosticPackage
 from modules.employee.models import Employee
 from modules.engagements.models import Engagement, EngagementTimeSlot, OnboardingAssistantAssignment
 from modules.organizations.models import Organization
-from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireOption
+from modules.questionnaire.models import (
+    QuestionnaireCategory,
+    QuestionnaireCategoryQuestion,
+    QuestionnaireDefinition,
+    QuestionnaireOption,
+)
 from modules.users.models import User
 
 
@@ -115,7 +120,6 @@ class SeedQuestion:
     question_key: str
     question_text: str
     question_type: str
-    category_id: int
     is_required: bool
     is_read_only: bool
     help_text: str | None
@@ -136,6 +140,14 @@ class SeedCategory:
     category_id: int
     category_key: str
     display_name: str
+    status: str
+
+
+@dataclass(frozen=True)
+class SeedCategoryQuestion:
+    id: int
+    category_id: int
+    question_id: int
 
 
 @dataclass(frozen=True)
@@ -210,17 +222,24 @@ SAMPLE_ENGAGEMENTS: tuple[SeedEngagement, ...] = (
 )
 
 SAMPLE_CATEGORIES: tuple[SeedCategory, ...] = (
-    SeedCategory(701, "wellbeing", "Wellbeing"),
-    SeedCategory(702, "fitness", "Fitness"),
-    SeedCategory(703, "lifestyle", "Lifestyle"),
+    SeedCategory(701, "wellbeing", "Wellbeing", "active"),
+    SeedCategory(702, "fitness", "Fitness", "active"),
+    SeedCategory(703, "lifestyle", "Lifestyle", "active"),
 )
 
 
 SAMPLE_QUESTIONS: tuple[SeedQuestion, ...] = (
-    SeedQuestion(501, "energy_level_weekly", "How would you rate your energy levels this week?", "scale", 701, True, False, "Use your weekly average", "active"),
-    SeedQuestion(502, "exercise_days_weekly", "How many days did you exercise in the last 7 days?", "single_choice", 702, True, False, None, "active"),
-    SeedQuestion(503, "health_goals", "What health goals are most important to you?", "multiple_choice", 703, False, False, None, "active"),
-    SeedQuestion(504, "health_concerns", "Any health concerns you want to share?", "text", 701, False, False, None, "inactive"),
+    SeedQuestion(501, "energy_level_weekly", "How would you rate your energy levels this week?", "scale", True, False, "Use your weekly average", "active"),
+    SeedQuestion(502, "exercise_days_weekly", "How many days did you exercise in the last 7 days?", "single_choice", True, False, None, "active"),
+    SeedQuestion(503, "health_goals", "What health goals are most important to you?", "multiple_choice", False, False, None, "active"),
+    SeedQuestion(504, "health_concerns", "Any health concerns you want to share?", "text", False, False, None, "inactive"),
+)
+
+SAMPLE_CATEGORY_QUESTIONS: tuple[SeedCategoryQuestion, ...] = (
+    SeedCategoryQuestion(901, 701, 501),
+    SeedCategoryQuestion(902, 702, 502),
+    SeedCategoryQuestion(903, 703, 503),
+    SeedCategoryQuestion(904, 701, 504),
 )
 
 SAMPLE_QUESTION_OPTIONS: tuple[SeedQuestionOption, ...] = (
@@ -377,6 +396,7 @@ async def _upsert_categories(session: AsyncSession, categories: Iterable[SeedCat
             session.add(row)
         row.category_key = seed.category_key
         row.display_name = seed.display_name
+        row.status = seed.status
 
 
 async def _upsert_questions(
@@ -399,7 +419,6 @@ async def _upsert_questions(
         row.question_key = seed.question_key
         row.question_text = seed.question_text
         row.question_type = seed.question_type
-        row.category_id = seed.category_id
         row.is_required = seed.is_required
         row.is_read_only = seed.is_read_only
         row.help_text = seed.help_text
@@ -407,6 +426,37 @@ async def _upsert_questions(
         await session.flush()
         id_map[seed.question_id] = int(row.question_id)
     return id_map
+
+
+async def _upsert_category_questions(
+    session: AsyncSession,
+    category_questions: Iterable[SeedCategoryQuestion],
+    question_id_map: dict[int, int],
+) -> None:
+    for seed in category_questions:
+        resolved_question_id = question_id_map.get(seed.question_id, seed.question_id)
+        row = await session.get(QuestionnaireCategoryQuestion, seed.id)
+        if row is None:
+            existing = await session.execute(
+                select(QuestionnaireCategoryQuestion).where(
+                    and_(
+                        QuestionnaireCategoryQuestion.category_id == seed.category_id,
+                        QuestionnaireCategoryQuestion.question_id == resolved_question_id,
+                    )
+                )
+            )
+            row = existing.scalar_one_or_none()
+        if row is None:
+            session.add(
+                QuestionnaireCategoryQuestion(
+                    id=seed.id,
+                    category_id=seed.category_id,
+                    question_id=resolved_question_id,
+                )
+            )
+        else:
+            row.category_id = seed.category_id
+            row.question_id = resolved_question_id
 
 
 async def _upsert_question_options(
@@ -510,6 +560,7 @@ async def _reset_sequences(session: AsyncSession) -> None:
         ("questionnaire_categories", "category_id"),
         ("questionnaire_definitions", "question_id"),
         ("questionnaire_options", "option_id"),
+        ("questionnaire_category_questions", "id"),
         ("assessment_package_categories", "id"),
         ("onboarding_assistant_assignment", "onboarding_assistant_id"),
         ("engagement_time_slots", "time_slot_id"),
@@ -554,6 +605,7 @@ async def seed_sample_data(*, yes: bool) -> None:
             await _upsert_engagements(session, SAMPLE_ENGAGEMENTS)
             await _upsert_categories(session, SAMPLE_CATEGORIES)
             question_id_map = await _upsert_questions(session, SAMPLE_QUESTIONS)
+            await _upsert_category_questions(session, SAMPLE_CATEGORY_QUESTIONS, question_id_map)
             await _upsert_question_options(session, SAMPLE_QUESTION_OPTIONS, question_id_map)
             await _upsert_package_categories(session, SAMPLE_PACKAGE_CATEGORIES)
             await _upsert_assignments(session, SAMPLE_ASSIGNMENTS)

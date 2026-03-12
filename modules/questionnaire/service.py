@@ -12,6 +12,7 @@ from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDef
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.questionnaire.schemas import (
     QuestionnaireCategoryCreateRequest,
+    QuestionnaireCategoryStatusUpdateRequest,
     QuestionnaireCategoryUpdateRequest,
     QuestionnaireQuestionCreateRequest,
     QuestionnaireQuestionStatusUpdateRequest,
@@ -75,15 +76,6 @@ class QuestionnaireService:
         if row is None:
             raise AppError(status_code=404, error_code="QUESTIONNAIRE_CATEGORY_NOT_FOUND", message="Category does not exist")
 
-    async def _get_or_create_default_category_id(self, db: AsyncSession) -> int:
-        row = await self._repository.get_category_by_key(db, category_key="general")
-        if row is None:
-            row = await self._repository.create_category(
-                db,
-                QuestionnaireCategory(category_key="general", display_name="General"),
-            )
-        return int(row.category_id)
-
     async def _serialize_question(self, db: AsyncSession, row: QuestionnaireDefinition) -> dict:
         options = await self._repository.list_options_for_question(db, question_id=row.question_id)
         serialized_options = [
@@ -99,7 +91,6 @@ class QuestionnaireService:
             "question_key": row.question_key,
             "question_text": row.question_text,
             "question_type": row.question_type,
-            "category_id": row.category_id,
             "is_required": bool(row.is_required),
             "is_read_only": bool(row.is_read_only),
             "help_text": row.help_text,
@@ -172,10 +163,6 @@ class QuestionnaireService:
         if status_value not in _ALLOWED_STATUS:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-        category_id = payload.category_id
-        if category_id is None:
-            category_id = await self._get_or_create_default_category_id(db)
-        await self._ensure_category_exists(db, category_id=category_id)
         options = _clean_options(payload.options)
         self._validate_options_by_type(question_type=question_type, options=options)
         existing = await self._repository.get_definition_by_key(db, question_key=question_key)
@@ -190,7 +177,6 @@ class QuestionnaireService:
             question_key=question_key,
             question_text=question_text,
             question_type=question_type,
-            category_id=category_id,
             is_required=payload.is_required,
             is_read_only=payload.is_read_only,
             help_text=(payload.help_text or "").strip() or None,
@@ -302,10 +288,6 @@ class QuestionnaireService:
         question_key = payload.normalized_question_key()
         if not question_key:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-        category_id = payload.category_id if payload.category_id is not None else row.category_id
-        if category_id is None:
-            category_id = await self._get_or_create_default_category_id(db)
-        await self._ensure_category_exists(db, category_id=category_id)
         existing = await self._repository.get_definition_by_key(db, question_key=question_key)
         if existing is not None and existing.question_id != row.question_id:
             raise AppError(
@@ -317,7 +299,6 @@ class QuestionnaireService:
         row.question_text = question_text
         row.question_key = question_key
         row.question_type = question_type
-        row.category_id = category_id
         row.is_required = payload.is_required
         row.is_read_only = payload.is_read_only
         row.help_text = (payload.help_text or "").strip() or None
@@ -369,7 +350,7 @@ class QuestionnaireService:
         existing = await self._repository.get_category_by_key(db, category_key=category_key)
         if existing is not None:
             raise AppError(status_code=409, error_code="QUESTIONNAIRE_CATEGORY_EXISTS", message="Category already exists")
-        row = QuestionnaireCategory(category_key=category_key, display_name=display_name)
+        row = QuestionnaireCategory(category_key=category_key, display_name=display_name, status="active")
         row = await self._repository.create_category(db, row)
         await self._require_audit_service().log_event(
             db,
@@ -440,6 +421,35 @@ class QuestionnaireService:
         )
         return row
 
+    async def change_category_status(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        category_id: int,
+        payload: QuestionnaireCategoryStatusUpdateRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> QuestionnaireCategory:
+        self._ensure_employee_access(employee)
+        row = await self.get_category(db, employee=employee, category_id=category_id)
+        normalized = payload.normalized_status()
+        if normalized not in _ALLOWED_STATUS_UPDATE:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        row.status = normalized
+        row = await self._repository.update_category(db, row)
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_UPDATE_QUESTIONNAIRE_CATEGORY_STATUS",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return row
+
     async def list_category_questions(
         self,
         db: AsyncSession,
@@ -450,7 +460,12 @@ class QuestionnaireService:
         self._ensure_employee_access(employee)
         await self._ensure_category_exists(db, category_id=category_id)
         rows = await self._repository.list_questions_by_category(db, category_id=category_id)
-        return [await self._serialize_question(db, row) for row in rows]
+        data: list[dict] = []
+        for row in rows:
+            payload = await self._serialize_question(db, row)
+            payload["category_id"] = category_id
+            data.append(payload)
+        return data
 
     async def list_category_questions_for_user(
         self,
@@ -461,7 +476,12 @@ class QuestionnaireService:
         await self._ensure_category_exists(db, category_id=category_id)
         rows = await self._repository.list_questions_by_category(db, category_id=category_id)
         active_rows = [row for row in rows if (row.status or "").lower() == "active"]
-        return [await self._serialize_question(db, row) for row in active_rows]
+        data: list[dict] = []
+        for row in active_rows:
+            payload = await self._serialize_question(db, row)
+            payload["category_id"] = category_id
+            data.append(payload)
+        return data
 
     async def assign_category_questions(
         self,
@@ -610,7 +630,7 @@ class QuestionnaireService:
                     "question_text": question.question_text,
                     "question_type": question.question_type,
                     "question_key": question.question_key,
-                    "category_id": question.category_id,
+                    "category_id": category_id,
                     "is_required": bool(question.is_required),
                     "is_read_only": bool(question.is_read_only),
                     "help_text": question.help_text,
@@ -693,6 +713,7 @@ class QuestionnaireService:
             existing = await self._repository.get_response_by_instance_and_question(
                 db,
                 assessment_instance_id=instance.assessment_instance_id,
+                category_id=category_id,
                 question_id=question_id,
             )
 
@@ -706,6 +727,7 @@ class QuestionnaireService:
                 new_response = QuestionnaireResponse(
                     assessment_instance_id=instance.assessment_instance_id,
                     question_id=question_id,
+                    category_id=category_id,
                     answer=answer,
                     submitted_at=None,
                 )
@@ -743,6 +765,7 @@ class QuestionnaireService:
         - Triggers Metsights (placeholder for now)
         """
         from datetime import datetime, timezone
+        from modules.assessments.models import AssessmentCategoryProgress
         from modules.assessments.repository import AssessmentsRepository
 
         assessments_repo = AssessmentsRepository()
@@ -789,6 +812,26 @@ class QuestionnaireService:
         for response in responses:
             response.submitted_at = now
             await self._repository.update_response(db, response)
+
+        package_categories = await assessments_repo.list_package_categories(db, package_id=instance.package_id)
+        for link in package_categories:
+            progress = await assessments_repo.get_category_progress(
+                db,
+                assessment_instance_id=assessment_instance_id,
+                category_id=link.category_id,
+            )
+            if progress is None:
+                progress = AssessmentCategoryProgress(
+                    assessment_instance_id=assessment_instance_id,
+                    category_id=link.category_id,
+                    status="complete",
+                    completed_at=now,
+                )
+                await assessments_repo.create_category_progress(db, progress)
+            else:
+                progress.status = "complete"
+                progress.completed_at = now
+                await assessments_repo.update_category_progress(db, progress)
         
         # Mark assessment as completed
         instance.status = "completed"
