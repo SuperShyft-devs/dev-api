@@ -1,4 +1,4 @@
-"""Integration tests for assessment package category routes (employee-only)."""
+"""Integration tests for assessment package category routes."""
 
 from __future__ import annotations
 
@@ -33,11 +33,16 @@ async def test_list_package_categories_requires_auth(async_client):
 
 
 @pytest.mark.asyncio
-async def test_list_package_categories_requires_employee(async_client, test_db_session):
+async def test_list_package_categories_allows_authenticated_user(async_client, test_db_session):
     test_db_session.add(User(user_id=8101, phone="8101000000", status="active"))
+    test_db_session.add(AssessmentPackage(package_id=6101, package_code="PKU", display_name="User Package", status="active"))
+    test_db_session.add(QuestionnaireCategory(category_id=7101, category_key="user_cat", display_name="User Cat"))
     await test_db_session.commit()
-    response = await async_client.get("/assessment-packages/1/categories", headers=_auth_header(8101))
-    assert response.status_code == 403
+    test_db_session.add(AssessmentPackageCategory(package_id=6101, category_id=7101))
+    await test_db_session.commit()
+    response = await async_client.get("/assessment-packages/6101/categories", headers=_auth_header(8101))
+    assert response.status_code == 200
+    assert response.json()["data"][0]["category_id"] == 7101
 
 
 @pytest.mark.asyncio

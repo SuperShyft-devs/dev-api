@@ -232,14 +232,10 @@ async def update_category(
 async def list_category_questions(
     category_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    _current_user=Depends(get_current_user),
     service: QuestionnaireService = Depends(get_questionnaire_management_service),
 ):
-    rows = await service.list_category_questions(
-        db,
-        employee=employee,
-        category_id=category_id,
-    )
+    rows = await service.list_category_questions_for_user(db, category_id=category_id)
     return success_response(rows)
 
 
@@ -289,43 +285,36 @@ async def remove_category_question(
 
 # User-facing endpoints for questionnaire responses
 
-@user_router.get("/{assessment_instance_id}")
-@management_router.get("/{assessment_instance_id}")
+@user_router.get("/{category_id}")
+@management_router.get("/{category_id}")
 async def get_questionnaire(
-    assessment_instance_id: int,
+    category_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
     service: QuestionnaireService = Depends(get_questionnaire_user_service),
 ):
-    """Get questionnaire questions and existing draft answers for a user.
-    
-    Security: User authentication required. Access control enforced in service layer.
-    """
+    """Get category questionnaire questions and existing draft answers for a user."""
     result = await service.get_questionnaire_for_user(
         db,
         user_id=current_user.user_id,
-        assessment_instance_id=assessment_instance_id,
+        category_id=category_id,
     )
     
     return success_response(result)
 
 
-@user_router.put("/{assessment_instance_id}/responses")
-@management_router.put("/{assessment_instance_id}/responses")
+@user_router.put("/{category_id}/responses")
+@management_router.put("/{category_id}/responses")
 async def upsert_questionnaire_responses(
-    assessment_instance_id: int,
+    category_id: int,
     payload: QuestionnaireResponsesUpsertRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
     service: QuestionnaireService = Depends(get_questionnaire_user_service),
 ):
-    """Create or update draft answers for a questionnaire.
-    
-    Security: User authentication required. Access control enforced in service layer.
-    Responses are editable until submit is called.
-    """
+    """Create or update draft answers for a category questionnaire."""
     # Convert schema to dict for service layer
     responses_data = [
         {"question_id": item.question_id, "answer": item.normalized_answer()}
@@ -335,7 +324,7 @@ async def upsert_questionnaire_responses(
     await service.upsert_responses_for_user(
         db,
         user_id=current_user.user_id,
-        assessment_instance_id=assessment_instance_id,
+        category_id=category_id,
         responses=responses_data,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),

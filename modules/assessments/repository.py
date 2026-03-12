@@ -183,6 +183,25 @@ class AssessmentsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def list_instances_for_user_category(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        category_id: int,
+    ) -> list[AssessmentInstance]:
+        result = await db.execute(
+            select(AssessmentInstance)
+            .join(
+                AssessmentPackageCategory,
+                AssessmentPackageCategory.package_id == AssessmentInstance.package_id,
+            )
+            .where(AssessmentInstance.user_id == user_id)
+            .where(AssessmentPackageCategory.category_id == category_id)
+            .order_by(AssessmentInstance.assessment_instance_id.desc())
+        )
+        return list(result.scalars().all())
+
     async def update_instance(self, db: AsyncSession, instance: AssessmentInstance) -> AssessmentInstance:
         db.add(instance)
         await db.flush()

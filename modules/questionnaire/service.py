@@ -108,6 +108,33 @@ class QuestionnaireService:
             "created_at": row.created_at,
         }
 
+    async def _resolve_instance_for_user_category(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        category_id: int,
+    ):
+        from modules.assessments.repository import AssessmentsRepository
+
+        assessments_repo = AssessmentsRepository()
+        instances = await assessments_repo.list_instances_for_user_category(
+            db,
+            user_id=user_id,
+            category_id=category_id,
+        )
+        if not instances:
+            raise AppError(
+                status_code=404,
+                error_code="ASSESSMENT_NOT_FOUND",
+                message="Assessment does not exist",
+            )
+
+        active = [row for row in instances if (row.status or "").lower() == "active"]
+        if active:
+            return active[0]
+        return instances[0]
+
     async def serialize_question_definition(self, db: AsyncSession, row: QuestionnaireDefinition) -> dict:
         return await self._serialize_question(db, row)
 
@@ -425,6 +452,17 @@ class QuestionnaireService:
         rows = await self._repository.list_questions_by_category(db, category_id=category_id)
         return [await self._serialize_question(db, row) for row in rows]
 
+    async def list_category_questions_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        category_id: int,
+    ) -> list[dict]:
+        await self._ensure_category_exists(db, category_id=category_id)
+        rows = await self._repository.list_questions_by_category(db, category_id=category_id)
+        active_rows = [row for row in rows if (row.status or "").lower() == "active"]
+        return [await self._serialize_question(db, row) for row in active_rows]
+
     async def assign_category_questions(
         self,
         db: AsyncSession,
@@ -530,68 +568,34 @@ class QuestionnaireService:
         db: AsyncSession,
         *,
         user_id: int,
-        assessment_instance_id: int,
+        category_id: int,
     ) -> dict:
-        """Get questionnaire questions and existing draft answers for a user.
-        
-        Security: Validates that the assessment instance belongs to the user.
-        Returns questions linked to the assessment package with existing answers.
-        """
-        from modules.assessments.repository import AssessmentsRepository
-        from modules.questionnaire.models import QuestionnaireResponse
-
-        assessments_repo = AssessmentsRepository()
-        
-        # Validate ownership and get instance
-        instance = await assessments_repo.get_instance_by_id(db, assessment_instance_id)
-        if instance is None:
-            raise AppError(
-                status_code=404,
-                error_code="ASSESSMENT_NOT_FOUND",
-                message="Assessment does not exist"
-            )
-        
-        if instance.user_id != user_id:
-            raise AppError(
-                status_code=403,
-                error_code="FORBIDDEN",
-                message="You do not have permission to perform this action"
-            )
-        
-        question_ids = await assessments_repo.list_question_ids_for_package(
+        """Get category questionnaire questions and existing draft answers for a user."""
+        instance = await self._resolve_instance_for_user_category(
             db,
-            package_id=instance.package_id,
+            user_id=user_id,
+            category_id=category_id,
         )
-        
-        if not question_ids:
+
+        questions = await self._repository.list_questions_by_category(db, category_id=category_id)
+        active_questions = [q for q in questions if (q.status or "").lower() == "active"]
+        if not active_questions:
             return {
-                "assessment_instance_id": assessment_instance_id,
+                "assessment_instance_id": instance.assessment_instance_id,
                 "status": instance.status or "active",
-                "questions": []
+                "questions": [],
             }
-        
-        # Get question definitions (only active ones)
-        questions_map = {}
-        for question_id in question_ids:
-            question = await self._repository.get_definition_by_id(db, question_id)
-            if question is not None and (question.status or "").lower() == "active":
-                questions_map[question_id] = question
-        
+
         # Get existing responses
         responses = await self._repository.list_responses_for_instance(
             db,
-            assessment_instance_id=assessment_instance_id
+            assessment_instance_id=instance.assessment_instance_id,
         )
-        
         responses_map = {r.question_id: r.answer for r in responses}
-        
+
         # Build response
         questions_with_answers = []
-        for question_id in question_ids:
-            question = questions_map.get(question_id)
-            if question is None:
-                continue
-            
+        for question in active_questions:
             serialized_options = [
                 {
                     "option_value": opt.option_value,
@@ -600,23 +604,25 @@ class QuestionnaireService:
                 }
                 for opt in await self._repository.list_options_for_question(db, question_id=question.question_id)
             ]
-            questions_with_answers.append({
-                "question_id": question.question_id,
-                "question_text": question.question_text,
-                "question_type": question.question_type,
-                "question_key": question.question_key,
-                "category_id": question.category_id,
-                "is_required": bool(question.is_required),
-                "is_read_only": bool(question.is_read_only),
-                "help_text": question.help_text,
-                "options": serialized_options if serialized_options else None,
-                "answer": responses_map.get(question_id)
-            })
-        
+            questions_with_answers.append(
+                {
+                    "question_id": question.question_id,
+                    "question_text": question.question_text,
+                    "question_type": question.question_type,
+                    "question_key": question.question_key,
+                    "category_id": question.category_id,
+                    "is_required": bool(question.is_required),
+                    "is_read_only": bool(question.is_read_only),
+                    "help_text": question.help_text,
+                    "options": serialized_options if serialized_options else None,
+                    "answer": responses_map.get(question.question_id),
+                }
+            )
+
         return {
-            "assessment_instance_id": assessment_instance_id,
+            "assessment_instance_id": instance.assessment_instance_id,
             "status": instance.status or "active",
-            "questions": questions_with_answers
+            "questions": questions_with_answers,
         }
 
     async def upsert_responses_for_user(
@@ -624,7 +630,7 @@ class QuestionnaireService:
         db: AsyncSession,
         *,
         user_id: int,
-        assessment_instance_id: int,
+        category_id: int,
         responses: list[dict],
         ip_address: str,
         user_agent: str,
@@ -639,27 +645,14 @@ class QuestionnaireService:
         - Questions must be active
         - Responses are stored as JSON (no interpretation)
         """
-        from modules.assessments.repository import AssessmentsRepository
         from modules.questionnaire.models import QuestionnaireResponse
 
-        assessments_repo = AssessmentsRepository()
-        
-        # Validate ownership and get instance
-        instance = await assessments_repo.get_instance_by_id(db, assessment_instance_id)
-        if instance is None:
-            raise AppError(
-                status_code=404,
-                error_code="ASSESSMENT_NOT_FOUND",
-                message="Assessment does not exist"
-            )
-        
-        if instance.user_id != user_id:
-            raise AppError(
-                status_code=403,
-                error_code="FORBIDDEN",
-                message="You do not have permission to perform this action"
-            )
-        
+        instance = await self._resolve_instance_for_user_category(
+            db,
+            user_id=user_id,
+            category_id=category_id,
+        )
+
         # Check if already completed
         current_status = (instance.status or "").lower()
         if current_status == "completed":
@@ -669,41 +662,40 @@ class QuestionnaireService:
                 message="Assessment is already completed"
             )
         
-        valid_question_ids = set(
-            await assessments_repo.list_question_ids_for_package(db, package_id=instance.package_id)
-        )
-        
+        category_questions = await self._repository.list_questions_by_category(db, category_id=category_id)
+        valid_question_ids = {int(row.question_id) for row in category_questions}
+
         # Validate all question IDs and ensure they're active
         for response_item in responses:
             question_id = response_item["question_id"]
-            
+
             if question_id not in valid_question_ids:
                 raise AppError(
                     status_code=422,
                     error_code="INVALID_STATE",
-                    message="Question does not belong to this assessment"
+                    message="Question does not belong to this category",
                 )
-            
+
             # Verify question is active
             question = await self._repository.get_definition_by_id(db, question_id)
             if question is None or (question.status or "").lower() != "active":
                 raise AppError(
                     status_code=422,
                     error_code="INVALID_STATE",
-                    message="Question is not available"
+                    message="Question is not available",
                 )
-        
+
         # Upsert responses
         for response_item in responses:
             question_id = response_item["question_id"]
             answer = response_item["answer"]
-            
+
             existing = await self._repository.get_response_by_instance_and_question(
                 db,
-                assessment_instance_id=assessment_instance_id,
-                question_id=question_id
+                assessment_instance_id=instance.assessment_instance_id,
+                question_id=question_id,
             )
-            
+
             if existing is not None:
                 # Update existing response (draft mode)
                 existing.answer = answer
@@ -712,13 +704,13 @@ class QuestionnaireService:
             else:
                 # Create new response
                 new_response = QuestionnaireResponse(
-                    assessment_instance_id=assessment_instance_id,
+                    assessment_instance_id=instance.assessment_instance_id,
                     question_id=question_id,
                     answer=answer,
-                    submitted_at=None
+                    submitted_at=None,
                 )
                 await self._repository.create_response(db, new_response)
-        
+
         # Audit log
         audit = self._require_audit_service()
         await audit.log_event(

@@ -71,6 +71,34 @@ class AssessmentPackageCategoriesService:
             )
         return categories
 
+    async def list_categories_for_package_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        package_id: int,
+    ) -> list[dict]:
+        package_id = _normalize_int(package_id)
+
+        package = await self._repository.get_package_by_id(db, package_id=package_id)
+        if package is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_PACKAGE_NOT_FOUND", message="Package does not exist")
+
+        links = await self._repository.list_package_categories(db, package_id=package_id)
+        categories: list[dict] = []
+        for link in links:
+            category = await self._questionnaire_repository.get_category_by_id(db, link.category_id)
+            if category is None:
+                continue
+            categories.append(
+                {
+                    "id": link.id,
+                    "category_id": category.category_id,
+                    "category_key": category.category_key,
+                    "display_name": category.display_name,
+                }
+            )
+        return categories
+
     async def add_categories_to_package(
         self,
         db: AsyncSession,
