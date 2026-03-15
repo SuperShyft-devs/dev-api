@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
+from core.dependencies import get_current_user
 from db.session import get_db
 from modules.auth.dependencies import get_auth_service
 from modules.auth.schemas import (
@@ -119,3 +120,31 @@ async def logout(
     )
     await db.commit()
     return success_response({"success": True})
+
+
+@router.post("/switch/{target_user_id}")
+async def switch_account(
+    target_user_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    tokens = await auth_service.switch_account(
+        db,
+        current_user_id=current_user.user_id,
+        target_user_id=target_user_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(
+        {
+            "tokens": {
+                "access_token": tokens.access_token,
+                "refresh_token": tokens.refresh_token,
+                "token_type": "bearer",
+            }
+        }
+    )

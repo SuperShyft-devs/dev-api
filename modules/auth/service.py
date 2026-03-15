@@ -86,6 +86,21 @@ class AuthService:
         secret = self._otp_secret()
         return hmac.new(secret.encode("utf-8"), refresh_token.encode("utf-8"), hashlib.sha256).hexdigest()
 
+    async def _issue_refresh_token_for_user(self, db: AsyncSession, user_id: int) -> str:
+        now = datetime.now(timezone.utc)
+        expires_at = now + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
+        token_record = AuthToken(
+            user_id=user_id,
+            refresh_token_hash="",
+            issued_at=now,
+            expires_at=expires_at,
+        )
+        created = await self._repository.create_refresh_token(db, token_record)
+        refresh_token = self._build_refresh_token(created.token_id)
+        refresh_token_hash = self._hash_refresh_token(refresh_token)
+        await self._repository.update_refresh_token_hash(db, created.token_id, refresh_token_hash)
+        return refresh_token
+
     async def send_otp(
         self,
         db: AsyncSession,
@@ -95,7 +110,7 @@ class AuthService:
         user_agent: str,
         endpoint: str,
     ) -> int:
-        user = await self._users_service.get_existing_user_by_phone(db, phone)
+        user = await self._repository.get_primary_user_by_phone(db, phone)
         if user is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
@@ -140,7 +155,7 @@ class AuthService:
         user_agent: str,
         endpoint: str,
     ) -> tuple[int, TokenPair]:
-        user = await self._users_service.get_existing_user_by_phone(db, phone)
+        user = await self._repository.get_primary_user_by_phone(db, phone)
         if user is None:
             raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
 
@@ -160,19 +175,7 @@ class AuthService:
         # Store session_id before deletion for audit log
         session_id_for_audit = session.session_id
 
-        issued_at = now
-        expires_at = now + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
-        token_record = AuthToken(
-            user_id=user.user_id,
-            refresh_token_hash="",
-            issued_at=issued_at,
-            expires_at=expires_at,
-        )
-        created = await self._repository.create_refresh_token(db, token_record)
-
-        refresh_token = self._build_refresh_token(created.token_id)
-        refresh_token_hash = self._hash_refresh_token(refresh_token)
-        await self._repository.update_refresh_token_hash(db, created.token_id, refresh_token_hash)
+        refresh_token = await self._issue_refresh_token_for_user(db, user.user_id)
 
         access_token = self._issue_access_token(user.user_id)
 
@@ -195,6 +198,52 @@ class AuthService:
         await self._repository.delete_otp_session(db, session.session_id)
 
         return user.user_id, TokenPair(access_token=access_token, refresh_token=refresh_token)
+
+    async def switch_account(
+        self,
+        db: AsyncSession,
+        *,
+        current_user_id: int,
+        target_user_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> TokenPair:
+        current_user = await self._repository.get_user_by_id(db, current_user_id)
+        if current_user is None:
+            raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
+
+        target_user = await self._repository.get_user_by_id(db, target_user_id)
+        if target_user is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        is_self = target_user.user_id == current_user_id
+        is_switch_to_child = target_user.parent_id == current_user_id
+        is_switch_to_parent = current_user.parent_id is not None and target_user.user_id == current_user.parent_id
+
+        if not (is_self or is_switch_to_child or is_switch_to_parent):
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        await self._repository.delete_all_refresh_tokens_for_user(db, current_user_id)
+
+        new_refresh_token = await self._issue_refresh_token_for_user(db, target_user.user_id)
+        new_access_token = self._issue_access_token(target_user.user_id)
+
+        await self._audit_service.log_event(
+            db,
+            action="AUTH_SWITCH_ACCOUNT",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=current_user_id,
+            session_id=None,
+        )
+
+        return TokenPair(access_token=new_access_token, refresh_token=new_refresh_token)
 
     async def refresh_tokens(
         self,

@@ -30,6 +30,8 @@ class User(Base):
     referred_by = Column(String)
     is_participant = Column(Boolean)
     status = Column(String)
+    parent_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    relationship = Column(String, nullable=False, server_default=text("'self'"))
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True),

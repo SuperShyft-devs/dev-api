@@ -17,6 +17,10 @@ from modules.users.schemas import (
     EngagementUserOnboardRequest,
     UpcomingSlotResponse,
     PublicUserOnboardRequest,
+    SubProfileCreate,
+    SubProfileResponse,
+    SubProfileUpdate,
+    UnlinkRequest,
     UserPreferencesUpdate,
     UpdateMyProfileRequest,
 )
@@ -112,6 +116,142 @@ async def get_my_upcoming_slot(
 ):
     result: UpcomingSlotResponse = await users_service.get_upcoming_slots(db, user_id=current_user.user_id)
     return success_response(result.model_dump())
+
+
+@router.get("/me/profiles")
+async def get_my_profiles(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    users_service: UsersService = Depends(get_users_service),
+):
+    rows = await users_service.get_profiles(db, current_user=current_user)
+    data: list[SubProfileResponse] = []
+    for row in rows:
+        data.append(
+            SubProfileResponse(
+                user_id=row.user_id,
+                first_name=row.first_name or "",
+                last_name=row.last_name or "",
+                date_of_birth=row.date_of_birth,
+                gender=row.gender or "",
+                relationship=row.relationship or "self",
+                phone=row.phone or "",
+                email=row.email or "",
+                parent_id=row.parent_id,
+                status=row.status or "",
+            )
+        )
+    return success_response([item.model_dump() for item in data])
+
+
+@router.post("/me/profiles")
+async def create_my_sub_profile(
+    payload: SubProfileCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    users_service: UsersService = Depends(get_users_service),
+):
+    row = await users_service.create_sub_profile(
+        db,
+        current_user=current_user,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(
+        SubProfileResponse(
+            user_id=row.user_id,
+            first_name=row.first_name or "",
+            last_name=row.last_name or "",
+            date_of_birth=row.date_of_birth,
+            gender=row.gender or "",
+            relationship=row.relationship or "",
+            phone=row.phone or "",
+            email=row.email or "",
+            parent_id=row.parent_id,
+            status=row.status or "",
+        ).model_dump()
+    )
+
+
+@router.put("/me/profiles/{user_id}")
+async def update_my_sub_profile(
+    user_id: int,
+    payload: SubProfileUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    users_service: UsersService = Depends(get_users_service),
+):
+    row = await users_service.update_sub_profile(
+        db,
+        current_user=current_user,
+        target_user_id=user_id,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(
+        SubProfileResponse(
+            user_id=row.user_id,
+            first_name=row.first_name or "",
+            last_name=row.last_name or "",
+            date_of_birth=row.date_of_birth,
+            gender=row.gender or "",
+            relationship=row.relationship or "",
+            phone=row.phone or "",
+            email=row.email or "",
+            parent_id=row.parent_id,
+            status=row.status or "",
+        ).model_dump()
+    )
+
+
+@router.post("/me/unlink")
+async def unlink_my_profile(
+    payload: UnlinkRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    users_service: UsersService = Depends(get_users_service),
+):
+    row = await users_service.unlink_profile(
+        db,
+        current_user=current_user,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(
+        {
+            "user_id": row.user_id,
+            "first_name": row.first_name,
+            "last_name": row.last_name,
+            "phone": row.phone,
+            "email": row.email,
+            "date_of_birth": row.date_of_birth,
+            "gender": row.gender,
+            "address": row.address,
+            "pin_code": row.pin_code,
+            "city": row.city,
+            "state": row.state,
+            "country": row.country,
+            "referred_by": row.referred_by,
+            "is_participant": row.is_participant,
+            "status": row.status,
+            "parent_id": row.parent_id,
+            "relationship": row.relationship,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+    )
 
 
 @router.put("/me")

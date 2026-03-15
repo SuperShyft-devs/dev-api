@@ -92,6 +92,45 @@ class UsersRepository:
         result = await db.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
 
+    async def get_profiles_as_primary(self, db: AsyncSession, user_id: int) -> list[User]:
+        result = await db.execute(select(User).where(User.parent_id == user_id).order_by(User.user_id.asc()))
+        return list(result.scalars().all())
+
+    async def get_profiles_as_sub(self, db: AsyncSession, parent_id: int) -> list[User]:
+        result = await db.execute(select(User).where(User.user_id == parent_id).limit(1))
+        row = result.scalar_one_or_none()
+        return [row] if row is not None else []
+
+    async def create_sub_profile(self, db: AsyncSession, parent_user: User, data: dict) -> User:
+        sub_profile = User(
+            first_name=data.get("first_name"),
+            last_name=data.get("last_name"),
+            phone=parent_user.phone,
+            email=data.get("email"),
+            date_of_birth=data.get("date_of_birth"),
+            gender=data.get("gender"),
+            city=data.get("city"),
+            status="active",
+            parent_id=parent_user.user_id,
+            relationship=data.get("relationship"),
+        )
+        db.add(sub_profile)
+        await db.flush()
+        return sub_profile
+
+    async def update_user_partial(self, db: AsyncSession, user_id: int, fields: dict) -> Optional[User]:
+        row = await self.get_user_by_id(db, user_id)
+        if row is None:
+            return None
+
+        for field_name, value in fields.items():
+            setattr(row, field_name, value)
+
+        row.updated_at = datetime.now(timezone.utc)
+        db.add(row)
+        await db.flush()
+        return row
+
     async def get_upcoming_slots(self, db: AsyncSession, user_id: int):
         today = date.today()
         query = (

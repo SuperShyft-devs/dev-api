@@ -12,6 +12,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.auth.models import AuthOtpSession, AuthToken
+from modules.users.models import User
 
 
 class AuthRepository:
@@ -62,3 +63,16 @@ class AuthRepository:
             .where(AuthToken.token_id == token_id)
             .values(refresh_token_hash=refresh_token_hash, issued_at=datetime.now(timezone.utc))
         )
+
+    async def get_primary_user_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
+        result = await db.execute(
+            select(User).where(
+                User.phone == phone,
+                User.parent_id.is_(None),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_user_by_id(self, db: AsyncSession, user_id: int) -> Optional[User]:
+        result = await db.execute(select(User).where(User.user_id == user_id))
+        return result.scalar_one_or_none()

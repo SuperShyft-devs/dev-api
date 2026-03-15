@@ -87,6 +87,44 @@ class UpcomingSlotResponse(BaseModel):
     slots: list[UpcomingSlotItem]
 
 
+class SubProfileCreate(BaseModel):
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    date_of_birth: date
+    gender: str = Field(min_length=1, max_length=30)
+    relationship: Literal["spouse", "child", "sibling", "parent", "grandparent", "other"]
+    phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
+    city: Optional[str] = Field(default=None, max_length=100)
+
+
+class SubProfileUpdate(BaseModel):
+    first_name: Optional[str] = Field(default=None, max_length=100)
+    last_name: Optional[str] = Field(default=None, max_length=100)
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = Field(default=None, max_length=30)
+    relationship: Optional[Literal["spouse", "child", "sibling", "parent", "grandparent", "other"]] = None
+    phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
+    city: Optional[str] = Field(default=None, max_length=100)
+    address: Optional[str] = Field(default=None, max_length=500)
+
+
+class SubProfileResponse(BaseModel):
+    user_id: int
+    first_name: str
+    last_name: str
+    date_of_birth: date | None
+    gender: str
+    relationship: str
+    phone: str
+    email: str
+    parent_id: int | None
+    status: str
+
+
+class UnlinkRequest(BaseModel):
+    email: EmailStr
+
+
 class PublicUserOnboardRequest(BaseModel):
     """Payload for B2C onboarding."""
 

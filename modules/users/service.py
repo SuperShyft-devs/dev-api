@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Optional
 
 import logging
+import random
 from datetime import datetime, time, timedelta
 
 from sqlalchemy import select
@@ -25,6 +26,9 @@ from modules.users.schemas import (
     EngagementUserOnboardRequest,
     UpcomingSlotResponse,
     PublicUserOnboardRequest,
+    SubProfileCreate,
+    SubProfileUpdate,
+    UnlinkRequest,
     UserPreferencesUpdate,
     UpdateMyProfileRequest,
     UserOnboardResponse,
@@ -111,6 +115,175 @@ class UsersService:
             )
 
         return UpcomingSlotResponse(has_scheduled_slot=True, slots=slots)
+
+    async def get_profiles(self, db: AsyncSession, *, current_user: User) -> list[User]:
+        if current_user.parent_id is not None:
+            return await self._repository.get_profiles_as_sub(db, current_user.parent_id)
+        return await self._repository.get_profiles_as_primary(db, current_user.user_id)
+
+    async def create_sub_profile(
+        self,
+        db: AsyncSession,
+        *,
+        current_user: User,
+        data: SubProfileCreate,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> User:
+        if current_user.parent_id is not None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="Sub-profiles cannot create additional profiles",
+            )
+
+        if not current_user.email or "@" not in current_user.email:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        local_part, domain = current_user.email.split("@", 1)
+        generated_email = None
+        for _ in range(200):
+            suffix = random.randint(1000, 9999)
+            candidate = f"{local_part}+{suffix}@{domain}"
+            existing = await self._repository.get_user_by_email(db, candidate)
+            if existing is None:
+                generated_email = candidate
+                break
+
+        if generated_email is None:
+            raise AppError(status_code=409, error_code="CONFLICT", message="Unable to create profile")
+
+        created = await self._repository.create_sub_profile(
+            db,
+            current_user,
+            {
+                "first_name": data.first_name,
+                "last_name": data.last_name,
+                "date_of_birth": data.date_of_birth,
+                "gender": data.gender,
+                "relationship": data.relationship,
+                "city": data.city,
+                "email": generated_email,
+            },
+        )
+
+        if self._audit_service is None:
+            raise RuntimeError("Audit service is required")
+        await self._audit_service.log_event(
+            db,
+            action="USER_CREATE_SUB_PROFILE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=current_user.user_id,
+            session_id=None,
+        )
+
+        return created
+
+    async def update_sub_profile(
+        self,
+        db: AsyncSession,
+        *,
+        current_user: User,
+        target_user_id: int,
+        data: SubProfileUpdate,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> User:
+        if current_user.parent_id is not None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        target = await self._repository.get_user_by_id(db, target_user_id)
+        if target is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+        if target.parent_id != current_user.user_id:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        updated = await self._repository.update_user_partial(db, target_user_id, data.model_dump(exclude_unset=True))
+        if updated is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        if self._audit_service is None:
+            raise RuntimeError("Audit service is required")
+        await self._audit_service.log_event(
+            db,
+            action="USER_UPDATE_SUB_PROFILE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=current_user.user_id,
+            session_id=None,
+        )
+        return updated
+
+    async def unlink_profile(
+        self,
+        db: AsyncSession,
+        *,
+        current_user: User,
+        data: UnlinkRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> User:
+        if current_user.parent_id is None:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Already a primary user")
+
+        parent_user = await self._repository.get_user_by_id(db, current_user.parent_id)
+        if parent_user is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        if current_user.phone == parent_user.phone:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Cannot unlink without an independent phone number. Update your phone number first before unlinking.",
+            )
+
+        local_part = str(data.email).split("@", 1)[0]
+        if "+" in local_part:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Please provide a real email address")
+
+        existing = await self._repository.get_user_by_email(db, str(data.email))
+        if existing is not None and existing.user_id != current_user.user_id:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Email already exists")
+
+        updated = await self._repository.update_user_partial(
+            db,
+            current_user.user_id,
+            {
+                "parent_id": None,
+                "relationship": "self",
+                "email": str(data.email),
+            },
+        )
+        if updated is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        if self._audit_service is None:
+            raise RuntimeError("Audit service is required")
+        await self._audit_service.log_event(
+            db,
+            action="USER_UNLINK_PROFILE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=current_user.user_id,
+            session_id=None,
+        )
+
+        return updated
 
     async def get_user_preferences(
         self,
