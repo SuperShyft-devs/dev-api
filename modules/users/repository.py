@@ -105,6 +105,7 @@ class UsersRepository:
         sub_profile = User(
             first_name=data.get("first_name"),
             last_name=data.get("last_name"),
+            age=data.get("age"),
             phone=parent_user.phone,
             email=data.get("email"),
             date_of_birth=data.get("date_of_birth"),

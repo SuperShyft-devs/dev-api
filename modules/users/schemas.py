@@ -5,13 +5,14 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, validator
 
 
 class UserProfileResponse(BaseModel):
     user_id: int
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    age: int
     phone: str
     email: Optional[EmailStr] = None
     date_of_birth: Optional[date] = None
@@ -29,6 +30,7 @@ class UserProfileResponse(BaseModel):
 
 
 class UpdateMyProfileRequest(BaseModel):
+    age: int
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
     email: Optional[EmailStr] = None
@@ -39,6 +41,12 @@ class UpdateMyProfileRequest(BaseModel):
     city: Optional[str] = Field(default=None, max_length=100)
     state: Optional[str] = Field(default=None, max_length=100)
     country: Optional[str] = Field(default=None, max_length=100)
+
+    @validator("age")
+    def age_must_be_valid(cls, v):
+        if v < 1 or v > 120:
+            raise ValueError("Age must be between 1 and 120")
+        return v
 
 
 class UserPreferencesResponse(BaseModel):
@@ -88,16 +96,24 @@ class UpcomingSlotResponse(BaseModel):
 
 
 class SubProfileCreate(BaseModel):
+    age: int
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
-    date_of_birth: date
+    date_of_birth: Optional[date] = None
     gender: str = Field(min_length=1, max_length=30)
     relationship: Literal["spouse", "child", "sibling", "parent", "grandparent", "other"]
     phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
     city: Optional[str] = Field(default=None, max_length=100)
 
+    @validator("age")
+    def age_must_be_valid(cls, v):
+        if v < 1 or v > 120:
+            raise ValueError("Age must be between 1 and 120")
+        return v
+
 
 class SubProfileUpdate(BaseModel):
+    age: int
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
     date_of_birth: Optional[date] = None
@@ -107,11 +123,18 @@ class SubProfileUpdate(BaseModel):
     city: Optional[str] = Field(default=None, max_length=100)
     address: Optional[str] = Field(default=None, max_length=500)
 
+    @validator("age")
+    def age_must_be_valid(cls, v):
+        if v < 1 or v > 120:
+            raise ValueError("Age must be between 1 and 120")
+        return v
+
 
 class SubProfileResponse(BaseModel):
     user_id: int
     first_name: str
     last_name: str
+    age: int
     date_of_birth: date | None
     gender: str
     relationship: str
@@ -128,6 +151,7 @@ class UnlinkRequest(BaseModel):
 class PublicUserOnboardRequest(BaseModel):
     """Payload for B2C onboarding."""
 
+    age: int
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
     email: Optional[EmailStr] = None
@@ -143,6 +167,12 @@ class PublicUserOnboardRequest(BaseModel):
     blood_collection_date: date
     blood_collection_time_slot: str = Field(min_length=1, max_length=20)
 
+    @validator("age")
+    def age_must_be_valid(cls, v):
+        if v < 1 or v > 120:
+            raise ValueError("Age must be between 1 and 120")
+        return v
+
 
 class EngagementUserOnboardRequest(BaseModel):
     """Payload for B2B onboarding into an existing engagement.
@@ -151,6 +181,7 @@ class EngagementUserOnboardRequest(BaseModel):
     The path param is supported for backward compatibility.
     """
 
+    age: int
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
     email: Optional[EmailStr] = None
@@ -167,6 +198,12 @@ class EngagementUserOnboardRequest(BaseModel):
 
     blood_collection_date: date
     blood_collection_time_slot: str = Field(min_length=1, max_length=20)
+
+    @validator("age")
+    def age_must_be_valid(cls, v):
+        if v < 1 or v > 120:
+            raise ValueError("Age must be between 1 and 120")
+        return v
 
 
 class UserOnboardResponse(BaseModel):
@@ -185,6 +222,7 @@ class UserStatusResponse(BaseModel):
 
 
 class EmployeeCreateUserRequest(BaseModel):
+    age: int
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
     phone: str = Field(min_length=5, max_length=30)
@@ -200,8 +238,15 @@ class EmployeeCreateUserRequest(BaseModel):
     is_participant: Optional[bool] = None
     status: Optional[str] = Field(default="active", max_length=30)
 
+    @validator("age")
+    def age_must_be_valid(cls, v):
+        if v < 1 or v > 120:
+            raise ValueError("Age must be between 1 and 120")
+        return v
+
 
 class EmployeeUpdateUserRequest(BaseModel):
+    age: int
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
     phone: str = Field(min_length=5, max_length=30)
@@ -217,13 +262,21 @@ class EmployeeUpdateUserRequest(BaseModel):
     is_participant: Optional[bool] = None
     status: str = Field(default="active", max_length=30)
 
+    @validator("age")
+    def age_must_be_valid(cls, v):
+        if v < 1 or v > 120:
+            raise ValueError("Age must be between 1 and 120")
+        return v
+
 
 class EmployeeUserListItem(BaseModel):
     user_id: int
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    age: int
     phone: str
     email: Optional[EmailStr] = None
+    date_of_birth: Optional[date] = None
     city: Optional[str] = None
     status: Optional[str] = None
     is_participant: Optional[bool] = None

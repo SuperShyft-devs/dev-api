@@ -160,6 +160,7 @@ class UsersService:
             {
                 "first_name": data.first_name,
                 "last_name": data.last_name,
+                "age": data.age,
                 "date_of_birth": data.date_of_birth,
                 "gender": data.gender,
                 "relationship": data.relationship,
@@ -425,6 +426,7 @@ class UsersService:
         user = User(
             first_name=payload.first_name,
             last_name=payload.last_name,
+            age=payload.age,
             phone=payload.phone,
             email=str(payload.email) if payload.email is not None else None,
             date_of_birth=payload.date_of_birth,
@@ -627,6 +629,7 @@ class UsersService:
         patch_data = {
             "first_name": payload.first_name,
             "last_name": payload.last_name,
+            "age": payload.age,
             "email": email,
             "date_of_birth": payload.dob,
             "gender": payload.gender,
@@ -747,6 +750,7 @@ class UsersService:
         patch_data = {
             "first_name": payload.first_name,
             "last_name": payload.last_name,
+            "age": payload.age,
             "email": email,
             "date_of_birth": payload.dob,
             "gender": payload.gender,
