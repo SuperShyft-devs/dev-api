@@ -12,6 +12,7 @@ from modules.employee.router import router as employees_router
 from modules.assessments.router import router as assessments_router
 from modules.assessments.packages_router import router as assessment_packages_router
 from modules.questionnaire.router import router as questionnaire_router
+from modules.support.router import router as support_router
 
 # Configure logging
 configure_logging()
@@ -45,6 +46,7 @@ app.include_router(employees_router)
 app.include_router(assessments_router)
 app.include_router(assessment_packages_router)
 app.include_router(questionnaire_router)
+app.include_router(support_router)
 
 
 @app.get("/health")

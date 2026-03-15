@@ -25,3 +25,4 @@ from modules.organizations import models as _organizations_models  # noqa: F401,
 from modules.assessments import models as _assessments_models  # noqa: F401, E402
 from modules.questionnaire import models as _questionnaire_models  # noqa: F401, E402
 from modules.diagnostics import models as _diagnostics_models  # noqa: F401, E402
+from modules.support import models as _support_models  # noqa: F401, E402
