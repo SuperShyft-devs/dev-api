@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Optional
 
 import logging
-from datetime import time
+from datetime import datetime, time, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +23,7 @@ from modules.users.schemas import (
     EmployeeCreateUserRequest,
     EmployeeUpdateUserRequest,
     EngagementUserOnboardRequest,
+    UpcomingSlotResponse,
     PublicUserOnboardRequest,
     UserPreferencesUpdate,
     UpdateMyProfileRequest,
@@ -72,6 +73,44 @@ class UsersService:
 
     async def get_user_by_id(self, db: AsyncSession, user_id: int) -> Optional[User]:
         return await self._repository.get_user_by_id(db, user_id)
+
+    async def get_upcoming_slots(self, db: AsyncSession, *, user_id: int) -> UpcomingSlotResponse:
+        rows = await self._repository.get_upcoming_slots(db, user_id)
+        if not rows:
+            return UpcomingSlotResponse(has_scheduled_slot=False, slots=[])
+
+        slots = []
+        for row in rows:
+            engagement_type = (row.engagement_type or "").strip().lower()
+            if engagement_type != "b2b":
+                engagement_type = "b2c"
+
+            slot_duration_minutes = int(row.slot_duration or 0)
+            slot_start_dt = datetime.combine(row.engagement_date, row.slot_start_time)
+            slot_end_dt = slot_start_dt + timedelta(minutes=slot_duration_minutes)
+
+            is_b2b = engagement_type == "b2b"
+            location_display = row.engagement_city if is_b2b else (row.user_address or row.user_city or "")
+
+            slots.append(
+                {
+                    "engagement": {
+                        "engagement_type": engagement_type,
+                        "organization_name": row.organization_name if is_b2b else None,
+                    },
+                    "slot": {
+                        "slot_start_time": slot_start_dt.strftime("%I:%M %p").lstrip("0"),
+                        "slot_end_time": slot_end_dt.strftime("%I:%M %p").lstrip("0"),
+                        "engagement_date": row.engagement_date,
+                    },
+                    "location": {
+                        "type": "venue" if is_b2b else "home_collection",
+                        "display": location_display,
+                    },
+                }
+            )
+
+        return UpcomingSlotResponse(has_scheduled_slot=True, slots=slots)
 
     async def get_user_preferences(
         self,

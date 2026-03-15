@@ -7,13 +7,15 @@ from __future__ import annotations
 
 from typing import Optional
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.users.models import User, UserPreference
+from modules.engagements.models import Engagement, EngagementTimeSlot
+from modules.organizations.models import Organization
 
 
 class UsersRepository:
@@ -89,6 +91,33 @@ class UsersRepository:
     async def get_user_by_email(self, db: AsyncSession, email: str) -> Optional[User]:
         result = await db.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
+
+    async def get_upcoming_slots(self, db: AsyncSession, user_id: int):
+        today = date.today()
+        query = (
+            select(
+                EngagementTimeSlot.slot_start_time.label("slot_start_time"),
+                EngagementTimeSlot.engagement_date.label("engagement_date"),
+                Engagement.engagement_type.label("engagement_type"),
+                Engagement.slot_duration.label("slot_duration"),
+                Engagement.city.label("engagement_city"),
+                Engagement.organization_id.label("organization_id"),
+                Organization.name.label("organization_name"),
+                User.address.label("user_address"),
+                User.city.label("user_city"),
+            )
+            .select_from(EngagementTimeSlot)
+            .join(Engagement, Engagement.engagement_id == EngagementTimeSlot.engagement_id)
+            .outerjoin(Organization, Organization.organization_id == Engagement.organization_id)
+            .join(User, User.user_id == EngagementTimeSlot.user_id)
+            .where(
+                EngagementTimeSlot.user_id == user_id,
+                EngagementTimeSlot.engagement_date >= today,
+            )
+            .order_by(EngagementTimeSlot.engagement_date.asc(), EngagementTimeSlot.slot_start_time.asc())
+        )
+        result = await db.execute(query)
+        return result.all()
 
     async def get_preferences(self, db: AsyncSession, user_id: int) -> Optional[UserPreference]:
         result = await db.execute(select(UserPreference).where(UserPreference.user_id == user_id))

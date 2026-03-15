@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -58,6 +58,33 @@ class UserPreferencesUpdate(BaseModel):
     sms_enabled: Optional[bool] = None
     access_to_files: Optional[bool] = None
     store_downloaded_files: Optional[bool] = None
+
+
+class UpcomingSlotEngagement(BaseModel):
+    engagement_type: Literal["b2b", "b2c"]
+    organization_name: str | None = None
+
+
+class UpcomingSlotTiming(BaseModel):
+    slot_start_time: str
+    slot_end_time: str
+    engagement_date: date
+
+
+class UpcomingSlotLocation(BaseModel):
+    type: Literal["venue", "home_collection"]
+    display: str
+
+
+class UpcomingSlotItem(BaseModel):
+    engagement: UpcomingSlotEngagement
+    slot: UpcomingSlotTiming
+    location: UpcomingSlotLocation
+
+
+class UpcomingSlotResponse(BaseModel):
+    has_scheduled_slot: bool
+    slots: list[UpcomingSlotItem]
 
 
 class PublicUserOnboardRequest(BaseModel):

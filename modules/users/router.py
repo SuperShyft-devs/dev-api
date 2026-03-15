@@ -15,6 +15,7 @@ from modules.users.schemas import (
     EmployeeCreateUserRequest,
     EmployeeUpdateUserRequest,
     EngagementUserOnboardRequest,
+    UpcomingSlotResponse,
     PublicUserOnboardRequest,
     UserPreferencesUpdate,
     UpdateMyProfileRequest,
@@ -101,6 +102,16 @@ async def get_me(
             "updated_at": current_user.updated_at,
         }
     )
+
+
+@router.get("/me/upcoming-slot")
+async def get_my_upcoming_slot(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    users_service: UsersService = Depends(get_users_service),
+):
+    result: UpcomingSlotResponse = await users_service.get_upcoming_slots(db, user_id=current_user.user_id)
+    return success_response(result.model_dump())
 
 
 @router.put("/me")
