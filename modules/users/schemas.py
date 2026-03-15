@@ -41,6 +41,25 @@ class UpdateMyProfileRequest(BaseModel):
     country: Optional[str] = Field(default=None, max_length=100)
 
 
+class UserPreferencesResponse(BaseModel):
+    preference_id: int
+    user_id: int
+    push_enabled: bool
+    email_enabled: bool
+    sms_enabled: bool
+    access_to_files: bool
+    store_downloaded_files: bool
+    updated_at: datetime
+
+
+class UserPreferencesUpdate(BaseModel):
+    push_enabled: Optional[bool] = None
+    email_enabled: Optional[bool] = None
+    sms_enabled: Optional[bool] = None
+    access_to_files: Optional[bool] = None
+    store_downloaded_files: Optional[bool] = None
+
+
 class PublicUserOnboardRequest(BaseModel):
     """Payload for B2C onboarding."""
 

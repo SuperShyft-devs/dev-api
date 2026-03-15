@@ -17,13 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.employee.models import Employee
 from modules.audit.service import AuditService
-from modules.users.models import User
+from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
 from modules.users.schemas import (
     EmployeeCreateUserRequest,
     EmployeeUpdateUserRequest,
     EngagementUserOnboardRequest,
     PublicUserOnboardRequest,
+    UserPreferencesUpdate,
     UpdateMyProfileRequest,
     UserOnboardResponse,
 )
@@ -71,6 +72,61 @@ class UsersService:
 
     async def get_user_by_id(self, db: AsyncSession, user_id: int) -> Optional[User]:
         return await self._repository.get_user_by_id(db, user_id)
+
+    async def get_user_preferences(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> UserPreference:
+        preferences = await self._repository.get_preferences(db, user_id)
+        if preferences is not None:
+            return preferences
+
+        created = await self._repository.upsert_preferences(db, user_id, data={})
+
+        if self._audit_service is None:
+            raise RuntimeError("Audit service is required")
+
+        await self._audit_service.log_event(
+            db,
+            action="USER_INIT_PREFERENCES",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id,
+            session_id=None,
+        )
+        return created
+
+    async def update_user_preferences(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        data: UserPreferencesUpdate,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> UserPreference:
+        updated = await self._repository.upsert_preferences(db, user_id, data=data.model_dump(exclude_unset=True))
+
+        if self._audit_service is None:
+            raise RuntimeError("Audit service is required")
+
+        await self._audit_service.log_event(
+            db,
+            action="USER_UPDATE_PREFERENCES",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id,
+            session_id=None,
+        )
+        return updated
 
     async def update_my_profile(
         self,

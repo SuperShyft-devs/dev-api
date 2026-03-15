@@ -10,9 +10,10 @@ from typing import Optional
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.users.models import User
+from modules.users.models import User, UserPreference
 
 
 class UsersRepository:
@@ -88,6 +89,31 @@ class UsersRepository:
     async def get_user_by_email(self, db: AsyncSession, email: str) -> Optional[User]:
         result = await db.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
+
+    async def get_preferences(self, db: AsyncSession, user_id: int) -> Optional[UserPreference]:
+        result = await db.execute(select(UserPreference).where(UserPreference.user_id == user_id))
+        return result.scalar_one_or_none()
+
+    async def upsert_preferences(self, db: AsyncSession, user_id: int, data: dict) -> UserPreference:
+        now = datetime.now(timezone.utc)
+        update_values = {**data, "updated_at": now}
+
+        statement = (
+            insert(UserPreference)
+            .values(user_id=user_id, **data)
+            .on_conflict_do_update(
+                index_elements=[UserPreference.user_id],
+                set_=update_values,
+            )
+            .returning(UserPreference.preference_id)
+        )
+        result = await db.execute(statement)
+        preference_id = result.scalar_one()
+
+        row = await db.execute(
+            select(UserPreference).where(UserPreference.preference_id == preference_id)
+        )
+        return row.scalar_one()
 
     async def update_user_profile(self, db: AsyncSession, *, user: User, payload) -> User:
         data = payload.model_dump(exclude_unset=True)

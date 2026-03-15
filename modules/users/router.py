@@ -16,6 +16,7 @@ from modules.users.schemas import (
     EmployeeUpdateUserRequest,
     EngagementUserOnboardRequest,
     PublicUserOnboardRequest,
+    UserPreferencesUpdate,
     UpdateMyProfileRequest,
 )
 from modules.users.service import UsersService
@@ -139,6 +140,68 @@ async def update_me(
             "status": updated.status,
             "created_at": updated.created_at,
             "updated_at": updated.updated_at,
+        }
+    )
+
+
+@router.get("/me/preferences")
+async def get_my_preferences(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    users_service: UsersService = Depends(get_users_service),
+):
+    preference = await users_service.get_user_preferences(
+        db,
+        user_id=current_user.user_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+
+    await db.commit()
+    return success_response(
+        {
+            "preference_id": preference.preference_id,
+            "user_id": preference.user_id,
+            "push_enabled": preference.push_enabled,
+            "email_enabled": preference.email_enabled,
+            "sms_enabled": preference.sms_enabled,
+            "access_to_files": preference.access_to_files,
+            "store_downloaded_files": preference.store_downloaded_files,
+            "updated_at": preference.updated_at,
+        }
+    )
+
+
+@router.put("/me/preferences")
+async def update_my_preferences(
+    payload: UserPreferencesUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    users_service: UsersService = Depends(get_users_service),
+):
+    preference = await users_service.update_user_preferences(
+        db,
+        user_id=current_user.user_id,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+
+    return success_response(
+        {
+            "preference_id": preference.preference_id,
+            "user_id": preference.user_id,
+            "push_enabled": preference.push_enabled,
+            "email_enabled": preference.email_enabled,
+            "sms_enabled": preference.sms_enabled,
+            "access_to_files": preference.access_to_files,
+            "store_downloaded_files": preference.store_downloaded_files,
+            "updated_at": preference.updated_at,
         }
     )
 
