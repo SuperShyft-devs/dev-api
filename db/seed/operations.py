@@ -36,6 +36,7 @@ async def upsert_users(session: AsyncSession, users: Iterable[SeedUser]) -> None
                     user_id=seed.user_id,
                     first_name=seed.first_name,
                     last_name=seed.last_name,
+                    age=seed.age,
                     phone=seed.phone,
                     email=seed.email,
                     date_of_birth=seed.date_of_birth,
@@ -53,6 +54,7 @@ async def upsert_users(session: AsyncSession, users: Iterable[SeedUser]) -> None
         else:
             existing.first_name = seed.first_name
             existing.last_name = seed.last_name
+            existing.age = seed.age
             existing.phone = seed.phone
             existing.email = seed.email
             existing.date_of_birth = seed.date_of_birth

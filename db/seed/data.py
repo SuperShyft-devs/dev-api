@@ -9,6 +9,7 @@ class SeedUser:
     user_id: int
     first_name: str
     last_name: str
+    age: int
     phone: str
     email: str
     date_of_birth: date
@@ -87,6 +88,7 @@ DEFAULT_USERS: tuple[SeedUser, ...] = (
         user_id=1,
         first_name="Rishi",
         last_name="Nagar",
+        age=30,
         phone="9898898912",
         email="rishi@supershyft.com",
         date_of_birth=date(1995, 1, 1),

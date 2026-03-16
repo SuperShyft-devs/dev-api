@@ -74,8 +74,8 @@ async def seed_reference_data(*, yes: bool) -> None:
             await upsert_package_categories(session, DEFAULT_PACKAGE_CATEGORIES)
             await reset_sequences(session)
 
-            print("✓ Seeded users, employees, and assessment packages")
-            print("✓ Reset PostgreSQL sequences for auto-increment")
+            print("Seeded users, employees, and assessment packages")
+            print("Reset PostgreSQL sequences for auto-increment")
 
     await engine.dispose()
 

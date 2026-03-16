@@ -34,6 +34,7 @@ class SeedUser:
     user_id: int
     first_name: str
     last_name: str
+    age: int
     phone: str
     email: str
     date_of_birth: date
@@ -174,16 +175,16 @@ class SeedTimeSlot:
 
 
 SAMPLE_USERS: tuple[SeedUser, ...] = (
-    SeedUser(1001, "Aarav", "Shah", "9000001001", "aarav.shah@example.com", date(1992, 5, 15), "male", "Andheri East", "400059", "Mumbai", "Maharashtra", "India", None, False, "active"),
-    SeedUser(1002, "Mira", "Kapoor", "9000001002", "mira.kapoor@example.com", date(1991, 8, 9), "female", "Banjara Hills", "500034", "Hyderabad", "Telangana", "India", None, False, "active"),
-    SeedUser(1003, "Kabir", "Mehta", "9000001003", "kabir.mehta@example.com", date(1990, 2, 19), "male", "Koramangala", "560034", "Bengaluru", "Karnataka", "India", None, False, "active"),
-    SeedUser(1004, "Nisha", "Rao", "9000001004", "nisha.rao@example.com", date(1989, 11, 27), "female", "Kondapur", "500084", "Hyderabad", "Telangana", "India", None, False, "inactive"),
-    SeedUser(1005, "Rohan", "Das", "9000001005", "rohan.das@example.com", date(1993, 3, 4), "male", "Salt Lake", "700091", "Kolkata", "West Bengal", "India", None, False, "active"),
-    SeedUser(1101, "Pooja", "Iyer", "9000001101", "pooja.iyer@example.com", date(1995, 1, 11), "female", "HSR Layout", "560102", "Bengaluru", "Karnataka", "India", "HC-MUM-2026", True, "active"),
-    SeedUser(1102, "Arjun", "Nair", "9000001102", "arjun.nair@example.com", date(1994, 6, 2), "male", "Powai", "400076", "Mumbai", "Maharashtra", "India", "HC-MUM-2026", True, "active"),
-    SeedUser(1103, "Sara", "Khan", "9000001103", "sara.khan@example.com", date(1996, 9, 18), "female", "Whitefield", "560066", "Bengaluru", "Karnataka", "India", "FIN-BLR-2026", True, "inactive"),
-    SeedUser(1104, "Dev", "Patel", "9000001104", "dev.patel@example.com", date(1997, 4, 25), "male", "Thane West", "400601", "Mumbai", "Maharashtra", "India", "FIN-BLR-2026", True, "active"),
-    SeedUser(1105, "Isha", "Verma", "9000001105", "isha.verma@example.com", date(1998, 12, 7), "female", "Indiranagar", "560038", "Bengaluru", "Karnataka", "India", "OPEN-CARE-2026", True, "active"),
+    SeedUser(1001, "Aarav", "Shah", 33, "9000001001", "aarav.shah@example.com", date(1992, 5, 15), "male", "Andheri East", "400059", "Mumbai", "Maharashtra", "India", None, False, "active"),
+    SeedUser(1002, "Mira", "Kapoor", 34, "9000001002", "mira.kapoor@example.com", date(1991, 8, 9), "female", "Banjara Hills", "500034", "Hyderabad", "Telangana", "India", None, False, "active"),
+    SeedUser(1003, "Kabir", "Mehta", 35, "9000001003", "kabir.mehta@example.com", date(1990, 2, 19), "male", "Koramangala", "560034", "Bengaluru", "Karnataka", "India", None, False, "active"),
+    SeedUser(1004, "Nisha", "Rao", 36, "9000001004", "nisha.rao@example.com", date(1989, 11, 27), "female", "Kondapur", "500084", "Hyderabad", "Telangana", "India", None, False, "inactive"),
+    SeedUser(1005, "Rohan", "Das", 32, "9000001005", "rohan.das@example.com", date(1993, 3, 4), "male", "Salt Lake", "700091", "Kolkata", "West Bengal", "India", None, False, "active"),
+    SeedUser(1101, "Pooja", "Iyer", 30, "9000001101", "pooja.iyer@example.com", date(1995, 1, 11), "female", "HSR Layout", "560102", "Bengaluru", "Karnataka", "India", "HC-MUM-2026", True, "active"),
+    SeedUser(1102, "Arjun", "Nair", 31, "9000001102", "arjun.nair@example.com", date(1994, 6, 2), "male", "Powai", "400076", "Mumbai", "Maharashtra", "India", "HC-MUM-2026", True, "active"),
+    SeedUser(1103, "Sara", "Khan", 29, "9000001103", "sara.khan@example.com", date(1996, 9, 18), "female", "Whitefield", "560066", "Bengaluru", "Karnataka", "India", "FIN-BLR-2026", True, "inactive"),
+    SeedUser(1104, "Dev", "Patel", 28, "9000001104", "dev.patel@example.com", date(1997, 4, 25), "male", "Thane West", "400601", "Mumbai", "Maharashtra", "India", "FIN-BLR-2026", True, "active"),
+    SeedUser(1105, "Isha", "Verma", 27, "9000001105", "isha.verma@example.com", date(1998, 12, 7), "female", "Indiranagar", "560038", "Bengaluru", "Karnataka", "India", "OPEN-CARE-2026", True, "active"),
 )
 
 SAMPLE_EMPLOYEES: tuple[SeedEmployee, ...] = (
@@ -292,6 +293,7 @@ async def _upsert_users(session: AsyncSession, users: Iterable[SeedUser]) -> Non
             session.add(row)
         row.first_name = seed.first_name
         row.last_name = seed.last_name
+        row.age = seed.age
         row.phone = seed.phone
         row.email = seed.email
         row.date_of_birth = seed.date_of_birth
