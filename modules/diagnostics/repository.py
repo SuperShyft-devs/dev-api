@@ -5,7 +5,7 @@ Only database queries live here.
 
 from __future__ import annotations
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, distinct, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -202,6 +202,14 @@ class DiagnosticsRepository:
     async def get_tag_by_id(self, db: AsyncSession, *, tag_id: int) -> DiagnosticPackageTag | None:
         result = await db.execute(select(DiagnosticPackageTag).where(DiagnosticPackageTag.tag_id == tag_id))
         return result.scalar_one_or_none()
+
+    async def get_distinct_tag_names(self, db: AsyncSession) -> list[str]:
+        result = await db.execute(
+            select(distinct(DiagnosticPackageTag.tag_name))
+            .where(DiagnosticPackageTag.tag_name.is_not(None))
+            .order_by(DiagnosticPackageTag.tag_name.asc())
+        )
+        return [tag_name for tag_name in result.scalars().all() if isinstance(tag_name, str) and tag_name.strip()]
 
     async def create_tag(
         self,

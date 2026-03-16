@@ -105,6 +105,35 @@ class DiagnosticsService:
         if gender is not None:
             payload["gender_suitability"] = gender
 
+    async def _validate_filter_key_for_type(
+        self,
+        db,
+        *,
+        filter_type: str | None,
+        filter_key: str | None,
+    ) -> str | None:
+        normalized_type = self._normalize_lower(filter_type)
+        normalized_key = self._normalize(filter_key)
+
+        if normalized_type == "tag":
+            if normalized_key is None:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+            existing_tags = await self._repository.get_distinct_tag_names(db)
+            existing_tag_map = {tag.lower(): tag for tag in existing_tags}
+            canonical = existing_tag_map.get(normalized_key.lower())
+            if canonical is None:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="Filter key must be an existing package tag",
+                )
+            return canonical
+
+        if normalized_key is not None:
+            return normalized_key
+        return None
+
     def _to_tag_response(self, row: DiagnosticPackageTag) -> TagResponse:
         return TagResponse(
             tag_id=row.tag_id,
@@ -381,6 +410,11 @@ class DiagnosticsService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         if filter_type is not None:
             payload["filter_type"] = filter_type
+        payload["filter_key"] = await self._validate_filter_key_for_type(
+            db,
+            filter_type=payload.get("filter_type"),
+            filter_key=payload.get("filter_key"),
+        )
 
         created = await self._repository.create_filter(db, DiagnosticPackageFilter(**payload))
         await self._require_audit_service().log_event(
@@ -423,6 +457,16 @@ class DiagnosticsService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         if filter_type is not None:
             payload["filter_type"] = filter_type
+
+        effective_filter_type = payload.get("filter_type", existing.filter_type)
+        effective_filter_key = payload.get("filter_key", existing.filter_key)
+        validated_key = await self._validate_filter_key_for_type(
+            db,
+            filter_type=effective_filter_type,
+            filter_key=effective_filter_key,
+        )
+        if "filter_key" in payload or (effective_filter_type == "tag" and effective_filter_key is not None):
+            payload["filter_key"] = validated_key
 
         status = self._normalize_lower(payload.get("status"))
         if status is not None and status not in _ALLOWED_STATUS_VALUES:
