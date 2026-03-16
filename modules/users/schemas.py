@@ -103,6 +103,7 @@ class SubProfileCreate(BaseModel):
     gender: str = Field(min_length=1, max_length=30)
     relationship: Literal["spouse", "child", "sibling", "parent", "grandparent", "other"]
     phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
+    email: Optional[EmailStr] = None
     city: Optional[str] = Field(default=None, max_length=100)
 
     @validator("age")

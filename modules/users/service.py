@@ -138,20 +138,31 @@ class UsersService:
                 message="Sub-profiles cannot create additional profiles",
             )
 
-        if not current_user.email or "@" not in current_user.email:
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        phone_to_use = data.phone or current_user.phone
+        if data.phone is not None:
+            existing_phone = await self._repository.get_user_by_phone(db, data.phone)
+            if existing_phone is not None and existing_phone.user_id != current_user.user_id:
+                raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
 
-        local_part, domain = current_user.email.split("@", 1)
-        generated_email = None
-        for _ in range(200):
-            suffix = random.randint(1000, 9999)
-            candidate = f"{local_part}+{suffix}@{domain}"
-            existing = await self._repository.get_user_by_email(db, candidate)
-            if existing is None:
-                generated_email = candidate
-                break
+        email_to_use = str(data.email) if data.email is not None else None
+        if email_to_use is not None:
+            existing_email = await self._repository.get_user_by_email(db, email_to_use)
+            if existing_email is not None:
+                raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
+        else:
+            if not current_user.email or "@" not in current_user.email:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-        if generated_email is None:
+            local_part, domain = current_user.email.split("@", 1)
+            for _ in range(200):
+                suffix = random.randint(1000, 9999)
+                candidate = f"{local_part}+{suffix}@{domain}"
+                existing = await self._repository.get_user_by_email(db, candidate)
+                if existing is None:
+                    email_to_use = candidate
+                    break
+
+        if email_to_use is None:
             raise AppError(status_code=409, error_code="CONFLICT", message="Unable to create profile")
 
         created = await self._repository.create_sub_profile(
@@ -165,9 +176,12 @@ class UsersService:
                 "gender": data.gender,
                 "relationship": data.relationship,
                 "city": data.city,
-                "email": generated_email,
+                "phone": phone_to_use,
+                "email": email_to_use,
             },
         )
+        if created is None:
+            raise AppError(status_code=409, error_code="CONFLICT", message="Unable to create profile")
 
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
