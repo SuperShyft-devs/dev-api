@@ -7,6 +7,9 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, validator
 
+_ALLOWED_DIET_PREFERENCES = {"veg", "non_veg", "vegan", "jain", "eggetarian", "keto"}
+_ALLOWED_ALLERGIES = {"peanuts", "dairy", "eggs", "fish", "soy", "wheat", "sesame", "mustard", "corn", "other"}
+
 
 class UserProfileResponse(BaseModel):
     user_id: int
@@ -57,6 +60,8 @@ class UserPreferencesResponse(BaseModel):
     sms_enabled: bool
     access_to_files: bool
     store_downloaded_files: bool
+    diet_preference: str | None
+    allergies: list[str]
     updated_at: datetime
 
 
@@ -66,6 +71,23 @@ class UserPreferencesUpdate(BaseModel):
     sms_enabled: Optional[bool] = None
     access_to_files: Optional[bool] = None
     store_downloaded_files: Optional[bool] = None
+    diet_preference: str | None = None
+    allergies: list[str] | None = None
+
+    @validator("diet_preference")
+    def validate_diet_preference(cls, value):
+        if value is not None and value not in _ALLOWED_DIET_PREFERENCES:
+            raise ValueError("Invalid diet preference. Allowed: veg, non_veg, vegan, jain, eggetarian, keto")
+        return value
+
+    @validator("allergies")
+    def validate_allergies(cls, value):
+        if value is None:
+            return value
+        for item in value:
+            if item not in _ALLOWED_ALLERGIES:
+                raise ValueError(f"Invalid allergy value: {item}")
+        return value
 
 
 class UpcomingSlotEngagement(BaseModel):

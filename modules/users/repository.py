@@ -165,11 +165,18 @@ class UsersRepository:
 
     async def upsert_preferences(self, db: AsyncSession, user_id: int, data: dict) -> UserPreference:
         now = datetime.now(timezone.utc)
-        update_values = {**data, "updated_at": now}
+        upsert_data = dict(data)
+
+        # Nutrition fields are optional and should only be persisted when explicitly non-null.
+        for field_name in ("diet_preference", "allergies"):
+            if upsert_data.get(field_name) is None:
+                upsert_data.pop(field_name, None)
+
+        update_values = {**upsert_data, "updated_at": now}
 
         statement = (
             insert(UserPreference)
-            .values(user_id=user_id, **data)
+            .values(user_id=user_id, **upsert_data)
             .on_conflict_do_update(
                 index_elements=[UserPreference.user_id],
                 set_=update_values,

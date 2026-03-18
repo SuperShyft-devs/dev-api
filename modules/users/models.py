@@ -5,7 +5,7 @@ Auth depends on this module for read-only existence checks.
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, func, text
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, JSON, String, func, text
 
 from db.base import Base
 
@@ -54,4 +54,6 @@ class UserPreference(Base):
     sms_enabled = Column(Boolean, nullable=False, server_default=text("false"))
     access_to_files = Column(Boolean, nullable=False, server_default=text("true"))
     store_downloaded_files = Column(Boolean, nullable=False, server_default=text("true"))
+    diet_preference = Column(String, nullable=True)
+    allergies = Column(JSON, nullable=True, server_default=text("'[]'"))
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

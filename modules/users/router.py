@@ -326,6 +326,8 @@ async def get_my_preferences(
             "sms_enabled": preference.sms_enabled,
             "access_to_files": preference.access_to_files,
             "store_downloaded_files": preference.store_downloaded_files,
+            "diet_preference": preference.diet_preference,
+            "allergies": preference.allergies,
             "updated_at": preference.updated_at,
         }
     )
@@ -358,6 +360,8 @@ async def update_my_preferences(
             "sms_enabled": preference.sms_enabled,
             "access_to_files": preference.access_to_files,
             "store_downloaded_files": preference.store_downloaded_files,
+            "diet_preference": preference.diet_preference,
+            "allergies": preference.allergies,
             "updated_at": preference.updated_at,
         }
     )
