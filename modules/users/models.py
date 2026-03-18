@@ -21,6 +21,7 @@ class User(Base):
     age = Column(Integer, nullable=False)
     phone = Column(String, nullable=False)
     email = Column(String)
+    profile_photo = Column(String)
     date_of_birth = Column(Date, nullable=True)
     gender = Column(String)
     address = Column(String)

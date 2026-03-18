@@ -443,6 +443,7 @@ class UsersService:
             age=payload.age,
             phone=payload.phone,
             email=str(payload.email) if payload.email is not None else None,
+            profile_photo=payload.profile_photo,
             date_of_birth=payload.date_of_birth,
             gender=payload.gender,
             address=payload.address,

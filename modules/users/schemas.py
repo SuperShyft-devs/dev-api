@@ -18,6 +18,7 @@ class UserProfileResponse(BaseModel):
     age: int
     phone: str
     email: Optional[EmailStr] = None
+    profile_photo: Optional[str] = None
     date_of_birth: Optional[date] = None
     gender: Optional[str] = None
     address: Optional[str] = None
@@ -37,6 +38,7 @@ class UpdateMyProfileRequest(BaseModel):
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
     email: Optional[EmailStr] = None
+    profile_photo: Optional[str] = Field(default=None, max_length=500)
     date_of_birth: Optional[date] = None
     gender: Optional[str] = Field(default=None, max_length=30)
     address: Optional[str] = Field(default=None, max_length=500)
@@ -250,6 +252,7 @@ class EmployeeCreateUserRequest(BaseModel):
     last_name: Optional[str] = Field(default=None, max_length=100)
     phone: str = Field(min_length=5, max_length=30)
     email: Optional[EmailStr] = None
+    profile_photo: Optional[str] = Field(default=None, max_length=500)
     date_of_birth: Optional[date] = None
     gender: Optional[str] = Field(default=None, max_length=30)
     address: Optional[str] = Field(default=None, max_length=500)
@@ -274,6 +277,7 @@ class EmployeeUpdateUserRequest(BaseModel):
     last_name: Optional[str] = Field(default=None, max_length=100)
     phone: str = Field(min_length=5, max_length=30)
     email: Optional[EmailStr] = None
+    profile_photo: Optional[str] = Field(default=None, max_length=500)
     date_of_birth: Optional[date] = None
     gender: Optional[str] = Field(default=None, max_length=30)
     address: Optional[str] = Field(default=None, max_length=500)
@@ -299,6 +303,7 @@ class EmployeeUserListItem(BaseModel):
     age: int
     phone: str
     email: Optional[EmailStr] = None
+    profile_photo: Optional[str] = None
     date_of_birth: Optional[date] = None
     city: Optional[str] = None
     status: Optional[str] = None

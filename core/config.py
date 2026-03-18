@@ -61,6 +61,12 @@ class Settings:
         "ALLOW_BYPASS_OTP",
         os.getenv("allow_bypass_otp", "False"),
     ).lower() == "true"
+
+    # Media upload settings
+    MEDIA_ROOT: str = os.getenv("MEDIA_ROOT", "/var/www/backend/media")
+    MEDIA_BASE_URL: str = os.getenv("MEDIA_BASE_URL", "http://localhost:8000/media")
+    USER_PROFILE_PHOTO_MAX_MB: int = int(os.getenv("USER_PROFILE_PHOTO_MAX_MB", "2"))
+    ORG_LOGO_MAX_MB: int = int(os.getenv("ORG_LOGO_MAX_MB", "5"))
     
     @classmethod
     def validate(cls) -> None:
