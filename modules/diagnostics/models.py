@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship
 
@@ -42,8 +42,8 @@ class DiagnosticPackage(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-    test_groups = relationship(
-        "DiagnosticTestGroup",
+    test_group_assignments = relationship(
+        "DiagnosticPackageTestGroup",
         back_populates="package",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -115,18 +115,17 @@ class DiagnosticTestGroup(Base):
     __tablename__ = "diagnostic_test_groups"
 
     group_id = Column(Integer, primary_key=True)
-    diagnostic_package_id = Column(
-        Integer,
-        ForeignKey("diagnostic_package.diagnostic_package_id", ondelete="CASCADE"),
-        nullable=False,
-    )
     group_name = Column(String, nullable=False)
-    test_count = Column(Integer)
     display_order = Column(Integer)
 
-    package = relationship("DiagnosticPackage", back_populates="test_groups")
     tests = relationship(
-        "DiagnosticTest",
+        "DiagnosticTestGroupTest",
+        back_populates="group",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    package_assignments = relationship(
+        "DiagnosticPackageTestGroup",
         back_populates="group",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -139,12 +138,56 @@ class DiagnosticTest(Base):
     __tablename__ = "diagnostic_tests"
 
     test_id = Column(Integer, primary_key=True)
-    group_id = Column(Integer, ForeignKey("diagnostic_test_groups.group_id", ondelete="CASCADE"), nullable=False)
     test_name = Column(String, nullable=False)
-    display_order = Column(Integer)
     is_available = Column(Boolean, nullable=False, default=True, server_default="true")
+    display_order = Column(Integer)
+
+    group_assignments = relationship(
+        "DiagnosticTestGroupTest",
+        back_populates="test",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class DiagnosticTestGroupTest(Base):
+    """SQLAlchemy model for `diagnostic_test_group_tests` table."""
+
+    __tablename__ = "diagnostic_test_group_tests"
+    __table_args__ = (UniqueConstraint("group_id", "test_id", name="uq_diagnostic_test_group_tests_group_test"),)
+
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey("diagnostic_test_groups.group_id", ondelete="CASCADE"), nullable=False)
+    test_id = Column(Integer, ForeignKey("diagnostic_tests.test_id", ondelete="CASCADE"), nullable=False)
+    display_order = Column(Integer)
 
     group = relationship("DiagnosticTestGroup", back_populates="tests")
+    test = relationship("DiagnosticTest", back_populates="group_assignments")
+
+
+class DiagnosticPackageTestGroup(Base):
+    """SQLAlchemy model for `diagnostic_package_test_groups` table."""
+
+    __tablename__ = "diagnostic_package_test_groups"
+    __table_args__ = (
+        UniqueConstraint(
+            "diagnostic_package_id",
+            "group_id",
+            name="uq_diagnostic_package_test_groups_package_group",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    diagnostic_package_id = Column(
+        Integer,
+        ForeignKey("diagnostic_package.diagnostic_package_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    group_id = Column(Integer, ForeignKey("diagnostic_test_groups.group_id", ondelete="CASCADE"), nullable=False)
+    display_order = Column(Integer)
+
+    package = relationship("DiagnosticPackage", back_populates="test_group_assignments")
+    group = relationship("DiagnosticTestGroup", back_populates="package_assignments")
 
 
 class DiagnosticPackageSample(Base):

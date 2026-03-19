@@ -5,7 +5,8 @@ Only database queries live here.
 
 from __future__ import annotations
 
-from sqlalchemy import delete, distinct, or_, select
+from sqlalchemy import delete, distinct, func, or_, select, update as sql_update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -16,8 +17,10 @@ from modules.diagnostics.models import (
     DiagnosticPackageReason,
     DiagnosticPackageSample,
     DiagnosticPackageTag,
+    DiagnosticPackageTestGroup,
     DiagnosticTest,
     DiagnosticTestGroup,
+    DiagnosticTestGroupTest,
 )
 
 
@@ -70,15 +73,6 @@ class DiagnosticsRepository:
             select(DiagnosticPackage).where(DiagnosticPackage.diagnostic_package_id == package_id)
         )
         return result.scalar_one_or_none()
-
-    async def get_package_tests(self, db: AsyncSession, *, package_id: int) -> list[DiagnosticTestGroup]:
-        result = await db.execute(
-            select(DiagnosticTestGroup)
-            .where(DiagnosticTestGroup.diagnostic_package_id == package_id)
-            .options(selectinload(DiagnosticTestGroup.tests))
-            .order_by(DiagnosticTestGroup.display_order.asc().nulls_last(), DiagnosticTestGroup.group_id.asc())
-        )
-        return list(result.scalars().all())
 
     async def create_package(self, db: AsyncSession, package: DiagnosticPackage) -> DiagnosticPackage:
         db.add(package)
@@ -227,57 +221,17 @@ class DiagnosticsRepository:
         result = await db.execute(delete(DiagnosticPackageTag).where(DiagnosticPackageTag.tag_id == tag_id))
         return int(result.rowcount or 0)
 
-    async def get_test_groups(self, db: AsyncSession, *, package_id: int) -> list[DiagnosticTestGroup]:
+    async def get_all_tests(self, db: AsyncSession) -> list[DiagnosticTest]:
         result = await db.execute(
-            select(DiagnosticTestGroup)
-            .where(DiagnosticTestGroup.diagnostic_package_id == package_id)
-            .order_by(DiagnosticTestGroup.display_order.asc().nulls_last(), DiagnosticTestGroup.group_id.asc())
+            select(DiagnosticTest).order_by(DiagnosticTest.display_order.asc().nulls_last(), DiagnosticTest.test_id.asc())
         )
         return list(result.scalars().all())
-
-    async def get_test_group_by_id(self, db: AsyncSession, *, group_id: int) -> DiagnosticTestGroup | None:
-        result = await db.execute(select(DiagnosticTestGroup).where(DiagnosticTestGroup.group_id == group_id))
-        return result.scalar_one_or_none()
-
-    async def create_test_group(
-        self,
-        db: AsyncSession,
-        *,
-        package_id: int,
-        data: DiagnosticTestGroup,
-    ) -> DiagnosticTestGroup:
-        data.diagnostic_package_id = package_id
-        db.add(data)
-        await db.flush()
-        return data
-
-    async def update_test_group(
-        self,
-        db: AsyncSession,
-        *,
-        group_id: int,
-        data: dict,
-    ) -> DiagnosticTestGroup | None:
-        row = await self.get_test_group_by_id(db, group_id=group_id)
-        if row is None:
-            return None
-        for key, value in data.items():
-            if value is not None:
-                setattr(row, key, value)
-        db.add(row)
-        await db.flush()
-        return row
-
-    async def delete_test_group(self, db: AsyncSession, *, group_id: int) -> int:
-        result = await db.execute(delete(DiagnosticTestGroup).where(DiagnosticTestGroup.group_id == group_id))
-        return int(result.rowcount or 0)
 
     async def get_test_by_id(self, db: AsyncSession, *, test_id: int) -> DiagnosticTest | None:
         result = await db.execute(select(DiagnosticTest).where(DiagnosticTest.test_id == test_id))
         return result.scalar_one_or_none()
 
-    async def create_test(self, db: AsyncSession, *, group_id: int, data: DiagnosticTest) -> DiagnosticTest:
-        data.group_id = group_id
+    async def create_test(self, db: AsyncSession, data: DiagnosticTest) -> DiagnosticTest:
         db.add(data)
         await db.flush()
         return data
@@ -296,6 +250,209 @@ class DiagnosticsRepository:
     async def delete_test(self, db: AsyncSession, *, test_id: int) -> int:
         result = await db.execute(delete(DiagnosticTest).where(DiagnosticTest.test_id == test_id))
         return int(result.rowcount or 0)
+
+    async def get_all_groups(self, db: AsyncSession) -> list[tuple[DiagnosticTestGroup, int]]:
+        result = await db.execute(
+            select(DiagnosticTestGroup, func.count(DiagnosticTestGroupTest.id))
+            .outerjoin(DiagnosticTestGroupTest, DiagnosticTestGroupTest.group_id == DiagnosticTestGroup.group_id)
+            .group_by(
+                DiagnosticTestGroup.group_id,
+                DiagnosticTestGroup.group_name,
+                DiagnosticTestGroup.display_order,
+            )
+            .order_by(DiagnosticTestGroup.display_order.asc().nulls_last(), DiagnosticTestGroup.group_id.asc())
+        )
+        return [(row[0], int(row[1] or 0)) for row in result.all()]
+
+    async def get_group_by_id(self, db: AsyncSession, *, group_id: int) -> DiagnosticTestGroup | None:
+        result = await db.execute(select(DiagnosticTestGroup).where(DiagnosticTestGroup.group_id == group_id))
+        return result.scalar_one_or_none()
+
+    async def get_tests_for_group(self, db: AsyncSession, *, group_id: int) -> list[DiagnosticTest]:
+        result = await db.execute(
+            select(DiagnosticTest)
+            .join(DiagnosticTestGroupTest, DiagnosticTestGroupTest.test_id == DiagnosticTest.test_id)
+            .where(DiagnosticTestGroupTest.group_id == group_id)
+            .order_by(DiagnosticTestGroupTest.display_order.asc().nulls_last(), DiagnosticTest.test_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def create_group(self, db: AsyncSession, data: DiagnosticTestGroup) -> DiagnosticTestGroup:
+        db.add(data)
+        await db.flush()
+        return data
+
+    async def update_group(self, db: AsyncSession, *, group_id: int, data: dict) -> DiagnosticTestGroup | None:
+        row = await self.get_group_by_id(db, group_id=group_id)
+        if row is None:
+            return None
+        for key, value in data.items():
+            if value is not None:
+                setattr(row, key, value)
+        db.add(row)
+        await db.flush()
+        return row
+
+    async def delete_group(self, db: AsyncSession, *, group_id: int) -> int:
+        result = await db.execute(delete(DiagnosticTestGroup).where(DiagnosticTestGroup.group_id == group_id))
+        return int(result.rowcount or 0)
+
+    async def get_assigned_test_ids_for_group(self, db: AsyncSession, *, group_id: int) -> set[int]:
+        result = await db.execute(
+            select(DiagnosticTestGroupTest.test_id).where(DiagnosticTestGroupTest.group_id == group_id)
+        )
+        return set(result.scalars().all())
+
+    async def get_assigned_test_ids_for_group_ordered(self, db: AsyncSession, *, group_id: int) -> list[int]:
+        result = await db.execute(
+            select(DiagnosticTestGroupTest.test_id)
+            .where(DiagnosticTestGroupTest.group_id == group_id)
+            .order_by(DiagnosticTestGroupTest.display_order.asc().nulls_last(), DiagnosticTestGroupTest.id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def assign_tests_to_group(
+        self,
+        db: AsyncSession,
+        *,
+        group_id: int,
+        test_ids: list[int],
+    ) -> tuple[list[int], list[int]]:
+        unique_ids = list(dict.fromkeys(test_ids))
+        added: list[int] = []
+        skipped: list[int] = []
+        max_order_result = await db.execute(
+            select(func.max(DiagnosticTestGroupTest.display_order)).where(DiagnosticTestGroupTest.group_id == group_id)
+        )
+        max_order = max_order_result.scalar_one_or_none()
+        next_order = (int(max_order) if max_order is not None else 0) + 1
+
+        for test_id in unique_ids:
+            stmt = (
+                insert(DiagnosticTestGroupTest)
+                .values(group_id=group_id, test_id=test_id, display_order=next_order)
+                .on_conflict_do_nothing(index_elements=["group_id", "test_id"])
+                .returning(DiagnosticTestGroupTest.id)
+            )
+            result = await db.execute(stmt)
+            inserted_id = result.scalar_one_or_none()
+            if inserted_id is None:
+                skipped.append(test_id)
+            else:
+                added.append(test_id)
+                next_order += 1
+        return added, skipped
+
+    async def remove_test_from_group(self, db: AsyncSession, *, group_id: int, test_id: int) -> bool:
+        result = await db.execute(
+            delete(DiagnosticTestGroupTest).where(
+                DiagnosticTestGroupTest.group_id == group_id,
+                DiagnosticTestGroupTest.test_id == test_id,
+            )
+        )
+        return int(result.rowcount or 0) > 0
+
+    async def reorder_group_tests(self, db: AsyncSession, *, group_id: int, test_ids: list[int]) -> None:
+        for index, test_id in enumerate(test_ids, start=1):
+            await db.execute(
+                sql_update(DiagnosticTestGroupTest)
+                .where(
+                    DiagnosticTestGroupTest.group_id == group_id,
+                    DiagnosticTestGroupTest.test_id == test_id,
+                )
+                .values(display_order=index)
+            )
+        await db.flush()
+
+    async def get_package_test_groups(
+        self,
+        db: AsyncSession,
+        *,
+        package_id: int,
+    ) -> list[tuple[DiagnosticTestGroup, list[DiagnosticTest]]]:
+        result = await db.execute(
+            select(DiagnosticTestGroup)
+            .join(DiagnosticPackageTestGroup, DiagnosticPackageTestGroup.group_id == DiagnosticTestGroup.group_id)
+            .where(DiagnosticPackageTestGroup.diagnostic_package_id == package_id)
+            .order_by(DiagnosticPackageTestGroup.display_order.asc().nulls_last(), DiagnosticTestGroup.group_id.asc())
+        )
+        groups = list(result.scalars().all())
+        response: list[tuple[DiagnosticTestGroup, list[DiagnosticTest]]] = []
+        for group in groups:
+            tests = await self.get_tests_for_group(db, group_id=group.group_id)
+            response.append((group, tests))
+        return response
+
+    async def get_assigned_group_ids_for_package(self, db: AsyncSession, *, package_id: int) -> set[int]:
+        result = await db.execute(
+            select(DiagnosticPackageTestGroup.group_id).where(
+                DiagnosticPackageTestGroup.diagnostic_package_id == package_id
+            )
+        )
+        return set(result.scalars().all())
+
+    async def get_assigned_group_ids_for_package_ordered(self, db: AsyncSession, *, package_id: int) -> list[int]:
+        result = await db.execute(
+            select(DiagnosticPackageTestGroup.group_id)
+            .where(DiagnosticPackageTestGroup.diagnostic_package_id == package_id)
+            .order_by(DiagnosticPackageTestGroup.display_order.asc().nulls_last(), DiagnosticPackageTestGroup.id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def assign_groups_to_package(
+        self,
+        db: AsyncSession,
+        *,
+        package_id: int,
+        group_ids: list[int],
+    ) -> tuple[list[int], list[int]]:
+        unique_ids = list(dict.fromkeys(group_ids))
+        added: list[int] = []
+        skipped: list[int] = []
+        max_order_result = await db.execute(
+            select(func.max(DiagnosticPackageTestGroup.display_order)).where(
+                DiagnosticPackageTestGroup.diagnostic_package_id == package_id
+            )
+        )
+        max_order = max_order_result.scalar_one_or_none()
+        next_order = (int(max_order) if max_order is not None else 0) + 1
+
+        for group_id in unique_ids:
+            stmt = (
+                insert(DiagnosticPackageTestGroup)
+                .values(diagnostic_package_id=package_id, group_id=group_id, display_order=next_order)
+                .on_conflict_do_nothing(index_elements=["diagnostic_package_id", "group_id"])
+                .returning(DiagnosticPackageTestGroup.id)
+            )
+            result = await db.execute(stmt)
+            inserted_id = result.scalar_one_or_none()
+            if inserted_id is None:
+                skipped.append(group_id)
+            else:
+                added.append(group_id)
+                next_order += 1
+        return added, skipped
+
+    async def remove_group_from_package(self, db: AsyncSession, *, package_id: int, group_id: int) -> bool:
+        result = await db.execute(
+            delete(DiagnosticPackageTestGroup).where(
+                DiagnosticPackageTestGroup.diagnostic_package_id == package_id,
+                DiagnosticPackageTestGroup.group_id == group_id,
+            )
+        )
+        return int(result.rowcount or 0) > 0
+
+    async def reorder_package_groups(self, db: AsyncSession, *, package_id: int, group_ids: list[int]) -> None:
+        for index, group_id in enumerate(group_ids, start=1):
+            await db.execute(
+                sql_update(DiagnosticPackageTestGroup)
+                .where(
+                    DiagnosticPackageTestGroup.diagnostic_package_id == package_id,
+                    DiagnosticPackageTestGroup.group_id == group_id,
+                )
+                .values(display_order=index)
+            )
+        await db.flush()
 
     async def get_samples(self, db: AsyncSession, *, package_id: int) -> list[DiagnosticPackageSample]:
         result = await db.execute(

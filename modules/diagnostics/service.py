@@ -22,6 +22,10 @@ from modules.diagnostics.models import (
 )
 from modules.diagnostics.repository import DiagnosticsRepository
 from modules.diagnostics.schemas import (
+    AssignGroupsToPackageRequest,
+    AssignGroupsToPackageResponse,
+    AssignTestsToGroupRequest,
+    AssignTestsToGroupResponse,
     DiagnosticPackageCreate,
     DiagnosticPackageDetailResponse,
     DiagnosticPackageListItem,
@@ -31,6 +35,7 @@ from modules.diagnostics.schemas import (
     FilterCreate,
     FilterResponse,
     FilterUpdate,
+    PackageTestsResponse,
     PreparationCreate,
     PreparationResponse,
     PreparationUpdate,
@@ -48,6 +53,8 @@ from modules.diagnostics.schemas import (
     TestGroupUpdate,
     TestResponse,
     TestUpdate,
+    ReorderGroupTestsRequest,
+    ReorderPackageGroupsRequest,
 )
 from modules.employee.service import EmployeeContext
 
@@ -91,6 +98,22 @@ class DiagnosticsService:
     def _normalize_lower(self, value: str | None) -> str | None:
         normalized = self._normalize(value)
         return normalized.lower() if normalized else None
+
+    def _validate_exact_assignment_ids(self, *, requested_ids: list[int], assigned_ids: list[int], field_name: str) -> list[int]:
+        requested_unique = list(dict.fromkeys(requested_ids))
+        if len(requested_unique) != len(requested_ids):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"{field_name} contains duplicate ids",
+            )
+        if set(requested_unique) != set(assigned_ids):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"{field_name} must contain exactly the currently assigned ids",
+            )
+        return requested_unique
 
     def _validate_package_common_fields(self, payload: dict) -> None:
         collection_type = self._normalize_lower(payload.get("collection_type"))
@@ -167,6 +190,31 @@ class DiagnosticsService:
             preparation_title=row.preparation_title,
             steps=steps,
             display_order=row.display_order,
+        )
+
+    def _to_test_response(self, row: DiagnosticTest) -> TestResponse:
+        return TestResponse(
+            test_id=row.test_id,
+            test_name=row.test_name,
+            is_available=bool(row.is_available),
+            display_order=row.display_order,
+        )
+
+    def _to_group_response(
+        self,
+        row: DiagnosticTestGroup,
+        *,
+        tests: list[DiagnosticTest] | None = None,
+        test_count: int | None = None,
+    ) -> TestGroupResponse:
+        tests_value = tests or []
+        resolved_count = test_count if test_count is not None else len(tests_value)
+        return TestGroupResponse(
+            group_id=row.group_id,
+            group_name=row.group_name,
+            display_order=row.display_order,
+            test_count=resolved_count,
+            tests=[self._to_test_response(test_row) for test_row in tests_value],
         )
 
     def _to_package_response(self, row: DiagnosticPackage) -> DiagnosticPackageResponse:
@@ -246,35 +294,14 @@ class DiagnosticsService:
             preparations=[self._to_preparation_response(preparation_row) for preparation_row in preparations],
         )
 
-    async def get_package_tests(self, db, *, package_id: int) -> list[TestGroupResponse]:
+    async def get_package_tests(self, db, *, package_id: int) -> PackageTestsResponse:
         package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
         if package is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
 
-        groups = await self._repository.get_package_tests(db, package_id=package_id)
-        response: list[TestGroupResponse] = []
-        for group in groups:
-            tests_sorted = sorted(list(group.tests), key=lambda t: (t.display_order is None, t.display_order or 0, t.test_id))
-            response.append(
-                TestGroupResponse(
-                    group_id=group.group_id,
-                    diagnostic_package_id=group.diagnostic_package_id,
-                    group_name=group.group_name,
-                    test_count=group.test_count,
-                    display_order=group.display_order,
-                    tests=[
-                        TestResponse(
-                            test_id=test.test_id,
-                            group_id=test.group_id,
-                            test_name=test.test_name,
-                            display_order=test.display_order,
-                            is_available=test.is_available,
-                        )
-                        for test in tests_sorted
-                    ],
-                )
-            )
-        return response
+        group_rows = await self._repository.get_package_test_groups(db, package_id=package_id)
+        groups = [self._to_group_response(group_row, tests=tests) for group_row, tests in group_rows]
+        return PackageTestsResponse(diagnostic_package_id=package_id, groups=groups)
 
     async def create_package(
         self,
@@ -343,6 +370,453 @@ class DiagnosticsService:
             session_id=None,
         )
         return self._to_package_response(updated)
+
+    async def get_all_tests(self, db) -> list[TestResponse]:
+        rows = await self._repository.get_all_tests(db)
+        return [self._to_test_response(row) for row in rows]
+
+    async def get_test_by_id(self, db, *, test_id: int) -> TestResponse:
+        row = await self._repository.get_test_by_id(db, test_id=test_id)
+        if row is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
+        return self._to_test_response(row)
+
+    async def create_test(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        data: TestCreate,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> TestResponse:
+        self._ensure_employee_access(employee)
+        payload = data.model_dump(exclude_none=True)
+        test_name = self._normalize(payload.get("test_name"))
+        if test_name is None:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        payload["test_name"] = test_name
+
+        created = await self._repository.create_test(db, DiagnosticTest(**payload))
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_CREATE_DIAGNOSTIC_TEST",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return self._to_test_response(created)
+
+    async def update_test(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        test_id: int,
+        data: TestUpdate,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> TestResponse:
+        self._ensure_employee_access(employee)
+        existing = await self._repository.get_test_by_id(db, test_id=test_id)
+        if existing is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
+
+        payload = data.model_dump(exclude_none=True)
+        if "test_name" in payload:
+            test_name = self._normalize(payload.get("test_name"))
+            if test_name is None:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            payload["test_name"] = test_name
+
+        updated = await self._repository.update_test(db, test_id=test_id, data=payload)
+        if updated is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_UPDATE_DIAGNOSTIC_TEST",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return self._to_test_response(updated)
+
+    async def delete_test(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        test_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> None:
+        self._ensure_employee_access(employee)
+        existing = await self._repository.get_test_by_id(db, test_id=test_id)
+        if existing is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
+        await self._repository.delete_test(db, test_id=test_id)
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_DELETE_DIAGNOSTIC_TEST",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+    async def get_all_groups(self, db) -> list[TestGroupResponse]:
+        rows = await self._repository.get_all_groups(db)
+        return [self._to_group_response(group, tests=[], test_count=test_count) for group, test_count in rows]
+
+    async def get_group_detail(self, db, *, group_id: int) -> TestGroupResponse:
+        group = await self._repository.get_group_by_id(db, group_id=group_id)
+        if group is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+        tests = await self._repository.get_tests_for_group(db, group_id=group_id)
+        return self._to_group_response(group, tests=tests)
+
+    async def create_group(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        data: TestGroupCreate,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> TestGroupResponse:
+        self._ensure_employee_access(employee)
+        payload = data.model_dump(exclude_none=True)
+        group_name = self._normalize(payload.get("group_name"))
+        if group_name is None:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        payload["group_name"] = group_name
+
+        created = await self._repository.create_group(db, DiagnosticTestGroup(**payload))
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_CREATE_DIAGNOSTIC_TEST_GROUP",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return self._to_group_response(created, tests=[], test_count=0)
+
+    async def update_group(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        group_id: int,
+        data: TestGroupUpdate,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> TestGroupResponse:
+        self._ensure_employee_access(employee)
+        existing = await self._repository.get_group_by_id(db, group_id=group_id)
+        if existing is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+
+        payload = data.model_dump(exclude_none=True)
+        if "group_name" in payload:
+            group_name = self._normalize(payload.get("group_name"))
+            if group_name is None:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            payload["group_name"] = group_name
+
+        updated = await self._repository.update_group(db, group_id=group_id, data=payload)
+        if updated is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+        tests = await self._repository.get_tests_for_group(db, group_id=group_id)
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_UPDATE_DIAGNOSTIC_TEST_GROUP",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return self._to_group_response(updated, tests=tests)
+
+    async def delete_group(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        group_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> None:
+        self._ensure_employee_access(employee)
+        existing = await self._repository.get_group_by_id(db, group_id=group_id)
+        if existing is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+        await self._repository.delete_group(db, group_id=group_id)
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_DELETE_DIAGNOSTIC_TEST_GROUP",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+    async def get_group_tests(self, db, *, group_id: int) -> list[TestResponse]:
+        group = await self._repository.get_group_by_id(db, group_id=group_id)
+        if group is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+        tests = await self._repository.get_tests_for_group(db, group_id=group_id)
+        return [self._to_test_response(row) for row in tests]
+
+    async def assign_tests_to_group(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        group_id: int,
+        data: AssignTestsToGroupRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> AssignTestsToGroupResponse:
+        self._ensure_employee_access(employee)
+        group = await self._repository.get_group_by_id(db, group_id=group_id)
+        if group is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+
+        invalid_ids: list[int] = []
+        for test_id in data.test_ids:
+            row = await self._repository.get_test_by_id(db, test_id=test_id)
+            if row is None:
+                invalid_ids.append(test_id)
+        if invalid_ids:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"The following test_ids do not exist: {invalid_ids}",
+            )
+
+        added_ids, skipped_ids = await self._repository.assign_tests_to_group(
+            db,
+            group_id=group_id,
+            test_ids=data.test_ids,
+        )
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_ASSIGN_DIAGNOSTIC_TESTS_TO_GROUP",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return AssignTestsToGroupResponse(
+            group_id=group_id,
+            added_test_ids=added_ids,
+            skipped_test_ids=skipped_ids,
+        )
+
+    async def remove_test_from_group(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        group_id: int,
+        test_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> None:
+        self._ensure_employee_access(employee)
+        group = await self._repository.get_group_by_id(db, group_id=group_id)
+        if group is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+        test = await self._repository.get_test_by_id(db, test_id=test_id)
+        if test is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
+        deleted = await self._repository.remove_test_from_group(db, group_id=group_id, test_id=test_id)
+        if not deleted:
+            raise AppError(
+                status_code=404,
+                error_code="DIAGNOSTIC_TEST_NOT_ASSIGNED_TO_GROUP",
+                message="This test is not assigned to this group",
+            )
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_REMOVE_DIAGNOSTIC_TEST_FROM_GROUP",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+    async def reorder_group_tests(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        group_id: int,
+        data: ReorderGroupTestsRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+        group = await self._repository.get_group_by_id(db, group_id=group_id)
+        if group is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+        assigned_ids = await self._repository.get_assigned_test_ids_for_group_ordered(db, group_id=group_id)
+        ordered_ids = self._validate_exact_assignment_ids(
+            requested_ids=data.test_ids,
+            assigned_ids=assigned_ids,
+            field_name="test_ids",
+        )
+        await self._repository.reorder_group_tests(db, group_id=group_id, test_ids=ordered_ids)
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_REORDER_DIAGNOSTIC_TESTS_IN_GROUP",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return {"group_id": group_id, "test_ids": ordered_ids}
+
+    async def assign_groups_to_package(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        package_id: int,
+        data: AssignGroupsToPackageRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> AssignGroupsToPackageResponse:
+        self._ensure_employee_access(employee)
+        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
+        if package is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
+
+        invalid_ids: list[int] = []
+        for group_id in data.group_ids:
+            row = await self._repository.get_group_by_id(db, group_id=group_id)
+            if row is None:
+                invalid_ids.append(group_id)
+        if invalid_ids:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"The following group_ids do not exist: {invalid_ids}",
+            )
+
+        added_ids, skipped_ids = await self._repository.assign_groups_to_package(
+            db,
+            package_id=package_id,
+            group_ids=data.group_ids,
+        )
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_ASSIGN_DIAGNOSTIC_TEST_GROUPS_TO_PACKAGE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return AssignGroupsToPackageResponse(
+            diagnostic_package_id=package_id,
+            added_group_ids=added_ids,
+            skipped_group_ids=skipped_ids,
+        )
+
+    async def remove_group_from_package(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        package_id: int,
+        group_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> None:
+        self._ensure_employee_access(employee)
+        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
+        if package is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
+        group = await self._repository.get_group_by_id(db, group_id=group_id)
+        if group is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+        deleted = await self._repository.remove_group_from_package(
+            db,
+            package_id=package_id,
+            group_id=group_id,
+        )
+        if not deleted:
+            raise AppError(
+                status_code=404,
+                error_code="DIAGNOSTIC_GROUP_NOT_ASSIGNED_TO_PACKAGE",
+                message="This group is not assigned to this package",
+            )
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_REMOVE_DIAGNOSTIC_TEST_GROUP_FROM_PACKAGE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+    async def reorder_package_groups(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        package_id: int,
+        data: ReorderPackageGroupsRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
+        if package is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
+        assigned_ids = await self._repository.get_assigned_group_ids_for_package_ordered(db, package_id=package_id)
+        ordered_ids = self._validate_exact_assignment_ids(
+            requested_ids=data.group_ids,
+            assigned_ids=assigned_ids,
+            field_name="group_ids",
+        )
+        await self._repository.reorder_package_groups(db, package_id=package_id, group_ids=ordered_ids)
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_REORDER_DIAGNOSTIC_GROUPS_IN_PACKAGE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return {"diagnostic_package_id": package_id, "group_ids": ordered_ids}
 
     async def update_package_status(
         self,
@@ -685,266 +1159,6 @@ class DiagnosticsService:
             session_id=None,
         )
 
-    async def create_test_group(
-        self,
-        db,
-        *,
-        employee: EmployeeContext,
-        package_id: int,
-        data: TestGroupCreate,
-        ip_address: str,
-        user_agent: str,
-        endpoint: str,
-    ) -> TestGroupResponse:
-        self._ensure_employee_access(employee)
-        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
-        if package is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
-
-        payload = data.model_dump(exclude_none=True)
-        group_name = self._normalize(payload.get("group_name"))
-        if group_name is None:
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-        payload["group_name"] = group_name
-
-        created = await self._repository.create_test_group(
-            db,
-            package_id=package_id,
-            data=DiagnosticTestGroup(**payload),
-        )
-        await self._require_audit_service().log_event(
-            db,
-            action="EMPLOYEE_CREATE_DIAGNOSTIC_TEST_GROUP",
-            endpoint=endpoint,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            user_id=employee.user_id,
-            session_id=None,
-        )
-        return TestGroupResponse(
-            group_id=created.group_id,
-            diagnostic_package_id=created.diagnostic_package_id,
-            group_name=created.group_name,
-            test_count=created.test_count,
-            display_order=created.display_order,
-            tests=[],
-        )
-
-    async def update_test_group(
-        self,
-        db,
-        *,
-        employee: EmployeeContext,
-        package_id: int,
-        group_id: int,
-        data: TestGroupUpdate,
-        ip_address: str,
-        user_agent: str,
-        endpoint: str,
-    ) -> TestGroupResponse:
-        self._ensure_employee_access(employee)
-        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
-        if package is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
-
-        group = await self._repository.get_test_group_by_id(db, group_id=group_id)
-        if group is None or group.diagnostic_package_id != package_id:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
-
-        payload = data.model_dump(exclude_none=True)
-        if "group_name" in payload:
-            group_name = self._normalize(payload["group_name"])
-            if group_name is None:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            payload["group_name"] = group_name
-
-        updated = await self._repository.update_test_group(db, group_id=group_id, data=payload)
-        if updated is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
-
-        await self._require_audit_service().log_event(
-            db,
-            action="EMPLOYEE_UPDATE_DIAGNOSTIC_TEST_GROUP",
-            endpoint=endpoint,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            user_id=employee.user_id,
-            session_id=None,
-        )
-        return TestGroupResponse(
-            group_id=updated.group_id,
-            diagnostic_package_id=updated.diagnostic_package_id,
-            group_name=updated.group_name,
-            test_count=updated.test_count,
-            display_order=updated.display_order,
-            tests=[],
-        )
-
-    async def delete_test_group(
-        self,
-        db,
-        *,
-        employee: EmployeeContext,
-        package_id: int,
-        group_id: int,
-        ip_address: str,
-        user_agent: str,
-        endpoint: str,
-    ) -> None:
-        self._ensure_employee_access(employee)
-        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
-        if package is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
-
-        group = await self._repository.get_test_group_by_id(db, group_id=group_id)
-        if group is None or group.diagnostic_package_id != package_id:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
-
-        await self._repository.delete_test_group(db, group_id=group_id)
-        await self._require_audit_service().log_event(
-            db,
-            action="EMPLOYEE_DELETE_DIAGNOSTIC_TEST_GROUP",
-            endpoint=endpoint,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            user_id=employee.user_id,
-            session_id=None,
-        )
-
-    async def create_test(
-        self,
-        db,
-        *,
-        employee: EmployeeContext,
-        package_id: int,
-        group_id: int,
-        data: TestCreate,
-        ip_address: str,
-        user_agent: str,
-        endpoint: str,
-    ) -> TestResponse:
-        self._ensure_employee_access(employee)
-        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
-        if package is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
-
-        group = await self._repository.get_test_group_by_id(db, group_id=group_id)
-        if group is None or group.diagnostic_package_id != package_id:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
-
-        payload = data.model_dump(exclude_none=True)
-        test_name = self._normalize(payload.get("test_name"))
-        if test_name is None:
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-        payload["test_name"] = test_name
-
-        created = await self._repository.create_test(db, group_id=group_id, data=DiagnosticTest(**payload))
-        await self._require_audit_service().log_event(
-            db,
-            action="EMPLOYEE_CREATE_DIAGNOSTIC_TEST",
-            endpoint=endpoint,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            user_id=employee.user_id,
-            session_id=None,
-        )
-        return TestResponse(
-            test_id=created.test_id,
-            group_id=created.group_id,
-            test_name=created.test_name,
-            display_order=created.display_order,
-            is_available=created.is_available,
-        )
-
-    async def update_test(
-        self,
-        db,
-        *,
-        employee: EmployeeContext,
-        package_id: int,
-        group_id: int,
-        test_id: int,
-        data: TestUpdate,
-        ip_address: str,
-        user_agent: str,
-        endpoint: str,
-    ) -> TestResponse:
-        self._ensure_employee_access(employee)
-        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
-        if package is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
-
-        group = await self._repository.get_test_group_by_id(db, group_id=group_id)
-        if group is None or group.diagnostic_package_id != package_id:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
-
-        test = await self._repository.get_test_by_id(db, test_id=test_id)
-        if test is None or test.group_id != group_id:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
-
-        payload = data.model_dump(exclude_none=True)
-        if "test_name" in payload:
-            test_name = self._normalize(payload["test_name"])
-            if test_name is None:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            payload["test_name"] = test_name
-
-        updated = await self._repository.update_test(db, test_id=test_id, data=payload)
-        if updated is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
-
-        await self._require_audit_service().log_event(
-            db,
-            action="EMPLOYEE_UPDATE_DIAGNOSTIC_TEST",
-            endpoint=endpoint,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            user_id=employee.user_id,
-            session_id=None,
-        )
-        return TestResponse(
-            test_id=updated.test_id,
-            group_id=updated.group_id,
-            test_name=updated.test_name,
-            display_order=updated.display_order,
-            is_available=updated.is_available,
-        )
-
-    async def delete_test(
-        self,
-        db,
-        *,
-        employee: EmployeeContext,
-        package_id: int,
-        group_id: int,
-        test_id: int,
-        ip_address: str,
-        user_agent: str,
-        endpoint: str,
-    ) -> None:
-        self._ensure_employee_access(employee)
-        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
-        if package is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
-
-        group = await self._repository.get_test_group_by_id(db, group_id=group_id)
-        if group is None or group.diagnostic_package_id != package_id:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
-
-        test = await self._repository.get_test_by_id(db, test_id=test_id)
-        if test is None or test.group_id != group_id:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
-
-        await self._repository.delete_test(db, test_id=test_id)
-        await self._require_audit_service().log_event(
-            db,
-            action="EMPLOYEE_DELETE_DIAGNOSTIC_TEST",
-            endpoint=endpoint,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            user_id=employee.user_id,
-            session_id=None,
-        )
 
     async def create_sample(
         self,

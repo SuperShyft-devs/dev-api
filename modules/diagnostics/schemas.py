@@ -116,8 +116,8 @@ class TagResponse(BaseModel):
 
 class TestCreate(BaseModel):
     test_name: str = Field(min_length=1)
+    is_available: bool = True
     display_order: Optional[int] = None
-    is_available: Optional[bool] = True
 
 
 class TestUpdate(BaseModel):
@@ -128,31 +128,60 @@ class TestUpdate(BaseModel):
 
 class TestResponse(BaseModel):
     test_id: int
-    group_id: int
     test_name: str
+    is_available: bool
     display_order: Optional[int] = None
-    is_available: Optional[bool] = None
 
 
 class TestGroupCreate(BaseModel):
     group_name: str = Field(min_length=1)
-    test_count: Optional[int] = None
     display_order: Optional[int] = None
 
 
 class TestGroupUpdate(BaseModel):
     group_name: Optional[str] = None
-    test_count: Optional[int] = None
     display_order: Optional[int] = None
 
 
 class TestGroupResponse(BaseModel):
     group_id: int
-    diagnostic_package_id: int
     group_name: str
-    test_count: Optional[int] = None
+    test_count: int
     display_order: Optional[int] = None
     tests: list[TestResponse] = Field(default_factory=list)
+
+
+class AssignTestsToGroupRequest(BaseModel):
+    test_ids: list[int] = Field(min_length=1)
+
+
+class ReorderGroupTestsRequest(BaseModel):
+    test_ids: list[int] = Field(min_length=1)
+
+
+class AssignTestsToGroupResponse(BaseModel):
+    group_id: int
+    added_test_ids: list[int] = Field(default_factory=list)
+    skipped_test_ids: list[int] = Field(default_factory=list)
+
+
+class AssignGroupsToPackageRequest(BaseModel):
+    group_ids: list[int] = Field(min_length=1)
+
+
+class ReorderPackageGroupsRequest(BaseModel):
+    group_ids: list[int] = Field(min_length=1)
+
+
+class AssignGroupsToPackageResponse(BaseModel):
+    diagnostic_package_id: int
+    added_group_ids: list[int] = Field(default_factory=list)
+    skipped_group_ids: list[int] = Field(default_factory=list)
+
+
+class PackageTestsResponse(BaseModel):
+    diagnostic_package_id: int
+    groups: list[TestGroupResponse] = Field(default_factory=list)
 
 
 class SampleCreate(BaseModel):

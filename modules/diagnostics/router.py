@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
 from db.session import get_db
 from modules.diagnostics.dependencies import get_diagnostics_service
 from modules.diagnostics.schemas import (
+    AssignGroupsToPackageRequest,
+    AssignTestsToGroupRequest,
     DiagnosticPackageCreate,
     DiagnosticPackageStatusUpdate,
     DiagnosticPackageUpdate,
@@ -18,6 +20,8 @@ from modules.diagnostics.schemas import (
     PreparationUpdate,
     ReasonCreate,
     ReasonUpdate,
+    ReorderGroupTestsRequest,
+    ReorderPackageGroupsRequest,
     SampleCreate,
     SampleUpdate,
     TagCreate,
@@ -31,7 +35,7 @@ from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
 
 
-router = APIRouter(prefix="/diagnostic-packages", tags=["diagnostic-packages"])
+router = APIRouter(tags=["diagnostics"])
 
 
 def _client_ip(request: Request) -> str:
@@ -43,7 +47,7 @@ def _client_ip(request: Request) -> str:
     return request.client.host
 
 
-@router.get("")
+@router.get("/diagnostic-packages")
 async def list_diagnostic_packages(
     gender: str | None = None,
     tag: str | None = None,
@@ -54,7 +58,7 @@ async def list_diagnostic_packages(
     return success_response([item.model_dump() for item in data])
 
 
-@router.get("/filters")
+@router.get("/diagnostic-packages/filters")
 async def list_diagnostic_filters(
     db: AsyncSession = Depends(get_db),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
@@ -63,7 +67,7 @@ async def list_diagnostic_filters(
     return success_response([item.model_dump() for item in data])
 
 
-@router.get("/{package_id}")
+@router.get("/diagnostic-packages/{package_id}")
 async def get_diagnostic_package_detail(
     package_id: int,
     db: AsyncSession = Depends(get_db),
@@ -73,17 +77,17 @@ async def get_diagnostic_package_detail(
     return success_response(data.model_dump())
 
 
-@router.get("/{package_id}/tests")
+@router.get("/diagnostic-packages/{package_id}/tests")
 async def get_diagnostic_package_tests(
     package_id: int,
     db: AsyncSession = Depends(get_db),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
     data = await diagnostics_service.get_package_tests(db, package_id=package_id)
-    return success_response([item.model_dump() for item in data])
+    return success_response(data.model_dump())
 
 
-@router.post("/filters", status_code=201)
+@router.post("/diagnostic-packages/filters", status_code=201)
 async def create_filter(
     payload: FilterCreate,
     request: Request,
@@ -103,7 +107,7 @@ async def create_filter(
     return success_response(created.model_dump())
 
 
-@router.put("/filters/{filter_id}")
+@router.put("/diagnostic-packages/filters/{filter_id}")
 async def update_filter(
     filter_id: int,
     payload: FilterUpdate,
@@ -125,7 +129,7 @@ async def update_filter(
     return success_response(updated.model_dump())
 
 
-@router.delete("/filters/{filter_id}")
+@router.delete("/diagnostic-packages/filters/{filter_id}")
 async def delete_filter(
     filter_id: int,
     request: Request,
@@ -145,7 +149,7 @@ async def delete_filter(
     return success_response({"filter_id": filter_id, "deleted": True})
 
 
-@router.post("", status_code=201)
+@router.post("/diagnostic-packages", status_code=201)
 async def create_package(
     payload: DiagnosticPackageCreate,
     request: Request,
@@ -165,7 +169,7 @@ async def create_package(
     return success_response(created.model_dump())
 
 
-@router.put("/{package_id}")
+@router.put("/diagnostic-packages/{package_id}")
 async def update_package(
     package_id: int,
     payload: DiagnosticPackageUpdate,
@@ -187,7 +191,7 @@ async def update_package(
     return success_response(updated.model_dump())
 
 
-@router.patch("/{package_id}/status")
+@router.patch("/diagnostic-packages/{package_id}/status")
 async def update_package_status(
     package_id: int,
     payload: DiagnosticPackageStatusUpdate,
@@ -209,7 +213,7 @@ async def update_package_status(
     return success_response(updated.model_dump())
 
 
-@router.post("/{package_id}/reasons", status_code=201)
+@router.post("/diagnostic-packages/{package_id}/reasons", status_code=201)
 async def create_reason(
     package_id: int,
     payload: ReasonCreate,
@@ -231,7 +235,7 @@ async def create_reason(
     return success_response(created.model_dump())
 
 
-@router.put("/{package_id}/reasons/{reason_id}")
+@router.put("/diagnostic-packages/{package_id}/reasons/{reason_id}")
 async def update_reason(
     package_id: int,
     reason_id: int,
@@ -255,7 +259,7 @@ async def update_reason(
     return success_response(updated.model_dump())
 
 
-@router.delete("/{package_id}/reasons/{reason_id}")
+@router.delete("/diagnostic-packages/{package_id}/reasons/{reason_id}")
 async def delete_reason(
     package_id: int,
     reason_id: int,
@@ -277,7 +281,7 @@ async def delete_reason(
     return success_response({"reason_id": reason_id, "deleted": True})
 
 
-@router.post("/{package_id}/tags", status_code=201)
+@router.post("/diagnostic-packages/{package_id}/tags", status_code=201)
 async def create_tag(
     package_id: int,
     payload: TagCreate,
@@ -299,7 +303,7 @@ async def create_tag(
     return success_response(created.model_dump())
 
 
-@router.delete("/{package_id}/tags/{tag_id}")
+@router.delete("/diagnostic-packages/{package_id}/tags/{tag_id}")
 async def delete_tag(
     package_id: int,
     tag_id: int,
@@ -321,149 +325,7 @@ async def delete_tag(
     return success_response({"tag_id": tag_id, "deleted": True})
 
 
-@router.post("/{package_id}/test-groups", status_code=201)
-async def create_test_group(
-    package_id: int,
-    payload: TestGroupCreate,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
-):
-    created = await diagnostics_service.create_test_group(
-        db,
-        employee=employee,
-        package_id=package_id,
-        data=payload,
-        ip_address=_client_ip(request),
-        user_agent=request.headers.get("User-Agent", "unknown"),
-        endpoint=str(request.url.path),
-    )
-    await db.commit()
-    return success_response(created.model_dump())
-
-
-@router.put("/{package_id}/test-groups/{group_id}")
-async def update_test_group(
-    package_id: int,
-    group_id: int,
-    payload: TestGroupUpdate,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
-):
-    updated = await diagnostics_service.update_test_group(
-        db,
-        employee=employee,
-        package_id=package_id,
-        group_id=group_id,
-        data=payload,
-        ip_address=_client_ip(request),
-        user_agent=request.headers.get("User-Agent", "unknown"),
-        endpoint=str(request.url.path),
-    )
-    await db.commit()
-    return success_response(updated.model_dump())
-
-
-@router.delete("/{package_id}/test-groups/{group_id}")
-async def delete_test_group(
-    package_id: int,
-    group_id: int,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
-):
-    await diagnostics_service.delete_test_group(
-        db,
-        employee=employee,
-        package_id=package_id,
-        group_id=group_id,
-        ip_address=_client_ip(request),
-        user_agent=request.headers.get("User-Agent", "unknown"),
-        endpoint=str(request.url.path),
-    )
-    await db.commit()
-    return success_response({"group_id": group_id, "deleted": True})
-
-
-@router.post("/{package_id}/test-groups/{group_id}/tests", status_code=201)
-async def create_test(
-    package_id: int,
-    group_id: int,
-    payload: TestCreate,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
-):
-    created = await diagnostics_service.create_test(
-        db,
-        employee=employee,
-        package_id=package_id,
-        group_id=group_id,
-        data=payload,
-        ip_address=_client_ip(request),
-        user_agent=request.headers.get("User-Agent", "unknown"),
-        endpoint=str(request.url.path),
-    )
-    await db.commit()
-    return success_response(created.model_dump())
-
-
-@router.put("/{package_id}/test-groups/{group_id}/tests/{test_id}")
-async def update_test(
-    package_id: int,
-    group_id: int,
-    test_id: int,
-    payload: TestUpdate,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
-):
-    updated = await diagnostics_service.update_test(
-        db,
-        employee=employee,
-        package_id=package_id,
-        group_id=group_id,
-        test_id=test_id,
-        data=payload,
-        ip_address=_client_ip(request),
-        user_agent=request.headers.get("User-Agent", "unknown"),
-        endpoint=str(request.url.path),
-    )
-    await db.commit()
-    return success_response(updated.model_dump())
-
-
-@router.delete("/{package_id}/test-groups/{group_id}/tests/{test_id}")
-async def delete_test(
-    package_id: int,
-    group_id: int,
-    test_id: int,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
-):
-    await diagnostics_service.delete_test(
-        db,
-        employee=employee,
-        package_id=package_id,
-        group_id=group_id,
-        test_id=test_id,
-        ip_address=_client_ip(request),
-        user_agent=request.headers.get("User-Agent", "unknown"),
-        endpoint=str(request.url.path),
-    )
-    await db.commit()
-    return success_response({"test_id": test_id, "deleted": True})
-
-
-@router.post("/{package_id}/samples", status_code=201)
+@router.post("/diagnostic-packages/{package_id}/samples", status_code=201)
 async def create_sample(
     package_id: int,
     payload: SampleCreate,
@@ -485,7 +347,7 @@ async def create_sample(
     return success_response(created.model_dump())
 
 
-@router.put("/{package_id}/samples/{sample_id}")
+@router.put("/diagnostic-packages/{package_id}/samples/{sample_id}")
 async def update_sample(
     package_id: int,
     sample_id: int,
@@ -509,7 +371,7 @@ async def update_sample(
     return success_response(updated.model_dump())
 
 
-@router.delete("/{package_id}/samples/{sample_id}")
+@router.delete("/diagnostic-packages/{package_id}/samples/{sample_id}")
 async def delete_sample(
     package_id: int,
     sample_id: int,
@@ -531,7 +393,7 @@ async def delete_sample(
     return success_response({"sample_id": sample_id, "deleted": True})
 
 
-@router.post("/{package_id}/preparations", status_code=201)
+@router.post("/diagnostic-packages/{package_id}/preparations", status_code=201)
 async def create_preparation(
     package_id: int,
     payload: PreparationCreate,
@@ -553,7 +415,7 @@ async def create_preparation(
     return success_response(created.model_dump())
 
 
-@router.put("/{package_id}/preparations/{preparation_id}")
+@router.put("/diagnostic-packages/{package_id}/preparations/{preparation_id}")
 async def update_preparation(
     package_id: int,
     preparation_id: int,
@@ -577,7 +439,7 @@ async def update_preparation(
     return success_response(updated.model_dump())
 
 
-@router.delete("/{package_id}/preparations/{preparation_id}")
+@router.delete("/diagnostic-packages/{package_id}/preparations/{preparation_id}")
 async def delete_preparation(
     package_id: int,
     preparation_id: int,
@@ -597,3 +459,314 @@ async def delete_preparation(
     )
     await db.commit()
     return success_response({"preparation_id": preparation_id, "deleted": True})
+
+
+# diagnostic-tests: static routes before dynamic routes
+@router.get("/diagnostic-tests")
+async def list_diagnostic_tests(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.get_all_tests(db)
+    return success_response([item.model_dump() for item in data])
+
+
+@router.post("/diagnostic-tests", status_code=201)
+async def create_diagnostic_test(
+    payload: TestCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    created = await diagnostics_service.create_test(
+        db,
+        employee=employee,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(created.model_dump())
+
+
+@router.get("/diagnostic-tests/{test_id}")
+async def get_diagnostic_test(
+    test_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.get_test_by_id(db, test_id=test_id)
+    return success_response(data.model_dump())
+
+
+@router.put("/diagnostic-tests/{test_id}")
+async def update_diagnostic_test(
+    test_id: int,
+    payload: TestUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    updated = await diagnostics_service.update_test(
+        db,
+        employee=employee,
+        test_id=test_id,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(updated.model_dump())
+
+
+@router.delete("/diagnostic-tests/{test_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_diagnostic_test(
+    test_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    await diagnostics_service.delete_test(
+        db,
+        employee=employee,
+        test_id=test_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# diagnostic-test-groups: static routes before dynamic routes
+@router.get("/diagnostic-test-groups")
+async def list_diagnostic_test_groups(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.get_all_groups(db)
+    return success_response([item.model_dump() for item in data])
+
+
+@router.post("/diagnostic-test-groups", status_code=201)
+async def create_diagnostic_test_group(
+    payload: TestGroupCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    created = await diagnostics_service.create_group(
+        db,
+        employee=employee,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(created.model_dump())
+
+
+@router.get("/diagnostic-test-groups/{group_id}")
+async def get_diagnostic_test_group(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.get_group_detail(db, group_id=group_id)
+    return success_response(data.model_dump())
+
+
+@router.get("/diagnostic-test-groups/{group_id}/tests")
+async def list_group_tests(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.get_group_tests(db, group_id=group_id)
+    return success_response([item.model_dump() for item in data])
+
+
+@router.post("/diagnostic-test-groups/{group_id}/tests", status_code=201)
+async def assign_tests_to_group(
+    group_id: int,
+    payload: AssignTestsToGroupRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.assign_tests_to_group(
+        db,
+        employee=employee,
+        group_id=group_id,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data.model_dump())
+
+
+@router.patch("/diagnostic-test-groups/{group_id}/tests/order")
+async def reorder_group_tests(
+    group_id: int,
+    payload: ReorderGroupTestsRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.reorder_group_tests(
+        db,
+        employee=employee,
+        group_id=group_id,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.put("/diagnostic-test-groups/{group_id}")
+async def update_diagnostic_test_group(
+    group_id: int,
+    payload: TestGroupUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    updated = await diagnostics_service.update_group(
+        db,
+        employee=employee,
+        group_id=group_id,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(updated.model_dump())
+
+
+@router.delete("/diagnostic-test-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_diagnostic_test_group(
+    group_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    await diagnostics_service.delete_group(
+        db,
+        employee=employee,
+        group_id=group_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/diagnostic-test-groups/{group_id}/tests/{test_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_test_from_group(
+    group_id: int,
+    test_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    await diagnostics_service.remove_test_from_group(
+        db,
+        employee=employee,
+        group_id=group_id,
+        test_id=test_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/diagnostic-packages/{package_id}/test-groups", status_code=201)
+async def assign_groups_to_package(
+    package_id: int,
+    payload: AssignGroupsToPackageRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.assign_groups_to_package(
+        db,
+        employee=employee,
+        package_id=package_id,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data.model_dump())
+
+
+@router.patch("/diagnostic-packages/{package_id}/test-groups/order")
+async def reorder_package_test_groups(
+    package_id: int,
+    payload: ReorderPackageGroupsRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.reorder_package_groups(
+        db,
+        employee=employee,
+        package_id=package_id,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.delete("/diagnostic-packages/{package_id}/test-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_group_from_package(
+    package_id: int,
+    group_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    await diagnostics_service.remove_group_from_package(
+        db,
+        employee=employee,
+        package_id=package_id,
+        group_id=group_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
