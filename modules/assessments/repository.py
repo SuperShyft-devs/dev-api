@@ -5,7 +5,7 @@ Only database queries live here.
 
 from __future__ import annotations
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import (
@@ -24,7 +24,7 @@ class AssessmentsRepository:
         result = await db.execute(
             select(AssessmentPackageCategory)
             .where(AssessmentPackageCategory.package_id == package_id)
-            .order_by(AssessmentPackageCategory.id.asc())
+            .order_by(AssessmentPackageCategory.display_order.asc().nulls_last(), AssessmentPackageCategory.id.asc())
         )
         return list(result.scalars().all())
 
@@ -47,6 +47,14 @@ class AssessmentsRepository:
         db: AsyncSession,
         link: AssessmentPackageCategory,
     ) -> AssessmentPackageCategory:
+        if link.display_order is None:
+            max_order_result = await db.execute(
+                select(func.max(AssessmentPackageCategory.display_order)).where(
+                    AssessmentPackageCategory.package_id == link.package_id
+                )
+            )
+            max_order = max_order_result.scalar_one_or_none()
+            link.display_order = (int(max_order) if max_order is not None else 0) + 1
         db.add(link)
         await db.flush()
         return link
@@ -58,6 +66,37 @@ class AssessmentsRepository:
             .where(AssessmentPackageCategory.category_id == category_id)
         )
         return int(result.rowcount or 0)
+
+    async def get_assigned_category_ids_for_package_ordered(
+        self,
+        db: AsyncSession,
+        *,
+        package_id: int,
+    ) -> list[int]:
+        result = await db.execute(
+            select(AssessmentPackageCategory.category_id)
+            .where(AssessmentPackageCategory.package_id == package_id)
+            .order_by(AssessmentPackageCategory.display_order.asc().nulls_last(), AssessmentPackageCategory.id.asc())
+        )
+        return [int(v) for v in result.scalars().all()]
+
+    async def reorder_package_categories(
+        self,
+        db: AsyncSession,
+        *,
+        package_id: int,
+        category_ids: list[int],
+    ) -> None:
+        for index, category_id in enumerate(category_ids, start=1):
+            await db.execute(
+                sql_update(AssessmentPackageCategory)
+                .where(
+                    AssessmentPackageCategory.package_id == package_id,
+                    AssessmentPackageCategory.category_id == category_id,
+                )
+                .values(display_order=index)
+            )
+        await db.flush()
 
     async def list_question_ids_for_package(self, db: AsyncSession, *, package_id: int) -> list[int]:
         result = await db.execute(

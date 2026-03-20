@@ -40,6 +40,22 @@ class AssessmentPackageCategoriesService:
             raise RuntimeError("Audit service is required")
         return self._audit_service
 
+    def _validate_exact_assignment_ids(self, *, requested_ids: list[int], assigned_ids: list[int], field_name: str) -> list[int]:
+        requested_unique = list(dict.fromkeys(requested_ids))
+        if len(requested_unique) != len(requested_ids):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"{field_name} contains duplicate ids",
+            )
+        if set(requested_unique) != set(assigned_ids):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"{field_name} must contain exactly the currently assigned ids",
+            )
+        return requested_unique
+
     async def list_categories_for_package(
         self,
         db: AsyncSession,
@@ -252,3 +268,47 @@ class AssessmentPackageCategoriesService:
         )
 
         return {"package_id": package_id, "removed_category_id": category_id}
+
+    async def reorder_categories_for_package(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        package_id: int,
+        category_ids: list[int],
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+        package_id = _normalize_int(package_id)
+        package = await self._repository.get_package_by_id(db, package_id=package_id)
+        if package is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_PACKAGE_NOT_FOUND", message="Package does not exist")
+
+        assigned_ids = await self._repository.get_assigned_category_ids_for_package_ordered(
+            db,
+            package_id=package_id,
+        )
+        ordered_ids = self._validate_exact_assignment_ids(
+            requested_ids=category_ids,
+            assigned_ids=assigned_ids,
+            field_name="category_ids",
+        )
+        await self._repository.reorder_package_categories(
+            db,
+            package_id=package_id,
+            category_ids=ordered_ids,
+        )
+
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_REORDER_ASSESSMENT_PACKAGE_CATEGORIES",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return {"package_id": package_id, "category_ids": ordered_ids}

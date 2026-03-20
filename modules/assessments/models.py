@@ -43,6 +43,7 @@ class AssessmentPackageCategory(Base):
     id = Column(Integer, primary_key=True)
     package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=False)
     category_id = Column(Integer, ForeignKey("questionnaire_categories.category_id"), nullable=False)
+    display_order = Column(Integer, nullable=True)
 
 
 class AssessmentCategoryProgress(Base):

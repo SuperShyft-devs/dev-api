@@ -48,6 +48,10 @@ class AssessmentPackageCategoriesAddRequest(BaseModel):
     category_ids: list[int] = Field(..., min_length=1)
 
 
+class AssessmentPackageCategoriesReorderRequest(BaseModel):
+    category_ids: list[int] = Field(..., min_length=1)
+
+
 class AssessmentPackageListItem(BaseModel):
     package_id: int
     package_code: Optional[str] = None

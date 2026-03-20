@@ -19,6 +19,7 @@ from modules.assessments.dependencies import (
 from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
 from modules.assessments.schemas import (
     AssessmentPackageCategoriesAddRequest,
+    AssessmentPackageCategoriesReorderRequest,
     AssessmentPackageCreateRequest,
     AssessmentPackageUpdateRequest,
     AssessmentStatusUpdateRequest,
@@ -232,6 +233,28 @@ async def remove_category_from_package(
         employee=employee,
         package_id=package_id,
         category_id=category_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.patch("/{package_id}/categories/order")
+async def reorder_package_categories(
+    package_id: int,
+    payload: AssessmentPackageCategoriesReorderRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: AssessmentPackageCategoriesService = Depends(get_assessment_package_categories_service),
+):
+    data = await service.reorder_categories_for_package(
+        db,
+        employee=employee,
+        package_id=package_id,
+        category_ids=payload.category_ids,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
