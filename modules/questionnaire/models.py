@@ -23,6 +23,8 @@ class QuestionnaireDefinition(Base):
     is_required = Column(Boolean, nullable=False, server_default=text("false"))
     is_read_only = Column(Boolean, nullable=False, server_default=text("false"))
     help_text = Column(Text, nullable=True)
+    visibility_rules = Column(JSON, nullable=True)
+    prefill_from = Column(JSON, nullable=True)
     status = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 

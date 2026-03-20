@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -19,6 +19,8 @@ class QuestionnaireQuestionCreateRequest(BaseModel):
     is_read_only: bool = False
     help_text: Optional[str] = Field(default=None, max_length=2000)
     options: Optional[list[dict[str, str | None]]] = Field(default=None)
+    visibility_rules: Optional[dict[str, Any]] = Field(default=None)
+    prefill_from: Optional[dict[str, Any]] = Field(default=None)
     status: Optional[str] = Field(default="active", min_length=1, max_length=20)
 
     def normalized_question_key(self) -> str:
@@ -42,6 +44,8 @@ class QuestionnaireQuestionUpdateRequest(BaseModel):
     is_read_only: bool = False
     help_text: Optional[str] = Field(default=None, max_length=2000)
     options: Optional[list[dict[str, str | None]]] = Field(default=None)
+    visibility_rules: Optional[dict[str, Any]] = Field(default=None)
+    prefill_from: Optional[dict[str, Any]] = Field(default=None)
 
     def normalized_question_key(self) -> str:
         return _strip(self.question_key).lower()
@@ -69,6 +73,8 @@ class QuestionnaireQuestionResponse(BaseModel):
     is_read_only: bool
     help_text: str | None
     options: Any | None
+    visibility_rules: dict[str, Any] | None
+    prefill_from: dict[str, Any] | None
     status: str
     created_at: Any
 
@@ -86,6 +92,11 @@ class QuestionnaireQuestionWithAnswer(BaseModel):
     is_read_only: bool
     help_text: str | None
     options: Any | None
+    visibility_rules: dict[str, Any] | None
+    prefill_from: dict[str, Any] | None
+    is_visible: bool = True
+    visibility_reason: str | None = None
+    answer_source: Literal["draft", "prefill", "none"] = "none"
     answer: Any | None
 
 

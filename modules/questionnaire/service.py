@@ -10,6 +10,7 @@ from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
 from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition
 from modules.questionnaire.repository import QuestionnaireRepository
+from modules.users.repository import UsersRepository
 from modules.questionnaire.schemas import (
     QuestionnaireCategoryCreateRequest,
     QuestionnaireCategoryQuestionsReorderRequest,
@@ -23,6 +24,10 @@ from modules.questionnaire.schemas import (
 _ALLOWED_STATUS = {"active", "inactive", "archived"}
 _ALLOWED_STATUS_UPDATE = {"active", "inactive"}
 _CHOICE_TYPES = {"single_choice", "multiple_choice"}
+_RULE_MATCH_MODES = {"all", "any"}
+_RULE_TYPES = {"question_answer", "user_preference"}
+_RULE_OPERATORS = {"equals", "not_equals", "contains", "not_contains", "in", "not_in"}
+_PREFERENCE_KEYS = {"diet_preference", "allergies"}
 
 
 def _normalize(value: str | None) -> str:
@@ -58,9 +63,21 @@ def _clean_options(options: list[dict[str, str | None]] | None) -> list[dict[str
     return cleaned
 
 
+def _normalize_text(value: object) -> str:
+    if value is None:
+        return ""
+    return str(value).strip().lower()
+
+
 class QuestionnaireService:
-    def __init__(self, repository: QuestionnaireRepository, audit_service: AuditService | None = None):
+    def __init__(
+        self,
+        repository: QuestionnaireRepository,
+        users_repository: UsersRepository,
+        audit_service: AuditService | None = None,
+    ):
         self._repository = repository
+        self._users_repository = users_repository
         self._audit_service = audit_service
 
     def _ensure_employee_access(self, employee: EmployeeContext | None) -> None:
@@ -88,6 +105,133 @@ class QuestionnaireService:
             )
         return requested_unique
 
+    def _normalize_visibility_rules(self, value: dict | None) -> dict | None:
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        raw_match = _normalize_text(value.get("match") or "all")
+        match_mode = raw_match if raw_match in _RULE_MATCH_MODES else None
+        if match_mode is None:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        conditions = value.get("conditions")
+        if not isinstance(conditions, list):
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        normalized_conditions: list[dict] = []
+        for raw_condition in conditions:
+            if not isinstance(raw_condition, dict):
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            rule_type = _normalize_text(raw_condition.get("type"))
+            operator = _normalize_text(raw_condition.get("operator") or "equals")
+            if rule_type not in _RULE_TYPES or operator not in _RULE_OPERATORS:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+            condition: dict = {"type": rule_type, "operator": operator}
+            if rule_type == "question_answer":
+                question_key = _normalize_text(raw_condition.get("question_key"))
+                if not question_key:
+                    raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+                condition["question_key"] = question_key
+                condition["value"] = raw_condition.get("value")
+            else:
+                preference_key = _normalize_text(raw_condition.get("preference_key"))
+                if preference_key not in _PREFERENCE_KEYS:
+                    raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+                condition["preference_key"] = preference_key
+                condition["value"] = raw_condition.get("value")
+            normalized_conditions.append(condition)
+
+        if len(normalized_conditions) == 0:
+            return None
+
+        return {"match": match_mode, "conditions": normalized_conditions}
+
+    def _normalize_prefill_from(self, value: dict | None) -> dict | None:
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        source = _normalize_text(value.get("source"))
+        preference_key = _normalize_text(value.get("preference_key"))
+        if source != "user_preference" or preference_key not in _PREFERENCE_KEYS:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        return {"source": "user_preference", "preference_key": preference_key}
+
+    def _matches_operator(self, *, actual: object, expected: object, operator: str) -> bool:
+        if operator == "equals":
+            return _normalize_text(actual) == _normalize_text(expected)
+        if operator == "not_equals":
+            return _normalize_text(actual) != _normalize_text(expected)
+        if operator == "contains":
+            if isinstance(actual, list):
+                return _normalize_text(expected) in {_normalize_text(item) for item in actual}
+            return _normalize_text(expected) in _normalize_text(actual)
+        if operator == "not_contains":
+            if isinstance(actual, list):
+                return _normalize_text(expected) not in {_normalize_text(item) for item in actual}
+            return _normalize_text(expected) not in _normalize_text(actual)
+        if operator == "in":
+            if not isinstance(expected, list):
+                return False
+            return _normalize_text(actual) in {_normalize_text(item) for item in expected}
+        if operator == "not_in":
+            if not isinstance(expected, list):
+                return False
+            return _normalize_text(actual) not in {_normalize_text(item) for item in expected}
+        return False
+
+    def _evaluate_visibility_rules(
+        self,
+        *,
+        visibility_rules: dict | None,
+        answers_by_question_key: dict[str, object],
+        preferences: dict[str, object],
+    ) -> tuple[bool, str | None]:
+        if not visibility_rules:
+            return True, None
+
+        conditions = visibility_rules.get("conditions") or []
+        if not isinstance(conditions, list) or len(conditions) == 0:
+            return True, None
+        match_mode = _normalize_text(visibility_rules.get("match") or "all")
+        if match_mode not in _RULE_MATCH_MODES:
+            return False, "invalid_rule"
+
+        results: list[bool] = []
+        for condition in conditions:
+            if not isinstance(condition, dict):
+                results.append(False)
+                continue
+            condition_type = _normalize_text(condition.get("type"))
+            operator = _normalize_text(condition.get("operator") or "equals")
+            expected = condition.get("value")
+            if condition_type == "question_answer":
+                question_key = _normalize_text(condition.get("question_key"))
+                actual = answers_by_question_key.get(question_key)
+                results.append(self._matches_operator(actual=actual, expected=expected, operator=operator))
+            elif condition_type == "user_preference":
+                preference_key = _normalize_text(condition.get("preference_key"))
+                actual = preferences.get(preference_key)
+                results.append(self._matches_operator(actual=actual, expected=expected, operator=operator))
+            else:
+                results.append(False)
+
+        is_visible = all(results) if match_mode == "all" else any(results)
+        return (is_visible, None if is_visible else "visibility_rules_not_matched")
+
+    def _resolve_prefill_answer(self, *, prefill_from: dict | None, preferences: dict[str, object]) -> object | None:
+        if not prefill_from:
+            return None
+        if _normalize_text(prefill_from.get("source")) != "user_preference":
+            return None
+        preference_key = _normalize_text(prefill_from.get("preference_key"))
+        if preference_key not in _PREFERENCE_KEYS:
+            return None
+        return preferences.get(preference_key)
+
     async def _ensure_category_exists(self, db: AsyncSession, *, category_id: int) -> None:
         row = await self._repository.get_category_by_id(db, category_id)
         if row is None:
@@ -112,9 +256,63 @@ class QuestionnaireService:
             "is_read_only": bool(row.is_read_only),
             "help_text": row.help_text,
             "options": serialized_options if serialized_options else None,
+            "visibility_rules": row.visibility_rules,
+            "prefill_from": row.prefill_from,
             "status": row.status,
             "created_at": row.created_at,
         }
+
+    async def _list_active_questions_for_category(
+        self,
+        db: AsyncSession,
+        *,
+        category_id: int,
+    ) -> list[dict]:
+        rows = await self._repository.list_questions_by_category(db, category_id=category_id)
+        active_rows = [row for row in rows if (row.status or "").lower() == "active"]
+        payloads: list[dict] = []
+        for row in active_rows:
+            question = await self._serialize_question(db, row)
+            question["category_id"] = category_id
+            payloads.append(question)
+        return payloads
+
+    def _build_preferences_map(self, preference_row) -> dict[str, object]:
+        if preference_row is None:
+            return {"diet_preference": None, "allergies": []}
+        allergies = preference_row.allergies if isinstance(preference_row.allergies, list) else []
+        return {
+            "diet_preference": preference_row.diet_preference,
+            "allergies": allergies,
+        }
+
+    def _compute_visibility_state(
+        self,
+        *,
+        questions: list[dict],
+        answers_by_question_id: dict[int, object],
+        preferences: dict[str, object],
+    ) -> dict[int, bool]:
+        visibility: dict[int, bool] = {}
+        answers_by_key: dict[str, object] = {}
+        for question in questions:
+            question_id = int(question["question_id"])
+            question_key = _normalize_text(question.get("question_key"))
+            visible, _ = self._evaluate_visibility_rules(
+                visibility_rules=question.get("visibility_rules"),
+                answers_by_question_key=answers_by_key,
+                preferences=preferences,
+            )
+            visibility[question_id] = visible
+            answer = answers_by_question_id.get(question_id)
+            if answer is None:
+                answer = self._resolve_prefill_answer(
+                    prefill_from=question.get("prefill_from"),
+                    preferences=preferences,
+                )
+            if question_key and answer is not None:
+                answers_by_key[question_key] = answer
+        return visibility
 
     async def _resolve_instance_for_user_category(
         self,
@@ -182,6 +380,8 @@ class QuestionnaireService:
 
         options = _clean_options(payload.options)
         self._validate_options_by_type(question_type=question_type, options=options)
+        visibility_rules = self._normalize_visibility_rules(payload.visibility_rules)
+        prefill_from = self._normalize_prefill_from(payload.prefill_from)
         existing = await self._repository.get_definition_by_key(db, question_key=question_key)
         if existing is not None:
             raise AppError(
@@ -197,6 +397,8 @@ class QuestionnaireService:
             is_required=payload.is_required,
             is_read_only=payload.is_read_only,
             help_text=(payload.help_text or "").strip() or None,
+            visibility_rules=visibility_rules,
+            prefill_from=prefill_from,
             status=status_value,
         )
         try:
@@ -319,6 +521,8 @@ class QuestionnaireService:
         row.is_required = payload.is_required
         row.is_read_only = payload.is_read_only
         row.help_text = (payload.help_text or "").strip() or None
+        row.visibility_rules = self._normalize_visibility_rules(payload.visibility_rules)
+        row.prefill_from = self._normalize_prefill_from(payload.prefill_from)
 
         cleaned_options = _clean_options(payload.options)
         self._validate_options_by_type(question_type=question_type, options=cleaned_options)
@@ -491,14 +695,7 @@ class QuestionnaireService:
         category_id: int,
     ) -> list[dict]:
         await self._ensure_category_exists(db, category_id=category_id)
-        rows = await self._repository.list_questions_by_category(db, category_id=category_id)
-        active_rows = [row for row in rows if (row.status or "").lower() == "active"]
-        data: list[dict] = []
-        for row in active_rows:
-            payload = await self._serialize_question(db, row)
-            payload["category_id"] = category_id
-            data.append(payload)
-        return data
+        return await self._list_active_questions_for_category(db, category_id=category_id)
 
     async def assign_category_questions(
         self,
@@ -652,9 +849,8 @@ class QuestionnaireService:
             category_id=category_id,
         )
 
-        questions = await self._repository.list_questions_by_category(db, category_id=category_id)
-        active_questions = [q for q in questions if (q.status or "").lower() == "active"]
-        if not active_questions:
+        questions = await self._list_active_questions_for_category(db, category_id=category_id)
+        if not questions:
             return {
                 "assessment_instance_id": instance.assessment_instance_id,
                 "status": instance.status or "active",
@@ -667,30 +863,61 @@ class QuestionnaireService:
             assessment_instance_id=instance.assessment_instance_id,
         )
         responses_map = {r.question_id: r.answer for r in responses}
+        preferences = self._build_preferences_map(
+            await self._users_repository.get_preferences(db, user_id=user_id)
+        )
 
         # Build response
         questions_with_answers = []
-        for question in active_questions:
-            serialized_options = [
-                {
-                    "option_value": opt.option_value,
-                    "display_name": opt.display_name,
-                    "tooltip_text": opt.tooltip_text,
-                }
-                for opt in await self._repository.list_options_for_question(db, question_id=question.question_id)
-            ]
+        visibility = self._compute_visibility_state(
+            questions=questions,
+            answers_by_question_id=responses_map,
+            preferences=preferences,
+        )
+        answers_by_key: dict[str, object] = {}
+        for question in questions:
+            question_id = int(question["question_id"])
+            question_key = _normalize_text(question.get("question_key"))
+            is_visible, visibility_reason = self._evaluate_visibility_rules(
+                visibility_rules=question.get("visibility_rules"),
+                answers_by_question_key=answers_by_key,
+                preferences=preferences,
+            )
+            # Keep deterministic behavior from computed visibility map for consistency.
+            is_visible = visibility.get(question_id, is_visible)
+            answer = responses_map.get(question_id)
+            answer_source = "none"
+            if answer is not None:
+                answer_source = "draft"
+            elif is_visible:
+                prefill_answer = self._resolve_prefill_answer(
+                    prefill_from=question.get("prefill_from"),
+                    preferences=preferences,
+                )
+                if prefill_answer is not None:
+                    answer = prefill_answer
+                    answer_source = "prefill"
+
+            if question_key and answer is not None:
+                answers_by_key[question_key] = answer
+
             questions_with_answers.append(
                 {
-                    "question_id": question.question_id,
-                    "question_text": question.question_text,
-                    "question_type": question.question_type,
-                    "question_key": question.question_key,
+                    "question_id": question_id,
+                    "question_text": question.get("question_text"),
+                    "question_type": question.get("question_type"),
+                    "question_key": question.get("question_key"),
                     "category_id": category_id,
-                    "is_required": bool(question.is_required),
-                    "is_read_only": bool(question.is_read_only),
-                    "help_text": question.help_text,
-                    "options": serialized_options if serialized_options else None,
-                    "answer": responses_map.get(question.question_id),
+                    "is_required": bool(question.get("is_required")),
+                    "is_read_only": bool(question.get("is_read_only")),
+                    "help_text": question.get("help_text"),
+                    "options": question.get("options"),
+                    "visibility_rules": question.get("visibility_rules"),
+                    "prefill_from": question.get("prefill_from"),
+                    "is_visible": is_visible,
+                    "visibility_reason": visibility_reason,
+                    "answer_source": answer_source,
+                    "answer": answer,
                 }
             )
 
@@ -737,8 +964,30 @@ class QuestionnaireService:
                 message="Assessment is already completed"
             )
         
-        category_questions = await self._repository.list_questions_by_category(db, category_id=category_id)
-        valid_question_ids = {int(row.question_id) for row in category_questions}
+        category_question_rows = await self._repository.list_questions_by_category(db, category_id=category_id)
+        valid_question_ids = {int(row.question_id) for row in category_question_rows}
+        category_questions = await self._list_active_questions_for_category(db, category_id=category_id)
+        active_question_ids = {int(row["question_id"]) for row in category_questions}
+
+        existing_responses = await self._repository.list_responses_for_instance(
+            db,
+            assessment_instance_id=instance.assessment_instance_id,
+            category_id=category_id,
+        )
+        answers_for_visibility: dict[int, object] = {int(row.question_id): row.answer for row in existing_responses}
+        incoming_answers: dict[int, object] = {}
+        for response_item in responses:
+            incoming_answers[int(response_item["question_id"])] = response_item["answer"]
+        answers_for_visibility.update(incoming_answers)
+
+        preferences = self._build_preferences_map(
+            await self._users_repository.get_preferences(db, user_id=user_id)
+        )
+        visible_questions = self._compute_visibility_state(
+            questions=category_questions,
+            answers_by_question_id=answers_for_visibility,
+            preferences=preferences,
+        )
 
         # Validate all question IDs and ensure they're active
         for response_item in responses:
@@ -750,14 +999,17 @@ class QuestionnaireService:
                     error_code="INVALID_STATE",
                     message="Question does not belong to this category",
                 )
-
-            # Verify question is active
-            question = await self._repository.get_definition_by_id(db, question_id)
-            if question is None or (question.status or "").lower() != "active":
+            if question_id not in active_question_ids:
                 raise AppError(
                     status_code=422,
                     error_code="INVALID_STATE",
                     message="Question is not available",
+                )
+            if not visible_questions.get(int(question_id), False):
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Question is not currently visible",
                 )
 
         # Upsert responses

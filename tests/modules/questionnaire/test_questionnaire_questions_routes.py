@@ -98,6 +98,52 @@ async def test_create_question_creates_row(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
+async def test_create_question_persists_visibility_rules_and_prefill(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9012, employee_id=20)
+    payload = {
+        "question_key": "coffee_cups",
+        "question_text": "How many cups?",
+        "question_type": "number",
+        "visibility_rules": {
+            "match": "all",
+            "conditions": [
+                {
+                    "type": "question_answer",
+                    "operator": "equals",
+                    "question_key": "consume_coffee_or_tea",
+                    "value": "yes",
+                }
+            ],
+        },
+        "prefill_from": {"source": "user_preference", "preference_key": "diet_preference"},
+    }
+    response = await async_client.post("/questionnaire/questions", headers=_auth_header(9012), json=payload)
+    assert response.status_code == 201
+    question_id = response.json()["data"]["question_id"]
+    created = await test_db_session.get(QuestionnaireDefinition, question_id)
+    assert created is not None
+    assert created.visibility_rules["match"] == "all"
+    assert created.prefill_from["preference_key"] == "diet_preference"
+
+
+@pytest.mark.asyncio
+async def test_create_question_rejects_invalid_visibility_rules(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9013, employee_id=21)
+    payload = {
+        "question_key": "invalid_rule_q",
+        "question_text": "Invalid rule test",
+        "question_type": "text",
+        "visibility_rules": {
+            "match": "all",
+            "conditions": [{"type": "question_answer", "operator": "equals", "value": "yes"}],
+        },
+    }
+    response = await async_client.post("/questionnaire/questions", headers=_auth_header(9013), json=payload)
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT"
+
+
+@pytest.mark.asyncio
 async def test_list_questions_paginates_and_filters(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9003, employee_id=11)
 

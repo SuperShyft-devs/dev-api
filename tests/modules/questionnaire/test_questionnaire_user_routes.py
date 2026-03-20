@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
+from sqlalchemy import select
 
 from core.config import settings
 from core.security import create_jwt_token
@@ -17,7 +18,7 @@ from modules.questionnaire.models import (
     QuestionnaireOption,
     QuestionnaireResponse,
 )
-from modules.users.models import User
+from modules.users.models import User, UserPreference
 
 
 def _auth_header(user_id: int) -> dict[str, str]:
@@ -423,6 +424,158 @@ async def test_get_questionnaire_skips_inactive_questions(async_client, test_db_
     assert data["questions"][0]["question_id"] == 3004
 
 
+@pytest.mark.asyncio
+async def test_get_questionnaire_applies_parent_answer_visibility(async_client, test_db_session):
+    """Child question is hidden when parent answer does not match rule."""
+    await _seed_user(test_db_session, user_id=5071)
+    await _ensure_test_engagement(test_db_session)
+
+    package = AssessmentPackage(package_id=1701, package_code="PKG1701", display_name="Rule Package", status="active")
+    category = QuestionnaireCategory(category_id=7701, category_key="cat_7701", display_name="Diet", status="active")
+    test_db_session.add_all([package, category])
+    await test_db_session.commit()
+
+    q_parent = QuestionnaireDefinition(
+        question_id=3701,
+        question_key="consume_coffee_or_tea",
+        question_text="Do you consume coffee or tea?",
+        question_type="single_choice",
+        status="active",
+    )
+    q_child = QuestionnaireDefinition(
+        question_id=3702,
+        question_key="coffee_or_tea_cups",
+        question_text="How many cups do you consume?",
+        question_type="number",
+        visibility_rules={
+            "match": "all",
+            "conditions": [
+                {
+                    "type": "question_answer",
+                    "operator": "equals",
+                    "question_key": "consume_coffee_or_tea",
+                    "value": "yes",
+                }
+            ],
+        },
+        status="active",
+    )
+    test_db_session.add_all([q_parent, q_child])
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9971, category_id=7701, question_id=3701)
+    await _map_question_to_category(test_db_session, mapping_id=9972, category_id=7701, question_id=3702)
+    await test_db_session.commit()
+
+    test_db_session.add(AssessmentPackageCategory(package_id=1701, category_id=7701))
+    instance = AssessmentInstance(
+        assessment_instance_id=2701,
+        user_id=5071,
+        package_id=1701,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=2701,
+            question_id=3701,
+            category_id=7701,
+            answer="no",
+            submitted_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get("/questionnaire/7701", headers=_auth_header(5071))
+    assert response.status_code == 200
+    questions = response.json()["data"]["questions"]
+    by_id = {row["question_id"]: row for row in questions}
+    assert by_id[3701]["is_visible"] is True
+    assert by_id[3702]["is_visible"] is False
+    assert by_id[3702]["visibility_reason"] == "visibility_rules_not_matched"
+
+
+@pytest.mark.asyncio
+async def test_get_questionnaire_prefills_and_uses_preferences_for_visibility(async_client, test_db_session):
+    """Preference data should prefill and hide non-applicable questions."""
+    await _seed_user(test_db_session, user_id=5072)
+    await _ensure_test_engagement(test_db_session)
+
+    package = AssessmentPackage(package_id=1702, package_code="PKG1702", display_name="Rule Package", status="active")
+    category = QuestionnaireCategory(category_id=7702, category_key="cat_7702", display_name="Diet", status="active")
+    test_db_session.add_all([package, category])
+    await test_db_session.commit()
+
+    test_db_session.add(
+        UserPreference(
+            user_id=5072,
+            diet_preference="veg",
+            allergies=["dairy"],
+        )
+    )
+
+    q_diet = QuestionnaireDefinition(
+        question_id=3703,
+        question_key="diet_preference",
+        question_text="What is your diet preference?",
+        question_type="single_choice",
+        prefill_from={"source": "user_preference", "preference_key": "diet_preference"},
+        status="active",
+    )
+    q_non_veg = QuestionnaireDefinition(
+        question_id=3704,
+        question_key="consume_non_veg",
+        question_text="Do you consume non-veg?",
+        question_type="single_choice",
+        visibility_rules={
+            "match": "all",
+            "conditions": [
+                {
+                    "type": "user_preference",
+                    "operator": "equals",
+                    "preference_key": "diet_preference",
+                    "value": "non_veg",
+                }
+            ],
+        },
+        status="active",
+    )
+    test_db_session.add_all([q_diet, q_non_veg])
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9973, category_id=7702, question_id=3703)
+    await _map_question_to_category(test_db_session, mapping_id=9974, category_id=7702, question_id=3704)
+    await test_db_session.commit()
+
+    test_db_session.add(AssessmentPackageCategory(package_id=1702, category_id=7702))
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=2702,
+            user_id=5072,
+            package_id=1702,
+            engagement_id=1,
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get("/questionnaire/7702", headers=_auth_header(5072))
+    assert response.status_code == 200
+    questions = response.json()["data"]["questions"]
+    by_id = {row["question_id"]: row for row in questions}
+    assert by_id[3703]["answer"] == "veg"
+    assert by_id[3703]["answer_source"] == "prefill"
+    assert by_id[3704]["is_visible"] is False
+
+    await test_db_session.delete(
+        (
+            await test_db_session.execute(
+                select(UserPreference).where(UserPreference.user_id == 5072)
+            )
+        ).scalar_one()
+    )
+    await test_db_session.commit()
+
+
 # ==================== PUT /questionnaire/{category_id}/responses Tests ====================
 
 
@@ -576,6 +729,71 @@ async def test_upsert_responses_returns_422_when_question_inactive(async_client,
     response = await async_client.put("/questionnaire/7009/responses", headers=_auth_header(5014), json=payload)
     assert response.status_code == 422
     assert "not available" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_rejects_hidden_question(async_client, test_db_session):
+    """Submitting hidden question answers should be rejected."""
+    await _seed_user(test_db_session, user_id=5073)
+    await _ensure_test_engagement(test_db_session)
+
+    package = AssessmentPackage(package_id=1703, package_code="PKG1703", display_name="Rule Package", status="active")
+    category = QuestionnaireCategory(category_id=7703, category_key="cat_7703", display_name="Diet", status="active")
+    test_db_session.add_all([package, category])
+    await test_db_session.commit()
+
+    q_parent = QuestionnaireDefinition(
+        question_id=3705,
+        question_key="consume_coffee_or_tea",
+        question_text="Do you consume coffee or tea?",
+        question_type="single_choice",
+        status="active",
+    )
+    q_child = QuestionnaireDefinition(
+        question_id=3706,
+        question_key="coffee_or_tea_cups",
+        question_text="How many cups?",
+        question_type="number",
+        visibility_rules={
+            "match": "all",
+            "conditions": [
+                {
+                    "type": "question_answer",
+                    "operator": "equals",
+                    "question_key": "consume_coffee_or_tea",
+                    "value": "yes",
+                }
+            ],
+        },
+        status="active",
+    )
+    test_db_session.add_all([q_parent, q_child])
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9975, category_id=7703, question_id=3705)
+    await _map_question_to_category(test_db_session, mapping_id=9976, category_id=7703, question_id=3706)
+    await test_db_session.commit()
+
+    test_db_session.add(AssessmentPackageCategory(package_id=1703, category_id=7703))
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=2703,
+            user_id=5073,
+            package_id=1703,
+            engagement_id=1,
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "responses": [
+            {"question_id": 3705, "answer": "no"},
+            {"question_id": 3706, "answer": 3},
+        ]
+    }
+    response = await async_client.put("/questionnaire/7703/responses", headers=_auth_header(5073), json=payload)
+    assert response.status_code == 422
+    assert response.json()["message"] == "Question is not currently visible"
 
 
 @pytest.mark.asyncio
