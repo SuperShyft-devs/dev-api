@@ -12,6 +12,7 @@ from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDef
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.questionnaire.schemas import (
     QuestionnaireCategoryCreateRequest,
+    QuestionnaireCategoryQuestionsReorderRequest,
     QuestionnaireCategoryStatusUpdateRequest,
     QuestionnaireCategoryUpdateRequest,
     QuestionnaireQuestionCreateRequest,
@@ -70,6 +71,22 @@ class QuestionnaireService:
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
         return self._audit_service
+
+    def _validate_exact_assignment_ids(self, *, requested_ids: list[int], assigned_ids: list[int], field_name: str) -> list[int]:
+        requested_unique = list(dict.fromkeys(requested_ids))
+        if len(requested_unique) != len(requested_ids):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"{field_name} contains duplicate ids",
+            )
+        if set(requested_unique) != set(assigned_ids):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"{field_name} must contain exactly the currently assigned ids",
+            )
+        return requested_unique
 
     async def _ensure_category_exists(self, db: AsyncSession, *, category_id: int) -> None:
         row = await self._repository.get_category_by_id(db, category_id)
@@ -543,6 +560,44 @@ class QuestionnaireService:
             session_id=None,
         )
         return {"category_id": category_id, "question_id": question_id}
+
+    async def reorder_category_questions(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        category_id: int,
+        payload: QuestionnaireCategoryQuestionsReorderRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+        await self._ensure_category_exists(db, category_id=category_id)
+        assigned_ids = await self._repository.get_assigned_question_ids_for_category_ordered(
+            db,
+            category_id=category_id,
+        )
+        ordered_ids = self._validate_exact_assignment_ids(
+            requested_ids=payload.question_ids,
+            assigned_ids=assigned_ids,
+            field_name="question_ids",
+        )
+        await self._repository.reorder_category_questions(
+            db,
+            category_id=category_id,
+            question_ids=ordered_ids,
+        )
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_REORDER_QUESTIONNAIRE_CATEGORY_QUESTIONS",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return {"category_id": category_id, "question_ids": ordered_ids}
 
     async def change_question_status(
         self,

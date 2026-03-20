@@ -26,7 +26,7 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 
 async def _seed_user(test_db_session, *, user_id: int):
-    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000000", status="active"))
+    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.commit()
 
 

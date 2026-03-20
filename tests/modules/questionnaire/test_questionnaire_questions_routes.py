@@ -9,7 +9,12 @@ import pytest
 from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
-from modules.questionnaire.models import QuestionnaireDefinition, QuestionnaireOption
+from modules.questionnaire.models import (
+    QuestionnaireCategory,
+    QuestionnaireCategoryQuestion,
+    QuestionnaireDefinition,
+    QuestionnaireOption,
+)
 from modules.users.models import User
 
 
@@ -19,7 +24,7 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1, role: str = "admin"):
-    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000000", status="active"))
+    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()  # Ensure user is inserted before employee
     test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role=role, status="active"))
     await test_db_session.commit()
@@ -44,7 +49,7 @@ async def test_create_question_requires_auth(async_client):
 
 @pytest.mark.asyncio
 async def test_create_question_requires_employee(async_client, test_db_session):
-    test_db_session.add(User(user_id=9001, phone="9001000000", status="active"))
+    test_db_session.add(User(user_id=9001, age=30, phone="9001000000", status="active"))
     await test_db_session.commit()
 
     response = await async_client.post(
@@ -202,3 +207,124 @@ async def test_list_questions_rejects_invalid_pagination(async_client, test_db_s
     response = await async_client.get("/questionnaire/questions?page=0&limit=10", headers=_auth_header(9008))
     assert response.status_code == 400
     assert response.json() == {"error_code": "INVALID_INPUT", "message": "Invalid request"}
+
+
+@pytest.mark.asyncio
+async def test_reorder_category_questions_requires_auth(async_client):
+    response = await async_client.patch(
+        "/questionnaire/categories/1/questions/order",
+        json={"question_ids": [1]},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_reorder_category_questions_persists_display_order(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9010, employee_id=18)
+
+    test_db_session.add(
+        QuestionnaireCategory(category_id=8100, category_key="cat_8100", display_name="Category 8100", status="active")
+    )
+    test_db_session.add_all(
+        [
+            QuestionnaireDefinition(
+                question_id=9101,
+                question_key="q9101",
+                question_text="Question one",
+                question_type="text",
+                status="active",
+            ),
+            QuestionnaireDefinition(
+                question_id=9102,
+                question_key="q9102",
+                question_text="Question two",
+                question_type="text",
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.commit()
+    test_db_session.add_all(
+        [
+            QuestionnaireCategoryQuestion(
+                id=10101,
+                category_id=8100,
+                question_id=9101,
+                display_order=1,
+            ),
+            QuestionnaireCategoryQuestion(
+                id=10102,
+                category_id=8100,
+                question_id=9102,
+                display_order=2,
+            ),
+        ]
+    )
+    await test_db_session.commit()
+
+    reorder_response = await async_client.patch(
+        "/questionnaire/categories/8100/questions/order",
+        headers=_auth_header(9010),
+        json={"question_ids": [9102, 9101]},
+    )
+    assert reorder_response.status_code == 200
+    assert reorder_response.json()["data"]["question_ids"] == [9102, 9101]
+
+    list_response = await async_client.get(
+        "/questionnaire/categories/8100/questions",
+        headers=_auth_header(9010),
+    )
+    assert list_response.status_code == 200
+    data = list_response.json()["data"]
+    assert [row["question_id"] for row in data] == [9102, 9101]
+
+
+@pytest.mark.asyncio
+async def test_reorder_category_questions_rejects_invalid_ids(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9011, employee_id=19)
+
+    test_db_session.add(
+        QuestionnaireCategory(category_id=8101, category_key="cat_8101", display_name="Category 8101", status="active")
+    )
+    test_db_session.add_all(
+        [
+            QuestionnaireDefinition(
+                question_id=9201,
+                question_key="q9201",
+                question_text="Question one",
+                question_type="text",
+                status="active",
+            ),
+            QuestionnaireDefinition(
+                question_id=9202,
+                question_key="q9202",
+                question_text="Question two",
+                question_type="text",
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.commit()
+    test_db_session.add_all(
+        [
+            QuestionnaireCategoryQuestion(id=10201, category_id=8101, question_id=9201, display_order=1),
+            QuestionnaireCategoryQuestion(id=10202, category_id=8101, question_id=9202, display_order=2),
+        ]
+    )
+    await test_db_session.commit()
+
+    duplicate_response = await async_client.patch(
+        "/questionnaire/categories/8101/questions/order",
+        headers=_auth_header(9011),
+        json={"question_ids": [9201, 9201]},
+    )
+    assert duplicate_response.status_code == 400
+    assert duplicate_response.json()["error_code"] == "INVALID_INPUT"
+
+    missing_response = await async_client.patch(
+        "/questionnaire/categories/8101/questions/order",
+        headers=_auth_header(9011),
+        json={"question_ids": [9201]},
+    )
+    assert missing_response.status_code == 400
+    assert missing_response.json()["error_code"] == "INVALID_INPUT"

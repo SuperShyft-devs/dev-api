@@ -20,6 +20,7 @@ from modules.questionnaire.dependencies import (
 from modules.questionnaire.schemas import (
     QuestionnaireCategoryCreateRequest,
     QuestionnaireCategoryQuestionsAssignRequest,
+    QuestionnaireCategoryQuestionsReorderRequest,
     QuestionnaireCategoryStatusUpdateRequest,
     QuestionnaireCategoryUpdateRequest,
     QuestionnaireQuestionCreateRequest,
@@ -304,6 +305,28 @@ async def remove_category_question(
         employee=employee,
         category_id=category_id,
         question_id=question_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@management_router.patch("/categories/{category_id}/questions/order")
+async def reorder_category_questions(
+    category_id: int,
+    payload: QuestionnaireCategoryQuestionsReorderRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    data = await service.reorder_category_questions(
+        db,
+        employee=employee,
+        category_id=category_id,
+        payload=payload,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),

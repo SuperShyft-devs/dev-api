@@ -5,7 +5,7 @@ Only database queries live here.
 
 from __future__ import annotations
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.questionnaire.models import (
@@ -162,7 +162,10 @@ class QuestionnaireRepository:
                 QuestionnaireCategoryQuestion.question_id == QuestionnaireDefinition.question_id,
             )
             .where(QuestionnaireCategoryQuestion.category_id == category_id)
-            .order_by(QuestionnaireDefinition.question_id.asc())
+            .order_by(
+                QuestionnaireCategoryQuestion.display_order.asc().nulls_last(),
+                QuestionnaireDefinition.question_id.asc(),
+            )
         )
         return list(result.scalars().all())
 
@@ -186,6 +189,13 @@ class QuestionnaireRepository:
             select(QuestionnaireDefinition.question_id).where(QuestionnaireDefinition.question_id.in_(question_ids))
         )
         valid_question_ids = {int(qid) for qid in result.scalars().all()}
+        max_order_result = await db.execute(
+            select(func.max(QuestionnaireCategoryQuestion.display_order)).where(
+                QuestionnaireCategoryQuestion.category_id == category_id
+            )
+        )
+        max_order = max_order_result.scalar_one_or_none()
+        next_order = (int(max_order) if max_order is not None else 0) + 1
 
         for question_id in question_ids:
             if question_id not in valid_question_ids or question_id in existing_question_ids:
@@ -194,7 +204,40 @@ class QuestionnaireRepository:
                 QuestionnaireCategoryQuestion(
                     category_id=category_id,
                     question_id=question_id,
+                    display_order=next_order,
                 )
+            )
+            next_order += 1
+        await db.flush()
+
+    async def get_assigned_question_ids_for_category_ordered(
+        self,
+        db: AsyncSession,
+        *,
+        category_id: int,
+    ) -> list[int]:
+        result = await db.execute(
+            select(QuestionnaireCategoryQuestion.question_id)
+            .where(QuestionnaireCategoryQuestion.category_id == category_id)
+            .order_by(QuestionnaireCategoryQuestion.display_order.asc().nulls_last(), QuestionnaireCategoryQuestion.id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def reorder_category_questions(
+        self,
+        db: AsyncSession,
+        *,
+        category_id: int,
+        question_ids: list[int],
+    ) -> None:
+        for index, question_id in enumerate(question_ids, start=1):
+            await db.execute(
+                sql_update(QuestionnaireCategoryQuestion)
+                .where(
+                    QuestionnaireCategoryQuestion.category_id == category_id,
+                    QuestionnaireCategoryQuestion.question_id == question_id,
+                )
+                .values(display_order=index)
             )
         await db.flush()
 

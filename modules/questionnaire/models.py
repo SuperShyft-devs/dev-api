@@ -58,6 +58,7 @@ class QuestionnaireCategoryQuestion(Base):
     id = Column(Integer, primary_key=True)
     category_id = Column(Integer, ForeignKey("questionnaire_categories.category_id"), nullable=False)
     question_id = Column(Integer, ForeignKey("questionnaire_definitions.question_id"), nullable=False)
+    display_order = Column(Integer, nullable=True)
 
 
 class QuestionnaireResponse(Base):

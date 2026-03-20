@@ -142,3 +142,7 @@ class QuestionnaireCategoryStatusUpdateRequest(BaseModel):
 
 class QuestionnaireCategoryQuestionsAssignRequest(BaseModel):
     question_ids: list[int] = Field(..., min_length=1)
+
+
+class QuestionnaireCategoryQuestionsReorderRequest(BaseModel):
+    question_ids: list[int] = Field(..., min_length=1)
