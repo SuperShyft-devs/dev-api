@@ -7,6 +7,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from modules.checklists.schemas import ChecklistReadiness
+
 
 class EngagementCreateRequest(BaseModel):
     """Create a new B2B engagement."""
@@ -58,10 +60,14 @@ class EngagementListItem(BaseModel):
     end_date: Optional[date] = None
     status: Optional[str] = None
     participant_count: Optional[int] = None
+    readiness: ChecklistReadiness
 
 
 class EngagementDetailsResponse(EngagementListItem):
     metsights_engagement_id: Optional[str] = None
+    readiness: ChecklistReadiness = Field(
+        default_factory=lambda: ChecklistReadiness(done=0, total=0, percent=0),
+    )
 
 
 class OnboardingAssistantsAddRequest(BaseModel):

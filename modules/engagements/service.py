@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
+from modules.checklists.schemas import ChecklistReadiness
 from modules.employee.service import EmployeeContext
 from modules.engagements.models import Engagement, EngagementTimeSlot
 from modules.engagements.repository import EngagementsRepository
@@ -45,6 +46,19 @@ class EngagementsService:
         self._repository = repository
         self._audit_service = audit_service
         self._organizations_repository = organizations_repository
+        self._checklists_service = None
+
+    def lazy_checklists_service(self) -> "ChecklistsService":
+        if self._checklists_service is None:
+            from modules.checklists.repository import ChecklistsRepository
+            from modules.checklists.service import ChecklistsService
+
+            self._checklists_service = ChecklistsService(
+                ChecklistsRepository(),
+                self._require_audit_service(),
+                engagements_service=self,
+            )
+        return self._checklists_service
 
     def _group_slots_by_date(self, rows: list[tuple]) -> dict[str, list[str]]:
         """Group (date, time) rows into a {"YYYY-MM-DD": ["HH:MM:SS", ...]} mapping."""
@@ -195,7 +209,7 @@ class EngagementsService:
         status: str | None,
         city: str | None,
         on_date,
-    ) -> tuple[list[Engagement], int]:
+    ) -> tuple[list[Engagement], int, dict[int, ChecklistReadiness]]:
         self._ensure_employee_access(employee)
 
         status_value = None
@@ -223,7 +237,12 @@ class EngagementsService:
             on_date=on_date,
         )
 
-        return engagements, total
+        checklists = self.lazy_checklists_service()
+        readiness_by_id: dict[int, ChecklistReadiness] = {}
+        for row in engagements:
+            readiness_by_id[row.engagement_id] = await checklists.get_engagement_readiness(db, row.engagement_id)
+
+        return engagements, total, readiness_by_id
 
     async def get_engagement_details_for_employee(
         self,

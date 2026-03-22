@@ -75,7 +75,7 @@ async def list_engagements(
     if page < 1 or limit < 1 or limit > 100:
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-    engagements, total = await engagements_service.list_engagements_for_employee(
+    engagements, total, readiness_by_id = await engagements_service.list_engagements_for_employee(
         db,
         employee=employee,
         page=page,
@@ -88,6 +88,7 @@ async def list_engagements(
 
     data = []
     for engagement in engagements:
+        readiness = readiness_by_id[engagement.engagement_id]
         data.append(
             {
                 "engagement_id": engagement.engagement_id,
@@ -104,6 +105,7 @@ async def list_engagements(
                 "end_date": engagement.end_date,
                 "status": engagement.status,
                 "participant_count": engagement.participant_count,
+                "readiness": readiness.model_dump(mode="json"),
             }
         )
 
