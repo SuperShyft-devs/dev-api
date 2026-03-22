@@ -7,8 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
 from core.dependencies import get_current_user
+from core.exceptions import AppError
 from db.session import get_db
-from modules.users.dependencies import get_users_service
+from modules.users.dependencies import get_participant_journey_service, get_users_service
+from modules.users.participant_journey_service import ParticipantJourneyService
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
 from modules.users.schemas import (
@@ -417,8 +419,6 @@ async def employee_list_users(
     users_service: UsersService = Depends(get_users_service),
 ):
     if page < 1 or limit < 1 or limit > 100:
-        from core.exceptions import AppError
-
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
     users, total = await users_service.list_users_for_employee(
@@ -456,6 +456,45 @@ async def employee_list_users(
         data,
         meta={"page": page, "limit": limit, "total": total},
     )
+
+
+@router.get("/{user_id}/participant-journey")
+async def employee_get_participant_journey_summary(
+    user_id: int,
+    page: int = 1,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    journey_service: ParticipantJourneyService = Depends(get_participant_journey_service),
+):
+    if page < 1 or limit < 1 or limit > 100:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    data, meta = await journey_service.get_summary(
+        db,
+        employee=employee,
+        user_id=user_id,
+        page=page,
+        limit=limit,
+    )
+    return success_response(data, meta=meta)
+
+
+@router.get("/{user_id}/participant-journey/{assessment_instance_id}")
+async def employee_get_participant_journey_detail(
+    user_id: int,
+    assessment_instance_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    journey_service: ParticipantJourneyService = Depends(get_participant_journey_service),
+):
+    detail = await journey_service.get_instance_detail(
+        db,
+        employee=employee,
+        user_id=user_id,
+        assessment_instance_id=assessment_instance_id,
+    )
+    return success_response(detail)
 
 
 @router.get("/{user_id}")

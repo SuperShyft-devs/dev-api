@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
-from modules.engagements.dependencies import get_engagements_service
 from modules.assessments.dependencies import get_assessments_service
+from modules.assessments.repository import AssessmentsRepository
+from modules.engagements.dependencies import get_engagements_service
+from modules.questionnaire.dependencies import get_questionnaire_user_service
+from modules.questionnaire.repository import QuestionnaireRepository
+from modules.users.participant_journey_service import ParticipantJourneyService
 from modules.users.repository import UsersRepository
 from modules.users.service import UsersService
 
@@ -19,4 +23,13 @@ def get_users_service() -> UsersService:
         audit_service=audit_service,
         engagements_service=engagements_service,
         assessments_service=assessments_service,
+    )
+
+
+def get_participant_journey_service() -> ParticipantJourneyService:
+    return ParticipantJourneyService(
+        users_repository=UsersRepository(),
+        assessments_repository=AssessmentsRepository(),
+        questionnaire_repository=QuestionnaireRepository(),
+        questionnaire_service=get_questionnaire_user_service(),
     )

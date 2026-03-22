@@ -14,6 +14,7 @@ from modules.assessments.models import (
     AssessmentPackage,
     AssessmentPackageCategory,
 )
+from modules.engagements.models import Engagement
 from modules.questionnaire.models import QuestionnaireCategoryQuestion
 
 
@@ -218,6 +219,28 @@ class AssessmentsRepository:
         result = await db.execute(query)
         return list(result.all())
 
+    async def list_instances_for_user_with_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        page: int,
+        limit: int,
+    ) -> list[tuple[AssessmentInstance, AssessmentPackage | None, Engagement | None]]:
+        offset = (page - 1) * limit
+
+        query = (
+            select(AssessmentInstance, AssessmentPackage, Engagement)
+            .outerjoin(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .outerjoin(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
+            .where(AssessmentInstance.user_id == user_id)
+            .order_by(AssessmentInstance.assessment_instance_id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await db.execute(query)
+        return list(result.all())
+
     async def get_instance_for_user(
         self,
         db: AsyncSession,
@@ -228,6 +251,26 @@ class AssessmentsRepository:
         query = (
             select(AssessmentInstance, AssessmentPackage)
             .outerjoin(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .where(AssessmentInstance.assessment_instance_id == assessment_instance_id)
+            .where(AssessmentInstance.user_id == user_id)
+        )
+        result = await db.execute(query)
+        row = result.first()
+        if row is None:
+            return None
+        return row
+
+    async def get_instance_for_user_with_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        user_id: int,
+    ) -> tuple[AssessmentInstance, AssessmentPackage | None, Engagement | None] | None:
+        query = (
+            select(AssessmentInstance, AssessmentPackage, Engagement)
+            .outerjoin(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .outerjoin(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
             .where(AssessmentInstance.assessment_instance_id == assessment_instance_id)
             .where(AssessmentInstance.user_id == user_id)
         )
@@ -266,6 +309,19 @@ class AssessmentsRepository:
         db.add(instance)
         await db.flush()
         return instance
+
+    async def list_category_progress_for_instance(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+    ) -> list[AssessmentCategoryProgress]:
+        result = await db.execute(
+            select(AssessmentCategoryProgress)
+            .where(AssessmentCategoryProgress.assessment_instance_id == assessment_instance_id)
+            .order_by(AssessmentCategoryProgress.category_id.asc())
+        )
+        return list(result.scalars().all())
 
     async def get_category_progress(
         self,
