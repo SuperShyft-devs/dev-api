@@ -13,6 +13,8 @@ from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance
 from modules.assessments.repository import AssessmentsRepository
+from modules.assessments.schemas import MetsightsRecordIdUpdate
+from modules.employee.service import EmployeeContext
 
 
 _ALLOWED_USER_ASSESSMENT_STATUSES = {"active", "completed"}
@@ -185,3 +187,37 @@ class AssessmentsService:
         )
 
         return instance
+
+    async def set_metsights_record_id(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        data: MetsightsRecordIdUpdate,
+        current_employee: EmployeeContext,
+    ) -> AssessmentInstance:
+        instance = await self._repository.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
+        if instance is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+
+        await self._repository.set_metsights_record_id(
+            db,
+            assessment_instance_id=assessment_instance_id,
+            metsights_record_id=data.metsights_record_id.strip(),
+        )
+
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_SET_METSIGHTS_RECORD_ID",
+            endpoint="/assessments/{assessment_id}/metsights-record-id",
+            ip_address="0.0.0.0",
+            user_agent="employee-api",
+            user_id=current_employee.user_id,
+            session_id=None,
+        )
+
+        updated = await self._repository.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
+        if updated is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+        return updated

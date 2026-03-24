@@ -9,6 +9,7 @@ import pytest
 from core.config import settings
 from core.security import create_jwt_token
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
+from modules.employee.models import Employee
 from modules.engagements.models import Engagement
 from modules.users.models import User
 
@@ -16,6 +17,13 @@ from modules.users.models import User
 def _auth_header(user_id: int) -> dict[str, str]:
     token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
     return {"Authorization": f"Bearer {token}"}
+
+
+async def _seed_employee(test_db_session, *, user_id: int, employee_id: int):
+    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000", age=30, status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
+    await test_db_session.commit()
 
 
 @pytest.mark.asyncio
@@ -196,5 +204,84 @@ async def test_patch_assessment_status_rejects_changes_after_completion(async_cl
         json={"status": "active"},
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 400
     assert response.json() == {"error_code": "INVALID_STATE", "message": "Assessment is already completed"}
+
+
+@pytest.mark.asyncio
+async def test_put_metsights_record_id_returns_404_for_missing_instance(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=3301, employee_id=3301)
+
+    response = await async_client.put(
+        "/assessments/999/metsights-record-id",
+        headers=_auth_header(3301),
+        json={"metsights_record_id": "0FF4776794C5"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"error_code": "ASSESSMENT_NOT_FOUND", "message": "Assessment does not exist"}
+
+
+@pytest.mark.asyncio
+async def test_put_metsights_record_id_rejects_empty_string(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=3302, employee_id=3302)
+    test_db_session.add(User(user_id=3303, phone="3303000000", age=30, status="active"))
+    test_db_session.add(AssessmentPackage(package_id=33, package_code="P33", display_name="P33", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Engagement(engagement_id=3303, engagement_code="ENG3303", assessment_package_id=33))
+    await test_db_session.flush()
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=3303001,
+            user_id=3303,
+            package_id=33,
+            engagement_id=3303,
+            status="active",
+            assigned_at=datetime.now(timezone.utc),
+            completed_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.put(
+        "/assessments/3303001/metsights-record-id",
+        headers=_auth_header(3302),
+        json={"metsights_record_id": "   "},
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_put_metsights_record_id_updates_and_get_returns_field(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=3304, employee_id=3304)
+    test_db_session.add(User(user_id=3305, phone="3305000000", age=30, status="active"))
+    test_db_session.add(AssessmentPackage(package_id=34, package_code="P34", display_name="P34", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Engagement(engagement_id=3305, engagement_code="ENG3305", assessment_package_id=34))
+    await test_db_session.flush()
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=3305001,
+            user_id=3305,
+            package_id=34,
+            engagement_id=3305,
+            status="active",
+            assigned_at=datetime.now(timezone.utc),
+            completed_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    update_response = await async_client.put(
+        "/assessments/3305001/metsights-record-id",
+        headers=_auth_header(3304),
+        json={"metsights_record_id": "0FF4776794C5"},
+    )
+
+    assert update_response.status_code == 200
+    assert update_response.json()["data"]["metsights_record_id"] == "0FF4776794C5"
+
+    get_response = await async_client.get("/assessments/3305001", headers=_auth_header(3305))
+    assert get_response.status_code == 200
+    assert get_response.json()["data"]["metsights_record_id"] == "0FF4776794C5"

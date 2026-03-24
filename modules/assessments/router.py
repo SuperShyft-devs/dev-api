@@ -10,8 +10,10 @@ from core.exceptions import AppError
 from core.dependencies import get_current_user
 from db.session import get_db
 from modules.assessments.dependencies import get_assessments_service
-from modules.assessments.schemas import AssessmentStatusUpdateRequest
+from modules.assessments.schemas import AssessmentStatusUpdateRequest, MetsightsRecordIdUpdate
 from modules.assessments.service import AssessmentsService
+from modules.employee.dependencies import get_current_employee
+from modules.employee.service import EmployeeContext
 
 
 router = APIRouter(prefix="/assessments", tags=["assessments"])
@@ -57,6 +59,7 @@ async def list_my_assessments(
                 "package_display_name": getattr(package, "display_name", None) if package is not None else None,
                 "engagement_id": instance.engagement_id,
                 "status": instance.status,
+                "metsights_record_id": instance.metsights_record_id,
                 "assigned_at": instance.assigned_at,
                 "completed_at": instance.completed_at,
             }
@@ -86,6 +89,7 @@ async def get_assessment_details(
             "package_display_name": getattr(package, "display_name", None) if package is not None else None,
             "engagement_id": instance.engagement_id,
             "status": instance.status,
+            "metsights_record_id": instance.metsights_record_id,
             "assigned_at": instance.assigned_at,
             "completed_at": instance.completed_at,
         }
@@ -116,6 +120,36 @@ async def update_assessment_status(
         {
             "assessment_instance_id": updated.assessment_instance_id,
             "status": updated.status,
+            "completed_at": updated.completed_at,
+        }
+    )
+
+
+@router.put("/{assessment_id}/metsights-record-id")
+async def set_assessment_metsights_record_id(
+    assessment_id: int,
+    body: MetsightsRecordIdUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_employee: EmployeeContext = Depends(get_current_employee),
+    assessments_service: AssessmentsService = Depends(get_assessments_service),
+):
+    updated = await assessments_service.set_metsights_record_id(
+        db,
+        assessment_instance_id=assessment_id,
+        data=body,
+        current_employee=current_employee,
+    )
+    await db.commit()
+    return success_response(
+        {
+            "assessment_instance_id": updated.assessment_instance_id,
+            "package_id": updated.package_id,
+            "package_code": None,
+            "package_display_name": None,
+            "engagement_id": updated.engagement_id,
+            "status": updated.status,
+            "metsights_record_id": updated.metsights_record_id,
+            "assigned_at": updated.assigned_at,
             "completed_at": updated.completed_at,
         }
     )

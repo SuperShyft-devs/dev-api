@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AssessmentListItem(BaseModel):
@@ -15,6 +15,7 @@ class AssessmentListItem(BaseModel):
     package_display_name: Optional[str] = None
     engagement_id: int
     status: Optional[str] = None
+    metsights_record_id: Optional[str] = None
     assigned_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
@@ -31,6 +32,18 @@ class AssessmentStatusUpdateResponse(BaseModel):
     assessment_instance_id: int
     status: str
     completed_at: Optional[datetime] = None
+
+
+class MetsightsRecordIdUpdate(BaseModel):
+    metsights_record_id: str
+
+    @field_validator("metsights_record_id")
+    @classmethod
+    def validate_metsights_record_id(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("metsights_record_id cannot be empty")
+        return stripped
 
 
 class AssessmentPackageCreateRequest(BaseModel):

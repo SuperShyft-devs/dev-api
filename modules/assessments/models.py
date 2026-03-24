@@ -31,6 +31,7 @@ class AssessmentInstance(Base):
     package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=False)
     engagement_id = Column(Integer, ForeignKey("engagements.engagement_id"), nullable=False)
     status = Column(String)
+    metsights_record_id = Column(String, nullable=True)
     assigned_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True), nullable=True)
 

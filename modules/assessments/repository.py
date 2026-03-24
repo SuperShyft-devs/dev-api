@@ -286,6 +286,20 @@ class AssessmentsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def set_metsights_record_id(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        metsights_record_id: str,
+    ) -> None:
+        await db.execute(
+            sql_update(AssessmentInstance)
+            .where(AssessmentInstance.assessment_instance_id == assessment_instance_id)
+            .values(metsights_record_id=metsights_record_id)
+        )
+        await db.flush()
+
     async def list_instances_for_user_category(
         self,
         db: AsyncSession,
