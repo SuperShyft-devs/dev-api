@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance
-from modules.reports.models import IndividualHealthReport
+from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 
 
 class ReportsRepository:
@@ -66,3 +66,60 @@ class ReportsRepository:
             )
         )
         return list(result.all())
+
+    async def get_user_sync_state(self, db: AsyncSession, *, user_id: int) -> ReportsUserSyncState | None:
+        result = await db.execute(select(ReportsUserSyncState).where(ReportsUserSyncState.user_id == user_id))
+        return result.scalar_one_or_none()
+
+    async def create_user_sync_state(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+    ) -> ReportsUserSyncState:
+        row = ReportsUserSyncState(user_id=user_id, sync_status="idle")
+        db.add(row)
+        await db.flush()
+        return row
+
+    async def update_user_sync_state(
+        self,
+        db: AsyncSession,
+        row: ReportsUserSyncState,
+    ) -> ReportsUserSyncState:
+        db.add(row)
+        await db.flush()
+        return row
+
+    async def get_latest_assessment_with_record_id(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+    ) -> AssessmentInstance | None:
+        result = await db.execute(
+            select(AssessmentInstance)
+            .where(AssessmentInstance.user_id == user_id)
+            .where(AssessmentInstance.metsights_record_id.is_not(None))
+            .where(AssessmentInstance.metsights_record_id != "")
+            .order_by(AssessmentInstance.assessment_instance_id.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def list_unsynced_assessments_with_record_id(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        after_assessment_instance_id: int,
+    ) -> list[AssessmentInstance]:
+        result = await db.execute(
+            select(AssessmentInstance)
+            .where(AssessmentInstance.user_id == user_id)
+            .where(AssessmentInstance.metsights_record_id.is_not(None))
+            .where(AssessmentInstance.metsights_record_id != "")
+            .where(AssessmentInstance.assessment_instance_id > after_assessment_instance_id)
+            .order_by(AssessmentInstance.assessment_instance_id.asc())
+        )
+        return list(result.scalars().all())

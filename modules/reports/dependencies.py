@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from db.session import AsyncSessionLocal
 from modules.assessments.repository import AssessmentsRepository
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
@@ -16,4 +17,5 @@ def get_reports_service() -> ReportsService:
         assessments_repository=AssessmentsRepository(),
         metsights_service=get_metsights_service(),
         audit_service=AuditService(AuditRepository()),
+        session_factory=AsyncSessionLocal,
     )

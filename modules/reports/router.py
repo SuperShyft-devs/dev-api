@@ -56,10 +56,13 @@ async def get_blood_parameter_trends(
     user=Depends(get_current_user),
     reports_service: ReportsService = Depends(get_reports_service),
 ):
-    payload = await reports_service.get_blood_parameter_trends_for_user(
+    payload, meta, should_trigger = await reports_service.get_blood_parameter_trends_for_user(
         db,
         user_id=user.user_id,
         blood_parameter=blood_parameter,
     )
+    if should_trigger:
+        await db.commit()
+        reports_service.trigger_user_blood_parameters_refresh(user_id=user.user_id)
     response = BloodParameterTrendResponse.model_validate(payload)
-    return success_response(response.model_dump())
+    return success_response(response.model_dump(), meta=meta)
