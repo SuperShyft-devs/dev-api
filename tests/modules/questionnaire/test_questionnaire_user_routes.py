@@ -797,6 +797,85 @@ async def test_upsert_responses_rejects_hidden_question(async_client, test_db_se
 
 
 @pytest.mark.asyncio
+async def test_upsert_scale_response_requires_value_and_unit(async_client, test_db_session):
+    await _seed_user(test_db_session, user_id=5074)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1710, package_code="PKG1710", display_name="Scale Package", status="active")
+    category = QuestionnaireCategory(category_id=7710, category_key="cat_7710", display_name="Scale Category", status="active")
+    question = QuestionnaireDefinition(
+        question_id=3710,
+        question_key="height",
+        question_text="What is your height?",
+        question_type="scale",
+        status="active",
+    )
+    test_db_session.add_all([package, category, question])
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9980, category_id=7710, question_id=3710)
+    test_db_session.add_all(
+        [
+            QuestionnaireOption(question_id=3710, option_value="cm", display_name="Centimeters"),
+            QuestionnaireOption(question_id=3710, option_value="ft", display_name="Feet"),
+            AssessmentPackageCategory(package_id=1710, category_id=7710),
+            AssessmentInstance(
+                assessment_instance_id=2710,
+                user_id=5074,
+                package_id=1710,
+                engagement_id=1,
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.commit()
+
+    invalid_payload = {"responses": [{"question_id": 3710, "answer": {"value": 180}}]}
+    invalid = await async_client.put("/questionnaire/7710/responses", headers=_auth_header(5074), json=invalid_payload)
+    assert invalid.status_code == 422
+    assert "unit" in invalid.json()["message"].lower()
+
+    valid_payload = {"responses": [{"question_id": 3710, "answer": {"value": 180, "unit": "cm"}}]}
+    valid = await async_client.put("/questionnaire/7710/responses", headers=_auth_header(5074), json=valid_payload)
+    assert valid.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_upsert_scale_response_rejects_unknown_unit(async_client, test_db_session):
+    await _seed_user(test_db_session, user_id=5075)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1711, package_code="PKG1711", display_name="Scale Package", status="active")
+    category = QuestionnaireCategory(category_id=7711, category_key="cat_7711", display_name="Scale Category", status="active")
+    question = QuestionnaireDefinition(
+        question_id=3711,
+        question_key="weight",
+        question_text="What is your weight?",
+        question_type="scale",
+        status="active",
+    )
+    test_db_session.add_all([package, category, question])
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9981, category_id=7711, question_id=3711)
+    test_db_session.add_all(
+        [
+            QuestionnaireOption(question_id=3711, option_value="kg", display_name="Kilograms"),
+            AssessmentPackageCategory(package_id=1711, category_id=7711),
+            AssessmentInstance(
+                assessment_instance_id=2711,
+                user_id=5075,
+                package_id=1711,
+                engagement_id=1,
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.commit()
+
+    payload = {"responses": [{"question_id": 3711, "answer": {"value": 72, "unit": "lb"}}]}
+    response = await async_client.put("/questionnaire/7711/responses", headers=_auth_header(5075), json=payload)
+    assert response.status_code == 422
+    assert "not allowed" in response.json()["message"].lower()
+
+
+@pytest.mark.asyncio
 async def test_upsert_responses_creates_new_responses(async_client, test_db_session):
     """Test creating new responses."""
     await _seed_user(test_db_session, user_id=5015)

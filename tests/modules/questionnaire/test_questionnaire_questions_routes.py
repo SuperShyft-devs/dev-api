@@ -217,6 +217,62 @@ async def test_update_question_updates_fields(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
+async def test_create_scale_question_requires_units(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9014, employee_id=22)
+    payload = {
+        "question_key": "height_measurement",
+        "question_text": "What is your height?",
+        "question_type": "scale",
+        "options": [],
+    }
+    response = await async_client.post("/questionnaire/questions", headers=_auth_header(9014), json=payload)
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT"
+
+
+@pytest.mark.asyncio
+async def test_create_scale_question_persists_units(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9015, employee_id=23)
+    payload = {
+        "question_key": "weight_measurement",
+        "question_text": "What is your weight?",
+        "question_type": "scale",
+        "options": [
+            {"option_value": "kg", "display_name": "Kilograms", "tooltip_text": None},
+            {"option_value": "lb", "display_name": "Pounds", "tooltip_text": None},
+        ],
+    }
+    response = await async_client.post("/questionnaire/questions", headers=_auth_header(9015), json=payload)
+    assert response.status_code == 201
+    question_id = response.json()["data"]["question_id"]
+    from sqlalchemy import select
+    opts = await test_db_session.execute(
+        select(QuestionnaireOption).where(QuestionnaireOption.question_id == question_id)
+    )
+    assert [o.option_value for o in opts.scalars().all()] == ["kg", "lb"]
+
+
+@pytest.mark.asyncio
+async def test_create_question_multi_choice_alias_normalized(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9016, employee_id=24)
+    payload = {
+        "question_key": "food_choices",
+        "question_text": "Pick your foods",
+        "question_type": "multi_choice",
+        "options": [
+            {"option_value": "veg", "display_name": "Veg", "tooltip_text": None},
+            {"option_value": "non_veg", "display_name": "Non Veg", "tooltip_text": None},
+        ],
+    }
+    response = await async_client.post("/questionnaire/questions", headers=_auth_header(9016), json=payload)
+    assert response.status_code == 201
+    question_id = response.json()["data"]["question_id"]
+    created = await test_db_session.get(QuestionnaireDefinition, question_id)
+    assert created is not None
+    assert created.question_type == "multiple_choice"
+
+
+@pytest.mark.asyncio
 async def test_patch_question_status_sets_inactive(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9006, employee_id=14)
 

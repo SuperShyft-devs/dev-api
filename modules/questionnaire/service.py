@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +26,8 @@ from modules.questionnaire.schemas import (
 _ALLOWED_STATUS = {"active", "inactive", "archived"}
 _ALLOWED_STATUS_UPDATE = {"active", "inactive"}
 _CHOICE_TYPES = {"single_choice", "multiple_choice"}
+_QUESTION_TYPE_ALIASES = {"multi_choice": "multiple_choice"}
+_SCALE_TYPE = "scale"
 _RULE_MATCH_MODES = {"all", "any"}
 _RULE_TYPES = {"question_answer", "user_preference"}
 _RULE_OPERATORS = {"equals", "not_equals", "contains", "not_contains", "in", "not_in"}
@@ -67,6 +71,11 @@ def _normalize_text(value: object) -> str:
     if value is None:
         return ""
     return str(value).strip().lower()
+
+
+def _normalize_question_type(value: str | None) -> str:
+    normalized = _normalize(value)
+    return _QUESTION_TYPE_ALIASES.get(normalized, normalized)
 
 
 class QuestionnaireService:
@@ -347,8 +356,30 @@ class QuestionnaireService:
     def _validate_options_by_type(self, *, question_type: str, options: list[dict[str, str | None]]) -> None:
         if question_type in _CHOICE_TYPES and len(options) == 0:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-        if question_type not in _CHOICE_TYPES and len(options) > 0:
+        if question_type == _SCALE_TYPE and len(options) == 0:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        if question_type not in _CHOICE_TYPES and question_type != _SCALE_TYPE and len(options) > 0:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    def _validate_answer_by_type(self, *, question: dict, answer: object) -> None:
+        question_type = _normalize_question_type(question.get("question_type"))
+        if question_type != _SCALE_TYPE:
+            return
+        if not isinstance(answer, dict):
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must be an object")
+        value = answer.get("value")
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must include a valid number")
+        unit = _normalize_text(answer.get("unit"))
+        if not unit:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must include a unit")
+        allowed_units = {
+            _normalize_text(option.get("option_value"))
+            for option in (question.get("options") or [])
+            if isinstance(option, dict)
+        }
+        if unit not in allowed_units:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer unit is not allowed")
 
     async def create_question_definition(
         self,
@@ -366,7 +397,7 @@ class QuestionnaireService:
         if not question_text:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-        question_type = payload.normalized_question_type()
+        question_type = _normalize_question_type(payload.normalized_question_type())
         if not question_type:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
@@ -449,7 +480,7 @@ class QuestionnaireService:
 
         type_value = None
         if question_type is not None:
-            normalized = _normalize(question_type)
+            normalized = _normalize_question_type(question_type)
             if not normalized:
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
             type_value = normalized
@@ -500,7 +531,7 @@ class QuestionnaireService:
         if not question_text:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-        question_type = payload.normalized_question_type()
+        question_type = _normalize_question_type(payload.normalized_question_type())
         if not question_type:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
@@ -988,6 +1019,7 @@ class QuestionnaireService:
             answers_by_question_id=answers_for_visibility,
             preferences=preferences,
         )
+        questions_by_id = {int(row["question_id"]): row for row in category_questions}
 
         # Validate all question IDs and ensure they're active
         for response_item in responses:
@@ -1011,6 +1043,10 @@ class QuestionnaireService:
                     error_code="INVALID_STATE",
                     message="Question is not currently visible",
                 )
+            self._validate_answer_by_type(
+                question=questions_by_id[int(question_id)],
+                answer=response_item["answer"],
+            )
 
         # Upsert responses
         for response_item in responses:
