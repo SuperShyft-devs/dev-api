@@ -27,3 +27,4 @@ from modules.questionnaire import models as _questionnaire_models  # noqa: F401,
 from modules.diagnostics import models as _diagnostics_models  # noqa: F401, E402
 from modules.support import models as _support_models  # noqa: F401, E402
 from modules.checklists import models as _checklists_models  # noqa: F401, E402
+from modules.reports import models as _reports_models  # noqa: F401, E402

@@ -47,6 +47,7 @@ from modules.employee.router import router as employees_router
 from modules.assessments.router import router as assessments_router
 from modules.assessments.packages_router import router as assessment_packages_router
 from modules.questionnaire.router import router as questionnaire_router
+from modules.reports.router import router as reports_router
 
 
 @pytest.fixture(autouse=True)
@@ -148,6 +149,7 @@ async def fastapi_app(test_db_session: AsyncSession, auth_service, otp_sender: C
     app.include_router(assessments_router)
     app.include_router(assessment_packages_router)
     app.include_router(questionnaire_router)
+    app.include_router(reports_router)
 
     async def _get_test_db():
         yield test_db_session
@@ -207,6 +209,8 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     )
     await test_db_session.execute(text("DELETE FROM questionnaire_responses"))
     await test_db_session.execute(text("DELETE FROM assessment_category_progress"))
+    await test_db_session.execute(text("DELETE FROM individual_health_report"))
+    await test_db_session.execute(text("DELETE FROM organization_health_report"))
     await test_db_session.execute(text("DELETE FROM engagement_time_slots"))
     await test_db_session.execute(text("DELETE FROM assessment_instances"))
     await test_db_session.execute(text("DELETE FROM onboarding_assistant_assignment"))
