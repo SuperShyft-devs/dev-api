@@ -171,3 +171,131 @@ async def test_get_blood_parameters_requires_metsights_record_id(
         "error_code": "INVALID_STATE",
         "message": "Metsights record id is missing for this assessment",
     }
+
+
+@pytest.mark.asyncio
+async def test_get_blood_parameter_trends_returns_ordered_points(async_client, test_db_session):
+    test_db_session.add(User(user_id=3811, phone="3811000000", age=30, status="active"))
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=811,
+            package_code="P811",
+            display_name="Package 811",
+            status="active",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(Engagement(engagement_id=4811, engagement_code="ENG4811", assessment_package_id=811))
+    test_db_session.add(Engagement(engagement_id=4812, engagement_code="ENG4812", assessment_package_id=811))
+    test_db_session.add(Engagement(engagement_id=4813, engagement_code="ENG4813", assessment_package_id=811))
+    await test_db_session.flush()
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=98011,
+            user_id=3811,
+            package_id=811,
+            engagement_id=4811,
+            status="completed",
+            metsights_record_id="TREND1",
+            assigned_at=datetime.now(timezone.utc),
+            completed_at=datetime(2024, 6, 6, tzinfo=timezone.utc),
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=98012,
+            user_id=3811,
+            package_id=811,
+            engagement_id=4812,
+            status="completed",
+            metsights_record_id="TREND2",
+            assigned_at=datetime.now(timezone.utc),
+            completed_at=datetime(2024, 12, 26, tzinfo=timezone.utc),
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=98013,
+            user_id=3811,
+            package_id=811,
+            engagement_id=4813,
+            status="completed",
+            metsights_record_id="TREND3",
+            assigned_at=datetime.now(timezone.utc),
+            completed_at=datetime(2025, 4, 18, tzinfo=timezone.utc),
+        )
+    )
+
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=70111,
+            user_id=3811,
+            engagement_id=4811,
+            assessment_instance_id=98011,
+            blood_parameters={"albumin": 3.8, "albumin_unit": "g/dL"},
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=70112,
+            user_id=3811,
+            engagement_id=4812,
+            assessment_instance_id=98012,
+            blood_parameters={"albumin": 4.1, "albumin_unit": "g/dL"},
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=70113,
+            user_id=3811,
+            engagement_id=4813,
+            assessment_instance_id=98013,
+            blood_parameters={"albumin": 4.05, "albumin_unit": "g/dL"},
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        "/reports/trends?blood_parameter=albumin",
+        headers=_auth_header(3811),
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["parameter"] == "albumin"
+    assert payload["unit"] == "g/dL"
+    assert payload["data_points"] == [
+        {"date": "2024-06-06", "value": 3.8, "engagement_id": 4811},
+        {"date": "2024-12-26", "value": 4.1, "engagement_id": 4812},
+        {"date": "2025-04-18", "value": 4.05, "engagement_id": 4813},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_blood_parameter_trends_returns_empty_when_no_points(async_client, test_db_session):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=98021,
+        user_id=3821,
+        engagement_id=4821,
+        record_id="TREND4",
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=70221,
+            user_id=3821,
+            engagement_id=4821,
+            assessment_instance_id=98021,
+            blood_parameters={"haemoglobin": 13.2, "haemoglobin_unit": "g/dL"},
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        "/reports/trends?blood_parameter=albumin",
+        headers=_auth_header(3821),
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["parameter"] == "albumin"
+    assert payload["unit"] is None
+    assert payload["data_points"] == []

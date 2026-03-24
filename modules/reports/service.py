@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -95,3 +96,61 @@ class ReportsService:
         )
 
         return blood_parameters
+
+    async def get_blood_parameter_trends_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        blood_parameter: str,
+    ) -> dict[str, Any]:
+        parameter_key = (blood_parameter or "").strip().lower()
+        if not parameter_key:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        rows = await self._repository.list_individual_reports_for_user_with_assessment(
+            db,
+            user_id=user_id,
+        )
+
+        unit_key = f"{parameter_key}_unit"
+        data_points: list[dict[str, Any]] = []
+        unit: str | None = None
+
+        for report, assessment in rows:
+            blood_parameters = report.blood_parameters
+            if not isinstance(blood_parameters, dict):
+                continue
+            raw_value = blood_parameters.get(parameter_key)
+            if raw_value is None:
+                continue
+            try:
+                numeric_value = float(raw_value)
+            except (TypeError, ValueError):
+                continue
+
+            raw_unit = blood_parameters.get(unit_key)
+            if unit is None and isinstance(raw_unit, str):
+                unit = raw_unit
+
+            point_date = assessment.completed_at or assessment.assigned_at
+            if point_date is None:
+                continue
+            if isinstance(point_date, date):
+                date_value = point_date.isoformat()[:10]
+            else:
+                date_value = str(point_date)[:10]
+
+            data_points.append(
+                {
+                    "date": date_value,
+                    "value": numeric_value,
+                    "engagement_id": int(assessment.engagement_id),
+                }
+            )
+
+        return {
+            "parameter": parameter_key,
+            "unit": unit,
+            "data_points": data_points,
+        }

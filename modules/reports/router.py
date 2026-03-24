@@ -9,7 +9,7 @@ from common.responses import success_response
 from core.dependencies import get_current_user
 from db.session import get_db
 from modules.reports.dependencies import get_reports_service
-from modules.reports.schemas import BloodParametersReportResponse
+from modules.reports.schemas import BloodParameterTrendResponse, BloodParametersReportResponse
 from modules.reports.service import ReportsService
 
 
@@ -46,4 +46,20 @@ async def get_blood_parameters_report(
         assessment_id=assessment_id,
         blood_parameters=blood_parameters,
     )
+    return success_response(response.model_dump())
+
+
+@router.get("/trends")
+async def get_blood_parameter_trends(
+    blood_parameter: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    reports_service: ReportsService = Depends(get_reports_service),
+):
+    payload = await reports_service.get_blood_parameter_trends_for_user(
+        db,
+        user_id=user.user_id,
+        blood_parameter=blood_parameter,
+    )
+    response = BloodParameterTrendResponse.model_validate(payload)
     return success_response(response.model_dump())

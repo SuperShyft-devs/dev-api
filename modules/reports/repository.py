@@ -8,6 +8,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from modules.assessments.models import AssessmentInstance
 from modules.reports.models import IndividualHealthReport
 
 
@@ -44,3 +45,24 @@ class ReportsRepository:
         db.add(report)
         await db.flush()
         return report
+
+    async def list_individual_reports_for_user_with_assessment(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+    ) -> list[tuple[IndividualHealthReport, AssessmentInstance]]:
+        result = await db.execute(
+            select(IndividualHealthReport, AssessmentInstance)
+            .join(
+                AssessmentInstance,
+                AssessmentInstance.assessment_instance_id == IndividualHealthReport.assessment_instance_id,
+            )
+            .where(IndividualHealthReport.user_id == user_id)
+            .order_by(
+                AssessmentInstance.completed_at.asc().nulls_last(),
+                AssessmentInstance.assigned_at.asc().nulls_last(),
+                AssessmentInstance.assessment_instance_id.asc(),
+            )
+        )
+        return list(result.all())
