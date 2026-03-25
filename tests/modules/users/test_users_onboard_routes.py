@@ -301,3 +301,90 @@ async def test_engagement_onboard_requires_active_engagement(async_client, test_
     response = await async_client.post("/users/code/ENGINACT/onboard", json=payload)
     assert response.status_code == 422
     assert response.json() == {"error_code": "INVALID_STATE", "message": "Engagement is no longer active"}
+
+
+@pytest.mark.asyncio
+async def test_public_onboard_uses_platform_settings_package_ids(async_client, test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES "
+            "(1, 'PK1', 'Package 1', 'active'), (2, 'PK2', 'Package 2', 'active')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) VALUES "
+            "(1, 'REF1', 'Diag 1', 'active'), (2, 'REF2', 'Diag 2', 'active')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO platform_settings (settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
+            "VALUES (1, 2, 2)"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "B2C",
+        "last_name": "Cfg",
+        "email": "b2c_cfg@example.com",
+        "phone": "4444444444",
+        "city": "Chennai",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "10:00",
+        "referred_by": "",
+    }
+
+    response = await async_client.post("/users/public/onboard", json=payload)
+    assert response.status_code == 200
+    data = response.json()["data"]
+    engagement_id = data["engagement_id"]
+
+    engagement_row = (
+        await test_db_session.execute(
+            text(
+                "SELECT assessment_package_id, diagnostic_package_id FROM engagements WHERE engagement_id = :eid"
+            ),
+            {"eid": engagement_id},
+        )
+    ).first()
+
+    assert engagement_row.assessment_package_id == 2
+    assert engagement_row.diagnostic_package_id == 2
+
+    instance_row = (
+        await test_db_session.execute(
+            text(
+                "SELECT package_id FROM assessment_instances WHERE user_id = :uid AND engagement_id = :eid"
+            ),
+            {"uid": data["user_id"], "eid": engagement_id},
+        )
+    ).first()
+    assert instance_row.package_id == 2
+
+
+@pytest.mark.asyncio
+async def test_public_onboard_fails_when_fallback_packages_inactive(async_client, test_db_session):
+    """With no platform_settings row, defaults 1/1 must be active."""
+    await test_db_session.execute(
+        text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PK1', 'Package', 'inactive')")
+    )
+    await test_db_session.execute(
+        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) VALUES (1, 'REF1', 'Diag', 'active')")
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "X",
+        "phone": "4444444445",
+        "city": "Goa",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "10:00",
+    }
+
+    response = await async_client.post("/users/public/onboard", json=payload)
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "INVALID_B2C_ASSESSMENT_PACKAGE"

@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.employee.models import Employee
 from modules.audit.service import AuditService
-from modules.engagements.service import DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
+from modules.platform_settings.service import PlatformSettingsService
 from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
 from modules.users.schemas import (
@@ -67,11 +67,13 @@ class UsersService:
         audit_service: AuditService | None = None,
         engagements_service=None,
         assessments_service=None,
+        platform_settings_service: PlatformSettingsService | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
         self._engagements_service = engagements_service
         self._assessments_service = assessments_service
+        self._platform_settings_service = platform_settings_service
 
     async def get_existing_user_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
         return await self._repository.get_user_by_phone(db, phone)
@@ -674,6 +676,15 @@ class UsersService:
 
         if self._engagements_service is None:
             raise RuntimeError("Engagements service is required")
+        if self._platform_settings_service is None:
+            raise RuntimeError("Platform settings service is required")
+
+        assessment_package_id, diagnostic_package_id = await self._platform_settings_service.resolve_b2c_default_package_ids(
+            db
+        )
+        await self._platform_settings_service.ensure_active_b2c_packages(
+            db, assessment_package_id, diagnostic_package_id
+        )
 
         # Create a new engagement for this user.
         # B2C engagements are created with no onboarding assistants by default.
@@ -682,8 +693,8 @@ class UsersService:
             user_first_name=user.first_name,
             engagement_date=payload.blood_collection_date,
             city=user.city,
-            assessment_package_id=1,
-            diagnostic_package_id=DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
+            assessment_package_id=assessment_package_id,
+            diagnostic_package_id=diagnostic_package_id,
         )
 
         # Enroll the user by booking a time slot.

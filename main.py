@@ -17,6 +17,7 @@ from modules.support.router import router as support_router
 from modules.diagnostics.router import router as diagnostics_router
 from modules.uploads.router import router as uploads_router
 from modules.reports.router import router as reports_router
+from modules.platform_settings.router import router as platform_settings_router
 
 # Configure logging
 configure_logging()
@@ -55,6 +56,7 @@ app.include_router(support_router)
 app.include_router(diagnostics_router)
 app.include_router(uploads_router)
 app.include_router(reports_router)
+app.include_router(platform_settings_router)
 
 
 @app.get("/health")

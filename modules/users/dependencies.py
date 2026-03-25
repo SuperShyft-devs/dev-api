@@ -9,6 +9,7 @@ from modules.assessments.repository import AssessmentsRepository
 from modules.engagements.dependencies import get_engagements_service
 from modules.questionnaire.dependencies import get_questionnaire_user_service
 from modules.questionnaire.repository import QuestionnaireRepository
+from modules.platform_settings.dependencies import get_platform_settings_service_readonly
 from modules.users.participant_journey_service import ParticipantJourneyService
 from modules.users.repository import UsersRepository
 from modules.users.service import UsersService
@@ -23,6 +24,7 @@ def get_users_service() -> UsersService:
         audit_service=audit_service,
         engagements_service=engagements_service,
         assessments_service=assessments_service,
+        platform_settings_service=get_platform_settings_service_readonly(),
     )
 
 

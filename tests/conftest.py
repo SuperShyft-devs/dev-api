@@ -32,6 +32,7 @@ from modules.assessments import models as _assessments_models  # noqa: F401
 from modules.questionnaire import models as _questionnaire_models  # noqa: F401
 from modules.diagnostics import models as _diagnostics_models  # noqa: F401
 from modules.reports import models as _reports_models  # noqa: F401
+from modules.platform_settings import models as _platform_settings_models  # noqa: F401
 
 from core.config import settings
 from core.exceptions import add_exception_handlers
@@ -48,6 +49,7 @@ from modules.assessments.router import router as assessments_router
 from modules.assessments.packages_router import router as assessment_packages_router
 from modules.questionnaire.router import router as questionnaire_router
 from modules.reports.router import router as reports_router
+from modules.platform_settings.router import router as platform_settings_router
 
 
 @pytest.fixture(autouse=True)
@@ -150,6 +152,7 @@ async def fastapi_app(test_db_session: AsyncSession, auth_service, otp_sender: C
     app.include_router(assessment_packages_router)
     app.include_router(questionnaire_router)
     app.include_router(reports_router)
+    app.include_router(platform_settings_router)
 
     async def _get_test_db():
         yield test_db_session
@@ -193,6 +196,7 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
         "2222222222",
         "3333333333",
         '4444444444',
+        "4444444445",
         "7777700000",
     )
 
@@ -215,6 +219,7 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     await test_db_session.execute(text("DELETE FROM engagement_time_slots"))
     await test_db_session.execute(text("DELETE FROM assessment_instances"))
     await test_db_session.execute(text("DELETE FROM onboarding_assistant_assignment"))
+    await test_db_session.execute(text("DELETE FROM platform_settings"))
     await test_db_session.execute(text("DELETE FROM engagements"))
     await test_db_session.execute(text("DELETE FROM assessment_package_categories"))
     await test_db_session.execute(text("DELETE FROM questionnaire_category_questions"))
