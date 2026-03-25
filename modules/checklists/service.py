@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
+from modules.engagements.service import EngagementsService
 from modules.checklists.models import EngagementChecklist, EngagementChecklistTask
 from modules.checklists.repository import ChecklistsRepository
 from modules.checklists.schemas import (
@@ -84,7 +85,7 @@ class ChecklistsService:
         self,
         repository: ChecklistsRepository,
         audit_service: AuditService | None = None,
-        engagements_service: "EngagementsService | None" = None,
+        engagements_service: EngagementsService | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
@@ -95,7 +96,7 @@ class ChecklistsService:
             raise RuntimeError("Audit service is required")
         return self._audit_service
 
-    def _require_engagements_service(self) -> "EngagementsService":
+    def _require_engagements_service(self) -> EngagementsService:
         if self._engagements_service is None:
             raise RuntimeError("Engagements service is required")
         return self._engagements_service
