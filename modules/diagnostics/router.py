@@ -496,7 +496,6 @@ async def create_diagnostic_test(
 async def get_diagnostic_test(
     test_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
     data = await diagnostics_service.get_test_by_id(db, test_id=test_id)
