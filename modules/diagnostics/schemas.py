@@ -116,12 +116,38 @@ class TagResponse(BaseModel):
 
 class TestCreate(BaseModel):
     test_name: str = Field(min_length=1)
+    parameter_key: Optional[str] = None
+    unit: Optional[str] = None
+    meaning: Optional[str] = None
+    lower_range_male: Optional[float] = None
+    higher_range_male: Optional[float] = None
+    lower_range_female: Optional[float] = None
+    higher_range_female: Optional[float] = None
+    causes_when_high: Optional[str] = None
+    causes_when_low: Optional[str] = None
+    effects_when_high: Optional[str] = None
+    effects_when_low: Optional[str] = None
+    what_to_do_when_low: Optional[str] = None
+    what_to_do_when_high: Optional[str] = None
     is_available: bool = True
     display_order: Optional[int] = None
 
 
 class TestUpdate(BaseModel):
     test_name: Optional[str] = None
+    parameter_key: Optional[str] = None
+    unit: Optional[str] = None
+    meaning: Optional[str] = None
+    lower_range_male: Optional[float] = None
+    higher_range_male: Optional[float] = None
+    lower_range_female: Optional[float] = None
+    higher_range_female: Optional[float] = None
+    causes_when_high: Optional[str] = None
+    causes_when_low: Optional[str] = None
+    effects_when_high: Optional[str] = None
+    effects_when_low: Optional[str] = None
+    what_to_do_when_low: Optional[str] = None
+    what_to_do_when_high: Optional[str] = None
     display_order: Optional[int] = None
     is_available: Optional[bool] = None
 
@@ -129,6 +155,19 @@ class TestUpdate(BaseModel):
 class TestResponse(BaseModel):
     test_id: int
     test_name: str
+    parameter_key: Optional[str] = None
+    unit: Optional[str] = None
+    meaning: Optional[str] = None
+    lower_range_male: Optional[float] = None
+    higher_range_male: Optional[float] = None
+    lower_range_female: Optional[float] = None
+    higher_range_female: Optional[float] = None
+    causes_when_high: Optional[str] = None
+    causes_when_low: Optional[str] = None
+    effects_when_high: Optional[str] = None
+    effects_when_low: Optional[str] = None
+    what_to_do_when_low: Optional[str] = None
+    what_to_do_when_high: Optional[str] = None
     is_available: bool
     display_order: Optional[int] = None
 

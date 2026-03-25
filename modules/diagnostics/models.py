@@ -139,8 +139,24 @@ class DiagnosticTest(Base):
 
     test_id = Column(Integer, primary_key=True)
     test_name = Column(String, nullable=False)
+    # Maps to the corresponding key in `blood_parameters` JSON (e.g. "haemoglobin").
+    parameter_key = Column(String, nullable=True)
+    unit = Column(String, nullable=True)
+    meaning = Column(Text, nullable=True)
     is_available = Column(Boolean, nullable=False, default=True, server_default="true")
     display_order = Column(Integer)
+
+    lower_range_male = Column(Numeric(12, 4), nullable=True)
+    higher_range_male = Column(Numeric(12, 4), nullable=True)
+    lower_range_female = Column(Numeric(12, 4), nullable=True)
+    higher_range_female = Column(Numeric(12, 4), nullable=True)
+
+    causes_when_high = Column(Text, nullable=True)
+    causes_when_low = Column(Text, nullable=True)
+    effects_when_high = Column(Text, nullable=True)
+    effects_when_low = Column(Text, nullable=True)
+    what_to_do_when_low = Column(Text, nullable=True)
+    what_to_do_when_high = Column(Text, nullable=True)
 
     group_assignments = relationship(
         "DiagnosticTestGroupTest",

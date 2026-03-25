@@ -193,9 +193,26 @@ class DiagnosticsService:
         )
 
     def _to_test_response(self, row: DiagnosticTest) -> TestResponse:
+        lower_range_male = float(row.lower_range_male) if row.lower_range_male is not None else None
+        higher_range_male = float(row.higher_range_male) if row.higher_range_male is not None else None
+        lower_range_female = float(row.lower_range_female) if row.lower_range_female is not None else None
+        higher_range_female = float(row.higher_range_female) if row.higher_range_female is not None else None
         return TestResponse(
             test_id=row.test_id,
             test_name=row.test_name,
+            parameter_key=row.parameter_key,
+            unit=row.unit,
+            meaning=row.meaning,
+            lower_range_male=lower_range_male,
+            higher_range_male=higher_range_male,
+            lower_range_female=lower_range_female,
+            higher_range_female=higher_range_female,
+            causes_when_high=row.causes_when_high,
+            causes_when_low=row.causes_when_low,
+            effects_when_high=row.effects_when_high,
+            effects_when_low=row.effects_when_low,
+            what_to_do_when_low=row.what_to_do_when_low,
+            what_to_do_when_high=row.what_to_do_when_high,
             is_available=bool(row.is_available),
             display_order=row.display_order,
         )
@@ -398,6 +415,28 @@ class DiagnosticsService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         payload["test_name"] = test_name
 
+        if "parameter_key" in payload:
+            parameter_key = self._normalize_lower(payload.get("parameter_key"))
+            if parameter_key is None:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            payload["parameter_key"] = parameter_key
+        if "unit" in payload:
+            payload["unit"] = self._normalize(payload.get("unit"))
+        if "meaning" in payload:
+            payload["meaning"] = self._normalize(payload.get("meaning"))
+        if "causes_when_high" in payload:
+            payload["causes_when_high"] = self._normalize(payload.get("causes_when_high"))
+        if "causes_when_low" in payload:
+            payload["causes_when_low"] = self._normalize(payload.get("causes_when_low"))
+        if "effects_when_high" in payload:
+            payload["effects_when_high"] = self._normalize(payload.get("effects_when_high"))
+        if "effects_when_low" in payload:
+            payload["effects_when_low"] = self._normalize(payload.get("effects_when_low"))
+        if "what_to_do_when_low" in payload:
+            payload["what_to_do_when_low"] = self._normalize(payload.get("what_to_do_when_low"))
+        if "what_to_do_when_high" in payload:
+            payload["what_to_do_when_high"] = self._normalize(payload.get("what_to_do_when_high"))
+
         created = await self._repository.create_test(db, DiagnosticTest(**payload))
         await self._require_audit_service().log_event(
             db,
@@ -432,6 +471,28 @@ class DiagnosticsService:
             if test_name is None:
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
             payload["test_name"] = test_name
+
+        if "parameter_key" in payload:
+            parameter_key = self._normalize_lower(payload.get("parameter_key"))
+            if parameter_key is None:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            payload["parameter_key"] = parameter_key
+        if "unit" in payload:
+            payload["unit"] = self._normalize(payload.get("unit"))
+        if "meaning" in payload:
+            payload["meaning"] = self._normalize(payload.get("meaning"))
+        if "causes_when_high" in payload:
+            payload["causes_when_high"] = self._normalize(payload.get("causes_when_high"))
+        if "causes_when_low" in payload:
+            payload["causes_when_low"] = self._normalize(payload.get("causes_when_low"))
+        if "effects_when_high" in payload:
+            payload["effects_when_high"] = self._normalize(payload.get("effects_when_high"))
+        if "effects_when_low" in payload:
+            payload["effects_when_low"] = self._normalize(payload.get("effects_when_low"))
+        if "what_to_do_when_low" in payload:
+            payload["what_to_do_when_low"] = self._normalize(payload.get("what_to_do_when_low"))
+        if "what_to_do_when_high" in payload:
+            payload["what_to_do_when_high"] = self._normalize(payload.get("what_to_do_when_high"))
 
         updated = await self._repository.update_test(db, test_id=test_id, data=payload)
         if updated is None:
