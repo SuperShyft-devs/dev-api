@@ -73,6 +73,16 @@ DIAGNOSTIC_TEST_PACKAGES: tuple[SeedDiagnosticPackage, ...] = (
     SeedDiagnosticPackage("Women peak performance"),
 )
 
+# Canonical `diagnostic_tests.test_name` values, in display order, for the Liver profile group.
+LIVER_PROFILE_TEST_NAMES: tuple[str, ...] = (
+    "Albumin",
+    "Direct Bilirubin",
+    "Total Bilirubin",
+    "Indirect Bilirubin",
+    "Globulin",
+    "A/G Ratio",
+)
+
 
 # Diagnostic tests you provided (hemogram sample).
 DIAGNOSTIC_TESTS: tuple[SeedDiagnosticTest, ...] = (

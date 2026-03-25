@@ -18,6 +18,7 @@ from core.config import settings
 
 from db.seed_data.data import DIAGNOSTIC_TEST_GROUPS, DIAGNOSTIC_TEST_PACKAGES, DIAGNOSTIC_TESTS
 from db.seed_data.operations import (
+    sync_liver_profile_tests,
     upsert_diagnostic_test_groups,
     upsert_diagnostic_test_packages,
     upsert_diagnostic_tests,
@@ -51,6 +52,7 @@ async def seed_diagnostic_reference_data(*, yes: bool) -> None:
             await upsert_diagnostic_test_groups(session, DIAGNOSTIC_TEST_GROUPS)
             await upsert_diagnostic_test_packages(session, DIAGNOSTIC_TEST_PACKAGES)
             await upsert_diagnostic_tests(session, DIAGNOSTIC_TESTS)
+            await sync_liver_profile_tests(session)
 
             print("Seeded diagnostic groups, packages, and tests")
 
