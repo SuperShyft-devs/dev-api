@@ -15,6 +15,12 @@ from modules.assessments.repository import AssessmentsRepository
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
 from modules.engagements.models import Engagement
+from modules.diagnostics.models import DiagnosticPackage
+from modules.diagnostics.schemas import (
+    PackageTestsResponse,
+    TestGroupResponse as DiagnosticTestGroupResponse,
+    TestResponse as DiagnosticTestResponse,
+)
 from modules.reports.dependencies import get_reports_service
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.reports.repository import ReportsRepository
@@ -45,8 +51,85 @@ class _FailingMetsightsService:
         raise RuntimeError("simulated metsights failure")
 
 
-async def _seed_assessment(test_db_session, *, assessment_id: int, user_id: int, engagement_id: int, record_id: str | None):
-    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000", age=30, status="active"))
+class _FakeDiagnosticsService:
+    def __init__(self):
+        self._payload = PackageTestsResponse(
+            diagnostic_package_id=1,
+            groups=[
+                DiagnosticTestGroupResponse(
+                    group_id=10,
+                    group_name="Blood parameters",
+                    test_count=2,
+                    display_order=1,
+                    tests=[
+                        DiagnosticTestResponse(
+                            test_id=1,
+                            test_name="Haemoglobin (Hb)",
+                            parameter_key="haemoglobin",
+                            unit="g/dL",
+                            meaning=None,
+                            lower_range_male=13.0,
+                            higher_range_male=17.0,
+                            lower_range_female=12.0,
+                            higher_range_female=16.0,
+                            causes_when_high=None,
+                            causes_when_low=None,
+                            effects_when_high=None,
+                            effects_when_low=None,
+                            what_to_do_when_low=None,
+                            what_to_do_when_high=None,
+                            is_available=True,
+                            display_order=1,
+                        ),
+                        DiagnosticTestResponse(
+                            test_id=2,
+                            test_name="Glucose (fasting)",
+                            parameter_key="glucose_fasting",
+                            unit="mg/dL",
+                            meaning=None,
+                            lower_range_male=70.0,
+                            higher_range_male=110.0,
+                            lower_range_female=70.0,
+                            higher_range_female=110.0,
+                            causes_when_high=None,
+                            causes_when_low=None,
+                            effects_when_high=None,
+                            effects_when_low=None,
+                            what_to_do_when_low=None,
+                            what_to_do_when_high=None,
+                            is_available=True,
+                            display_order=2,
+                        ),
+                    ],
+                )
+            ],
+        )
+
+    async def get_package_tests(self, db, *, package_id: int) -> PackageTestsResponse:
+        # Keep response static for tests; package_id is irrelevant here.
+        return self._payload
+
+
+async def _seed_assessment(
+    test_db_session,
+    *,
+    assessment_id: int,
+    user_id: int,
+    engagement_id: int,
+    record_id: str | None,
+    diagnostic_package_id: int = 1,
+    user_gender: str = "male",
+):
+    test_db_session.add(
+        DiagnosticPackage(
+            diagnostic_package_id=diagnostic_package_id,
+            reference_id=f"REF{diagnostic_package_id}",
+            package_name=f"Diag Package {diagnostic_package_id}",
+            diagnostic_provider="test_provider",
+            status="active",
+        )
+    )
+    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000", age=30, gender=user_gender, status="active"))
     test_db_session.add(
         AssessmentPackage(
             package_id=assessment_id % 1000,
@@ -61,6 +144,7 @@ async def _seed_assessment(test_db_session, *, assessment_id: int, user_id: int,
             engagement_id=engagement_id,
             engagement_code=f"ENG{engagement_id}",
             assessment_package_id=assessment_id % 1000,
+            diagnostic_package_id=diagnostic_package_id,
         )
     )
     await test_db_session.flush()
@@ -98,7 +182,7 @@ async def test_get_blood_parameters_returns_cached_without_metsights(
             user_id=3801,
             engagement_id=4801,
             assessment_instance_id=98001,
-            blood_parameters={"haemoglobin": 13.2, "haemoglobin_unit": "0"},
+            blood_parameters={"haemoglobin": 13.2, "haemoglobin_unit": "g/dL"},
         )
     )
     await test_db_session.commit()
@@ -108,13 +192,19 @@ async def test_get_blood_parameters_returns_cached_without_metsights(
         repository=ReportsRepository(),
         assessments_repository=AssessmentsRepository(),
         metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
     response = await async_client.get("/reports/98001/blood-parameters", headers=_auth_header(3801))
     assert response.status_code == 200
-    assert response.json()["data"]["blood_parameters"]["haemoglobin"] == 13.2
+    data = response.json()["data"]
+    haemoglobin_test = next(t for g in data for t in g["tests"] if t["parameter_key"] == "haemoglobin")
+    assert haemoglobin_test["value"] == 13.2
+    assert haemoglobin_test["unit"] == "g/dL"
+    assert haemoglobin_test["lower_range"] == 13.0
+    assert haemoglobin_test["higher_range"] == 17.0
     assert fake_metsights.calls == 0
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
@@ -133,11 +223,12 @@ async def test_get_blood_parameters_fetches_and_caches_on_miss(
         record_id="XYZ1234DEF56",
     )
 
-    fake_metsights = _FakeMetsightsService(payload={"glucose_fasting": 91, "glucose_fasting_unit": "0"})
+    fake_metsights = _FakeMetsightsService(payload={"glucose_fasting": 91, "glucose_fasting_unit": "mg/dL"})
     reports_service = ReportsService(
         repository=ReportsRepository(),
         assessments_repository=AssessmentsRepository(),
         metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
@@ -145,8 +236,11 @@ async def test_get_blood_parameters_fetches_and_caches_on_miss(
     response = await async_client.get("/reports/98002/blood-parameters", headers=_auth_header(3802))
     assert response.status_code == 200
     body = response.json()["data"]
-    assert body["assessment_id"] == 98002
-    assert body["blood_parameters"]["glucose_fasting"] == 91
+    glucose_test = next(t for g in body for t in g["tests"] if t["parameter_key"] == "glucose_fasting")
+    assert glucose_test["value"] == 91
+    assert glucose_test["unit"] == "mg/dL"
+    assert glucose_test["lower_range"] == 70.0
+    assert glucose_test["higher_range"] == 110.0
     assert fake_metsights.calls == 1
 
     saved = await test_db_session.execute(
@@ -183,6 +277,15 @@ async def test_get_blood_parameters_requires_metsights_record_id(
 async def test_get_blood_parameter_trends_returns_ordered_points(async_client, test_db_session):
     test_db_session.add(User(user_id=3811, phone="3811000000", age=30, status="active"))
     test_db_session.add(
+        DiagnosticPackage(
+            diagnostic_package_id=1,
+            reference_id="REF1",
+            package_name="Diag Package 1",
+            diagnostic_provider="test_provider",
+            status="active",
+        )
+    )
+    test_db_session.add(
         AssessmentPackage(
             package_id=811,
             package_code="P811",
@@ -191,9 +294,9 @@ async def test_get_blood_parameter_trends_returns_ordered_points(async_client, t
         )
     )
     await test_db_session.flush()
-    test_db_session.add(Engagement(engagement_id=4811, engagement_code="ENG4811", assessment_package_id=811))
-    test_db_session.add(Engagement(engagement_id=4812, engagement_code="ENG4812", assessment_package_id=811))
-    test_db_session.add(Engagement(engagement_id=4813, engagement_code="ENG4813", assessment_package_id=811))
+    test_db_session.add(Engagement(engagement_id=4811, engagement_code="ENG4811", assessment_package_id=811, diagnostic_package_id=1))
+    test_db_session.add(Engagement(engagement_id=4812, engagement_code="ENG4812", assessment_package_id=811, diagnostic_package_id=1))
+    test_db_session.add(Engagement(engagement_id=4813, engagement_code="ENG4813", assessment_package_id=811, diagnostic_package_id=1))
     await test_db_session.flush()
     test_db_session.add(
         AssessmentInstance(
@@ -349,6 +452,7 @@ async def test_get_blood_parameter_trends_stale_returns_cached_and_meta(
         repository=ReportsRepository(),
         assessments_repository=AssessmentsRepository(),
         metsights_service=_FakeMetsightsService(payload={"albumin": 3.9, "albumin_unit": "g/dL"}),
+        diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
     )
     reports_service.trigger_user_blood_parameters_refresh = lambda *, user_id: None
@@ -378,7 +482,14 @@ async def test_refresh_user_blood_parameters_success_advances_cursor(test_db_ses
         engagement_id=4841,
         record_id="REC1",
     )
-    test_db_session.add(Engagement(engagement_id=4842, engagement_code="ENG4842", assessment_package_id=41))
+    test_db_session.add(
+        Engagement(
+            engagement_id=4842,
+            engagement_code="ENG4842",
+            assessment_package_id=41,
+            diagnostic_package_id=1,
+        )
+    )
     await test_db_session.flush()
     test_db_session.add(
         AssessmentInstance(
@@ -407,6 +518,7 @@ async def test_refresh_user_blood_parameters_success_advances_cursor(test_db_ses
         repository=ReportsRepository(),
         assessments_repository=AssessmentsRepository(),
         metsights_service=_FakeMetsightsService(payload={"albumin": 4.2, "albumin_unit": "g/dL"}),
+        diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
         session_factory=session_factory,
     )
@@ -443,6 +555,7 @@ async def test_refresh_user_blood_parameters_failure_sets_failed(test_db_session
         repository=ReportsRepository(),
         assessments_repository=AssessmentsRepository(),
         metsights_service=_FailingMetsightsService(),
+        diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
         session_factory=session_factory,
     )

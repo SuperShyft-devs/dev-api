@@ -13,9 +13,11 @@ from core.exceptions import AppError
 from db.session import AsyncSessionLocal
 from modules.assessments.repository import AssessmentsRepository
 from modules.audit.service import AuditService
+from modules.diagnostics.service import DiagnosticsService
 from modules.metsights.service import MetsightsService
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.reports.repository import ReportsRepository
+from modules.reports.schemas import BloodParameterGroupInReportResponse, BloodParameterTestInReportResponse
 
 
 _SYNC_IDLE = "idle"
@@ -31,12 +33,14 @@ class ReportsService:
         repository: ReportsRepository,
         assessments_repository: AssessmentsRepository,
         metsights_service: MetsightsService,
+        diagnostics_service: DiagnosticsService,
         audit_service: AuditService | None = None,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
     ):
         self._repository = repository
         self._assessments_repository = assessments_repository
         self._metsights_service = metsights_service
+        self._diagnostics_service = diagnostics_service
         self._audit_service = audit_service
         self._session_factory = session_factory or AsyncSessionLocal
 
@@ -51,11 +55,12 @@ class ReportsService:
         *,
         assessment_id: int,
         user_id: int,
+        user_gender: str | None,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> Any:
-        assessment_row = await self._assessments_repository.get_instance_for_user(
+        assessment_row = await self._assessments_repository.get_instance_for_user_with_engagement(
             db,
             assessment_instance_id=assessment_id,
             user_id=user_id,
@@ -63,14 +68,30 @@ class ReportsService:
         if assessment_row is None:
             raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
 
-        assessment_instance, _package = assessment_row
+        assessment_instance, _package, engagement = assessment_row
+        if engagement is None:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Assessment is missing engagement context",
+            )
+
+        diagnostic_package_id = engagement.diagnostic_package_id
+        normalized_gender = (user_gender or "").strip().lower() or None
+        if normalized_gender not in {"male", "female"}:
+            normalized_gender = None
         existing_report = await self._repository.get_individual_report_by_assessment(
             db,
             assessment_instance_id=assessment_id,
         )
 
         if existing_report is not None and existing_report.blood_parameters is not None:
-            return existing_report.blood_parameters
+            return await self._build_blood_parameter_groups_report(
+                db=db,
+                blood_parameters=existing_report.blood_parameters,
+                diagnostic_package_id=diagnostic_package_id,
+                user_gender=normalized_gender,
+            )
 
         record_id = (assessment_instance.metsights_record_id or "").strip()
         if not record_id:
@@ -105,7 +126,77 @@ class ReportsService:
             session_id=None,
         )
 
-        return blood_parameters
+        return await self._build_blood_parameter_groups_report(
+            db=db,
+            blood_parameters=blood_parameters,
+            diagnostic_package_id=diagnostic_package_id,
+            user_gender=normalized_gender,
+        )
+
+    async def _build_blood_parameter_groups_report(
+        self,
+        *,
+        db: AsyncSession,
+        blood_parameters: Any,
+        diagnostic_package_id: int,
+        user_gender: str | None,
+    ) -> list[BloodParameterGroupInReportResponse]:
+        raw: dict[str, Any] = blood_parameters if isinstance(blood_parameters, dict) else {}
+
+        # Use diagnostic reference data for the scheduled diagnostic package.
+        package_tests = await self._diagnostics_service.get_package_tests(db=db, package_id=diagnostic_package_id)
+
+        groups: list[BloodParameterGroupInReportResponse] = []
+        for group in package_tests.groups:
+            tests: list[BloodParameterTestInReportResponse] = []
+            for test in group.tests:
+                parameter_key = test.parameter_key
+
+                raw_value: Any = raw.get(parameter_key) if parameter_key else None
+                value: float | None = None
+                if raw_value is not None:
+                    try:
+                        value = float(raw_value)
+                    except (TypeError, ValueError):
+                        value = None
+
+                unit_key = f"{parameter_key}_unit" if parameter_key else None
+                raw_unit = raw.get(unit_key) if unit_key else None
+                if isinstance(raw_unit, str) and raw_unit.strip():
+                    unit: str | None = raw_unit.strip()
+                else:
+                    unit = test.unit.strip() if isinstance(test.unit, str) else None
+
+                lower_range: float | None = None
+                higher_range: float | None = None
+                if user_gender == "male":
+                    lower_range = float(test.lower_range_male) if test.lower_range_male is not None else None
+                    higher_range = float(test.higher_range_male) if test.higher_range_male is not None else None
+                elif user_gender == "female":
+                    lower_range = float(test.lower_range_female) if test.lower_range_female is not None else None
+                    higher_range = float(test.higher_range_female) if test.higher_range_female is not None else None
+
+                tests.append(
+                    BloodParameterTestInReportResponse(
+                        test_id=test.test_id,
+                        test_name=test.test_name,
+                        parameter_key=parameter_key,
+                        unit=unit,
+                        value=value,
+                        lower_range=lower_range,
+                        higher_range=higher_range,
+                    )
+                )
+
+            groups.append(
+                BloodParameterGroupInReportResponse(
+                    group_name=group.group_name,
+                    test_count=len(tests),
+                    tests=tests,
+                )
+            )
+
+        return groups
 
     async def _get_or_create_sync_state(self, db: AsyncSession, *, user_id: int) -> ReportsUserSyncState:
         state = await self._repository.get_user_sync_state(db, user_id=user_id)
