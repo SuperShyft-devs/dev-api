@@ -16,6 +16,7 @@ from modules.assessments.models import (
 )
 from modules.employee.models import Employee
 from modules.engagements.models import Engagement
+from modules.diagnostics.models import DiagnosticPackage
 from modules.questionnaire.models import QuestionnaireCategory
 from modules.users.models import User
 
@@ -79,13 +80,24 @@ async def test_list_my_package_categories_returns_incomplete_by_default(async_cl
 
     test_db_session.add(AssessmentPackageCategory(package_id=6102, category_id=7102))
     test_db_session.add(
+        DiagnosticPackage(
+            diagnostic_package_id=1,
+            reference_id="REF1",
+            package_name="Diag Package",
+            diagnostic_provider="test_provider",
+            no_of_tests=1,
+            status="active",
+            bookings_count=0,
+        )
+    )
+    test_db_session.add(
         Engagement(
             engagement_id=6200,
             engagement_name="Test Engagement",
             engagement_code="ENG6200",
             engagement_type="test",
             assessment_package_id=6102,
-            diagnostic_package_id=None,
+            diagnostic_package_id=1,
             status="active",
             participant_count=1,
         )
@@ -118,13 +130,24 @@ async def test_list_my_package_categories_returns_complete_from_progress(async_c
 
     test_db_session.add(AssessmentPackageCategory(package_id=6103, category_id=7103))
     test_db_session.add(
+        DiagnosticPackage(
+            diagnostic_package_id=1,
+            reference_id="REF1",
+            package_name="Diag Package",
+            diagnostic_provider="test_provider",
+            no_of_tests=1,
+            status="active",
+            bookings_count=0,
+        )
+    )
+    test_db_session.add(
         Engagement(
             engagement_id=6300,
             engagement_name="Test Engagement",
             engagement_code="ENG6300",
             engagement_type="test",
             assessment_package_id=6103,
-            diagnostic_package_id=None,
+            diagnostic_package_id=1,
             status="active",
             participant_count=1,
         )

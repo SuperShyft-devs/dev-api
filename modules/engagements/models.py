@@ -19,7 +19,8 @@ class Engagement(Base):
     engagement_code = Column(String, nullable=False)
     engagement_type = Column(String)
     assessment_package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=False)
-    diagnostic_package_id = Column(Integer, ForeignKey("diagnostic_package.diagnostic_package_id"), nullable=True)
+    # Always required: B2C defaults to 1 in service, B2B must be selected by admin.
+    diagnostic_package_id = Column(Integer, ForeignKey("diagnostic_package.diagnostic_package_id"), nullable=False)
     city = Column(String)
     slot_duration = Column(Integer)
     start_date = Column(Date)

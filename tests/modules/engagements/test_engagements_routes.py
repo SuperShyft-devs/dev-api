@@ -18,7 +18,7 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
-    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000000", status="active"))
+    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
     await test_db_session.commit()
@@ -83,7 +83,7 @@ async def test_create_engagement_requires_auth(async_client):
 
 @pytest.mark.asyncio
 async def test_create_engagement_requires_employee(async_client, test_db_session):
-    test_db_session.add(User(user_id=7001, phone="7001000000", status="active"))
+    test_db_session.add(User(user_id=7001, age=30, phone="7001000000", status="active"))
     await test_db_session.commit()
 
     payload = {
@@ -126,6 +126,32 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
 
     engagement_id = response.json()["data"]["engagement_id"]
     assert isinstance(engagement_id, int)
+
+
+@pytest.mark.asyncio
+async def test_create_engagement_requires_diagnostic_package_for_b2b(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7008, employee_id=15)
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+
+    payload = {
+        "engagement_name": "Camp",
+        "organization_id": 1,
+        "engagement_type": "b2b",
+        "assessment_package_id": 1,
+        # diagnostic_package_id intentionally omitted to simulate "not selected"
+        "city": "BLR",
+        "slot_duration": 20,
+        "start_date": "2026-02-01",
+        "end_date": "2026-02-02",
+    }
+
+    response = await async_client.post("/engagements", headers=_auth_header(7008), json=payload)
+    assert response.status_code == 400
+    assert response.json() == {
+        "error_code": "DIAGNOSTIC_PACKAGE_REQUIRED",
+        "message": "Diagnostic package must be selected for B2B engagements",
+    }
 
 
 @pytest.mark.asyncio
@@ -300,9 +326,9 @@ async def test_get_occupied_slots_by_engagement_code_returns_grouped_slots(async
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
 
     # Create users for time slots
-    test_db_session.add(User(user_id=1001, phone="1001000000", status="active"))
-    test_db_session.add(User(user_id=1002, phone="1002000000", status="active"))
-    test_db_session.add(User(user_id=1003, phone="1003000000", status="active"))
+    test_db_session.add(User(user_id=1001, age=30, phone="1001000000", status="active"))
+    test_db_session.add(User(user_id=1002, age=30, phone="1002000000", status="active"))
+    test_db_session.add(User(user_id=1003, age=30, phone="1003000000", status="active"))
     await test_db_session.flush()
 
     test_db_session.add(
@@ -383,7 +409,7 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
 
     # Create user for time slots
-    test_db_session.add(User(user_id=1001, phone="1001000000", status="active"))
+    test_db_session.add(User(user_id=1001, age=30, phone="1001000000", status="active"))
     await test_db_session.flush()
 
     # Active B2C (organization_id is None)

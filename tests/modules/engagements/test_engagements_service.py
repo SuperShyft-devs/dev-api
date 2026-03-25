@@ -37,7 +37,7 @@ async def test_enroll_user_in_engagement_does_not_increment_participant_count_by
 
     await test_db_session.execute(
         text(
-            "INSERT INTO users (user_id, phone, status) VALUES (1001, '9999999999', 'active')"
+            "INSERT INTO users (user_id, age, phone, status) VALUES (1001, 30, '9999999999', 'active')"
         )
     )
     await test_db_session.commit()

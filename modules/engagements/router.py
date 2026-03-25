@@ -22,7 +22,7 @@ from modules.engagements.schemas import (
     EngagementUpdateRequest,
     OnboardingAssistantsAddRequest,
 )
-from modules.engagements.service import EngagementsService
+from modules.engagements.service import EngagementsService, DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
 
 
 router = APIRouter(prefix="/engagements", tags=["engagements"])
@@ -98,7 +98,7 @@ async def list_engagements(
                 "engagement_code": engagement.engagement_code,
                 "engagement_type": engagement.engagement_type,
                 "assessment_package_id": engagement.assessment_package_id,
-                "diagnostic_package_id": engagement.diagnostic_package_id,
+                        "diagnostic_package_id": engagement.diagnostic_package_id or DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
                 "city": engagement.city,
                 "slot_duration": engagement.slot_duration,
                 "start_date": engagement.start_date,
@@ -134,7 +134,7 @@ async def get_engagement_details(
             "engagement_code": engagement.engagement_code,
             "engagement_type": engagement.engagement_type,
             "assessment_package_id": engagement.assessment_package_id,
-            "diagnostic_package_id": engagement.diagnostic_package_id,
+            "diagnostic_package_id": engagement.diagnostic_package_id or DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
             "city": engagement.city,
             "slot_duration": engagement.slot_duration,
             "start_date": engagement.start_date,

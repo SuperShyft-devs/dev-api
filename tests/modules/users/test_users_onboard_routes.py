@@ -9,6 +9,7 @@ from sqlalchemy import text
 @pytest.mark.asyncio
 async def test_public_onboard_requires_blood_fields(async_client, test_db_session):
     payload = {
+        "age": 30,
         "first_name": "A",
         "last_name": "B",
         "email": "ab@example.com",
@@ -34,16 +35,21 @@ async def test_public_onboard_updates_only_missing_fields(async_client, test_db_
     await test_db_session.execute(
         text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PK1', 'Package', 'active')")
     )
+    # Seed required diagnostic package used by B2C onboarding.
+    await test_db_session.execute(
+        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) VALUES (1, 'REF1', 'Diag Package', 'active')")
+    )
     await test_db_session.commit()
     # Create a user with first_name already set, last_name missing.
     await test_db_session.execute(
         text(
-            "INSERT INTO users (user_id, first_name, last_name, phone, email, status) VALUES (2001, 'Existing', NULL, '2222222222', 'ex@example.com', 'active')"
+            "INSERT INTO users (user_id, first_name, last_name, age, phone, email, status) VALUES (2001, 'Existing', NULL, 30, '2222222222', 'ex@example.com', 'active')"
         )
     )
     await test_db_session.commit()
 
     payload = {
+        "age": 30,
         "first_name": "NewFirst",
         "last_name": "NewLast",
         "email": "ex@example.com",
@@ -72,9 +78,14 @@ async def test_public_onboard_creates_engagement_time_slot_and_assessment_instan
     await test_db_session.execute(
         text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PK1', 'Package', 'active')")
     )
+    # Seed required diagnostic package used by B2C onboarding.
+    await test_db_session.execute(
+        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) VALUES (1, 'REF1', 'Diag Package', 'active')")
+    )
     await test_db_session.commit()
 
     payload = {
+        "age": 30,
         "first_name": "C",
         "last_name": "D",
         "email": "cd@example.com",
@@ -106,7 +117,7 @@ async def test_public_onboard_creates_engagement_time_slot_and_assessment_instan
     ).first()
 
     assert engagement_row.engagement_type == "healthcamp"
-    assert engagement_row.diagnostic_package_id is None  # Now nullable
+    assert engagement_row.diagnostic_package_id == 1
     assert engagement_row.participant_count == 0
     assert engagement_row.city == "Delhi"
     assert str(engagement_row.start_date) == "2026-02-01"
@@ -166,6 +177,7 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
     await test_db_session.commit()
 
     payload = {
+        "age": 30,
         "first_name": "E",
         "last_name": "F",
         "phone": "4444444444",
@@ -237,6 +249,7 @@ async def test_engagement_onboard_prefers_payload_referred_by(async_client, test
     await test_db_session.commit()
 
     payload = {
+        "age": 30,
         "first_name": "Payload",
         "phone": "6666666666",
         "city": "BLR",
@@ -277,6 +290,7 @@ async def test_engagement_onboard_requires_active_engagement(async_client, test_
     await test_db_session.commit()
 
     payload = {
+        "age": 30,
         "first_name": "G",
         "phone": "5555555555",
         "blood_collection_date": "2026-02-01",

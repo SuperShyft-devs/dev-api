@@ -11,6 +11,7 @@ from core.security import create_jwt_token
 from modules.assessments.models import AssessmentPackage
 from modules.employee.models import Employee
 from modules.engagements.models import Engagement, OnboardingAssistantAssignment
+from modules.diagnostics.models import DiagnosticPackage
 from modules.users.models import User
 
 
@@ -22,7 +23,22 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int, role: str = "admin"):
     """Seed a user and employee record."""
-    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000000", status="active"))
+    # Ensure required diagnostic package exists for b2b engagements.
+    existing_diag = await test_db_session.get(DiagnosticPackage, 1)
+    if existing_diag is None:
+        test_db_session.add(
+            DiagnosticPackage(
+                diagnostic_package_id=1,
+                reference_id="REF1",
+                package_name="Diag Package",
+                diagnostic_provider="test_provider",
+                no_of_tests=1,
+                status="active",
+                bookings_count=0,
+            )
+        )
+
+    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role=role, status="active"))
     await test_db_session.commit()
@@ -58,7 +74,7 @@ async def test_list_onboarding_assistants_requires_auth(async_client):
 @pytest.mark.asyncio
 async def test_list_onboarding_assistants_requires_employee(async_client, test_db_session):
     """Test that listing onboarding assistants requires employee role."""
-    test_db_session.add(User(user_id=9001, phone="9001000000", status="active"))
+    test_db_session.add(User(user_id=9001, age=30, phone="9001000000", status="active"))
     await test_db_session.commit()
 
     response = await async_client.get("/engagements/1/onboarding-assistants", headers=_auth_header(9001))
@@ -78,6 +94,7 @@ async def test_list_onboarding_assistants_returns_empty_list(async_client, test_
             engagement_code="ENG001",
             engagement_type="b2b",
             assessment_package_id=1,
+            diagnostic_package_id=1,
             status="active",
             participant_count=0,
             start_date=date.today(),
@@ -109,6 +126,7 @@ async def test_list_onboarding_assistants_returns_assigned_employees(async_clien
             engagement_code="ENG002",
             engagement_type="b2b",
             assessment_package_id=1,
+            diagnostic_package_id=1,
             status="active",
             participant_count=0,
             start_date=date.today(),
@@ -157,7 +175,7 @@ async def test_add_onboarding_assistants_requires_auth(async_client):
 @pytest.mark.asyncio
 async def test_add_onboarding_assistants_requires_employee(async_client, test_db_session):
     """Test that adding onboarding assistants requires employee role."""
-    test_db_session.add(User(user_id=9007, phone="9007000000", status="active"))
+    test_db_session.add(User(user_id=9007, age=30, phone="9007000000", status="active"))
     await test_db_session.commit()
 
     response = await async_client.post(
@@ -183,6 +201,7 @@ async def test_add_onboarding_assistants_creates_assignment(async_client, test_d
             engagement_code="ENG003",
             engagement_type="b2b",
             assessment_package_id=1,
+            diagnostic_package_id=1,
             status="active",
             participant_count=0,
             start_date=date.today(),
@@ -228,6 +247,7 @@ async def test_add_onboarding_assistants_skips_duplicates(async_client, test_db_
             engagement_code="ENG004",
             engagement_type="b2b",
             assessment_package_id=1,
+            diagnostic_package_id=1,
             status="active",
             participant_count=0,
             start_date=date.today(),
@@ -267,6 +287,7 @@ async def test_add_onboarding_assistants_handles_multiple(async_client, test_db_
             engagement_code="ENG005",
             engagement_type="b2b",
             assessment_package_id=1,
+            diagnostic_package_id=1,
             status="active",
             participant_count=0,
             start_date=date.today(),
@@ -300,6 +321,7 @@ async def test_add_onboarding_assistants_returns_404_when_employee_missing(async
             engagement_code="ENG006",
             engagement_type="b2b",
             assessment_package_id=1,
+            diagnostic_package_id=1,
             status="active",
             participant_count=0,
             start_date=date.today(),
@@ -345,6 +367,7 @@ async def test_add_onboarding_assistants_validates_empty_list(async_client, test
             engagement_code="ENG007",
             engagement_type="b2b",
             assessment_package_id=1,
+            diagnostic_package_id=1,
             status="active",
             participant_count=0,
             start_date=date.today(),
@@ -376,7 +399,7 @@ async def test_remove_onboarding_assistant_requires_auth(async_client):
 @pytest.mark.asyncio
 async def test_remove_onboarding_assistant_requires_employee(async_client, test_db_session):
     """Test that removing onboarding assistant requires employee role."""
-    test_db_session.add(User(user_id=9018, phone="9018000000", status="active"))
+    test_db_session.add(User(user_id=9018, age=30, phone="9018000000", status="active"))
     await test_db_session.commit()
 
     response = await async_client.delete("/engagements/1/onboarding-assistants/1", headers=_auth_header(9018))
@@ -397,6 +420,7 @@ async def test_remove_onboarding_assistant_deletes_assignment(async_client, test
             engagement_code="ENG008",
             engagement_type="b2b",
             assessment_package_id=1,
+            diagnostic_package_id=1,
             status="active",
             participant_count=0,
             start_date=date.today(),
@@ -440,6 +464,7 @@ async def test_remove_onboarding_assistant_returns_404_when_assignment_missing(a
             engagement_code="ENG009",
             engagement_type="b2b",
             assessment_package_id=1,
+            diagnostic_package_id=1,
             status="active",
             participant_count=0,
             start_date=date.today(),

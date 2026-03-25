@@ -9,6 +9,7 @@ import pytest
 from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
+from modules.diagnostics.models import DiagnosticPackage
 from modules.users.models import User
 from modules.engagements.models import Engagement, EngagementTimeSlot
 from modules.assessments.models import AssessmentPackage
@@ -23,7 +24,20 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
     """Seed a test employee."""
-    user = User(user_id=user_id, phone=f"{user_id}000000000", status="active")
+    # Seed required diagnostic package for engagements (b2b requires non-null FK).
+    test_db_session.add(
+        DiagnosticPackage(
+            diagnostic_package_id=1,
+            reference_id="REF1",
+            package_name="Diag Package",
+            diagnostic_provider="test_provider",
+            no_of_tests=1,
+            status="active",
+            bookings_count=0,
+        )
+    )
+
+    user = User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active")
     test_db_session.add(user)
     await test_db_session.flush()
     
@@ -42,7 +56,7 @@ async def test_get_public_participants_requires_auth(async_client):
 @pytest.mark.asyncio
 async def test_get_public_participants_requires_employee(async_client, test_db_session):
     """Test that the endpoint requires employee role."""
-    test_db_session.add(User(user_id=6001, phone="6001000000", status="active"))
+    test_db_session.add(User(user_id=6001, age=30, phone="6001000000", status="active"))
     await test_db_session.commit()
 
     response = await async_client.get("/engagements/public/participants", headers=_auth_header(6001))
@@ -87,6 +101,7 @@ async def test_get_public_participants_returns_empty_list_when_no_participants(a
             engagement_code="B2C5001",
             engagement_type="healthcamp",
             assessment_package_id=201,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -129,6 +144,7 @@ async def test_get_public_participants_returns_participants_from_b2c_engagements
             engagement_code="B2C5002",
             engagement_type="healthcamp",
             assessment_package_id=202,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -142,6 +158,7 @@ async def test_get_public_participants_returns_participants_from_b2c_engagements
     test_db_session.add(
         User(
             user_id=7001,
+            age=30,
             first_name="Alice",
             last_name="Public",
             phone="7001111111",
@@ -153,6 +170,7 @@ async def test_get_public_participants_returns_participants_from_b2c_engagements
     test_db_session.add(
         User(
             user_id=7002,
+            age=30,
             first_name="Bob",
             last_name="Public",
             phone="7002222222",
@@ -230,6 +248,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
             engagement_code="B2C5003",
             engagement_type="healthcamp",
             assessment_package_id=203,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -244,6 +263,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
             engagement_code="B2C5004",
             engagement_type="healthcamp",
             assessment_package_id=203,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 4, 1),
             end_date=date(2026, 4, 30),
@@ -257,6 +277,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
     test_db_session.add(
         User(
             user_id=7003,
+            age=30,
             first_name="Charlie",
             last_name="Public",
             phone="7003333333",
@@ -268,6 +289,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
     test_db_session.add(
         User(
             user_id=7004,
+            age=30,
             first_name="Diana",
             last_name="Public",
             phone="7004444444",
@@ -279,6 +301,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
     test_db_session.add(
         User(
             user_id=7005,
+            age=30,
             first_name="Eve",
             last_name="Public",
             phone="7005555555",
@@ -380,6 +403,7 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
             engagement_code="B2C5005",
             engagement_type="healthcamp",
             assessment_package_id=204,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -396,6 +420,7 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
             engagement_code="B2B5006",
             engagement_type="b2b",
             assessment_package_id=204,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -409,6 +434,7 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
     test_db_session.add(
         User(
             user_id=7006,
+            age=30,
             first_name="B2C_User",
             last_name="Public",
             phone="7006666666",
@@ -420,6 +446,7 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
     test_db_session.add(
         User(
             user_id=7007,
+            age=30,
             first_name="B2B_User",
             last_name="Corporate",
             phone="7007777777",
@@ -506,6 +533,7 @@ async def test_get_public_participants_paginates_results(async_client, test_db_s
             engagement_code="B2C5007",
             engagement_type="healthcamp",
             assessment_package_id=205,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -521,6 +549,7 @@ async def test_get_public_participants_paginates_results(async_client, test_db_s
         test_db_session.add(
             User(
                 user_id=user_id,
+                age=30,
                 first_name=f"User{i}",
                 last_name=f"Last{i}",
                 phone=f"710{i}000000",

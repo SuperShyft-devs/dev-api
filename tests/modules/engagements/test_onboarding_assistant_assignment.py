@@ -24,7 +24,7 @@ async def test_add_onboarding_assistant_creates_assignment(test_db_session):
     
     # Seed employee
     await test_db_session.execute(
-        text("INSERT INTO users (user_id, phone, status) VALUES (5001, '5001000000', 'active')")
+        text("INSERT INTO users (user_id, age, phone, status) VALUES (5001, 30, '5001000000', 'active')")
     )
     await test_db_session.execute(
         text("INSERT INTO employee (employee_id, user_id, role, status) VALUES (101, 5001, 'onboarding_assistant', 'active')")
@@ -74,7 +74,7 @@ async def test_add_multiple_onboarding_assistants_to_one_engagement(test_db_sess
     
     # Seed employees
     await test_db_session.execute(
-        text("INSERT INTO users (user_id, phone, status) VALUES (5002, '5002000000', 'active'), (5003, '5003000000', 'active')")
+        text("INSERT INTO users (user_id, age, phone, status) VALUES (5002, 30, '5002000000', 'active'), (5003, 30, '5003000000', 'active')")
     )
     await test_db_session.execute(
         text(
@@ -122,7 +122,7 @@ async def test_duplicate_assignment_prevented_by_unique_constraint(test_db_sessi
     
     # Seed employee and engagement
     await test_db_session.execute(
-        text("INSERT INTO users (user_id, phone, status) VALUES (5004, '5004000000', 'active')")
+        text("INSERT INTO users (user_id, age, phone, status) VALUES (5004, 30, '5004000000', 'active')")
     )
     await test_db_session.execute(
         text("INSERT INTO employee (employee_id, user_id, role, status) VALUES (104, 5004, 'onboarding_assistant', 'active')")
@@ -161,7 +161,7 @@ async def test_list_onboarding_assistants_returns_all_assignments(test_db_sessio
     
     # Seed employees
     await test_db_session.execute(
-        text("INSERT INTO users (user_id, phone, status) VALUES (5005, '5005000000', 'active'), (5006, '5006000000', 'active')")
+        text("INSERT INTO users (user_id, age, phone, status) VALUES (5005, 30, '5005000000', 'active'), (5006, 30, '5006000000', 'active')")
     )
     await test_db_session.execute(
         text(
@@ -207,7 +207,7 @@ async def test_remove_onboarding_assistant_deletes_assignment(test_db_session):
     
     # Seed employee and engagement
     await test_db_session.execute(
-        text("INSERT INTO users (user_id, phone, status) VALUES (5007, '5007000000', 'active')")
+        text("INSERT INTO users (user_id, age, phone, status) VALUES (5007, 30, '5007000000', 'active')")
     )
     await test_db_session.execute(
         text("INSERT INTO employee (employee_id, user_id, role, status) VALUES (107, 5007, 'onboarding_assistant', 'active')")
@@ -284,7 +284,7 @@ async def test_get_onboarding_assistant_assignment_returns_specific_assignment(t
     
     # Seed employee and engagement
     await test_db_session.execute(
-        text("INSERT INTO users (user_id, phone, status) VALUES (5008, '5008000000', 'active')")
+        text("INSERT INTO users (user_id, age, phone, status) VALUES (5008, 30, '5008000000', 'active')")
     )
     await test_db_session.execute(
         text("INSERT INTO employee (employee_id, user_id, role, status) VALUES (108, 5008, 'onboarding_assistant', 'active')")
@@ -343,7 +343,7 @@ async def test_b2c_engagement_created_without_onboarding_assistants(test_db_sess
     
     # Seed users table for foreign key
     await test_db_session.execute(
-        text("INSERT INTO users (user_id, phone, status) VALUES (5009, '5009000000', 'active')")
+        text("INSERT INTO users (user_id, age, phone, status) VALUES (5009, 30, '5009000000', 'active')")
     )
     await test_db_session.commit()
     

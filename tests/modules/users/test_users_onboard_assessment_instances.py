@@ -9,9 +9,13 @@ async def test_onboard_is_idempotent_for_assessment_instance(async_client, test_
     await test_db_session.execute(
         text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PK1', 'Package', 'active')")
     )
+    await test_db_session.execute(
+        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) VALUES (1, 'REF1', 'Diag Package', 'active')")
+    )
     await test_db_session.commit()
 
     payload = {
+        "age": 30,
         "first_name": "Idem",
         "phone": "7777700000",
         "city": "Delhi",

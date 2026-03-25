@@ -30,6 +30,7 @@ def _generate_engagement_code(length: int = 8) -> str:
 
 
 _ALLOWED_ENGAGEMENT_STATUS = {"active", "inactive", "archived"}
+DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID = 1
 
 
 def _normalize_status(value: str | None) -> str:
@@ -148,6 +149,21 @@ class EngagementsService:
                     message=f"Organization with ID {payload.organization_id} does not exist",
                 )
 
+        engagement_type_normalized = (payload.engagement_type or "").strip().lower()
+        diagnostic_package_id = payload.diagnostic_package_id
+        if engagement_type_normalized == "b2b":
+            if diagnostic_package_id is None:
+                raise AppError(
+                    status_code=400,
+                    error_code="DIAGNOSTIC_PACKAGE_REQUIRED",
+                    message="Diagnostic package must be selected for B2B engagements",
+                )
+        else:
+            # Defensive: if admin creates a non-B2B engagement via this endpoint,
+            # default diagnostic package to the B2C fallback.
+            if diagnostic_package_id is None:
+                diagnostic_package_id = DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
+
         # Use provided engagement_code or generate a unique one.
         if payload.engagement_code:
             code = payload.engagement_code.strip()
@@ -174,7 +190,7 @@ class EngagementsService:
             engagement_code=code,
             engagement_type=payload.engagement_type,
             assessment_package_id=payload.assessment_package_id,
-            diagnostic_package_id=payload.diagnostic_package_id,
+            diagnostic_package_id=diagnostic_package_id,
             city=payload.city,
             slot_duration=payload.slot_duration,
             start_date=payload.start_date,
@@ -293,7 +309,19 @@ class EngagementsService:
         engagement.organization_id = payload.organization_id
         engagement.engagement_type = payload.engagement_type
         engagement.assessment_package_id = payload.assessment_package_id
-        engagement.diagnostic_package_id = payload.diagnostic_package_id
+        engagement_type_normalized = (payload.engagement_type or "").strip().lower()
+        diagnostic_package_id = payload.diagnostic_package_id
+        if engagement_type_normalized == "b2b":
+            if diagnostic_package_id is None:
+                raise AppError(
+                    status_code=400,
+                    error_code="DIAGNOSTIC_PACKAGE_REQUIRED",
+                    message="Diagnostic package must be selected for B2B engagements",
+                )
+        else:
+            if diagnostic_package_id is None:
+                diagnostic_package_id = DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
+        engagement.diagnostic_package_id = diagnostic_package_id
         engagement.city = payload.city
         engagement.slot_duration = payload.slot_duration
         engagement.start_date = payload.start_date
@@ -360,14 +388,12 @@ class EngagementsService:
         engagement_date: date,
         city: str | None,
         assessment_package_id: int,
-        diagnostic_package_id: int | None = None,
+        diagnostic_package_id: int = DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
     ) -> Engagement:
         """Create a B2C engagement with no onboarding assistants assigned by default.
         
         B2C engagements are created automatically during public user onboarding.
         Onboarding assistant assignments can be added later if needed.
-        
-        diagnostic_package_id is optional and can be None for engagements that don't require diagnostics.
         """
         name_part = (user_first_name or "user").strip() or "user"
         engagement_name = f"{name_part}-{engagement_date.isoformat()}"

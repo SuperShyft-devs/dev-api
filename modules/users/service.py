@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.employee.models import Employee
 from modules.audit.service import AuditService
+from modules.engagements.service import DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
 from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
 from modules.users.schemas import (
@@ -676,14 +677,13 @@ class UsersService:
 
         # Create a new engagement for this user.
         # B2C engagements are created with no onboarding assistants by default.
-        # diagnostic_package_id is set to None as it's not required for now.
         engagement = await self._engagements_service.create_b2c_engagement(
             db,
             user_first_name=user.first_name,
             engagement_date=payload.blood_collection_date,
             city=user.city,
             assessment_package_id=1,
-            diagnostic_package_id=None,
+            diagnostic_package_id=DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
         )
 
         # Enroll the user by booking a time slot.

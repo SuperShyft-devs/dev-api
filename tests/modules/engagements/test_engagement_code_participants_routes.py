@@ -9,6 +9,7 @@ import pytest
 from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
+from modules.diagnostics.models import DiagnosticPackage
 from modules.users.models import User
 from modules.engagements.models import Engagement, EngagementTimeSlot
 from modules.assessments.models import AssessmentPackage
@@ -22,7 +23,19 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
     """Seed a test employee."""
-    user = User(user_id=user_id, phone=f"{user_id}000000000", status="active")
+    # Seed required diagnostic package for engagements (b2b requires non-null FK).
+    test_db_session.add(
+        DiagnosticPackage(
+            diagnostic_package_id=1,
+            reference_id="REF1",
+            package_name="Diag Package",
+            diagnostic_provider="test_provider",
+            no_of_tests=1,
+            status="active",
+            bookings_count=0,
+        )
+    )
+    user = User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active")
     test_db_session.add(user)
     await test_db_session.flush()
     
@@ -41,7 +54,7 @@ async def test_get_engagement_code_participants_requires_auth(async_client):
 @pytest.mark.asyncio
 async def test_get_engagement_code_participants_requires_employee(async_client, test_db_session):
     """Test that the endpoint requires employee role."""
-    test_db_session.add(User(user_id=7001, phone="7001000000", status="active"))
+    test_db_session.add(User(user_id=7001, age=30, phone="7001000000", status="active"))
     await test_db_session.commit()
 
     response = await async_client.get("/engagements/code/ENG001/participants", headers=_auth_header(7001))
@@ -81,6 +94,7 @@ async def test_get_engagement_code_participants_returns_empty_list_when_no_parti
             engagement_code="ENG3001",
             engagement_type="b2b",
             assessment_package_id=101,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -124,6 +138,7 @@ async def test_get_engagement_code_participants_returns_participants_from_engage
             engagement_code="ENG3002",
             engagement_type="b2b",
             assessment_package_id=102,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -137,6 +152,7 @@ async def test_get_engagement_code_participants_returns_participants_from_engage
     test_db_session.add(
         User(
             user_id=8001,
+            age=30,
             first_name="Alice",
             last_name="Smith",
             phone="8001111111",
@@ -148,6 +164,7 @@ async def test_get_engagement_code_participants_returns_participants_from_engage
     test_db_session.add(
         User(
             user_id=8002,
+            age=30,
             first_name="Bob",
             last_name="Jones",
             phone="8002222222",
@@ -222,6 +239,7 @@ async def test_get_engagement_code_participants_returns_distinct_users(async_cli
             engagement_code="ENG3003",
             engagement_type="b2b",
             assessment_package_id=103,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -235,6 +253,7 @@ async def test_get_engagement_code_participants_returns_distinct_users(async_cli
     test_db_session.add(
         User(
             user_id=8003,
+            age=30,
             first_name="Charlie",
             last_name="Brown",
             phone="8003333333",
@@ -299,6 +318,7 @@ async def test_get_engagement_code_participants_validates_pagination_params(asyn
             engagement_code="ENG3004",
             engagement_type="b2b",
             assessment_package_id=104,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -344,6 +364,7 @@ async def test_get_engagement_code_participants_paginates_results(async_client, 
             engagement_code="ENG3005",
             engagement_type="b2b",
             assessment_package_id=105,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -359,6 +380,7 @@ async def test_get_engagement_code_participants_paginates_results(async_client, 
         test_db_session.add(
             User(
                 user_id=user_id,
+                age=30,
                 first_name=f"User{i}",
                 last_name=f"Last{i}",
                 phone=f"810{i}000000",
@@ -439,6 +461,7 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
             engagement_code="ENG3006",
             engagement_type="b2b",
             assessment_package_id=106,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -452,6 +475,7 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
             engagement_code="ENG3007",
             engagement_type="b2b",
             assessment_package_id=106,
+            diagnostic_package_id=1,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -465,6 +489,7 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
     test_db_session.add(
         User(
             user_id=8201,
+            age=30,
             first_name="EngA_User",
             last_name="Smith",
             phone="8201000000",
@@ -474,6 +499,7 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
     test_db_session.add(
         User(
             user_id=8202,
+            age=30,
             first_name="EngB_User",
             last_name="Jones",
             phone="8202000000",
