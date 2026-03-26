@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
+from core.dependencies import get_current_user
 from db.session import get_db
 from modules.checklists.dependencies import get_checklists_service
 from modules.checklists.schemas import (
@@ -20,7 +21,7 @@ from modules.checklists.schemas import (
     TaskUpdate,
 )
 from modules.checklists.service import ChecklistsService
-from modules.employee.dependencies import get_current_employee
+from modules.employee.dependencies import get_current_employee, get_optional_employee
 from modules.employee.service import EmployeeContext
 
 router = APIRouter(tags=["checklists"])
@@ -269,10 +270,15 @@ async def update_checklist_task(
 async def list_engagement_checklists(
     engagement_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    _current_user=Depends(get_current_user),
+    employee: EmployeeContext | None = Depends(get_optional_employee),
     service: ChecklistsService = Depends(get_checklists_service),
 ):
-    rows = await service.get_engagement_checklists(db, engagement_id)
+    if employee is not None:
+        rows = await service.get_engagement_checklists(db, engagement_id)
+        return success_response([r.model_dump(mode="json") for r in rows])
+
+    rows = await service.get_engagement_user_facing_checklists(db, engagement_id)
     return success_response([r.model_dump(mode="json") for r in rows])
 
 

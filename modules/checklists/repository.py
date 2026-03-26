@@ -1,12 +1,15 @@
-"""Checklists repository — database queries only."""
+"""Checklists repository.
+
+Only database queries live here.
+"""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
-from sqlalchemy import case, func, nullslast, select
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import selectinload
 
 from modules.checklists.models import (
     ChecklistTemplate,
@@ -14,30 +17,21 @@ from modules.checklists.models import (
     EngagementChecklist,
     EngagementChecklistTask,
 )
-from modules.checklists.schemas import ChecklistReadiness
-from modules.engagements.models import Engagement
 
 
 class ChecklistsRepository:
     async def get_all_templates(self, db: AsyncSession) -> list[ChecklistTemplate]:
-        stmt = select(ChecklistTemplate).order_by(ChecklistTemplate.created_at.desc())
-        result = await db.execute(stmt)
-        return list(result.scalars().all())
+        res = await db.execute(select(ChecklistTemplate).order_by(ChecklistTemplate.template_id.desc()))
+        return list(res.scalars().all())
 
     async def get_template_by_id(self, db: AsyncSession, template_id: int) -> ChecklistTemplate | None:
-        stmt = (
+        q = (
             select(ChecklistTemplate)
             .where(ChecklistTemplate.template_id == template_id)
-            .options(joinedload(ChecklistTemplate.items))
+            .options(selectinload(ChecklistTemplate.items))
         )
-        result = await db.execute(stmt)
-        template = result.unique().scalar_one_or_none()
-        if template is None:
-            return None
-        template.items.sort(
-            key=lambda i: (i.display_order is None, i.display_order if i.display_order is not None else 0, i.item_id),
-        )
-        return template
+        res = await db.execute(q)
+        return res.scalar_one_or_none()
 
     async def create_template(
         self,
@@ -45,37 +39,39 @@ class ChecklistsRepository:
         *,
         name: str,
         description: str | None,
+        audience: str,
         created_employee_id: int | None,
     ) -> ChecklistTemplate:
         row = ChecklistTemplate(
             name=name,
             description=description,
+            status="active",
+            audience=audience,
+            created_at=datetime.utcnow(),
             created_employee_id=created_employee_id,
         )
         db.add(row)
         await db.flush()
         return row
 
-    async def update_template(self, db: AsyncSession, template_id: int, data: dict) -> ChecklistTemplate | None:
-        stmt = select(ChecklistTemplate).where(ChecklistTemplate.template_id == template_id)
-        result = await db.execute(stmt)
-        template = result.scalar_one_or_none()
-        if template is None:
-            return None
-        for key, value in data.items():
-            setattr(template, key, value)
+    async def update_template(
+        self,
+        db: AsyncSession,
+        template_id: int,
+        patch: dict,
+    ) -> ChecklistTemplate | None:
+        await db.execute(update(ChecklistTemplate).where(ChecklistTemplate.template_id == template_id).values(**patch))
         await db.flush()
-        return template
+        return await self.get_template_by_id(db, template_id)
 
     async def update_template_status(self, db: AsyncSession, template_id: int, status: str) -> ChecklistTemplate | None:
-        stmt = select(ChecklistTemplate).where(ChecklistTemplate.template_id == template_id)
-        result = await db.execute(stmt)
-        template = result.scalar_one_or_none()
-        if template is None:
-            return None
-        template.status = status
+        await db.execute(
+            update(ChecklistTemplate)
+            .where(ChecklistTemplate.template_id == template_id)
+            .values(status=status)
+        )
         await db.flush()
-        return template
+        return await self.get_template_by_id(db, template_id)
 
     async def create_template_item(
         self,
@@ -96,71 +92,29 @@ class ChecklistsRepository:
         await db.flush()
         return row
 
-    async def update_template_item(self, db: AsyncSession, item_id: int, data: dict) -> ChecklistTemplateItem | None:
-        stmt = select(ChecklistTemplateItem).where(ChecklistTemplateItem.item_id == item_id)
-        result = await db.execute(stmt)
-        row = result.scalar_one_or_none()
-        if row is None:
-            return None
-        for key, value in data.items():
-            setattr(row, key, value)
+    async def get_template_item_by_id(self, db: AsyncSession, item_id: int) -> ChecklistTemplateItem | None:
+        res = await db.execute(select(ChecklistTemplateItem).where(ChecklistTemplateItem.item_id == item_id))
+        return res.scalar_one_or_none()
+
+    async def update_template_item(self, db: AsyncSession, item_id: int, patch: dict) -> ChecklistTemplateItem | None:
+        await db.execute(update(ChecklistTemplateItem).where(ChecklistTemplateItem.item_id == item_id).values(**patch))
         await db.flush()
-        return row
+        return await self.get_template_item_by_id(db, item_id)
 
     async def delete_template_item(self, db: AsyncSession, item_id: int) -> None:
-        stmt = select(ChecklistTemplateItem).where(ChecklistTemplateItem.item_id == item_id)
-        result = await db.execute(stmt)
-        row = result.scalar_one_or_none()
-        if row is None:
+        item = await self.get_template_item_by_id(db, item_id)
+        if item is None:
             return
-        await db.delete(row)
+        await db.delete(item)
         await db.flush()
 
-    async def get_template_item_by_id(self, db: AsyncSession, item_id: int) -> ChecklistTemplateItem | None:
-        stmt = select(ChecklistTemplateItem).where(ChecklistTemplateItem.item_id == item_id)
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
-
-    async def get_checklists_for_engagement(
-        self,
-        db: AsyncSession,
-        engagement_id: int,
-    ) -> list[EngagementChecklist]:
-        stmt = (
-            select(EngagementChecklist)
-            .where(EngagementChecklist.engagement_id == engagement_id)
-            .options(
-                selectinload(EngagementChecklist.tasks).selectinload(EngagementChecklistTask.item),
-                selectinload(EngagementChecklist.template),
-            )
-            .order_by(EngagementChecklist.checklist_id.asc())
-        )
-        result = await db.execute(stmt)
-        return list(result.scalars().unique().all())
-
-    async def get_checklist_by_id(self, db: AsyncSession, checklist_id: int) -> EngagementChecklist | None:
-        stmt = (
-            select(EngagementChecklist)
-            .where(EngagementChecklist.checklist_id == checklist_id)
-            .options(
-                selectinload(EngagementChecklist.tasks).selectinload(EngagementChecklistTask.item),
-                selectinload(EngagementChecklist.template),
-            )
-        )
-        result = await db.execute(stmt)
-        return result.scalars().unique().one_or_none()
-
     async def checklist_exists(self, db: AsyncSession, engagement_id: int, template_id: int) -> bool:
-        stmt = (
-            select(EngagementChecklist.checklist_id)
-            .where(
-                EngagementChecklist.engagement_id == engagement_id,
-                EngagementChecklist.template_id == template_id,
-            )
-            .limit(1)
+        res = await db.execute(
+            select(func.count())
+            .select_from(EngagementChecklist)
+            .where(and_(EngagementChecklist.engagement_id == engagement_id, EngagementChecklist.template_id == template_id))
         )
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        return int(res.scalar_one()) > 0
 
     async def create_checklist(
         self,
@@ -170,57 +124,109 @@ class ChecklistsRepository:
         template_id: int,
         created_employee_id: int | None,
     ) -> int:
-        checklist = EngagementChecklist(
+        row = EngagementChecklist(
             engagement_id=engagement_id,
             template_id=template_id,
+            created_at=datetime.utcnow(),
             created_employee_id=created_employee_id,
         )
-        db.add(checklist)
+        db.add(row)
         await db.flush()
+        return int(row.checklist_id)
 
-        items_stmt = (
-            select(ChecklistTemplateItem)
-            .where(ChecklistTemplateItem.template_id == template_id)
-            .order_by(nullslast(ChecklistTemplateItem.display_order.asc()), ChecklistTemplateItem.item_id.asc())
-        )
-        items_result = await db.execute(items_stmt)
-        items = list(items_result.scalars().all())
-
+    async def create_tasks_for_checklist(self, db: AsyncSession, *, checklist_id: int, template_id: int) -> int:
+        """Create tasks for all template items. Returns count created."""
+        res = await db.execute(select(ChecklistTemplateItem).where(ChecklistTemplateItem.template_id == template_id))
+        items = list(res.scalars().all())
+        if not items:
+            return 0
         for item in items:
-            task = EngagementChecklistTask(
-                checklist_id=checklist.checklist_id,
-                item_id=item.item_id,
-                status="pending",
+            db.add(
+                EngagementChecklistTask(
+                    checklist_id=checklist_id,
+                    item_id=item.item_id,
+                    assigned_employee_id=None,
+                    status="pending",
+                )
             )
-            db.add(task)
         await db.flush()
-        return checklist.checklist_id
+        return len(items)
+
+    async def get_checklist_by_id(self, db: AsyncSession, checklist_id: int) -> EngagementChecklist | None:
+        q = (
+            select(EngagementChecklist)
+            .where(EngagementChecklist.checklist_id == checklist_id)
+            .options(
+                selectinload(EngagementChecklist.template),
+                selectinload(EngagementChecklist.tasks).selectinload(EngagementChecklistTask.item),
+            )
+        )
+        res = await db.execute(q)
+        return res.scalar_one_or_none()
 
     async def delete_checklist(self, db: AsyncSession, checklist_id: int) -> None:
-        stmt = select(EngagementChecklist).where(EngagementChecklist.checklist_id == checklist_id)
-        result = await db.execute(stmt)
-        row = result.scalar_one_or_none()
+        row = await self.get_checklist_by_id(db, checklist_id)
         if row is None:
             return
         await db.delete(row)
         await db.flush()
 
+    async def get_checklists_for_engagement(self, db: AsyncSession, engagement_id: int) -> list[EngagementChecklist]:
+        q = (
+            select(EngagementChecklist)
+            .where(EngagementChecklist.engagement_id == engagement_id)
+            .order_by(EngagementChecklist.checklist_id.asc())
+            .options(
+                selectinload(EngagementChecklist.template),
+                selectinload(EngagementChecklist.tasks).selectinload(EngagementChecklistTask.item),
+            )
+        )
+        res = await db.execute(q)
+        return list(res.scalars().all())
+
+    async def get_user_facing_checklists_for_engagement(
+        self,
+        db: AsyncSession,
+        engagement_id: int,
+    ) -> list[EngagementChecklist]:
+        q = (
+            select(EngagementChecklist)
+            .join(ChecklistTemplate, ChecklistTemplate.template_id == EngagementChecklist.template_id)
+            .where(EngagementChecklist.engagement_id == engagement_id)
+            .where(ChecklistTemplate.audience == "user")
+            .order_by(EngagementChecklist.checklist_id.asc())
+            .options(selectinload(EngagementChecklist.template).selectinload(ChecklistTemplate.items))
+        )
+        res = await db.execute(q)
+        return list(res.scalars().all())
+
+    async def get_engagement_readiness(self, db: AsyncSession, engagement_id: int):
+        res = await db.execute(
+            select(EngagementChecklistTask.status)
+            .join(EngagementChecklist, EngagementChecklist.checklist_id == EngagementChecklistTask.checklist_id)
+            .where(EngagementChecklist.engagement_id == engagement_id)
+        )
+        statuses = [s for (s,) in res.all()]
+        total = len(statuses)
+        done = sum(1 for s in statuses if (s or "").lower() == "done")
+        percent = int(round(done * 100 / total)) if total else 0
+        return {"done": done, "total": total, "percent": percent}
+
     async def get_task_by_id(self, db: AsyncSession, task_id: int) -> EngagementChecklistTask | None:
-        stmt = (
+        q = (
             select(EngagementChecklistTask)
             .where(EngagementChecklistTask.task_id == task_id)
-            .options(joinedload(EngagementChecklistTask.item))
+            .options(selectinload(EngagementChecklistTask.item))
         )
-        result = await db.execute(stmt)
-        return result.unique().scalar_one_or_none()
+        res = await db.execute(q)
+        return res.scalar_one_or_none()
 
     async def assign_task(self, db: AsyncSession, task_id: int, assigned_employee_id: int | None) -> None:
-        stmt = select(EngagementChecklistTask).where(EngagementChecklistTask.task_id == task_id)
-        result = await db.execute(stmt)
-        task = result.scalar_one_or_none()
-        if task is None:
-            return
-        task.assigned_employee_id = assigned_employee_id
+        await db.execute(
+            update(EngagementChecklistTask)
+            .where(EngagementChecklistTask.task_id == task_id)
+            .values(assigned_employee_id=assigned_employee_id)
+        )
         await db.flush()
 
     async def update_task_status(
@@ -230,55 +236,21 @@ class ChecklistsRepository:
         task_id: int,
         status: str,
         notes: str | None,
-        completed_by_employee_id: int | None,
+        completed_by_employee_id: int,
     ) -> None:
-        stmt = select(EngagementChecklistTask).where(EngagementChecklistTask.task_id == task_id)
-        result = await db.execute(stmt)
-        task = result.scalar_one_or_none()
-        if task is None:
-            return
-        if status == "done":
-            task.status = "done"
-            task.completed_at = datetime.now(timezone.utc)
-            task.completed_by_employee_id = completed_by_employee_id
-            if notes is not None:
-                task.notes = notes
+        values = {"status": status, "notes": notes}
+        if status.lower() == "done":
+            values["completed_at"] = datetime.utcnow()
+            values["completed_by_employee_id"] = completed_by_employee_id
         else:
-            task.status = "pending"
-            task.completed_at = None
-            task.completed_by_employee_id = None
+            values["completed_at"] = None
+            values["completed_by_employee_id"] = None
+        await db.execute(update(EngagementChecklistTask).where(EngagementChecklistTask.task_id == task_id).values(**values))
         await db.flush()
 
-    async def update_task(self, db: AsyncSession, task_id: int, data: dict) -> None:
-        stmt = select(EngagementChecklistTask).where(EngagementChecklistTask.task_id == task_id)
-        result = await db.execute(stmt)
-        task = result.scalar_one_or_none()
-        if task is None:
-            return
-        for key, value in data.items():
-            setattr(task, key, value)
+    async def update_task(self, db: AsyncSession, task_id: int, patch: dict) -> None:
+        await db.execute(update(EngagementChecklistTask).where(EngagementChecklistTask.task_id == task_id).values(**patch))
         await db.flush()
-
-    async def get_engagement_readiness(self, db: AsyncSession, engagement_id: int) -> ChecklistReadiness:
-        done_expr = func.coalesce(
-            func.sum(case((EngagementChecklistTask.status == "done", 1), else_=0)),
-            0,
-        )
-        total_expr = func.count(EngagementChecklistTask.task_id)
-        stmt = (
-            select(done_expr, total_expr)
-            .select_from(EngagementChecklistTask)
-            .join(EngagementChecklist, EngagementChecklist.checklist_id == EngagementChecklistTask.checklist_id)
-            .where(EngagementChecklist.engagement_id == engagement_id)
-        )
-        result = await db.execute(stmt)
-        row = result.one_or_none()
-        if row is None:
-            return ChecklistReadiness(done=0, total=0, percent=0)
-        done = int(row[0] or 0)
-        total = int(row[1] or 0)
-        percent = int(round(done * 100 / total)) if total else 0
-        return ChecklistReadiness(done=done, total=total, percent=percent)
 
     async def get_my_tasks(
         self,
@@ -286,11 +258,13 @@ class ChecklistsRepository:
         *,
         employee_id: int,
         status_filter: str | None,
-    ) -> list[tuple[EngagementChecklistTask, int, str | None, str, str | None]]:
-        stmt = (
+    ):
+        from modules.engagements.models import Engagement
+
+        q = (
             select(
                 EngagementChecklistTask,
-                EngagementChecklist.engagement_id,
+                Engagement.engagement_id,
                 Engagement.engagement_name,
                 ChecklistTemplateItem.title,
                 ChecklistTemplateItem.description,
@@ -299,16 +273,9 @@ class ChecklistsRepository:
             .join(Engagement, Engagement.engagement_id == EngagementChecklist.engagement_id)
             .join(ChecklistTemplateItem, ChecklistTemplateItem.item_id == EngagementChecklistTask.item_id)
             .where(EngagementChecklistTask.assigned_employee_id == employee_id)
+            .order_by(EngagementChecklistTask.task_id.desc())
         )
         if status_filter is not None:
-            stmt = stmt.where(EngagementChecklistTask.status == status_filter)
-        stmt = stmt.order_by(
-            nullslast(EngagementChecklistTask.due_date.asc()),
-            EngagementChecklistTask.task_id.asc(),
-        )
-        result = await db.execute(stmt)
-        rows = result.all()
-        out: list[tuple[EngagementChecklistTask, int, str | None, str, str | None]] = []
-        for task, eng_id, eng_name, item_title, item_description in rows:
-            out.append((task, eng_id, eng_name, item_title, item_description))
-        return out
+            q = q.where(EngagementChecklistTask.status == status_filter)
+        res = await db.execute(q)
+        return list(res.all())

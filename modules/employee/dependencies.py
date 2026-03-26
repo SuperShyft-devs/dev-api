@@ -6,6 +6,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_user
+from core.exceptions import AppError
 from db.session import get_db
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
@@ -38,3 +39,16 @@ async def get_current_employee(
     """
 
     return await employee_service.get_active_employee_by_user_id(db, current_user.user_id)
+
+
+async def get_optional_employee(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    employee_service: EmployeeService = Depends(get_employee_service),
+) -> EmployeeContext | None:
+    """Return employee context if the user is an active employee, else None."""
+
+    try:
+        return await employee_service.get_active_employee_by_user_id(db, current_user.user_id)
+    except AppError:
+        return None

@@ -1,8 +1,11 @@
-"""SQLAlchemy models for checklists."""
+"""Checklists module models.
+
+This module owns checklist templates and engagement-applied checklists.
+"""
 
 from __future__ import annotations
 
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 
 from db.base import Base
@@ -14,8 +17,9 @@ class ChecklistTemplate(Base):
     template_id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(String, nullable=False, default="active", server_default="active")
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    status = Column(String, nullable=False, default="active")
+    audience = Column(String, nullable=False, default="internal")  # 'internal' | 'user'
+    created_at = Column(DateTime(timezone=True), nullable=False)
     created_employee_id = Column(Integer, ForeignKey("employee.employee_id", ondelete="SET NULL"), nullable=True)
 
     items = relationship(
@@ -23,7 +27,7 @@ class ChecklistTemplate(Base):
         back_populates="template",
         cascade="all, delete-orphan",
         passive_deletes=True,
-        order_by="ChecklistTemplateItem.display_order",
+        order_by="ChecklistTemplateItem.item_id.asc()",
     )
 
 
@@ -45,8 +49,13 @@ class EngagementChecklist(Base):
     checklist_id = Column(Integer, primary_key=True)
     engagement_id = Column(Integer, ForeignKey("engagements.engagement_id", ondelete="CASCADE"), nullable=False)
     template_id = Column(Integer, ForeignKey("checklist_templates.template_id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), nullable=False)
     created_employee_id = Column(Integer, ForeignKey("employee.employee_id", ondelete="SET NULL"), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("engagement_id", "template_id", name="uq_engagement_checklists_engagement_template"),
+        Index("ix_engagement_checklists_engagement_id", "engagement_id"),
+    )
 
     template = relationship("ChecklistTemplate")
     tasks = relationship(
@@ -54,6 +63,7 @@ class EngagementChecklist(Base):
         back_populates="checklist",
         cascade="all, delete-orphan",
         passive_deletes=True,
+        order_by="EngagementChecklistTask.task_id.asc()",
     )
 
 
@@ -68,11 +78,16 @@ class EngagementChecklistTask(Base):
     )
     item_id = Column(Integer, ForeignKey("checklist_template_items.item_id"), nullable=False)
     assigned_employee_id = Column(Integer, ForeignKey("employee.employee_id", ondelete="SET NULL"), nullable=True)
-    status = Column(String, nullable=False, default="pending", server_default="pending")
+    status = Column(String, nullable=False, default="pending")
     notes = Column(Text, nullable=True)
     due_date = Column(Date, nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     completed_by_employee_id = Column(Integer, ForeignKey("employee.employee_id", ondelete="SET NULL"), nullable=True)
 
+    __table_args__ = (
+        Index("ix_engagement_checklist_tasks_checklist_id", "checklist_id"),
+        Index("ix_engagement_checklist_tasks_assigned_employee_id", "assigned_employee_id"),
+    )
+
     checklist = relationship("EngagementChecklist", back_populates="tasks")
-    item = relationship("ChecklistTemplateItem", foreign_keys=[item_id])
+    item = relationship("ChecklistTemplateItem")

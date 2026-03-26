@@ -26,6 +26,8 @@ from modules.checklists.schemas import (
     TaskResponse,
     TaskStatusUpdate,
     TaskUpdate,
+    UserFacingEngagementChecklist,
+    UserFacingChecklistItem,
 )
 from modules.employee.service import EmployeeContext
 
@@ -117,6 +119,7 @@ class ChecklistsService:
                 name=r.name,
                 description=r.description,
                 status=r.status,
+                audience=(getattr(r, "audience", None) or "internal"),
                 created_at=r.created_at,
                 created_employee_id=r.created_employee_id,
             )
@@ -142,6 +145,7 @@ class ChecklistsService:
             name=template.name,
             description=template.description,
             status=template.status,
+            audience=(getattr(template, "audience", None) or "internal"),
             created_at=template.created_at,
             created_employee_id=template.created_employee_id,
             items=items,
@@ -162,6 +166,7 @@ class ChecklistsService:
             db,
             name=data.name,
             description=data.description,
+            audience=data.audience,
             created_employee_id=current_employee.employee_id,
         )
         audit = self._require_audit_service()
@@ -179,6 +184,7 @@ class ChecklistsService:
             name=row.name,
             description=row.description,
             status=row.status,
+            audience=(getattr(row, "audience", None) or "internal"),
             created_at=row.created_at,
             created_employee_id=row.created_employee_id,
         )
@@ -221,6 +227,7 @@ class ChecklistsService:
             name=row.name,
             description=row.description,
             status=row.status,
+            audience=(getattr(row, "audience", None) or "internal"),
             created_at=row.created_at,
             created_employee_id=row.created_employee_id,
         )
@@ -375,6 +382,37 @@ class ChecklistsService:
         rows = await self._repository.get_checklists_for_engagement(db, engagement_id)
         return [_checklist_to_response(c) for c in rows]
 
+    async def get_engagement_user_facing_checklists(
+        self,
+        db: AsyncSession,
+        engagement_id: int,
+    ) -> list[UserFacingEngagementChecklist]:
+        rows = await self._repository.get_user_facing_checklists_for_engagement(db, engagement_id)
+        out: list[UserFacingEngagementChecklist] = []
+        for cl in rows:
+            t = cl.template
+            items = []
+            if t is not None:
+                for i in list(t.items or []):
+                    items.append(
+                        UserFacingChecklistItem(
+                            title=i.title,
+                            description=i.description,
+                            display_order=i.display_order,
+                        )
+                    )
+            out.append(
+                UserFacingEngagementChecklist(
+                    checklist_id=cl.checklist_id,
+                    engagement_id=cl.engagement_id,
+                    template_id=cl.template_id,
+                    template_name=(t.name if t is not None else ""),
+                    template_description=(t.description if t is not None else None),
+                    items=items,
+                )
+            )
+        return out
+
     async def apply_template_to_engagement(
         self,
         db: AsyncSession,
@@ -414,6 +452,10 @@ class ChecklistsService:
             template_id=data.template_id,
             created_employee_id=current_employee.employee_id,
         )
+
+        # Internal templates create operational tasks; user-facing templates do not.
+        if (getattr(template, "audience", "internal") or "internal") == "internal":
+            await self._repository.create_tasks_for_checklist(db, checklist_id=checklist_id, template_id=template.template_id)
 
         audit = self._require_audit_service()
         await audit.log_event(
@@ -461,7 +503,8 @@ class ChecklistsService:
         )
 
     async def get_engagement_readiness(self, db: AsyncSession, engagement_id: int) -> ChecklistReadiness:
-        return await self._repository.get_engagement_readiness(db, engagement_id)
+        data = await self._repository.get_engagement_readiness(db, engagement_id)
+        return ChecklistReadiness(**data)
 
     async def assign_task(
         self,
