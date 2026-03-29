@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -23,6 +23,8 @@ from modules.engagements.schemas import (
     OnboardingAssistantsAddRequest,
 )
 from modules.engagements.service import EngagementsService, DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
+from modules.users.dependencies import get_users_service
+from modules.users.service import UsersService
 
 
 router = APIRouter(prefix="/engagements", tags=["engagements"])
@@ -110,6 +112,44 @@ async def list_engagements(
         )
 
     return success_response(data, meta={"page": page, "limit": limit, "total": total})
+
+
+@router.post("/{engagement_id}/import/metsights-csv")
+async def import_metsights_csv_participants(
+    engagement_id: int,
+    request: Request,
+    file: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    users_service: UsersService = Depends(get_users_service),
+):
+    if file is None:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="CSV file is required")
+
+    raw = await file.read()
+    if not raw:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="CSV file is empty")
+
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message="CSV file must be valid UTF-8",
+        ) from exc
+
+    result = await users_service.import_metsights_csv_for_engagement(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        file_content=text,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
 
 
 @router.get("/{engagement_id}")

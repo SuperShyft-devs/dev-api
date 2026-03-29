@@ -39,6 +39,7 @@ class AssessmentsService:
         ip_address: str,
         user_agent: str,
         endpoint: str,
+        metsights_record_id: str | None = None,
     ) -> AssessmentInstance:
         """Ensure an assessment instance exists for this (user, engagement, package).
 
@@ -56,13 +57,32 @@ class AssessmentsService:
             package_id=package_id,
         )
         if existing is not None:
+            if metsights_record_id is not None:
+                mid = (metsights_record_id or "").strip()
+                ex_mid = (existing.metsights_record_id or "").strip()
+                if mid:
+                    if ex_mid and ex_mid != mid:
+                        raise AppError(
+                            status_code=409,
+                            error_code="CONFLICT",
+                            message="Metsights record id does not match existing assessment instance",
+                        )
+                    if not ex_mid:
+                        await self._repository.set_metsights_record_id(
+                            db,
+                            assessment_instance_id=existing.assessment_instance_id,
+                            metsights_record_id=mid,
+                        )
+                        existing.metsights_record_id = mid
             return existing
 
+        mid_new = (metsights_record_id or "").strip() or None
         instance = AssessmentInstance(
             user_id=user_id,
             engagement_id=engagement_id,
             package_id=package_id,
             status="active",
+            metsights_record_id=mid_new,
             assigned_at=datetime.now(timezone.utc),
             completed_at=None,
         )
@@ -103,6 +123,11 @@ class AssessmentsService:
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
         return self._audit_service
+
+    async def get_instance_by_metsights_record_id(self, db: AsyncSession, metsights_record_id: str) -> AssessmentInstance | None:
+        return await self._repository.get_instance_by_metsights_record_id(
+            db, metsights_record_id=metsights_record_id
+        )
 
     async def list_my_assessments(
         self,

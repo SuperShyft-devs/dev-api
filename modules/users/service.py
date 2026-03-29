@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from typing import Optional
 
+import csv
+import io
 import logging
 import random
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +39,40 @@ from modules.users.schemas import (
 
 logger = logging.getLogger(__name__)
 _ALWAYS_ACTIVE_EMPLOYEE_ID = 1
+
+_METSIGHTS_HEADER_ALIASES: dict[str, str] = {
+    "id": "id",
+    "created date": "created_date",
+    "first name": "first_name",
+    "last name": "last_name",
+    "phone": "phone",
+    "email": "email",
+    "gender": "gender",
+    "age": "age",
+}
+
+
+def _metsights_canonical_header(cell: str) -> str | None:
+    raw = (cell or "").strip().lower().replace("#", " ").strip()
+    key = " ".join(raw.split())
+    return _METSIGHTS_HEADER_ALIASES.get(key)
+
+
+def _parse_csv_age(raw: str | None) -> int | None:
+    if raw is None or str(raw).strip() == "":
+        return None
+    try:
+        v = int(float(str(raw).strip()))
+    except ValueError:
+        return None
+    if 1 <= v <= 120:
+        return v
+    return None
+
+
+def _normalize_import_phone(raw: str | None) -> str:
+    s = (raw or "").strip().replace(" ", "").replace("-", "")
+    return s
 
 
 class UsersService:
@@ -848,3 +884,215 @@ class UsersService:
             engagement_code=engagement.engagement_code,
             time_slot_id=time_slot.time_slot_id,
         )
+
+    def _metsights_csv_cell(self, raw_row: dict[str, str], colmap: dict[str, str], key: str) -> str:
+        h = colmap.get(key)
+        if not h:
+            return ""
+        return (raw_row.get(h) or "").strip()
+
+    async def _import_one_metsights_csv_row(
+        self,
+        db: AsyncSession,
+        *,
+        raw_row: dict[str, str],
+        colmap: dict[str, str],
+        engagement,
+        slot_date: date,
+        slot_time: time,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict[str, str]:
+        """Return {status, reason} where status is imported | skipped | failed."""
+
+        def _out(status: str, reason: str = "") -> dict[str, str]:
+            return {"status": status, "reason": reason}
+
+        metsights_id = self._metsights_csv_cell(raw_row, colmap, "id")
+        if not metsights_id:
+            return _out("failed", "Missing Metsights id")
+
+        phone = _normalize_import_phone(self._metsights_csv_cell(raw_row, colmap, "phone"))
+        if len(phone) < 5:
+            return _out("failed", "Invalid or missing phone")
+
+        age = _parse_csv_age(self._metsights_csv_cell(raw_row, colmap, "age"))
+        if age is None:
+            return _out("failed", "Invalid or missing age")
+
+        email_raw = self._metsights_csv_cell(raw_row, colmap, "email")
+        email = str(email_raw) if email_raw else None
+
+        first_name = self._metsights_csv_cell(raw_row, colmap, "first_name") or None
+        last_name = self._metsights_csv_cell(raw_row, colmap, "last_name") or None
+        gender_raw = self._metsights_csv_cell(raw_row, colmap, "gender")
+        gender = gender_raw or None
+
+        if self._assessments_service is None or self._engagements_service is None:
+            raise RuntimeError("Engagements and assessments services are required")
+
+        existing_ai = await self._assessments_service.get_instance_by_metsights_record_id(db, metsights_id)
+        if existing_ai is not None:
+            if existing_ai.engagement_id != engagement.engagement_id:
+                return _out("failed", "Metsights id already linked to another engagement")
+
+        patch_data = {
+            "first_name": first_name,
+            "last_name": last_name,
+            "age": age,
+            "email": email,
+            "date_of_birth": None,
+            "gender": gender,
+            "address": None,
+            "pin_code": None,
+            "city": None,
+            "state": None,
+            "country": None,
+        }
+        code = (engagement.engagement_code or "").strip()
+        create_data = {
+            **patch_data,
+            "phone": phone,
+            "referred_by": code or None,
+            "is_participant": True,
+            "status": "active",
+        }
+
+        user, _created = await self._get_or_create_user_for_onboarding(
+            db,
+            phone=phone,
+            email=email,
+            patch_data={**patch_data, "is_participant": True, "referred_by": code or None},
+            create_data=create_data,
+        )
+
+        if existing_ai is not None:
+            if existing_ai.user_id != user.user_id:
+                return _out("failed", "Metsights id already linked to another user")
+            return _out("skipped", "Already imported for this engagement")
+
+        if await self._engagements_service.user_has_slot_for_engagement(
+            db, user_id=user.user_id, engagement_id=engagement.engagement_id
+        ):
+            return _out("skipped", "User already enrolled in this engagement")
+
+        await self._engagements_service.enroll_user_in_engagement(
+            db,
+            engagement=engagement,
+            user_id=user.user_id,
+            engagement_date=slot_date,
+            slot_start_time=slot_time,
+            increment_participant_count=True,
+        )
+
+        try:
+            await self._assessments_service.ensure_instance_assigned(
+                db,
+                user_id=user.user_id,
+                engagement_id=engagement.engagement_id,
+                package_id=engagement.assessment_package_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                endpoint=endpoint,
+                metsights_record_id=metsights_id,
+            )
+        except AppError as exc:
+            return _out("failed", exc.message or "Assessment assignment failed")
+
+        return _out("imported", "")
+
+    async def import_metsights_csv_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        employee,
+        engagement_id: int,
+        file_content: str,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        """Parse a Metsights-export CSV and enroll participants into an engagement."""
+
+        self._ensure_employee_access(employee)
+        if self._engagements_service is None or self._assessments_service is None:
+            raise RuntimeError("Engagements and assessments services are required")
+
+        engagement = await self._engagements_service.get_engagement_details_for_employee(
+            db,
+            employee=employee,
+            engagement_id=engagement_id,
+        )
+        if (engagement.status or "").lower() != "active":
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Engagement is not active",
+            )
+
+        slot_date = engagement.start_date or engagement.end_date
+        if slot_date is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Engagement must have start_date or end_date set before importing participants",
+            )
+
+        slot_time = time(10, 0)
+        text = (file_content or "").strip()
+        if not text:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="CSV file is empty")
+
+        reader = csv.DictReader(io.StringIO(text))
+        if not reader.fieldnames:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="CSV has no header row")
+
+        colmap: dict[str, str] = {}
+        for h in reader.fieldnames:
+            if h is None:
+                continue
+            canon = _metsights_canonical_header(h)
+            if canon:
+                colmap[canon] = h
+
+        required = {"id", "phone", "age"}
+        missing = required - colmap.keys()
+        if missing:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"CSV missing required columns: {', '.join(sorted(missing))}",
+            )
+
+        rows_out: list[dict] = []
+        imported = skipped = failed = 0
+        line_no = 1
+
+        for raw_row in reader:
+            line_no += 1
+            one = await self._import_one_metsights_csv_row(
+                db,
+                raw_row=raw_row,
+                colmap=colmap,
+                engagement=engagement,
+                slot_date=slot_date,
+                slot_time=slot_time,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                endpoint=endpoint,
+            )
+            rows_out.append({"line": line_no, "status": one["status"], "reason": one["reason"]})
+            if one["status"] == "imported":
+                imported += 1
+            elif one["status"] == "skipped":
+                skipped += 1
+            else:
+                failed += 1
+
+        return {
+            "imported": imported,
+            "skipped": skipped,
+            "failed": failed,
+            "rows": rows_out,
+        }

@@ -125,6 +125,21 @@ class EngagementsRepository:
         await db.flush()
         return slot
 
+    async def has_slot_for_user_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+    ) -> bool:
+        result = await db.execute(
+            select(EngagementTimeSlot.time_slot_id)
+            .where(EngagementTimeSlot.user_id == user_id)
+            .where(EngagementTimeSlot.engagement_id == engagement_id)
+            .limit(1)
+        )
+        return result.scalar_one_or_none() is not None
+
     async def add_onboarding_assistant(
         self,
         db: AsyncSession,

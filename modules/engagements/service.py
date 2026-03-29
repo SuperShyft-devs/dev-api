@@ -11,6 +11,7 @@ from __future__ import annotations
 import secrets
 import string
 from datetime import date, time
+from typing import TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +23,9 @@ from modules.engagements.models import Engagement, EngagementTimeSlot
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.schemas import EngagementCreateRequest, EngagementUpdateRequest
 from modules.organizations.repository import OrganizationsRepository
+
+if TYPE_CHECKING:
+    from modules.checklists.service import ChecklistsService
 
 
 def _generate_engagement_code(length: int = 8) -> str:
@@ -49,7 +53,7 @@ class EngagementsService:
         self._organizations_repository = organizations_repository
         self._checklists_service = None
 
-    def lazy_checklists_service(self) -> "ChecklistsService":
+    def lazy_checklists_service(self) -> ChecklistsService:
         if self._checklists_service is None:
             from modules.checklists.repository import ChecklistsRepository
             from modules.checklists.service import ChecklistsService
@@ -414,6 +418,17 @@ class EngagementsService:
             participant_count=0,
         )
         return await self._repository.create_engagement(db, engagement)
+
+    async def user_has_slot_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+    ) -> bool:
+        return await self._repository.has_slot_for_user_engagement(
+            db, user_id=user_id, engagement_id=engagement_id
+        )
 
     async def enroll_user_in_engagement(
         self,

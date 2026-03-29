@@ -111,6 +111,22 @@ class AssessmentsRepository:
         )
         return [int(v) for v in result.scalars().all()]
 
+    async def get_instance_by_metsights_record_id(
+        self,
+        db: AsyncSession,
+        *,
+        metsights_record_id: str,
+    ) -> AssessmentInstance | None:
+        rid = (metsights_record_id or "").strip()
+        if not rid:
+            return None
+        result = await db.execute(
+            select(AssessmentInstance)
+            .where(AssessmentInstance.metsights_record_id == rid)
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def get_instance_by_user_engagement_package(
         self,
         db: AsyncSession,
