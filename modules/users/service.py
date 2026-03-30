@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.employee.models import Employee
 from modules.audit.service import AuditService
+from modules.metsights.service import MetsightsService
 from modules.platform_settings.service import PlatformSettingsService
 from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
@@ -76,6 +77,17 @@ def _normalize_import_phone(raw: str | None) -> str:
 
 
 class UsersService:
+    def _normalize_phone_for_metsights(self, raw: str | None) -> str | None:
+        value = (raw or "").strip().replace(" ", "").replace("-", "")
+        if not value:
+            return None
+        if value.startswith("+"):
+            return value
+        digits = "".join(ch for ch in value if ch.isdigit())
+        if len(digits) == 10:
+            return f"+91{digits}"
+        return f"+{digits}" if digits else None
+
     async def _is_protected_employee_user(self, db: AsyncSession, user_id: int) -> bool:
         result = await db.execute(select(Employee.employee_id).where(Employee.user_id == user_id).limit(1))
         employee_id = result.scalar_one_or_none()
@@ -104,12 +116,14 @@ class UsersService:
         engagements_service=None,
         assessments_service=None,
         platform_settings_service: PlatformSettingsService | None = None,
+        metsights_service: MetsightsService | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
         self._engagements_service = engagements_service
         self._assessments_service = assessments_service
         self._platform_settings_service = platform_settings_service
+        self._metsights_service = metsights_service
 
     async def get_existing_user_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
         return await self._repository.get_user_by_phone(db, phone)
@@ -459,6 +473,75 @@ class UsersService:
         _ = user
         return None
 
+    def _to_metsights_gender(self, raw: str | None) -> str | None:
+        v = (raw or "").strip()
+        if not v:
+            return None
+        if v in {"1", "2"}:
+            return v
+        lowered = v.lower()
+        if lowered.startswith("m"):
+            return "1"
+        if lowered.startswith("f"):
+            return "2"
+        return None
+
+    async def _ensure_metsights_profile_id(self, db: AsyncSession, *, user: User) -> None:
+        if user.metsights_profile_id:
+            return
+        if self._metsights_service is None:
+            return
+
+        first_name = (user.first_name or "").strip()
+        last_name = (user.last_name or "").strip()
+        phone = (user.phone or "").strip()
+        gender = self._to_metsights_gender(user.gender)
+
+        if not first_name or not last_name or not phone or gender is None:
+            return
+
+        dob = user.date_of_birth.isoformat() if user.date_of_birth is not None else None
+        email = (user.email or "").strip() if user.email else None
+        normalized_phone = self._normalize_phone_for_metsights(phone)
+        candidate_phones = [phone]
+        if normalized_phone and normalized_phone != phone:
+            candidate_phones.insert(0, normalized_phone)
+
+        profile_id: str | None = None
+        for candidate_phone in candidate_phones:
+            try:
+                profile_id = await self._metsights_service.get_or_create_profile_id(
+                    first_name=first_name,
+                    last_name=last_name,
+                    phone=candidate_phone,
+                    email=email,
+                    gender=gender,
+                    date_of_birth=dob,
+                    age=user.age,
+                )
+                if profile_id:
+                    break
+            except AppError as exc:
+                logger.warning(
+                    "Metsights profile sync failed for user_id=%s phone=%s: %s",
+                    user.user_id,
+                    candidate_phone,
+                    exc.message,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Metsights profile sync crashed for user_id=%s phone=%s: %s",
+                    user.user_id,
+                    candidate_phone,
+                    str(exc),
+                )
+
+        if not profile_id:
+            # Non-blocking: user creation/onboarding should not fail on external integration.
+            return
+
+        await self._repository.update_user_partial(db, user.user_id, {"metsights_profile_id": profile_id})
+
     async def create_user_by_employee(
         self,
         db: AsyncSession,
@@ -496,6 +579,7 @@ class UsersService:
         )
 
         created = await self._repository.create_user(db, user)
+        await self._ensure_metsights_profile_id(db, user=created)
 
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
@@ -709,6 +793,7 @@ class UsersService:
             patch_data={**patch_data, "is_participant": True},
             create_data=create_data,
         )
+        await self._ensure_metsights_profile_id(db, user=user)
 
         if self._engagements_service is None:
             raise RuntimeError("Engagements service is required")
@@ -838,6 +923,7 @@ class UsersService:
             patch_data={**patch_data, "is_participant": True, "referred_by": code},
             create_data=create_data,
         )
+        await self._ensure_metsights_profile_id(db, user=user)
 
         slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
         # Enroll the user by booking a time slot.
