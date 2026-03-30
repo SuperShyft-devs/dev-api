@@ -37,6 +37,7 @@ class SeedAssessmentPackage:
     package_id: int
     package_code: str
     display_name: str
+    assessment_type_code: str
     status: str
 
 
@@ -113,12 +114,14 @@ DEFAULT_ASSESSMENT_PACKAGES: tuple[SeedAssessmentPackage, ...] = (
         package_id=1,
         package_code="METSIGHTS_BASIC",
         display_name="Metsights Basic",
+        assessment_type_code="1",
         status="active",
     ),
     SeedAssessmentPackage(
         package_id=2,
         package_code="METSIGHTS_PRO",
         display_name="Metsights Pro",
+        assessment_type_code="2",
         status="active",
     ),
 )

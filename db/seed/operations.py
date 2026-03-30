@@ -100,12 +100,14 @@ async def upsert_assessment_packages(
                     package_id=seed.package_id,
                     package_code=seed.package_code,
                     display_name=seed.display_name,
+                    assessment_type_code=seed.assessment_type_code,
                     status=seed.status,
                 )
             )
         else:
             existing.package_code = seed.package_code
             existing.display_name = seed.display_name
+            existing.assessment_type_code = seed.assessment_type_code
             existing.status = seed.status
 
 
@@ -289,6 +291,18 @@ async def reset_sequences(session: AsyncSession) -> None:
         SELECT setval(
             pg_get_serial_sequence('questionnaire_category_questions', 'id'),
             COALESCE((SELECT MAX(id) FROM questionnaire_category_questions), 1),
+            true
+        )
+        """
+        )
+    )
+
+    await session.execute(
+        text(
+            """
+        SELECT setval(
+            pg_get_serial_sequence('assessment_package_categories', 'id'),
+            COALESCE((SELECT MAX(id) FROM assessment_package_categories), 1),
             true
         )
         """
