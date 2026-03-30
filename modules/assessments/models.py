@@ -18,6 +18,7 @@ class AssessmentPackage(Base):
     package_id = Column(Integer, primary_key=True)
     package_code = Column(String)
     display_name = Column(String)
+    assessment_type_code = Column(String, nullable=True)
     status = Column(String)
 
 

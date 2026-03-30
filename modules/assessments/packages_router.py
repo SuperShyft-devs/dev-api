@@ -56,6 +56,7 @@ async def create_assessment_package(
         employee=employee,
         package_code=payload.package_code,
         display_name=payload.display_name,
+        assessment_type_code=payload.assessment_type_code,
         status=payload.status,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
@@ -94,6 +95,7 @@ async def list_assessment_packages(
                 "package_id": package.package_id,
                 "package_code": package.package_code,
                 "display_name": package.display_name,
+                "assessment_type_code": package.assessment_type_code,
                 "status": package.status,
             }
         )
@@ -115,6 +117,7 @@ async def get_assessment_package_details(
             "package_id": package.package_id,
             "package_code": package.package_code,
             "display_name": package.display_name,
+            "assessment_type_code": package.assessment_type_code,
             "status": package.status,
         }
     )
@@ -135,6 +138,7 @@ async def update_assessment_package_details(
         package_id=package_id,
         package_code=payload.package_code,
         display_name=payload.display_name,
+        assessment_type_code=payload.assessment_type_code,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),

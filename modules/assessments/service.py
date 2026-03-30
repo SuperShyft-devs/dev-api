@@ -129,6 +129,9 @@ class AssessmentsService:
             db, metsights_record_id=metsights_record_id
         )
 
+    async def get_package_by_id(self, db: AsyncSession, package_id: int):
+        return await self._repository.get_package_by_id(db, package_id=package_id)
+
     async def list_my_assessments(
         self,
         db: AsyncSession,

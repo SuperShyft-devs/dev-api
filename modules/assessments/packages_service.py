@@ -54,6 +54,7 @@ class AssessmentPackagesService:
         employee: EmployeeContext,
         package_code: str,
         display_name: str,
+        assessment_type_code: str,
         status: str,
         ip_address: str,
         user_agent: str,
@@ -63,9 +64,10 @@ class AssessmentPackagesService:
 
         code = _normalize(package_code)
         name = _normalize(display_name)
+        type_code = _normalize(assessment_type_code)
         status_value = _normalize_status(status)
 
-        if not code or not name:
+        if not code or not name or not type_code:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
         if status_value not in _ALLOWED_PACKAGE_STATUS:
@@ -75,7 +77,12 @@ class AssessmentPackagesService:
         if existing is not None:
             raise AppError(status_code=409, error_code="ASSESSMENT_PACKAGE_ALREADY_EXISTS", message="Package already exists")
 
-        package = AssessmentPackage(package_code=code, display_name=name, status=status_value)
+        package = AssessmentPackage(
+            package_code=code,
+            display_name=name,
+            assessment_type_code=type_code,
+            status=status_value,
+        )
         package = await self._repository.create_package(db, package)
 
         audit = self._require_audit_service()
@@ -173,6 +180,7 @@ class AssessmentPackagesService:
         package_id: int,
         package_code: str,
         display_name: str,
+        assessment_type_code: str,
         ip_address: str,
         user_agent: str,
         endpoint: str,
@@ -181,8 +189,9 @@ class AssessmentPackagesService:
 
         code = _normalize(package_code)
         name = _normalize(display_name)
+        type_code = _normalize(assessment_type_code)
 
-        if not code or not name:
+        if not code or not name or not type_code:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
         package = await self._repository.get_package_by_id(db, package_id=package_id)
@@ -195,6 +204,7 @@ class AssessmentPackagesService:
 
         package.package_code = code
         package.display_name = name
+        package.assessment_type_code = type_code
         package = await self._repository.update_package(db, package)
 
         audit = self._require_audit_service()

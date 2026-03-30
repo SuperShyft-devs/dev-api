@@ -832,7 +832,7 @@ class UsersService:
         # Create assessment instance for this user and engagement.
         if self._assessments_service is None:
             raise RuntimeError("Assessments service is required")
-        await self._assessments_service.ensure_instance_assigned(
+        assessment_instance = await self._assessments_service.ensure_instance_assigned(
             db,
             user_id=user.user_id,
             engagement_id=engagement.engagement_id,
@@ -841,6 +841,35 @@ class UsersService:
             user_agent=user_agent,
             endpoint=endpoint,
         )
+
+        # Create Metsights record for this assessment instance when integration data is available.
+        if self._metsights_service is not None and not (assessment_instance.metsights_record_id or "").strip():
+            try:
+                package = await self._assessments_service.get_package_by_id(db, engagement.assessment_package_id)
+                assessment_type_code = (getattr(package, "assessment_type_code", None) or "").strip() if package else ""
+                profile_id = (user.metsights_profile_id or "").strip()
+                if profile_id and assessment_type_code:
+                    record_id = await self._metsights_service.create_record_for_profile(
+                        profile_id=profile_id,
+                        assessment_type_code=assessment_type_code,
+                    )
+                    await self._assessments_service.ensure_instance_assigned(
+                        db,
+                        user_id=user.user_id,
+                        engagement_id=engagement.engagement_id,
+                        package_id=engagement.assessment_package_id,
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        endpoint=endpoint,
+                        metsights_record_id=record_id,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Metsights record creation failed for user_id=%s engagement_id=%s: %s",
+                    user.user_id,
+                    engagement.engagement_id,
+                    str(exc),
+                )
 
         # Record onboarding audit log.
         if self._audit_service is None:
@@ -939,7 +968,7 @@ class UsersService:
         # Create assessment instance for this user and engagement.
         if self._assessments_service is None:
             raise RuntimeError("Assessments service is required")
-        await self._assessments_service.ensure_instance_assigned(
+        assessment_instance = await self._assessments_service.ensure_instance_assigned(
             db,
             user_id=user.user_id,
             engagement_id=engagement.engagement_id,
@@ -948,6 +977,34 @@ class UsersService:
             user_agent=user_agent,
             endpoint=endpoint,
         )
+
+        if self._metsights_service is not None and not (assessment_instance.metsights_record_id or "").strip():
+            try:
+                package = await self._assessments_service.get_package_by_id(db, engagement.assessment_package_id)
+                assessment_type_code = (getattr(package, "assessment_type_code", None) or "").strip() if package else ""
+                profile_id = (user.metsights_profile_id or "").strip()
+                if profile_id and assessment_type_code:
+                    record_id = await self._metsights_service.create_record_for_profile(
+                        profile_id=profile_id,
+                        assessment_type_code=assessment_type_code,
+                    )
+                    await self._assessments_service.ensure_instance_assigned(
+                        db,
+                        user_id=user.user_id,
+                        engagement_id=engagement.engagement_id,
+                        package_id=engagement.assessment_package_id,
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        endpoint=endpoint,
+                        metsights_record_id=record_id,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Metsights record creation failed for user_id=%s engagement_id=%s: %s",
+                    user.user_id,
+                    engagement.engagement_id,
+                    str(exc),
+                )
 
         # Record onboarding audit log.
         if self._audit_service is None:

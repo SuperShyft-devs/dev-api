@@ -181,3 +181,58 @@ class MetsightsService:
                 error_code="EXTERNAL_SERVICE_UNAVAILABLE",
                 message="Metsights request failed",
             ) from exc
+
+    async def create_record_for_profile(self, *, profile_id: str, assessment_type_code: str) -> str:
+        safe_profile_id = (profile_id or "").strip()
+        safe_type_code = (assessment_type_code or "").strip()
+        if not safe_profile_id or not safe_type_code:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Missing Metsights record inputs")
+        if not settings.METSIGHTS_API_KEY:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights integration is not configured",
+            )
+
+        try:
+            payload = await self._client.create_profile_record(
+                profile_id=safe_profile_id,
+                data={"assessment_type": safe_type_code},
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 403:
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Metsights authorization failed",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
+        envelope = MetsightsEnvelope.model_validate(payload)
+        body = envelope.data
+
+        # Some Metsights responses send record in data object, others as first item in data[].
+        if isinstance(body, dict):
+            record_id = str(body.get("id") or "").strip()
+            if record_id:
+                return record_id
+        if isinstance(body, list) and len(body) > 0 and isinstance(body[0], dict):
+            record_id = str(body[0].get("id") or "").strip()
+            if record_id:
+                return record_id
+
+        raise AppError(
+            status_code=503,
+            error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+            message="Metsights record creation returned no id",
+        )
