@@ -20,10 +20,13 @@ from modules.reports.repository import ReportsRepository
 from modules.reports.schemas import (
     BloodParameterGroupInReportResponse,
     BloodParameterTestInReportResponse,
+    DiseaseDetailResponse,
+    DiseaseListItem,
     DiseaseOverview,
     OverviewReportResponse,
     PositiveWins,
     RiskAnalysisItem,
+    RiskAnalysisListResponse,
 )
 
 
@@ -273,6 +276,201 @@ class ReportsService:
             metabolic_age=metabolic_age,
             positive_wins=PositiveWins(low_risk=positive_wins_list),
             risk_analysis=risk_analysis_list,
+        )
+
+    async def _get_or_fetch_report(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_id: int,
+        user_id: int,
+    ) -> Any:
+        row = await self._assessments_repository.get_instance_for_user(
+            db,
+            assessment_instance_id=assessment_id,
+            user_id=user_id,
+        )
+        if row is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+
+        assessment_instance, package = row
+        if package is None:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Assessment package is missing",
+            )
+
+        existing_report = await self._repository.get_individual_report_by_assessment(
+            db,
+            assessment_instance_id=assessment_id,
+        )
+
+        if existing_report is not None and existing_report.reports is not None:
+            return existing_report.reports
+
+        record_id = (assessment_instance.metsights_record_id or "").strip()
+        if not record_id:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Metsights record id is missing for this assessment",
+            )
+
+        report_data = await self._metsights_service.get_report(
+            record_id=record_id,
+            assessment_type_code=package.assessment_type_code,
+        )
+
+        if existing_report is None:
+            report = IndividualHealthReport(
+                user_id=assessment_instance.user_id,
+                engagement_id=assessment_instance.engagement_id,
+                assessment_instance_id=assessment_instance.assessment_instance_id,
+                reports=report_data,
+                blood_parameters=None,
+            )
+            await self._repository.create_individual_report(db, report)
+        else:
+            existing_report.reports = report_data
+            await self._repository.update_individual_report(db, existing_report)
+
+        return report_data
+
+    async def get_risk_analysis_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_id: int,
+        user_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> RiskAnalysisListResponse:
+        report_data = await self._get_or_fetch_report(
+            db,
+            assessment_id=assessment_id,
+            user_id=user_id,
+        )
+
+        report_dict = report_data if isinstance(report_data, dict) else {}
+        ms = report_dict.get("metabolic_score")
+        if isinstance(ms, (int, float)):
+            metabolic_score = float(ms)
+        else:
+            metabolic_score = None
+
+        raw_diseases = report_dict.get("diseases", [])
+        diseases_raw: list[Any] = raw_diseases if isinstance(raw_diseases, list) else []
+        diseases: list[DiseaseListItem] = []
+        for d in diseases_raw:
+            if not isinstance(d, dict):
+                continue
+            code = str(d.get("code") or "")
+            name = str(d.get("name") or "")
+            rsc = d.get("risk_score_scaled")
+            try:
+                risk_score_scaled = int(rsc) if rsc is not None else 0
+            except (TypeError, ValueError):
+                risk_score_scaled = 0
+            diseases.append(
+                DiseaseListItem(
+                    code=code,
+                    name=name,
+                    risk_score_scaled=risk_score_scaled,
+                )
+            )
+
+        await self._require_audit_service().log_event(
+            db,
+            action="USER_FETCH_RISK_ANALYSIS",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id,
+            session_id=None,
+        )
+
+        return RiskAnalysisListResponse(
+            assessment_id=assessment_id,
+            metabolic_score=metabolic_score,
+            diseases=diseases,
+        )
+
+    async def get_disease_detail_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_id: int,
+        user_id: int,
+        disease_code: str,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> DiseaseDetailResponse:
+        report_data = await self._get_or_fetch_report(
+            db,
+            assessment_id=assessment_id,
+            user_id=user_id,
+        )
+
+        report_dict = report_data if isinstance(report_data, dict) else {}
+        raw_diseases = report_dict.get("diseases", [])
+        diseases_raw: list[Any] = raw_diseases if isinstance(raw_diseases, list) else []
+
+        matched: dict[str, Any] | None = None
+        for d in diseases_raw:
+            if isinstance(d, dict) and str(d.get("code") or "") == disease_code:
+                matched = d
+                break
+
+        if matched is None:
+            raise AppError(
+                status_code=404,
+                error_code="DISEASE_NOT_FOUND",
+                message=f"Disease '{disease_code}' not found in this report",
+            )
+
+        rsc = matched.get("risk_score_scaled")
+        try:
+            risk_score_scaled = int(rsc) if rsc is not None else 0
+        except (TypeError, ValueError):
+            risk_score_scaled = 0
+
+        lc = matched.get("lifestyle_contribution")
+        if lc is None:
+            lifestyle_contribution: int | None = None
+        else:
+            try:
+                lifestyle_contribution = int(lc)
+            except (TypeError, ValueError):
+                lifestyle_contribution = None
+
+        dp = matched.get("disease_percentile")
+        if dp is None:
+            disease_percentile: int | None = None
+        else:
+            try:
+                disease_percentile = int(dp)
+            except (TypeError, ValueError):
+                disease_percentile = None
+
+        await self._require_audit_service().log_event(
+            db,
+            action="USER_FETCH_DISEASE_DETAIL",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id,
+            session_id=None,
+        )
+
+        return DiseaseDetailResponse(
+            code=str(matched.get("code") or ""),
+            name=str(matched.get("name") or ""),
+            risk_score_scaled=risk_score_scaled,
+            lifestyle_contribution=lifestyle_contribution,
+            disease_percentile=disease_percentile,
         )
 
     async def _build_blood_parameter_groups_report(

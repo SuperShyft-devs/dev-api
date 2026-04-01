@@ -59,3 +59,23 @@ class OverviewReportResponse(BaseModel):
     metabolic_age: float | None
     positive_wins: PositiveWins
     risk_analysis: list[RiskAnalysisItem]
+
+
+class DiseaseListItem(BaseModel):
+    code: str
+    name: str
+    risk_score_scaled: int
+
+
+class RiskAnalysisListResponse(BaseModel):
+    assessment_id: int
+    metabolic_score: float | None
+    diseases: list[DiseaseListItem]
+
+
+class DiseaseDetailResponse(BaseModel):
+    code: str
+    name: str
+    risk_score_scaled: int
+    lifestyle_contribution: int | None
+    disease_percentile: int | None

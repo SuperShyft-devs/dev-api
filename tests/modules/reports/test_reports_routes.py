@@ -891,3 +891,313 @@ async def test_get_overview_missing_metsights_record_returns_422(
         "message": "Metsights record id is missing for this assessment",
     }
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_risk_analysis_cached_skips_metsights(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99101,
+        user_id=39101,
+        engagement_id=59101,
+        record_id="REC99101",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=79101,
+            user_id=39101,
+            engagement_id=59101,
+            assessment_instance_id=99101,
+            reports={
+                "metabolic_score": 72.5,
+                "diseases": [
+                    {"code": "oxidative_stress", "name": "Oxidative stress", "risk_score_scaled": 40},
+                ],
+            },
+            blood_parameters=None,
+        )
+    )
+    await test_db_session.commit()
+
+    fake_metsights = _FakeMetsightsService(payload={}, should_fail=True)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/99101/risk-analysis", headers=_auth_header(39101))
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["assessment_id"] == 99101
+    assert body["metabolic_score"] == 72.5
+    assert body["diseases"] == [
+        {"code": "oxidative_stress", "name": "Oxidative stress", "risk_score_scaled": 40},
+    ]
+    assert fake_metsights.report_calls == 0
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_risk_analysis_fetches_then_second_call_uses_cache(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99102,
+        user_id=39102,
+        engagement_id=59102,
+        record_id="REC99102",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    met_report = {
+        "metabolic_score": 65.0,
+        "diseases": [{"code": "A", "name": "A", "risk_score_scaled": 5}],
+    }
+    fake_metsights = _FakeMetsightsService(payload={}, report_payload=met_report)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    r1 = await async_client.get("/reports/99102/risk-analysis", headers=_auth_header(39102))
+    assert r1.status_code == 200
+    assert r1.json()["data"]["metabolic_score"] == 65.0
+    assert fake_metsights.report_calls == 1
+
+    r2 = await async_client.get("/reports/99102/risk-analysis", headers=_auth_header(39102))
+    assert r2.status_code == 200
+    assert r2.json()["data"]["metabolic_score"] == 65.0
+    assert fake_metsights.report_calls == 1
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_risk_analysis_disease_query_returns_detail(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99103,
+        user_id=39103,
+        engagement_id=59103,
+        record_id="REC99103",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=79103,
+            user_id=39103,
+            engagement_id=59103,
+            assessment_instance_id=99103,
+            reports={
+                "metabolic_score": 70.0,
+                "diseases": [
+                    {
+                        "code": "oxidative_stress",
+                        "name": "Oxidative stress",
+                        "risk_score_scaled": 40,
+                        "lifestyle_contribution": 12,
+                        "disease_percentile": 55,
+                    },
+                ],
+            },
+            blood_parameters=None,
+        )
+    )
+    await test_db_session.commit()
+
+    fake_metsights = _FakeMetsightsService(payload={}, should_fail=True)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get(
+        "/reports/99103/risk-analysis?disease=oxidative_stress",
+        headers=_auth_header(39103),
+    )
+    assert response.status_code == 200
+    assert response.json()["data"] == {
+        "code": "oxidative_stress",
+        "name": "Oxidative stress",
+        "risk_score_scaled": 40,
+        "lifestyle_contribution": 12,
+        "disease_percentile": 55,
+    }
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_risk_analysis_disease_not_found(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99104,
+        user_id=39104,
+        engagement_id=59104,
+        record_id="REC99104",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=79104,
+            user_id=39104,
+            engagement_id=59104,
+            assessment_instance_id=99104,
+            reports={"diseases": [{"code": "A", "name": "A", "risk_score_scaled": 1}]},
+            blood_parameters=None,
+        )
+    )
+    await test_db_session.commit()
+
+    fake_metsights = _FakeMetsightsService(payload={}, should_fail=True)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get(
+        "/reports/99104/risk-analysis?disease=invalid_code",
+        headers=_auth_header(39104),
+    )
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "DISEASE_NOT_FOUND"
+    assert "invalid_code" in response.json()["message"]
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_risk_analysis_wrong_user_returns_404(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99105,
+        user_id=39105,
+        engagement_id=59105,
+        record_id="REC99105",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    test_db_session.add(User(user_id=39106, phone="3910600000", age=30, gender="male", status="active"))
+    await test_db_session.commit()
+
+    fake_metsights = _FakeMetsightsService(payload={}, report_payload={})
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/99105/risk-analysis", headers=_auth_header(39106))
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "ASSESSMENT_NOT_FOUND"
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_risk_analysis_missing_metsights_record_returns_422(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99106,
+        user_id=39107,
+        engagement_id=59106,
+        record_id=None,
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    fake_metsights = _FakeMetsightsService(payload={}, report_payload={})
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/99106/risk-analysis", headers=_auth_header(39107))
+    assert response.status_code == 422
+    assert response.json() == {
+        "error_code": "INVALID_STATE",
+        "message": "Metsights record id is missing for this assessment",
+    }
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_risk_analysis_fitprint_allowed_empty_diseases(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    """FitPrint has no diseases in Metsights payload; endpoint still returns 200."""
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99107,
+        user_id=39108,
+        engagement_id=59107,
+        record_id="REC99107",
+        package_code="MY_FITNESS_PRINT",
+        assessment_type_code="7",
+    )
+    fitprint_report = {"metabolic_score": None}
+    fake_metsights = _FakeMetsightsService(payload={}, report_payload=fitprint_report)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/99107/risk-analysis", headers=_auth_header(39108))
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["assessment_id"] == 99107
+    assert data["metabolic_score"] is None
+    assert data["diseases"] == []
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)

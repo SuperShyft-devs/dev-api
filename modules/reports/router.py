@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -43,6 +43,38 @@ async def get_overview_report(
     )
     await db.commit()
     return success_response(response.model_dump())
+
+
+@router.get("/{assessment_id}/risk-analysis")
+async def get_risk_analysis(
+    assessment_id: int,
+    request: Request,
+    disease: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    reports_service: ReportsService = Depends(get_reports_service),
+):
+    if disease is not None and disease.strip():
+        result = await reports_service.get_disease_detail_for_user(
+            db,
+            assessment_id=assessment_id,
+            user_id=user.user_id,
+            disease_code=disease.strip(),
+            ip_address=_client_ip(request),
+            user_agent=request.headers.get("User-Agent", "unknown"),
+            endpoint=str(request.url.path),
+        )
+    else:
+        result = await reports_service.get_risk_analysis_for_user(
+            db,
+            assessment_id=assessment_id,
+            user_id=user.user_id,
+            ip_address=_client_ip(request),
+            user_agent=request.headers.get("User-Agent", "unknown"),
+            endpoint=str(request.url.path),
+        )
+    await db.commit()
+    return success_response(result.model_dump())
 
 
 @router.get("/{assessment_id}/blood-parameters")
