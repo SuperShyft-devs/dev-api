@@ -17,9 +17,10 @@ from modules.audit.service import AuditService
 from modules.engagements.models import Engagement
 from modules.diagnostics.models import DiagnosticPackage
 from modules.diagnostics.schemas import (
+    HealthParameterResponse,
     PackageTestsResponse,
+    ParameterType,
     TestGroupResponse as DiagnosticTestGroupResponse,
-    TestResponse as DiagnosticTestResponse,
 )
 from modules.reports.dependencies import get_reports_service
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
@@ -70,8 +71,9 @@ class _FakeDiagnosticsService:
                     test_count=2,
                     display_order=1,
                     tests=[
-                        DiagnosticTestResponse(
+                        HealthParameterResponse(
                             test_id=1,
+                            parameter_type=ParameterType.TEST,
                             test_name="Haemoglobin (Hb)",
                             parameter_key="haemoglobin",
                             unit="g/dL",
@@ -89,8 +91,9 @@ class _FakeDiagnosticsService:
                             is_available=True,
                             display_order=1,
                         ),
-                        DiagnosticTestResponse(
+                        HealthParameterResponse(
                             test_id=2,
+                            parameter_type=ParameterType.TEST,
                             test_name="Glucose (fasting)",
                             parameter_key="glucose_fasting",
                             unit="mg/dL",
@@ -116,6 +119,9 @@ class _FakeDiagnosticsService:
     async def get_package_tests(self, db, *, package_id: int) -> PackageTestsResponse:
         # Keep response static for tests; package_id is irrelevant here.
         return self._payload
+
+    async def get_health_parameter_by_parameter_key(self, db, *, parameter_key: str):
+        return None
 
 
 async def _seed_assessment(
@@ -1045,9 +1051,21 @@ async def test_get_risk_analysis_disease_query_returns_detail(
     assert response.json()["data"] == {
         "code": "oxidative_stress",
         "name": "Oxidative stress",
+        "meaning": None,
+        "unit": None,
         "risk_score_scaled": 40,
         "lifestyle_contribution": 12,
         "disease_percentile": 55,
+        "lower_range_male": None,
+        "higher_range_male": None,
+        "lower_range_female": None,
+        "higher_range_female": None,
+        "causes_when_high": None,
+        "causes_when_low": None,
+        "effects_when_high": None,
+        "effects_when_low": None,
+        "what_to_do_when_low": None,
+        "what_to_do_when_high": None,
     }
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 

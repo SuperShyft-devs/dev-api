@@ -17,8 +17,9 @@ from modules.diagnostics.models import (
     DiagnosticPackageReason,
     DiagnosticPackageSample,
     DiagnosticPackageTag,
-    DiagnosticTest,
     DiagnosticTestGroup,
+    HealthParameter,
+    ParameterType as ORMParameterType,
 )
 from modules.diagnostics.repository import DiagnosticsRepository
 from modules.diagnostics.schemas import (
@@ -35,7 +36,11 @@ from modules.diagnostics.schemas import (
     FilterCreate,
     FilterResponse,
     FilterUpdate,
+    HealthParameterCreate,
+    HealthParameterResponse,
+    HealthParameterUpdate,
     PackageTestsResponse,
+    ParameterType,
     PreparationCreate,
     PreparationResponse,
     PreparationUpdate,
@@ -47,12 +52,9 @@ from modules.diagnostics.schemas import (
     SampleUpdate,
     TagCreate,
     TagResponse,
-    TestCreate,
     TestGroupCreate,
     TestGroupResponse,
     TestGroupUpdate,
-    TestResponse,
-    TestUpdate,
     ReorderGroupTestsRequest,
     ReorderPackageGroupsRequest,
 )
@@ -98,6 +100,15 @@ class DiagnosticsService:
     def _normalize_lower(self, value: str | None) -> str | None:
         normalized = self._normalize(value)
         return normalized.lower() if normalized else None
+
+    def _orm_parameter_type(self, value: ParameterType | ORMParameterType | str | None) -> ORMParameterType:
+        if value is None:
+            return ORMParameterType.TEST
+        if isinstance(value, ORMParameterType):
+            return value
+        if isinstance(value, ParameterType):
+            return ORMParameterType(value.value)
+        return ORMParameterType(value)
 
     def _validate_exact_assignment_ids(self, *, requested_ids: list[int], assigned_ids: list[int], field_name: str) -> list[int]:
         requested_unique = list(dict.fromkeys(requested_ids))
@@ -192,13 +203,16 @@ class DiagnosticsService:
             display_order=row.display_order,
         )
 
-    def _to_test_response(self, row: DiagnosticTest) -> TestResponse:
+    def _to_health_parameter_response(self, row: HealthParameter) -> HealthParameterResponse:
         lower_range_male = float(row.lower_range_male) if row.lower_range_male is not None else None
         higher_range_male = float(row.higher_range_male) if row.higher_range_male is not None else None
         lower_range_female = float(row.lower_range_female) if row.lower_range_female is not None else None
         higher_range_female = float(row.higher_range_female) if row.higher_range_female is not None else None
-        return TestResponse(
+        pt = row.parameter_type
+        parameter_type = ParameterType(pt.value) if isinstance(pt, ORMParameterType) else ParameterType(pt)
+        return HealthParameterResponse(
             test_id=row.test_id,
+            parameter_type=parameter_type,
             test_name=row.test_name,
             parameter_key=row.parameter_key,
             unit=row.unit,
@@ -221,7 +235,7 @@ class DiagnosticsService:
         self,
         row: DiagnosticTestGroup,
         *,
-        tests: list[DiagnosticTest] | None = None,
+        tests: list[HealthParameter] | None = None,
         test_count: int | None = None,
     ) -> TestGroupResponse:
         tests_value = tests or []
@@ -231,7 +245,7 @@ class DiagnosticsService:
             group_name=row.group_name,
             display_order=row.display_order,
             test_count=resolved_count,
-            tests=[self._to_test_response(test_row) for test_row in tests_value],
+            tests=[self._to_health_parameter_response(test_row) for test_row in tests_value],
         )
 
     def _to_package_response(self, row: DiagnosticPackage) -> DiagnosticPackageResponse:
@@ -388,28 +402,49 @@ class DiagnosticsService:
         )
         return self._to_package_response(updated)
 
-    async def get_all_tests(self, db) -> list[TestResponse]:
-        rows = await self._repository.get_all_tests(db)
-        return [self._to_test_response(row) for row in rows]
+    async def list_parameters(
+        self,
+        db,
+        *,
+        parameter_type: ParameterType | None = None,
+    ) -> list[HealthParameterResponse]:
+        orm_type = self._orm_parameter_type(parameter_type) if parameter_type is not None else None
+        rows = await self._repository.get_all_parameters(db, parameter_type=orm_type)
+        return [self._to_health_parameter_response(row) for row in rows]
 
-    async def get_test_by_id(self, db, *, test_id: int) -> TestResponse:
-        row = await self._repository.get_test_by_id(db, test_id=test_id)
+    async def get_parameter(self, db, *, test_id: int) -> HealthParameterResponse:
+        row = await self._repository.get_parameter_by_id(db, test_id=test_id)
         if row is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
-        return self._to_test_response(row)
+        return self._to_health_parameter_response(row)
 
-    async def create_test(
+    async def get_health_parameter_by_parameter_key(
+        self,
+        db,
+        *,
+        parameter_key: str,
+    ) -> HealthParameterResponse | None:
+        key = self._normalize_lower(parameter_key)
+        if key is None:
+            return None
+        row = await self._repository.get_parameter_by_parameter_key(db, parameter_key=key)
+        if row is None:
+            return None
+        return self._to_health_parameter_response(row)
+
+    async def create_parameter(
         self,
         db,
         *,
         employee: EmployeeContext,
-        data: TestCreate,
+        data: HealthParameterCreate,
         ip_address: str,
         user_agent: str,
         endpoint: str,
-    ) -> TestResponse:
+    ) -> HealthParameterResponse:
         self._ensure_employee_access(employee)
         payload = data.model_dump(exclude_none=True)
+        payload["parameter_type"] = self._orm_parameter_type(payload.get("parameter_type"))
         test_name = self._normalize(payload.get("test_name"))
         if test_name is None:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
@@ -437,7 +472,7 @@ class DiagnosticsService:
         if "what_to_do_when_high" in payload:
             payload["what_to_do_when_high"] = self._normalize(payload.get("what_to_do_when_high"))
 
-        created = await self._repository.create_test(db, DiagnosticTest(**payload))
+        created = await self._repository.create_parameter(db, HealthParameter(**payload))
         await self._require_audit_service().log_event(
             db,
             action="EMPLOYEE_CREATE_DIAGNOSTIC_TEST",
@@ -447,25 +482,27 @@ class DiagnosticsService:
             user_id=employee.user_id,
             session_id=None,
         )
-        return self._to_test_response(created)
+        return self._to_health_parameter_response(created)
 
-    async def update_test(
+    async def update_parameter(
         self,
         db,
         *,
         employee: EmployeeContext,
         test_id: int,
-        data: TestUpdate,
+        data: HealthParameterUpdate,
         ip_address: str,
         user_agent: str,
         endpoint: str,
-    ) -> TestResponse:
+    ) -> HealthParameterResponse:
         self._ensure_employee_access(employee)
-        existing = await self._repository.get_test_by_id(db, test_id=test_id)
+        existing = await self._repository.get_parameter_by_id(db, test_id=test_id)
         if existing is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
 
         payload = data.model_dump(exclude_none=True)
+        if "parameter_type" in payload:
+            payload["parameter_type"] = self._orm_parameter_type(payload["parameter_type"])
         if "test_name" in payload:
             test_name = self._normalize(payload.get("test_name"))
             if test_name is None:
@@ -494,7 +531,7 @@ class DiagnosticsService:
         if "what_to_do_when_high" in payload:
             payload["what_to_do_when_high"] = self._normalize(payload.get("what_to_do_when_high"))
 
-        updated = await self._repository.update_test(db, test_id=test_id, data=payload)
+        updated = await self._repository.update_parameter(db, test_id=test_id, data=payload)
         if updated is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
         await self._require_audit_service().log_event(
@@ -506,9 +543,9 @@ class DiagnosticsService:
             user_id=employee.user_id,
             session_id=None,
         )
-        return self._to_test_response(updated)
+        return self._to_health_parameter_response(updated)
 
-    async def delete_test(
+    async def delete_parameter(
         self,
         db,
         *,
@@ -517,12 +554,12 @@ class DiagnosticsService:
         ip_address: str,
         user_agent: str,
         endpoint: str,
-    ) -> None:
+    ) -> dict:
         self._ensure_employee_access(employee)
-        existing = await self._repository.get_test_by_id(db, test_id=test_id)
+        existing = await self._repository.get_parameter_by_id(db, test_id=test_id)
         if existing is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
-        await self._repository.delete_test(db, test_id=test_id)
+        await self._repository.delete_parameter(db, test_id=test_id)
         await self._require_audit_service().log_event(
             db,
             action="EMPLOYEE_DELETE_DIAGNOSTIC_TEST",
@@ -532,6 +569,7 @@ class DiagnosticsService:
             user_id=employee.user_id,
             session_id=None,
         )
+        return {"deleted": True}
 
     async def get_all_groups(self, db) -> list[TestGroupResponse]:
         rows = await self._repository.get_all_groups(db)
@@ -541,7 +579,7 @@ class DiagnosticsService:
         group = await self._repository.get_group_by_id(db, group_id=group_id)
         if group is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
-        tests = await self._repository.get_tests_for_group(db, group_id=group_id)
+        tests = await self._repository.get_parameters_for_group(db, group_id=group_id)
         return self._to_group_response(group, tests=tests)
 
     async def create_group(
@@ -599,7 +637,7 @@ class DiagnosticsService:
         updated = await self._repository.update_group(db, group_id=group_id, data=payload)
         if updated is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
-        tests = await self._repository.get_tests_for_group(db, group_id=group_id)
+        tests = await self._repository.get_parameters_for_group(db, group_id=group_id)
         await self._require_audit_service().log_event(
             db,
             action="EMPLOYEE_UPDATE_DIAGNOSTIC_TEST_GROUP",
@@ -636,12 +674,12 @@ class DiagnosticsService:
             session_id=None,
         )
 
-    async def get_group_tests(self, db, *, group_id: int) -> list[TestResponse]:
+    async def get_group_tests(self, db, *, group_id: int) -> list[HealthParameterResponse]:
         group = await self._repository.get_group_by_id(db, group_id=group_id)
         if group is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
-        tests = await self._repository.get_tests_for_group(db, group_id=group_id)
-        return [self._to_test_response(row) for row in tests]
+        tests = await self._repository.get_parameters_for_group(db, group_id=group_id)
+        return [self._to_health_parameter_response(row) for row in tests]
 
     async def assign_tests_to_group(
         self,
@@ -661,7 +699,7 @@ class DiagnosticsService:
 
         invalid_ids: list[int] = []
         for test_id in data.test_ids:
-            row = await self._repository.get_test_by_id(db, test_id=test_id)
+            row = await self._repository.get_parameter_by_id(db, test_id=test_id)
             if row is None:
                 invalid_ids.append(test_id)
         if invalid_ids:
@@ -706,7 +744,7 @@ class DiagnosticsService:
         group = await self._repository.get_group_by_id(db, group_id=group_id)
         if group is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
-        test = await self._repository.get_test_by_id(db, test_id=test_id)
+        test = await self._repository.get_parameter_by_id(db, test_id=test_id)
         if test is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_NOT_FOUND", message="Test does not exist")
         deleted = await self._repository.remove_test_from_group(db, group_id=group_id, test_id=test_id)

@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class ParameterType(str, Enum):
+    TEST = "test"
+    METRIC = "metric"
 
 
 class DiagnosticPackageCreate(BaseModel):
@@ -114,7 +120,8 @@ class TagResponse(BaseModel):
     display_order: Optional[int] = None
 
 
-class TestCreate(BaseModel):
+class HealthParameterCreate(BaseModel):
+    parameter_type: ParameterType = ParameterType.TEST
     test_name: str = Field(min_length=1)
     parameter_key: Optional[str] = None
     unit: Optional[str] = None
@@ -133,7 +140,8 @@ class TestCreate(BaseModel):
     display_order: Optional[int] = None
 
 
-class TestUpdate(BaseModel):
+class HealthParameterUpdate(BaseModel):
+    parameter_type: Optional[ParameterType] = None
     test_name: Optional[str] = None
     parameter_key: Optional[str] = None
     unit: Optional[str] = None
@@ -152,8 +160,11 @@ class TestUpdate(BaseModel):
     is_available: Optional[bool] = None
 
 
-class TestResponse(BaseModel):
+class HealthParameterResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     test_id: int
+    parameter_type: ParameterType
     test_name: str
     parameter_key: Optional[str] = None
     unit: Optional[str] = None
@@ -187,7 +198,7 @@ class TestGroupResponse(BaseModel):
     group_name: str
     test_count: int
     display_order: Optional[int] = None
-    tests: list[TestResponse] = Field(default_factory=list)
+    tests: list[HealthParameterResponse] = Field(default_factory=list)
 
 
 class AssignTestsToGroupRequest(BaseModel):

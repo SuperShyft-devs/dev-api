@@ -7,9 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.diagnostics.models import (
     DiagnosticPackage,
-    DiagnosticTest,
     DiagnosticTestGroup,
     DiagnosticTestGroupTest,
+    HealthParameter,
+    ParameterType,
 )
 
 from db.seed_data.data import (
@@ -59,12 +60,12 @@ async def upsert_diagnostic_test_packages(
 async def upsert_diagnostic_tests(session: AsyncSession, tests: Iterable[SeedDiagnosticTest]) -> None:
     for seed in tests:
         result = await session.execute(
-            select(DiagnosticTest).where(DiagnosticTest.test_name == seed.test_name).limit(1)
+            select(HealthParameter).where(HealthParameter.test_name == seed.test_name).limit(1)
         )
         row = result.scalar_one_or_none()
 
         if row is None:
-            session.add(DiagnosticTest(**_build_test_payload(seed)))
+            session.add(HealthParameter(**_build_test_payload(seed)))
             continue
 
         payload = _build_test_payload(seed)
@@ -90,7 +91,7 @@ async def sync_liver_profile_tests(session: AsyncSession) -> None:
     resolved_ids: list[int] = []
     for test_name in LIVER_PROFILE_TEST_NAMES:
         test_result = await session.execute(
-            select(DiagnosticTest).where(DiagnosticTest.test_name == test_name).limit(1)
+            select(HealthParameter).where(HealthParameter.test_name == test_name).limit(1)
         )
         test = test_result.scalar_one_or_none()
         if test is not None:
@@ -113,6 +114,7 @@ async def sync_liver_profile_tests(session: AsyncSession) -> None:
 def _build_test_payload(seed: SeedDiagnosticTest) -> dict:
     # We keep `is_available` as default from the model; seeding is only what you asked for.
     return {
+        "parameter_type": ParameterType.TEST,
         "test_name": seed.test_name,
         "parameter_key": seed.parameter_key,
         "unit": seed.unit,

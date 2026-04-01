@@ -18,9 +18,10 @@ from modules.diagnostics.models import (
     DiagnosticPackageSample,
     DiagnosticPackageTag,
     DiagnosticPackageTestGroup,
-    DiagnosticTest,
     DiagnosticTestGroup,
     DiagnosticTestGroupTest,
+    HealthParameter,
+    ParameterType,
 )
 
 
@@ -221,23 +222,44 @@ class DiagnosticsRepository:
         result = await db.execute(delete(DiagnosticPackageTag).where(DiagnosticPackageTag.tag_id == tag_id))
         return int(result.rowcount or 0)
 
-    async def get_all_tests(self, db: AsyncSession) -> list[DiagnosticTest]:
-        result = await db.execute(
-            select(DiagnosticTest).order_by(DiagnosticTest.display_order.asc().nulls_last(), DiagnosticTest.test_id.asc())
+    async def get_all_parameters(
+        self,
+        db: AsyncSession,
+        *,
+        parameter_type: ParameterType | None = None,
+    ) -> list[HealthParameter]:
+        query = select(HealthParameter).order_by(
+            HealthParameter.display_order.asc().nulls_last(),
+            HealthParameter.test_id.asc(),
         )
+        if parameter_type is not None:
+            query = query.where(HealthParameter.parameter_type == parameter_type)
+        result = await db.execute(query)
         return list(result.scalars().all())
 
-    async def get_test_by_id(self, db: AsyncSession, *, test_id: int) -> DiagnosticTest | None:
-        result = await db.execute(select(DiagnosticTest).where(DiagnosticTest.test_id == test_id))
+    async def get_parameter_by_id(self, db: AsyncSession, *, test_id: int) -> HealthParameter | None:
+        result = await db.execute(select(HealthParameter).where(HealthParameter.test_id == test_id))
         return result.scalar_one_or_none()
 
-    async def create_test(self, db: AsyncSession, data: DiagnosticTest) -> DiagnosticTest:
+    async def get_parameter_by_parameter_key(self, db: AsyncSession, *, parameter_key: str) -> HealthParameter | None:
+        """Match case-insensitively. Prefer METRIC over TEST when both exist."""
+        key_lower = parameter_key.strip().lower()
+        result = await db.execute(
+            select(HealthParameter).where(func.lower(HealthParameter.parameter_key) == key_lower)
+        )
+        rows = list(result.scalars().all())
+        if not rows:
+            return None
+        rows.sort(key=lambda r: 0 if r.parameter_type == ParameterType.METRIC else 1)
+        return rows[0]
+
+    async def create_parameter(self, db: AsyncSession, data: HealthParameter) -> HealthParameter:
         db.add(data)
         await db.flush()
         return data
 
-    async def update_test(self, db: AsyncSession, *, test_id: int, data: dict) -> DiagnosticTest | None:
-        row = await self.get_test_by_id(db, test_id=test_id)
+    async def update_parameter(self, db: AsyncSession, *, test_id: int, data: dict) -> HealthParameter | None:
+        row = await self.get_parameter_by_id(db, test_id=test_id)
         if row is None:
             return None
         for key, value in data.items():
@@ -247,8 +269,8 @@ class DiagnosticsRepository:
         await db.flush()
         return row
 
-    async def delete_test(self, db: AsyncSession, *, test_id: int) -> int:
-        result = await db.execute(delete(DiagnosticTest).where(DiagnosticTest.test_id == test_id))
+    async def delete_parameter(self, db: AsyncSession, *, test_id: int) -> int:
+        result = await db.execute(delete(HealthParameter).where(HealthParameter.test_id == test_id))
         return int(result.rowcount or 0)
 
     async def get_all_groups(self, db: AsyncSession) -> list[tuple[DiagnosticTestGroup, int]]:
@@ -268,12 +290,12 @@ class DiagnosticsRepository:
         result = await db.execute(select(DiagnosticTestGroup).where(DiagnosticTestGroup.group_id == group_id))
         return result.scalar_one_or_none()
 
-    async def get_tests_for_group(self, db: AsyncSession, *, group_id: int) -> list[DiagnosticTest]:
+    async def get_parameters_for_group(self, db: AsyncSession, *, group_id: int) -> list[HealthParameter]:
         result = await db.execute(
-            select(DiagnosticTest)
-            .join(DiagnosticTestGroupTest, DiagnosticTestGroupTest.test_id == DiagnosticTest.test_id)
+            select(HealthParameter)
+            .join(DiagnosticTestGroupTest, DiagnosticTestGroupTest.test_id == HealthParameter.test_id)
             .where(DiagnosticTestGroupTest.group_id == group_id)
-            .order_by(DiagnosticTestGroupTest.display_order.asc().nulls_last(), DiagnosticTest.test_id.asc())
+            .order_by(DiagnosticTestGroupTest.display_order.asc().nulls_last(), HealthParameter.test_id.asc())
         )
         return list(result.scalars().all())
 
@@ -369,7 +391,7 @@ class DiagnosticsRepository:
         db: AsyncSession,
         *,
         package_id: int,
-    ) -> list[tuple[DiagnosticTestGroup, list[DiagnosticTest]]]:
+    ) -> list[tuple[DiagnosticTestGroup, list[HealthParameter]]]:
         result = await db.execute(
             select(DiagnosticTestGroup)
             .join(DiagnosticPackageTestGroup, DiagnosticPackageTestGroup.group_id == DiagnosticTestGroup.group_id)
@@ -377,9 +399,9 @@ class DiagnosticsRepository:
             .order_by(DiagnosticPackageTestGroup.display_order.asc().nulls_last(), DiagnosticTestGroup.group_id.asc())
         )
         groups = list(result.scalars().all())
-        response: list[tuple[DiagnosticTestGroup, list[DiagnosticTest]]] = []
+        response: list[tuple[DiagnosticTestGroup, list[HealthParameter]]] = []
         for group in groups:
-            tests = await self.get_tests_for_group(db, group_id=group.group_id)
+            tests = await self.get_parameters_for_group(db, group_id=group.group_id)
             response.append((group, tests))
         return response
 

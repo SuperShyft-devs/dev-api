@@ -465,12 +465,28 @@ class ReportsService:
             session_id=None,
         )
 
+        hp = await self._diagnostics_service.get_health_parameter_by_parameter_key(
+            db, parameter_key=disease_code
+        )
+
         return DiseaseDetailResponse(
             code=str(matched.get("code") or ""),
             name=str(matched.get("name") or ""),
+            meaning=hp.meaning if hp is not None else None,
+            unit=hp.unit if hp is not None else None,
             risk_score_scaled=risk_score_scaled,
             lifestyle_contribution=lifestyle_contribution,
             disease_percentile=disease_percentile,
+            lower_range_male=hp.lower_range_male if hp is not None else None,
+            higher_range_male=hp.higher_range_male if hp is not None else None,
+            lower_range_female=hp.lower_range_female if hp is not None else None,
+            higher_range_female=hp.higher_range_female if hp is not None else None,
+            causes_when_high=hp.causes_when_high if hp is not None else None,
+            causes_when_low=hp.causes_when_low if hp is not None else None,
+            effects_when_high=hp.effects_when_high if hp is not None else None,
+            effects_when_low=hp.effects_when_low if hp is not None else None,
+            what_to_do_when_low=hp.what_to_do_when_low if hp is not None else None,
+            what_to_do_when_high=hp.what_to_do_when_high if hp is not None else None,
         )
 
     async def _build_blood_parameter_groups_report(

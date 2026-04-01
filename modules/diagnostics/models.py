@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+import enum
+
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship
 
 from db.base import Base
+
+
+class ParameterType(str, enum.Enum):
+    TEST = "test"
+    METRIC = "metric"
 
 
 class DiagnosticPackage(Base):
@@ -132,12 +139,23 @@ class DiagnosticTestGroup(Base):
     )
 
 
-class DiagnosticTest(Base):
-    """SQLAlchemy model for `diagnostic_tests` table."""
+class HealthParameter(Base):
+    """SQLAlchemy model for `health_parameters` table."""
 
-    __tablename__ = "diagnostic_tests"
+    __tablename__ = "health_parameters"
 
     test_id = Column(Integer, primary_key=True)
+    parameter_type = Column(
+        Enum(
+            ParameterType,
+            name="health_parameter_type",
+            create_constraint=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=ParameterType.TEST,
+        server_default=text("'test'::health_parameter_type"),
+    )
     test_name = Column(String, nullable=False)
     # Maps to the corresponding key in `blood_parameters` JSON (e.g. "haemoglobin").
     parameter_key = Column(String, nullable=True)
@@ -174,11 +192,11 @@ class DiagnosticTestGroupTest(Base):
 
     id = Column(Integer, primary_key=True)
     group_id = Column(Integer, ForeignKey("diagnostic_test_groups.group_id", ondelete="CASCADE"), nullable=False)
-    test_id = Column(Integer, ForeignKey("diagnostic_tests.test_id", ondelete="CASCADE"), nullable=False)
+    test_id = Column(Integer, ForeignKey("health_parameters.test_id", ondelete="CASCADE"), nullable=False)
     display_order = Column(Integer)
 
     group = relationship("DiagnosticTestGroup", back_populates="tests")
-    test = relationship("DiagnosticTest", back_populates="group_assignments")
+    test = relationship("HealthParameter", back_populates="group_assignments")
 
 
 class DiagnosticPackageTestGroup(Base):

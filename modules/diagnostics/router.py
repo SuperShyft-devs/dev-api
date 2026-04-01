@@ -24,11 +24,12 @@ from modules.diagnostics.schemas import (
     ReorderPackageGroupsRequest,
     SampleCreate,
     SampleUpdate,
+    HealthParameterCreate,
+    HealthParameterUpdate,
+    ParameterType,
     TagCreate,
-    TestCreate,
     TestGroupCreate,
     TestGroupUpdate,
-    TestUpdate,
 )
 from modules.diagnostics.service import DiagnosticsService
 from modules.employee.dependencies import get_current_employee
@@ -461,26 +462,27 @@ async def delete_preparation(
     return success_response({"preparation_id": preparation_id, "deleted": True})
 
 
-# diagnostic-tests: static routes before dynamic routes
-@router.get("/diagnostic-tests")
-async def list_diagnostic_tests(
+# diagnostics/health-parameters: static routes before dynamic routes
+@router.get("/diagnostics/health-parameters")
+async def list_health_parameters(
+    parameter_type: ParameterType | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    data = await diagnostics_service.get_all_tests(db)
+    data = await diagnostics_service.list_parameters(db, parameter_type=parameter_type)
     return success_response([item.model_dump() for item in data])
 
 
-@router.post("/diagnostic-tests", status_code=201)
-async def create_diagnostic_test(
-    payload: TestCreate,
+@router.post("/diagnostics/health-parameters", status_code=201)
+async def create_health_parameter(
+    payload: HealthParameterCreate,
     request: Request,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    created = await diagnostics_service.create_test(
+    created = await diagnostics_service.create_parameter(
         db,
         employee=employee,
         data=payload,
@@ -492,26 +494,26 @@ async def create_diagnostic_test(
     return success_response(created.model_dump())
 
 
-@router.get("/diagnostic-tests/{test_id}")
-async def get_diagnostic_test(
+@router.get("/diagnostics/health-parameters/{test_id}")
+async def get_health_parameter(
     test_id: int,
     db: AsyncSession = Depends(get_db),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    data = await diagnostics_service.get_test_by_id(db, test_id=test_id)
+    data = await diagnostics_service.get_parameter(db, test_id=test_id)
     return success_response(data.model_dump())
 
 
-@router.put("/diagnostic-tests/{test_id}")
-async def update_diagnostic_test(
+@router.put("/diagnostics/health-parameters/{test_id}")
+async def update_health_parameter(
     test_id: int,
-    payload: TestUpdate,
+    payload: HealthParameterUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    updated = await diagnostics_service.update_test(
+    updated = await diagnostics_service.update_parameter(
         db,
         employee=employee,
         test_id=test_id,
@@ -524,15 +526,15 @@ async def update_diagnostic_test(
     return success_response(updated.model_dump())
 
 
-@router.delete("/diagnostic-tests/{test_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_diagnostic_test(
+@router.delete("/diagnostics/health-parameters/{test_id}")
+async def delete_health_parameter(
     test_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    await diagnostics_service.delete_test(
+    result = await diagnostics_service.delete_parameter(
         db,
         employee=employee,
         test_id=test_id,
@@ -541,7 +543,7 @@ async def delete_diagnostic_test(
         endpoint=str(request.url.path),
     )
     await db.commit()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return success_response(result)
 
 
 # diagnostic-test-groups: static routes before dynamic routes
