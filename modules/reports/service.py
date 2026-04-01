@@ -17,7 +17,14 @@ from modules.diagnostics.service import DiagnosticsService
 from modules.metsights.service import MetsightsService
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.reports.repository import ReportsRepository
-from modules.reports.schemas import BloodParameterGroupInReportResponse, BloodParameterTestInReportResponse
+from modules.reports.schemas import (
+    BloodParameterGroupInReportResponse,
+    BloodParameterTestInReportResponse,
+    DiseaseOverview,
+    OverviewReportResponse,
+    PositiveWins,
+    RiskAnalysisItem,
+)
 
 
 _SYNC_IDLE = "idle"
@@ -108,7 +115,7 @@ class ReportsService:
                 user_id=assessment_instance.user_id,
                 engagement_id=assessment_instance.engagement_id,
                 assessment_instance_id=assessment_instance.assessment_instance_id,
-                metsights_output=None,
+                reports=None,
                 blood_parameters=blood_parameters,
             )
             await self._repository.create_individual_report(db, report)
@@ -131,6 +138,141 @@ class ReportsService:
             blood_parameters=blood_parameters,
             diagnostic_package_id=diagnostic_package_id,
             user_gender=normalized_gender,
+        )
+
+    async def get_overview_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_id: int,
+        user_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> OverviewReportResponse:
+        row = await self._assessments_repository.get_instance_for_user(
+            db,
+            assessment_instance_id=assessment_id,
+            user_id=user_id,
+        )
+        if row is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+
+        assessment_instance, package = row
+        if package is None:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Assessment package is missing",
+            )
+
+        assessment_type_code = (package.assessment_type_code or "").strip()
+        if assessment_type_code == "7":
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="FitPrint report overview is not allowed",
+            )
+
+        existing_report = await self._repository.get_individual_report_by_assessment(
+            db,
+            assessment_instance_id=assessment_id,
+        )
+
+        if existing_report is not None and existing_report.reports is not None:
+            report_data: Any = existing_report.reports
+        else:
+            record_id = (assessment_instance.metsights_record_id or "").strip()
+            if not record_id:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Metsights record id is missing for this assessment",
+                )
+
+            report_data = await self._metsights_service.get_report(
+                record_id=record_id,
+                assessment_type_code=package.assessment_type_code,
+            )
+
+            if existing_report is None:
+                report = IndividualHealthReport(
+                    user_id=assessment_instance.user_id,
+                    engagement_id=assessment_instance.engagement_id,
+                    assessment_instance_id=assessment_instance.assessment_instance_id,
+                    reports=report_data,
+                    blood_parameters=None,
+                )
+                await self._repository.create_individual_report(db, report)
+            else:
+                existing_report.reports = report_data
+                await self._repository.update_individual_report(db, existing_report)
+
+        report_dict = report_data if isinstance(report_data, dict) else {}
+
+        ma = report_dict.get("metabolic_age")
+        if isinstance(ma, (int, float)):
+            metabolic_age = float(ma)
+        else:
+            metabolic_age = None
+        dis = report_dict.get("diseases", [])
+        diseases_raw: list[Any] = dis if isinstance(dis, list) else []
+
+        positive_wins_list: list[DiseaseOverview] = []
+        risk_analysis_list: list[RiskAnalysisItem] = []
+        for d in diseases_raw:
+            if not isinstance(d, dict):
+                continue
+            code = str(d.get("code") or "")
+            name = str(d.get("name") or "")
+            rs = d.get("risk_status")
+            risk_status = str(rs) if rs is not None else ""
+            rsc = d.get("risk_score_scaled")
+            try:
+                risk_score_scaled = int(rsc) if rsc is not None else 0
+            except (TypeError, ValueError):
+                risk_score_scaled = 0
+            if risk_status == "Healthy":
+                positive_wins_list.append(
+                    DiseaseOverview(
+                        code=code,
+                        name=name,
+                        risk_status=risk_status,
+                        risk_score_scaled=risk_score_scaled,
+                    )
+                )
+            hp = d.get("healthy_percentile")
+            try:
+                healthy_percentile = int(hp) if hp is not None else 0
+            except (TypeError, ValueError):
+                healthy_percentile = 0
+            risk_analysis_list.append(
+                RiskAnalysisItem(
+                    code=code,
+                    name=name,
+                    risk_status=risk_status,
+                    risk_score_scaled=risk_score_scaled,
+                    healthy_percentile=healthy_percentile,
+                )
+            )
+
+        risk_analysis_list.sort(key=lambda x: x.risk_score_scaled, reverse=True)
+
+        await self._require_audit_service().log_event(
+            db,
+            action="USER_FETCH_OVERVIEW_REPORT",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id,
+            session_id=None,
+        )
+
+        return OverviewReportResponse(
+            assessment_id=assessment_id,
+            metabolic_age=metabolic_age,
+            positive_wins=PositiveWins(low_risk=positive_wins_list),
+            risk_analysis=risk_analysis_list,
         )
 
     async def _build_blood_parameter_groups_report(
@@ -289,7 +431,7 @@ class ReportsService:
                                 user_id=assessment.user_id,
                                 engagement_id=assessment.engagement_id,
                                 assessment_instance_id=assessment.assessment_instance_id,
-                                metsights_output=None,
+                                reports=None,
                                 blood_parameters=blood_parameters,
                             ),
                         )

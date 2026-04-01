@@ -5,10 +5,10 @@ Only database queries belong here.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.assessments.models import AssessmentInstance
+from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 
 
@@ -97,11 +97,14 @@ class ReportsRepository:
         *,
         user_id: int,
     ) -> AssessmentInstance | None:
+        # FitPrint (assessment_type_code "7") has no blood-parameters resource on Metsights records.
         result = await db.execute(
             select(AssessmentInstance)
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .where(AssessmentInstance.user_id == user_id)
             .where(AssessmentInstance.metsights_record_id.is_not(None))
             .where(AssessmentInstance.metsights_record_id != "")
+            .where(func.coalesce(AssessmentPackage.assessment_type_code, "") != "7")
             .order_by(AssessmentInstance.assessment_instance_id.desc())
             .limit(1)
         )
@@ -116,10 +119,12 @@ class ReportsRepository:
     ) -> list[AssessmentInstance]:
         result = await db.execute(
             select(AssessmentInstance)
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .where(AssessmentInstance.user_id == user_id)
             .where(AssessmentInstance.metsights_record_id.is_not(None))
             .where(AssessmentInstance.metsights_record_id != "")
             .where(AssessmentInstance.assessment_instance_id > after_assessment_instance_id)
+            .where(func.coalesce(AssessmentPackage.assessment_type_code, "") != "7")
             .order_by(AssessmentInstance.assessment_instance_id.asc())
         )
         return list(result.scalars().all())

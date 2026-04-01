@@ -60,6 +60,51 @@ class MetsightsService:
         envelope = MetsightsEnvelope.model_validate(payload)
         return envelope.data
 
+    async def get_report(self, *, record_id: str, assessment_type_code: str | None) -> Any:
+        normalized_record_id = (record_id or "").strip()
+        if not normalized_record_id:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Metsights record id is missing")
+        if not settings.METSIGHTS_API_KEY:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights integration is not configured",
+            )
+
+        try:
+            payload = await self._client.get_report(
+                record_id=normalized_record_id,
+                assessment_type_code=assessment_type_code,
+            )
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 404:
+                raise AppError(
+                    status_code=404,
+                    error_code="REPORT_NOT_FOUND",
+                    message="Report not found for this record",
+                ) from exc
+            if status_code == 403:
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Metsights authorization failed",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
+        envelope = MetsightsEnvelope.model_validate(payload)
+        return envelope.data
+
     async def get_or_create_profile_id(
         self,
         *,

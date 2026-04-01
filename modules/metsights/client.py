@@ -26,6 +26,24 @@ class MetsightsClient:
                 return {"detail": "Unexpected response", "data": None}
             return payload
 
+    async def get_report(self, *, record_id: str, assessment_type_code: str | None) -> dict[str, Any]:
+        base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
+        type_code = (assessment_type_code or "").strip()
+        if type_code == "7":
+            url = f"{base_url}/reports/fitness-reports/{record_id}/"
+        else:
+            url = f"{base_url}/reports/{record_id}/"
+        headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
+        timeout = settings.METSIGHTS_TIMEOUT_SECONDS
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                return {"detail": "Unexpected response", "data": None}
+            return payload
+
     async def create_profile(self, *, data: dict[str, Any]) -> dict[str, Any]:
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
         url = f"{base_url}/profiles/"

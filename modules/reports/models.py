@@ -24,7 +24,7 @@ class IndividualHealthReport(Base):
         nullable=False,
     )
     engagement_id = Column(Integer, ForeignKey("engagements.engagement_id"), nullable=False)
-    metsights_output = Column(JSON)
+    reports = Column(JSON)
     blood_parameters = Column(JSON)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 

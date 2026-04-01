@@ -25,6 +25,26 @@ def _client_ip(request: Request) -> str:
     return request.client.host
 
 
+@router.get("/{assessment_id}/overview")
+async def get_overview_report(
+    assessment_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    reports_service: ReportsService = Depends(get_reports_service),
+):
+    response = await reports_service.get_overview_for_user(
+        db,
+        assessment_id=assessment_id,
+        user_id=user.user_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(response.model_dump())
+
+
 @router.get("/{assessment_id}/blood-parameters")
 async def get_blood_parameters_report(
     assessment_id: int,
