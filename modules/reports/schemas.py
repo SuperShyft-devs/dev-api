@@ -50,8 +50,14 @@ class RiskAnalysisItem(BaseModel):
     healthy_percentile: int
 
 
+class HealthyHabitItem(BaseModel):
+    habit_key: str | None = None
+    habit_label: str
+
+
 class PositiveWins(BaseModel):
     low_risk: list[DiseaseOverview]
+    healthy_habits: list[HealthyHabitItem] = Field(default_factory=list)
     healthy_profiles: list[str] = Field(default_factory=list)
 
 

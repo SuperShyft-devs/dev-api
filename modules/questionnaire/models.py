@@ -5,7 +5,7 @@ This module owns the `questionnaire_definitions` table.
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, func, text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, Text, func, text
 from sqlalchemy.types import JSON
 
 from db.base import Base
@@ -86,3 +86,23 @@ class QuestionnaireResponse(Base):
     )
     answer = Column(JSON)
     submitted_at = Column(DateTime(timezone=True))
+
+
+class QuestionnaireHealthyHabitRule(Base):
+    """SQLAlchemy model for `questionnaire_healthy_habit_rules` table."""
+
+    __tablename__ = "questionnaire_healthy_habit_rules"
+
+    rule_id = Column(Integer, primary_key=True, autoincrement=True)
+    question_id = Column(Integer, ForeignKey("questionnaire_definitions.question_id", ondelete="CASCADE"), nullable=False)
+    habit_key = Column(String(200), nullable=True)
+    habit_label = Column(String(500), nullable=False)
+    display_order = Column(Integer, nullable=True)
+    condition_type = Column(String(50), nullable=False)
+    matched_option_values = Column(JSON, nullable=True)
+    scale_min = Column(Numeric(20, 8), nullable=True)
+    scale_max = Column(Numeric(20, 8), nullable=True)
+    scale_unit = Column(String(200), nullable=True)
+    status = Column(String(20), nullable=False, server_default=text("'active'"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_employee_id = Column(Integer, ForeignKey("employee.employee_id", ondelete="SET NULL"), nullable=True)

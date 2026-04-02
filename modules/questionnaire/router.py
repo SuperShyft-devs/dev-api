@@ -18,6 +18,8 @@ from modules.questionnaire.dependencies import (
     get_questionnaire_user_service,
 )
 from modules.questionnaire.schemas import (
+    HealthyHabitRuleCreateRequest,
+    HealthyHabitRuleUpdateRequest,
     QuestionnaireCategoryCreateRequest,
     QuestionnaireCategoryQuestionsAssignRequest,
     QuestionnaireCategoryQuestionsReorderRequest,
@@ -150,6 +152,85 @@ async def update_question_status(
     )
     await db.commit()
     return success_response({"question_id": updated.question_id, "status": updated.status})
+
+
+@management_router.get("/questions/{question_id}/healthy-habit-rules")
+async def list_healthy_habit_rules(
+    question_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    data = await service.list_healthy_habit_rules(db, employee=employee, question_id=question_id)
+    return success_response(data)
+
+
+@management_router.post("/questions/{question_id}/healthy-habit-rules", status_code=201)
+async def create_healthy_habit_rule(
+    question_id: int,
+    payload: HealthyHabitRuleCreateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    data = await service.create_healthy_habit_rule(
+        db,
+        employee=employee,
+        question_id=question_id,
+        payload=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@management_router.put("/questions/{question_id}/healthy-habit-rules/{rule_id}")
+async def update_healthy_habit_rule(
+    question_id: int,
+    rule_id: int,
+    payload: HealthyHabitRuleUpdateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    data = await service.update_healthy_habit_rule(
+        db,
+        employee=employee,
+        question_id=question_id,
+        rule_id=rule_id,
+        payload=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@management_router.delete("/questions/{question_id}/healthy-habit-rules/{rule_id}")
+async def delete_healthy_habit_rule(
+    question_id: int,
+    rule_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    await service.delete_healthy_habit_rule(
+        db,
+        employee=employee,
+        question_id=question_id,
+        rule_id=rule_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response({"deleted": True})
 
 
 # Category CRUD

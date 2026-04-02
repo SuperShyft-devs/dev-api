@@ -212,6 +212,7 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
         text("DELETE FROM auth_tokens WHERE user_id >= 1001 AND user_id < 10000")
     )
     await test_db_session.execute(text("DELETE FROM questionnaire_responses"))
+    await test_db_session.execute(text("DELETE FROM questionnaire_healthy_habit_rules"))
     await test_db_session.execute(text("DELETE FROM assessment_category_progress"))
     await test_db_session.execute(text("DELETE FROM individual_health_report"))
     await test_db_session.execute(text("DELETE FROM organization_health_report"))

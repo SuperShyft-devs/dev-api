@@ -157,3 +157,39 @@ class QuestionnaireCategoryQuestionsAssignRequest(BaseModel):
 
 class QuestionnaireCategoryQuestionsReorderRequest(BaseModel):
     question_ids: list[int] = Field(..., min_length=1)
+
+
+class HealthyHabitRuleCreateRequest(BaseModel):
+    habit_key: Optional[str] = Field(default=None, max_length=200)
+    habit_label: str = Field(..., min_length=1, max_length=500)
+    display_order: Optional[int] = None
+    condition_type: str = Field(..., min_length=1, max_length=50)
+    matched_option_values: Optional[list[str]] = None
+    scale_min: Optional[float] = None
+    scale_max: Optional[float] = None
+    scale_unit: Optional[str] = Field(default=None, max_length=200)
+    status: str = Field(default="active", min_length=1, max_length=20)
+
+    def normalized_condition_type(self) -> str:
+        return _strip(self.condition_type).lower()
+
+    def normalized_status(self) -> str:
+        return _strip(self.status).lower()
+
+
+class HealthyHabitRuleUpdateRequest(BaseModel):
+    habit_key: Optional[str] = Field(default=None, max_length=200)
+    habit_label: str = Field(..., min_length=1, max_length=500)
+    display_order: Optional[int] = None
+    condition_type: str = Field(..., min_length=1, max_length=50)
+    matched_option_values: Optional[list[str]] = None
+    scale_min: Optional[float] = None
+    scale_max: Optional[float] = None
+    scale_unit: Optional[str] = Field(default=None, max_length=200)
+    status: str = Field(default="active", min_length=1, max_length=20)
+
+    def normalized_condition_type(self) -> str:
+        return _strip(self.condition_type).lower()
+
+    def normalized_status(self) -> str:
+        return _strip(self.status).lower()

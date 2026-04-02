@@ -8,10 +8,12 @@ from __future__ import annotations
 from sqlalchemy import delete, func, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from modules.assessments.models import AssessmentPackageCategory
 from modules.questionnaire.models import (
     QuestionnaireCategory,
     QuestionnaireCategoryQuestion,
     QuestionnaireDefinition,
+    QuestionnaireHealthyHabitRule,
     QuestionnaireOption,
     QuestionnaireResponse,
 )
@@ -30,6 +32,20 @@ class QuestionnaireRepository:
             select(QuestionnaireDefinition).where(QuestionnaireDefinition.question_id == question_id)
         )
         return result.scalar_one_or_none()
+
+    async def get_definitions_by_ids(
+        self,
+        db: AsyncSession,
+        *,
+        question_ids: list[int],
+    ) -> dict[int, QuestionnaireDefinition]:
+        if not question_ids:
+            return {}
+        result = await db.execute(
+            select(QuestionnaireDefinition).where(QuestionnaireDefinition.question_id.in_(question_ids))
+        )
+        rows = list(result.scalars().all())
+        return {int(r.question_id): r for r in rows}
 
     async def get_definition_by_key(self, db: AsyncSession, *, question_key: str) -> QuestionnaireDefinition | None:
         result = await db.execute(
@@ -321,3 +337,93 @@ class QuestionnaireRepository:
             )
         )
         return int(result.rowcount or 0)
+
+    async def list_question_ids_for_package(self, db: AsyncSession, *, package_id: int) -> list[int]:
+        result = await db.execute(
+            select(QuestionnaireCategoryQuestion.question_id)
+            .join(
+                AssessmentPackageCategory,
+                AssessmentPackageCategory.category_id == QuestionnaireCategoryQuestion.category_id,
+            )
+            .where(AssessmentPackageCategory.package_id == package_id)
+            .distinct()
+        )
+        return [int(qid) for qid in result.scalars().all()]
+
+    async def list_healthy_habit_rules_for_question(
+        self,
+        db: AsyncSession,
+        *,
+        question_id: int,
+    ) -> list[QuestionnaireHealthyHabitRule]:
+        result = await db.execute(
+            select(QuestionnaireHealthyHabitRule)
+            .where(QuestionnaireHealthyHabitRule.question_id == question_id)
+            .order_by(
+                QuestionnaireHealthyHabitRule.display_order.asc().nulls_last(),
+                QuestionnaireHealthyHabitRule.rule_id.asc(),
+            )
+        )
+        return list(result.scalars().all())
+
+    async def list_active_healthy_habit_rules_for_questions(
+        self,
+        db: AsyncSession,
+        *,
+        question_ids: list[int],
+    ) -> list[QuestionnaireHealthyHabitRule]:
+        if not question_ids:
+            return []
+        result = await db.execute(
+            select(QuestionnaireHealthyHabitRule)
+            .where(QuestionnaireHealthyHabitRule.question_id.in_(question_ids))
+            .where(QuestionnaireHealthyHabitRule.status == "active")
+            .order_by(
+                QuestionnaireHealthyHabitRule.display_order.asc().nulls_last(),
+                QuestionnaireHealthyHabitRule.rule_id.asc(),
+            )
+        )
+        return list(result.scalars().all())
+
+    async def get_healthy_habit_rule(
+        self,
+        db: AsyncSession,
+        *,
+        rule_id: int,
+        question_id: int,
+    ) -> QuestionnaireHealthyHabitRule | None:
+        result = await db.execute(
+            select(QuestionnaireHealthyHabitRule).where(
+                QuestionnaireHealthyHabitRule.rule_id == rule_id,
+                QuestionnaireHealthyHabitRule.question_id == question_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def create_healthy_habit_rule(
+        self,
+        db: AsyncSession,
+        row: QuestionnaireHealthyHabitRule,
+    ) -> QuestionnaireHealthyHabitRule:
+        db.add(row)
+        await db.flush()
+        return row
+
+    async def update_healthy_habit_rule(
+        self,
+        db: AsyncSession,
+        row: QuestionnaireHealthyHabitRule,
+    ) -> QuestionnaireHealthyHabitRule:
+        db.add(row)
+        await db.flush()
+        return row
+
+    async def delete_healthy_habit_rule(self, db: AsyncSession, *, rule_id: int, question_id: int) -> bool:
+        result = await db.execute(
+            delete(QuestionnaireHealthyHabitRule).where(
+                QuestionnaireHealthyHabitRule.rule_id == rule_id,
+                QuestionnaireHealthyHabitRule.question_id == question_id,
+            )
+        )
+        await db.flush()
+        return int(result.rowcount or 0) > 0

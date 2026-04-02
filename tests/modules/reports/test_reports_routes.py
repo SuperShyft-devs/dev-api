@@ -22,6 +22,8 @@ from modules.diagnostics.schemas import (
     ParameterType,
     TestGroupResponse as DiagnosticTestGroupResponse,
 )
+from modules.questionnaire.healthy_habits_service import HealthyHabitsService
+from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.dependencies import get_reports_service
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.reports.repository import ReportsRepository
@@ -212,6 +214,7 @@ async def test_get_blood_parameters_returns_cached_without_metsights(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -248,6 +251,7 @@ async def test_get_blood_parameters_fetches_and_caches_on_miss(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -472,6 +476,7 @@ async def test_get_blood_parameter_trends_stale_returns_cached_and_meta(
         metsights_service=_FakeMetsightsService(payload={"albumin": 3.9, "albumin_unit": "g/dL"}),
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     reports_service.trigger_user_blood_parameters_refresh = lambda *, user_id: None
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
@@ -645,6 +650,7 @@ async def test_refresh_user_blood_parameters_success_advances_cursor(test_db_ses
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
         session_factory=session_factory,
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     await service._refresh_user_blood_parameters(user_id=3841)
 
@@ -682,6 +688,7 @@ async def test_refresh_user_blood_parameters_failure_sets_failed(test_db_session
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
         session_factory=session_factory,
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     await service._refresh_user_blood_parameters(user_id=3851)
 
@@ -744,6 +751,7 @@ async def test_get_overview_met_cached_skips_metsights(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -754,6 +762,7 @@ async def test_get_overview_met_cached_skips_metsights(
     assert len(body["positive_wins"]["low_risk"]) == 1
     assert body["positive_wins"]["low_risk"][0]["code"] == "A"
     assert body["positive_wins"]["healthy_profiles"] == []
+    assert body["positive_wins"]["healthy_habits"] == []
     assert [x["code"] for x in body["risk_analysis"]] == ["B", "A"]
     assert fake_metsights.report_calls == 0
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
@@ -833,6 +842,7 @@ async def test_get_overview_top_three_low_and_high_risk_scores(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -848,6 +858,7 @@ async def test_get_overview_top_three_low_and_high_risk_scores(
     assert [x["code"] for x in ra] == ["nafld", "high_score", "mid"]
     assert [x["risk_score_scaled"] for x in ra] == [49, 21, 16]
     assert response.json()["data"]["positive_wins"]["healthy_profiles"] == []
+    assert response.json()["data"]["positive_wins"]["healthy_habits"] == []
 
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
@@ -956,12 +967,14 @@ async def test_get_overview_healthy_profiles_lists_top_groups_by_in_range_count(
         metsights_service=_FakeMetsightsService(payload={}, should_fail=True),
         diagnostics_service=_DiagMultiGroup(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
     response = await async_client.get("/reports/99011/overview", headers=_auth_header(3921))
     assert response.status_code == 200
     assert response.json()["data"]["positive_wins"]["healthy_profiles"] == ["Beta", "Alpha", "Gamma"]
+    assert response.json()["data"]["positive_wins"]["healthy_habits"] == []
 
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
@@ -999,12 +1012,119 @@ async def test_get_overview_healthy_profiles_when_blood_values_in_range(
         metsights_service=_FakeMetsightsService(payload={}, should_fail=True),
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
     response = await async_client.get("/reports/99012/overview", headers=_auth_header(3922))
     assert response.status_code == 200
     assert response.json()["data"]["positive_wins"]["healthy_profiles"] == ["Blood parameters"]
+    assert response.json()["data"]["positive_wins"]["healthy_habits"] == []
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_overview_includes_healthy_habits_from_questionnaire(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    from modules.assessments.models import AssessmentPackageCategory
+    from modules.questionnaire.models import (
+        QuestionnaireCategory,
+        QuestionnaireCategoryQuestion,
+        QuestionnaireDefinition,
+        QuestionnaireHealthyHabitRule,
+        QuestionnaireOption,
+        QuestionnaireResponse,
+    )
+
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99501,
+        user_id=3951,
+        engagement_id=5951,
+        record_id="REC99501",
+        package_code="PKG_HABIT",
+        assessment_type_code="2",
+    )
+    pkg_id = 99501 % 1000
+    cat_id = 9501
+    q_id = 9501
+    test_db_session.add(
+        QuestionnaireCategory(
+            category_id=cat_id,
+            category_key="hab_cat",
+            display_name="Habits category",
+            status="active",
+        )
+    )
+    test_db_session.add(
+        QuestionnaireDefinition(
+            question_id=q_id,
+            question_key="alcohol_consumption",
+            question_text="Weekly alcohol?",
+            question_type="single_choice",
+            status="active",
+        )
+    )
+    test_db_session.add_all(
+        [
+            QuestionnaireOption(question_id=q_id, option_value="no_alcohol", display_name="None"),
+            QuestionnaireOption(question_id=q_id, option_value="more", display_name="More"),
+        ]
+    )
+    await test_db_session.flush()
+    test_db_session.add_all(
+        [
+            QuestionnaireCategoryQuestion(id=88001, category_id=cat_id, question_id=q_id, display_order=1),
+            AssessmentPackageCategory(id=88002, package_id=pkg_id, category_id=cat_id, display_order=1),
+            QuestionnaireResponse(
+                response_id=88003,
+                assessment_instance_id=99501,
+                question_id=q_id,
+                category_id=cat_id,
+                answer="no_alcohol",
+            ),
+            QuestionnaireHealthyHabitRule(
+                question_id=q_id,
+                habit_key="no_alcohol",
+                habit_label="No Alcohol",
+                display_order=1,
+                condition_type="option_match",
+                matched_option_values=["no_alcohol"],
+                status="active",
+            ),
+            IndividualHealthReport(
+                report_id=79501,
+                user_id=3951,
+                engagement_id=5951,
+                assessment_instance_id=99501,
+                reports={"metabolic_age": 31.0, "diseases": []},
+                blood_parameters={"haemoglobin": 12.0},
+            ),
+        ]
+    )
+    await test_db_session.commit()
+
+    fake_metsights = _FakeMetsightsService(payload={}, should_fail=True)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/99501/overview", headers=_auth_header(3951))
+    assert response.status_code == 200
+    habits = response.json()["data"]["positive_wins"]["healthy_habits"]
+    assert len(habits) == 1
+    assert habits[0]["habit_key"] == "no_alcohol"
+    assert habits[0]["habit_label"] == "No Alcohol"
 
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
@@ -1032,6 +1152,7 @@ async def test_get_overview_met_fetches_then_uses_cache(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -1070,6 +1191,7 @@ async def test_get_overview_fitprint_not_allowed(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -1107,6 +1229,7 @@ async def test_get_overview_wrong_user_returns_404(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -1138,6 +1261,7 @@ async def test_get_overview_missing_metsights_record_returns_422(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -1189,6 +1313,7 @@ async def test_get_risk_analysis_cached_skips_metsights(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -1230,6 +1355,7 @@ async def test_get_risk_analysis_fetches_then_second_call_uses_cache(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -1291,6 +1417,7 @@ async def test_get_risk_analysis_disease_query_returns_detail(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -1355,6 +1482,7 @@ async def test_get_risk_analysis_disease_not_found(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -1393,6 +1521,7 @@ async def test_get_risk_analysis_wrong_user_returns_404(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -1424,6 +1553,7 @@ async def test_get_risk_analysis_missing_metsights_record_returns_422(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -1460,6 +1590,7 @@ async def test_get_risk_analysis_fitprint_allowed_empty_diseases(
         metsights_service=fake_metsights,
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 

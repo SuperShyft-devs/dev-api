@@ -430,3 +430,92 @@ async def test_reorder_category_questions_rejects_invalid_ids(async_client, test
     )
     assert missing_response.status_code == 400
     assert missing_response.json()["error_code"] == "INVALID_INPUT"
+
+
+@pytest.mark.asyncio
+async def test_create_healthy_habit_rule_rejects_text_question(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9020, employee_id=20)
+    test_db_session.add(
+        QuestionnaireDefinition(
+            question_id=9301,
+            question_key="q_text_habit",
+            question_text="Free text",
+            question_type="text",
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+    response = await async_client.post(
+        "/questionnaire/questions/9301/healthy-habit-rules",
+        headers=_auth_header(9020),
+        json={
+            "habit_label": "X",
+            "condition_type": "option_match",
+            "matched_option_values": ["a"],
+            "status": "active",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT"
+
+
+@pytest.mark.asyncio
+async def test_healthy_habit_rules_crud(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9021, employee_id=21)
+    test_db_session.add_all(
+        [
+            QuestionnaireDefinition(
+                question_id=9302,
+                question_key="q_habit_crud",
+                question_text="Pick",
+                question_type="single_choice",
+                status="active",
+            ),
+            QuestionnaireOption(question_id=9302, option_value="opt_a", display_name="A"),
+        ]
+    )
+    await test_db_session.commit()
+
+    create_res = await async_client.post(
+        "/questionnaire/questions/9302/healthy-habit-rules",
+        headers=_auth_header(9021),
+        json={
+            "habit_key": "good_pick",
+            "habit_label": "Good pick",
+            "display_order": 1,
+            "condition_type": "option_match",
+            "matched_option_values": ["opt_a"],
+            "status": "active",
+        },
+    )
+    assert create_res.status_code == 201
+    body = create_res.json()["data"]
+    rule_id = body["rule_id"]
+    assert body["habit_label"] == "Good pick"
+
+    list_res = await async_client.get("/questionnaire/questions/9302/healthy-habit-rules", headers=_auth_header(9021))
+    assert list_res.status_code == 200
+    assert len(list_res.json()["data"]) == 1
+
+    update_res = await async_client.put(
+        f"/questionnaire/questions/9302/healthy-habit-rules/{rule_id}",
+        headers=_auth_header(9021),
+        json={
+            "habit_key": "good_pick",
+            "habit_label": "Good pick updated",
+            "display_order": 2,
+            "condition_type": "option_match",
+            "matched_option_values": ["opt_a"],
+            "status": "inactive",
+        },
+    )
+    assert update_res.status_code == 200
+    assert update_res.json()["data"]["habit_label"] == "Good pick updated"
+    assert update_res.json()["data"]["status"] == "inactive"
+
+    delete_res = await async_client.delete(
+        f"/questionnaire/questions/9302/healthy-habit-rules/{rule_id}",
+        headers=_auth_header(9021),
+    )
+    assert delete_res.status_code == 200
+    assert delete_res.json()["data"]["deleted"] is True

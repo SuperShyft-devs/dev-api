@@ -18,12 +18,14 @@ from modules.diagnostics.service import DiagnosticsService
 from modules.metsights.service import MetsightsService
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.reports.repository import ReportsRepository
+from modules.questionnaire.healthy_habits_service import HealthyHabitsService
 from modules.reports.schemas import (
     BloodParameterGroupInReportResponse,
     BloodParameterTestInReportResponse,
     DiseaseDetailResponse,
     DiseaseListItem,
     DiseaseOverview,
+    HealthyHabitItem,
     OverviewReportResponse,
     PositiveWins,
     RiskAnalysisItem,
@@ -47,6 +49,7 @@ class ReportsService:
         diagnostics_service: DiagnosticsService,
         audit_service: AuditService | None = None,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
+        healthy_habits_service: HealthyHabitsService | None = None,
     ):
         self._repository = repository
         self._assessments_repository = assessments_repository
@@ -54,6 +57,7 @@ class ReportsService:
         self._diagnostics_service = diagnostics_service
         self._audit_service = audit_service
         self._session_factory = session_factory or AsyncSessionLocal
+        self._healthy_habits_service = healthy_habits_service
 
     def _require_audit_service(self) -> AuditService:
         if self._audit_service is None:
@@ -329,6 +333,18 @@ class ReportsService:
             )
             healthy_profiles = self._top_healthy_profile_group_names(groups)
 
+        healthy_habits: list[HealthyHabitItem] = []
+        if self._healthy_habits_service is not None:
+            computed = await self._healthy_habits_service.top_habits_for_assessment(
+                db,
+                assessment_instance_id=assessment_id,
+                package_id=int(assessment_instance.package_id),
+                limit=3,
+            )
+            healthy_habits = [
+                HealthyHabitItem(habit_key=h.habit_key, habit_label=h.habit_label) for h in computed
+            ]
+
         await self._require_audit_service().log_event(
             db,
             action="USER_FETCH_OVERVIEW_REPORT",
@@ -342,7 +358,11 @@ class ReportsService:
         return OverviewReportResponse(
             assessment_id=assessment_id,
             metabolic_age=metabolic_age,
-            positive_wins=PositiveWins(low_risk=positive_wins_list, healthy_profiles=healthy_profiles),
+            positive_wins=PositiveWins(
+                low_risk=positive_wins_list,
+                healthy_habits=healthy_habits,
+                healthy_profiles=healthy_profiles,
+            ),
             risk_analysis=risk_analysis_list,
         )
 

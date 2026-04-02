@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from decimal import Decimal
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,10 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
-from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition
+from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireHealthyHabitRule
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.users.repository import UsersRepository
 from modules.questionnaire.schemas import (
+    HealthyHabitRuleCreateRequest,
+    HealthyHabitRuleUpdateRequest,
     QuestionnaireCategoryCreateRequest,
     QuestionnaireCategoryQuestionsReorderRequest,
     QuestionnaireCategoryStatusUpdateRequest,
@@ -32,6 +35,9 @@ _RULE_MATCH_MODES = {"all", "any"}
 _RULE_TYPES = {"question_answer", "user_preference"}
 _RULE_OPERATORS = {"equals", "not_equals", "contains", "not_contains", "in", "not_in"}
 _PREFERENCE_KEYS = {"diet_preference", "allergies"}
+_HABIT_CONDITION_OPTION = "option_match"
+_HABIT_CONDITION_SCALE = "scale_range"
+_ALLOWED_HABIT_RULE_STATUS = {"active", "inactive"}
 
 
 def _normalize(value: str | None) -> str:
@@ -1196,3 +1202,257 @@ class QuestionnaireService:
         # TODO: Trigger Metsights integration
         # This will be implemented later - placeholder for now
         # await self._trigger_metsights(db, assessment_instance_id)
+
+    def _serialize_healthy_habit_rule(self, row: QuestionnaireHealthyHabitRule) -> dict:
+        scale_min = row.scale_min
+        scale_max = row.scale_max
+        return {
+            "rule_id": int(row.rule_id),
+            "question_id": int(row.question_id),
+            "habit_key": (row.habit_key or "").strip() or None,
+            "habit_label": row.habit_label or "",
+            "display_order": int(row.display_order) if row.display_order is not None else None,
+            "condition_type": row.condition_type or "",
+            "matched_option_values": row.matched_option_values
+            if isinstance(row.matched_option_values, list)
+            else None,
+            "scale_min": float(scale_min) if scale_min is not None else None,
+            "scale_max": float(scale_max) if scale_max is not None else None,
+            "scale_unit": (row.scale_unit or "").strip() or None,
+            "status": row.status or "active",
+            "created_at": row.created_at,
+            "updated_employee_id": int(row.updated_employee_id) if row.updated_employee_id is not None else None,
+        }
+
+    def _prepare_healthy_habit_rule_fields(
+        self,
+        *,
+        definition: QuestionnaireDefinition,
+        payload: HealthyHabitRuleCreateRequest | HealthyHabitRuleUpdateRequest,
+        option_rows: list,
+    ) -> dict:
+        qtype = _normalize_question_type(definition.question_type)
+        if qtype == "text":
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Healthy habit rules are not supported for text questions",
+            )
+        ctype = payload.normalized_condition_type()
+        if ctype not in {_HABIT_CONDITION_OPTION, _HABIT_CONDITION_SCALE}:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid condition_type")
+        status = payload.normalized_status()
+        if status not in _ALLOWED_HABIT_RULE_STATUS:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid status")
+
+        if ctype == _HABIT_CONDITION_OPTION:
+            if qtype not in _CHOICE_TYPES:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="option_match requires a single_choice or multiple_choice question",
+                )
+            vals = payload.matched_option_values or []
+            cleaned_vals = [str(v).strip() for v in vals if str(v).strip()]
+            if not cleaned_vals:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="matched_option_values is required for option_match",
+                )
+            allowed = {(o.option_value or "").strip().lower() for o in option_rows}
+            for v in cleaned_vals:
+                if v.lower() not in allowed:
+                    raise AppError(
+                        status_code=400,
+                        error_code="INVALID_INPUT",
+                        message="matched_option_values must reference question option values",
+                    )
+            return {
+                "condition_type": ctype,
+                "matched_option_values": cleaned_vals,
+                "scale_min": None,
+                "scale_max": None,
+                "scale_unit": None,
+                "status": status,
+            }
+
+        if qtype != _SCALE_TYPE:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="scale_range requires a scale question",
+            )
+        if payload.scale_min is None or payload.scale_max is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="scale_min and scale_max are required for scale_range",
+            )
+        lo = float(payload.scale_min)
+        hi = float(payload.scale_max)
+        if not math.isfinite(lo) or not math.isfinite(hi):
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid scale range")
+        if lo > hi:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="scale_min cannot exceed scale_max")
+        su = (payload.scale_unit or "").strip()
+        if not su:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="scale_unit is required for scale_range",
+            )
+        allowed_units = {(o.option_value or "").strip().lower() for o in option_rows}
+        if su.lower() not in allowed_units:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="scale_unit must be an allowed unit for this question",
+            )
+        return {
+            "condition_type": ctype,
+            "matched_option_values": None,
+            "scale_min": Decimal(str(lo)),
+            "scale_max": Decimal(str(hi)),
+            "scale_unit": su,
+            "status": status,
+        }
+
+    async def list_healthy_habit_rules(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        question_id: int,
+    ) -> list[dict]:
+        self._ensure_employee_access(employee)
+        definition = await self._repository.get_definition_by_id(db, question_id)
+        if definition is None:
+            raise AppError(status_code=404, error_code="QUESTIONNAIRE_QUESTION_NOT_FOUND", message="Question not found")
+        rows = await self._repository.list_healthy_habit_rules_for_question(db, question_id=question_id)
+        return [self._serialize_healthy_habit_rule(r) for r in rows]
+
+    async def create_healthy_habit_rule(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        question_id: int,
+        payload: HealthyHabitRuleCreateRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+        definition = await self._repository.get_definition_by_id(db, question_id)
+        if definition is None:
+            raise AppError(status_code=404, error_code="QUESTIONNAIRE_QUESTION_NOT_FOUND", message="Question not found")
+        option_rows = await self._repository.list_options_for_question(db, question_id=question_id)
+        fields = self._prepare_healthy_habit_rule_fields(
+            definition=definition,
+            payload=payload,
+            option_rows=option_rows,
+        )
+        habit_key = (payload.habit_key or "").strip() or None
+        if habit_key and len(habit_key) > 200:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        row = QuestionnaireHealthyHabitRule(
+            question_id=question_id,
+            habit_key=habit_key,
+            habit_label=(payload.habit_label or "").strip(),
+            display_order=payload.display_order,
+            updated_employee_id=employee.employee_id,
+            **fields,
+        )
+        row = await self._repository.create_healthy_habit_rule(db, row)
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_CREATE_QUESTIONNAIRE_HEALTHY_HABIT_RULE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return self._serialize_healthy_habit_rule(row)
+
+    async def update_healthy_habit_rule(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        question_id: int,
+        rule_id: int,
+        payload: HealthyHabitRuleUpdateRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+        definition = await self._repository.get_definition_by_id(db, question_id)
+        if definition is None:
+            raise AppError(status_code=404, error_code="QUESTIONNAIRE_QUESTION_NOT_FOUND", message="Question not found")
+        existing = await self._repository.get_healthy_habit_rule(db, rule_id=rule_id, question_id=question_id)
+        if existing is None:
+            raise AppError(status_code=404, error_code="HEALTHY_HABIT_RULE_NOT_FOUND", message="Rule not found")
+        option_rows = await self._repository.list_options_for_question(db, question_id=question_id)
+        fields = self._prepare_healthy_habit_rule_fields(
+            definition=definition,
+            payload=payload,
+            option_rows=option_rows,
+        )
+        habit_key = (payload.habit_key or "").strip() or None
+        if habit_key and len(habit_key) > 200:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        existing.habit_key = habit_key
+        existing.habit_label = (payload.habit_label or "").strip()
+        existing.display_order = payload.display_order
+        existing.condition_type = fields["condition_type"]
+        existing.matched_option_values = fields["matched_option_values"]
+        existing.scale_min = fields["scale_min"]
+        existing.scale_max = fields["scale_max"]
+        existing.scale_unit = fields["scale_unit"]
+        existing.status = fields["status"]
+        existing.updated_employee_id = employee.employee_id
+        row = await self._repository.update_healthy_habit_rule(db, existing)
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_UPDATE_QUESTIONNAIRE_HEALTHY_HABIT_RULE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return self._serialize_healthy_habit_rule(row)
+
+    async def delete_healthy_habit_rule(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        question_id: int,
+        rule_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> None:
+        self._ensure_employee_access(employee)
+        definition = await self._repository.get_definition_by_id(db, question_id)
+        if definition is None:
+            raise AppError(status_code=404, error_code="QUESTIONNAIRE_QUESTION_NOT_FOUND", message="Question not found")
+        deleted = await self._repository.delete_healthy_habit_rule(db, rule_id=rule_id, question_id=question_id)
+        if not deleted:
+            raise AppError(status_code=404, error_code="HEALTHY_HABIT_RULE_NOT_FOUND", message="Rule not found")
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_DELETE_QUESTIONNAIRE_HEALTHY_HABIT_RULE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
