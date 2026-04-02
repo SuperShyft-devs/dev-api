@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class BloodParameterTestInReportResponse(BaseModel):
@@ -52,6 +52,7 @@ class RiskAnalysisItem(BaseModel):
 
 class PositiveWins(BaseModel):
     low_risk: list[DiseaseOverview]
+    healthy_profiles: list[str] = Field(default_factory=list)
 
 
 class OverviewReportResponse(BaseModel):

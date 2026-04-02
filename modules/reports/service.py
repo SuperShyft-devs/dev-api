@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from core.exceptions import AppError
 from db.session import AsyncSessionLocal
+from modules.assessments.models import AssessmentInstance
 from modules.assessments.repository import AssessmentsRepository
 from modules.audit.service import AuditService
 from modules.diagnostics.service import DiagnosticsService
@@ -143,17 +144,58 @@ class ReportsService:
             user_gender=normalized_gender,
         )
 
+    @staticmethod
+    def _top_healthy_profile_group_names(
+        groups: list[BloodParameterGroupInReportResponse],
+        *,
+        limit: int = 3,
+    ) -> list[str]:
+        """Names of test groups with the most in-range parameters, up to ``limit``."""
+        scored: list[tuple[int, str]] = []
+        for group in groups:
+            optimal = 0
+            for test in group.tests:
+                if test.value is None or test.lower_range is None or test.higher_range is None:
+                    continue
+                if test.lower_range <= test.value <= test.higher_range:
+                    optimal += 1
+            if optimal > 0:
+                scored.append((optimal, group.group_name))
+        scored.sort(key=lambda x: (-x[0], x[1]))
+        return [name for _, name in scored[:limit]]
+
+    async def _resolve_blood_parameters_for_overview(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance: AssessmentInstance,
+        individual_report: IndividualHealthReport,
+    ) -> dict[str, Any]:
+        if individual_report.blood_parameters is not None:
+            raw = individual_report.blood_parameters
+            return raw if isinstance(raw, dict) else {}
+
+        record_id = (assessment_instance.metsights_record_id or "").strip()
+        if not record_id:
+            return {}
+
+        blood_parameters = await self._metsights_service.get_blood_parameters(record_id=record_id)
+        individual_report.blood_parameters = blood_parameters
+        await self._repository.update_individual_report(db, individual_report)
+        return blood_parameters if isinstance(blood_parameters, dict) else {}
+
     async def get_overview_for_user(
         self,
         db: AsyncSession,
         *,
         assessment_id: int,
         user_id: int,
+        user_gender: str | None,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> OverviewReportResponse:
-        row = await self._assessments_repository.get_instance_for_user(
+        row = await self._assessments_repository.get_instance_for_user_with_engagement(
             db,
             assessment_instance_id=assessment_id,
             user_id=user_id,
@@ -161,7 +203,7 @@ class ReportsService:
         if row is None:
             raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
 
-        assessment_instance, package = row
+        assessment_instance, package, engagement = row
         if package is None:
             raise AppError(
                 status_code=422,
@@ -177,13 +219,13 @@ class ReportsService:
                 message="FitPrint report overview is not allowed",
             )
 
-        existing_report = await self._repository.get_individual_report_by_assessment(
+        individual_report = await self._repository.get_individual_report_by_assessment(
             db,
             assessment_instance_id=assessment_id,
         )
 
-        if existing_report is not None and existing_report.reports is not None:
-            report_data: Any = existing_report.reports
+        if individual_report is not None and individual_report.reports is not None:
+            report_data: Any = individual_report.reports
         else:
             record_id = (assessment_instance.metsights_record_id or "").strip()
             if not record_id:
@@ -198,18 +240,18 @@ class ReportsService:
                 assessment_type_code=package.assessment_type_code,
             )
 
-            if existing_report is None:
-                report = IndividualHealthReport(
+            if individual_report is None:
+                individual_report = IndividualHealthReport(
                     user_id=assessment_instance.user_id,
                     engagement_id=assessment_instance.engagement_id,
                     assessment_instance_id=assessment_instance.assessment_instance_id,
                     reports=report_data,
                     blood_parameters=None,
                 )
-                await self._repository.create_individual_report(db, report)
+                await self._repository.create_individual_report(db, individual_report)
             else:
-                existing_report.reports = report_data
-                await self._repository.update_individual_report(db, existing_report)
+                individual_report.reports = report_data
+                await self._repository.update_individual_report(db, individual_report)
 
         report_dict = report_data if isinstance(report_data, dict) else {}
 
@@ -265,6 +307,28 @@ class ReportsService:
         risk_analysis_list.sort(key=lambda x: (-x.risk_score_scaled, x.code))
         risk_analysis_list = risk_analysis_list[:3]
 
+        healthy_profiles: list[str] = []
+        if (
+            engagement is not None
+            and engagement.diagnostic_package_id is not None
+            and individual_report is not None
+        ):
+            normalized_gender = (user_gender or "").strip().lower() or None
+            if normalized_gender not in {"male", "female"}:
+                normalized_gender = None
+            blood_raw = await self._resolve_blood_parameters_for_overview(
+                db,
+                assessment_instance=assessment_instance,
+                individual_report=individual_report,
+            )
+            groups = await self._build_blood_parameter_groups_report(
+                db=db,
+                blood_parameters=blood_raw,
+                diagnostic_package_id=int(engagement.diagnostic_package_id),
+                user_gender=normalized_gender,
+            )
+            healthy_profiles = self._top_healthy_profile_group_names(groups)
+
         await self._require_audit_service().log_event(
             db,
             action="USER_FETCH_OVERVIEW_REPORT",
@@ -278,7 +342,7 @@ class ReportsService:
         return OverviewReportResponse(
             assessment_id=assessment_id,
             metabolic_age=metabolic_age,
-            positive_wins=PositiveWins(low_risk=positive_wins_list),
+            positive_wins=PositiveWins(low_risk=positive_wins_list, healthy_profiles=healthy_profiles),
             risk_analysis=risk_analysis_list,
         )
 

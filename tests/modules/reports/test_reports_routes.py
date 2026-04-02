@@ -753,6 +753,7 @@ async def test_get_overview_met_cached_skips_metsights(
     assert body["metabolic_age"] == 42.5
     assert len(body["positive_wins"]["low_risk"]) == 1
     assert body["positive_wins"]["low_risk"][0]["code"] == "A"
+    assert body["positive_wins"]["healthy_profiles"] == []
     assert [x["code"] for x in body["risk_analysis"]] == ["B", "A"]
     assert fake_metsights.report_calls == 0
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
@@ -846,6 +847,164 @@ async def test_get_overview_top_three_low_and_high_risk_scores(
     assert len(ra) == 3
     assert [x["code"] for x in ra] == ["nafld", "high_score", "mid"]
     assert [x["risk_score_scaled"] for x in ra] == [49, 21, 16]
+    assert response.json()["data"]["positive_wins"]["healthy_profiles"] == []
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_overview_healthy_profiles_lists_top_groups_by_in_range_count(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    """Groups ranked by count of tests with value in [lower, higher]; at most three names."""
+
+    def _hp(tid: int, tname: str, pkey: str) -> HealthParameterResponse:
+        return HealthParameterResponse(
+            test_id=tid,
+            parameter_type=ParameterType.TEST,
+            test_name=tname,
+            parameter_key=pkey,
+            unit="u",
+            meaning=None,
+            lower_range_male=1.0,
+            higher_range_male=10.0,
+            lower_range_female=1.0,
+            higher_range_female=10.0,
+            causes_when_high=None,
+            causes_when_low=None,
+            effects_when_high=None,
+            effects_when_low=None,
+            what_to_do_when_low=None,
+            what_to_do_when_high=None,
+            is_available=True,
+            display_order=tid,
+        )
+
+    class _DiagMultiGroup:
+        async def get_package_tests(self, db, *, package_id: int) -> PackageTestsResponse:
+            return PackageTestsResponse(
+                diagnostic_package_id=1,
+                groups=[
+                    DiagnosticTestGroupResponse(
+                        group_id=1,
+                        group_name="Beta",
+                        test_count=3,
+                        display_order=2,
+                        tests=[_hp(1, "b1", "b1"), _hp(2, "b2", "b2"), _hp(3, "b3", "b3")],
+                    ),
+                    DiagnosticTestGroupResponse(
+                        group_id=2,
+                        group_name="Alpha",
+                        test_count=2,
+                        display_order=1,
+                        tests=[_hp(4, "a1", "a1"), _hp(5, "a2", "a2")],
+                    ),
+                    DiagnosticTestGroupResponse(
+                        group_id=3,
+                        group_name="Gamma",
+                        test_count=1,
+                        display_order=3,
+                        tests=[_hp(6, "g1", "g1")],
+                    ),
+                    DiagnosticTestGroupResponse(
+                        group_id=4,
+                        group_name="Delta",
+                        test_count=1,
+                        display_order=4,
+                        tests=[_hp(7, "d1", "d1")],
+                    ),
+                ],
+            )
+
+        async def get_health_parameter_by_parameter_key(self, db, *, parameter_key: str):
+            return None
+
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99011,
+        user_id=3921,
+        engagement_id=5921,
+        record_id="REC99011",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=79011,
+            user_id=3921,
+            engagement_id=5921,
+            assessment_instance_id=99011,
+            reports={"metabolic_age": 30.0, "diseases": []},
+            blood_parameters={
+                "b1": 5.0,
+                "b2": 5.0,
+                "b3": 5.0,
+                "a1": 5.0,
+                "a2": 5.0,
+                "g1": 5.0,
+                "d1": 99.0,
+            },
+        )
+    )
+    await test_db_session.commit()
+
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=_FakeMetsightsService(payload={}, should_fail=True),
+        diagnostics_service=_DiagMultiGroup(),
+        audit_service=AuditService(AuditRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/99011/overview", headers=_auth_header(3921))
+    assert response.status_code == 200
+    assert response.json()["data"]["positive_wins"]["healthy_profiles"] == ["Beta", "Alpha", "Gamma"]
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_overview_healthy_profiles_when_blood_values_in_range(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99012,
+        user_id=3922,
+        engagement_id=5922,
+        record_id="REC99012",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=79012,
+            user_id=3922,
+            engagement_id=5922,
+            assessment_instance_id=99012,
+            reports={"metabolic_age": 28.0, "diseases": []},
+            blood_parameters={"haemoglobin": 14.0, "glucose_fasting": 90.0},
+        )
+    )
+    await test_db_session.commit()
+
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=_FakeMetsightsService(payload={}, should_fail=True),
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/99012/overview", headers=_auth_header(3922))
+    assert response.status_code == 200
+    assert response.json()["data"]["positive_wins"]["healthy_profiles"] == ["Blood parameters"]
 
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 

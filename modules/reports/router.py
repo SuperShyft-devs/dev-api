@@ -37,6 +37,7 @@ async def get_overview_report(
         db,
         assessment_id=assessment_id,
         user_id=user.user_id,
+        user_gender=user.gender,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
