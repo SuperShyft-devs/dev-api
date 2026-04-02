@@ -31,26 +31,8 @@ def _parse_user_id(subject: Optional[str]) -> int:
     return user_id
 
 
-async def get_current_user(
-    db: AsyncSession = Depends(get_db),
-    credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),
-):
-    """Return the authenticated active user.
-
-    Authentication rules:
-    - Token must be sent via Authorization: Bearer <access_token>
-    - Token must be a valid signed JWT
-    - Token must not be expired
-    - Token subject (sub) must be a user_id
-    - User must exist and be active
-
-    Returns:
-        modules.users.models.User
-
-    Raises:
-        AppError(401): When token is missing or invalid.
-        AppError(403): When user is inactive.
-    """
+async def authenticate_bearer_user(db: AsyncSession, credentials: HTTPAuthorizationCredentials | None):
+    """Validate Bearer JWT and return the active user."""
 
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
@@ -72,3 +54,12 @@ async def get_current_user(
         raise AppError(status_code=403, error_code="FORBIDDEN", message="You do not have permission to perform this action")
 
     return user
+
+
+async def get_current_user(
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),
+):
+    """Return the authenticated active user."""
+
+    return await authenticate_bearer_user(db, credentials)

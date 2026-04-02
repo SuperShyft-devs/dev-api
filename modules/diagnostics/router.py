@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
+from core.dependencies import _http_bearer, authenticate_bearer_user
 from db.session import get_db
 from modules.diagnostics.dependencies import get_diagnostics_service
 from modules.diagnostics.schemas import (
@@ -32,8 +34,8 @@ from modules.diagnostics.schemas import (
     TestGroupUpdate,
 )
 from modules.diagnostics.service import DiagnosticsService
-from modules.employee.dependencies import get_current_employee
-from modules.employee.service import EmployeeContext
+from modules.employee.dependencies import get_current_employee, get_employee_service
+from modules.employee.service import EmployeeContext, EmployeeService
 
 
 router = APIRouter(tags=["diagnostics"])
@@ -52,10 +54,19 @@ def _client_ip(request: Request) -> str:
 async def list_diagnostic_packages(
     gender: str | None = None,
     tag: str | None = None,
+    include_inactive: bool = Query(default=False),
     db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+    employee_service: EmployeeService = Depends(get_employee_service),
 ):
-    data = await diagnostics_service.get_packages(db, gender=gender, tag=tag)
+    active_only = True
+    if include_inactive:
+        user = await authenticate_bearer_user(db, credentials)
+        await employee_service.get_active_employee_by_user_id(db, user.user_id)
+        active_only = False
+
+    data = await diagnostics_service.get_packages(db, gender=gender, tag=tag, active_only=active_only)
     return success_response([item.model_dump() for item in data])
 
 

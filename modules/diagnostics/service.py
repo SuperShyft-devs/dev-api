@@ -270,14 +270,23 @@ class DiagnosticsService:
             discount_percent=_discount_percent(price, original_price),
         )
 
-    async def get_packages(self, db, *, gender: str | None, tag: str | None) -> list[DiagnosticPackageListItem]:
+    async def get_packages(
+        self,
+        db,
+        *,
+        gender: str | None,
+        tag: str | None,
+        active_only: bool = True,
+    ) -> list[DiagnosticPackageListItem]:
         gender_value = self._normalize_lower(gender)
         tag_value = self._normalize(tag)
 
         if gender_value is not None and gender_value not in _ALLOWED_GENDER_VALUES:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-        rows = await self._repository.get_all_packages(db, gender=gender_value, tag=tag_value)
+        rows = await self._repository.get_all_packages(
+            db, gender=gender_value, tag=tag_value, active_only=active_only
+        )
         items: list[DiagnosticPackageListItem] = []
         for row in rows:
             price = float(row.price) if row.price is not None else None

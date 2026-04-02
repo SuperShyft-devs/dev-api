@@ -34,12 +34,12 @@ class DiagnosticsRepository:
         *,
         gender: str | None = None,
         tag: str | None = None,
+        active_only: bool = True,
     ) -> list[DiagnosticPackage]:
-        query = (
-            select(DiagnosticPackage)
-            .options(selectinload(DiagnosticPackage.tags))
-            .where(DiagnosticPackage.status == "active")
-        )
+        query = select(DiagnosticPackage).options(selectinload(DiagnosticPackage.tags))
+
+        if active_only:
+            query = query.where(DiagnosticPackage.status == "active")
 
         if gender is not None:
             query = query.where(
