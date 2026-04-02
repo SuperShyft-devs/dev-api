@@ -259,7 +259,11 @@ class ReportsService:
                 )
             )
 
-        risk_analysis_list.sort(key=lambda x: x.risk_score_scaled, reverse=True)
+        positive_wins_list.sort(key=lambda x: (x.risk_score_scaled, x.code))
+        positive_wins_list = positive_wins_list[:3]
+
+        risk_analysis_list.sort(key=lambda x: (-x.risk_score_scaled, x.code))
+        risk_analysis_list = risk_analysis_list[:3]
 
         await self._require_audit_service().log_event(
             db,

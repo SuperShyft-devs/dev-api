@@ -759,6 +759,98 @@ async def test_get_overview_met_cached_skips_metsights(
 
 
 @pytest.mark.asyncio
+async def test_get_overview_top_three_low_and_high_risk_scores(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    """low_risk: at most 3 Healthy, lowest risk_score_scaled first. risk_analysis: at most 3, highest score first."""
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99010,
+        user_id=3920,
+        engagement_id=5920,
+        record_id="REC99010",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=79010,
+            user_id=3920,
+            engagement_id=5920,
+            assessment_instance_id=99010,
+            reports={
+                "metabolic_age": 35.0,
+                "diseases": [
+                    {
+                        "code": "high_score",
+                        "name": "High Score Healthy",
+                        "risk_status": "Healthy",
+                        "risk_score_scaled": 21,
+                        "healthy_percentile": 80,
+                    },
+                    {
+                        "code": "low_a",
+                        "name": "Low A",
+                        "risk_status": "Healthy",
+                        "risk_score_scaled": 12,
+                        "healthy_percentile": 22,
+                    },
+                    {
+                        "code": "low_b",
+                        "name": "Low B",
+                        "risk_status": "Healthy",
+                        "risk_score_scaled": 12,
+                        "healthy_percentile": 60,
+                    },
+                    {
+                        "code": "mid",
+                        "name": "Mid",
+                        "risk_status": "Healthy",
+                        "risk_score_scaled": 16,
+                        "healthy_percentile": 72,
+                    },
+                    {
+                        "code": "nafld",
+                        "name": "NAFLD",
+                        "risk_status": "Increased",
+                        "risk_score_scaled": 49,
+                        "healthy_percentile": 86,
+                    },
+                ],
+            },
+            blood_parameters={"haemoglobin": 12.0},
+        )
+    )
+    await test_db_session.commit()
+
+    fake_metsights = _FakeMetsightsService(payload={}, should_fail=True)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/99010/overview", headers=_auth_header(3920))
+    assert response.status_code == 200
+    low_risk = response.json()["data"]["positive_wins"]["low_risk"]
+    assert len(low_risk) == 3
+    assert [x["code"] for x in low_risk] == ["low_a", "low_b", "mid"]
+    assert [x["risk_score_scaled"] for x in low_risk] == [12, 12, 16]
+
+    ra = response.json()["data"]["risk_analysis"]
+    assert len(ra) == 3
+    assert [x["code"] for x in ra] == ["nafld", "high_score", "mid"]
+    assert [x["risk_score_scaled"] for x in ra] == [49, 21, 16]
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
 async def test_get_overview_met_fetches_then_uses_cache(
     async_client,
     fastapi_app,
