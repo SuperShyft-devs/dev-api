@@ -11,9 +11,13 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
-@dataclass(frozen=True)
+@dataclass
 class AppError(Exception):
-    """Application error with safe client response details."""
+    """Application error with safe client response details.
+
+    Must not use ``frozen=True``: Python sets ``__traceback__`` when raising,
+    and frozen dataclasses reject that assignment (500 + FrozenInstanceError).
+    """
 
     status_code: int
     error_code: str
