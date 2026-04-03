@@ -5,13 +5,22 @@ These endpoints are employee-only.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from io import BytesIO
+
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.excel_db_export import export_public_schema_to_xlsx_bytes
 from common.responses import success_response
 from core.exceptions import AppError
 from db.session import get_db
-from modules.employee.dependencies import get_current_employee, get_employee_management_service
+from modules.employee.dependencies import (
+    get_current_employee,
+    get_current_employee_bearer_or_query,
+    get_employee_management_service,
+)
 from modules.employee.schemas import (
     EmployeeCreateRequest,
     EmployeeStatusUpdateRequest,
@@ -91,6 +100,28 @@ async def list_employees(
         )
 
     return success_response(data, meta={"page": page, "limit": limit, "total": total})
+
+
+@router.get("/database-backup")
+async def download_database_backup_excel(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee_bearer_or_query),
+):
+    """Export all public-schema tables to one .xlsx (one sheet per table). Active employee JWT required."""
+
+    _ = employee  # dependency enforces active employee
+
+    async with db.bind.connect() as conn:
+        async with conn.begin():
+            payload = await conn.run_sync(export_public_schema_to_xlsx_bytes)
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%SZ")
+    filename = f"supershyft-db-backup-{stamp}.xlsx"
+    return StreamingResponse(
+        BytesIO(payload),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{employee_id}")

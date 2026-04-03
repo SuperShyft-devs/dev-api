@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import Depends
+from fastapi import Depends, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,14 +31,25 @@ def _parse_user_id(subject: Optional[str]) -> int:
     return user_id
 
 
-async def authenticate_bearer_user(db: AsyncSession, credentials: HTTPAuthorizationCredentials | None):
-    """Validate Bearer JWT and return the active user."""
+async def authenticate_bearer_user(
+    db: AsyncSession,
+    credentials: HTTPAuthorizationCredentials | None,
+    *,
+    access_token: str | None = None,
+):
+    """Validate Bearer JWT (header or optional query token) and return the active user."""
 
-    if credentials is None or credentials.scheme.lower() != "bearer":
+    token: str | None = None
+    if credentials is not None and credentials.scheme.lower() == "bearer":
+        token = credentials.credentials
+    elif access_token is not None and access_token.strip():
+        token = access_token.strip()
+
+    if token is None:
         raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
 
     try:
-        payload = decode_and_verify_jwt(credentials.credentials)
+        payload = decode_and_verify_jwt(token)
         user_id = _parse_user_id(payload.get("sub"))
     except Exception as exc:
         raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed") from exc
@@ -62,4 +73,14 @@ async def get_current_user(
 ):
     """Return the authenticated active user."""
 
-    return await authenticate_bearer_user(db, credentials)
+    return await authenticate_bearer_user(db, credentials, access_token=None)
+
+
+async def get_current_user_bearer_or_query(
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),
+    access_token: str | None = Query(default=None, description="JWT for browser download links (prefer Authorization header)."),
+):
+    """Same as get_current_user, but also accepts ?access_token= for browser file downloads."""
+
+    return await authenticate_bearer_user(db, credentials, access_token=access_token)

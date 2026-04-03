@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from io import BytesIO
 
 import pytest
 
 from core.config import settings
 from core.security import create_jwt_token
+from openpyxl import load_workbook
+
 from modules.employee.models import Employee
 from modules.users.models import User
 
@@ -18,10 +21,45 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 
 async def _seed_admin_employee(test_db_session, *, user_id: int, employee_id: int = 1):
-    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000000", status="active"))
+    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000000", age=30, status="active"))
     await test_db_session.flush()  # Ensure user is inserted before employee
     test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
     await test_db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_database_backup_returns_xlsx_for_employee(async_client, test_db_session):
+    await _seed_admin_employee(test_db_session, user_id=8010, employee_id=501)
+
+    response = await async_client.get("/employees/database-backup", headers=_auth_header(8010))
+    assert response.status_code == 200
+    assert "spreadsheetml" in (response.headers.get("content-type") or "")
+    assert "attachment" in (response.headers.get("content-disposition") or "").lower()
+
+    wb = load_workbook(BytesIO(response.content))
+    names = {n.lower() for n in wb.sheetnames}
+    assert "users" in names
+    assert "employee" in names
+
+
+@pytest.mark.asyncio
+async def test_database_backup_accepts_access_token_query(async_client, test_db_session):
+    await _seed_admin_employee(test_db_session, user_id=8011, employee_id=502)
+
+    token = create_jwt_token({"sub": "8011"}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
+    response = await async_client.get(f"/employees/database-backup?access_token={token}")
+    assert response.status_code == 200
+    wb = load_workbook(BytesIO(response.content))
+    assert len(wb.sheetnames) >= 1
+
+
+@pytest.mark.asyncio
+async def test_database_backup_rejects_non_employee(async_client, test_db_session):
+    test_db_session.add(User(user_id=8012, phone="8012000000", age=30, status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.get("/employees/database-backup", headers=_auth_header(8012))
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -32,7 +70,7 @@ async def test_create_employee_requires_auth(async_client):
 
 @pytest.mark.asyncio
 async def test_create_employee_requires_employee(async_client, test_db_session):
-    test_db_session.add(User(user_id=8001, phone="8001000000", status="active"))
+    test_db_session.add(User(user_id=8001, phone="8001000000", age=30, status="active"))
     await test_db_session.commit()
 
     response = await async_client.post("/employees", headers=_auth_header(8001), json={"user_id": 2, "role": "admin"})
@@ -42,7 +80,7 @@ async def test_create_employee_requires_employee(async_client, test_db_session):
 @pytest.mark.asyncio
 async def test_create_employee_creates_row(async_client, test_db_session):
     await _seed_admin_employee(test_db_session, user_id=8002, employee_id=11)
-    test_db_session.add(User(user_id=9000, phone="9000000000", status="active"))
+    test_db_session.add(User(user_id=9000, phone="9000000000", age=30, status="active"))
     await test_db_session.commit()
 
     payload = {"user_id": 9000, "role": "admin"}
@@ -60,8 +98,8 @@ async def test_create_employee_creates_row(async_client, test_db_session):
 async def test_list_employees_paginates_and_filters(async_client, test_db_session):
     await _seed_admin_employee(test_db_session, user_id=8003, employee_id=12)
 
-    test_db_session.add(User(user_id=9100, phone="9100000000", status="active"))
-    test_db_session.add(User(user_id=9101, phone="9101000000", status="active"))
+    test_db_session.add(User(user_id=9100, phone="9100000000", age=30, status="active"))
+    test_db_session.add(User(user_id=9101, phone="9101000000", age=30, status="active"))
     await test_db_session.flush()
     test_db_session.add_all(
         [
@@ -87,7 +125,7 @@ async def test_list_employees_paginates_and_filters(async_client, test_db_sessio
 async def test_get_employee_returns_details(async_client, test_db_session):
     await _seed_admin_employee(test_db_session, user_id=8004, employee_id=13)
 
-    test_db_session.add(User(user_id=9201, phone="9201000000", status="active"))
+    test_db_session.add(User(user_id=9201, phone="9201000000", age=30, status="active"))
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=201, user_id=9201, role="ops", status="active"))
     await test_db_session.commit()
@@ -102,7 +140,7 @@ async def test_get_employee_returns_details(async_client, test_db_session):
 async def test_update_employee_updates_fields(async_client, test_db_session):
     await _seed_admin_employee(test_db_session, user_id=8005, employee_id=14)
 
-    test_db_session.add(User(user_id=9301, phone="9301000000", status="active"))
+    test_db_session.add(User(user_id=9301, phone="9301000000", age=30, status="active"))
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=301, user_id=9301, role="ops", status="active"))
     await test_db_session.commit()
@@ -120,7 +158,7 @@ async def test_update_employee_updates_fields(async_client, test_db_session):
 async def test_update_employee_status_sets_inactive(async_client, test_db_session):
     await _seed_admin_employee(test_db_session, user_id=8006, employee_id=15)
 
-    test_db_session.add(User(user_id=9401, phone="9401000000", status="active"))
+    test_db_session.add(User(user_id=9401, phone="9401000000", age=30, status="active"))
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=401, user_id=9401, role="ops", status="active"))
     await test_db_session.commit()
@@ -141,7 +179,7 @@ async def test_update_employee_status_sets_inactive(async_client, test_db_sessio
 async def test_update_employee_status_rejects_inactive_for_employee_one(async_client, test_db_session):
     await _seed_admin_employee(test_db_session, user_id=8007, employee_id=15)
 
-    test_db_session.add(User(user_id=9402, phone="9402000000", status="active"))
+    test_db_session.add(User(user_id=9402, phone="9402000000", age=30, status="active"))
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=1, user_id=9402, role="ops", status="active"))
     await test_db_session.commit()
