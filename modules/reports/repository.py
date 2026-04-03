@@ -21,10 +21,13 @@ class ReportsRepository:
         *,
         assessment_instance_id: int,
     ) -> IndividualHealthReport | None:
+        # assessment_instance_id is not unique; concurrent cache writes can leave duplicates.
+        # Always use the newest row so reads/updates stay consistent.
         result = await db.execute(
-            select(IndividualHealthReport).where(
-                IndividualHealthReport.assessment_instance_id == assessment_instance_id
-            )
+            select(IndividualHealthReport)
+            .where(IndividualHealthReport.assessment_instance_id == assessment_instance_id)
+            .order_by(IndividualHealthReport.report_id.desc())
+            .limit(1)
         )
         return result.scalar_one_or_none()
 
