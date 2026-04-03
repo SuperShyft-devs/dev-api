@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
@@ -56,7 +57,17 @@ def _cell_value(value):
         return bytes(value).hex()
     if isinstance(value, str):
         return _STR_SANITIZE.sub("", value)
-    return value
+    if isinstance(value, (dict, list, tuple)):
+        try:
+            serialized = json.dumps(value, ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            serialized = str(value)
+        return _STR_SANITIZE.sub("", serialized)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value
+    return _STR_SANITIZE.sub("", str(value))
 
 
 def export_public_schema_to_xlsx_bytes(connection: Connection) -> bytes:
