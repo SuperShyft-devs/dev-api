@@ -17,6 +17,7 @@ from datetime import date, datetime, time, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from core.exceptions import AppError
 from modules.employee.models import Employee
 from modules.audit.service import AuditService
@@ -25,6 +26,7 @@ from modules.platform_settings.service import PlatformSettingsService
 from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
 from modules.users.schemas import (
+    BookBioAiRequest,
     EmployeeCreateUserRequest,
     EmployeeUpdateUserRequest,
     EngagementUserOnboardRequest,
@@ -891,6 +893,122 @@ class UsersService:
             engagement_id=engagement.engagement_id,
             engagement_code=engagement.engagement_code,
             time_slot_id=time_slot.time_slot_id,
+        )
+
+    async def book_bio_ai_for_authenticated_user(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        payload: BookBioAiRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> UserOnboardResponse:
+        """B2C Bio AI booking for an existing JWT user (new engagement + slot + assessment instance)."""
+
+        if self._engagements_service is None:
+            raise RuntimeError("Engagements service is required")
+        if self._platform_settings_service is None:
+            raise RuntimeError("Platform settings service is required")
+        if self._assessments_service is None:
+            raise RuntimeError("Assessments service is required")
+
+        await self._ensure_metsights_profile_id(db, user=user)
+
+        if not user.is_participant:
+            await self._repository.update_user_partial(db, user.user_id, {"is_participant": True})
+            user.is_participant = True
+
+        assessment_package_id, default_diagnostic_id = await self._platform_settings_service.resolve_b2c_default_package_ids(
+            db
+        )
+        diagnostic_package_id = (
+            payload.diagnostic_package_id if payload.diagnostic_package_id is not None else default_diagnostic_id
+        )
+        await self._platform_settings_service.ensure_active_b2c_packages(
+            db, assessment_package_id, diagnostic_package_id
+        )
+
+        engagement = await self._engagements_service.create_b2c_engagement(
+            db,
+            user_first_name=user.first_name,
+            engagement_date=payload.blood_collection_date,
+            city=user.city,
+            assessment_package_id=assessment_package_id,
+            diagnostic_package_id=diagnostic_package_id,
+        )
+
+        slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
+        time_slot = await self._engagements_service.enroll_user_in_engagement(
+            db,
+            engagement=engagement,
+            user_id=user.user_id,
+            engagement_date=payload.blood_collection_date,
+            slot_start_time=slot_start,
+            increment_participant_count=False,
+        )
+
+        metsights_record_id: str | None = None
+        if (settings.METSIGHTS_API_KEY or "").strip():
+            fresh_user = await self._repository.get_user_by_id(db, user.user_id)
+            if fresh_user is None:
+                raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
+            profile_id = (fresh_user.metsights_profile_id or "").strip()
+            if not profile_id:
+                raise AppError(
+                    status_code=422,
+                    error_code="METSIGHTS_PROFILE_REQUIRED",
+                    message="Profile is incomplete for health record sync; provide first name, last name, phone, and gender",
+                )
+            if self._metsights_service is None:
+                raise RuntimeError("Metsights service is required")
+
+            package = await self._assessments_service.get_package_by_id(db, assessment_package_id)
+            assessment_type_code = (getattr(package, "assessment_type_code", None) or "").strip() if package else ""
+            if not assessment_type_code:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Assessment package is missing Metsights assessment type",
+                )
+            metsights_record_id = await self._metsights_service.create_record_for_profile(
+                profile_id=profile_id,
+                assessment_type_code=assessment_type_code,
+            )
+
+        assessment_instance = await self._assessments_service.ensure_instance_assigned(
+            db,
+            user_id=user.user_id,
+            engagement_id=engagement.engagement_id,
+            package_id=engagement.assessment_package_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            endpoint=endpoint,
+            metsights_record_id=metsights_record_id,
+        )
+
+        if self._audit_service is None:
+            raise RuntimeError("Audit service is required")
+        await self._audit_service.log_event(
+            db,
+            action="USER_BOOK_BIO_AI",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user.user_id,
+            session_id=None,
+        )
+
+        return UserOnboardResponse(
+            user_id=user.user_id,
+            created=False,
+            is_participant=True,
+            engagement_id=engagement.engagement_id,
+            engagement_code=engagement.engagement_code,
+            time_slot_id=time_slot.time_slot_id,
+            assessment_instance_id=assessment_instance.assessment_instance_id,
+            metsights_record_id=assessment_instance.metsights_record_id,
         )
 
     async def onboard_user_for_engagement(

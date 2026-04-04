@@ -14,6 +14,7 @@ from modules.users.participant_journey_service import ParticipantJourneyService
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
 from modules.users.schemas import (
+    BookBioAiRequest,
     EmployeeCreateUserRequest,
     EmployeeUpdateUserRequest,
     EngagementUserOnboardRequest,
@@ -119,6 +120,26 @@ async def get_my_upcoming_slot(
     users_service: UsersService = Depends(get_users_service),
 ):
     result: UpcomingSlotResponse = await users_service.get_upcoming_slots(db, user_id=current_user.user_id)
+    return success_response(result.model_dump())
+
+
+@router.post("/me/book-bio-ai")
+async def book_bio_ai_for_current_user(
+    payload: BookBioAiRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    users_service: UsersService = Depends(get_users_service),
+):
+    result = await users_service.book_bio_ai_for_authenticated_user(
+        db,
+        user=current_user,
+        payload=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
     return success_response(result.model_dump())
 
 

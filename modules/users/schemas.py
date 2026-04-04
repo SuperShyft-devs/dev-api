@@ -173,6 +173,14 @@ class UnlinkRequest(BaseModel):
     email: EmailStr
 
 
+class BookBioAiRequest(BaseModel):
+    """Authenticated B2C booking: new engagement, slot, assessment instance, Metsights record (when configured)."""
+
+    blood_collection_date: date
+    blood_collection_time_slot: str = Field(min_length=1, max_length=20)
+    diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
+
+
 class PublicUserOnboardRequest(BaseModel):
     """Payload for B2C onboarding."""
 
@@ -238,6 +246,8 @@ class UserOnboardResponse(BaseModel):
     engagement_id: Optional[int] = None
     engagement_code: Optional[str] = None
     time_slot_id: Optional[int] = None
+    assessment_instance_id: Optional[int] = None
+    metsights_record_id: Optional[str] = None
 
 
 class UserStatusResponse(BaseModel):
