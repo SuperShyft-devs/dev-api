@@ -1,0 +1,52 @@
+reason_id,diagnostic_package_id,display_order,reason_text
+2,1,2,this is perfect
+1,1,1,Bcoz this is good
+3,6,1,"Detecting early warning signs of common health issues
+Monitoring vital functions like metabolism, organ health, and nutrient levels
+Supporting preventive care instead of reactive treatment
+Providing actionable insights to improve your daily habits"
+4,7,1,"Detecting early risks of diabetes, cholesterol imbalance, and thyroid disorders
+Identifying Vitamin D3 and B12 deficiencies that can impact energy, mood, and immunity
+Monitoring vital organ health including liver and kidneys
+Supporting better lifestyle decisions with clear, actionable insights
+Helping prevent fatigue, weakness, and long-term health issues
+Enabling regular health tracking for ongoing wellness"
+5,9,1,"Supports hormonal balance by identifying underlying nutritional deficiencies
+Evaluates iron levels to address common issues like fatigue and weakness
+Detects Vitamin D3 & B12 deficiencies that impact mood, energy, and bone health
+Measures Homocysteine for heart and metabolic health insights
+Monitors thyroid function, a key regulator of hormones and metabolism
+Tracks blood sugar levels (FBS, HbA1c) which influence hormonal stability
+Enables early detection of imbalances affecting menstrual and overall health"
+6,11,1,"Comprehensive diabetes and insulin resistance screening
+In-depth cardiovascular and inflammatory risk assessment
+Extensive hormone panel for complete endocrine evaluation
+Covers essential micronutrients impacting energy and immunity
+Monitors vital organ health including liver and kidneys
+Detects early inflammation and cellular stress markers
+Supports personalized health and lifestyle optimization
+Suitable for high-performance individuals and preventive care seekers"
+7,12,1,"Provides a complete evaluation of blood sugar control and metabolic health
+Assesses cardiovascular risk through advanced markers like homocysteine and HS-CRP
+Offers detailed hormonal profiling for performance, energy, and reproductive health
+Includes key vitamin and mineral levels essential for immunity and recovery
+Screens liver and kidney function for early signs of organ stress
+Evaluates inflammation and tissue health for underlying conditions
+Supports preventive healthcare with actionable insights
+Ideal for routine executive checkups or performance optimization"
+8,13,1,"Screening markers linked to women-specific cancers
+Enabling early detection for timely medical attention
+Supporting preventive healthcare and routine check-ups
+Helping identify hidden risks even without symptoms
+Providing clarity and peace of mind about your health status"
+9,14,1,"Screening markers linked to men-specific cancers
+Detecting early warning signs before symptoms develop
+Supporting proactive and preventive health management
+Helping identify potential risks early for timely follow-up
+Encouraging regular health monitoring for long-term well-being"
+10,15,1,"Identifying a wide range of allergens including food, dust, pets, and environmental triggers
+Measuring total IgE levels to assess allergic response
+Helping pinpoint root causes of symptoms like sneezing, rashes, or breathing issues
+Supporting personalized lifestyle and dietary adjustments
+Enabling better allergy management and prevention
+Providing comprehensive insights across 15 detailed allergen profiles"
