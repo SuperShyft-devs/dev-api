@@ -86,6 +86,33 @@ class AuthService:
         secret = self._otp_secret()
         return hmac.new(secret.encode("utf-8"), refresh_token.encode("utf-8"), hashlib.sha256).hexdigest()
 
+    async def _resolve_user_for_otp(self, db: AsyncSession, phone: str) -> Optional[User]:
+        """Pick the account that receives OTP for this phone.
+
+        If any primary user has this phone, that user wins (shared family number).
+        Otherwise exactly one linked profile with this phone must exist.
+        """
+        rows = await self._repository.list_users_by_phone(db, phone)
+        if not rows:
+            return None
+        primaries = [u for u in rows if u.parent_id is None]
+        if len(primaries) > 1:
+            raise AppError(
+                status_code=409,
+                error_code="AMBIGUOUS_PHONE",
+                message="Multiple accounts match this phone number",
+            )
+        if len(primaries) == 1:
+            return primaries[0]
+        subs = [u for u in rows if u.parent_id is not None]
+        if len(subs) > 1:
+            raise AppError(
+                status_code=409,
+                error_code="AMBIGUOUS_PHONE",
+                message="Multiple accounts match this phone number",
+            )
+        return subs[0] if subs else None
+
     async def _issue_refresh_token_for_user(self, db: AsyncSession, user_id: int) -> str:
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
@@ -110,7 +137,7 @@ class AuthService:
         user_agent: str,
         endpoint: str,
     ) -> int:
-        user = await self._repository.get_primary_user_by_phone(db, phone)
+        user = await self._resolve_user_for_otp(db, phone)
         if user is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
@@ -155,7 +182,7 @@ class AuthService:
         user_agent: str,
         endpoint: str,
     ) -> tuple[int, TokenPair]:
-        user = await self._repository.get_primary_user_by_phone(db, phone)
+        user = await self._resolve_user_for_otp(db, phone)
         if user is None:
             raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
 

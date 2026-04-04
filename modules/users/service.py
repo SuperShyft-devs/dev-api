@@ -280,7 +280,15 @@ class UsersService:
                 message="You do not have permission to perform this action",
             )
 
-        updated = await self._repository.update_user_partial(db, target_user_id, data.model_dump(exclude_unset=True))
+        partial = data.model_dump(exclude_unset=True)
+        if "email" in partial and partial["email"] is not None:
+            new_email = str(partial["email"])
+            existing_email = await self._repository.get_user_by_email(db, new_email)
+            if existing_email is not None and existing_email.user_id != target_user_id:
+                raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
+            partial["email"] = new_email
+
+        updated = await self._repository.update_user_partial(db, target_user_id, partial)
         if updated is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
@@ -297,45 +305,29 @@ class UsersService:
         )
         return updated
 
-    async def unlink_profile(
+    async def _unlink_subject_from_parent(
         self,
         db: AsyncSession,
         *,
-        current_user: User,
-        data: UnlinkRequest,
+        subject: User,
+        parent_user: User,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> User:
-        if current_user.parent_id is None:
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Already a primary user")
-
-        parent_user = await self._repository.get_user_by_id(db, current_user.parent_id)
-        if parent_user is None:
-            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
-
-        if current_user.phone == parent_user.phone:
+        if subject.phone == parent_user.phone:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_INPUT",
                 message="Cannot unlink without an independent phone number. Update your phone number first before unlinking.",
             )
 
-        local_part = str(data.email).split("@", 1)[0]
-        if "+" in local_part:
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Please provide a real email address")
-
-        existing = await self._repository.get_user_by_email(db, str(data.email))
-        if existing is not None and existing.user_id != current_user.user_id:
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Email already exists")
-
         updated = await self._repository.update_user_partial(
             db,
-            current_user.user_id,
+            subject.user_id,
             {
                 "parent_id": None,
                 "relationship": "self",
-                "email": str(data.email),
             },
         )
         if updated is None:
@@ -349,11 +341,66 @@ class UsersService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_user.user_id,
+            user_id=subject.user_id,
             session_id=None,
         )
 
         return updated
+
+    async def unlink_profile(
+        self,
+        db: AsyncSession,
+        *,
+        current_user: User,
+        data: UnlinkRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> User:
+        if current_user.parent_id is not None:
+            if data.child_user_id is not None:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="Cannot specify child_user_id when unlinking your own profile",
+                )
+            parent_user = await self._repository.get_user_by_id(db, current_user.parent_id)
+            if parent_user is None:
+                raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+            return await self._unlink_subject_from_parent(
+                db,
+                subject=current_user,
+                parent_user=parent_user,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                endpoint=endpoint,
+            )
+
+        if data.child_user_id is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Specify child_user_id to unlink a sub-profile from your account",
+            )
+
+        child = await self._repository.get_user_by_id(db, data.child_user_id)
+        if child is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+        if child.parent_id != current_user.user_id:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        return await self._unlink_subject_from_parent(
+            db,
+            subject=child,
+            parent_user=current_user,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            endpoint=endpoint,
+        )
 
     async def get_user_preferences(
         self,

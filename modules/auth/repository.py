@@ -64,14 +64,9 @@ class AuthRepository:
             .values(refresh_token_hash=refresh_token_hash, issued_at=datetime.now(timezone.utc))
         )
 
-    async def get_primary_user_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
-        result = await db.execute(
-            select(User).where(
-                User.phone == phone,
-                User.parent_id.is_(None),
-            )
-        )
-        return result.scalar_one_or_none()
+    async def list_users_by_phone(self, db: AsyncSession, phone: str) -> list[User]:
+        result = await db.execute(select(User).where(User.phone == phone))
+        return list(result.scalars().all())
 
     async def get_user_by_id(self, db: AsyncSession, user_id: int) -> Optional[User]:
         result = await db.execute(select(User).where(User.user_id == user_id))

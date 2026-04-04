@@ -145,6 +145,7 @@ class SubProfileUpdate(BaseModel):
     gender: Optional[str] = Field(default=None, max_length=30)
     relationship: Optional[Literal["spouse", "child", "sibling", "parent", "grandparent", "other"]] = None
     phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
+    email: Optional[EmailStr] = None
     city: Optional[str] = Field(default=None, max_length=100)
     address: Optional[str] = Field(default=None, max_length=500)
 
@@ -170,7 +171,9 @@ class SubProfileResponse(BaseModel):
 
 
 class UnlinkRequest(BaseModel):
-    email: EmailStr
+    """Unlink a sub-profile from its parent. Sub-profile phone must differ from the parent's."""
+
+    child_user_id: Optional[int] = Field(default=None, gt=0)
 
 
 class BookBioAiRequest(BaseModel):

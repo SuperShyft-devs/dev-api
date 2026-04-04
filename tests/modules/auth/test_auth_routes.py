@@ -53,6 +53,112 @@ async def test_send_otp_returns_404_for_unknown_user(async_client):
 
 
 @pytest.mark.asyncio
+async def test_send_and_verify_otp_sub_profile_with_unique_phone(async_client, test_db_session):
+    parent = User(
+        user_id=9201,
+        age=40,
+        phone="6100000001",
+        status="active",
+        email="parent9201@example.com",
+        relationship="self",
+    )
+    sub = User(
+        user_id=9202,
+        age=10,
+        phone="6100000002",
+        status="active",
+        email="sub9202+1@example.com",
+        parent_id=9201,
+        relationship="child",
+    )
+    test_db_session.add_all([parent, sub])
+    await test_db_session.commit()
+
+    send = await async_client.post("/auth/send-otp", json={"phone": "6100000002"})
+    assert send.status_code == 200
+
+    otp = async_client._transport.app.state.otp_sender.last_otp
+    assert otp is not None
+
+    verify = await async_client.post(
+        "/auth/verify-otp",
+        json={"phone": "6100000002", "otp": otp},
+    )
+    assert verify.status_code == 200
+    assert verify.json()["data"]["user_id"] == 9202
+
+
+@pytest.mark.asyncio
+async def test_send_and_verify_otp_shared_phone_authenticates_parent(async_client, test_db_session):
+    parent = User(
+        user_id=9203,
+        age=40,
+        phone="6100000003",
+        status="active",
+        email="parent9203@example.com",
+        relationship="self",
+    )
+    sub = User(
+        user_id=9204,
+        age=10,
+        phone="6100000003",
+        status="active",
+        email="sub9204+1@example.com",
+        parent_id=9203,
+        relationship="child",
+    )
+    test_db_session.add_all([parent, sub])
+    await test_db_session.commit()
+
+    send = await async_client.post("/auth/send-otp", json={"phone": "6100000003"})
+    assert send.status_code == 200
+
+    otp = async_client._transport.app.state.otp_sender.last_otp
+    verify = await async_client.post(
+        "/auth/verify-otp",
+        json={"phone": "6100000003", "otp": otp},
+    )
+    assert verify.status_code == 200
+    assert verify.json()["data"]["user_id"] == 9203
+
+
+@pytest.mark.asyncio
+async def test_send_otp_ambiguous_when_multiple_linked_share_phone(async_client, test_db_session):
+    parent = User(
+        user_id=9205,
+        age=40,
+        phone="6100000004",
+        status="active",
+        email="parent9205@example.com",
+        relationship="self",
+    )
+    sub_a = User(
+        user_id=9206,
+        age=8,
+        phone="6100000005",
+        status="active",
+        email="suba9206@example.com",
+        parent_id=9205,
+        relationship="child",
+    )
+    sub_b = User(
+        user_id=9207,
+        age=6,
+        phone="6100000005",
+        status="active",
+        email="subb9207@example.com",
+        parent_id=9205,
+        relationship="child",
+    )
+    test_db_session.add_all([parent, sub_a, sub_b])
+    await test_db_session.commit()
+
+    response = await async_client.post("/auth/send-otp", json={"phone": "6100000005"})
+    assert response.status_code == 409
+    assert response.json()["error_code"] == "AMBIGUOUS_PHONE"
+
+
+@pytest.mark.asyncio
 async def test_verify_otp_issues_tokens_and_consumes_session(async_client, test_db_session):
     test_db_session.add(User(user_id=1002, age=30, phone="8888888888", status="active"))
     await test_db_session.commit()
