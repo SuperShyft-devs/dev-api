@@ -89,10 +89,10 @@ DEFAULT_USERS: tuple[SeedUser, ...] = (
         user_id=1,
         first_name="Rishi",
         last_name="Nagar",
-        age=30,
-        phone="9898898912",
+        age=31,
+        phone="7770081606",
         email="rishi@supershyft.com",
-        date_of_birth=date(1995, 1, 1),
+        date_of_birth=date(1995, 4, 4),
         gender="male",
         address="Sher-E-Punjab, Pump House, Andheri East",
         pin_code="400059",
@@ -103,10 +103,29 @@ DEFAULT_USERS: tuple[SeedUser, ...] = (
         is_participant=False,
         status="active",
     ),
+    SeedUser(
+        user_id=2,
+        first_name="Harshili",
+        last_name="Gada",
+        age=30,
+        phone="9769422110",
+        email="harshili.fitnastic@gmail.com",
+        date_of_birth=date(1996, 4, 4),
+        gender="female",
+        address="",
+        pin_code="",
+        city="",
+        state="",
+        country="India",
+        referred_by=None,
+        is_participant=False,
+        status="active",
+    ),
 )
 
 DEFAULT_EMPLOYEES: tuple[SeedEmployee, ...] = (
     SeedEmployee(employee_id=1, user_id=1, role="admin", status="active"),
+    SeedEmployee(employee_id=2, user_id=2, role="admin", status="active"),
 )
 
 DEFAULT_ASSESSMENT_PACKAGES: tuple[SeedAssessmentPackage, ...] = (
@@ -1197,13 +1216,68 @@ DEFAULT_OPTIONS: tuple[SeedOption, ...] = (
         display_name="None",
         tooltip_text=None,
     ),
+    # Scale question units (required for scale-type answers)
+    SeedOption(
+        option_id=102, question_id=1, option_value="kg", display_name="kg", tooltip_text=None
+    ),
+    SeedOption(
+        option_id=103, question_id=1, option_value="lb", display_name="lb", tooltip_text=None
+    ),
+    SeedOption(
+        option_id=104, question_id=2, option_value="cm", display_name="cm", tooltip_text=None
+    ),
+    SeedOption(
+        option_id=105, question_id=2, option_value="in", display_name="in", tooltip_text=None
+    ),
+    SeedOption(
+        option_id=106, question_id=3, option_value="cm", display_name="cm", tooltip_text=None
+    ),
+    SeedOption(
+        option_id=107, question_id=3, option_value="in", display_name="in", tooltip_text=None
+    ),
+    SeedOption(
+        option_id=108,
+        question_id=4,
+        option_value="kg/m²",
+        display_name="kg/m²",
+        tooltip_text=None,
+    ),
+    SeedOption(
+        option_id=109,
+        question_id=5,
+        option_value="mmhg",
+        display_name="mmHg",
+        tooltip_text=None,
+    ),
+    SeedOption(
+        option_id=110,
+        question_id=6,
+        option_value="mmhg",
+        display_name="mmHg",
+        tooltip_text=None,
+    ),
+    SeedOption(
+        option_id=111, question_id=7, option_value="bpm", display_name="bpm", tooltip_text=None
+    ),
+    SeedOption(
+        option_id=112,
+        question_id=8,
+        option_value="breaths/min",
+        display_name="breaths/min",
+        tooltip_text=None,
+    ),
+    SeedOption(
+        option_id=113, question_id=9, option_value="ms", display_name="ms", tooltip_text=None
+    ),
 )
 
 DEFAULT_PACKAGE_CATEGORIES: tuple[SeedPackageCategory, ...] = (
+    # Metsights Pro: anthropometry, diet & lifestyle, vitals
     SeedPackageCategory(id=1, package_id=2, category_id=1),
     SeedPackageCategory(id=2, package_id=2, category_id=2),
     SeedPackageCategory(id=3, package_id=2, category_id=3),
-    SeedPackageCategory(id=1, package_id=1, category_id=1),
-    SeedPackageCategory(id=2, package_id=1, category_id=2),
-    SeedPackageCategory(id=3, package_id=1, category_id=3),
+    # Metsights Basic: same three categories
+    SeedPackageCategory(id=4, package_id=1, category_id=1),
+    SeedPackageCategory(id=5, package_id=1, category_id=2),
+    SeedPackageCategory(id=6, package_id=1, category_id=3),
 )

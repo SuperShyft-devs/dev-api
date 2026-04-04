@@ -27,6 +27,13 @@ from db.seed.data import (
     DEFAULT_QUESTIONS,
     DEFAULT_USERS,
 )
+from db.seed.diagnostics_csv import resolve_diagnostics_csv_dir
+from db.seed.diagnostics_operations import (
+    reset_diagnostics_sequences,
+    seed_diagnostics_reference_from_csv_dir,
+    upsert_diagnostic_package_samples,
+)
+from db.seed.diagnostics_seed_tables import DIAG_SAMPLES
 from db.seed.operations import (
     reset_sequences,
     upsert_assessment_packages,
@@ -72,9 +79,15 @@ async def seed_reference_data(*, yes: bool) -> None:
             await upsert_category_questions(session, DEFAULT_CATEGORY_QUESTIONS)
             await upsert_options(session, DEFAULT_OPTIONS)
             await upsert_package_categories(session, DEFAULT_PACKAGE_CATEGORIES)
-            await reset_sequences(session)
 
-            print("Seeded users, employees, and assessment packages")
+            csv_dir = resolve_diagnostics_csv_dir()
+            await seed_diagnostics_reference_from_csv_dir(session, csv_dir)
+            await upsert_diagnostic_package_samples(session, DIAG_SAMPLES)
+
+            await reset_sequences(session)
+            await reset_diagnostics_sequences(session)
+
+            print("Seeded users, employees, assessment packages, and diagnostics reference data")
             print("Reset PostgreSQL sequences for auto-increment")
 
     await engine.dispose()
