@@ -15,13 +15,13 @@ async def test_enroll_user_in_engagement_does_not_increment_participant_count_by
     await test_db_session.execute(
         text(
             "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
-            "VALUES (1, 'PKG1', 'Test Package', 'active')"
+            "VALUES (1, 'PKG1', 'Test Package', 'active') ON CONFLICT (package_id) DO NOTHING"
         )
     )
     await test_db_session.execute(
         text(
             "INSERT INTO diagnostic_package (diagnostic_package_id, package_name, diagnostic_provider, status) "
-            "VALUES (1, 'Test Diagnostic', 'test_provider', 'active')"
+            "VALUES (1, 'Test Diagnostic', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
         )
     )
     await test_db_session.commit()

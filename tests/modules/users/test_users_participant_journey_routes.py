@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import select
 
 from core.config import settings
 from core.security import create_jwt_token
@@ -25,6 +26,26 @@ from modules.users.models import User
 def _auth_header(user_id: int) -> dict[str, str]:
     token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
     return {"Authorization": f"Bearer {token}"}
+
+
+async def _has_package_category(session, *, package_id: int, category_id: int) -> bool:
+    q = await session.execute(
+        select(AssessmentPackageCategory.id).where(
+            AssessmentPackageCategory.package_id == package_id,
+            AssessmentPackageCategory.category_id == category_id,
+        )
+    )
+    return q.scalar_one_or_none() is not None
+
+
+async def _has_category_question(session, *, category_id: int, question_id: int) -> bool:
+    q = await session.execute(
+        select(QuestionnaireCategoryQuestion.id).where(
+            QuestionnaireCategoryQuestion.category_id == category_id,
+            QuestionnaireCategoryQuestion.question_id == question_id,
+        )
+    )
+    return q.scalar_one_or_none() is not None
 
 
 @pytest.mark.asyncio
@@ -65,46 +86,50 @@ async def test_participant_journey_summary_returns_instance_and_counts(async_cli
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=9610, user_id=9610, role="ops", status="active"))
 
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=1,
-            reference_id="REF1",
-            package_name="Diag Package",
-            diagnostic_provider="test_provider",
-            no_of_tests=1,
-            status="active",
-            bookings_count=0,
+    if await test_db_session.get(DiagnosticPackage, 9699) is None:
+        test_db_session.add(
+            DiagnosticPackage(
+                diagnostic_package_id=9699,
+                reference_id="REF1",
+                package_name="Diag Package",
+                diagnostic_provider="test_provider",
+                no_of_tests=1,
+                status="active",
+                bookings_count=0,
+            )
         )
-    )
 
     test_db_session.add(User(user_id=9611, phone="96110000000", status="active", age=25))
     # Flush to ensure `users` row exists before inserting `assessment_instances`.
     await test_db_session.flush()
-    test_db_session.add(
-        Organization(organization_id=9611, name="O1", organization_type="corporate", status="active")
-    )
-    test_db_session.add(
-        AssessmentPackage(package_id=9611, package_code="PJ1", display_name="PJ Package", status="active")
-    )
+    if await test_db_session.get(Organization, 9611) is None:
+        test_db_session.add(
+            Organization(organization_id=9611, name="O1", organization_type="corporate", status="active")
+        )
+    if await test_db_session.get(AssessmentPackage, 9611) is None:
+        test_db_session.add(
+            AssessmentPackage(package_id=9611, package_code="PJ1", display_name="PJ Package", status="active")
+        )
     # Flush FK parents before inserting Engagement (depends on organization_id + assessment_package_id).
     await test_db_session.flush()
-    test_db_session.add(
-        Engagement(
-            engagement_id=9611,
-            engagement_name="Camp 9611",
-            organization_id=9611,
-            engagement_code="PJ9611",
-            engagement_type="b2b",
-            assessment_package_id=9611,
-            diagnostic_package_id=1,
-            city="Pune",
-            slot_duration=30,
-            start_date=date(2026, 1, 1),
-            end_date=date(2026, 12, 31),
-            status="active",
-            participant_count=1,
+    if await test_db_session.get(Engagement, 9611) is None:
+        test_db_session.add(
+            Engagement(
+                engagement_id=9611,
+                engagement_name="Camp 9611",
+                organization_id=9611,
+                engagement_code="PJ9611",
+                engagement_type="b2b",
+                assessment_package_id=9611,
+                diagnostic_package_id=9699,
+                city="Pune",
+                slot_duration=30,
+                start_date=date(2026, 1, 1),
+                end_date=date(2026, 12, 31),
+                status="active",
+                participant_count=1,
+            )
         )
-    )
     # Flush dependent rows so FKs exist before inserting AssessmentInstance.
     await test_db_session.flush()
     inst = AssessmentInstance(
@@ -118,24 +143,28 @@ async def test_participant_journey_summary_returns_instance_and_counts(async_cli
     test_db_session.add(inst)
     await test_db_session.flush()
 
-    test_db_session.add(
-        QuestionnaireCategory(category_id=9611, category_key="cat_pj", display_name="Cat PJ", status="active")
-    )
+    if await test_db_session.get(QuestionnaireCategory, 9611) is None:
+        test_db_session.add(
+            QuestionnaireCategory(category_id=9611, category_key="cat_pj", display_name="Cat PJ", status="active")
+        )
     # Flush so questionnaire_categories rows exist before assessment_package_categories.
     await test_db_session.flush()
-    test_db_session.add(
-        QuestionnaireDefinition(
-            question_id=9611,
-            question_key="q_pj",
-            question_text="Q text",
-            question_type="text",
-            status="active",
+    if await test_db_session.get(QuestionnaireDefinition, 9611) is None:
+        test_db_session.add(
+            QuestionnaireDefinition(
+                question_id=9611,
+                question_key="q_pj",
+                question_text="Q text",
+                question_type="text",
+                status="active",
+            )
         )
-    )
     # Flush so questionnaire_definitions exists before linking rows.
     await test_db_session.flush()
-    test_db_session.add(QuestionnaireCategoryQuestion(category_id=9611, question_id=9611, display_order=1))
-    test_db_session.add(AssessmentPackageCategory(package_id=9611, category_id=9611, display_order=1))
+    if not await _has_category_question(test_db_session, category_id=9611, question_id=9611):
+        test_db_session.add(QuestionnaireCategoryQuestion(category_id=9611, question_id=9611, display_order=1))
+    if not await _has_package_category(test_db_session, package_id=9611, category_id=9611):
+        test_db_session.add(AssessmentPackageCategory(package_id=9611, category_id=9611, display_order=1))
     test_db_session.add(
         QuestionnaireResponse(
             assessment_instance_id=inst.assessment_instance_id,
@@ -145,18 +174,20 @@ async def test_participant_journey_summary_returns_instance_and_counts(async_cli
             submitted_at=None,
         )
     )
-    test_db_session.add(
-        QuestionnaireDefinition(
-            question_id=9612,
-            question_key="q_pj_b",
-            question_text="Q b",
-            question_type="text",
-            status="active",
+    if await test_db_session.get(QuestionnaireDefinition, 9612) is None:
+        test_db_session.add(
+            QuestionnaireDefinition(
+                question_id=9612,
+                question_key="q_pj_b",
+                question_text="Q b",
+                question_type="text",
+                status="active",
+            )
         )
-    )
     # Flush so questionnaire_definitions exists before linking rows.
     await test_db_session.flush()
-    test_db_session.add(QuestionnaireCategoryQuestion(category_id=9611, question_id=9612, display_order=2))
+    if not await _has_category_question(test_db_session, category_id=9611, question_id=9612):
+        test_db_session.add(QuestionnaireCategoryQuestion(category_id=9611, question_id=9612, display_order=2))
     test_db_session.add(
         QuestionnaireResponse(
             assessment_instance_id=inst.assessment_instance_id,
@@ -194,44 +225,48 @@ async def test_participant_journey_detail_not_found_for_wrong_user(async_client,
     test_db_session.add(User(user_id=9622, phone="96220000000", status="active", age=30))
     # Flush so FK parent rows exist before inserting AssessmentInstance.
     await test_db_session.flush()
-    test_db_session.add(
-        Organization(organization_id=9621, name="O2", organization_type="corporate", status="active")
-    )
-    test_db_session.add(
-        AssessmentPackage(package_id=9621, package_code="PJ2", display_name="PJ2", status="active")
-    )
+    if await test_db_session.get(Organization, 9621) is None:
+        test_db_session.add(
+            Organization(organization_id=9621, name="O2", organization_type="corporate", status="active")
+        )
+    if await test_db_session.get(AssessmentPackage, 9621) is None:
+        test_db_session.add(
+            AssessmentPackage(package_id=9621, package_code="PJ2", display_name="PJ2", status="active")
+        )
     # Flush FK parents before inserting Engagement/AssessmentInstance.
     await test_db_session.flush()
 
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=1,
-            reference_id="REF1",
-            package_name="Diag Package",
-            diagnostic_provider="test_provider",
-            no_of_tests=1,
-            status="active",
-            bookings_count=0,
+    if await test_db_session.get(DiagnosticPackage, 9700) is None:
+        test_db_session.add(
+            DiagnosticPackage(
+                diagnostic_package_id=9700,
+                reference_id="REF1",
+                package_name="Diag Package",
+                diagnostic_provider="test_provider",
+                no_of_tests=1,
+                status="active",
+                bookings_count=0,
+            )
         )
-    )
 
-    test_db_session.add(
-        Engagement(
-            engagement_id=9621,
-            engagement_name="E2",
-            organization_id=9621,
-            engagement_code="PJ9621",
-            engagement_type="b2b",
-            assessment_package_id=9621,
-            diagnostic_package_id=1,
-            city="Pune",
-            slot_duration=30,
-            start_date=date(2026, 1, 1),
-            end_date=date(2026, 12, 31),
-            status="active",
-            participant_count=0,
+    if await test_db_session.get(Engagement, 9621) is None:
+        test_db_session.add(
+            Engagement(
+                engagement_id=9621,
+                engagement_name="E2",
+                organization_id=9621,
+                engagement_code="PJ9621",
+                engagement_type="b2b",
+                assessment_package_id=9621,
+                diagnostic_package_id=9700,
+                city="Pune",
+                slot_duration=30,
+                start_date=date(2026, 1, 1),
+                end_date=date(2026, 12, 31),
+                status="active",
+                participant_count=0,
+            )
         )
-    )
     # Flush so engagement exists before inserting AssessmentInstance.
     await test_db_session.flush()
     inst = AssessmentInstance(
@@ -258,44 +293,48 @@ async def test_participant_journey_detail_returns_categories_and_answer_state(as
     test_db_session.add(User(user_id=9631, phone="96310000000", status="active", age=30))
     # Flush so `users` row exists before inserting AssessmentInstance.
     await test_db_session.flush()
-    test_db_session.add(
-        Organization(organization_id=9631, name="O3", organization_type="corporate", status="active")
-    )
-    test_db_session.add(
-        AssessmentPackage(package_id=9631, package_code="PJ3", display_name="PJ3", status="active")
-    )
+    if await test_db_session.get(Organization, 9631) is None:
+        test_db_session.add(
+            Organization(organization_id=9631, name="O3", organization_type="corporate", status="active")
+        )
+    if await test_db_session.get(AssessmentPackage, 9631) is None:
+        test_db_session.add(
+            AssessmentPackage(package_id=9631, package_code="PJ3", display_name="PJ3", status="active")
+        )
     # Flush FK parents so AssessmentInstance insert doesn't violate package FK.
     await test_db_session.flush()
 
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=1,
-            reference_id="REF1",
-            package_name="Diag Package",
-            diagnostic_provider="test_provider",
-            no_of_tests=1,
-            status="active",
-            bookings_count=0,
+    if await test_db_session.get(DiagnosticPackage, 9701) is None:
+        test_db_session.add(
+            DiagnosticPackage(
+                diagnostic_package_id=9701,
+                reference_id="REF1",
+                package_name="Diag Package",
+                diagnostic_provider="test_provider",
+                no_of_tests=1,
+                status="active",
+                bookings_count=0,
+            )
         )
-    )
 
-    test_db_session.add(
-        Engagement(
-            engagement_id=9631,
-            engagement_name="E3",
-            organization_id=9631,
-            engagement_code="PJ9631",
-            engagement_type="b2b",
-            assessment_package_id=9631,
-            diagnostic_package_id=1,
-            city="Pune",
-            slot_duration=30,
-            start_date=date(2026, 1, 1),
-            end_date=date(2026, 12, 31),
-            status="active",
-            participant_count=0,
+    if await test_db_session.get(Engagement, 9631) is None:
+        test_db_session.add(
+            Engagement(
+                engagement_id=9631,
+                engagement_name="E3",
+                organization_id=9631,
+                engagement_code="PJ9631",
+                engagement_type="b2b",
+                assessment_package_id=9631,
+                diagnostic_package_id=9701,
+                city="Pune",
+                slot_duration=30,
+                start_date=date(2026, 1, 1),
+                end_date=date(2026, 12, 31),
+                status="active",
+                participant_count=0,
+            )
         )
-    )
     # Flush engagement FK parents before inserting AssessmentInstance.
     await test_db_session.flush()
     inst = AssessmentInstance(
@@ -309,24 +348,28 @@ async def test_participant_journey_detail_returns_categories_and_answer_state(as
     test_db_session.add(inst)
     await test_db_session.flush()
 
-    test_db_session.add(
-        QuestionnaireCategory(category_id=9631, category_key="cat3", display_name="Cat 3", status="active")
-    )
+    if await test_db_session.get(QuestionnaireCategory, 9631) is None:
+        test_db_session.add(
+            QuestionnaireCategory(category_id=9631, category_key="cat3", display_name="Cat 3", status="active")
+        )
     # Flush questionnaire_categories before inserting assessment_package_categories.
     await test_db_session.flush()
-    test_db_session.add(
-        QuestionnaireDefinition(
-            question_id=9631,
-            question_key="q3",
-            question_text="Question three",
-            question_type="text",
-            status="active",
+    if await test_db_session.get(QuestionnaireDefinition, 9631) is None:
+        test_db_session.add(
+            QuestionnaireDefinition(
+                question_id=9631,
+                question_key="q3",
+                question_text="Question three",
+                question_type="text",
+                status="active",
+            )
         )
-    )
     # Flush so questionnaire_definitions exists before linking rows.
     await test_db_session.flush()
-    test_db_session.add(QuestionnaireCategoryQuestion(category_id=9631, question_id=9631, display_order=1))
-    test_db_session.add(AssessmentPackageCategory(package_id=9631, category_id=9631, display_order=1))
+    if not await _has_category_question(test_db_session, category_id=9631, question_id=9631):
+        test_db_session.add(QuestionnaireCategoryQuestion(category_id=9631, question_id=9631, display_order=1))
+    if not await _has_package_category(test_db_session, package_id=9631, category_id=9631):
+        test_db_session.add(AssessmentPackageCategory(package_id=9631, category_id=9631, display_order=1))
     test_db_session.add(
         QuestionnaireResponse(
             assessment_instance_id=inst.assessment_instance_id,

@@ -11,7 +11,7 @@ from modules.users.models import User
 
 @pytest.mark.asyncio
 async def test_send_otp_requires_existing_user(async_client, test_db_session):
-    test_db_session.add(User(user_id=1001, phone="9999999999", status="active"))
+    test_db_session.add(User(user_id=1001, age=30, phone="9999999999", status="active"))
     await test_db_session.commit()
 
     response = await async_client.post("/auth/send-otp", json={"phone": "9999999999"})
@@ -54,7 +54,7 @@ async def test_send_otp_returns_404_for_unknown_user(async_client):
 
 @pytest.mark.asyncio
 async def test_verify_otp_issues_tokens_and_consumes_session(async_client, test_db_session):
-    test_db_session.add(User(user_id=1002, phone="8888888888", status="active"))
+    test_db_session.add(User(user_id=1002, age=30, phone="8888888888", status="active"))
     await test_db_session.commit()
 
     send = await async_client.post("/auth/send-otp", json={"phone": "8888888888"})
@@ -96,7 +96,7 @@ async def test_verify_otp_issues_tokens_and_consumes_session(async_client, test_
 
 @pytest.mark.asyncio
 async def test_refresh_token_rotates_refresh_token(async_client, test_db_session):
-    test_db_session.add(User(user_id=1003, phone="7777777777", status="active"))
+    test_db_session.add(User(user_id=1003, age=30, phone="7777777777", status="active"))
     await test_db_session.commit()
 
     send = await async_client.post("/auth/send-otp", json={"phone": "7777777777"})
@@ -127,7 +127,7 @@ async def test_refresh_token_rotates_refresh_token(async_client, test_db_session
 
 @pytest.mark.asyncio
 async def test_logout_invalidates_refresh_token(async_client, test_db_session):
-    test_db_session.add(User(user_id=1004, phone="6666666666", status="active"))
+    test_db_session.add(User(user_id=1004, age=30, phone="6666666666", status="active"))
     await test_db_session.commit()
 
     send = await async_client.post("/auth/send-otp", json={"phone": "6666666666"})

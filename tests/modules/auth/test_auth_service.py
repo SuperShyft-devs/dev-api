@@ -11,7 +11,7 @@ from modules.users.models import User
 
 @pytest.mark.asyncio
 async def test_verify_otp_fails_with_wrong_code(auth_service, test_db_session):
-    test_db_session.add(User(user_id=1010, phone="5555555555", status="active"))
+    test_db_session.add(User(user_id=1010, age=30, phone="5555555555", status="active"))
     await test_db_session.commit()
 
     session_id = await auth_service.send_otp(
@@ -37,7 +37,7 @@ async def test_verify_otp_fails_with_wrong_code(auth_service, test_db_session):
 
 @pytest.mark.asyncio
 async def test_verify_otp_allows_bypass_code_when_enabled(auth_service, test_db_session):
-    test_db_session.add(User(user_id=1011, phone="5555555556", status="active"))
+    test_db_session.add(User(user_id=1011, age=30, phone="5555555556", status="active"))
     await test_db_session.commit()
 
     await auth_service.send_otp(
@@ -69,7 +69,7 @@ async def test_verify_otp_allows_bypass_code_when_enabled(auth_service, test_db_
 
 @pytest.mark.asyncio
 async def test_verify_otp_rejects_bypass_code_when_disabled(auth_service, test_db_session):
-    test_db_session.add(User(user_id=1012, phone="5555555557", status="active"))
+    test_db_session.add(User(user_id=1012, age=30, phone="5555555557", status="active"))
     await test_db_session.commit()
 
     await auth_service.send_otp(

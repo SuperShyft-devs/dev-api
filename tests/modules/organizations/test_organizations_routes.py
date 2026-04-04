@@ -19,7 +19,7 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
-    user = User(user_id=user_id, phone=f"{user_id}000000000", status="active")
+    user = User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active")
     test_db_session.add(user)
     await test_db_session.flush()
     
@@ -36,7 +36,7 @@ async def test_create_organization_requires_auth(async_client):
 
 @pytest.mark.asyncio
 async def test_create_organization_requires_employee(async_client, test_db_session):
-    test_db_session.add(User(user_id=7101, phone="7101000000", status="active"))
+    test_db_session.add(User(user_id=7101, age=30, phone="7101000000", status="active"))
     await test_db_session.commit()
 
     response = await async_client.post("/organizations", headers=_auth_header(7101), json={"name": "Org"})

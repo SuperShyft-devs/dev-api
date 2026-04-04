@@ -1,23 +1,44 @@
 """Pytest configuration and shared fixtures.
 
-These tests use the database configured by `DATABASE_URL`.
+Database behavior:
 
-Important: the application creates its SQLAlchemy engine at import time from
-`DATABASE_URL` (via `core.config.settings`).
+- If ``TEST_DATABASE_URL`` is set (recommended): it is copied to ``DATABASE_URL``
+  before any app code imports the DB engine. Each session runs
+  ``alembic downgrade base`` (ignored if it fails, e.g. empty DB), then
+  ``alembic upgrade head`` and ``python -m db.seed --yes``. Tests use a
+  session-scoped async engine (no per-test schema drop). Avoid ``DROP SCHEMA
+  public`` here: it can orphan PostgreSQL types and break the next ``alembic`` run.
 
-Tests must clean up data they insert.
+- If ``TEST_DATABASE_URL`` is unset (legacy): tests use ``DATABASE_URL`` and the
+  ``test_engine`` fixture drops ``public`` and recreates tables with SQLAlchemy
+  metadata for every test — dangerous on a shared dev database.
+
+Tests must still clean up data they insert (see autouse cleanup fixture).
 """
 
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env before reading TEST_DATABASE_URL (same as core.config).
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+# Must run before any import that reads DATABASE_URL (core.config, db.session).
+_use_isolated_test_db = bool(os.getenv("TEST_DATABASE_URL"))
+if _use_isolated_test_db:
+    os.environ["DATABASE_URL"] = os.getenv("TEST_DATABASE_URL", "")
+
+import subprocess
+import sys
+from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from typing import AsyncGenerator
-
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -52,6 +73,52 @@ from modules.reports.router import router as reports_router
 from modules.platform_settings.router import router as platform_settings_router
 
 
+def _project_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+def _run_subprocess(argv: list[str]) -> None:
+    result = subprocess.run(
+        argv,
+        cwd=_project_root(),
+        env=os.environ.copy(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        out = (result.stdout or "") + (result.stderr or "")
+        raise RuntimeError(
+            f"Command failed ({result.returncode}): {' '.join(argv)}\n{out}"
+        )
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    if not _use_isolated_test_db:
+        return
+
+    os.environ.setdefault(
+        "JWT_SECRET_KEY",
+        os.getenv("JWT_SECRET_KEY", "test-pytest-jwt-secret-16+"),
+    )
+
+    db_url = os.getenv("DATABASE_URL", "")
+    if not db_url:
+        raise RuntimeError("TEST_DATABASE_URL / DATABASE_URL is required for isolated test DB")
+
+    # Tear down migration state without DROP SCHEMA (avoids orphaned pg types on Windows PG).
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "downgrade", "base"],
+        cwd=_project_root(),
+        env=os.environ.copy(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    _run_subprocess([sys.executable, "-m", "alembic", "upgrade", "head"])
+    _run_subprocess([sys.executable, "-m", "db.seed", "--yes"])
+
+
 @pytest.fixture(autouse=True)
 def _set_test_settings():
     """Set required settings for tests."""
@@ -74,9 +141,9 @@ class CapturingOtpSender:
 
 
 async def _ensure_required_tables(connection) -> None:
-    """Recreate all tables for tests.
+    """Recreate all tables for tests (legacy path only).
 
-    We drop everything first so schema changes apply immediately.
+    Drops everything first so schema changes apply immediately without Alembic.
     """
     await connection.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
     await connection.execute(text("CREATE SCHEMA public"))
@@ -85,10 +152,7 @@ async def _ensure_required_tables(connection) -> None:
     await connection.run_sync(Base.metadata.create_all)
 
 
-@pytest_asyncio.fixture
-async def test_engine():
-    """Create an async engine within the current test event loop."""
-
+async def _create_test_engine_legacy():
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         raise RuntimeError("DATABASE_URL is required to run DB-backed tests")
@@ -98,12 +162,31 @@ async def test_engine():
     async with engine.begin() as conn:
         await _ensure_required_tables(conn)
 
-    yield engine
-
-    await engine.dispose()
+    return engine
 
 
-@pytest_asyncio.fixture
+if _use_isolated_test_db:
+
+    @pytest_asyncio.fixture(scope="session", loop_scope="session")
+    async def test_engine():
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise RuntimeError("TEST_DATABASE_URL is required for isolated test DB mode")
+
+        engine = create_async_engine(database_url, echo=False, pool_pre_ping=True)
+        yield engine
+        await engine.dispose()
+
+else:
+
+    @pytest_asyncio.fixture(loop_scope="session")
+    async def test_engine():
+        engine = await _create_test_engine_legacy()
+        yield engine
+        await engine.dispose()
+
+
+@pytest_asyncio.fixture(loop_scope="session")
 async def test_db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
     """Create a new DB session for each test."""
     session_factory = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
@@ -135,7 +218,7 @@ def auth_service(otp_sender: CapturingOtpSender):
     )
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def fastapi_app(test_db_session: AsyncSession, auth_service, otp_sender: CapturingOtpSender) -> FastAPI:
     """FastAPI app wired to the real DB and a capturing OTP sender."""
 
@@ -165,7 +248,7 @@ async def fastapi_app(test_db_session: AsyncSession, auth_service, otp_sender: C
     return app
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def async_client(fastapi_app: FastAPI):
     """Async HTTP client for the FastAPI app."""
     transport = ASGITransport(app=fastapi_app, raise_app_exceptions=False)
@@ -173,11 +256,12 @@ async def async_client(fastapi_app: FastAPI):
         yield client
 
 
-@pytest_asyncio.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True, loop_scope="session")
 async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
-    """Remove rows created by auth tests.
+    """Remove rows created by tests.
 
-    We only delete rows that match the user_ids and phones used in auth tests.
+    Legacy mode also wipes reference-like tables because the next test rebuilds an
+    empty schema. Isolated mode keeps ``db.seed`` reference data between tests.
     """
     yield
 
@@ -185,23 +269,7 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     # Rollback first so cleanup queries can run.
     await test_db_session.rollback()
 
-    user_ids = (1001, 1002, 1003, 1004, 1010, 2001)
-    phones = (
-        "9999999999",
-        "8888888888",
-        "7777777777",
-        "6666666666",
-        "5555555555",
-        "1111111111",
-        "2222222222",
-        "3333333333",
-        '4444444444',
-        "4444444445",
-        "7777700000",
-    )
-
     # Delete audit logs first - they reference auth_otp_sessions
-    # Clean up test users in various ranges: 1001-1999, 2001-2999, 8001-8999
     await test_db_session.execute(
         text("DELETE FROM data_audit_logs WHERE user_id >= 1001 AND user_id < 10000")
     )
@@ -222,20 +290,30 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     await test_db_session.execute(text("DELETE FROM onboarding_assistant_assignment"))
     await test_db_session.execute(text("DELETE FROM platform_settings"))
     await test_db_session.execute(text("DELETE FROM engagements"))
-    await test_db_session.execute(text("DELETE FROM assessment_package_categories"))
-    await test_db_session.execute(text("DELETE FROM questionnaire_category_questions"))
-    await test_db_session.execute(text("DELETE FROM assessment_packages"))
-    await test_db_session.execute(text("DELETE FROM questionnaire_options"))
-    await test_db_session.execute(text("DELETE FROM questionnaire_definitions"))
-    await test_db_session.execute(text("DELETE FROM questionnaire_categories"))
-    await test_db_session.execute(text("DELETE FROM diagnostic_package"))
     await test_db_session.execute(text("DELETE FROM organizations"))
-    await test_db_session.execute(text("DELETE FROM employee"))
+
+    if _use_isolated_test_db:
+        await test_db_session.execute(
+            text("DELETE FROM employee WHERE user_id >= 1001 AND user_id < 10000")
+        )
+    else:
+        await test_db_session.execute(text("DELETE FROM assessment_package_categories"))
+        await test_db_session.execute(text("DELETE FROM questionnaire_category_questions"))
+        await test_db_session.execute(text("DELETE FROM assessment_packages"))
+        await test_db_session.execute(text("DELETE FROM questionnaire_options"))
+        await test_db_session.execute(text("DELETE FROM questionnaire_definitions"))
+        await test_db_session.execute(text("DELETE FROM questionnaire_categories"))
+        await test_db_session.execute(text("DELETE FROM diagnostic_package"))
+        await test_db_session.execute(text("DELETE FROM employee"))
 
     await test_db_session.execute(
         text(
             "DELETE FROM users WHERE user_id >= 1001 AND user_id < 10000 "
-            "OR phone IN ('9999999999','8888888888','7777777777','6666666666','5555555555','1111111111','2222222222','3333333333','4444444444','7777700000')"
+            "OR phone IN ("
+            "'9999999999','8888888888','7777777777','6666666666','5555555555',"
+            "'1111111111','2222222222','3333333333','4444444444','7777700000',"
+            "'1234567890','1234567891','8877665501','5550000998','9301000000','9411000000','9876543210'"
+            ")"
         )
     )
 

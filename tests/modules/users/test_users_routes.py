@@ -25,7 +25,7 @@ async def test_get_me_requires_auth(async_client):
 
 @pytest.mark.asyncio
 async def test_get_me_returns_profile(async_client, test_db_session):
-    user = User(user_id=1010, phone="5555555555", status="active", first_name="A")
+    user = User(user_id=1010, age=30, phone="5555555555", status="active", first_name="A")
     test_db_session.add(user)
     await test_db_session.commit()
 
@@ -41,12 +41,12 @@ async def test_get_me_returns_profile(async_client, test_db_session):
 
 @pytest.mark.asyncio
 async def test_update_me_updates_editable_fields(async_client, test_db_session):
-    user = User(user_id=1010, phone="5555555555", status="active", first_name="A")
+    user = User(user_id=1010, age=30, phone="5555555555", status="active", first_name="A")
     test_db_session.add(user)
     await test_db_session.commit()
 
     headers = _auth_header(1010)
-    payload = {"first_name": "New", "city": "Pune"}
+    payload = {"age": 30, "first_name": "New", "city": "Pune"}
 
     response = await async_client.put("/users/me", headers=headers, json=payload)
     assert response.status_code == 200
@@ -58,7 +58,7 @@ async def test_update_me_updates_editable_fields(async_client, test_db_session):
 
 @pytest.mark.asyncio
 async def test_get_me_status_returns_active_flag(async_client, test_db_session):
-    user = User(user_id=1010, phone="5555555555", status="active")
+    user = User(user_id=1010, age=30, phone="5555555555", status="active")
     test_db_session.add(user)
     await test_db_session.commit()
 
@@ -71,7 +71,7 @@ async def test_get_me_status_returns_active_flag(async_client, test_db_session):
 
 @pytest.mark.asyncio
 async def test_inactive_user_is_forbidden(async_client, test_db_session):
-    user = User(user_id=1010, phone="5555555555", status="inactive")
+    user = User(user_id=1010, age=30, phone="5555555555", status="inactive")
     test_db_session.add(user)
     await test_db_session.commit()
 

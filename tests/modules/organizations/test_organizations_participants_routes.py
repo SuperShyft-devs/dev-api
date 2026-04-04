@@ -24,7 +24,7 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
     """Seed a test employee."""
-    user = User(user_id=user_id, phone=f"{user_id}000000000", status="active")
+    user = User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active")
     test_db_session.add(user)
     await test_db_session.flush()
     
@@ -43,7 +43,7 @@ async def test_get_organization_participants_requires_auth(async_client):
 @pytest.mark.asyncio
 async def test_get_organization_participants_requires_employee(async_client, test_db_session):
     """Test that the endpoint requires employee role."""
-    test_db_session.add(User(user_id=8001, phone="8001000000", status="active"))
+    test_db_session.add(User(user_id=8001, age=30, phone="8001000000", status="active"))
     await test_db_session.commit()
 
     response = await async_client.get("/organizations/1/participants", headers=_auth_header(8001))
@@ -181,6 +181,7 @@ async def test_get_organization_participants_returns_participants_from_single_en
     test_db_session.add(
         User(
             user_id=9001,
+            age=30,
             first_name="Alice",
             last_name="Smith",
             phone="9001111111",
@@ -192,6 +193,7 @@ async def test_get_organization_participants_returns_participants_from_single_en
     test_db_session.add(
         User(
             user_id=9002,
+            age=30,
             first_name="Bob",
             last_name="Jones",
             phone="9002222222",
@@ -306,6 +308,7 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
     test_db_session.add(
         User(
             user_id=9003,
+            age=30,
             first_name="Charlie",
             last_name="Brown",
             phone="9003333333",
@@ -317,6 +320,7 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
     test_db_session.add(
         User(
             user_id=9004,
+            age=30,
             first_name="Diana",
             last_name="Prince",
             phone="9004444444",
@@ -328,6 +332,7 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
     test_db_session.add(
         User(
             user_id=9005,
+            age=30,
             first_name="Eve",
             last_name="Adams",
             phone="9005555555",
@@ -470,6 +475,7 @@ async def test_get_organization_participants_paginates_results(async_client, tes
         test_db_session.add(
             User(
                 user_id=user_id,
+                age=30,
                 first_name=f"User{i}",
                 last_name=f"Last{i}",
                 phone=f"910{i}000000",
@@ -595,6 +601,7 @@ async def test_get_organization_participants_excludes_other_organizations(async_
     test_db_session.add(
         User(
             user_id=9201,
+            age=30,
             first_name="OrgA_User",
             last_name="Smith",
             phone="9201000000",
@@ -604,6 +611,7 @@ async def test_get_organization_participants_excludes_other_organizations(async_
     test_db_session.add(
         User(
             user_id=9202,
+            age=30,
             first_name="OrgB_User",
             last_name="Jones",
             phone="9202000000",

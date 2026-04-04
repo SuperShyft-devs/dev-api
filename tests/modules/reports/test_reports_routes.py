@@ -138,32 +138,35 @@ async def _seed_assessment(
     package_code: str | None = None,
     assessment_type_code: str | None = None,
 ):
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=diagnostic_package_id,
-            reference_id=f"REF{diagnostic_package_id}",
-            package_name=f"Diag Package {diagnostic_package_id}",
-            diagnostic_provider="test_provider",
-            status="active",
+    if await test_db_session.get(DiagnosticPackage, diagnostic_package_id) is None:
+        test_db_session.add(
+            DiagnosticPackage(
+                diagnostic_package_id=diagnostic_package_id,
+                reference_id=f"REF{diagnostic_package_id}",
+                package_name=f"Diag Package {diagnostic_package_id}",
+                diagnostic_provider="test_provider",
+                status="active",
+            )
         )
-    )
     test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000", age=30, gender=user_gender, status="active"))
     pkg_code = package_code if package_code is not None else f"P{assessment_id}"
-    pkg = AssessmentPackage(
-        package_id=assessment_id % 1000,
-        package_code=pkg_code,
-        display_name=f"Package {assessment_id}",
-        status="active",
-    )
-    if assessment_type_code is not None:
-        pkg.assessment_type_code = assessment_type_code
-    test_db_session.add(pkg)
+    pkg_id = assessment_id % 1000
+    if await test_db_session.get(AssessmentPackage, pkg_id) is None:
+        pkg = AssessmentPackage(
+            package_id=pkg_id,
+            package_code=pkg_code,
+            display_name=f"Package {assessment_id}",
+            status="active",
+        )
+        if assessment_type_code is not None:
+            pkg.assessment_type_code = assessment_type_code
+        test_db_session.add(pkg)
     await test_db_session.flush()
     test_db_session.add(
         Engagement(
             engagement_id=engagement_id,
             engagement_code=f"ENG{engagement_id}",
-            assessment_package_id=assessment_id % 1000,
+            assessment_package_id=pkg_id,
             diagnostic_package_id=diagnostic_package_id,
         )
     )

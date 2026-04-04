@@ -36,13 +36,13 @@ async def _seed_packages_and_engagement(
     await test_db_session.execute(
         text(
             "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
-            "VALUES (1, 'PK1', 'Package', 'active')"
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
         )
     )
     await test_db_session.execute(
         text(
             "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
-            "VALUES (1, 'REF1', 'Diag Package', 'active')"
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
         )
     )
     sd = "NULL" if start_date is None else f"'{start_date}'"

@@ -35,8 +35,8 @@ async def test_list_my_assessments_requires_auth(async_client):
 
 @pytest.mark.asyncio
 async def test_list_my_assessments_returns_only_my_rows(async_client, test_db_session):
-    test_db_session.add(User(user_id=3001, phone="3001000000", status="active"))
-    test_db_session.add(User(user_id=3002, phone="3002000000", status="active"))
+    test_db_session.add(User(user_id=3001, age=30, phone="3001000000", status="active"))
+    test_db_session.add(User(user_id=3002, age=30, phone="3002000000", status="active"))
     test_db_session.add(AssessmentPackage(package_id=1, package_code="BASIC", display_name="Basic", status="active"))
     await test_db_session.flush()  # Ensure users and packages exist before adding engagements
     test_db_session.add(Engagement(engagement_id=501, engagement_code="ENG501", assessment_package_id=1))
@@ -83,8 +83,8 @@ async def test_list_my_assessments_returns_only_my_rows(async_client, test_db_se
 
 @pytest.mark.asyncio
 async def test_get_assessment_details_blocks_cross_user_access(async_client, test_db_session):
-    test_db_session.add(User(user_id=3011, phone="3011000000", status="active"))
-    test_db_session.add(User(user_id=3012, phone="3012000000", status="active"))
+    test_db_session.add(User(user_id=3011, age=30, phone="3011000000", status="active"))
+    test_db_session.add(User(user_id=3012, age=30, phone="3012000000", status="active"))
     test_db_session.add(AssessmentPackage(package_id=2, package_code="P2", display_name="P2", status="active"))
     await test_db_session.flush()
     test_db_session.add(Engagement(engagement_id=601, engagement_code="ENG601", assessment_package_id=2))
@@ -110,7 +110,7 @@ async def test_get_assessment_details_blocks_cross_user_access(async_client, tes
 
 @pytest.mark.asyncio
 async def test_patch_assessment_status_allows_active_to_completed(async_client, test_db_session):
-    test_db_session.add(User(user_id=3021, phone="3021000000", status="active"))
+    test_db_session.add(User(user_id=3021, age=30, phone="3021000000", status="active"))
     test_db_session.add(AssessmentPackage(package_id=3, package_code="P3", display_name="P3", status="active"))
     await test_db_session.flush()
     test_db_session.add(Engagement(engagement_id=701, engagement_code="ENG701", assessment_package_id=3))
@@ -149,7 +149,7 @@ async def test_patch_assessment_status_allows_active_to_completed(async_client, 
 
 @pytest.mark.asyncio
 async def test_patch_assessment_status_rejects_invalid_status(async_client, test_db_session):
-    test_db_session.add(User(user_id=3031, phone="3031000000", status="active"))
+    test_db_session.add(User(user_id=3031, age=30, phone="3031000000", status="active"))
     test_db_session.add(AssessmentPackage(package_id=4, package_code="P4", display_name="P4", status="active"))
     await test_db_session.flush()
     test_db_session.add(Engagement(engagement_id=801, engagement_code="ENG801", assessment_package_id=4))
@@ -179,7 +179,7 @@ async def test_patch_assessment_status_rejects_invalid_status(async_client, test
 
 @pytest.mark.asyncio
 async def test_patch_assessment_status_rejects_changes_after_completion(async_client, test_db_session):
-    test_db_session.add(User(user_id=3041, phone="3041000000", status="active"))
+    test_db_session.add(User(user_id=3041, age=30, phone="3041000000", status="active"))
     test_db_session.add(AssessmentPackage(package_id=5, package_code="P5", display_name="P5", status="active"))
     await test_db_session.flush()
     test_db_session.add(Engagement(engagement_id=901, engagement_code="ENG901", assessment_package_id=5))

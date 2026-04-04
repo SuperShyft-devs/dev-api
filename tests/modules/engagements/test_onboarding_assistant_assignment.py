@@ -16,7 +16,10 @@ async def test_add_onboarding_assistant_creates_assignment(test_db_session):
     """Test that adding an onboarding assistant creates a new assignment record."""
     # Seed required packages
     await test_db_session.execute(
-        text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PKG1', 'Package 1', 'active')")
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Package 1', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
     )
     await test_db_session.execute(
         text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
@@ -66,7 +69,10 @@ async def test_add_multiple_onboarding_assistants_to_one_engagement(test_db_sess
     """Test that multiple employees can be assigned to one engagement."""
     # Seed required packages
     await test_db_session.execute(
-        text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PKG1', 'Package 1', 'active')")
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Package 1', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
     )
     await test_db_session.execute(
         text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
@@ -114,7 +120,10 @@ async def test_duplicate_assignment_prevented_by_unique_constraint(test_db_sessi
     """Test that the unique constraint prevents duplicate assignments."""
     # Seed required packages
     await test_db_session.execute(
-        text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PKG1', 'Package 1', 'active')")
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Package 1', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
     )
     await test_db_session.execute(
         text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
@@ -153,7 +162,10 @@ async def test_list_onboarding_assistants_returns_all_assignments(test_db_sessio
     """Test listing all onboarding assistants for an engagement."""
     # Seed required packages
     await test_db_session.execute(
-        text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PKG1', 'Package 1', 'active')")
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Package 1', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
     )
     await test_db_session.execute(
         text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
@@ -199,7 +211,10 @@ async def test_remove_onboarding_assistant_deletes_assignment(test_db_session):
     """Test removing an onboarding assistant from an engagement."""
     # Seed required packages
     await test_db_session.execute(
-        text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PKG1', 'Package 1', 'active')")
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Package 1', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
     )
     await test_db_session.execute(
         text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
@@ -247,7 +262,10 @@ async def test_remove_nonexistent_assignment_returns_false(test_db_session):
     """Test that removing a non-existent assignment returns False."""
     # Seed required packages
     await test_db_session.execute(
-        text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PKG1', 'Package 1', 'active')")
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Package 1', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
     )
     await test_db_session.execute(
         text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
@@ -276,7 +294,10 @@ async def test_get_onboarding_assistant_assignment_returns_specific_assignment(t
     """Test getting a specific assignment."""
     # Seed required packages
     await test_db_session.execute(
-        text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PKG1', 'Package 1', 'active')")
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Package 1', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
     )
     await test_db_session.execute(
         text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
@@ -335,7 +356,10 @@ async def test_b2c_engagement_created_without_onboarding_assistants(test_db_sess
     """Test that B2C engagements are created without any onboarding assistants by default."""
     # Seed required packages
     await test_db_session.execute(
-        text("INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES (1, 'PKG1', 'Package 1', 'active')")
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Package 1', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
     )
     await test_db_session.execute(
         text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
