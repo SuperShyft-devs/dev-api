@@ -101,7 +101,7 @@ class QuestionnaireQuestionWithAnswer(BaseModel):
 
 
 class QuestionnaireGetResponse(BaseModel):
-    """Response for GET /questionnaires/{category_id}."""
+    """Response for GET /questionnaire/{category_id}."""
     assessment_instance_id: int
     status: str
     questions: list[QuestionnaireQuestionWithAnswer]
@@ -118,7 +118,7 @@ class ResponseItem(BaseModel):
 
 
 class QuestionnaireResponsesUpsertRequest(BaseModel):
-    """Request for PUT /questionnaires/{category_id}/responses."""
+    """Request for PUT /questionnaire/{category_id}/responses."""
     responses: list[ResponseItem] = Field(..., min_length=1, max_length=500)
 
 

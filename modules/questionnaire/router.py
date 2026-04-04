@@ -1,6 +1,7 @@
 """Questionnaire HTTP routes.
 
-These endpoints are employee-only.
+Employee endpoints manage question/category definitions; authenticated users
+fill and submit questionnaires under the same `/questionnaire` prefix.
 """
 
 from __future__ import annotations
@@ -36,7 +37,6 @@ from core.dependencies import get_current_user
 
 router = APIRouter(tags=["questionnaire"])
 management_router = APIRouter(prefix="/questionnaire", tags=["questionnaire"])
-user_router = APIRouter(prefix="/questionnaires", tags=["questionnaire"])
 
 
 def _client_ip(request: Request) -> str:
@@ -418,7 +418,6 @@ async def reorder_category_questions(
 
 # User-facing endpoints for questionnaire responses
 
-@user_router.get("/{category_id}")
 @management_router.get("/{category_id}")
 async def get_questionnaire(
     category_id: int,
@@ -437,7 +436,6 @@ async def get_questionnaire(
     return success_response(result)
 
 
-@user_router.put("/{category_id}/responses")
 @management_router.put("/{category_id}/responses")
 async def upsert_questionnaire_responses(
     category_id: int,
@@ -469,7 +467,6 @@ async def upsert_questionnaire_responses(
     return success_response({"message": "Responses saved successfully"})
 
 
-@user_router.post("/{assessment_instance_id}/submit")
 @management_router.post("/{assessment_instance_id}/submit")
 async def submit_questionnaire(
     assessment_instance_id: int,
@@ -498,4 +495,3 @@ async def submit_questionnaire(
 
 
 router.include_router(management_router)
-router.include_router(user_router)
