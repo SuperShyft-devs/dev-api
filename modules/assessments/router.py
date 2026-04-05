@@ -12,7 +12,9 @@ from db.session import get_db
 from modules.assessments.dependencies import get_assessments_service
 from modules.assessments.schemas import AssessmentStatusUpdateRequest, MetsightsRecordIdUpdate
 from modules.assessments.service import AssessmentsService
-from modules.employee.dependencies import get_current_employee
+from modules.employee.dependencies import get_current_employee, get_optional_employee
+from modules.metsights.dependencies import get_metsights_sync_service
+from modules.metsights.sync_service import MetsightsSyncService
 from modules.employee.service import EmployeeContext
 
 
@@ -94,6 +96,26 @@ async def get_assessment_details(
             "completed_at": instance.completed_at,
         }
     )
+
+
+@router.post("/{assessment_instance_id}/metsights/import-answers")
+async def import_metsights_questionnaire_answers(
+    assessment_instance_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    employee=Depends(get_optional_employee),
+    sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
+):
+    """Pull Metsights record detail and upsert mapped questionnaire responses."""
+
+    result = await sync_service.import_questionnaire_answers_for_instance(
+        db,
+        assessment_instance_id=assessment_instance_id,
+        current_user_id=current_user.user_id,
+        employee_ok=employee is not None,
+    )
+    await db.commit()
+    return success_response(result)
 
 
 @router.patch("/{assessment_instance_id}/status")

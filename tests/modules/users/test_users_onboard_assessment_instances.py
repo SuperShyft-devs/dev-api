@@ -6,20 +6,7 @@ from sqlalchemy import text
 
 @pytest.mark.asyncio
 async def test_onboard_is_idempotent_for_assessment_instance(async_client, test_db_session):
-    await test_db_session.execute(
-        text(
-            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
-            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
-        )
-    )
-    await test_db_session.execute(
-        text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
-            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
-        )
-    )
-    await test_db_session.commit()
-
+    """B2C onboarding uses platform default assessment package from seed, not ad-hoc package rows."""
     payload = {
         "age": 30,
         "first_name": "Idem",
@@ -44,7 +31,7 @@ async def test_onboard_is_idempotent_for_assessment_instance(async_client, test_
     count1 = (
         await test_db_session.execute(
             text(
-                "SELECT COUNT(*) AS c FROM assessment_instances WHERE user_id = :uid AND engagement_id = :eid AND package_id = 1"
+                "SELECT COUNT(*) AS c FROM assessment_instances WHERE user_id = :uid AND engagement_id = :eid"
             ),
             {"uid": body1["user_id"], "eid": body1["engagement_id"]},
         )
@@ -53,7 +40,7 @@ async def test_onboard_is_idempotent_for_assessment_instance(async_client, test_
     count2 = (
         await test_db_session.execute(
             text(
-                "SELECT COUNT(*) AS c FROM assessment_instances WHERE user_id = :uid AND engagement_id = :eid AND package_id = 1"
+                "SELECT COUNT(*) AS c FROM assessment_instances WHERE user_id = :uid AND engagement_id = :eid"
             ),
             {"uid": body2["user_id"], "eid": body2["engagement_id"]},
         )

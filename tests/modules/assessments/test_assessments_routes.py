@@ -37,10 +37,36 @@ async def test_list_my_assessments_requires_auth(async_client):
 async def test_list_my_assessments_returns_only_my_rows(async_client, test_db_session):
     test_db_session.add(User(user_id=3001, age=30, phone="3001000000", status="active"))
     test_db_session.add(User(user_id=3002, age=30, phone="3002000000", status="active"))
-    test_db_session.add(AssessmentPackage(package_id=1, package_code="BASIC", display_name="Basic", status="active"))
+    test_db_session.add(AssessmentPackage(package_id=99401, package_code="BASIC", display_name="Basic", status="active"))
     await test_db_session.flush()  # Ensure users and packages exist before adding engagements
-    test_db_session.add(Engagement(engagement_id=501, engagement_code="ENG501", assessment_package_id=1))
-    test_db_session.add(Engagement(engagement_id=502, engagement_code="ENG502", assessment_package_id=1))
+    test_db_session.add(
+        Engagement(
+            engagement_id=501,
+            engagement_name="E501",
+            engagement_code="ENG501",
+            engagement_type="healthcamp",
+            assessment_package_id=99401,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=60,
+            status="active",
+            participant_count=0,
+        )
+    )
+    test_db_session.add(
+        Engagement(
+            engagement_id=502,
+            engagement_name="E502",
+            engagement_code="ENG502",
+            engagement_type="healthcamp",
+            assessment_package_id=99401,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=60,
+            status="active",
+            participant_count=0,
+        )
+    )
     await test_db_session.flush()  # Ensure engagements exist before adding instances
 
     now = datetime.now(timezone.utc)
@@ -48,7 +74,7 @@ async def test_list_my_assessments_returns_only_my_rows(async_client, test_db_se
         AssessmentInstance(
             assessment_instance_id=91001,
             user_id=3001,
-            package_id=1,
+            package_id=99401,
             engagement_id=501,
             status="active",
             assigned_at=now,
@@ -59,7 +85,7 @@ async def test_list_my_assessments_returns_only_my_rows(async_client, test_db_se
         AssessmentInstance(
             assessment_instance_id=91002,
             user_id=3002,
-            package_id=1,
+            package_id=99401,
             engagement_id=502,
             status="active",
             assigned_at=now,
@@ -85,16 +111,29 @@ async def test_list_my_assessments_returns_only_my_rows(async_client, test_db_se
 async def test_get_assessment_details_blocks_cross_user_access(async_client, test_db_session):
     test_db_session.add(User(user_id=3011, age=30, phone="3011000000", status="active"))
     test_db_session.add(User(user_id=3012, age=30, phone="3012000000", status="active"))
-    test_db_session.add(AssessmentPackage(package_id=2, package_code="P2", display_name="P2", status="active"))
+    test_db_session.add(AssessmentPackage(package_id=99402, package_code="P2", display_name="P2", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Engagement(engagement_id=601, engagement_code="ENG601", assessment_package_id=2))
+    test_db_session.add(
+        Engagement(
+            engagement_id=601,
+            engagement_name="E601",
+            engagement_code="ENG601",
+            engagement_type="healthcamp",
+            assessment_package_id=99402,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=60,
+            status="active",
+            participant_count=0,
+        )
+    )
     await test_db_session.flush()
 
     test_db_session.add(
         AssessmentInstance(
             assessment_instance_id=92001,
             user_id=3012,
-            package_id=2,
+            package_id=99402,
             engagement_id=601,
             status="active",
             assigned_at=datetime.now(timezone.utc),
@@ -111,16 +150,29 @@ async def test_get_assessment_details_blocks_cross_user_access(async_client, tes
 @pytest.mark.asyncio
 async def test_patch_assessment_status_allows_active_to_completed(async_client, test_db_session):
     test_db_session.add(User(user_id=3021, age=30, phone="3021000000", status="active"))
-    test_db_session.add(AssessmentPackage(package_id=3, package_code="P3", display_name="P3", status="active"))
+    test_db_session.add(AssessmentPackage(package_id=99403, package_code="P3", display_name="P3", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Engagement(engagement_id=701, engagement_code="ENG701", assessment_package_id=3))
+    test_db_session.add(
+        Engagement(
+            engagement_id=701,
+            engagement_name="E701",
+            engagement_code="ENG701",
+            engagement_type="healthcamp",
+            assessment_package_id=99403,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=60,
+            status="active",
+            participant_count=0,
+        )
+    )
     await test_db_session.flush()
 
     test_db_session.add(
         AssessmentInstance(
             assessment_instance_id=93001,
             user_id=3021,
-            package_id=3,
+            package_id=99403,
             engagement_id=701,
             status="active",
             assigned_at=datetime.now(timezone.utc),
@@ -150,16 +202,29 @@ async def test_patch_assessment_status_allows_active_to_completed(async_client, 
 @pytest.mark.asyncio
 async def test_patch_assessment_status_rejects_invalid_status(async_client, test_db_session):
     test_db_session.add(User(user_id=3031, age=30, phone="3031000000", status="active"))
-    test_db_session.add(AssessmentPackage(package_id=4, package_code="P4", display_name="P4", status="active"))
+    test_db_session.add(AssessmentPackage(package_id=99404, package_code="P4", display_name="P4", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Engagement(engagement_id=801, engagement_code="ENG801", assessment_package_id=4))
+    test_db_session.add(
+        Engagement(
+            engagement_id=801,
+            engagement_name="E801",
+            engagement_code="ENG801",
+            engagement_type="healthcamp",
+            assessment_package_id=99404,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=60,
+            status="active",
+            participant_count=0,
+        )
+    )
     await test_db_session.flush()
 
     test_db_session.add(
         AssessmentInstance(
             assessment_instance_id=94001,
             user_id=3031,
-            package_id=4,
+            package_id=99404,
             engagement_id=801,
             status="active",
             assigned_at=datetime.now(timezone.utc),
@@ -180,16 +245,29 @@ async def test_patch_assessment_status_rejects_invalid_status(async_client, test
 @pytest.mark.asyncio
 async def test_patch_assessment_status_rejects_changes_after_completion(async_client, test_db_session):
     test_db_session.add(User(user_id=3041, age=30, phone="3041000000", status="active"))
-    test_db_session.add(AssessmentPackage(package_id=5, package_code="P5", display_name="P5", status="active"))
+    test_db_session.add(AssessmentPackage(package_id=99405, package_code="P5", display_name="P5", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Engagement(engagement_id=901, engagement_code="ENG901", assessment_package_id=5))
+    test_db_session.add(
+        Engagement(
+            engagement_id=901,
+            engagement_name="E901",
+            engagement_code="ENG901",
+            engagement_type="healthcamp",
+            assessment_package_id=99405,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=60,
+            status="active",
+            participant_count=0,
+        )
+    )
     await test_db_session.flush()
 
     test_db_session.add(
         AssessmentInstance(
             assessment_instance_id=95001,
             user_id=3041,
-            package_id=5,
+            package_id=99405,
             engagement_id=901,
             status="completed",
             assigned_at=datetime.now(timezone.utc),
@@ -204,7 +282,7 @@ async def test_patch_assessment_status_rejects_changes_after_completion(async_cl
         json={"status": "active"},
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 422
     assert response.json() == {"error_code": "INVALID_STATE", "message": "Assessment is already completed"}
 
 
@@ -226,15 +304,28 @@ async def test_put_metsights_record_id_returns_404_for_missing_instance(async_cl
 async def test_put_metsights_record_id_rejects_empty_string(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=3302, employee_id=3302)
     test_db_session.add(User(user_id=3303, phone="3303000000", age=30, status="active"))
-    test_db_session.add(AssessmentPackage(package_id=33, package_code="P33", display_name="P33", status="active"))
+    test_db_session.add(AssessmentPackage(package_id=99433, package_code="P33", display_name="P33", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Engagement(engagement_id=3303, engagement_code="ENG3303", assessment_package_id=33))
+    test_db_session.add(
+        Engagement(
+            engagement_id=3303,
+            engagement_name="E3303",
+            engagement_code="ENG3303",
+            engagement_type="healthcamp",
+            assessment_package_id=99433,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=60,
+            status="active",
+            participant_count=0,
+        )
+    )
     await test_db_session.flush()
     test_db_session.add(
         AssessmentInstance(
             assessment_instance_id=3303001,
             user_id=3303,
-            package_id=33,
+            package_id=99433,
             engagement_id=3303,
             status="active",
             assigned_at=datetime.now(timezone.utc),
@@ -256,15 +347,28 @@ async def test_put_metsights_record_id_rejects_empty_string(async_client, test_d
 async def test_put_metsights_record_id_updates_and_get_returns_field(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=3304, employee_id=3304)
     test_db_session.add(User(user_id=3305, phone="3305000000", age=30, status="active"))
-    test_db_session.add(AssessmentPackage(package_id=34, package_code="P34", display_name="P34", status="active"))
+    test_db_session.add(AssessmentPackage(package_id=99434, package_code="P34", display_name="P34", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Engagement(engagement_id=3305, engagement_code="ENG3305", assessment_package_id=34))
+    test_db_session.add(
+        Engagement(
+            engagement_id=3305,
+            engagement_name="E3305",
+            engagement_code="ENG3305",
+            engagement_type="healthcamp",
+            assessment_package_id=99434,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=60,
+            status="active",
+            participant_count=0,
+        )
+    )
     await test_db_session.flush()
     test_db_session.add(
         AssessmentInstance(
             assessment_instance_id=3305001,
             user_id=3305,
-            package_id=34,
+            package_id=99434,
             engagement_id=3305,
             status="active",
             assigned_at=datetime.now(timezone.utc),

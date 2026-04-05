@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentPackage, AssessmentPackageCategory
@@ -13,9 +13,10 @@ from modules.questionnaire.models import (
     QuestionnaireDefinition,
     QuestionnaireOption,
 )
+from modules.platform_settings.models import PlatformSettings
 from modules.users.models import User
 
-from db.seed.data import (
+from db.seed.seed_dataclasses import (
     SeedAssessmentPackage,
     SeedCategory,
     SeedCategoryQuestion,
@@ -25,6 +26,10 @@ from db.seed.data import (
     SeedQuestion,
     SeedUser,
 )
+
+# B2C singleton defaults (diagnostic id 1 is inactive in CSV; use active Supershyft Basic).
+DEFAULT_B2C_ASSESSMENT_PACKAGE_ID = 1
+DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID = 6
 
 
 async def upsert_users(session: AsyncSession, users: Iterable[SeedUser]) -> None:
@@ -135,6 +140,18 @@ async def upsert_questions(
     session: AsyncSession, questions: Iterable[SeedQuestion]
 ) -> None:
     for seed in questions:
+        # Avoid unique(question_key) violations when seed keys are renamed but older
+        # rows (or duplicates) still hold the target key.
+        key_conflict = await session.execute(
+            select(QuestionnaireDefinition).where(
+                QuestionnaireDefinition.question_key == seed.question_key,
+                QuestionnaireDefinition.question_id != seed.question_id,
+            )
+        )
+        for other in key_conflict.scalars().all():
+            other.question_key = f"_superseded_{other.question_id}"
+        await session.flush()
+
         existing = await session.get(QuestionnaireDefinition, seed.question_id)
         if existing is None:
             session.add(
@@ -164,6 +181,24 @@ async def upsert_category_questions(
     category_questions: Iterable[SeedCategoryQuestion],
 ) -> None:
     for seed in category_questions:
+        by_pair = (
+            await session.execute(
+                select(QuestionnaireCategoryQuestion).where(
+                    QuestionnaireCategoryQuestion.category_id == seed.category_id,
+                    QuestionnaireCategoryQuestion.question_id == seed.question_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if by_pair is not None and by_pair.id != seed.id:
+            await session.delete(by_pair)
+            await session.flush()
+        by_id = await session.get(QuestionnaireCategoryQuestion, seed.id)
+        if by_id is not None and (
+            by_id.category_id != seed.category_id or by_id.question_id != seed.question_id
+        ):
+            await session.delete(by_id)
+            await session.flush()
+
         existing = await session.get(QuestionnaireCategoryQuestion, seed.id)
         if existing is None:
             session.add(
@@ -203,6 +238,24 @@ async def upsert_package_categories(
     package_categories: Iterable[SeedPackageCategory],
 ) -> None:
     for seed in package_categories:
+        by_pair = (
+            await session.execute(
+                select(AssessmentPackageCategory).where(
+                    AssessmentPackageCategory.package_id == seed.package_id,
+                    AssessmentPackageCategory.category_id == seed.category_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if by_pair is not None and by_pair.id != seed.id:
+            await session.delete(by_pair)
+            await session.flush()
+        by_id = await session.get(AssessmentPackageCategory, seed.id)
+        if by_id is not None and (
+            by_id.package_id != seed.package_id or by_id.category_id != seed.category_id
+        ):
+            await session.delete(by_id)
+            await session.flush()
+
         existing = await session.get(AssessmentPackageCategory, seed.id)
         if existing is None:
             session.add(
@@ -308,3 +361,19 @@ async def reset_sequences(session: AsyncSession) -> None:
         """
         )
     )
+
+
+async def upsert_default_platform_settings(session: AsyncSession) -> None:
+    """Ensure row settings_id=1 exists so B2C onboarding does not fall back to inactive diagnostic package 1."""
+    existing = await session.get(PlatformSettings, 1)
+    if existing is not None:
+        return
+    session.add(
+        PlatformSettings(
+            settings_id=1,
+            b2c_default_assessment_package_id=DEFAULT_B2C_ASSESSMENT_PACKAGE_ID,
+            b2c_default_diagnostic_package_id=DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
+            updated_by_user_id=None,
+        )
+    )
+    await session.flush()

@@ -170,6 +170,24 @@ class AssessmentsRepository:
         result = await db.execute(select(AssessmentPackage).where(AssessmentPackage.package_id == package_id))
         return result.scalar_one_or_none()
 
+    async def get_package_by_assessment_type_code(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_type_code: str,
+    ) -> AssessmentPackage | None:
+        tc = (assessment_type_code or "").strip()
+        if not tc:
+            return None
+        result = await db.execute(
+            select(AssessmentPackage)
+            .where(AssessmentPackage.assessment_type_code == tc)
+            .where(func.lower(AssessmentPackage.status) == "active")
+            .order_by(AssessmentPackage.package_id.asc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def get_package_by_code(self, db: AsyncSession, *, package_code: str) -> AssessmentPackage | None:
         result = await db.execute(select(AssessmentPackage).where(AssessmentPackage.package_code == package_code))
         return result.scalar_one_or_none()

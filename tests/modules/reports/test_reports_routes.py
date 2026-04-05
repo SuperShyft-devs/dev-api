@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from core.config import settings
@@ -138,29 +138,42 @@ async def _seed_assessment(
     package_code: str | None = None,
     assessment_type_code: str | None = None,
 ):
-    if await test_db_session.get(DiagnosticPackage, diagnostic_package_id) is None:
-        test_db_session.add(
-            DiagnosticPackage(
-                diagnostic_package_id=diagnostic_package_id,
-                reference_id=f"REF{diagnostic_package_id}",
-                package_name=f"Diag Package {diagnostic_package_id}",
-                diagnostic_provider="test_provider",
-                status="active",
-            )
-        )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (:pid, :ref, :pname, 'test_provider', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        ),
+        {
+            "pid": diagnostic_package_id,
+            "ref": f"REF{diagnostic_package_id}",
+            "pname": f"Diag Package {diagnostic_package_id}",
+        },
+    )
     test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000", age=30, gender=user_gender, status="active"))
     pkg_code = package_code if package_code is not None else f"P{assessment_id}"
     pkg_id = assessment_id % 1000
-    if await test_db_session.get(AssessmentPackage, pkg_id) is None:
-        pkg = AssessmentPackage(
-            package_id=pkg_id,
-            package_code=pkg_code,
-            display_name=f"Package {assessment_id}",
-            status="active",
-        )
-        if assessment_type_code is not None:
-            pkg.assessment_type_code = assessment_type_code
-        test_db_session.add(pkg)
+    atype_sql = (
+        ", assessment_type_code = EXCLUDED.assessment_type_code"
+        if assessment_type_code is not None
+        else ""
+    )
+    await test_db_session.execute(
+        text(
+            f"INSERT INTO assessment_packages (package_id, package_code, display_name, status"
+            f"{', assessment_type_code' if assessment_type_code is not None else ''}) "
+            f"VALUES (:pkg_id, :pcode, :dname, 'active'"
+            f"{', :atype' if assessment_type_code is not None else ''}) "
+            f"ON CONFLICT (package_id) DO UPDATE SET package_code = EXCLUDED.package_code, "
+            f"display_name = EXCLUDED.display_name, status = EXCLUDED.status{atype_sql}"
+        ),
+        {
+            "pkg_id": pkg_id,
+            "pcode": pkg_code,
+            "dname": f"Package {assessment_id}",
+            **({"atype": assessment_type_code} if assessment_type_code is not None else {}),
+        },
+    )
     await test_db_session.flush()
     test_db_session.add(
         Engagement(
@@ -301,15 +314,6 @@ async def test_get_blood_parameters_requires_metsights_record_id(
 @pytest.mark.asyncio
 async def test_get_blood_parameter_trends_returns_ordered_points(async_client, test_db_session):
     test_db_session.add(User(user_id=3811, phone="3811000000", age=30, status="active"))
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=1,
-            reference_id="REF1",
-            package_name="Diag Package 1",
-            diagnostic_provider="test_provider",
-            status="active",
-        )
-    )
     test_db_session.add(
         AssessmentPackage(
             package_id=811,
@@ -505,15 +509,6 @@ async def test_get_blood_parameter_trends_ignores_fitprint_for_staleness(
     test_db_session,
 ):
     """FitPrint records have no blood-parameters API; they must not drive trends staleness."""
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=1,
-            reference_id="REF1",
-            package_name="Diag Package 1",
-            diagnostic_provider="test_provider",
-            status="active",
-        )
-    )
     test_db_session.add(User(user_id=3855, phone="3855000000", age=30, gender="male", status="active"))
     test_db_session.add(
         AssessmentPackage(

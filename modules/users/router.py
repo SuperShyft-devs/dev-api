@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Body, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -11,13 +11,16 @@ from core.exceptions import AppError
 from db.session import get_db
 from modules.users.dependencies import get_participant_journey_service, get_users_service
 from modules.users.participant_journey_service import ParticipantJourneyService
-from modules.employee.dependencies import get_current_employee
+from modules.employee.dependencies import get_current_employee, get_optional_employee
 from modules.employee.service import EmployeeContext
+from modules.metsights.dependencies import get_metsights_sync_service
+from modules.metsights.sync_service import MetsightsSyncService
 from modules.users.schemas import (
     BookBioAiRequest,
     EmployeeCreateUserRequest,
     EmployeeUpdateUserRequest,
     EngagementUserOnboardRequest,
+    MetsightsSyncRecordsRequest,
     UpcomingSlotResponse,
     PublicUserOnboardRequest,
     SubProfileCreate,
@@ -499,6 +502,32 @@ async def employee_get_participant_journey_summary(
         limit=limit,
     )
     return success_response(data, meta=meta)
+
+
+@router.post("/{user_id}/metsights/sync-records")
+async def sync_user_metsights_completed_records(
+    request: Request,
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    employee: EmployeeContext | None = Depends(get_optional_employee),
+    sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
+    payload: MetsightsSyncRecordsRequest = Body(default_factory=MetsightsSyncRecordsRequest),
+):
+    """Import completed Metsights assessments as local assessment instances (self or employee)."""
+
+    result = await sync_service.sync_completed_metsights_records(
+        db,
+        target_user_id=user_id,
+        current_user_id=current_user.user_id,
+        employee_ok=employee is not None,
+        engagement_code=payload.engagement_code,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
 
 
 @router.get("/{user_id}/participant-journey/{assessment_instance_id}")

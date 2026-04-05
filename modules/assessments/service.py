@@ -119,6 +119,89 @@ class AssessmentsService:
 
         return instance
 
+    async def create_instance_for_metsights_record(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+        package_id: int,
+        metsights_record_id: str,
+        metsights_is_complete: bool,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> AssessmentInstance:
+        """Create an assessment instance keyed by Metsights record id.
+
+        Idempotent on ``metsights_record_id`` only. Allows multiple instances per
+        (user_id, engagement_id, package_id) when Metsights record ids differ.
+        """
+
+        mid = (metsights_record_id or "").strip()
+        if not mid:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Metsights record id is missing")
+
+        package = await self._repository.get_package_by_id(db, package_id=package_id)
+        if package is None or (package.status or "").lower() != "active":
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment package is not active")
+
+        existing = await self._repository.get_instance_by_metsights_record_id(db, metsights_record_id=mid)
+        if existing is not None:
+            if int(existing.user_id) != int(user_id):
+                raise AppError(
+                    status_code=409,
+                    error_code="CONFLICT",
+                    message="Metsights record id is already linked to another user",
+                )
+            return existing
+
+        status = "completed" if metsights_is_complete else "active"
+        completed_at = datetime.now(timezone.utc) if metsights_is_complete else None
+        instance = AssessmentInstance(
+            user_id=user_id,
+            engagement_id=engagement_id,
+            package_id=package_id,
+            status=status,
+            metsights_record_id=mid,
+            assigned_at=datetime.now(timezone.utc),
+            completed_at=completed_at,
+        )
+        instance = await self._repository.create_instance(db, instance)
+        package_categories = await self._repository.list_package_categories(db, package_id=package_id)
+        for link in package_categories:
+            existing_progress = await self._repository.get_category_progress(
+                db,
+                assessment_instance_id=instance.assessment_instance_id,
+                category_id=link.category_id,
+            )
+            if existing_progress is not None:
+                continue
+            progress_status = "complete" if metsights_is_complete else "incomplete"
+            progress_completed = datetime.now(timezone.utc) if metsights_is_complete else None
+            await self._repository.create_category_progress(
+                db,
+                AssessmentCategoryProgress(
+                    assessment_instance_id=instance.assessment_instance_id,
+                    category_id=link.category_id,
+                    status=progress_status,
+                    completed_at=progress_completed,
+                ),
+            )
+
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="SYSTEM_ASSIGN_ASSESSMENT_INSTANCE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id,
+            session_id=None,
+        )
+
+        return instance
+
     def _require_audit_service(self) -> AuditService:
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
@@ -129,8 +212,16 @@ class AssessmentsService:
             db, metsights_record_id=metsights_record_id
         )
 
+    async def get_instance_by_id(self, db: AsyncSession, *, assessment_instance_id: int) -> AssessmentInstance | None:
+        return await self._repository.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
+
     async def get_package_by_id(self, db: AsyncSession, package_id: int):
         return await self._repository.get_package_by_id(db, package_id=package_id)
+
+    async def get_package_by_assessment_type_code(self, db: AsyncSession, *, assessment_type_code: str):
+        return await self._repository.get_package_by_assessment_type_code(
+            db, assessment_type_code=assessment_type_code
+        )
 
     async def list_my_assessments(
         self,

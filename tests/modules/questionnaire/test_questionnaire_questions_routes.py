@@ -73,7 +73,7 @@ async def test_create_question_creates_row(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9002, employee_id=10)
 
     payload = {
-        "question_key": "how_are_you",
+        "question_key": "pytest_how_are_you",
         "question_text": "How are you?",
         "question_type": "single_choice",
         "options": [
@@ -93,7 +93,7 @@ async def test_create_question_creates_row(async_client, test_db_session):
     opts = await test_db_session.execute(
         select(QuestionnaireOption).where(QuestionnaireOption.question_id == question_id)
     )
-    assert [o.option_value for o in opts.scalars().all()] == ["Good", "Bad"]
+    assert {o.option_value for o in opts.scalars().all()} == {"Good", "Bad"}
     assert (created.status or "").lower() == "active"
 
 

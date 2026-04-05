@@ -18,6 +18,102 @@ class MetsightsService:
     def __init__(self, client: MetsightsClient):
         self._client = client
 
+    def _require_api_key(self) -> None:
+        if not settings.METSIGHTS_API_KEY:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights integration is not configured",
+            )
+
+    async def list_profile_records(
+        self,
+        *,
+        profile_id: str,
+        completed: str | None = None,
+        code: str | None = None,
+        search: str | None = None,
+    ) -> Any:
+        """GET /profiles/:profile_id/records/ — returns envelope `data` (list or dict)."""
+
+        pid = (profile_id or "").strip()
+        if not pid:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Metsights profile id is missing")
+        self._require_api_key()
+        try:
+            payload = await self._client.list_profile_records(
+                profile_id=pid,
+                completed=completed,
+                code=code,
+                search=search,
+            )
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 404:
+                raise AppError(
+                    status_code=404,
+                    error_code="PROFILE_NOT_FOUND",
+                    message="Metsights profile not found",
+                ) from exc
+            if status_code == 403:
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Metsights authorization failed",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
+        envelope = MetsightsEnvelope.model_validate(payload)
+        return envelope.data
+
+    async def get_record_detail(self, *, record_id: str) -> Any:
+        """GET /records/:record_id/ — full record including nested questionnaire payloads."""
+
+        rid = (record_id or "").strip()
+        if not rid:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Metsights record id is missing")
+        self._require_api_key()
+        try:
+            payload = await self._client.get_record_detail(record_id=rid)
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 404:
+                raise AppError(
+                    status_code=404,
+                    error_code="RECORD_NOT_FOUND",
+                    message="Metsights record not found",
+                ) from exc
+            if status_code == 403:
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Metsights authorization failed",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
+        envelope = MetsightsEnvelope.model_validate(payload)
+        return envelope.data
+
     async def get_blood_parameters(self, *, record_id: str) -> Any:
         normalized_record_id = (record_id or "").strip()
         if not normalized_record_id:

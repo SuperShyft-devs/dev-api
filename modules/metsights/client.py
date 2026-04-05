@@ -89,3 +89,47 @@ class MetsightsClient:
             if not isinstance(payload, dict):
                 return {"detail": "Unexpected response", "data": None}
             return payload
+
+    async def list_profile_records(
+        self,
+        *,
+        profile_id: str,
+        completed: str | None = None,
+        code: str | None = None,
+        search: str | None = None,
+    ) -> dict[str, Any]:
+        base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
+        safe_pid = (profile_id or "").strip().strip("/")
+        url = f"{base_url}/profiles/{safe_pid}/records/"
+        headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
+        timeout = settings.METSIGHTS_TIMEOUT_SECONDS
+        params: dict[str, Any] = {}
+        if completed is not None and str(completed).strip() != "":
+            params["completed"] = str(completed).strip()
+        if code is not None and str(code).strip() != "":
+            params["code"] = str(code).strip()
+        if search is not None and str(search).strip() != "":
+            params["search"] = str(search).strip()
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(url, headers=headers, params=params or None)
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                return {"detail": "Unexpected response", "data": None}
+            return payload
+
+    async def get_record_detail(self, *, record_id: str) -> dict[str, Any]:
+        base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
+        safe_rid = (record_id or "").strip().strip("/")
+        url = f"{base_url}/records/{safe_rid}/"
+        headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
+        timeout = settings.METSIGHTS_TIMEOUT_SECONDS
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                return {"detail": "Unexpected response", "data": None}
+            return payload

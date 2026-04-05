@@ -22,7 +22,11 @@ async def test_add_onboarding_assistant_creates_assignment(test_db_session):
         )
     )
     await test_db_session.execute(
-        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
     )
     
     # Seed employee
@@ -75,7 +79,11 @@ async def test_add_multiple_onboarding_assistants_to_one_engagement(test_db_sess
         )
     )
     await test_db_session.execute(
-        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
     )
     
     # Seed employees
@@ -126,7 +134,11 @@ async def test_duplicate_assignment_prevented_by_unique_constraint(test_db_sessi
         )
     )
     await test_db_session.execute(
-        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
     )
     
     # Seed employee and engagement
@@ -168,7 +180,11 @@ async def test_list_onboarding_assistants_returns_all_assignments(test_db_sessio
         )
     )
     await test_db_session.execute(
-        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
     )
     
     # Seed employees
@@ -217,7 +233,11 @@ async def test_remove_onboarding_assistant_deletes_assignment(test_db_session):
         )
     )
     await test_db_session.execute(
-        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
     )
     
     # Seed employee and engagement
@@ -268,7 +288,11 @@ async def test_remove_nonexistent_assignment_returns_false(test_db_session):
         )
     )
     await test_db_session.execute(
-        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
     )
     
     # Seed engagement
@@ -300,7 +324,11 @@ async def test_get_onboarding_assistant_assignment_returns_specific_assignment(t
         )
     )
     await test_db_session.execute(
-        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
     )
     
     # Seed employee and engagement
@@ -362,7 +390,11 @@ async def test_b2c_engagement_created_without_onboarding_assistants(test_db_sess
         )
     )
     await test_db_session.execute(
-        text("INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active')")
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
     )
     
     # Seed users table for foreign key

@@ -309,6 +309,12 @@ class EmployeeUpdateUserRequest(BaseModel):
         return v
 
 
+class MetsightsSyncRecordsRequest(BaseModel):
+    """Optional B2B engagement to attach synced Metsights records to."""
+
+    engagement_code: Optional[str] = Field(default=None, max_length=200)
+
+
 class EmployeeUserListItem(BaseModel):
     user_id: int
     first_name: Optional[str] = None

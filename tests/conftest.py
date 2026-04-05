@@ -116,7 +116,23 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         check=False,
     )
     _run_subprocess([sys.executable, "-m", "alembic", "upgrade", "head"])
-    _run_subprocess([sys.executable, "-m", "db.seed", "--yes"])
+    # Diagnostics CSVs live under dev-api/db/seed/csv (not workspace root).
+    csv_dir = _project_root() / "db" / "seed" / "csv"
+    env = os.environ.copy()
+    env.setdefault("DIAGNOSTICS_CSV_DIR", str(csv_dir.resolve()))
+    result = subprocess.run(
+        [sys.executable, "-m", "db.seed", "--yes"],
+        cwd=_project_root(),
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Command failed ({result.returncode}): db.seed\n"
+            f"{(result.stdout or '') + (result.stderr or '')}"
+        )
 
 
 @pytest.fixture(autouse=True)
@@ -270,15 +286,13 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     await test_db_session.rollback()
 
     # Delete audit logs first - they reference auth_otp_sessions
-    await test_db_session.execute(
-        text("DELETE FROM data_audit_logs WHERE user_id >= 1001 AND user_id < 10000")
-    )
-    await test_db_session.execute(
-        text("DELETE FROM auth_otp_sessions WHERE user_id >= 1001 AND user_id < 10000")
-    )
-    await test_db_session.execute(
-        text("DELETE FROM auth_tokens WHERE user_id >= 1001 AND user_id < 10000")
-    )
+    if _use_isolated_test_db:
+        _non_seed_users = "user_id NOT IN (1, 2)"
+    else:
+        _non_seed_users = "user_id >= 1001 AND user_id < 10000"
+    await test_db_session.execute(text(f"DELETE FROM data_audit_logs WHERE {_non_seed_users}"))
+    await test_db_session.execute(text(f"DELETE FROM auth_otp_sessions WHERE {_non_seed_users}"))
+    await test_db_session.execute(text(f"DELETE FROM auth_tokens WHERE {_non_seed_users}"))
     await test_db_session.execute(text("DELETE FROM questionnaire_responses"))
     await test_db_session.execute(text("DELETE FROM questionnaire_healthy_habit_rules"))
     await test_db_session.execute(text("DELETE FROM assessment_category_progress"))
@@ -289,13 +303,39 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     await test_db_session.execute(text("DELETE FROM assessment_instances"))
     await test_db_session.execute(text("DELETE FROM onboarding_assistant_assignment"))
     await test_db_session.execute(text("DELETE FROM platform_settings"))
+    if _use_isolated_test_db:
+        # Restore B2C defaults (matches db.seed); tests that customize settings delete/replace this row.
+        await test_db_session.execute(
+            text(
+                "INSERT INTO platform_settings (settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
+                "VALUES (1, 1, 6)"
+            )
+        )
     await test_db_session.execute(text("DELETE FROM engagements"))
+    if _use_isolated_test_db:
+        # Tests insert ad-hoc assessment_packages; seed keeps MET_BASIC / MET_PRO / FitPrint as ids 1–3.
+        await test_db_session.execute(
+            text(
+                "DELETE FROM assessment_package_categories WHERE package_id NOT IN (1, 2, 3)"
+            )
+        )
+        await test_db_session.execute(
+            text("DELETE FROM assessment_packages WHERE package_id NOT IN (1, 2, 3)")
+        )
+        # After package↔category links for ad-hoc packages are gone, drop test questionnaire rows.
+        await test_db_session.execute(text("DELETE FROM questionnaire_options WHERE question_id > 44"))
+        await test_db_session.execute(
+            text(
+                "DELETE FROM questionnaire_category_questions WHERE category_id > 4 OR question_id > 44"
+            )
+        )
+        await test_db_session.execute(text("DELETE FROM questionnaire_definitions WHERE question_id > 44"))
+        await test_db_session.execute(text("DELETE FROM questionnaire_categories WHERE category_id > 4"))
+        await test_db_session.execute(text("DELETE FROM user_preferences WHERE user_id NOT IN (1, 2)"))
     await test_db_session.execute(text("DELETE FROM organizations"))
 
     if _use_isolated_test_db:
-        await test_db_session.execute(
-            text("DELETE FROM employee WHERE user_id >= 1001 AND user_id < 10000")
-        )
+        await test_db_session.execute(text("DELETE FROM employee WHERE user_id NOT IN (1, 2)"))
     else:
         await test_db_session.execute(text("DELETE FROM assessment_package_categories"))
         await test_db_session.execute(text("DELETE FROM questionnaire_category_questions"))
@@ -306,17 +346,20 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
         await test_db_session.execute(text("DELETE FROM diagnostic_package"))
         await test_db_session.execute(text("DELETE FROM employee"))
 
-    await test_db_session.execute(
-        text(
-            "DELETE FROM users WHERE user_id >= 1001 AND user_id < 10000 "
-            "OR phone IN ("
-            "'9999999999','8888888888','7777777777','6666666666','5555555555',"
-            "'1111111111','2222222222','3333333333','4444444444','7777700000',"
-            "'1234567890','1234567891','8877665501','5550000998','9301000000','9411000000','9876543210',"
-            "'6100000001','6100000002','6100000003','6100000004','6100000005',"
-            "'6111111111','6111111112','6111111113','6111111114'"
-            ")"
+    if _use_isolated_test_db:
+        await test_db_session.execute(text("DELETE FROM users WHERE user_id NOT IN (1, 2)"))
+    else:
+        await test_db_session.execute(
+            text(
+                "DELETE FROM users WHERE user_id >= 1001 AND user_id < 10000 "
+                "OR phone IN ("
+                "'9999999999','8888888888','7777777777','6666666666','5555555555',"
+                "'1111111111','2222222222','3333333333','4444444444','7777700000',"
+                "'1234567890','1234567891','8877665501','5550000998','9301000000','9411000000','9876543210',"
+                "'6100000001','6100000002','6100000003','6100000004','6100000005',"
+                "'6111111111','6111111112','6111111113','6111111114'"
+                ")"
+            )
         )
-    )
 
     await test_db_session.commit()

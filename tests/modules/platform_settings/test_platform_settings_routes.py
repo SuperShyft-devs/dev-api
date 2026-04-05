@@ -6,6 +6,8 @@ from datetime import timedelta
 
 import pytest
 
+from sqlalchemy import text
+
 from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
@@ -38,7 +40,9 @@ async def test_get_b2c_defaults_fallback_when_no_row(async_client, test_db_sessi
     test_db_session.add(User(user_id=uid, age=30, phone="91010000001", status="active"))
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=9101, user_id=uid, role="admin", status="active"))
+    await test_db_session.execute(text("DELETE FROM platform_settings"))
     await test_db_session.commit()
+    test_db_session.expire_all()
 
     response = await async_client.get("/platform-settings/b2c-onboarding", headers=_auth_header(uid))
     assert response.status_code == 200
@@ -54,31 +58,21 @@ async def test_patch_b2c_defaults_persists_and_get_returns(async_client, test_db
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=9102, user_id=uid, role="admin", status="active"))
 
-    from modules.assessments.models import AssessmentPackage
-    from modules.diagnostics.models import DiagnosticPackage
-
-    test_db_session.add(
-        AssessmentPackage(package_id=1, package_code="P1", display_name="One", status="active")
-    )
-    test_db_session.add(
-        AssessmentPackage(package_id=2, package_code="P2", display_name="Two", status="active")
-    )
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=1,
-            reference_id="R1",
-            package_name="D1",
-            diagnostic_provider="p",
-            status="active",
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES "
+            "(1, 'P1', 'One', 'active'), (2, 'P2', 'Two', 'active') "
+            "ON CONFLICT (package_id) DO UPDATE SET "
+            "package_code = EXCLUDED.package_code, display_name = EXCLUDED.display_name, status = EXCLUDED.status"
         )
     )
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=2,
-            reference_id="R2",
-            package_name="D2",
-            diagnostic_provider="p",
-            status="active",
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'R1', 'D1', 'p', 'active'), (2, 'R2', 'D2', 'p', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
+            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
+            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status"
         )
     )
     await test_db_session.commit()
@@ -105,22 +99,26 @@ async def test_patch_b2c_defaults_rejects_inactive_package(async_client, test_db
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=9103, user_id=uid, role="admin", status="active"))
 
-    from modules.assessments.models import AssessmentPackage
-    from modules.diagnostics.models import DiagnosticPackage
-
-    test_db_session.add(
-        AssessmentPackage(package_id=1, package_code="P1", display_name="One", status="active")
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES "
+            "(1, 'P1', 'One', 'active') "
+            "ON CONFLICT (package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
     )
-    test_db_session.add(
-        AssessmentPackage(package_id=99, package_code="PX", display_name="Inactive", status="inactive")
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES "
+            "(99, 'PX', 'Inactive', 'inactive') "
+            "ON CONFLICT (package_id) DO UPDATE SET "
+            "package_code = EXCLUDED.package_code, display_name = EXCLUDED.display_name, status = EXCLUDED.status"
+        )
     )
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=1,
-            reference_id="R1",
-            package_name="D1",
-            diagnostic_provider="p",
-            status="active",
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'R1', 'D1', 'p', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
         )
     )
     await test_db_session.commit()

@@ -82,7 +82,7 @@ async def test_book_bio_ai_creates_engagement_slot_instance(async_client, test_d
             {"eid": eid},
         )
     ).first()
-    assert eng.diagnostic_package_id == 1
+    assert eng.diagnostic_package_id == 6  # seeded platform_settings B2C default
     assert eng.assessment_package_id == 1
 
     inst = (

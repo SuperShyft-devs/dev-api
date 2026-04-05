@@ -437,14 +437,14 @@ async def test_get_questionnaire_applies_parent_answer_visibility(async_client, 
 
     q_parent = QuestionnaireDefinition(
         question_id=3701,
-        question_key="consume_coffee_or_tea",
+        question_key="pytest_consume_coffee_or_tea",
         question_text="Do you consume coffee or tea?",
         question_type="single_choice",
         status="active",
     )
     q_child = QuestionnaireDefinition(
         question_id=3702,
-        question_key="coffee_or_tea_cups",
+        question_key="pytest_coffee_or_tea_cups",
         question_text="How many cups do you consume?",
         question_type="number",
         visibility_rules={
@@ -453,7 +453,7 @@ async def test_get_questionnaire_applies_parent_answer_visibility(async_client, 
                 {
                     "type": "question_answer",
                     "operator": "equals",
-                    "question_key": "consume_coffee_or_tea",
+                    "question_key": "pytest_consume_coffee_or_tea",
                     "value": "yes",
                 }
             ],
@@ -516,7 +516,7 @@ async def test_get_questionnaire_prefills_and_uses_preferences_for_visibility(as
 
     q_diet = QuestionnaireDefinition(
         question_id=3703,
-        question_key="diet_preference",
+        question_key="pytest_diet_preference_q",
         question_text="What is your diet preference?",
         question_type="single_choice",
         prefill_from={"source": "user_preference", "preference_key": "diet_preference"},
@@ -744,14 +744,14 @@ async def test_upsert_responses_rejects_hidden_question(async_client, test_db_se
 
     q_parent = QuestionnaireDefinition(
         question_id=3705,
-        question_key="consume_coffee_or_tea",
+        question_key="pytest_consume_coffee_or_tea_b",
         question_text="Do you consume coffee or tea?",
         question_type="single_choice",
         status="active",
     )
     q_child = QuestionnaireDefinition(
         question_id=3706,
-        question_key="coffee_or_tea_cups",
+        question_key="pytest_coffee_or_tea_cups_b",
         question_text="How many cups?",
         question_type="number",
         visibility_rules={
@@ -760,7 +760,7 @@ async def test_upsert_responses_rejects_hidden_question(async_client, test_db_se
                 {
                     "type": "question_answer",
                     "operator": "equals",
-                    "question_key": "consume_coffee_or_tea",
+                    "question_key": "pytest_consume_coffee_or_tea_b",
                     "value": "yes",
                 }
             ],
@@ -804,7 +804,7 @@ async def test_upsert_scale_response_requires_value_and_unit(async_client, test_
     category = QuestionnaireCategory(category_id=7710, category_key="cat_7710", display_name="Scale Category", status="active")
     question = QuestionnaireDefinition(
         question_id=3710,
-        question_key="height",
+        question_key="pytest_scale_height",
         question_text="What is your height?",
         question_type="scale",
         status="active",
@@ -846,7 +846,7 @@ async def test_upsert_scale_response_rejects_unknown_unit(async_client, test_db_
     category = QuestionnaireCategory(category_id=7711, category_key="cat_7711", display_name="Scale Category", status="active")
     question = QuestionnaireDefinition(
         question_id=3711,
-        question_key="weight",
+        question_key="pytest_scale_weight",
         question_text="What is your weight?",
         question_type="scale",
         status="active",

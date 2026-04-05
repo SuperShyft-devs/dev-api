@@ -92,7 +92,7 @@ async def test_get_organization_participants_returns_empty_list_when_no_particip
     # Create assessment package (required for engagements)
     test_db_session.add(
         AssessmentPackage(
-            package_id=1,
+            package_id=88101,
             package_code="PKG001",
             display_name="Test Package",
             status="active",
@@ -113,10 +113,12 @@ async def test_get_organization_participants_returns_empty_list_when_no_particip
     test_db_session.add(
         Engagement(
             engagement_id=2001,
+            engagement_name="Org 1002 camp",
             organization_id=1002,
             engagement_code="ENG2001",
             engagement_type="b2b",
-            assessment_package_id=1,
+            assessment_package_id=88101,
+            diagnostic_package_id=6,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -143,7 +145,7 @@ async def test_get_organization_participants_returns_participants_from_single_en
     # Create assessment package
     test_db_session.add(
         AssessmentPackage(
-            package_id=2,
+            package_id=88102,
             package_code="PKG002",
             display_name="Test Package 2",
             status="active",
@@ -164,10 +166,12 @@ async def test_get_organization_participants_returns_participants_from_single_en
     test_db_session.add(
         Engagement(
             engagement_id=2002,
+            engagement_name="Org 1003 camp",
             organization_id=1003,
             engagement_code="ENG2002",
             engagement_type="b2b",
-            assessment_package_id=2,
+            assessment_package_id=88102,
+            diagnostic_package_id=6,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -255,7 +259,7 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
     # Create assessment package
     test_db_session.add(
         AssessmentPackage(
-            package_id=3,
+            package_id=88103,
             package_code="PKG003",
             display_name="Test Package 3",
             status="active",
@@ -277,10 +281,12 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
     test_db_session.add(
         Engagement(
             engagement_id=2003,
+            engagement_name="Org 1004 camp A",
             organization_id=1004,
             engagement_code="ENG2003",
             engagement_type="b2b",
-            assessment_package_id=3,
+            assessment_package_id=88103,
+            diagnostic_package_id=6,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -291,10 +297,12 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
     test_db_session.add(
         Engagement(
             engagement_id=2004,
+            engagement_name="Org 1004 camp B",
             organization_id=1004,
             engagement_code="ENG2004",
             engagement_type="b2b",
-            assessment_package_id=3,
+            assessment_package_id=88103,
+            diagnostic_package_id=6,
             slot_duration=20,
             start_date=date(2026, 4, 1),
             end_date=date(2026, 4, 30),
@@ -435,7 +443,7 @@ async def test_get_organization_participants_paginates_results(async_client, tes
     # Create assessment package
     test_db_session.add(
         AssessmentPackage(
-            package_id=4,
+            package_id=88104,
             package_code="PKG004",
             display_name="Test Package 4",
             status="active",
@@ -456,10 +464,12 @@ async def test_get_organization_participants_paginates_results(async_client, tes
     test_db_session.add(
         Engagement(
             engagement_id=2005,
+            engagement_name="Org 1006 camp",
             organization_id=1006,
             engagement_code="ENG2005",
             engagement_type="b2b",
-            assessment_package_id=4,
+            assessment_package_id=88104,
+            diagnostic_package_id=6,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -541,7 +551,7 @@ async def test_get_organization_participants_excludes_other_organizations(async_
     # Create assessment package
     test_db_session.add(
         AssessmentPackage(
-            package_id=5,
+            package_id=88105,
             package_code="PKG005",
             display_name="Test Package 5",
             status="active",
@@ -570,10 +580,12 @@ async def test_get_organization_participants_excludes_other_organizations(async_
     test_db_session.add(
         Engagement(
             engagement_id=2006,
+            engagement_name="Org A camp",
             organization_id=1007,
             engagement_code="ENG2006",
             engagement_type="b2b",
-            assessment_package_id=5,
+            assessment_package_id=88105,
+            diagnostic_package_id=6,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
@@ -584,10 +596,12 @@ async def test_get_organization_participants_excludes_other_organizations(async_
     test_db_session.add(
         Engagement(
             engagement_id=2007,
+            engagement_name="Org B camp",
             organization_id=1008,
             engagement_code="ENG2007",
             engagement_type="b2b",
-            assessment_package_id=5,
+            assessment_package_id=88105,
+            diagnostic_package_id=6,
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),

@@ -129,7 +129,7 @@ async def test_public_onboard_creates_engagement_time_slot_and_assessment_instan
     ).first()
 
     assert engagement_row.engagement_type == "healthcamp"
-    assert engagement_row.diagnostic_package_id == 1
+    assert engagement_row.diagnostic_package_id == 6  # db.seed platform_settings B2C default (active diagnostic)
     assert engagement_row.participant_count == 0
     assert engagement_row.city == "Delhi"
     assert str(engagement_row.start_date) == "2026-02-01"
@@ -354,7 +354,10 @@ async def test_public_onboard_uses_platform_settings_package_ids(async_client, t
     await test_db_session.execute(
         text(
             "INSERT INTO platform_settings (settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
-            "VALUES (1, 2, 2)"
+            "VALUES (1, 2, 2) "
+            "ON CONFLICT (settings_id) DO UPDATE SET "
+            "b2c_default_assessment_package_id = EXCLUDED.b2c_default_assessment_package_id, "
+            "b2c_default_diagnostic_package_id = EXCLUDED.b2c_default_diagnostic_package_id"
         )
     )
     await test_db_session.commit()

@@ -39,6 +39,7 @@ from db.seed.operations import (
     upsert_assessment_packages,
     upsert_categories,
     upsert_category_questions,
+    upsert_default_platform_settings,
     upsert_employees,
     upsert_options,
     upsert_package_categories,
@@ -83,6 +84,7 @@ async def seed_reference_data(*, yes: bool) -> None:
             csv_dir = resolve_diagnostics_csv_dir()
             await seed_diagnostics_reference_from_csv_dir(session, csv_dir)
             await upsert_diagnostic_package_samples(session, DIAG_SAMPLES)
+            await upsert_default_platform_settings(session)
 
             await reset_sequences(session)
             await reset_diagnostics_sequences(session)
