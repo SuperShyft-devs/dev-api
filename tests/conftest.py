@@ -323,14 +323,14 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
             text("DELETE FROM assessment_packages WHERE package_id NOT IN (1, 2, 3)")
         )
         # After package↔category links for ad-hoc packages are gone, drop test questionnaire rows.
-        await test_db_session.execute(text("DELETE FROM questionnaire_options WHERE question_id > 44"))
+        await test_db_session.execute(text("DELETE FROM questionnaire_options WHERE question_id > 39"))
         await test_db_session.execute(
             text(
-                "DELETE FROM questionnaire_category_questions WHERE category_id > 4 OR question_id > 44"
+                "DELETE FROM questionnaire_category_questions WHERE category_id > 5 OR question_id > 39"
             )
         )
-        await test_db_session.execute(text("DELETE FROM questionnaire_definitions WHERE question_id > 44"))
-        await test_db_session.execute(text("DELETE FROM questionnaire_categories WHERE category_id > 4"))
+        await test_db_session.execute(text("DELETE FROM questionnaire_definitions WHERE question_id > 39"))
+        await test_db_session.execute(text("DELETE FROM questionnaire_categories WHERE category_id > 5"))
         await test_db_session.execute(text("DELETE FROM user_preferences WHERE user_id NOT IN (1, 2)"))
     await test_db_session.execute(text("DELETE FROM organizations"))
 

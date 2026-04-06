@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from sqlalchemy import select, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentPackage, AssessmentPackageCategory
@@ -134,6 +134,14 @@ async def upsert_categories(
             existing.category_key = seed.category_key
             existing.display_name = seed.display_name
             existing.status = seed.status
+
+
+async def delete_options_for_question_ids(session: AsyncSession, question_ids: Iterable[int]) -> None:
+    qids = sorted({int(x) for x in question_ids})
+    if not qids:
+        return
+    await session.execute(delete(QuestionnaireOption).where(QuestionnaireOption.question_id.in_(qids)))
+    await session.flush()
 
 
 async def upsert_questions(

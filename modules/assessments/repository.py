@@ -81,6 +81,30 @@ class AssessmentsRepository:
         )
         return [int(v) for v in result.scalars().all()]
 
+    async def get_first_category_id_for_question_in_package(
+        self,
+        db: AsyncSession,
+        *,
+        package_id: int,
+        question_id: int,
+    ) -> int | None:
+        result = await db.execute(
+            select(QuestionnaireCategoryQuestion.category_id)
+            .join(
+                AssessmentPackageCategory,
+                AssessmentPackageCategory.category_id == QuestionnaireCategoryQuestion.category_id,
+            )
+            .where(AssessmentPackageCategory.package_id == package_id)
+            .where(QuestionnaireCategoryQuestion.question_id == question_id)
+            .order_by(
+                AssessmentPackageCategory.display_order.asc().nulls_last(),
+                AssessmentPackageCategory.id.asc(),
+            )
+            .limit(1)
+        )
+        row = result.scalar_one_or_none()
+        return int(row) if row is not None else None
+
     async def reorder_package_categories(
         self,
         db: AsyncSession,

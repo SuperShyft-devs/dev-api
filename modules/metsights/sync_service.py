@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime, time, timezone
 from typing import Any
 
@@ -52,14 +53,6 @@ _ASSESSMENT_CODE_TO_TYPE_CODE: dict[str, str] = {
     "MY_FITNESS_PRINT": "7",
 }
 
-# Top-level keys on Metsights record detail whose nested objects map 1:1 to our category_key.
-_RECORD_DETAIL_CATEGORY_KEYS: tuple[str, ...] = (
-    "physical_measurement",
-    "vital_parameter",
-    "diet_lifestyle_parameter",
-    "fitness_parameter",
-)
-
 _METADATA_FIELDS = frozenset(
     {
         "id",
@@ -69,12 +62,16 @@ _METADATA_FIELDS = frozenset(
     }
 )
 
-# (measurement_field_name, metsights_unit_code) -> canonical unit string stored in DB (scale option_value).
+# (measurement_field_name, metsights_unit_code) -> unit aligned with ``questionnaire_options.option_value`` when possible.
 _METSIGHTS_UNIT_TO_CANONICAL: dict[tuple[str, str], str] = {
     ("height", "0"): "cm",
+    ("height", "1"): "ft_in",
     ("weight", "0"): "kg",
+    ("weight", "1"): "lb",
     ("waist_circumference", "0"): "cm",
+    ("waist_circumference", "1"): "in",
     ("hip_circumference", "0"): "cm",
+    ("hip_circumference", "1"): "in",
     ("body_fat", "0"): "%",
     ("bmi", "0"): "kg/m²",
     ("systolic_blood_pressure", "0"): "mmhg",
@@ -115,19 +112,166 @@ def _parse_iso_date(raw: Any) -> date:
         return date.today()
 
 
-def _scale_answer(field: str, obj: dict[str, Any], value: Any) -> dict[str, Any] | None:
+def _normalize_label(s: str) -> str:
+    t = (s or "").strip().lower()
+    t = t.replace("–", "-").replace("—", "-")
+    return re.sub(r"\s+", " ", t)
+
+
+def _label_fingerprint(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", _normalize_label(s))
+
+
+def _merge_choices_into(target: dict[str, dict[str, str]], field_key: str, choices_raw: Any) -> None:
+    fk = (field_key or "").strip()
+    if not fk or choices_raw is None:
+        return
+    bucket = target.setdefault(fk, {})
+    if isinstance(choices_raw, dict):
+        for code, lab in choices_raw.items():
+            bucket[str(code).strip()] = str(lab).strip() if lab is not None else ""
+        return
+    if isinstance(choices_raw, list):
+        for item in choices_raw:
+            if not isinstance(item, dict):
+                continue
+            c = item.get("value")
+            if c is None:
+                c = item.get("code") or item.get("id")
+            lab = item.get("label") or item.get("display_name") or item.get("name")
+            if c is None:
+                continue
+            bucket[str(c).strip()] = str(lab).strip() if lab is not None else ""
+
+
+def _build_field_choice_maps(options_envelope: dict[str, Any]) -> dict[str, dict[str, str]]:
+    out: dict[str, dict[str, str]] = {}
+    data = options_envelope.get("data") if isinstance(options_envelope, dict) else None
+    if not isinstance(data, dict):
+        return out
+    qc = data.get("questions_config")
+    if isinstance(qc, list):
+        for item in qc:
+            if not isinstance(item, dict):
+                continue
+            key = str(
+                item.get("key") or item.get("field") or item.get("name") or item.get("question_key") or ""
+            ).strip()
+            if key:
+                _merge_choices_into(out, key, item.get("choices") or item.get("options"))
+    for k, v in data.items():
+        if k in _METADATA_FIELDS or not isinstance(v, dict):
+            continue
+        ch = v.get("choices") or v.get("options")
+        if ch is not None:
+            _merge_choices_into(out, str(k).strip(), ch)
+    return out
+
+
+def _option_value_display_pairs(db_options: Any) -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    for o in db_options:
+        ov = getattr(o, "option_value", None)
+        if ov is None:
+            continue
+        dn = getattr(o, "display_name", None)
+        rows.append((str(ov), str(dn or "")))
+    return rows
+
+
+def _match_option_value_for_label(label: str, db_options: Any) -> str | None:
+    nl = _normalize_label(label)
+    if not nl:
+        return None
+    fl = _label_fingerprint(label)
+    best: str | None = None
+    for ov, dn in _option_value_display_pairs(db_options):
+        nv = _normalize_label(ov)
+        nd = _normalize_label(dn)
+        if nl == nv or nl == nd:
+            return ov
+        if fl and fl == _label_fingerprint(dn):
+            return ov
+        if nd and (nl in nd or nd in nl):
+            best = ov
+    return best
+
+
+def _map_metsights_choice_to_option_value(
+    *,
+    raw_code: Any,
+    code_to_label: dict[str, str],
+    db_options: Any,
+) -> str | None:
+    if raw_code is None:
+        return None
+    code_s = str(raw_code).strip()
+    if not code_s:
+        return None
+    for ov, _dn in _option_value_display_pairs(db_options):
+        if _normalize_label(ov) == _normalize_label(code_s):
+            return ov
+    label = code_to_label.get(code_s)
+    if label:
+        hit = _match_option_value_for_label(str(label), db_options)
+        if hit:
+            return hit
+    return _match_option_value_for_label(code_s, db_options)
+
+
+def _pick_scale_unit_string(canonical_candidate: str | None, db_unit_options: Any) -> str | None:
+    if not canonical_candidate:
+        return None
+    nc = _normalize_label(canonical_candidate)
+    for ov, _dn in _option_value_display_pairs(db_unit_options):
+        if _normalize_label(ov) == nc:
+            return ov
+    return None
+
+
+def _scale_answer_mapped(
+    field: str,
+    payload: dict[str, Any],
+    value: Any,
+    choice_maps: dict[str, dict[str, str]],
+    db_unit_options: Any,
+) -> dict[str, Any] | None:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         return None
-    unit_raw = obj.get(f"{field}_unit")
+    unit_key = f"{field}_unit"
+    unit_raw = payload.get(unit_key)
     if unit_raw is None:
         return None
     ukey = str(unit_raw).strip()
+    unit_codes = choice_maps.get(unit_key) or {}
     canonical = _METSIGHTS_UNIT_TO_CANONICAL.get((field, ukey))
     if canonical is None:
         canonical = _METSIGHTS_UNIT_TO_CANONICAL.get((field, ukey.lower()))
     if canonical is None:
+        ulab = unit_codes.get(ukey)
+        if ulab:
+            picked = _match_option_value_for_label(str(ulab), db_unit_options)
+            if picked:
+                canonical = picked
+    if canonical is None:
+        canonical = _map_metsights_choice_to_option_value(
+            raw_code=ukey,
+            code_to_label=unit_codes,
+            db_options=db_unit_options,
+        )
+    final_unit = _pick_scale_unit_string(canonical, db_unit_options)
+    if final_unit is None:
         return None
-    return {"value": float(value), "unit": canonical}
+    return {"value": float(value), "unit": final_unit}
+
+
+def _resources_for_assessment_type(type_code: str) -> list[str]:
+    tc = (type_code or "").strip()
+    if tc in ("1", "2"):
+        return ["diet-lifestyle-parameters", "physical-measurement", "vitals"]
+    if tc == "7":
+        return ["fitness-parameters"]
+    return []
 
 
 class MetsightsSyncService:
@@ -340,27 +484,29 @@ class MetsightsSyncService:
                 message="Assessment instance has no Metsights record id",
             )
 
-        detail = await self._metsights.get_record_detail(record_id=mrid)
-        if not isinstance(detail, dict):
-            raise AppError(status_code=503, error_code="EXTERNAL_SERVICE_UNAVAILABLE", message="Unexpected Metsights payload")
+        package = await self._assessments.get_package_by_id(db, int(instance.package_id))
+        if package is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_PACKAGE_NOT_FOUND", message="Assessment package not found")
+
+        type_code = (package.assessment_type_code or "").strip()
+        resources = _resources_for_assessment_type(type_code)
+        if not resources:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message=f"No Metsights questionnaire resources mapped for assessment type {type_code!r}",
+            )
 
         imported = 0
-        skipped_categories: list[str] = []
         skipped_questions: list[str] = []
+        got_vitals_payload = False
 
-        for cat_key in _RECORD_DETAIL_CATEGORY_KEYS:
-            category = await self._questionnaire.get_category_by_key(db, category_key=cat_key)
-            if category is None:
-                skipped_categories.append(cat_key)
-                continue
-
-            payload = detail.get(cat_key)
-            if not isinstance(payload, dict):
-                continue
-
-            questions = await self._questionnaire.list_questions_by_category(db, category_id=category.category_id)
-            by_key = {q.question_key: q for q in questions if q.question_key}
-
+        async def _ingest_payload(
+            resource: str,
+            payload: dict[str, Any],
+            choice_maps: dict[str, dict[str, str]],
+        ) -> None:
+            nonlocal imported
             for field_name, raw_val in payload.items():
                 if field_name in _METADATA_FIELDS:
                     continue
@@ -368,49 +514,84 @@ class MetsightsSyncService:
                     continue
                 if raw_val is None:
                     continue
+                if raw_val == []:
+                    continue
 
-                qdef = by_key.get(field_name)
+                qdef = await self._questionnaire.get_definition_by_key(db, question_key=str(field_name))
                 if qdef is None:
-                    skipped_questions.append(f"{cat_key}.{field_name}")
+                    skipped_questions.append(f"{resource}.{field_name}")
+                    continue
+
+                category_id = await self._assessments.get_first_category_id_for_question_in_package(
+                    db,
+                    package_id=int(instance.package_id),
+                    question_id=int(qdef.question_id),
+                )
+                if category_id is None:
+                    skipped_questions.append(f"{resource}.{field_name}.no_category")
                     continue
 
                 qtype = (qdef.question_type or "").strip().lower()
+                qtype = {"multi_choice": "multiple_choice"}.get(qtype, qtype)
+                db_opts = await self._questionnaire.list_options_for_question(db, question_id=int(qdef.question_id))
+
                 answer: Any = None
 
-                unit_field = f"{field_name}_unit"
-                if unit_field in payload and qtype == "scale":
-                    answer = _scale_answer(field_name, payload, raw_val)
+                if qtype == "scale":
+                    answer = _scale_answer_mapped(str(field_name), payload, raw_val, choice_maps, db_opts)
                     if answer is None:
-                        skipped_questions.append(f"{cat_key}.{field_name}")
+                        skipped_questions.append(f"{resource}.{field_name}")
                         continue
-                elif qtype in ("multi_choice", "multiple_choice"):
-                    if not isinstance(raw_val, list):
-                        skipped_questions.append(f"{cat_key}.{field_name}")
-                        continue
-                    answer = [str(x).strip() for x in raw_val if x is not None and str(x).strip() != ""]
-                elif qtype in ("single_choice", "text", "string"):
+                elif qtype == "text":
                     answer = str(raw_val).strip() if raw_val is not None else None
-                    if answer == "":
+                    if not answer:
                         continue
+                elif qtype == "multiple_choice":
+                    seq = raw_val if isinstance(raw_val, list) else [raw_val]
+                    code_map = choice_maps.get(str(field_name)) or {}
+                    mapped: list[str] = []
+                    bad = False
+                    for item in seq:
+                        if item is None or str(item).strip() == "":
+                            continue
+                        mv = _map_metsights_choice_to_option_value(
+                            raw_code=item,
+                            code_to_label=code_map,
+                            db_options=db_opts,
+                        )
+                        if mv is None:
+                            skipped_questions.append(f"{resource}.{field_name}:{item!r}")
+                            bad = True
+                            break
+                        if mv not in mapped:
+                            mapped.append(mv)
+                    if bad or not mapped:
+                        continue
+                    answer = mapped
+                elif qtype == "single_choice":
+                    code_map = choice_maps.get(str(field_name)) or {}
+                    mv = _map_metsights_choice_to_option_value(
+                        raw_code=raw_val,
+                        code_to_label=code_map,
+                        db_options=db_opts,
+                    )
+                    if mv is None:
+                        skipped_questions.append(f"{resource}.{field_name}:{raw_val!r}")
+                        continue
+                    answer = mv
                 else:
-                    # Fallback: store primitives as string codes
-                    if isinstance(raw_val, (int, float)) and not isinstance(raw_val, bool):
-                        answer = str(raw_val)
-                    elif isinstance(raw_val, str):
-                        answer = raw_val.strip()
-                    else:
-                        skipped_questions.append(f"{cat_key}.{field_name}")
-                        continue
+                    skipped_questions.append(f"{resource}.{field_name}.type={qtype}")
+                    continue
 
-                existing = await self._questionnaire.get_response_by_instance_and_question(
+                existing = await self._questionnaire.get_response_by_instance_and_question_id(
                     db,
                     assessment_instance_id=assessment_instance_id,
-                    category_id=category.category_id,
-                    question_id=qdef.question_id,
+                    question_id=int(qdef.question_id),
                 )
                 now = datetime.now(timezone.utc)
                 if existing is not None:
                     existing.answer = answer
+                    existing.category_id = int(category_id)
                     existing.submitted_at = now
                     await self._questionnaire.update_response(db, existing)
                 else:
@@ -418,18 +599,43 @@ class MetsightsSyncService:
                         db,
                         QuestionnaireResponse(
                             assessment_instance_id=assessment_instance_id,
-                            question_id=qdef.question_id,
-                            category_id=category.category_id,
+                            question_id=int(qdef.question_id),
+                            category_id=int(category_id),
                             answer=answer,
                             submitted_at=now,
                         ),
                     )
                 imported += 1
 
+        for resource in resources:
+            payload = await self._metsights.get_record_subresource_or_none(record_id=mrid, resource=resource)
+            if not isinstance(payload, dict):
+                continue
+            if resource == "vitals":
+                for fn, rv in payload.items():
+                    if fn in _METADATA_FIELDS or str(fn).endswith("_unit"):
+                        continue
+                    if rv is not None and rv != []:
+                        got_vitals_payload = True
+                        break
+
+            opt_env = await self._metsights.options_record_subresource(record_id=mrid, resource=resource)
+            choice_maps = _build_field_choice_maps(opt_env if isinstance(opt_env, dict) else {})
+            await _ingest_payload(resource, payload, choice_maps)
+
+        if type_code in ("1", "2") and not got_vitals_payload:
+            detail = await self._metsights.get_record_detail(record_id=mrid)
+            if isinstance(detail, dict):
+                vp = detail.get("vital_parameter")
+                if isinstance(vp, dict) and vp:
+                    opt_env = await self._metsights.options_record_subresource(record_id=mrid, resource="vitals")
+                    cm = _build_field_choice_maps(opt_env if isinstance(opt_env, dict) else {})
+                    await _ingest_payload("record_detail.vital_parameter", vp, cm)
+
         return {
             "assessment_instance_id": assessment_instance_id,
             "metsights_record_id": mrid,
             "responses_upserted": imported,
-            "skipped_categories": skipped_categories,
+            "skipped_categories": [],
             "skipped_questions": skipped_questions,
         }

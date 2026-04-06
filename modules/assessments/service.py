@@ -218,6 +218,19 @@ class AssessmentsService:
     async def get_package_by_id(self, db: AsyncSession, package_id: int):
         return await self._repository.get_package_by_id(db, package_id=package_id)
 
+    async def get_first_category_id_for_question_in_package(
+        self,
+        db: AsyncSession,
+        *,
+        package_id: int,
+        question_id: int,
+    ) -> int | None:
+        return await self._repository.get_first_category_id_for_question_in_package(
+            db,
+            package_id=package_id,
+            question_id=question_id,
+        )
+
     async def get_package_by_assessment_type_code(self, db: AsyncSession, *, assessment_type_code: str):
         return await self._repository.get_package_by_assessment_type_code(
             db, assessment_type_code=assessment_type_code

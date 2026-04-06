@@ -106,7 +106,7 @@ async def import_metsights_questionnaire_answers(
     employee=Depends(get_optional_employee),
     sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
 ):
-    """Pull Metsights record detail and upsert mapped questionnaire responses."""
+    """Pull Metsights per-type questionnaire resources (GET + OPTIONS) and upsert responses using semantic option values."""
 
     result = await sync_service.import_questionnaire_answers_for_instance(
         db,

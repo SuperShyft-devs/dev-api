@@ -290,6 +290,21 @@ class QuestionnaireRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_response_by_instance_and_question_id(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        question_id: int,
+    ) -> QuestionnaireResponse | None:
+        result = await db.execute(
+            select(QuestionnaireResponse)
+            .where(QuestionnaireResponse.assessment_instance_id == assessment_instance_id)
+            .where(QuestionnaireResponse.question_id == question_id)
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def list_responses_for_instance(
         self,
         db: AsyncSession,

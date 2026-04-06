@@ -114,6 +114,64 @@ class MetsightsService:
         envelope = MetsightsEnvelope.model_validate(payload)
         return envelope.data
 
+    async def get_record_subresource_or_none(self, *, record_id: str, resource: str) -> dict[str, Any] | None:
+        """GET /records/:id/:resource/ — returns ``data`` object, or ``None`` if missing or unreadable.
+
+        Some Metsights deployments return ``404`` (no payload) or ``405`` (GET not exposed on that path);
+        both are treated as no data so import can continue with other resources.
+        """
+
+        rid = (record_id or "").strip()
+        res = (resource or "").strip().strip("/")
+        if not rid or not res:
+            return None
+        self._require_api_key()
+        try:
+            payload = await self._client.get_record_resource(record_id=rid, resource=res)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (404, 405):
+                return None
+            if exc.response.status_code == 403:
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Metsights authorization failed",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
+        envelope = MetsightsEnvelope.model_validate(payload)
+        data = envelope.data
+        return data if isinstance(data, dict) else None
+
+    async def options_record_subresource(self, *, record_id: str, resource: str) -> dict[str, Any]:
+        """OPTIONS /records/:id/:resource/ — raw JSON envelope; empty dict if unavailable."""
+
+        rid = (record_id or "").strip()
+        res = (resource or "").strip().strip("/")
+        if not rid or not res:
+            return {}
+        if not settings.METSIGHTS_API_KEY:
+            return {}
+        try:
+            payload = await self._client.options_record_resource(record_id=rid, resource=res)
+        except httpx.HTTPStatusError:
+            return {}
+        except httpx.HTTPError:
+            return {}
+        if not isinstance(payload, dict):
+            return {}
+        return payload
+
     async def get_blood_parameters(self, *, record_id: str) -> Any:
         normalized_record_id = (record_id or "").strip()
         if not normalized_record_id:

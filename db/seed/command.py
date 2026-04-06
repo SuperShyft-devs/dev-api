@@ -35,6 +35,7 @@ from db.seed.diagnostics_operations import (
 )
 from db.seed.diagnostics_seed_tables import DIAG_SAMPLES
 from db.seed.operations import (
+    delete_options_for_question_ids,
     reset_sequences,
     upsert_assessment_packages,
     upsert_categories,
@@ -77,6 +78,7 @@ async def seed_reference_data(*, yes: bool) -> None:
             await upsert_assessment_packages(session, DEFAULT_ASSESSMENT_PACKAGES)
             await upsert_categories(session, DEFAULT_CATEGORIES)
             await upsert_questions(session, DEFAULT_QUESTIONS)
+            await delete_options_for_question_ids(session, (q.question_id for q in DEFAULT_QUESTIONS))
             await upsert_category_questions(session, DEFAULT_CATEGORY_QUESTIONS)
             await upsert_options(session, DEFAULT_OPTIONS)
             await upsert_package_categories(session, DEFAULT_PACKAGE_CATEGORIES)

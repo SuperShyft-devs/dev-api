@@ -106,26 +106,44 @@ async def test_sync_then_import_stores_metsights_codes(async_client, test_db_ses
         ],
     }
 
-    detail = {
-        "id": rid,
-        "physical_measurement": None,
-        "vital_parameter": None,
-        "diet_lifestyle_parameter": {
-            "living_region": "1",
-            "diet_preference": "0",
-            "food_groups": ["0", "3"],
+    diet_payload = {
+        "living_region": "1",
+        "diet_preference": "0",
+        "food_groups": ["0", "3"],
+    }
+
+    options_payload = {
+        "detail": "ok",
+        "data": {
+            "living_region": {"choices": {"1": "Inland", "0": "Coastal"}},
+            "diet_preference": {"choices": {"0": "Veg", "1": "Non-Veg"}},
+            "food_groups": {"choices": {"0": "Whole grains", "3": "Pulses / Legumes"}},
         },
-        "fitness_parameter": None,
     }
 
     async def _fake_list(self, **kwargs):
         return list_payload
 
-    async def _fake_detail(self, **kwargs):
-        return {"detail": "ok", "data": detail}
+    async def _fake_get_sub(self, **kwargs):
+        resource = str(kwargs.get("resource") or "").strip().strip("/")
+        if resource == "diet-lifestyle-parameters":
+            return {"detail": "ok", "data": diet_payload}
+        return {"detail": "ok", "data": None}
+
+    async def _fake_options_sub(self, **kwargs):
+        resource = str(kwargs.get("resource") or "").strip().strip("/")
+        if resource == "diet-lifestyle-parameters":
+            return options_payload
+        return {}
+
+    async def _fake_record_detail(self, **kwargs):
+        # Import may call record detail when GET /vitals/ is unavailable (e.g. 405); keep vitals empty for this test.
+        return {"detail": "ok", "data": {"id": rid, "vital_parameter": None}}
 
     monkeypatch.setattr("modules.metsights.client.MetsightsClient.list_profile_records", _fake_list)
-    monkeypatch.setattr("modules.metsights.client.MetsightsClient.get_record_detail", _fake_detail)
+    monkeypatch.setattr("modules.metsights.client.MetsightsClient.get_record_resource", _fake_get_sub)
+    monkeypatch.setattr("modules.metsights.client.MetsightsClient.options_record_resource", _fake_options_sub)
+    monkeypatch.setattr("modules.metsights.client.MetsightsClient.get_record_detail", _fake_record_detail)
 
     await test_db_session.execute(
         text("UPDATE users SET metsights_profile_id = '550e8400-e29b-41d4-a716-446655440088' WHERE user_id = 1")
@@ -154,4 +172,4 @@ async def test_sync_then_import_stores_metsights_codes(async_client, test_db_ses
     ).first()
     assert row is not None
     ans = row[0]
-    assert ans == "1" or ans == '"1"' or (isinstance(ans, dict) and ans.get("value") is None)
+    assert ans == "inland" or (isinstance(ans, str) and ans.strip('"') == "inland")
