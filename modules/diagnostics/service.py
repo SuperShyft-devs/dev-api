@@ -270,12 +270,12 @@ class DiagnosticsService:
         *,
         gender: str | None,
         tag: str | None,
-        filter_chip_key: str | None = None,
+        filter_chip: str | None = None,
         active_only: bool = True,
     ) -> list[DiagnosticPackageListItem]:
         gender_value = self._normalize_lower(gender)
         tag_value = self._normalize(tag)
-        chip_key_value = self._normalize(filter_chip_key)
+        chip_key_value = self._normalize(filter_chip)
 
         if gender_value is not None and gender_value not in _ALLOWED_GENDER_VALUES:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
@@ -284,7 +284,7 @@ class DiagnosticsService:
             db,
             gender=gender_value,
             tag=tag_value,
-            filter_chip_key=chip_key_value,
+            filter_chip=chip_key_value,
             active_only=active_only,
         )
         items: list[DiagnosticPackageListItem] = []

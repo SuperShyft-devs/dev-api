@@ -35,7 +35,7 @@ class DiagnosticsRepository:
         *,
         gender: str | None = None,
         tag: str | None = None,
-        filter_chip_key: str | None = None,
+        filter_chip: str | None = None,
         active_only: bool = True,
     ) -> list[DiagnosticPackage]:
         query = (
@@ -62,14 +62,14 @@ class DiagnosticsRepository:
             )
             query = query.where(DiagnosticPackage.diagnostic_package_id.in_(tag_package_subquery))
 
-        if filter_chip_key is not None:
+        if filter_chip is not None:
             chip_package_subquery = (
                 select(DiagnosticPackageFilterChipLink.diagnostic_package_id)
                 .join(
                     DiagnosticPackageFilterChip,
                     DiagnosticPackageFilterChip.filter_chip_id == DiagnosticPackageFilterChipLink.filter_chip_id,
                 )
-                .where(DiagnosticPackageFilterChip.chip_key == filter_chip_key)
+                .where(DiagnosticPackageFilterChip.chip_key == filter_chip)
             )
             query = query.where(DiagnosticPackage.diagnostic_package_id.in_(chip_package_subquery))
 

@@ -55,7 +55,7 @@ def _client_ip(request: Request) -> str:
 async def list_diagnostic_packages(
     gender: str | None = None,
     tag: str | None = None,
-    filter_chip_key: str | None = None,
+    filter_chip: str | None = None,
     include_inactive: bool = Query(default=False),
     db: AsyncSession = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),
@@ -72,7 +72,7 @@ async def list_diagnostic_packages(
         db,
         gender=gender,
         tag=tag,
-        filter_chip_key=filter_chip_key,
+        filter_chip=filter_chip,
         active_only=active_only,
     )
     return success_response([item.model_dump() for item in data])
