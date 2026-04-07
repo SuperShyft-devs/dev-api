@@ -44,7 +44,8 @@ class Settings:
         origin.strip()
         for origin in os.getenv(
             "CORS_ORIGINS",
-            "http://localhost:3000,http://localhost:5173",
+            "http://localhost:3000,http://localhost:5173,"
+            "http://127.0.0.1:5500,http://localhost:5500",
         ).split(",")
         if origin.strip()
     ]
@@ -72,6 +73,10 @@ class Settings:
     METSIGHTS_BASE_URL: str = os.getenv("METSIGHTS_BASE_URL", "https://api.metsights.com")
     METSIGHTS_API_KEY: str = os.getenv("METSIGHTS_API_KEY", "")
     METSIGHTS_TIMEOUT_SECONDS: int = int(os.getenv("METSIGHTS_TIMEOUT_SECONDS", "15"))
+
+    # Razorpay (server-side secret; never expose RAZORPAY_KEY_SECRET to clients)
+    RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")
+    RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")
     
     @classmethod
     def validate(cls) -> None:

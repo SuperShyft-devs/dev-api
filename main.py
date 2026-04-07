@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from core.config import settings
 from core.exceptions import add_exception_handlers
@@ -18,6 +21,7 @@ from modules.diagnostics.router import router as diagnostics_router
 from modules.uploads.router import router as uploads_router
 from modules.reports.router import router as reports_router
 from modules.platform_settings.router import router as platform_settings_router
+from modules.payments.routes import router as payments_router
 
 # Configure logging
 configure_logging()
@@ -57,6 +61,15 @@ app.include_router(diagnostics_router)
 app.include_router(uploads_router)
 app.include_router(reports_router)
 app.include_router(platform_settings_router)
+app.include_router(payments_router)
+
+_payment_test_dir = Path(__file__).resolve().parent / "static" / "payment-test"
+if _payment_test_dir.is_dir():
+    app.mount(
+        "/payment-test",
+        StaticFiles(directory=str(_payment_test_dir), html=True),
+        name="payment-test",
+    )
 
 
 @app.get("/health")
