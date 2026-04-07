@@ -469,7 +469,7 @@ async def seed_diagnostics_reference_from_csv_dir(session: AsyncSession, directo
     if missing:
         raise FileNotFoundError(
             f"Diagnostics CSV directory {d} is missing: {', '.join(missing)}. "
-            f"Set DIAGNOSTICS_CSV_DIR or place files next to the dev-api folder (workspace root)."
+            f"Expected checked-in files under dev-api/db/seed/csv."
         )
 
     for w in validate_diagnostics_csv_fks(d):

@@ -116,14 +116,10 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         check=False,
     )
     _run_subprocess([sys.executable, "-m", "alembic", "upgrade", "head"])
-    # Diagnostics CSVs live under dev-api/db/seed/csv (not workspace root).
-    csv_dir = _project_root() / "db" / "seed" / "csv"
-    env = os.environ.copy()
-    env.setdefault("DIAGNOSTICS_CSV_DIR", str(csv_dir.resolve()))
     result = subprocess.run(
         [sys.executable, "-m", "db.seed", "--yes"],
         cwd=_project_root(),
-        env=env,
+        env=os.environ.copy(),
         capture_output=True,
         text=True,
         check=False,

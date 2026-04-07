@@ -1,3 +1,6 @@
 tag_id,diagnostic_package_id,tag_name,display_order
 1,1,male,
 2,1,fullbody,
+30,6,Bio Age,
+31,7,Bio Age,
+32,7,Vitamins,
