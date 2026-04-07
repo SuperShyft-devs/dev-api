@@ -16,8 +16,9 @@ from modules.diagnostics.schemas import (
     DiagnosticPackageCreate,
     DiagnosticPackageStatusUpdate,
     DiagnosticPackageUpdate,
-    FilterCreate,
-    FilterUpdate,
+    FilterChipCreate,
+    FilterChipUpdate,
+    PackageFilterChipAssign,
     PreparationCreate,
     PreparationUpdate,
     ReasonCreate,
@@ -54,6 +55,7 @@ def _client_ip(request: Request) -> str:
 async def list_diagnostic_packages(
     gender: str | None = None,
     tag: str | None = None,
+    filter_chip_key: str | None = None,
     include_inactive: bool = Query(default=False),
     db: AsyncSession = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),
@@ -66,16 +68,22 @@ async def list_diagnostic_packages(
         await employee_service.get_active_employee_by_user_id(db, user.user_id)
         active_only = False
 
-    data = await diagnostics_service.get_packages(db, gender=gender, tag=tag, active_only=active_only)
+    data = await diagnostics_service.get_packages(
+        db,
+        gender=gender,
+        tag=tag,
+        filter_chip_key=filter_chip_key,
+        active_only=active_only,
+    )
     return success_response([item.model_dump() for item in data])
 
 
-@router.get("/diagnostic-packages/filters")
-async def list_diagnostic_filters(
+@router.get("/diagnostic-packages/filters-chips")
+async def list_diagnostic_filter_chips(
     db: AsyncSession = Depends(get_db),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    data = await diagnostics_service.get_filters(db)
+    data = await diagnostics_service.get_filter_chips(db)
     return success_response([item.model_dump() for item in data])
 
 
@@ -99,15 +107,15 @@ async def get_diagnostic_package_tests(
     return success_response(data.model_dump())
 
 
-@router.post("/diagnostic-packages/filters", status_code=201)
-async def create_filter(
-    payload: FilterCreate,
+@router.post("/diagnostic-packages/filters-chips", status_code=201)
+async def create_filter_chip(
+    payload: FilterChipCreate,
     request: Request,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    created = await diagnostics_service.create_filter(
+    created = await diagnostics_service.create_filter_chip(
         db,
         employee=employee,
         data=payload,
@@ -119,19 +127,19 @@ async def create_filter(
     return success_response(created.model_dump())
 
 
-@router.put("/diagnostic-packages/filters/{filter_id}")
-async def update_filter(
-    filter_id: int,
-    payload: FilterUpdate,
+@router.put("/diagnostic-packages/filters-chips/{filter_chip_id}")
+async def update_filter_chip(
+    filter_chip_id: int,
+    payload: FilterChipUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    updated = await diagnostics_service.update_filter(
+    updated = await diagnostics_service.update_filter_chip(
         db,
         employee=employee,
-        filter_id=filter_id,
+        filter_chip_id=filter_chip_id,
         data=payload,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
@@ -141,24 +149,24 @@ async def update_filter(
     return success_response(updated.model_dump())
 
 
-@router.delete("/diagnostic-packages/filters/{filter_id}")
-async def delete_filter(
-    filter_id: int,
+@router.delete("/diagnostic-packages/filters-chips/{filter_chip_id}")
+async def delete_filter_chip(
+    filter_chip_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    await diagnostics_service.delete_filter(
+    await diagnostics_service.delete_filter_chip(
         db,
         employee=employee,
-        filter_id=filter_id,
+        filter_chip_id=filter_chip_id,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
     await db.commit()
-    return success_response({"filter_id": filter_id, "deleted": True})
+    return success_response({"filter_chip_id": filter_chip_id, "deleted": True})
 
 
 @router.post("/diagnostic-packages", status_code=201)
@@ -335,6 +343,50 @@ async def delete_tag(
     )
     await db.commit()
     return success_response({"tag_id": tag_id, "deleted": True})
+
+
+@router.post("/diagnostic-packages/{package_id}/filter-chips", status_code=201)
+async def assign_package_filter_chip(
+    package_id: int,
+    payload: PackageFilterChipAssign,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    created = await diagnostics_service.assign_filter_chip_to_package(
+        db,
+        employee=employee,
+        package_id=package_id,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(created.model_dump())
+
+
+@router.delete("/diagnostic-packages/{package_id}/filter-chips/{filter_chip_id}")
+async def remove_package_filter_chip(
+    package_id: int,
+    filter_chip_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    await diagnostics_service.remove_filter_chip_from_package(
+        db,
+        employee=employee,
+        package_id=package_id,
+        filter_chip_id=filter_chip_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response({"filter_chip_id": filter_chip_id, "deleted": True})
 
 
 @router.post("/diagnostic-packages/{package_id}/samples", status_code=201)

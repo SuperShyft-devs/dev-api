@@ -67,19 +67,59 @@ class DiagnosticPackage(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    filter_chip_links = relationship(
+        "DiagnosticPackageFilterChipLink",
+        back_populates="package",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
-class DiagnosticPackageFilter(Base):
-    """SQLAlchemy model for `diagnostic_package_filters` table."""
+class DiagnosticPackageFilterChip(Base):
+    """SQLAlchemy model for `diagnostic_package_filters_chips` catalog table."""
 
-    __tablename__ = "diagnostic_package_filters"
+    __tablename__ = "diagnostic_package_filters_chips"
 
-    filter_id = Column(Integer, primary_key=True)
-    filter_key = Column(String, nullable=False)
+    filter_chip_id = Column(Integer, primary_key=True)
+    chip_key = Column(String, nullable=False)
     display_name = Column(String, nullable=False)
     display_order = Column(Integer)
-    filter_type = Column(String)
     status = Column(String, default="active", server_default="active")
+
+    package_links = relationship(
+        "DiagnosticPackageFilterChipLink",
+        back_populates="filter_chip",
+        passive_deletes=True,
+    )
+
+
+class DiagnosticPackageFilterChipLink(Base):
+    """Junction: which filter chips apply to which diagnostic packages."""
+
+    __tablename__ = "diagnostic_package_filter_chip_links"
+    __table_args__ = (
+        UniqueConstraint(
+            "diagnostic_package_id",
+            "filter_chip_id",
+            name="uq_diag_pkg_filter_chip_links_pkg_chip",
+        ),
+    )
+
+    link_id = Column(Integer, primary_key=True)
+    diagnostic_package_id = Column(
+        Integer,
+        ForeignKey("diagnostic_package.diagnostic_package_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    filter_chip_id = Column(
+        Integer,
+        ForeignKey("diagnostic_package_filters_chips.filter_chip_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    display_order = Column(Integer)
+
+    package = relationship("DiagnosticPackage", back_populates="filter_chip_links")
+    filter_chip = relationship("DiagnosticPackageFilterChip", back_populates="package_links")
 
 
 class DiagnosticPackageReason(Base):

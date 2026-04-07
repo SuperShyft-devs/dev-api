@@ -67,28 +67,37 @@ class DiagnosticPackageResponse(BaseModel):
     discount_percent: Optional[int] = None
 
 
-class FilterCreate(BaseModel):
-    filter_key: str = Field(min_length=1)
+class FilterChipCreate(BaseModel):
+    chip_key: str = Field(min_length=1)
     display_name: str = Field(min_length=1)
     display_order: Optional[int] = None
-    filter_type: Optional[str] = None
 
 
-class FilterUpdate(BaseModel):
-    filter_key: Optional[str] = None
-    display_name: Optional[str] = None
+class FilterChipUpdate(BaseModel):
+    chip_key: Optional[str] = Field(default=None, min_length=1)
+    display_name: Optional[str] = Field(default=None, min_length=1)
     display_order: Optional[int] = None
-    filter_type: Optional[str] = None
     status: Optional[str] = None
 
 
-class FilterResponse(BaseModel):
-    filter_id: int
-    filter_key: str
+class FilterChipResponse(BaseModel):
+    filter_chip_id: int
+    chip_key: str
     display_name: str
     display_order: Optional[int] = None
-    filter_type: Optional[str] = None
     status: Optional[str] = None
+
+
+class PackageFilterChipResponse(BaseModel):
+    filter_chip_id: int
+    chip_key: str
+    display_name: str
+    display_order: Optional[int] = None
+
+
+class PackageFilterChipAssign(BaseModel):
+    filter_chip_id: int
+    display_order: Optional[int] = None
 
 
 class ReasonCreate(BaseModel):
@@ -279,6 +288,7 @@ class DiagnosticPackageDetailResponse(DiagnosticPackageResponse):
     tags: list[TagResponse] = Field(default_factory=list)
     samples: list[SampleResponse] = Field(default_factory=list)
     preparations: list[PreparationResponse] = Field(default_factory=list)
+    filter_chips: list[PackageFilterChipResponse] = Field(default_factory=list)
 
 
 class DiagnosticPackageListItem(BaseModel):
@@ -294,3 +304,4 @@ class DiagnosticPackageListItem(BaseModel):
     gender_suitability: Optional[str] = None
     status: Optional[str] = None
     tags: list[TagResponse] = Field(default_factory=list)
+    filter_chips: list[PackageFilterChipResponse] = Field(default_factory=list)

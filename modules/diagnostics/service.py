@@ -8,11 +8,13 @@ Business rules:
 
 from __future__ import annotations
 
+from sqlalchemy.exc import IntegrityError
+
 from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.diagnostics.models import (
     DiagnosticPackage,
-    DiagnosticPackageFilter,
+    DiagnosticPackageFilterChip,
     DiagnosticPackagePreparation,
     DiagnosticPackageReason,
     DiagnosticPackageSample,
@@ -33,9 +35,9 @@ from modules.diagnostics.schemas import (
     DiagnosticPackageResponse,
     DiagnosticPackageStatusUpdate,
     DiagnosticPackageUpdate,
-    FilterCreate,
-    FilterResponse,
-    FilterUpdate,
+    FilterChipCreate,
+    FilterChipResponse,
+    FilterChipUpdate,
     HealthParameterCreate,
     HealthParameterResponse,
     HealthParameterUpdate,
@@ -55,6 +57,8 @@ from modules.diagnostics.schemas import (
     TestGroupCreate,
     TestGroupResponse,
     TestGroupUpdate,
+    PackageFilterChipAssign,
+    PackageFilterChipResponse,
     ReorderGroupTestsRequest,
     ReorderPackageGroupsRequest,
 )
@@ -64,7 +68,6 @@ from modules.employee.service import EmployeeContext
 _ALLOWED_COLLECTION_TYPES = {"home_collection", "centre_visit"}
 _ALLOWED_GENDER_VALUES = {"male", "female", "both"}
 _ALLOWED_STATUS_VALUES = {"active", "inactive"}
-_ALLOWED_FILTER_TYPES = {"gender", "tag"}
 
 
 def _discount_percent(price: float | None, original_price: float | None) -> int | None:
@@ -139,35 +142,6 @@ class DiagnosticsService:
         if gender is not None:
             payload["gender_suitability"] = gender
 
-    async def _validate_filter_key_for_type(
-        self,
-        db,
-        *,
-        filter_type: str | None,
-        filter_key: str | None,
-    ) -> str | None:
-        normalized_type = self._normalize_lower(filter_type)
-        normalized_key = self._normalize(filter_key)
-
-        if normalized_type == "tag":
-            if normalized_key is None:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-
-            existing_tags = await self._repository.get_distinct_tag_names(db)
-            existing_tag_map = {tag.lower(): tag for tag in existing_tags}
-            canonical = existing_tag_map.get(normalized_key.lower())
-            if canonical is None:
-                raise AppError(
-                    status_code=400,
-                    error_code="INVALID_INPUT",
-                    message="Filter key must be an existing package tag",
-                )
-            return canonical
-
-        if normalized_key is not None:
-            return normalized_key
-        return None
-
     def _to_tag_response(self, row: DiagnosticPackageTag) -> TagResponse:
         return TagResponse(
             tag_id=row.tag_id,
@@ -175,6 +149,26 @@ class DiagnosticsService:
             tag_name=row.tag_name,
             display_order=row.display_order,
         )
+
+    def _package_filter_chip_responses(self, package: DiagnosticPackage) -> list[PackageFilterChipResponse]:
+        links = sorted(
+            list(package.filter_chip_links),
+            key=lambda ln: (ln.display_order is None, ln.display_order or 0, ln.link_id),
+        )
+        out: list[PackageFilterChipResponse] = []
+        for link in links:
+            chip = link.filter_chip
+            if chip is None:
+                continue
+            out.append(
+                PackageFilterChipResponse(
+                    filter_chip_id=chip.filter_chip_id,
+                    chip_key=chip.chip_key,
+                    display_name=chip.display_name,
+                    display_order=link.display_order,
+                )
+            )
+        return out
 
     def _to_reason_response(self, row: DiagnosticPackageReason) -> ReasonResponse:
         return ReasonResponse(
@@ -276,16 +270,22 @@ class DiagnosticsService:
         *,
         gender: str | None,
         tag: str | None,
+        filter_chip_key: str | None = None,
         active_only: bool = True,
     ) -> list[DiagnosticPackageListItem]:
         gender_value = self._normalize_lower(gender)
         tag_value = self._normalize(tag)
+        chip_key_value = self._normalize(filter_chip_key)
 
         if gender_value is not None and gender_value not in _ALLOWED_GENDER_VALUES:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
         rows = await self._repository.get_all_packages(
-            db, gender=gender_value, tag=tag_value, active_only=active_only
+            db,
+            gender=gender_value,
+            tag=tag_value,
+            filter_chip_key=chip_key_value,
+            active_only=active_only,
         )
         items: list[DiagnosticPackageListItem] = []
         for row in rows:
@@ -309,6 +309,7 @@ class DiagnosticsService:
                     gender_suitability=row.gender_suitability,
                     status=row.status,
                     tags=[self._to_tag_response(tag_row) for tag_row in tags],
+                    filter_chips=self._package_filter_chip_responses(row),
                 )
             )
         return items
@@ -332,6 +333,7 @@ class DiagnosticsService:
             tags=[self._to_tag_response(tag_row) for tag_row in tags],
             samples=[self._to_sample_response(sample_row) for sample_row in samples],
             preparations=[self._to_preparation_response(preparation_row) for preparation_row in preparations],
+            filter_chips=self._package_filter_chip_responses(row),
         )
 
     async def get_package_tests(self, db, *, package_id: int) -> PackageTestsResponse:
@@ -961,94 +963,90 @@ class DiagnosticsService:
         )
         return self._to_package_response(updated)
 
-    async def get_filters(self, db) -> list[FilterResponse]:
-        rows = await self._repository.get_all_filters(db)
+    async def get_filter_chips(self, db) -> list[FilterChipResponse]:
+        rows = await self._repository.get_all_filter_chips(db)
         return [
-            FilterResponse(
-                filter_id=row.filter_id,
-                filter_key=row.filter_key,
+            FilterChipResponse(
+                filter_chip_id=row.filter_chip_id,
+                chip_key=row.chip_key,
                 display_name=row.display_name,
                 display_order=row.display_order,
-                filter_type=row.filter_type,
                 status=row.status,
             )
             for row in rows
         ]
 
-    async def create_filter(
+    async def create_filter_chip(
         self,
         db,
         *,
         employee: EmployeeContext,
-        data: FilterCreate,
+        data: FilterChipCreate,
         ip_address: str,
         user_agent: str,
         endpoint: str,
-    ) -> FilterResponse:
+    ) -> FilterChipResponse:
         self._ensure_employee_access(employee)
         payload = data.model_dump(exclude_none=True)
-        filter_type = self._normalize_lower(payload.get("filter_type"))
-        if filter_type is not None and filter_type not in _ALLOWED_FILTER_TYPES:
+        chip_key = self._normalize(payload.get("chip_key"))
+        if chip_key is None:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-        if filter_type is not None:
-            payload["filter_type"] = filter_type
-        payload["filter_key"] = await self._validate_filter_key_for_type(
-            db,
-            filter_type=payload.get("filter_type"),
-            filter_key=payload.get("filter_key"),
-        )
+        payload["chip_key"] = chip_key
 
-        created = await self._repository.create_filter(db, DiagnosticPackageFilter(**payload))
+        dup = await self._repository.get_filter_chip_by_chip_key(db, chip_key=chip_key)
+        if dup is not None:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Chip key already exists")
+
+        row = DiagnosticPackageFilterChip(**payload)
+        try:
+            created = await self._repository.create_filter_chip(db, row)
+        except IntegrityError:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request") from None
+
         await self._require_audit_service().log_event(
             db,
-            action="EMPLOYEE_CREATE_DIAGNOSTIC_FILTER",
+            action="EMPLOYEE_CREATE_DIAGNOSTIC_FILTER_CHIP",
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
             user_id=employee.user_id,
             session_id=None,
         )
-        return FilterResponse(
-            filter_id=created.filter_id,
-            filter_key=created.filter_key,
+        return FilterChipResponse(
+            filter_chip_id=created.filter_chip_id,
+            chip_key=created.chip_key,
             display_name=created.display_name,
             display_order=created.display_order,
-            filter_type=created.filter_type,
             status=created.status,
         )
 
-    async def update_filter(
+    async def update_filter_chip(
         self,
         db,
         *,
         employee: EmployeeContext,
-        filter_id: int,
-        data: FilterUpdate,
+        filter_chip_id: int,
+        data: FilterChipUpdate,
         ip_address: str,
         user_agent: str,
         endpoint: str,
-    ) -> FilterResponse:
+    ) -> FilterChipResponse:
         self._ensure_employee_access(employee)
-        existing = await self._repository.get_filter_by_id(db, filter_id=filter_id)
+        existing = await self._repository.get_filter_chip_by_id(db, filter_chip_id=filter_chip_id)
         if existing is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_FILTER_NOT_FOUND", message="Filter does not exist")
+            raise AppError(
+                status_code=404, error_code="DIAGNOSTIC_FILTER_CHIP_NOT_FOUND", message="Filter chip does not exist"
+            )
 
         payload = data.model_dump(exclude_none=True)
-        filter_type = self._normalize_lower(payload.get("filter_type"))
-        if filter_type is not None and filter_type not in _ALLOWED_FILTER_TYPES:
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-        if filter_type is not None:
-            payload["filter_type"] = filter_type
-
-        effective_filter_type = payload.get("filter_type", existing.filter_type)
-        effective_filter_key = payload.get("filter_key", existing.filter_key)
-        validated_key = await self._validate_filter_key_for_type(
-            db,
-            filter_type=effective_filter_type,
-            filter_key=effective_filter_key,
-        )
-        if "filter_key" in payload or (effective_filter_type == "tag" and effective_filter_key is not None):
-            payload["filter_key"] = validated_key
+        if "chip_key" in payload:
+            ck = self._normalize(payload.get("chip_key"))
+            if ck is None:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            payload["chip_key"] = ck
+            other = await self._repository.get_filter_chip_by_chip_key(db, chip_key=ck)
+            if other is not None and other.filter_chip_id != filter_chip_id:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Chip key already exists")
 
         status = self._normalize_lower(payload.get("status"))
         if status is not None and status not in _ALLOWED_STATUS_VALUES:
@@ -1056,47 +1054,146 @@ class DiagnosticsService:
         if status is not None:
             payload["status"] = status
 
-        updated = await self._repository.update_filter(db, filter_id=filter_id, data=payload)
+        try:
+            updated = await self._repository.update_filter_chip(db, filter_chip_id=filter_chip_id, data=payload)
+        except IntegrityError:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request") from None
         if updated is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_FILTER_NOT_FOUND", message="Filter does not exist")
+            raise AppError(
+                status_code=404, error_code="DIAGNOSTIC_FILTER_CHIP_NOT_FOUND", message="Filter chip does not exist"
+            )
 
         await self._require_audit_service().log_event(
             db,
-            action="EMPLOYEE_UPDATE_DIAGNOSTIC_FILTER",
+            action="EMPLOYEE_UPDATE_DIAGNOSTIC_FILTER_CHIP",
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
             user_id=employee.user_id,
             session_id=None,
         )
-        return FilterResponse(
-            filter_id=updated.filter_id,
-            filter_key=updated.filter_key,
+        return FilterChipResponse(
+            filter_chip_id=updated.filter_chip_id,
+            chip_key=updated.chip_key,
             display_name=updated.display_name,
             display_order=updated.display_order,
-            filter_type=updated.filter_type,
             status=updated.status,
         )
 
-    async def delete_filter(
+    async def delete_filter_chip(
         self,
         db,
         *,
         employee: EmployeeContext,
-        filter_id: int,
+        filter_chip_id: int,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> None:
         self._ensure_employee_access(employee)
-        existing = await self._repository.get_filter_by_id(db, filter_id=filter_id)
+        existing = await self._repository.get_filter_chip_by_id(db, filter_chip_id=filter_chip_id)
         if existing is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_FILTER_NOT_FOUND", message="Filter does not exist")
+            raise AppError(
+                status_code=404, error_code="DIAGNOSTIC_FILTER_CHIP_NOT_FOUND", message="Filter chip does not exist"
+            )
 
-        await self._repository.delete_filter(db, filter_id=filter_id)
+        await self._repository.delete_filter_chip(db, filter_chip_id=filter_chip_id)
         await self._require_audit_service().log_event(
             db,
-            action="EMPLOYEE_DELETE_DIAGNOSTIC_FILTER",
+            action="EMPLOYEE_DELETE_DIAGNOSTIC_FILTER_CHIP",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+    async def assign_filter_chip_to_package(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        package_id: int,
+        data: PackageFilterChipAssign,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> PackageFilterChipResponse:
+        self._ensure_employee_access(employee)
+        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
+        if package is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
+
+        chip = await self._repository.get_filter_chip_by_id(db, filter_chip_id=data.filter_chip_id)
+        if chip is None:
+            raise AppError(
+                status_code=404, error_code="DIAGNOSTIC_FILTER_CHIP_NOT_FOUND", message="Filter chip does not exist"
+            )
+
+        existing_link = await self._repository.get_filter_chip_link(
+            db, package_id=package_id, filter_chip_id=data.filter_chip_id
+        )
+        if existing_link is not None:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Filter chip already on package")
+
+        display_order = data.display_order
+        if display_order is None:
+            max_ord = await self._repository.get_max_filter_chip_link_display_order(db, package_id=package_id)
+            display_order = (int(max_ord) if max_ord is not None else 0) + 1
+
+        link = await self._repository.add_filter_chip_link(
+            db,
+            package_id=package_id,
+            filter_chip_id=data.filter_chip_id,
+            display_order=display_order,
+        )
+        link.filter_chip = chip
+
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_ASSIGN_DIAGNOSTIC_PACKAGE_FILTER_CHIP",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return PackageFilterChipResponse(
+            filter_chip_id=chip.filter_chip_id,
+            chip_key=chip.chip_key,
+            display_name=chip.display_name,
+            display_order=link.display_order,
+        )
+
+    async def remove_filter_chip_from_package(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        package_id: int,
+        filter_chip_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> None:
+        self._ensure_employee_access(employee)
+        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
+        if package is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
+
+        n = await self._repository.delete_filter_chip_link(
+            db, package_id=package_id, filter_chip_id=filter_chip_id
+        )
+        if n == 0:
+            raise AppError(
+                status_code=404,
+                error_code="DIAGNOSTIC_FILTER_CHIP_LINK_NOT_FOUND",
+                message="Filter chip is not assigned to this package",
+            )
+
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_REMOVE_DIAGNOSTIC_PACKAGE_FILTER_CHIP",
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,

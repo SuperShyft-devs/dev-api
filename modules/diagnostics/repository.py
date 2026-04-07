@@ -12,7 +12,8 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from modules.diagnostics.models import (
     DiagnosticPackage,
-    DiagnosticPackageFilter,
+    DiagnosticPackageFilterChip,
+    DiagnosticPackageFilterChipLink,
     DiagnosticPackagePreparation,
     DiagnosticPackageReason,
     DiagnosticPackageSample,
@@ -34,9 +35,18 @@ class DiagnosticsRepository:
         *,
         gender: str | None = None,
         tag: str | None = None,
+        filter_chip_key: str | None = None,
         active_only: bool = True,
     ) -> list[DiagnosticPackage]:
-        query = select(DiagnosticPackage).options(selectinload(DiagnosticPackage.tags))
+        query = (
+            select(DiagnosticPackage)
+            .options(
+                selectinload(DiagnosticPackage.tags),
+                selectinload(DiagnosticPackage.filter_chip_links).selectinload(
+                    DiagnosticPackageFilterChipLink.filter_chip
+                ),
+            )
+        )
 
         if active_only:
             query = query.where(DiagnosticPackage.status == "active")
@@ -52,6 +62,17 @@ class DiagnosticsRepository:
             )
             query = query.where(DiagnosticPackage.diagnostic_package_id.in_(tag_package_subquery))
 
+        if filter_chip_key is not None:
+            chip_package_subquery = (
+                select(DiagnosticPackageFilterChipLink.diagnostic_package_id)
+                .join(
+                    DiagnosticPackageFilterChip,
+                    DiagnosticPackageFilterChip.filter_chip_id == DiagnosticPackageFilterChipLink.filter_chip_id,
+                )
+                .where(DiagnosticPackageFilterChip.chip_key == filter_chip_key)
+            )
+            query = query.where(DiagnosticPackage.diagnostic_package_id.in_(chip_package_subquery))
+
         query = query.order_by(DiagnosticPackage.diagnostic_package_id.desc())
         result = await db.execute(query)
         return list(result.scalars().all())
@@ -65,6 +86,9 @@ class DiagnosticsRepository:
                 joinedload(DiagnosticPackage.tags),
                 joinedload(DiagnosticPackage.samples),
                 joinedload(DiagnosticPackage.preparations),
+                joinedload(DiagnosticPackage.filter_chip_links).joinedload(
+                    DiagnosticPackageFilterChipLink.filter_chip
+                ),
             )
         )
         return result.unique().scalar_one_or_none()
@@ -109,27 +133,46 @@ class DiagnosticsRepository:
         await db.flush()
         return package
 
-    async def get_all_filters(self, db: AsyncSession) -> list[DiagnosticPackageFilter]:
+    async def get_all_filter_chips(self, db: AsyncSession) -> list[DiagnosticPackageFilterChip]:
         result = await db.execute(
-            select(DiagnosticPackageFilter)
-            .where(DiagnosticPackageFilter.status == "active")
-            .order_by(DiagnosticPackageFilter.display_order.asc().nulls_last(), DiagnosticPackageFilter.filter_id.asc())
+            select(DiagnosticPackageFilterChip)
+            .where(DiagnosticPackageFilterChip.status == "active")
+            .order_by(
+                DiagnosticPackageFilterChip.display_order.asc().nulls_last(),
+                DiagnosticPackageFilterChip.filter_chip_id.asc(),
+            )
         )
         return list(result.scalars().all())
 
-    async def get_filter_by_id(self, db: AsyncSession, *, filter_id: int) -> DiagnosticPackageFilter | None:
+    async def get_filter_chip_by_id(
+        self, db: AsyncSession, *, filter_chip_id: int
+    ) -> DiagnosticPackageFilterChip | None:
         result = await db.execute(
-            select(DiagnosticPackageFilter).where(DiagnosticPackageFilter.filter_id == filter_id)
+            select(DiagnosticPackageFilterChip).where(
+                DiagnosticPackageFilterChip.filter_chip_id == filter_chip_id
+            )
         )
         return result.scalar_one_or_none()
 
-    async def create_filter(self, db: AsyncSession, data: DiagnosticPackageFilter) -> DiagnosticPackageFilter:
+    async def get_filter_chip_by_chip_key(
+        self, db: AsyncSession, *, chip_key: str
+    ) -> DiagnosticPackageFilterChip | None:
+        result = await db.execute(
+            select(DiagnosticPackageFilterChip).where(DiagnosticPackageFilterChip.chip_key == chip_key)
+        )
+        return result.scalar_one_or_none()
+
+    async def create_filter_chip(
+        self, db: AsyncSession, data: DiagnosticPackageFilterChip
+    ) -> DiagnosticPackageFilterChip:
         db.add(data)
         await db.flush()
         return data
 
-    async def update_filter(self, db: AsyncSession, *, filter_id: int, data: dict) -> DiagnosticPackageFilter | None:
-        row = await self.get_filter_by_id(db, filter_id=filter_id)
+    async def update_filter_chip(
+        self, db: AsyncSession, *, filter_chip_id: int, data: dict
+    ) -> DiagnosticPackageFilterChip | None:
+        row = await self.get_filter_chip_by_id(db, filter_chip_id=filter_chip_id)
         if row is None:
             return None
 
@@ -141,11 +184,70 @@ class DiagnosticsRepository:
         await db.flush()
         return row
 
-    async def delete_filter(self, db: AsyncSession, *, filter_id: int) -> int:
+    async def delete_filter_chip(self, db: AsyncSession, *, filter_chip_id: int) -> int:
         result = await db.execute(
-            delete(DiagnosticPackageFilter).where(DiagnosticPackageFilter.filter_id == filter_id)
+            delete(DiagnosticPackageFilterChip).where(
+                DiagnosticPackageFilterChip.filter_chip_id == filter_chip_id
+            )
         )
         return int(result.rowcount or 0)
+
+    async def get_filter_chip_link(
+        self,
+        db: AsyncSession,
+        *,
+        package_id: int,
+        filter_chip_id: int,
+    ) -> DiagnosticPackageFilterChipLink | None:
+        result = await db.execute(
+            select(DiagnosticPackageFilterChipLink).where(
+                DiagnosticPackageFilterChipLink.diagnostic_package_id == package_id,
+                DiagnosticPackageFilterChipLink.filter_chip_id == filter_chip_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def add_filter_chip_link(
+        self,
+        db: AsyncSession,
+        *,
+        package_id: int,
+        filter_chip_id: int,
+        display_order: int | None = None,
+    ) -> DiagnosticPackageFilterChipLink:
+        link = DiagnosticPackageFilterChipLink(
+            diagnostic_package_id=package_id,
+            filter_chip_id=filter_chip_id,
+            display_order=display_order,
+        )
+        db.add(link)
+        await db.flush()
+        return link
+
+    async def delete_filter_chip_link(
+        self,
+        db: AsyncSession,
+        *,
+        package_id: int,
+        filter_chip_id: int,
+    ) -> int:
+        result = await db.execute(
+            delete(DiagnosticPackageFilterChipLink).where(
+                DiagnosticPackageFilterChipLink.diagnostic_package_id == package_id,
+                DiagnosticPackageFilterChipLink.filter_chip_id == filter_chip_id,
+            )
+        )
+        return int(result.rowcount or 0)
+
+    async def get_max_filter_chip_link_display_order(
+        self, db: AsyncSession, *, package_id: int
+    ) -> int | None:
+        result = await db.execute(
+            select(func.max(DiagnosticPackageFilterChipLink.display_order)).where(
+                DiagnosticPackageFilterChipLink.diagnostic_package_id == package_id
+            )
+        )
+        return result.scalar_one_or_none()
 
     async def get_reasons(self, db: AsyncSession, *, package_id: int) -> list[DiagnosticPackageReason]:
         result = await db.execute(
