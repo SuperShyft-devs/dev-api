@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.responses import success_response
+from core.dependencies import get_optional_user
+from core.exceptions import AppError
 from db.session import get_db
+from modules.employee.dependencies import get_current_employee, get_employee_service
+from modules.employee.service import EmployeeContext, EmployeeService
 from modules.payments.services import PaymentsService
 
-router = APIRouter(prefix="/api/payments", tags=["payments"])
+# Prefix /payments (not /api/payments): dev-admin Vite proxy strips /api from the request path.
+router = APIRouter(prefix="/payments", tags=["payments"])
 
 
 def get_payments_service() -> PaymentsService:
@@ -120,14 +126,62 @@ async def payment_failed(
         )
 
 
+@router.get("/bookings")
+async def list_bookings(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    search: str | None = None,
+    status: str | None = None,
+    sort_key: str = Query("booking_id"),
+    sort_dir: str = Query("desc"),
+    db: AsyncSession = Depends(get_db),
+    service: PaymentsService = Depends(get_payments_service),
+    _employee: EmployeeContext = Depends(get_current_employee),
+):
+    if sort_key != "booking_id":
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error_code": "INVALID_INPUT", "message": "Invalid sort_key"},
+        )
+    if sort_dir.lower() not in ("asc", "desc"):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error_code": "INVALID_INPUT", "message": "Invalid sort_dir"},
+        )
+    payload = await service.list_bookings_admin(
+        db,
+        page=page,
+        limit=limit,
+        search=search,
+        status=status,
+        sort_key=sort_key,
+        sort_dir=sort_dir,
+    )
+    return success_response(payload)
+
+
 @router.get("/booking/{booking_id}/status")
 async def booking_status(
     booking_id: int,
     db: AsyncSession = Depends(get_db),
     service: PaymentsService = Depends(get_payments_service),
+    user=Depends(get_optional_user),
+    employee_service: EmployeeService = Depends(get_employee_service),
 ):
+    include_user_detail = False
+    if user is not None:
+        try:
+            await employee_service.get_active_employee_by_user_id(db, user.user_id)
+            include_user_detail = True
+        except AppError:
+            include_user_detail = False
+
     try:
-        data = await service.get_booking_status(db, booking_id=booking_id)
+        data = await service.get_booking_status(
+            db,
+            booking_id=booking_id,
+            include_user_detail=include_user_detail,
+        )
         if data is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,

@@ -76,6 +76,20 @@ async def get_current_user(
     return await authenticate_bearer_user(db, credentials, access_token=None)
 
 
+async def get_optional_user(
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),
+):
+    """Return active user if Bearer token is valid; otherwise None (no 401)."""
+
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        return None
+    try:
+        return await authenticate_bearer_user(db, credentials, access_token=None)
+    except AppError:
+        return None
+
+
 async def get_current_user_bearer_or_query(
     db: AsyncSession = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),

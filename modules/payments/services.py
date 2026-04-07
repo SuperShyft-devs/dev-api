@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
@@ -297,7 +297,13 @@ class PaymentsService:
             await db.rollback()
             return {"_error": (500, "Internal server error")}
 
-    async def get_booking_status(self, db: AsyncSession, *, booking_id: int) -> dict[str, Any] | None:
+    async def get_booking_status(
+        self,
+        db: AsyncSession,
+        *,
+        booking_id: int,
+        include_user_detail: bool = False,
+    ) -> dict[str, Any] | None:
         booking_result = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
         booking = booking_result.scalar_one_or_none()
         if booking is None:
@@ -318,7 +324,7 @@ class PaymentsService:
                 ts = ts.replace(tzinfo=timezone.utc)
             paid_at_str = ts.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        return {
+        base: dict[str, Any] = {
             "booking_id": booking.booking_id,
             "entity_type": booking.entity_type,
             "entity_name": booking.entity_name,
@@ -332,3 +338,105 @@ class PaymentsService:
             "signature_verified": payment_row.signature_verified if payment_row else False,
             "paid_at": paid_at_str,
         }
+
+        if include_user_detail:
+            user_result = await db.execute(select(User).where(User.user_id == booking.user_id))
+            user_row = user_result.scalar_one_or_none()
+            user_name = (
+                " ".join(x for x in [user_row.first_name, user_row.last_name] if x)
+                if user_row
+                else ""
+            )
+            booked_ts = booking.booked_at
+            if booked_ts is not None and booked_ts.tzinfo is None:
+                booked_ts = booked_ts.replace(tzinfo=timezone.utc)
+            booked_at_str = booked_ts.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if booked_ts else ""
+            base.update(
+                {
+                    "user_id": booking.user_id,
+                    "user_name": user_name or "—",
+                    "booked_at": booked_at_str,
+                    "failure_reason": payment_row.failure_reason if payment_row else None,
+                    "signature_verified": payment_row.signature_verified if payment_row else None,
+                }
+            )
+
+        return base
+
+    async def list_bookings_admin(
+        self,
+        db: AsyncSession,
+        *,
+        page: int,
+        limit: int,
+        search: str | None,
+        status: str | None,
+        sort_key: str,
+        sort_dir: str,
+    ) -> dict[str, Any]:
+        latest_sub = (
+            select(
+                Payment.booking_id.label("bid"),
+                func.max(Payment.payment_id).label("max_pid"),
+            ).group_by(Payment.booking_id)
+        ).subquery()
+
+        filters = []
+        if status:
+            filters.append(Booking.status == status)
+        if search and search.strip():
+            q = f"%{search.strip()}%"
+            user_full = func.trim(
+                func.concat(
+                    func.coalesce(User.first_name, ""),
+                    " ",
+                    func.coalesce(User.last_name, ""),
+                )
+            )
+            filters.append(or_(Booking.entity_name.ilike(q), user_full.ilike(q)))
+
+        count_stmt = select(func.count()).select_from(Booking).join(User, User.user_id == Booking.user_id)
+        if filters:
+            count_stmt = count_stmt.where(*filters)
+        total_result = await db.execute(count_stmt)
+        total = int(total_result.scalar_one() or 0)
+
+        order_fn = Booking.booking_id.desc() if sort_dir.lower() == "desc" else Booking.booking_id.asc()
+
+        list_stmt = (
+            select(Booking, User, Payment)
+            .select_from(Booking)
+            .join(User, User.user_id == Booking.user_id)
+            .outerjoin(latest_sub, latest_sub.c.bid == Booking.booking_id)
+            .outerjoin(Payment, Payment.payment_id == latest_sub.c.max_pid)
+        )
+        if filters:
+            list_stmt = list_stmt.where(*filters)
+        list_stmt = list_stmt.order_by(order_fn).offset((page - 1) * limit).limit(limit)
+        rows = await db.execute(list_stmt)
+        items: list[dict[str, Any]] = []
+        for booking, user_row, pay in rows.all():
+            user_name = " ".join(x for x in [user_row.first_name, user_row.last_name] if x) or "—"
+            booked_ts = booking.booked_at
+            if booked_ts is not None and booked_ts.tzinfo is None:
+                booked_ts = booked_ts.replace(tzinfo=timezone.utc)
+            booked_at_str = (
+                booked_ts.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if booked_ts else ""
+            )
+            items.append(
+                {
+                    "booking_id": booking.booking_id,
+                    "user_id": booking.user_id,
+                    "user_name": user_name,
+                    "entity_type": booking.entity_type,
+                    "entity_name": booking.entity_name,
+                    "amount_paise": booking.amount_paise,
+                    "currency": booking.currency or "INR",
+                    "status": booking.status,
+                    "payment_status": pay.status if pay else None,
+                    "payment_method": pay.payment_method if pay else None,
+                    "booked_at": booked_at_str,
+                }
+            )
+
+        return {"items": items, "total": total}
