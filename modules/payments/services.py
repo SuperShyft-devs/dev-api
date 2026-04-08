@@ -12,6 +12,7 @@ from typing import Any
 
 from sqlalchemy import func, or_, select, union_all, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from core.config import settings
 from modules.diagnostics.models import DiagnosticPackage
@@ -465,12 +466,23 @@ class PaymentsService:
                     )
                     junction_count = int(ob_cnt.scalar_one() or 0)
                     line_count = junction_count if junction_count > 0 else 1
+                    payer_res = await db.execute(
+                        select(User).where(User.user_id == order_row.user_id)
+                    )
+                    payer_u = payer_res.scalar_one_or_none()
+                    payer_nm = (
+                        " ".join(x for x in [payer_u.first_name, payer_u.last_name] if x)
+                        if payer_u
+                        else ""
+                    )
                     base["checkout"] = {
                         "order_id": order_row.order_id,
                         "razorpay_order_id": order_row.razorpay_order_id,
                         "order_amount_paise": order_row.amount_paise,
                         "order_amount_rupees": rupees_from_paise(order_row.amount_paise),
                         "checkout_line_count": line_count,
+                        "payer_user_id": order_row.user_id,
+                        "payer_user_name": payer_nm or "—",
                         "lines": lines_out,
                     }
 
@@ -487,6 +499,9 @@ class PaymentsService:
         sort_key: str,
         sort_dir: str,
     ) -> dict[str, Any]:
+        member_user = aliased(User)
+        payer_user = aliased(User)
+
         # Explicit FROM + correlate(Booking): otherwise SQLAlchemy strips bol FROM
         # inside JOIN ON scalar subqueries ("no FROM clauses due to auto-correlation").
         order_ids_for_booking_sq = (
@@ -525,14 +540,16 @@ class PaymentsService:
             q = f"%{search.strip()}%"
             user_full = func.trim(
                 func.concat(
-                    func.coalesce(User.first_name, ""),
+                    func.coalesce(member_user.first_name, ""),
                     " ",
-                    func.coalesce(User.last_name, ""),
+                    func.coalesce(member_user.last_name, ""),
                 )
             )
             filters.append(or_(Booking.entity_name.ilike(q), user_full.ilike(q)))
 
-        count_stmt = select(func.count()).select_from(Booking).join(User, User.user_id == Booking.user_id)
+        count_stmt = (
+            select(func.count()).select_from(Booking).join(member_user, member_user.user_id == Booking.user_id)
+        )
         if filters:
             count_stmt = count_stmt.where(*filters)
         total_result = await db.execute(count_stmt)
@@ -541,10 +558,11 @@ class PaymentsService:
         order_fn = Booking.booking_id.desc() if sort_dir.lower() == "desc" else Booking.booking_id.asc()
 
         list_stmt = (
-            select(Booking, User, Payment, Order)
+            select(Booking, member_user, Payment, Order, payer_user)
             .select_from(Booking)
-            .join(User, User.user_id == Booking.user_id)
+            .join(member_user, member_user.user_id == Booking.user_id)
             .outerjoin(Order, Order.order_id == booking_primary_order_sq)
+            .outerjoin(payer_user, payer_user.user_id == Order.user_id)
             .outerjoin(Payment, Payment.payment_id == latest_payment_id_sq)
         )
         if filters:
@@ -552,7 +570,11 @@ class PaymentsService:
         list_stmt = list_stmt.order_by(order_fn).offset((page - 1) * limit).limit(limit)
         rows = await db.execute(list_stmt)
         row_tuples = rows.all()
-        order_ids_needed = {o.order_id for *_, o in row_tuples if o is not None}
+        order_ids_needed = {
+            order_row.order_id
+            for (_, _, _, order_row, _) in row_tuples
+            if order_row is not None
+        }
         counts_map: dict[int, int] = {}
         if order_ids_needed:
             cnt_res = await db.execute(
@@ -564,8 +586,18 @@ class PaymentsService:
                 counts_map[int(oid)] = int(c)
 
         items: list[dict[str, Any]] = []
-        for booking, user_row, pay, order_row in row_tuples:
+        for booking, user_row, pay, order_row, payer_row in row_tuples:
             user_name = " ".join(x for x in [user_row.first_name, user_row.last_name] if x) or "—"
+            payer_user_id: int | None = None
+            payer_user_name: str | None = None
+            if order_row is not None:
+                payer_user_id = order_row.user_id
+                if payer_row is not None:
+                    payer_user_name = (
+                        " ".join(x for x in [payer_row.first_name, payer_row.last_name] if x) or "—"
+                    )
+                else:
+                    payer_user_name = "—"
             booked_ts = booking.booked_at
             if booked_ts is not None and booked_ts.tzinfo is None:
                 booked_ts = booked_ts.replace(tzinfo=timezone.utc)
@@ -600,6 +632,8 @@ class PaymentsService:
                     "razorpay_order_id": razorpay_order_id,
                     "order_amount_paise": order_amount_paise,
                     "checkout_line_count": checkout_line_count,
+                    "payer_user_id": payer_user_id,
+                    "payer_user_name": payer_user_name,
                 }
             )
 
