@@ -29,6 +29,15 @@ class Booking(Base):
     )
 
 
+class OrderBooking(Base):
+    """Associates one Razorpay order with every booking line in that checkout."""
+
+    __tablename__ = "order_bookings"
+
+    order_id = Column(Integer, ForeignKey("orders.order_id", ondelete="CASCADE"), primary_key=True)
+    booking_id = Column(Integer, ForeignKey("bookings.booking_id", ondelete="CASCADE"), primary_key=True)
+
+
 class Order(Base):
     """Razorpay order linked to a booking."""
 

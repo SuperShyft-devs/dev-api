@@ -10,12 +10,12 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, or_, select, union_all, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from modules.diagnostics.models import DiagnosticPackage
-from modules.payments.models import Booking, Order, Payment
+from modules.payments.models import Booking, Order, OrderBooking, Payment
 from modules.payments.razorpay_client import get_razorpay_client
 from modules.users.models import User
 
@@ -55,94 +55,140 @@ def _create_razorpay_order_sync(*, amount_paise: int, receipt: str) -> dict[str,
     )
 
 
+async def _booking_ids_for_order(db: AsyncSession, order_row: Order) -> list[int]:
+    ob_result = await db.execute(
+        select(OrderBooking.booking_id).where(OrderBooking.order_id == order_row.order_id)
+    )
+    ids = {row[0] for row in ob_result.all()}
+    ids.add(order_row.booking_id)
+    return sorted(ids)
+
+
+async def _resolve_line_pricing(
+    db: AsyncSession, *, entity_type: str, entity_id: int
+) -> tuple[int, str] | dict[str, Any]:
+    if entity_type == "diagnostic_package":
+        pkg_result = await db.execute(
+            select(DiagnosticPackage).where(
+                DiagnosticPackage.diagnostic_package_id == entity_id,
+                DiagnosticPackage.status == "active",
+            )
+        )
+        package = pkg_result.scalar_one_or_none()
+        if package is None:
+            return {"_error": (400, "Diagnostic package not found or not active")}
+        rupee_price = package.price if package.price is not None else package.original_price
+        if rupee_price is None:
+            return {
+                "_error": (
+                    400,
+                    "Diagnostic package has no price (set price or original_price in the database)",
+                ),
+            }
+        return (_price_to_paise(rupee_price), package.package_name or "")
+    return {"_error": (400, f"Unsupported entity_type: {entity_type}")}
+
+
+# (order_id, booking_id) pairs: Razorpay order row + junction (multi-line) + legacy single booking
+_booking_order_link = (
+    union_all(
+        select(Order.order_id.label("oid"), Order.booking_id.label("bid")),
+        select(OrderBooking.order_id.label("oid"), OrderBooking.booking_id.label("bid")),
+    )
+).subquery("bol")
+
+
 class PaymentsService:
     async def create_order(
         self,
         db: AsyncSession,
         *,
-        user_id: int,
-        entity_type: str,
-        entity_id: int,
+        payer_user_id: int,
+        items: list[tuple[int, str, int]],
     ) -> dict[str, Any]:
         try:
-            user_result = await db.execute(select(User).where(User.user_id == user_id))
-            user = user_result.scalar_one_or_none()
-            if user is None:
+            payer_result = await db.execute(select(User).where(User.user_id == payer_user_id))
+            if payer_result.scalar_one_or_none() is None:
                 return {"_error": (400, "User not found")}
 
-            amount_paise: int
-            entity_name: str
+            bookings_created: list[Booking] = []
+            total_paise = 0
 
-            if entity_type == "diagnostic_package":
-                pkg_result = await db.execute(
-                    select(DiagnosticPackage).where(
-                        DiagnosticPackage.diagnostic_package_id == entity_id,
-                        DiagnosticPackage.status == "active",
-                    )
+            for member_user_id, entity_type, entity_id in items:
+                member_result = await db.execute(select(User).where(User.user_id == member_user_id))
+                if member_result.scalar_one_or_none() is None:
+                    return {"_error": (400, f"User not found for line (user_id={member_user_id})")}
+
+                resolved = await _resolve_line_pricing(db, entity_type=entity_type, entity_id=entity_id)
+                if isinstance(resolved, dict) and resolved.get("_error"):
+                    return resolved
+                assert isinstance(resolved, tuple)
+                line_paise, entity_name = resolved
+                total_paise += line_paise
+
+                booking = Booking(
+                    user_id=member_user_id,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    entity_name=entity_name,
+                    amount_paise=line_paise,
+                    currency="INR",
+                    status="pending",
                 )
-                package = pkg_result.scalar_one_or_none()
-                if package is None:
-                    return {"_error": (400, "Diagnostic package not found or not active")}
-                rupee_price = package.price if package.price is not None else package.original_price
-                if rupee_price is None:
-                    return {
-                        "_error": (
-                            400,
-                            "Diagnostic package has no price (set price or original_price in the database)",
-                        ),
-                    }
-                amount_paise = _price_to_paise(rupee_price)
-                entity_name = package.package_name or ""
-            else:
-                return {"_error": (400, f"Unsupported entity_type: {entity_type}")}
+                db.add(booking)
+                await db.flush()
+                bookings_created.append(booking)
 
-            booking = Booking(
-                user_id=user_id,
-                entity_type=entity_type,
-                entity_id=entity_id,
-                entity_name=entity_name,
-                amount_paise=amount_paise,
-                currency="INR",
-                status="pending",
-            )
-            db.add(booking)
-            await db.flush()
+            if not bookings_created:
+                return {"_error": (400, "No booking lines")}
+
+            anchor_booking_id = bookings_created[0].booking_id
+            receipt = f"checkout_{anchor_booking_id}"
 
             try:
                 rz_order = await asyncio.to_thread(
                     _create_razorpay_order_sync,
-                    amount_paise=amount_paise,
-                    receipt=f"booking_{booking.booking_id}",
+                    amount_paise=total_paise,
+                    receipt=receipt,
                 )
             except Exception as exc:
                 logger.exception("Razorpay order creation failed: %s", exc)
-                await db.delete(booking)
+                for b in bookings_created:
+                    await db.delete(b)
                 await db.commit()
                 return {"_error": (502, "Payment service unavailable")}
 
             razorpay_order_id = rz_order.get("id")
             if not razorpay_order_id:
-                await db.delete(booking)
+                for b in bookings_created:
+                    await db.delete(b)
                 await db.commit()
                 return {"_error": (502, "Payment service unavailable")}
 
             order_row = Order(
-                booking_id=booking.booking_id,
-                user_id=user_id,
+                booking_id=anchor_booking_id,
+                user_id=payer_user_id,
                 razorpay_order_id=razorpay_order_id,
-                amount_paise=amount_paise,
+                amount_paise=total_paise,
                 currency="INR",
                 status="created",
             )
             db.add(order_row)
+            await db.flush()
+
+            for b in bookings_created:
+                db.add(OrderBooking(order_id=order_row.order_id, booking_id=b.booking_id))
+
             await db.commit()
 
+            booking_ids = [b.booking_id for b in bookings_created]
             return {
                 "success": True,
-                "booking_id": booking.booking_id,
+                "booking_ids": booking_ids,
+                "booking_id": booking_ids[0],
                 "razorpay_order_id": razorpay_order_id,
-                "amount_paise": amount_paise,
-                "amount_rupees": rupees_from_paise(amount_paise),
+                "amount_paise": total_paise,
+                "amount_rupees": rupees_from_paise(total_paise),
                 "currency": "INR",
                 "key_id": settings.RAZORPAY_KEY_ID,
             }
@@ -186,24 +232,32 @@ class PaymentsService:
                 )
                 existing = pay_result.scalar_one_or_none()
                 if existing is not None:
-                    b_result = await db.execute(
-                        select(Booking).where(Booking.booking_id == order_row.booking_id)
-                    )
-                    booking = b_result.scalar_one()
+                    booking_ids = await _booking_ids_for_order(db, order_row)
                     return {
                         "success": True,
                         "message": "Payment verified. Booking confirmed.",
-                        "booking_id": booking.booking_id,
+                        "booking_ids": booking_ids,
+                        "booking_id": booking_ids[0] if booking_ids else order_row.booking_id,
                         "payment_id": razorpay_payment_id,
                     }
                 return {"_error": (422, "Order marked paid but no payment record")}
 
-            booking_result = await db.execute(
-                select(Booking).where(Booking.booking_id == order_row.booking_id)
+            booking_ids = await _booking_ids_for_order(db, order_row)
+            bookings_result = await db.execute(
+                select(Booking).where(Booking.booking_id.in_(booking_ids))
             )
-            booking = booking_result.scalar_one_or_none()
-            if booking is None:
+            bookings = list(bookings_result.scalars().all())
+            if len(bookings) != len(booking_ids):
                 return {"_error": (404, "Booking not found")}
+
+            for b in bookings:
+                if b.status != "pending":
+                    return {
+                        "_error": (
+                            422,
+                            "One or more bookings are not pending; cannot complete payment",
+                        ),
+                    }
 
             now = datetime.now(timezone.utc)
             payment_row = Payment(
@@ -226,22 +280,24 @@ class PaymentsService:
             order_row.status = "paid"
             order_row.updated_at = now
 
-            booking.status = "confirmed"
-            booking.updated_at = now
-
-            if booking.entity_type == "diagnostic_package":
-                await db.execute(
-                    update(DiagnosticPackage)
-                    .where(DiagnosticPackage.diagnostic_package_id == booking.entity_id)
-                    .values(bookings_count=DiagnosticPackage.bookings_count + 1)
-                )
+            for booking in bookings:
+                booking.status = "confirmed"
+                booking.updated_at = now
+                if booking.entity_type == "diagnostic_package":
+                    await db.execute(
+                        update(DiagnosticPackage)
+                        .where(DiagnosticPackage.diagnostic_package_id == booking.entity_id)
+                        .values(bookings_count=DiagnosticPackage.bookings_count + 1)
+                    )
 
             await db.commit()
 
+            sorted_ids = sorted(booking_ids)
             return {
                 "success": True,
                 "message": "Payment verified. Booking confirmed.",
-                "booking_id": booking.booking_id,
+                "booking_ids": sorted_ids,
+                "booking_id": sorted_ids[0],
                 "payment_id": razorpay_payment_id,
             }
         except Exception as exc:
@@ -309,9 +365,15 @@ class PaymentsService:
         if booking is None:
             return None
 
+        order_ids_sq = select(_booking_order_link.c.oid).where(_booking_order_link.c.bid == booking_id)
         pay_result = await db.execute(
             select(Payment)
-            .where(Payment.booking_id == booking_id)
+            .where(
+                or_(
+                    Payment.booking_id == booking_id,
+                    Payment.order_id.in_(order_ids_sq),
+                )
+            )
             .order_by(Payment.payment_id.desc())
             .limit(1)
         )
@@ -361,6 +423,57 @@ class PaymentsService:
                 }
             )
 
+            oid_res = await db.execute(
+                select(_booking_order_link.c.oid)
+                .where(_booking_order_link.c.bid == booking_id)
+                .limit(1)
+            )
+            first_oid = oid_res.scalar_one_or_none()
+            if first_oid is not None:
+                o_res = await db.execute(select(Order).where(Order.order_id == first_oid))
+                order_row = o_res.scalar_one_or_none()
+                if order_row is not None:
+                    sib_ids = await _booking_ids_for_order(db, order_row)
+                    sib_bookings = await db.execute(
+                        select(Booking).where(Booking.booking_id.in_(sib_ids))
+                    )
+                    sib_list = list(sib_bookings.scalars().all())
+                    lines_out: list[dict[str, Any]] = []
+                    for sb in sorted(sib_list, key=lambda x: x.booking_id):
+                        u_r = await db.execute(select(User).where(User.user_id == sb.user_id))
+                        u = u_r.scalar_one_or_none()
+                        nm = (
+                            " ".join(x for x in [u.first_name, u.last_name] if x)
+                            if u
+                            else ""
+                        )
+                        lines_out.append(
+                            {
+                                "booking_id": sb.booking_id,
+                                "user_id": sb.user_id,
+                                "user_name": nm or "—",
+                                "entity_name": sb.entity_name,
+                                "amount_paise": sb.amount_paise,
+                                "amount_rupees": rupees_from_paise(sb.amount_paise),
+                                "booking_status": sb.status,
+                            }
+                        )
+                    ob_cnt = await db.execute(
+                        select(func.count())
+                        .select_from(OrderBooking)
+                        .where(OrderBooking.order_id == order_row.order_id)
+                    )
+                    junction_count = int(ob_cnt.scalar_one() or 0)
+                    line_count = junction_count if junction_count > 0 else 1
+                    base["checkout"] = {
+                        "order_id": order_row.order_id,
+                        "razorpay_order_id": order_row.razorpay_order_id,
+                        "order_amount_paise": order_row.amount_paise,
+                        "order_amount_rupees": rupees_from_paise(order_row.amount_paise),
+                        "checkout_line_count": line_count,
+                        "lines": lines_out,
+                    }
+
         return base
 
     async def list_bookings_admin(
@@ -374,12 +487,36 @@ class PaymentsService:
         sort_key: str,
         sort_dir: str,
     ) -> dict[str, Any]:
-        latest_sub = (
-            select(
-                Payment.booking_id.label("bid"),
-                func.max(Payment.payment_id).label("max_pid"),
-            ).group_by(Payment.booking_id)
-        ).subquery()
+        # Explicit FROM + correlate(Booking): otherwise SQLAlchemy strips bol FROM
+        # inside JOIN ON scalar subqueries ("no FROM clauses due to auto-correlation").
+        order_ids_for_booking_sq = (
+            select(_booking_order_link.c.oid)
+            .select_from(_booking_order_link)
+            .where(_booking_order_link.c.bid == Booking.booking_id)
+            .correlate(Booking)
+            .scalar_subquery()
+        )
+
+        latest_payment_id_sq = (
+            select(func.max(Payment.payment_id))
+            .where(
+                or_(
+                    Payment.booking_id == Booking.booking_id,
+                    Payment.order_id.in_(order_ids_for_booking_sq),
+                )
+            )
+            .correlate(Booking)
+            .scalar_subquery()
+        )
+
+        booking_primary_order_sq = (
+            select(_booking_order_link.c.oid)
+            .select_from(_booking_order_link)
+            .where(_booking_order_link.c.bid == Booking.booking_id)
+            .limit(1)
+            .correlate(Booking)
+            .scalar_subquery()
+        )
 
         filters = []
         if status:
@@ -404,18 +541,30 @@ class PaymentsService:
         order_fn = Booking.booking_id.desc() if sort_dir.lower() == "desc" else Booking.booking_id.asc()
 
         list_stmt = (
-            select(Booking, User, Payment)
+            select(Booking, User, Payment, Order)
             .select_from(Booking)
             .join(User, User.user_id == Booking.user_id)
-            .outerjoin(latest_sub, latest_sub.c.bid == Booking.booking_id)
-            .outerjoin(Payment, Payment.payment_id == latest_sub.c.max_pid)
+            .outerjoin(Order, Order.order_id == booking_primary_order_sq)
+            .outerjoin(Payment, Payment.payment_id == latest_payment_id_sq)
         )
         if filters:
             list_stmt = list_stmt.where(*filters)
         list_stmt = list_stmt.order_by(order_fn).offset((page - 1) * limit).limit(limit)
         rows = await db.execute(list_stmt)
+        row_tuples = rows.all()
+        order_ids_needed = {o.order_id for *_, o in row_tuples if o is not None}
+        counts_map: dict[int, int] = {}
+        if order_ids_needed:
+            cnt_res = await db.execute(
+                select(OrderBooking.order_id, func.count(OrderBooking.booking_id))
+                .where(OrderBooking.order_id.in_(order_ids_needed))
+                .group_by(OrderBooking.order_id)
+            )
+            for oid, c in cnt_res.all():
+                counts_map[int(oid)] = int(c)
+
         items: list[dict[str, Any]] = []
-        for booking, user_row, pay in rows.all():
+        for booking, user_row, pay, order_row in row_tuples:
             user_name = " ".join(x for x in [user_row.first_name, user_row.last_name] if x) or "—"
             booked_ts = booking.booked_at
             if booked_ts is not None and booked_ts.tzinfo is None:
@@ -423,6 +572,17 @@ class PaymentsService:
             booked_at_str = (
                 booked_ts.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if booked_ts else ""
             )
+            checkout_line_count: int | None = None
+            order_id: int | None = None
+            razorpay_order_id: str | None = None
+            order_amount_paise: int | None = None
+            if order_row is not None:
+                order_id = order_row.order_id
+                razorpay_order_id = order_row.razorpay_order_id
+                order_amount_paise = order_row.amount_paise
+                raw_c = counts_map.get(order_row.order_id, 0)
+                checkout_line_count = raw_c if raw_c > 0 else 1
+
             items.append(
                 {
                     "booking_id": booking.booking_id,
@@ -436,6 +596,10 @@ class PaymentsService:
                     "payment_status": pay.status if pay else None,
                     "payment_method": pay.payment_method if pay else None,
                     "booked_at": booked_at_str,
+                    "order_id": order_id,
+                    "razorpay_order_id": razorpay_order_id,
+                    "order_amount_paise": order_amount_paise,
+                    "checkout_line_count": checkout_line_count,
                 }
             )
 

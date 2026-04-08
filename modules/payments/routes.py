@@ -23,10 +23,17 @@ def get_payments_service() -> PaymentsService:
     return PaymentsService()
 
 
-class CreateOrderRequest(BaseModel):
+class CreateOrderLineItem(BaseModel):
     user_id: int = Field(..., ge=1)
     entity_type: str = Field(..., min_length=1)
     entity_id: int = Field(..., ge=1)
+
+
+class CreateOrderRequest(BaseModel):
+    """Payer user_id plus at least one line (member user_id + entity)."""
+
+    user_id: int = Field(..., ge=1)
+    items: list[CreateOrderLineItem] = Field(..., min_length=1)
 
 
 class VerifyPaymentRequest(BaseModel):
@@ -49,9 +56,10 @@ async def create_order(
     try:
         result = await service.create_order(
             db,
-            user_id=body.user_id,
-            entity_type=body.entity_type.strip(),
-            entity_id=body.entity_id,
+            payer_user_id=body.user_id,
+            items=[
+                (line.user_id, line.entity_type.strip(), line.entity_id) for line in body.items
+            ],
         )
         err = result.get("_error")
         if err:
