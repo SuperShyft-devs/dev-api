@@ -471,7 +471,16 @@ class UsersService:
         if user is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
-        updated = await self._repository.update_user_profile(db, user=user, payload=payload)
+        payload_to_apply = payload
+        partial = payload.model_dump(exclude_unset=True)
+        if "phone" in partial and partial["phone"] is not None:
+            new_phone = partial["phone"].strip()
+            existing_phone = await self._repository.get_user_by_phone(db, new_phone)
+            if existing_phone is not None and existing_phone.user_id != user.user_id:
+                raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
+            payload_to_apply = payload.model_copy(update={"phone": new_phone})
+
+        updated = await self._repository.update_user_profile(db, user=user, payload=payload_to_apply)
 
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")

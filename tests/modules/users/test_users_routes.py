@@ -57,6 +57,20 @@ async def test_update_me_updates_editable_fields(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
+async def test_update_me_updates_phone(async_client, test_db_session):
+    user = User(user_id=1010, age=30, phone="5555555555", status="active", first_name="A")
+    test_db_session.add(user)
+    await test_db_session.commit()
+
+    headers = _auth_header(1010)
+    payload = {"age": 30, "phone": "5999999999"}
+
+    response = await async_client.put("/users/me", headers=headers, json=payload)
+    assert response.status_code == 200
+    assert response.json()["data"]["phone"] == "5999999999"
+
+
+@pytest.mark.asyncio
 async def test_get_me_status_returns_active_flag(async_client, test_db_session):
     user = User(user_id=1010, age=30, phone="5555555555", status="active")
     test_db_session.add(user)

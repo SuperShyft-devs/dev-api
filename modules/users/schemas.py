@@ -37,6 +37,7 @@ class UpdateMyProfileRequest(BaseModel):
     age: int
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
+    phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
     email: Optional[EmailStr] = None
     profile_photo: Optional[str] = Field(default=None, max_length=500)
     date_of_birth: Optional[date] = None
