@@ -882,12 +882,14 @@ async def remove_group_from_package(
     group_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    current_user: User = Depends(get_current_user),
+    employee: EmployeeContext | None = Depends(get_optional_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
     await diagnostics_service.remove_group_from_package(
         db,
         employee=employee,
+        current_user_id=current_user.user_id,
         package_id=package_id,
         group_id=group_id,
         ip_address=_client_ip(request),

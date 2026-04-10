@@ -989,17 +989,32 @@ class DiagnosticsService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None,
+        current_user_id: int,
         package_id: int,
         group_id: int,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> None:
-        self._ensure_employee_access(employee)
+        if employee is not None:
+            self._ensure_employee_access(employee)
+            audit_user_id = employee.user_id
+        else:
+            audit_user_id = current_user_id
+
         package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
         if package is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
+
+        if employee is None:
+            if package.created_by_user_id is None or package.created_by_user_id != current_user_id:
+                raise AppError(
+                    status_code=403,
+                    error_code="FORBIDDEN",
+                    message="You do not have permission to perform this action",
+                )
+
         group = await self._repository.get_group_by_id(db, group_id=group_id)
         if group is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
@@ -1014,13 +1029,18 @@ class DiagnosticsService:
                 error_code="DIAGNOSTIC_GROUP_NOT_ASSIGNED_TO_PACKAGE",
                 message="This group is not assigned to this package",
             )
+        action = (
+            "EMPLOYEE_REMOVE_DIAGNOSTIC_TEST_GROUP_FROM_PACKAGE"
+            if employee is not None
+            else "USER_REMOVE_DIAGNOSTIC_TEST_GROUP_FROM_PACKAGE"
+        )
         await self._require_audit_service().log_event(
             db,
-            action="EMPLOYEE_REMOVE_DIAGNOSTIC_TEST_GROUP_FROM_PACKAGE",
+            action=action,
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=audit_user_id,
             session_id=None,
         )
 
