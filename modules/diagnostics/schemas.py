@@ -27,7 +27,7 @@ class FilterChipForSchema(str, Enum):
 class DiagnosticPackageCreate(BaseModel):
     package_name: str = Field(min_length=1)
     diagnostic_provider: Optional[str] = None
-    created_by_user_id: Optional[int] = None
+    custom: bool = False
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
     about_text: Optional[str] = None

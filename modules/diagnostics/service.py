@@ -64,7 +64,6 @@ from modules.diagnostics.schemas import (
     ReorderPackageGroupsRequest,
 )
 from modules.employee.service import EmployeeContext
-from modules.users.repository import UsersRepository
 
 
 _ALLOWED_COLLECTION_TYPES = {"home_collection", "centre_visit"}
@@ -433,28 +432,24 @@ class DiagnosticsService:
         user_agent: str,
         endpoint: str,
     ) -> DiagnosticPackageResponse:
+        is_custom = data.custom
         payload = data.model_dump(exclude_none=True)
         payload.pop("no_of_tests", None)
-        created_by = payload.pop("created_by_user_id", None)
+        payload.pop("custom", None)
 
         if employee is not None:
-            if created_by is not None:
-                owner = await UsersRepository().get_user_by_id(db, created_by)
-                if owner is None:
-                    raise AppError(
-                        status_code=400,
-                        error_code="INVALID_INPUT",
-                        message="created_by_user_id does not exist",
-                    )
-                payload["created_by_user_id"] = created_by
+            if is_custom:
+                payload["created_by_user_id"] = current_user_id
+            else:
+                payload["created_by_user_id"] = None
         else:
-            if created_by is None or created_by != current_user_id:
+            if not is_custom:
                 raise AppError(
-                    status_code=400,
-                    error_code="INVALID_INPUT",
-                    message="created_by_user_id is required and must match the authenticated user",
+                    status_code=403,
+                    error_code="FORBIDDEN",
+                    message="Only staff can create public packages; set custom to true to create your package",
                 )
-            payload["created_by_user_id"] = created_by
+            payload["created_by_user_id"] = current_user_id
 
         self._validate_package_common_fields(payload)
         payload.setdefault("status", "active")
