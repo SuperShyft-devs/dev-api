@@ -85,7 +85,6 @@ async def test_list_my_package_categories_returns_incomplete_by_default(async_cl
             reference_id="REF1",
             package_name="Diag Package",
             diagnostic_provider="test_provider",
-            no_of_tests=1,
             status="active",
             bookings_count=0,
         )
@@ -135,7 +134,6 @@ async def test_list_my_package_categories_returns_complete_from_progress(async_c
             reference_id="REF1",
             package_name="Diag Package",
             diagnostic_provider="test_provider",
-            no_of_tests=1,
             status="active",
             bookings_count=0,
         )

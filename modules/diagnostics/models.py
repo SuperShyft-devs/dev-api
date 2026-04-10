@@ -25,7 +25,7 @@ class DiagnosticPackage(Base):
     reference_id = Column(String)
     package_name = Column(String, nullable=False)
     diagnostic_provider = Column(String)
-    no_of_tests = Column(Integer)
+    created_by_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     report_duration_hours = Column(Integer)
     collection_type = Column(String)
     about_text = Column(Text)
@@ -84,6 +84,7 @@ class DiagnosticPackageFilterChip(Base):
     chip_key = Column(String, nullable=False)
     display_name = Column(String, nullable=False)
     display_order = Column(Integer)
+    chip_for = Column(String, nullable=False, default="public_package", server_default="public_package")
     status = Column(String, default="active", server_default="active")
 
     package_links = relationship(
@@ -94,22 +95,20 @@ class DiagnosticPackageFilterChip(Base):
 
 
 class DiagnosticPackageFilterChipLink(Base):
-    """Junction: which filter chips apply to which diagnostic packages."""
+    """Junction: filter chips on packages or test groups (exactly one target)."""
 
     __tablename__ = "diagnostic_package_filter_chip_links"
-    __table_args__ = (
-        UniqueConstraint(
-            "diagnostic_package_id",
-            "filter_chip_id",
-            name="uq_diag_pkg_filter_chip_links_pkg_chip",
-        ),
-    )
 
     link_id = Column(Integer, primary_key=True)
     diagnostic_package_id = Column(
         Integer,
         ForeignKey("diagnostic_package.diagnostic_package_id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+    )
+    group_id = Column(
+        Integer,
+        ForeignKey("diagnostic_test_groups.group_id", ondelete="CASCADE"),
+        nullable=True,
     )
     filter_chip_id = Column(
         Integer,
@@ -119,6 +118,7 @@ class DiagnosticPackageFilterChipLink(Base):
     display_order = Column(Integer)
 
     package = relationship("DiagnosticPackage", back_populates="filter_chip_links")
+    group = relationship("DiagnosticTestGroup", back_populates="filter_chip_links")
     filter_chip = relationship("DiagnosticPackageFilterChip", back_populates="package_links")
 
 
@@ -164,6 +164,10 @@ class DiagnosticTestGroup(Base):
     group_id = Column(Integer, primary_key=True)
     group_name = Column(String, nullable=False)
     display_order = Column(Integer)
+    price = Column(Numeric(10, 2))
+    original_price = Column(Numeric(10, 2))
+    is_most_popular = Column(Boolean, nullable=False, default=False, server_default="false")
+    gender_suitability = Column(String)
 
     tests = relationship(
         "DiagnosticTestGroupTest",
@@ -173,6 +177,12 @@ class DiagnosticTestGroup(Base):
     )
     package_assignments = relationship(
         "DiagnosticPackageTestGroup",
+        back_populates="group",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    filter_chip_links = relationship(
+        "DiagnosticPackageFilterChipLink",
         back_populates="group",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -203,6 +213,10 @@ class HealthParameter(Base):
     meaning = Column(Text, nullable=True)
     is_available = Column(Boolean, nullable=False, default=True, server_default="true")
     display_order = Column(Integer)
+    price = Column(Numeric(10, 2))
+    original_price = Column(Numeric(10, 2))
+    is_most_popular = Column(Boolean, nullable=False, default=False, server_default="false")
+    gender_suitability = Column(String)
 
     lower_range_male = Column(Numeric(12, 4), nullable=True)
     higher_range_male = Column(Numeric(12, 4), nullable=True)

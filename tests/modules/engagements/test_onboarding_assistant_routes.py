@@ -32,7 +32,6 @@ async def _seed_employee(test_db_session, *, user_id: int, employee_id: int, rol
                 reference_id="REF1",
                 package_name="Diag Package",
                 diagnostic_provider="test_provider",
-                no_of_tests=1,
                 status="active",
                 bookings_count=0,
             )

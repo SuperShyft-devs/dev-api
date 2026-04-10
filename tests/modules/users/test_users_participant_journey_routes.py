@@ -93,7 +93,6 @@ async def test_participant_journey_summary_returns_instance_and_counts(async_cli
                 reference_id="REF1",
                 package_name="Diag Package",
                 diagnostic_provider="test_provider",
-                no_of_tests=1,
                 status="active",
                 bookings_count=0,
             )
@@ -243,7 +242,6 @@ async def test_participant_journey_detail_not_found_for_wrong_user(async_client,
                 reference_id="REF1",
                 package_name="Diag Package",
                 diagnostic_provider="test_provider",
-                no_of_tests=1,
                 status="active",
                 bookings_count=0,
             )
@@ -311,7 +309,6 @@ async def test_participant_journey_detail_returns_categories_and_answer_state(as
                 reference_id="REF1",
                 package_name="Diag Package",
                 diagnostic_provider="test_provider",
-                no_of_tests=1,
                 status="active",
                 bookings_count=0,
             )

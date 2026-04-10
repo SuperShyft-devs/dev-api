@@ -125,7 +125,6 @@ class SeedDiagPackage:
     reference_id: str | None
     package_name: str
     diagnostic_provider: str | None
-    no_of_tests: int | None
     status: str | None
     created_at: datetime | None
     report_duration_hours: int | None
@@ -197,7 +196,6 @@ async def upsert_diagnostic_packages(
         row.reference_id = seed.reference_id
         row.package_name = seed.package_name
         row.diagnostic_provider = seed.diagnostic_provider
-        row.no_of_tests = seed.no_of_tests
         row.status = seed.status or "active"
         if seed.created_at is not None:
             row.created_at = seed.created_at
@@ -259,7 +257,6 @@ async def upsert_diagnostic_packages_from_csv(session: AsyncSession, csv_path: P
             row.reference_id = _str_or_none(raw.get("reference_id"))
             row.package_name = (raw.get("package_name") or "").strip() or row.package_name
             row.diagnostic_provider = _str_or_none(raw.get("diagnostic_provider"))
-            row.no_of_tests = _int(raw.get("no_of_tests"))
             st = raw.get("status")
             row.status = st.strip() if st and str(st).strip() else "active"
             created = _parse_created_at(raw.get("created_at"))

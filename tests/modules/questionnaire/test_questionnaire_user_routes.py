@@ -78,7 +78,6 @@ async def _ensure_test_engagement(test_db_session, *, engagement_id: int = 1):
                 reference_id="TEST_DIAG",
                 package_name="Test Diagnostic",
                 diagnostic_provider="Test Provider",
-                no_of_tests=0,
                 status="active"
             )
             test_db_session.add(test_diag)

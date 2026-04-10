@@ -92,7 +92,6 @@ class SeedDiagnosticPackage:
     reference_id: str
     package_name: str
     diagnostic_provider: str
-    no_of_tests: int
     status: str
 
 
@@ -209,9 +208,9 @@ SAMPLE_ASSESSMENT_PACKAGES: tuple[SeedAssessmentPackage, ...] = (
 )
 
 SAMPLE_DIAGNOSTIC_PACKAGES: tuple[SeedDiagnosticPackage, ...] = (
-    SeedDiagnosticPackage(1, "DX-CORE-00", "Default Diagnostics", "HealthLabs", 8, "active"),
-    SeedDiagnosticPackage(21, "DX-CORE-01", "Core Diagnostics", "HealthLabs", 8, "active"),
-    SeedDiagnosticPackage(22, "DX-PRO-01", "Advanced Diagnostics", "HealthLabs", 14, "active"),
+    SeedDiagnosticPackage(1, "DX-CORE-00", "Default Diagnostics", "HealthLabs", "active"),
+    SeedDiagnosticPackage(21, "DX-CORE-01", "Core Diagnostics", "HealthLabs", "active"),
+    SeedDiagnosticPackage(22, "DX-PRO-01", "Advanced Diagnostics", "HealthLabs", "active"),
 )
 
 SAMPLE_ENGAGEMENTS: tuple[SeedEngagement, ...] = (
@@ -367,7 +366,6 @@ async def _upsert_diagnostic_packages(
         row.reference_id = seed.reference_id
         row.package_name = seed.package_name
         row.diagnostic_provider = seed.diagnostic_provider
-        row.no_of_tests = seed.no_of_tests
         row.status = seed.status
 
 

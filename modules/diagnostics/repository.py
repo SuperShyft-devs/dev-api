@@ -37,6 +37,8 @@ class DiagnosticsRepository:
         tag: str | None = None,
         filter_chip: str | None = None,
         active_only: bool = True,
+        public_only: bool = False,
+        created_by_user_id: int | None = None,
     ) -> list[DiagnosticPackage]:
         query = (
             select(DiagnosticPackage)
@@ -50,6 +52,11 @@ class DiagnosticsRepository:
 
         if active_only:
             query = query.where(DiagnosticPackage.status == "active")
+
+        if public_only:
+            query = query.where(DiagnosticPackage.created_by_user_id.is_(None))
+        elif created_by_user_id is not None:
+            query = query.where(DiagnosticPackage.created_by_user_id == created_by_user_id)
 
         if gender is not None:
             query = query.where(
@@ -69,13 +76,45 @@ class DiagnosticsRepository:
                     DiagnosticPackageFilterChip,
                     DiagnosticPackageFilterChip.filter_chip_id == DiagnosticPackageFilterChipLink.filter_chip_id,
                 )
-                .where(DiagnosticPackageFilterChip.chip_key == filter_chip)
+                .where(
+                    DiagnosticPackageFilterChip.chip_key == filter_chip,
+                    DiagnosticPackageFilterChipLink.diagnostic_package_id.isnot(None),
+                )
             )
             query = query.where(DiagnosticPackage.diagnostic_package_id.in_(chip_package_subquery))
 
         query = query.order_by(DiagnosticPackage.diagnostic_package_id.desc())
         result = await db.execute(query)
         return list(result.scalars().all())
+
+    async def count_distinct_tests_for_packages(
+        self,
+        db: AsyncSession,
+        *,
+        package_ids: list[int],
+    ) -> dict[int, int]:
+        if not package_ids:
+            return {}
+        pkg_col = DiagnosticPackageTestGroup.diagnostic_package_id
+        subq = (
+            select(
+                pkg_col.label("diagnostic_package_id"),
+                func.count(distinct(DiagnosticTestGroupTest.test_id)).label("cnt"),
+            )
+            .select_from(DiagnosticPackageTestGroup)
+            .join(
+                DiagnosticTestGroupTest,
+                DiagnosticTestGroupTest.group_id == DiagnosticPackageTestGroup.group_id,
+            )
+            .where(pkg_col.in_(package_ids))
+            .group_by(pkg_col)
+        )
+        result = await db.execute(subq)
+        rows = result.all()
+        out = {int(pid): 0 for pid in package_ids}
+        for row in rows:
+            out[int(row.diagnostic_package_id)] = int(row.cnt or 0)
+        return out
 
     async def get_package_by_id(self, db: AsyncSession, *, package_id: int) -> DiagnosticPackage | None:
         result = await db.execute(
@@ -133,15 +172,20 @@ class DiagnosticsRepository:
         await db.flush()
         return package
 
-    async def get_all_filter_chips(self, db: AsyncSession) -> list[DiagnosticPackageFilterChip]:
-        result = await db.execute(
-            select(DiagnosticPackageFilterChip)
-            .where(DiagnosticPackageFilterChip.status == "active")
-            .order_by(
-                DiagnosticPackageFilterChip.display_order.asc().nulls_last(),
-                DiagnosticPackageFilterChip.filter_chip_id.asc(),
-            )
+    async def get_all_filter_chips(
+        self,
+        db: AsyncSession,
+        *,
+        chip_for: str | None = None,
+    ) -> list[DiagnosticPackageFilterChip]:
+        query = select(DiagnosticPackageFilterChip).where(DiagnosticPackageFilterChip.status == "active")
+        if chip_for is not None:
+            query = query.where(DiagnosticPackageFilterChip.chip_for == chip_for)
+        query = query.order_by(
+            DiagnosticPackageFilterChip.display_order.asc().nulls_last(),
+            DiagnosticPackageFilterChip.filter_chip_id.asc(),
         )
+        result = await db.execute(query)
         return list(result.scalars().all())
 
     async def get_filter_chip_by_id(
@@ -203,6 +247,23 @@ class DiagnosticsRepository:
             select(DiagnosticPackageFilterChipLink).where(
                 DiagnosticPackageFilterChipLink.diagnostic_package_id == package_id,
                 DiagnosticPackageFilterChipLink.filter_chip_id == filter_chip_id,
+                DiagnosticPackageFilterChipLink.group_id.is_(None),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_group_filter_chip_link(
+        self,
+        db: AsyncSession,
+        *,
+        group_id: int,
+        filter_chip_id: int,
+    ) -> DiagnosticPackageFilterChipLink | None:
+        result = await db.execute(
+            select(DiagnosticPackageFilterChipLink).where(
+                DiagnosticPackageFilterChipLink.group_id == group_id,
+                DiagnosticPackageFilterChipLink.filter_chip_id == filter_chip_id,
+                DiagnosticPackageFilterChipLink.diagnostic_package_id.is_(None),
             )
         )
         return result.scalar_one_or_none()
@@ -219,6 +280,7 @@ class DiagnosticsRepository:
             diagnostic_package_id=package_id,
             filter_chip_id=filter_chip_id,
             display_order=display_order,
+            group_id=None,
         )
         db.add(link)
         await db.flush()
@@ -235,6 +297,23 @@ class DiagnosticsRepository:
             delete(DiagnosticPackageFilterChipLink).where(
                 DiagnosticPackageFilterChipLink.diagnostic_package_id == package_id,
                 DiagnosticPackageFilterChipLink.filter_chip_id == filter_chip_id,
+                DiagnosticPackageFilterChipLink.group_id.is_(None),
+            )
+        )
+        return int(result.rowcount or 0)
+
+    async def delete_group_filter_chip_link(
+        self,
+        db: AsyncSession,
+        *,
+        group_id: int,
+        filter_chip_id: int,
+    ) -> int:
+        result = await db.execute(
+            delete(DiagnosticPackageFilterChipLink).where(
+                DiagnosticPackageFilterChipLink.group_id == group_id,
+                DiagnosticPackageFilterChipLink.filter_chip_id == filter_chip_id,
+                DiagnosticPackageFilterChipLink.diagnostic_package_id.is_(None),
             )
         )
         return int(result.rowcount or 0)
@@ -244,10 +323,40 @@ class DiagnosticsRepository:
     ) -> int | None:
         result = await db.execute(
             select(func.max(DiagnosticPackageFilterChipLink.display_order)).where(
-                DiagnosticPackageFilterChipLink.diagnostic_package_id == package_id
+                DiagnosticPackageFilterChipLink.diagnostic_package_id == package_id,
+                DiagnosticPackageFilterChipLink.group_id.is_(None),
             )
         )
         return result.scalar_one_or_none()
+
+    async def get_max_group_filter_chip_link_display_order(
+        self, db: AsyncSession, *, group_id: int
+    ) -> int | None:
+        result = await db.execute(
+            select(func.max(DiagnosticPackageFilterChipLink.display_order)).where(
+                DiagnosticPackageFilterChipLink.group_id == group_id,
+                DiagnosticPackageFilterChipLink.diagnostic_package_id.is_(None),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def add_group_filter_chip_link(
+        self,
+        db: AsyncSession,
+        *,
+        group_id: int,
+        filter_chip_id: int,
+        display_order: int | None = None,
+    ) -> DiagnosticPackageFilterChipLink:
+        link = DiagnosticPackageFilterChipLink(
+            group_id=group_id,
+            filter_chip_id=filter_chip_id,
+            display_order=display_order,
+            diagnostic_package_id=None,
+        )
+        db.add(link)
+        await db.flush()
+        return link
 
     async def get_reasons(self, db: AsyncSession, *, package_id: int) -> list[DiagnosticPackageReason]:
         result = await db.execute(
@@ -375,22 +484,59 @@ class DiagnosticsRepository:
         result = await db.execute(delete(HealthParameter).where(HealthParameter.test_id == test_id))
         return int(result.rowcount or 0)
 
-    async def get_all_groups(self, db: AsyncSession) -> list[tuple[DiagnosticTestGroup, int]]:
-        result = await db.execute(
+    async def get_all_groups(
+        self,
+        db: AsyncSession,
+        *,
+        filter_chip_key: str | None = None,
+    ) -> list[tuple[DiagnosticTestGroup, int]]:
+        query = (
             select(DiagnosticTestGroup, func.count(DiagnosticTestGroupTest.id))
             .outerjoin(DiagnosticTestGroupTest, DiagnosticTestGroupTest.group_id == DiagnosticTestGroup.group_id)
-            .group_by(
-                DiagnosticTestGroup.group_id,
-                DiagnosticTestGroup.group_name,
-                DiagnosticTestGroup.display_order,
-            )
-            .order_by(DiagnosticTestGroup.display_order.asc().nulls_last(), DiagnosticTestGroup.group_id.asc())
         )
+        if filter_chip_key is not None:
+            chip_sub = (
+                select(DiagnosticPackageFilterChipLink.group_id)
+                .join(
+                    DiagnosticPackageFilterChip,
+                    DiagnosticPackageFilterChip.filter_chip_id == DiagnosticPackageFilterChipLink.filter_chip_id,
+                )
+                .where(
+                    DiagnosticPackageFilterChip.chip_key == filter_chip_key,
+                    DiagnosticPackageFilterChipLink.group_id.isnot(None),
+                )
+            )
+            query = query.where(DiagnosticTestGroup.group_id.in_(chip_sub))
+        query = query.group_by(DiagnosticTestGroup.group_id).order_by(
+            DiagnosticTestGroup.display_order.asc().nulls_last(),
+            DiagnosticTestGroup.group_id.asc(),
+        )
+        result = await db.execute(query)
         return [(row[0], int(row[1] or 0)) for row in result.all()]
 
     async def get_group_by_id(self, db: AsyncSession, *, group_id: int) -> DiagnosticTestGroup | None:
         result = await db.execute(select(DiagnosticTestGroup).where(DiagnosticTestGroup.group_id == group_id))
         return result.scalar_one_or_none()
+
+    async def get_group_filter_chip_links(
+        self,
+        db: AsyncSession,
+        *,
+        group_id: int,
+    ) -> list[DiagnosticPackageFilterChipLink]:
+        result = await db.execute(
+            select(DiagnosticPackageFilterChipLink)
+            .where(
+                DiagnosticPackageFilterChipLink.group_id == group_id,
+                DiagnosticPackageFilterChipLink.diagnostic_package_id.is_(None),
+            )
+            .options(joinedload(DiagnosticPackageFilterChipLink.filter_chip))
+            .order_by(
+                DiagnosticPackageFilterChipLink.display_order.asc().nulls_last(),
+                DiagnosticPackageFilterChipLink.link_id.asc(),
+            )
+        )
+        return list(result.scalars().unique().all())
 
     async def get_parameters_for_group(self, db: AsyncSession, *, group_id: int) -> list[HealthParameter]:
         result = await db.execute(

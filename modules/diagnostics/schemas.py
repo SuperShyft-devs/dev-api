@@ -14,10 +14,20 @@ class ParameterType(str, Enum):
     METRIC = "metric"
 
 
+class PackageListType(str, Enum):
+    PUBLIC_PACKAGE = "public_package"
+    CUSTOM_PACKAGE = "custom_package"
+
+
+class FilterChipForSchema(str, Enum):
+    PUBLIC_PACKAGE = "public_package"
+    CUSTOM_PACKAGE = "custom_package"
+
+
 class DiagnosticPackageCreate(BaseModel):
     package_name: str = Field(min_length=1)
     diagnostic_provider: Optional[str] = None
-    no_of_tests: Optional[int] = None
+    created_by_user_id: Optional[int] = None
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
     about_text: Optional[str] = None
@@ -32,7 +42,6 @@ class DiagnosticPackageCreate(BaseModel):
 class DiagnosticPackageUpdate(BaseModel):
     package_name: Optional[str] = Field(default=None, min_length=1)
     diagnostic_provider: Optional[str] = None
-    no_of_tests: Optional[int] = None
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
     about_text: Optional[str] = None
@@ -53,6 +62,7 @@ class DiagnosticPackageResponse(BaseModel):
     reference_id: Optional[str] = None
     package_name: str
     diagnostic_provider: Optional[str] = None
+    created_by_user_id: Optional[int] = None
     no_of_tests: Optional[int] = None
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
@@ -71,6 +81,7 @@ class FilterChipCreate(BaseModel):
     chip_key: str = Field(min_length=1)
     display_name: str = Field(min_length=1)
     display_order: Optional[int] = None
+    chip_for: FilterChipForSchema = FilterChipForSchema.PUBLIC_PACKAGE
 
 
 class FilterChipUpdate(BaseModel):
@@ -78,6 +89,7 @@ class FilterChipUpdate(BaseModel):
     display_name: Optional[str] = Field(default=None, min_length=1)
     display_order: Optional[int] = None
     status: Optional[str] = None
+    chip_for: Optional[FilterChipForSchema] = None
 
 
 class FilterChipResponse(BaseModel):
@@ -85,6 +97,7 @@ class FilterChipResponse(BaseModel):
     chip_key: str
     display_name: str
     display_order: Optional[int] = None
+    chip_for: str = "public_package"
     status: Optional[str] = None
 
 
@@ -147,6 +160,10 @@ class HealthParameterCreate(BaseModel):
     what_to_do_when_high: Optional[str] = None
     is_available: bool = True
     display_order: Optional[int] = None
+    price: Optional[float] = None
+    original_price: Optional[float] = None
+    is_most_popular: Optional[bool] = None
+    gender_suitability: Optional[str] = None
 
 
 class HealthParameterUpdate(BaseModel):
@@ -167,6 +184,10 @@ class HealthParameterUpdate(BaseModel):
     what_to_do_when_high: Optional[str] = None
     display_order: Optional[int] = None
     is_available: Optional[bool] = None
+    price: Optional[float] = None
+    original_price: Optional[float] = None
+    is_most_popular: Optional[bool] = None
+    gender_suitability: Optional[str] = None
 
 
 class HealthParameterResponse(BaseModel):
@@ -190,16 +211,28 @@ class HealthParameterResponse(BaseModel):
     what_to_do_when_high: Optional[str] = None
     is_available: bool
     display_order: Optional[int] = None
+    price: Optional[float] = None
+    original_price: Optional[float] = None
+    is_most_popular: Optional[bool] = None
+    gender_suitability: Optional[str] = None
 
 
 class TestGroupCreate(BaseModel):
     group_name: str = Field(min_length=1)
     display_order: Optional[int] = None
+    price: Optional[float] = None
+    original_price: Optional[float] = None
+    is_most_popular: Optional[bool] = None
+    gender_suitability: Optional[str] = None
 
 
 class TestGroupUpdate(BaseModel):
     group_name: Optional[str] = None
     display_order: Optional[int] = None
+    price: Optional[float] = None
+    original_price: Optional[float] = None
+    is_most_popular: Optional[bool] = None
+    gender_suitability: Optional[str] = None
 
 
 class TestGroupResponse(BaseModel):
@@ -207,7 +240,13 @@ class TestGroupResponse(BaseModel):
     group_name: str
     test_count: int
     display_order: Optional[int] = None
+    price: Optional[float] = None
+    discount: Optional[str] = None
+    original_price: Optional[float] = None
+    is_most_popular: Optional[bool] = None
+    gender_suitability: Optional[str] = None
     tests: list[HealthParameterResponse] = Field(default_factory=list)
+    filter_chips: list[PackageFilterChipResponse] = Field(default_factory=list)
 
 
 class AssignTestsToGroupRequest(BaseModel):

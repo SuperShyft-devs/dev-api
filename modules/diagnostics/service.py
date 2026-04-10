@@ -36,6 +36,7 @@ from modules.diagnostics.schemas import (
     DiagnosticPackageStatusUpdate,
     DiagnosticPackageUpdate,
     FilterChipCreate,
+    FilterChipForSchema,
     FilterChipResponse,
     FilterChipUpdate,
     HealthParameterCreate,
@@ -63,17 +64,26 @@ from modules.diagnostics.schemas import (
     ReorderPackageGroupsRequest,
 )
 from modules.employee.service import EmployeeContext
+from modules.users.repository import UsersRepository
 
 
 _ALLOWED_COLLECTION_TYPES = {"home_collection", "centre_visit"}
 _ALLOWED_GENDER_VALUES = {"male", "female", "both"}
 _ALLOWED_STATUS_VALUES = {"active", "inactive"}
+_ALLOWED_CHIP_FOR = {e.value for e in FilterChipForSchema}
 
 
 def _discount_percent(price: float | None, original_price: float | None) -> int | None:
     if original_price is None or original_price == 0 or price is None:
         return None
     return round(((original_price - price) / original_price) * 100)
+
+
+def _discount_percent_label(price: float | None, original_price: float | None) -> str | None:
+    pct = _discount_percent(price, original_price)
+    if pct is None:
+        return None
+    return f"{pct}%"
 
 
 class DiagnosticsService:
@@ -142,6 +152,13 @@ class DiagnosticsService:
         if gender is not None:
             payload["gender_suitability"] = gender
 
+    def _validate_optional_gender_field(self, payload: dict) -> None:
+        gender = self._normalize_lower(payload.get("gender_suitability"))
+        if gender is not None and gender not in _ALLOWED_GENDER_VALUES:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        if gender is not None:
+            payload["gender_suitability"] = gender
+
     def _to_tag_response(self, row: DiagnosticPackageTag) -> TagResponse:
         return TagResponse(
             tag_id=row.tag_id,
@@ -152,7 +169,7 @@ class DiagnosticsService:
 
     def _package_filter_chip_responses(self, package: DiagnosticPackage) -> list[PackageFilterChipResponse]:
         links = sorted(
-            list(package.filter_chip_links),
+            [ln for ln in package.filter_chip_links if ln.diagnostic_package_id is not None],
             key=lambda ln: (ln.display_order is None, ln.display_order or 0, ln.link_id),
         )
         out: list[PackageFilterChipResponse] = []
@@ -204,6 +221,8 @@ class DiagnosticsService:
         higher_range_female = float(row.higher_range_female) if row.higher_range_female is not None else None
         pt = row.parameter_type
         parameter_type = ParameterType(pt.value) if isinstance(pt, ORMParameterType) else ParameterType(pt)
+        price = float(row.price) if row.price is not None else None
+        original_price = float(row.original_price) if row.original_price is not None else None
         return HealthParameterResponse(
             test_id=row.test_id,
             parameter_type=parameter_type,
@@ -223,7 +242,27 @@ class DiagnosticsService:
             what_to_do_when_high=row.what_to_do_when_high,
             is_available=bool(row.is_available),
             display_order=row.display_order,
+            price=price,
+            original_price=original_price,
+            is_most_popular=bool(row.is_most_popular),
+            gender_suitability=row.gender_suitability,
         )
+
+    def _group_filter_chip_link_responses(self, links: list) -> list[PackageFilterChipResponse]:
+        out: list[PackageFilterChipResponse] = []
+        for link in links:
+            chip = getattr(link, "filter_chip", None)
+            if chip is None:
+                continue
+            out.append(
+                PackageFilterChipResponse(
+                    filter_chip_id=chip.filter_chip_id,
+                    chip_key=chip.chip_key,
+                    display_name=chip.display_name,
+                    display_order=link.display_order,
+                )
+            )
+        return out
 
     def _to_group_response(
         self,
@@ -231,18 +270,33 @@ class DiagnosticsService:
         *,
         tests: list[HealthParameter] | None = None,
         test_count: int | None = None,
+        filter_chip_links: list | None = None,
     ) -> TestGroupResponse:
         tests_value = tests or []
         resolved_count = test_count if test_count is not None else len(tests_value)
+        price = float(row.price) if row.price is not None else None
+        original_price = float(row.original_price) if row.original_price is not None else None
+        chip_links = filter_chip_links if filter_chip_links is not None else []
         return TestGroupResponse(
             group_id=row.group_id,
             group_name=row.group_name,
             display_order=row.display_order,
             test_count=resolved_count,
+            price=price,
+            discount=_discount_percent_label(price, original_price),
+            original_price=original_price,
+            is_most_popular=bool(row.is_most_popular),
+            gender_suitability=row.gender_suitability,
             tests=[self._to_health_parameter_response(test_row) for test_row in tests_value],
+            filter_chips=self._group_filter_chip_link_responses(chip_links),
         )
 
-    def _to_package_response(self, row: DiagnosticPackage) -> DiagnosticPackageResponse:
+    def _to_package_response(
+        self,
+        row: DiagnosticPackage,
+        *,
+        no_of_tests: int | None = None,
+    ) -> DiagnosticPackageResponse:
         price = float(row.price) if row.price is not None else None
         original_price = float(row.original_price) if row.original_price is not None else None
         return DiagnosticPackageResponse(
@@ -250,7 +304,8 @@ class DiagnosticsService:
             reference_id=row.reference_id,
             package_name=row.package_name,
             diagnostic_provider=row.diagnostic_provider,
-            no_of_tests=row.no_of_tests,
+            created_by_user_id=row.created_by_user_id,
+            no_of_tests=no_of_tests,
             report_duration_hours=row.report_duration_hours,
             collection_type=row.collection_type,
             about_text=row.about_text,
@@ -264,6 +319,12 @@ class DiagnosticsService:
             discount_percent=_discount_percent(price, original_price),
         )
 
+    async def _package_response_with_test_count(self, db, row: DiagnosticPackage) -> DiagnosticPackageResponse:
+        counts = await self._repository.count_distinct_tests_for_packages(
+            db, package_ids=[row.diagnostic_package_id]
+        )
+        return self._to_package_response(row, no_of_tests=counts.get(row.diagnostic_package_id, 0))
+
     async def get_packages(
         self,
         db,
@@ -272,6 +333,8 @@ class DiagnosticsService:
         tag: str | None,
         filter_chip: str | None = None,
         active_only: bool = True,
+        list_type: str = "public_package",
+        requesting_user_id: int | None = None,
     ) -> list[DiagnosticPackageListItem]:
         gender_value = self._normalize_lower(gender)
         tag_value = self._normalize(tag)
@@ -280,13 +343,22 @@ class DiagnosticsService:
         if gender_value is not None and gender_value not in _ALLOWED_GENDER_VALUES:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
+        if list_type not in ("public_package", "custom_package"):
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        public_only = list_type == "public_package"
+        created_by_user_id = None if public_only else requesting_user_id
+
         rows = await self._repository.get_all_packages(
             db,
             gender=gender_value,
             tag=tag_value,
             filter_chip=chip_key_value,
             active_only=active_only,
+            public_only=public_only,
+            created_by_user_id=created_by_user_id,
         )
+        pkg_ids = [r.diagnostic_package_id for r in rows]
+        counts = await self._repository.count_distinct_tests_for_packages(db, package_ids=pkg_ids)
         items: list[DiagnosticPackageListItem] = []
         for row in rows:
             price = float(row.price) if row.price is not None else None
@@ -295,11 +367,12 @@ class DiagnosticsService:
                 list(row.tags),
                 key=lambda t: (t.display_order is None, t.display_order or 0, t.tag_id),
             )
+            n_tests = counts.get(row.diagnostic_package_id, 0)
             items.append(
                 DiagnosticPackageListItem(
                     diagnostic_package_id=row.diagnostic_package_id,
                     package_name=row.package_name,
-                    no_of_tests=row.no_of_tests,
+                    no_of_tests=n_tests,
                     report_duration_hours=row.report_duration_hours,
                     collection_type=row.collection_type,
                     price=price,
@@ -319,7 +392,11 @@ class DiagnosticsService:
         if row is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
 
-        package = self._to_package_response(row)
+        counts = await self._repository.count_distinct_tests_for_packages(
+            db, package_ids=[row.diagnostic_package_id]
+        )
+        n_tests = counts.get(row.diagnostic_package_id, 0)
+        package = self._to_package_response(row, no_of_tests=n_tests)
         reasons = sorted(list(row.reasons), key=lambda r: (r.display_order is None, r.display_order or 0, r.reason_id))
         tags = sorted(list(row.tags), key=lambda t: (t.display_order is None, t.display_order or 0, t.tag_id))
         samples = sorted(list(row.samples), key=lambda s: (s.display_order is None, s.display_order or 0, s.sample_id))
@@ -349,48 +426,80 @@ class DiagnosticsService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None,
+        current_user_id: int,
         data: DiagnosticPackageCreate,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> DiagnosticPackageResponse:
-        self._ensure_employee_access(employee)
         payload = data.model_dump(exclude_none=True)
+        payload.pop("no_of_tests", None)
+        created_by = payload.pop("created_by_user_id", None)
+
+        if employee is not None:
+            if created_by is not None:
+                owner = await UsersRepository().get_user_by_id(db, created_by)
+                if owner is None:
+                    raise AppError(
+                        status_code=400,
+                        error_code="INVALID_INPUT",
+                        message="created_by_user_id does not exist",
+                    )
+                payload["created_by_user_id"] = created_by
+        else:
+            if created_by is None or created_by != current_user_id:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="created_by_user_id is required and must match the authenticated user",
+                )
+            payload["created_by_user_id"] = created_by
+
         self._validate_package_common_fields(payload)
         payload.setdefault("status", "active")
 
         package = DiagnosticPackage(**payload)
         package = await self._repository.create_package(db, package)
 
+        action = "EMPLOYEE_CREATE_DIAGNOSTIC_PACKAGE" if employee is not None else "USER_CREATE_DIAGNOSTIC_PACKAGE"
         await self._require_audit_service().log_event(
             db,
-            action="EMPLOYEE_CREATE_DIAGNOSTIC_PACKAGE",
+            action=action,
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=current_user_id,
             session_id=None,
         )
-        return self._to_package_response(package)
+        return await self._package_response_with_test_count(db, package)
 
     async def update_package(
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None,
+        current_user_id: int,
         package_id: int,
         data: DiagnosticPackageUpdate,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> DiagnosticPackageResponse:
-        self._ensure_employee_access(employee)
         existing = await self._repository.get_package_by_id_basic(db, package_id=package_id)
         if existing is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
 
+        if employee is None:
+            if existing.created_by_user_id is None or existing.created_by_user_id != current_user_id:
+                raise AppError(
+                    status_code=403,
+                    error_code="FORBIDDEN",
+                    message="You do not have permission to perform this action",
+                )
+
         payload = data.model_dump(exclude_none=True)
+        payload.pop("no_of_tests", None)
         if "package_name" in payload:
             name = self._normalize(payload["package_name"])
             if name is None:
@@ -402,16 +511,17 @@ class DiagnosticsService:
         if updated is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
 
+        action = "EMPLOYEE_UPDATE_DIAGNOSTIC_PACKAGE" if employee is not None else "USER_UPDATE_DIAGNOSTIC_PACKAGE"
         await self._require_audit_service().log_event(
             db,
-            action="EMPLOYEE_UPDATE_DIAGNOSTIC_PACKAGE",
+            action=action,
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=current_user_id,
             session_id=None,
         )
-        return self._to_package_response(updated)
+        return await self._package_response_with_test_count(db, updated)
 
     async def list_parameters(
         self,
@@ -482,6 +592,7 @@ class DiagnosticsService:
             payload["what_to_do_when_low"] = self._normalize(payload.get("what_to_do_when_low"))
         if "what_to_do_when_high" in payload:
             payload["what_to_do_when_high"] = self._normalize(payload.get("what_to_do_when_high"))
+        self._validate_optional_gender_field(payload)
 
         created = await self._repository.create_parameter(db, HealthParameter(**payload))
         await self._require_audit_service().log_event(
@@ -541,6 +652,7 @@ class DiagnosticsService:
             payload["what_to_do_when_low"] = self._normalize(payload.get("what_to_do_when_low"))
         if "what_to_do_when_high" in payload:
             payload["what_to_do_when_high"] = self._normalize(payload.get("what_to_do_when_high"))
+        self._validate_optional_gender_field(payload)
 
         updated = await self._repository.update_parameter(db, test_id=test_id, data=payload)
         if updated is None:
@@ -582,8 +694,9 @@ class DiagnosticsService:
         )
         return {"deleted": True}
 
-    async def get_all_groups(self, db) -> list[TestGroupResponse]:
-        rows = await self._repository.get_all_groups(db)
+    async def get_all_groups(self, db, *, filter_chip: str | None = None) -> list[TestGroupResponse]:
+        chip_key_value = self._normalize(filter_chip)
+        rows = await self._repository.get_all_groups(db, filter_chip_key=chip_key_value)
         return [self._to_group_response(group, tests=[], test_count=test_count) for group, test_count in rows]
 
     async def get_group_detail(self, db, *, group_id: int) -> TestGroupResponse:
@@ -591,7 +704,8 @@ class DiagnosticsService:
         if group is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
         tests = await self._repository.get_parameters_for_group(db, group_id=group_id)
-        return self._to_group_response(group, tests=tests)
+        chip_links = await self._repository.get_group_filter_chip_links(db, group_id=group_id)
+        return self._to_group_response(group, tests=tests, filter_chip_links=chip_links)
 
     async def create_group(
         self,
@@ -609,6 +723,7 @@ class DiagnosticsService:
         if group_name is None:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         payload["group_name"] = group_name
+        self._validate_optional_gender_field(payload)
 
         created = await self._repository.create_group(db, DiagnosticTestGroup(**payload))
         await self._require_audit_service().log_event(
@@ -644,6 +759,7 @@ class DiagnosticsService:
             if group_name is None:
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
             payload["group_name"] = group_name
+        self._validate_optional_gender_field(payload)
 
         updated = await self._repository.update_group(db, group_id=group_id, data=payload)
         if updated is None:
@@ -812,17 +928,25 @@ class DiagnosticsService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None,
+        current_user_id: int,
         package_id: int,
         data: AssignGroupsToPackageRequest,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> AssignGroupsToPackageResponse:
-        self._ensure_employee_access(employee)
         package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
         if package is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
+
+        if employee is None:
+            if package.created_by_user_id is None or package.created_by_user_id != current_user_id:
+                raise AppError(
+                    status_code=403,
+                    error_code="FORBIDDEN",
+                    message="You do not have permission to perform this action",
+                )
 
         invalid_ids: list[int] = []
         for group_id in data.group_ids:
@@ -841,13 +965,18 @@ class DiagnosticsService:
             package_id=package_id,
             group_ids=data.group_ids,
         )
+        action = (
+            "EMPLOYEE_ASSIGN_DIAGNOSTIC_TEST_GROUPS_TO_PACKAGE"
+            if employee is not None
+            else "USER_ASSIGN_DIAGNOSTIC_TEST_GROUPS_TO_PACKAGE"
+        )
         await self._require_audit_service().log_event(
             db,
-            action="EMPLOYEE_ASSIGN_DIAGNOSTIC_TEST_GROUPS_TO_PACKAGE",
+            action=action,
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=current_user_id,
             session_id=None,
         )
         return AssignGroupsToPackageResponse(
@@ -961,16 +1090,22 @@ class DiagnosticsService:
             user_id=employee.user_id,
             session_id=None,
         )
-        return self._to_package_response(updated)
+        return await self._package_response_with_test_count(db, updated)
 
-    async def get_filter_chips(self, db) -> list[FilterChipResponse]:
-        rows = await self._repository.get_all_filter_chips(db)
+    async def get_filter_chips(self, db, *, chip_for: str | None = None) -> list[FilterChipResponse]:
+        scope = self._normalize_lower(chip_for) if chip_for is not None else "public_package"
+        if scope is None:
+            scope = "public_package"
+        if scope not in _ALLOWED_CHIP_FOR:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        rows = await self._repository.get_all_filter_chips(db, chip_for=scope)
         return [
             FilterChipResponse(
                 filter_chip_id=row.filter_chip_id,
                 chip_key=row.chip_key,
                 display_name=row.display_name,
                 display_order=row.display_order,
+                chip_for=row.chip_for or "public_package",
                 status=row.status,
             )
             for row in rows
@@ -987,11 +1122,17 @@ class DiagnosticsService:
         endpoint: str,
     ) -> FilterChipResponse:
         self._ensure_employee_access(employee)
-        payload = data.model_dump(exclude_none=True)
+        payload = data.model_dump(exclude_none=True, mode="json")
         chip_key = self._normalize(payload.get("chip_key"))
         if chip_key is None:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         payload["chip_key"] = chip_key
+        cf = self._normalize_lower(payload.get("chip_for"))
+        if cf is None:
+            cf = FilterChipForSchema.PUBLIC_PACKAGE.value
+        if cf not in _ALLOWED_CHIP_FOR:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        payload["chip_for"] = cf
 
         dup = await self._repository.get_filter_chip_by_chip_key(db, chip_key=chip_key)
         if dup is not None:
@@ -1017,6 +1158,7 @@ class DiagnosticsService:
             chip_key=created.chip_key,
             display_name=created.display_name,
             display_order=created.display_order,
+            chip_for=created.chip_for or "public_package",
             status=created.status,
         )
 
@@ -1038,7 +1180,7 @@ class DiagnosticsService:
                 status_code=404, error_code="DIAGNOSTIC_FILTER_CHIP_NOT_FOUND", message="Filter chip does not exist"
             )
 
-        payload = data.model_dump(exclude_none=True)
+        payload = data.model_dump(exclude_none=True, mode="json")
         if "chip_key" in payload:
             ck = self._normalize(payload.get("chip_key"))
             if ck is None:
@@ -1053,6 +1195,11 @@ class DiagnosticsService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         if status is not None:
             payload["status"] = status
+        if "chip_for" in payload:
+            cf = self._normalize_lower(payload.get("chip_for"))
+            if cf is None or cf not in _ALLOWED_CHIP_FOR:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            payload["chip_for"] = cf
 
         try:
             updated = await self._repository.update_filter_chip(db, filter_chip_id=filter_chip_id, data=payload)
@@ -1077,6 +1224,7 @@ class DiagnosticsService:
             chip_key=updated.chip_key,
             display_name=updated.display_name,
             display_order=updated.display_order,
+            chip_for=updated.chip_for or "public_package",
             status=updated.status,
         )
 
@@ -1194,6 +1342,99 @@ class DiagnosticsService:
         await self._require_audit_service().log_event(
             db,
             action="EMPLOYEE_REMOVE_DIAGNOSTIC_PACKAGE_FILTER_CHIP",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+    async def assign_filter_chip_to_test_group(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        group_id: int,
+        data: PackageFilterChipAssign,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> PackageFilterChipResponse:
+        self._ensure_employee_access(employee)
+        group = await self._repository.get_group_by_id(db, group_id=group_id)
+        if group is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+
+        chip = await self._repository.get_filter_chip_by_id(db, filter_chip_id=data.filter_chip_id)
+        if chip is None:
+            raise AppError(
+                status_code=404, error_code="DIAGNOSTIC_FILTER_CHIP_NOT_FOUND", message="Filter chip does not exist"
+            )
+
+        existing_link = await self._repository.get_group_filter_chip_link(
+            db, group_id=group_id, filter_chip_id=data.filter_chip_id
+        )
+        if existing_link is not None:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Filter chip already on group")
+
+        display_order = data.display_order
+        if display_order is None:
+            max_ord = await self._repository.get_max_group_filter_chip_link_display_order(db, group_id=group_id)
+            display_order = (int(max_ord) if max_ord is not None else 0) + 1
+
+        link = await self._repository.add_group_filter_chip_link(
+            db,
+            group_id=group_id,
+            filter_chip_id=data.filter_chip_id,
+            display_order=display_order,
+        )
+        link.filter_chip = chip
+
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_ASSIGN_DIAGNOSTIC_TEST_GROUP_FILTER_CHIP",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return PackageFilterChipResponse(
+            filter_chip_id=chip.filter_chip_id,
+            chip_key=chip.chip_key,
+            display_name=chip.display_name,
+            display_order=link.display_order,
+        )
+
+    async def remove_filter_chip_from_test_group(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        group_id: int,
+        filter_chip_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> None:
+        self._ensure_employee_access(employee)
+        group = await self._repository.get_group_by_id(db, group_id=group_id)
+        if group is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+
+        n = await self._repository.delete_group_filter_chip_link(
+            db, group_id=group_id, filter_chip_id=filter_chip_id
+        )
+        if n == 0:
+            raise AppError(
+                status_code=404,
+                error_code="DIAGNOSTIC_FILTER_CHIP_LINK_NOT_FOUND",
+                message="Filter chip is not assigned to this group",
+            )
+
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_REMOVE_DIAGNOSTIC_TEST_GROUP_FILTER_CHIP",
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,

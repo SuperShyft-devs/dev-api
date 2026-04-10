@@ -7,7 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
-from core.dependencies import _http_bearer, authenticate_bearer_user
+from core.dependencies import _http_bearer, authenticate_bearer_user, get_current_user
 from db.session import get_db
 from modules.diagnostics.dependencies import get_diagnostics_service
 from modules.diagnostics.schemas import (
@@ -17,7 +17,9 @@ from modules.diagnostics.schemas import (
     DiagnosticPackageStatusUpdate,
     DiagnosticPackageUpdate,
     FilterChipCreate,
+    FilterChipForSchema,
     FilterChipUpdate,
+    PackageListType,
     PackageFilterChipAssign,
     PreparationCreate,
     PreparationUpdate,
@@ -35,8 +37,9 @@ from modules.diagnostics.schemas import (
     TestGroupUpdate,
 )
 from modules.diagnostics.service import DiagnosticsService
-from modules.employee.dependencies import get_current_employee, get_employee_service
+from modules.employee.dependencies import get_current_employee, get_employee_service, get_optional_employee
 from modules.employee.service import EmployeeContext, EmployeeService
+from modules.users.models import User
 
 
 router = APIRouter(tags=["diagnostics"])
@@ -56,6 +59,7 @@ async def list_diagnostic_packages(
     gender: str | None = None,
     tag: str | None = None,
     filter_chip: str | None = None,
+    package_list_type: PackageListType = Query(default=PackageListType.PUBLIC_PACKAGE, alias="type"),
     include_inactive: bool = Query(default=False),
     db: AsyncSession = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),
@@ -63,6 +67,10 @@ async def list_diagnostic_packages(
     employee_service: EmployeeService = Depends(get_employee_service),
 ):
     active_only = True
+    requesting_user_id = None
+    if package_list_type == PackageListType.CUSTOM_PACKAGE:
+        auth_user = await authenticate_bearer_user(db, credentials)
+        requesting_user_id = auth_user.user_id
     if include_inactive:
         user = await authenticate_bearer_user(db, credentials)
         await employee_service.get_active_employee_by_user_id(db, user.user_id)
@@ -74,16 +82,19 @@ async def list_diagnostic_packages(
         tag=tag,
         filter_chip=filter_chip,
         active_only=active_only,
+        list_type=package_list_type.value,
+        requesting_user_id=requesting_user_id,
     )
     return success_response([item.model_dump() for item in data])
 
 
 @router.get("/diagnostic-packages/filters-chips")
 async def list_diagnostic_filter_chips(
+    chip_scope: FilterChipForSchema = Query(default=FilterChipForSchema.PUBLIC_PACKAGE, alias="for"),
     db: AsyncSession = Depends(get_db),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    data = await diagnostics_service.get_filter_chips(db)
+    data = await diagnostics_service.get_filter_chips(db, chip_for=chip_scope.value)
     return success_response([item.model_dump() for item in data])
 
 
@@ -174,12 +185,14 @@ async def create_package(
     payload: DiagnosticPackageCreate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    current_user: User = Depends(get_current_user),
+    employee: EmployeeContext | None = Depends(get_optional_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
     created = await diagnostics_service.create_package(
         db,
         employee=employee,
+        current_user_id=current_user.user_id,
         data=payload,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
@@ -195,12 +208,14 @@ async def update_package(
     payload: DiagnosticPackageUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    current_user: User = Depends(get_current_user),
+    employee: EmployeeContext | None = Depends(get_optional_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
     updated = await diagnostics_service.update_package(
         db,
         employee=employee,
+        current_user_id=current_user.user_id,
         package_id=package_id,
         data=payload,
         ip_address=_client_ip(request),
@@ -612,11 +627,12 @@ async def delete_health_parameter(
 # diagnostic-test-groups: static routes before dynamic routes
 @router.get("/diagnostic-test-groups")
 async def list_diagnostic_test_groups(
+    filter_chip: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    _current_user: User = Depends(get_current_user),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    data = await diagnostics_service.get_all_groups(db)
+    data = await diagnostics_service.get_all_groups(db, filter_chip=filter_chip)
     return success_response([item.model_dump() for item in data])
 
 
@@ -655,11 +671,55 @@ async def get_diagnostic_test_group(
 async def list_group_tests(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    _current_user: User = Depends(get_current_user),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
     data = await diagnostics_service.get_group_tests(db, group_id=group_id)
     return success_response([item.model_dump() for item in data])
+
+
+@router.post("/diagnostic-test-groups/{group_id}/filter-chips", status_code=201)
+async def assign_test_group_filter_chip(
+    group_id: int,
+    payload: PackageFilterChipAssign,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    created = await diagnostics_service.assign_filter_chip_to_test_group(
+        db,
+        employee=employee,
+        group_id=group_id,
+        data=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(created.model_dump())
+
+
+@router.delete("/diagnostic-test-groups/{group_id}/filter-chips/{filter_chip_id}")
+async def remove_test_group_filter_chip(
+    group_id: int,
+    filter_chip_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    await diagnostics_service.remove_filter_chip_from_test_group(
+        db,
+        employee=employee,
+        group_id=group_id,
+        filter_chip_id=filter_chip_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response({"filter_chip_id": filter_chip_id, "deleted": True})
 
 
 @router.post("/diagnostic-test-groups/{group_id}/tests", status_code=201)
@@ -776,12 +836,14 @@ async def assign_groups_to_package(
     payload: AssignGroupsToPackageRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    current_user: User = Depends(get_current_user),
+    employee: EmployeeContext | None = Depends(get_optional_employee),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
     data = await diagnostics_service.assign_groups_to_package(
         db,
         employee=employee,
+        current_user_id=current_user.user_id,
         package_id=package_id,
         data=payload,
         ip_address=_client_ip(request),
