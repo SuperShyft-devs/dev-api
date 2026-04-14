@@ -332,6 +332,36 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
 
     if _use_isolated_test_db:
         await test_db_session.execute(text("DELETE FROM employee WHERE user_id NOT IN (1, 2)"))
+        # Checkout rows reference users and bookings; remove before users to avoid FK teardown failures.
+        await test_db_session.execute(
+            text(
+                "DELETE FROM payments WHERE user_id NOT IN (1, 2) "
+                "OR booking_id IN (SELECT booking_id FROM bookings WHERE user_id NOT IN (1, 2)) "
+                "OR order_id IN (SELECT order_id FROM orders WHERE user_id NOT IN (1, 2) "
+                "OR booking_id IN (SELECT booking_id FROM bookings WHERE user_id NOT IN (1, 2))) "
+                "OR order_id IN (SELECT order_id FROM order_bookings WHERE booking_id IN "
+                "(SELECT booking_id FROM bookings WHERE user_id NOT IN (1, 2)))"
+            )
+        )
+        await test_db_session.execute(
+            text(
+                "DELETE FROM order_bookings WHERE booking_id IN "
+                "(SELECT booking_id FROM bookings WHERE user_id NOT IN (1, 2)) "
+                "OR order_id IN (SELECT order_id FROM orders WHERE user_id NOT IN (1, 2))"
+            )
+        )
+        await test_db_session.execute(
+            text(
+                "DELETE FROM orders WHERE user_id NOT IN (1, 2) "
+                "OR booking_id IN (SELECT booking_id FROM bookings WHERE user_id NOT IN (1, 2)) "
+                "OR order_id IN (SELECT order_id FROM order_bookings WHERE booking_id IN "
+                "(SELECT booking_id FROM bookings WHERE user_id NOT IN (1, 2)))"
+            )
+        )
+        await test_db_session.execute(text("DELETE FROM bookings WHERE user_id NOT IN (1, 2)"))
+        await test_db_session.execute(
+            text("DELETE FROM support_tickets WHERE user_id IS NOT NULL AND user_id NOT IN (1, 2)")
+        )
     else:
         await test_db_session.execute(text("DELETE FROM assessment_package_categories"))
         await test_db_session.execute(text("DELETE FROM questionnaire_category_questions"))

@@ -185,11 +185,15 @@ async def test_employee_deactivate_user_rejects_employee_one_user(async_client, 
 
 @pytest.mark.asyncio
 async def test_employee_delete_user_cascades_related_data(async_client, test_db_session):
-    test_db_session.add(User(age=30, user_id=9010, phone="9010000000", status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10010, user_id=9010, role="admin", status="active"))
+    # High ids avoid collisions with stale rows from older test runs on shared DBs.
+    actor_user_id = 99010
+    target_user_id = 99051
 
-    target = User(age=31, user_id=9501, phone="9501000000", status="active")
+    test_db_session.add(User(age=30, user_id=actor_user_id, phone="9901000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=19010, user_id=actor_user_id, role="admin", status="active"))
+
+    target = User(age=31, user_id=target_user_id, phone="9905100000", status="active")
     test_db_session.add(target)
 
     test_db_session.add(
@@ -207,7 +211,7 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
         EngagementTimeSlot(
             time_slot_id=9901,
             engagement_id=9801,
-            user_id=9501,
+            user_id=target_user_id,
             engagement_date=date(2026, 1, 1),
             slot_start_time=time(10, 0),
         )
@@ -215,7 +219,7 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     test_db_session.add(
         AssessmentInstance(
             assessment_instance_id=9951,
-            user_id=9501,
+            user_id=target_user_id,
             package_id=1,
             engagement_id=9801,
             status="assigned",
@@ -252,7 +256,7 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     test_db_session.add(
         IndividualHealthReport(
             report_id=9965,
-            user_id=9501,
+            user_id=target_user_id,
             assessment_instance_id=9951,
             engagement_id=9801,
             reports={},
@@ -262,14 +266,14 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     test_db_session.add(
         ReportsUserSyncState(
             sync_id=9966,
-            user_id=9501,
+            user_id=target_user_id,
             sync_status="idle",
         )
     )
     test_db_session.add(
         AuthOtpSession(
             session_id=9967,
-            user_id=9501,
+            user_id=target_user_id,
             otp_hash="hash",
             otp_expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc),
             created_at=datetime(2099, 1, 1, tzinfo=timezone.utc),
@@ -278,17 +282,17 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     test_db_session.add(
         AuthToken(
             token_id=9968,
-            user_id=9501,
+            user_id=target_user_id,
             refresh_token_hash="hash",
             issued_at=datetime(2099, 1, 1, tzinfo=timezone.utc),
             expires_at=datetime(2099, 1, 2, tzinfo=timezone.utc),
         )
     )
-    test_db_session.add(UserPreference(preference_id=9969, user_id=9501))
+    test_db_session.add(UserPreference(preference_id=9969, user_id=target_user_id))
     test_db_session.add(
         Booking(
             booking_id=9970,
-            user_id=9501,
+            user_id=target_user_id,
             entity_type="diagnostic_package",
             entity_id=1,
             entity_name="Basic",
@@ -296,11 +300,12 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
             status="pending",
         )
     )
+    # Order + payment owned by another user (checkout payer) but tied to this user's booking — must still delete.
     test_db_session.add(
         Order(
             order_id=9971,
             booking_id=9970,
-            user_id=9501,
+            user_id=actor_user_id,
             razorpay_order_id="order_9971",
             amount_paise=10000,
             status="created",
@@ -311,7 +316,7 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
             payment_id=9972,
             order_id=9971,
             booking_id=9970,
-            user_id=9501,
+            user_id=actor_user_id,
             razorpay_order_id="order_9971",
             amount_paise=10000,
             status="created",
@@ -320,7 +325,7 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     test_db_session.add(
         SupportTicket(
             ticket_id=9973,
-            user_id=9501,
+            user_id=target_user_id,
             contact_input="9501000000",
             query_text="Need help",
             status="open",
@@ -328,11 +333,11 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     )
     await test_db_session.commit()
 
-    response = await async_client.delete("/users/9501", headers=_auth_header(9010))
+    response = await async_client.delete(f"/users/{target_user_id}", headers=_auth_header(actor_user_id))
     assert response.status_code == 200
-    assert response.json()["data"]["deleted_user_id"] == 9501
+    assert response.json()["data"]["deleted_user_id"] == target_user_id
 
-    assert await test_db_session.get(User, 9501) is None
+    assert await test_db_session.get(User, target_user_id) is None
     assert await test_db_session.get(AssessmentInstance, 9951) is None
     assert await test_db_session.get(EngagementTimeSlot, 9901) is None
     assert await test_db_session.get(QuestionnaireResponse, 9963) is None

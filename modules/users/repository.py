@@ -9,7 +9,7 @@ from typing import Optional
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +22,7 @@ from modules.audit.models import DataAuditLog
 from modules.employee.models import Employee
 from modules.engagements.models import OnboardingAssistantAssignment
 from modules.questionnaire.models import QuestionnaireResponse
-from modules.payments.models import Booking, Order, Payment
+from modules.payments.models import Booking, Order, OrderBooking, Payment
 from modules.reports.models import IndividualHealthReport, OrganizationHealthReport, ReportsUserSyncState
 from modules.support.models import SupportTicket
 
@@ -306,8 +306,36 @@ class UsersRepository:
             )
 
         await db.execute(delete(ReportsUserSyncState).where(ReportsUserSyncState.user_id.in_(user_ids)))
-        await db.execute(delete(Payment).where(Payment.user_id.in_(user_ids)))
-        await db.execute(delete(Order).where(Order.user_id.in_(user_ids)))
+
+        # Payments / checkout: bookings belong to this user, but orders.user_id may be another
+        # payer (e.g. family checkout). Remove by booking_id and related order_ids first.
+        user_booking_ids = select(Booking.booking_id).where(Booking.user_id.in_(user_ids))
+        order_ids_linked_via_order_bookings = select(OrderBooking.order_id).where(
+            OrderBooking.booking_id.in_(user_booking_ids)
+        )
+
+        await db.execute(
+            delete(Payment).where(
+                or_(
+                    Payment.user_id.in_(user_ids),
+                    Payment.booking_id.in_(user_booking_ids),
+                    Payment.order_id.in_(select(Order.order_id).where(Order.booking_id.in_(user_booking_ids))),
+                    Payment.order_id.in_(order_ids_linked_via_order_bookings),
+                )
+            )
+        )
+        # Delete orders before bookings: orders.booking_id FKs bookings; multi-line checkout may use
+        # order_bookings only. CASCADE clears order_bookings for removed orders.
+        await db.execute(
+            delete(Order).where(
+                or_(
+                    Order.user_id.in_(user_ids),
+                    Order.booking_id.in_(user_booking_ids),
+                    Order.order_id.in_(order_ids_linked_via_order_bookings),
+                )
+            )
+        )
+        await db.execute(delete(OrderBooking).where(OrderBooking.booking_id.in_(user_booking_ids)))
         await db.execute(delete(Booking).where(Booking.user_id.in_(user_ids)))
         await db.execute(delete(SupportTicket).where(SupportTicket.user_id.in_(user_ids)))
         await db.execute(delete(AssessmentInstance).where(AssessmentInstance.user_id.in_(user_ids)))
