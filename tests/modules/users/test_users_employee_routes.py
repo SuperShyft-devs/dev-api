@@ -12,8 +12,10 @@ from modules.assessments.models import AssessmentCategoryProgress, AssessmentIns
 from modules.auth.models import AuthOtpSession, AuthToken
 from modules.employee.models import Employee
 from modules.engagements.models import Engagement, EngagementTimeSlot
+from modules.payments.models import Booking, Order, Payment
 from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireResponse
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
+from modules.support.models import SupportTicket
 from modules.users import service as users_service_module
 from modules.users.models import User, UserPreference
 
@@ -283,6 +285,47 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
         )
     )
     test_db_session.add(UserPreference(preference_id=9969, user_id=9501))
+    test_db_session.add(
+        Booking(
+            booking_id=9970,
+            user_id=9501,
+            entity_type="diagnostic_package",
+            entity_id=1,
+            entity_name="Basic",
+            amount_paise=10000,
+            status="pending",
+        )
+    )
+    test_db_session.add(
+        Order(
+            order_id=9971,
+            booking_id=9970,
+            user_id=9501,
+            razorpay_order_id="order_9971",
+            amount_paise=10000,
+            status="created",
+        )
+    )
+    test_db_session.add(
+        Payment(
+            payment_id=9972,
+            order_id=9971,
+            booking_id=9970,
+            user_id=9501,
+            razorpay_order_id="order_9971",
+            amount_paise=10000,
+            status="created",
+        )
+    )
+    test_db_session.add(
+        SupportTicket(
+            ticket_id=9973,
+            user_id=9501,
+            contact_input="9501000000",
+            query_text="Need help",
+            status="open",
+        )
+    )
     await test_db_session.commit()
 
     response = await async_client.delete("/users/9501", headers=_auth_header(9010))
@@ -299,3 +342,7 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     assert await test_db_session.get(AuthOtpSession, 9967) is None
     assert await test_db_session.get(AuthToken, 9968) is None
     assert await test_db_session.get(UserPreference, 9969) is None
+    assert await test_db_session.get(Booking, 9970) is None
+    assert await test_db_session.get(Order, 9971) is None
+    assert await test_db_session.get(Payment, 9972) is None
+    assert await test_db_session.get(SupportTicket, 9973) is None

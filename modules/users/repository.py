@@ -22,7 +22,9 @@ from modules.audit.models import DataAuditLog
 from modules.employee.models import Employee
 from modules.engagements.models import OnboardingAssistantAssignment
 from modules.questionnaire.models import QuestionnaireResponse
+from modules.payments.models import Booking, Order, Payment
 from modules.reports.models import IndividualHealthReport, OrganizationHealthReport, ReportsUserSyncState
+from modules.support.models import SupportTicket
 
 
 class UsersRepository:
@@ -304,6 +306,10 @@ class UsersRepository:
             )
 
         await db.execute(delete(ReportsUserSyncState).where(ReportsUserSyncState.user_id.in_(user_ids)))
+        await db.execute(delete(Payment).where(Payment.user_id.in_(user_ids)))
+        await db.execute(delete(Order).where(Order.user_id.in_(user_ids)))
+        await db.execute(delete(Booking).where(Booking.user_id.in_(user_ids)))
+        await db.execute(delete(SupportTicket).where(SupportTicket.user_id.in_(user_ids)))
         await db.execute(delete(AssessmentInstance).where(AssessmentInstance.user_id.in_(user_ids)))
         await db.execute(delete(AuthToken).where(AuthToken.user_id.in_(user_ids)))
         await db.execute(delete(AuthOtpSession).where(AuthOtpSession.user_id.in_(user_ids)))
