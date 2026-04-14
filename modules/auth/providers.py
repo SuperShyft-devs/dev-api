@@ -83,9 +83,17 @@ class WhatApiOtpSender(OtpSender):
         if not digits_only:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid phone number")
 
-        if digits_only.startswith(self.country_code):
+        cc = self.country_code
+        if len(digits_only) == 10:
+            return f"{cc}{digits_only}"
+
+        if digits_only.startswith(cc) and len(digits_only) == len(cc) + 10:
             return digits_only
-        return f"{self.country_code}{digits_only}"
+
+        if digits_only.startswith(cc):
+            return digits_only
+
+        return f"{cc}{digits_only}"
 
     async def send_otp(self, phone: str, otp: str) -> None:
         number = self._normalize_number(phone)

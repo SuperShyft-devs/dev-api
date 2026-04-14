@@ -53,6 +53,31 @@ async def test_whatapi_sender_sends_expected_query_params(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_whatapi_sender_prefixes_ten_digit_mobile_starting_with_country_digits(monkeypatch):
+    """10-digit numbers starting with 91 are national mobiles, not +91 already."""
+    response = _FakeResponse(status_code=200, payload={"accepted": True})
+    fake_client = _FakeAsyncClient(response)
+    monkeypatch.setattr("modules.auth.providers.httpx.AsyncClient", lambda timeout: fake_client)
+
+    sender = WhatApiOtpSender(webhook_url="https://webhook.whatapi.in/webhook/test-token", country_code="91")
+    await sender.send_otp("9167228151", "002585")
+
+    assert fake_client.last_params == {"number": "919167228151", "message": "otp,002585"}
+
+
+@pytest.mark.asyncio
+async def test_whatapi_sender_leaves_twelve_digit_international_unchanged(monkeypatch):
+    response = _FakeResponse(status_code=200, payload={"accepted": True})
+    fake_client = _FakeAsyncClient(response)
+    monkeypatch.setattr("modules.auth.providers.httpx.AsyncClient", lambda timeout: fake_client)
+
+    sender = WhatApiOtpSender(webhook_url="https://webhook.whatapi.in/webhook/test-token", country_code="91")
+    await sender.send_otp("918762830757", "434068")
+
+    assert fake_client.last_params == {"number": "918762830757", "message": "otp,434068"}
+
+
+@pytest.mark.asyncio
 async def test_whatapi_sender_raises_when_not_accepted(monkeypatch):
     response = _FakeResponse(status_code=200, payload={"accepted": False})
     fake_client = _FakeAsyncClient(response)
