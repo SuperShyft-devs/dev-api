@@ -58,6 +58,9 @@ class Settings:
     
     # OTP settings
     OTP_LOG_TO_TERMINAL: bool = os.getenv("OTP_LOG_TO_TERMINAL", "True").lower() == "true"
+    OTP_WEBHOOK_URL: str = os.getenv("OTP_WEBHOOK_URL", "")
+    OTP_COUNTRY_CODE: str = os.getenv("OTP_COUNTRY_CODE", "91")
+    OTP_WEBHOOK_TIMEOUT_SECONDS: int = int(os.getenv("OTP_WEBHOOK_TIMEOUT_SECONDS", "10"))
     ALLOW_BYPASS_OTP: bool = os.getenv(
         "ALLOW_BYPASS_OTP",
         os.getenv("allow_bypass_otp", "False"),

@@ -8,6 +8,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
+
+import httpx
+
+from core.exceptions import AppError
 
 
 logger = logging.getLogger(__name__)
@@ -63,3 +68,66 @@ class DevelopmentOtpSender(OtpSender):
         
         # Also log it normally so it appears in log files
         logger.info(f"Development OTP sent for phone {phone[-4:].rjust(len(phone), '*')}")
+
+
+@dataclass
+class WhatApiOtpSender(OtpSender):
+    """OTP sender backed by whatapi webhook."""
+
+    webhook_url: str
+    country_code: str = "91"
+    timeout_seconds: float = 10.0
+
+    def _normalize_number(self, phone: str) -> str:
+        digits_only = "".join(ch for ch in phone if ch.isdigit())
+        if not digits_only:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid phone number")
+
+        if digits_only.startswith(self.country_code):
+            return digits_only
+        return f"{self.country_code}{digits_only}"
+
+    async def send_otp(self, phone: str, otp: str) -> None:
+        number = self._normalize_number(phone)
+        params = {"number": number, "message": f"otp,{otp}"}
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                response = await client.get(self.webhook_url, params=params)
+        except httpx.HTTPError as exc:
+            logger.exception("WhatApi OTP webhook request failed")
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Unable to send OTP at the moment",
+            ) from exc
+
+        if response.status_code >= 400:
+            logger.error(
+                "WhatApi OTP webhook rejected request",
+                extra={"status_code": response.status_code, "body": response.text[:500]},
+            )
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Unable to send OTP at the moment",
+            )
+
+        payload: Any
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            logger.error("WhatApi OTP webhook returned non-JSON response", extra={"body": response.text[:500]})
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Unable to send OTP at the moment",
+            ) from exc
+
+        if not isinstance(payload, dict) or payload.get("accepted") is not True:
+            logger.error("WhatApi OTP webhook response not accepted", extra={"payload": payload})
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Unable to send OTP at the moment",
+            )

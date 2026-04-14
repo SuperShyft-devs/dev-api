@@ -8,7 +8,7 @@ from __future__ import annotations
 from core.config import settings
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
-from modules.auth.providers import DevelopmentOtpSender, StubOtpSender
+from modules.auth.providers import DevelopmentOtpSender, StubOtpSender, WhatApiOtpSender
 from modules.auth.repository import AuthRepository
 from modules.auth.service import AuthService
 from modules.users.repository import UsersRepository
@@ -25,8 +25,14 @@ def get_auth_service() -> AuthService:
 
     auth_repo = AuthRepository()
     
-    # Use DevelopmentOtpSender in development when OTP_LOG_TO_TERMINAL is enabled
-    if settings.OTP_LOG_TO_TERMINAL and settings.is_development():
+    # Prefer real webhook sender when configured.
+    if settings.OTP_WEBHOOK_URL:
+        otp_sender = WhatApiOtpSender(
+            webhook_url=settings.OTP_WEBHOOK_URL,
+            country_code=settings.OTP_COUNTRY_CODE,
+            timeout_seconds=float(settings.OTP_WEBHOOK_TIMEOUT_SECONDS),
+        )
+    elif settings.OTP_LOG_TO_TERMINAL and settings.is_development():
         otp_sender = DevelopmentOtpSender()
     else:
         otp_sender = StubOtpSender()
