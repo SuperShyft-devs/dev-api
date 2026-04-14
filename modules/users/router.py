@@ -623,3 +623,23 @@ async def employee_deactivate_user(
     await db.commit()
 
     return success_response({"user_id": user.user_id, "status": user.status})
+
+
+@router.delete("/{user_id}")
+async def employee_delete_user(
+    user_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    users_service: UsersService = Depends(get_users_service),
+):
+    result = await users_service.delete_user_by_employee(
+        db,
+        employee=employee,
+        user_id=user_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)

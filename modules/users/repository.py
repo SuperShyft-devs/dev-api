@@ -9,13 +9,20 @@ from typing import Optional
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.users.models import User, UserPreference
 from modules.engagements.models import Engagement, EngagementTimeSlot
 from modules.organizations.models import Organization
+from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance
+from modules.auth.models import AuthOtpSession, AuthToken
+from modules.audit.models import DataAuditLog
+from modules.employee.models import Employee
+from modules.engagements.models import OnboardingAssistantAssignment
+from modules.questionnaire.models import QuestionnaireResponse
+from modules.reports.models import IndividualHealthReport, OrganizationHealthReport, ReportsUserSyncState
 
 
 class UsersRepository:
@@ -236,3 +243,137 @@ class UsersRepository:
         db.add(user)
         await db.flush()
         return user
+
+    async def get_employee_by_user_id(self, db: AsyncSession, user_id: int) -> Employee | None:
+        result = await db.execute(select(Employee).where(Employee.user_id == user_id).limit(1))
+        return result.scalar_one_or_none()
+
+    async def list_descendant_user_ids(self, db: AsyncSession, root_user_id: int) -> list[int]:
+        """Return root user id + all descendants through users.parent_id."""
+        all_ids: set[int] = {root_user_id}
+        frontier: list[int] = [root_user_id]
+
+        while frontier:
+            result = await db.execute(select(User.user_id).where(User.parent_id.in_(frontier)))
+            child_ids = [int(v) for v in result.scalars().all()]
+            unseen = [uid for uid in child_ids if uid not in all_ids]
+            if not unseen:
+                break
+            all_ids.update(unseen)
+            frontier = unseen
+
+        return sorted(all_ids)
+
+    async def delete_user_related_data(self, db: AsyncSession, user_ids: list[int]) -> None:
+        if not user_ids:
+            return
+
+        engagement_ids = list(
+            (
+                await db.execute(
+                    select(EngagementTimeSlot.engagement_id).where(EngagementTimeSlot.user_id.in_(user_ids)).distinct()
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        assessment_instance_ids = list(
+            (
+                await db.execute(select(AssessmentInstance.assessment_instance_id).where(AssessmentInstance.user_id.in_(user_ids)))
+            )
+            .scalars()
+            .all()
+        )
+
+        if assessment_instance_ids:
+            await db.execute(
+                delete(QuestionnaireResponse).where(
+                    QuestionnaireResponse.assessment_instance_id.in_(assessment_instance_ids)
+                )
+            )
+            await db.execute(
+                delete(AssessmentCategoryProgress).where(
+                    AssessmentCategoryProgress.assessment_instance_id.in_(assessment_instance_ids)
+                )
+            )
+            await db.execute(
+                delete(IndividualHealthReport).where(
+                    IndividualHealthReport.assessment_instance_id.in_(assessment_instance_ids)
+                )
+            )
+
+        await db.execute(delete(ReportsUserSyncState).where(ReportsUserSyncState.user_id.in_(user_ids)))
+        await db.execute(delete(AssessmentInstance).where(AssessmentInstance.user_id.in_(user_ids)))
+        await db.execute(delete(AuthToken).where(AuthToken.user_id.in_(user_ids)))
+        await db.execute(delete(AuthOtpSession).where(AuthOtpSession.user_id.in_(user_ids)))
+        await db.execute(delete(DataAuditLog).where(DataAuditLog.user_id.in_(user_ids)))
+        await db.execute(delete(UserPreference).where(UserPreference.user_id.in_(user_ids)))
+        await db.execute(delete(EngagementTimeSlot).where(EngagementTimeSlot.user_id.in_(user_ids)))
+
+        if engagement_ids:
+            orphan_engagement_ids = list(
+                (
+                    await db.execute(
+                        select(Engagement.engagement_id)
+                        .where(Engagement.engagement_id.in_(engagement_ids))
+                        .where(
+                            ~Engagement.engagement_id.in_(
+                                select(EngagementTimeSlot.engagement_id).distinct()
+                            )
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            if orphan_engagement_ids:
+                orphan_assessment_ids = list(
+                    (
+                        await db.execute(
+                            select(AssessmentInstance.assessment_instance_id).where(
+                                AssessmentInstance.engagement_id.in_(orphan_engagement_ids)
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                if orphan_assessment_ids:
+                    await db.execute(
+                        delete(QuestionnaireResponse).where(
+                            QuestionnaireResponse.assessment_instance_id.in_(orphan_assessment_ids)
+                        )
+                    )
+                    await db.execute(
+                        delete(AssessmentCategoryProgress).where(
+                            AssessmentCategoryProgress.assessment_instance_id.in_(orphan_assessment_ids)
+                        )
+                    )
+                    await db.execute(
+                        delete(IndividualHealthReport).where(
+                            IndividualHealthReport.assessment_instance_id.in_(orphan_assessment_ids)
+                        )
+                    )
+                    await db.execute(
+                        delete(AssessmentInstance).where(AssessmentInstance.assessment_instance_id.in_(orphan_assessment_ids))
+                    )
+
+                await db.execute(
+                    delete(OrganizationHealthReport).where(
+                        OrganizationHealthReport.engagement_id.in_(orphan_engagement_ids)
+                    )
+                )
+                await db.execute(
+                    delete(OnboardingAssistantAssignment).where(
+                        OnboardingAssistantAssignment.engagement_id.in_(orphan_engagement_ids)
+                    )
+                )
+                await db.execute(delete(Engagement).where(Engagement.engagement_id.in_(orphan_engagement_ids)))
+
+    async def delete_users_by_ids(self, db: AsyncSession, user_ids: list[int]) -> int:
+        if not user_ids:
+            return 0
+        result = await db.execute(delete(User).where(User.user_id.in_(user_ids)))
+        return int(result.rowcount or 0)

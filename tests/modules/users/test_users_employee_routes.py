@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 
 from core.config import settings
 from core.security import create_jwt_token
+from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance
+from modules.auth.models import AuthOtpSession, AuthToken
 from modules.employee.models import Employee
+from modules.engagements.models import Engagement, EngagementTimeSlot
+from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireResponse
+from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.users import service as users_service_module
-from modules.users.models import User
+from modules.users.models import User, UserPreference
 
 
 def _auth_header(user_id: int) -> dict[str, str]:
@@ -174,3 +179,123 @@ async def test_employee_deactivate_user_rejects_employee_one_user(async_client, 
     protected_user = await test_db_session.get(User, 9412)
     assert protected_user is not None
     assert (protected_user.status or "").lower() == "active"
+
+
+@pytest.mark.asyncio
+async def test_employee_delete_user_cascades_related_data(async_client, test_db_session):
+    test_db_session.add(User(age=30, user_id=9010, phone="9010000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=10010, user_id=9010, role="admin", status="active"))
+
+    target = User(age=31, user_id=9501, phone="9501000000", status="active")
+    test_db_session.add(target)
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=9801,
+            engagement_code="ENG9801",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+
+    test_db_session.add(
+        EngagementTimeSlot(
+            time_slot_id=9901,
+            engagement_id=9801,
+            user_id=9501,
+            engagement_date=date(2026, 1, 1),
+            slot_start_time=time(10, 0),
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9951,
+            user_id=9501,
+            package_id=1,
+            engagement_id=9801,
+            status="assigned",
+        )
+    )
+    test_db_session.add(QuestionnaireCategory(category_id=9961, category_key="lifestyle", display_name="Lifestyle"))
+    test_db_session.add(
+        QuestionnaireDefinition(
+            question_id=9962,
+            question_key="sleep_quality",
+            question_text="How do you sleep?",
+            question_type="single_select",
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+    test_db_session.add(
+        QuestionnaireResponse(
+            response_id=9963,
+            assessment_instance_id=9951,
+            question_id=9962,
+            category_id=9961,
+            answer={"value": "good"},
+        )
+    )
+    test_db_session.add(
+        AssessmentCategoryProgress(
+            id=9964,
+            assessment_instance_id=9951,
+            category_id=9961,
+            status="completed",
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=9965,
+            user_id=9501,
+            assessment_instance_id=9951,
+            engagement_id=9801,
+            reports={},
+            blood_parameters={},
+        )
+    )
+    test_db_session.add(
+        ReportsUserSyncState(
+            sync_id=9966,
+            user_id=9501,
+            sync_status="idle",
+        )
+    )
+    test_db_session.add(
+        AuthOtpSession(
+            session_id=9967,
+            user_id=9501,
+            otp_hash="hash",
+            otp_expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc),
+            created_at=datetime(2099, 1, 1, tzinfo=timezone.utc),
+        )
+    )
+    test_db_session.add(
+        AuthToken(
+            token_id=9968,
+            user_id=9501,
+            refresh_token_hash="hash",
+            issued_at=datetime(2099, 1, 1, tzinfo=timezone.utc),
+            expires_at=datetime(2099, 1, 2, tzinfo=timezone.utc),
+        )
+    )
+    test_db_session.add(UserPreference(preference_id=9969, user_id=9501))
+    await test_db_session.commit()
+
+    response = await async_client.delete("/users/9501", headers=_auth_header(9010))
+    assert response.status_code == 200
+    assert response.json()["data"]["deleted_user_id"] == 9501
+
+    assert await test_db_session.get(User, 9501) is None
+    assert await test_db_session.get(AssessmentInstance, 9951) is None
+    assert await test_db_session.get(EngagementTimeSlot, 9901) is None
+    assert await test_db_session.get(QuestionnaireResponse, 9963) is None
+    assert await test_db_session.get(AssessmentCategoryProgress, 9964) is None
+    assert await test_db_session.get(IndividualHealthReport, 9965) is None
+    assert await test_db_session.get(ReportsUserSyncState, 9966) is None
+    assert await test_db_session.get(AuthOtpSession, 9967) is None
+    assert await test_db_session.get(AuthToken, 9968) is None
+    assert await test_db_session.get(UserPreference, 9969) is None

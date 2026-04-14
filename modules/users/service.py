@@ -785,6 +785,51 @@ class UsersService:
 
         return updated
 
+    async def delete_user_by_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee,
+        user_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+
+        if employee.user_id == user_id:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="You cannot delete your own account")
+
+        user = await self._repository.get_user_by_id(db, user_id)
+        if user is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        user_ids_to_delete = await self._repository.list_descendant_user_ids(db, user_id)
+        for candidate_user_id in user_ids_to_delete:
+            if await self._is_protected_employee_user(db, candidate_user_id):
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="User cannot be deleted")
+
+            if await self._repository.get_employee_by_user_id(db, candidate_user_id) is not None:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Employee user cannot be deleted")
+
+        await self._repository.delete_user_related_data(db, user_ids_to_delete)
+        deleted_count = await self._repository.delete_users_by_ids(db, user_ids_to_delete)
+
+        if self._audit_service is None:
+            raise RuntimeError("Audit service is required")
+
+        await self._audit_service.log_event(
+            db,
+            action="EMPLOYEE_DELETE_USER",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return {"deleted_user_id": user_id, "deleted_user_count": deleted_count}
+
     async def _get_or_create_user_for_onboarding(
         self,
         db: AsyncSession,
