@@ -183,6 +183,29 @@ class BookBioAiRequest(BaseModel):
     blood_collection_date: date
     blood_collection_time_slot: str = Field(min_length=1, max_length=20)
     diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
+    address: Optional[str] = Field(default=None, max_length=500)
+    pincode: Optional[str] = Field(default=None, max_length=20)
+    city: Optional[str] = Field(default=None, max_length=100)
+
+
+class BookBioAiMemberPayload(BaseModel):
+    """One member in a batch Bio AI or blood-test booking."""
+
+    user_id: int = Field(gt=0)
+    address: str = Field(min_length=1, max_length=500)
+    pincode: str = Field(min_length=1, max_length=20)
+    city: str = Field(min_length=1, max_length=100)
+    blood_collection_date: date
+    blood_collection_time_slot: str = Field(min_length=1, max_length=20)
+    diagnostic_package_id: int = Field(gt=0)
+
+
+class BookBioAiBatchRequest(BaseModel):
+    members: list[BookBioAiMemberPayload] = Field(..., min_length=1)
+
+
+class BookBloodTestBatchRequest(BaseModel):
+    members: list[BookBioAiMemberPayload] = Field(..., min_length=1)
 
 
 class PublicUserOnboardRequest(BaseModel):

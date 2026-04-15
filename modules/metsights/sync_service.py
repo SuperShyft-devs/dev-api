@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.diagnostics.models import DiagnosticPackage
 from modules.assessments.service import AssessmentsService
+from modules.engagements.enums import EngagementKind
 from modules.engagements.service import EngagementsService
 from modules.metsights.service import MetsightsService
 from modules.platform_settings.service import PlatformSettingsService
@@ -393,9 +394,12 @@ class MetsightsSyncService:
                     city=user.city,
                     assessment_package_id=ap_id,
                     diagnostic_package_id=default_diag,
+                    engagement_type=EngagementKind.bio_ai,
+                    address=user.address,
+                    pincode=user.pin_code,
                 )
             else:
-                if int(engagement.assessment_package_id) != int(package.package_id):
+                if engagement.assessment_package_id is None or int(engagement.assessment_package_id) != int(package.package_id):
                     skipped.append(
                         {
                             "metsights_record_id": mrid,

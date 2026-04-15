@@ -51,6 +51,21 @@ class PlatformSettingsService:
                 message="Diagnostic package is missing or not active",
             )
 
+    async def ensure_active_diagnostic_package(self, db: AsyncSession, diagnostic_package_id: int) -> None:
+        """Validate a diagnostic package exists and is active (assessment optional)."""
+
+        dp = (
+            await db.execute(
+                select(DiagnosticPackage).where(DiagnosticPackage.diagnostic_package_id == diagnostic_package_id).limit(1)
+            )
+        ).scalar_one_or_none()
+        if dp is None or (dp.status or "").lower() != "active":
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_B2C_DIAGNOSTIC_PACKAGE",
+                message="Diagnostic package is missing or not active",
+            )
+
     async def get_b2c_onboarding_defaults(self, db: AsyncSession) -> B2cOnboardingDefaultsRead:
         a_id, d_id = await self.resolve_b2c_default_package_ids(db)
         return B2cOnboardingDefaultsRead(

@@ -19,6 +19,7 @@ from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.checklists.schemas import ChecklistReadiness
 from modules.employee.service import EmployeeContext
+from modules.engagements.enums import EngagementKind
 from modules.engagements.models import Engagement, EngagementTimeSlot
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.schemas import EngagementCreateRequest, EngagementUpdateRequest
@@ -153,20 +154,7 @@ class EngagementsService:
                     message=f"Organization with ID {payload.organization_id} does not exist",
                 )
 
-        engagement_type_normalized = (payload.engagement_type or "").strip().lower()
         diagnostic_package_id = payload.diagnostic_package_id
-        if engagement_type_normalized == "b2b":
-            if diagnostic_package_id is None:
-                raise AppError(
-                    status_code=400,
-                    error_code="DIAGNOSTIC_PACKAGE_REQUIRED",
-                    message="Diagnostic package must be selected for B2B engagements",
-                )
-        else:
-            # Defensive: if admin creates a non-B2B engagement via this endpoint,
-            # default diagnostic package to the B2C fallback.
-            if diagnostic_package_id is None:
-                diagnostic_package_id = DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
 
         # Use provided engagement_code or generate a unique one.
         if payload.engagement_code:
@@ -196,6 +184,8 @@ class EngagementsService:
             assessment_package_id=payload.assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
             city=payload.city,
+            address=payload.address,
+            pincode=payload.pincode,
             slot_duration=payload.slot_duration,
             start_date=payload.start_date,
             end_date=payload.end_date,
@@ -313,20 +303,10 @@ class EngagementsService:
         engagement.organization_id = payload.organization_id
         engagement.engagement_type = payload.engagement_type
         engagement.assessment_package_id = payload.assessment_package_id
-        engagement_type_normalized = (payload.engagement_type or "").strip().lower()
-        diagnostic_package_id = payload.diagnostic_package_id
-        if engagement_type_normalized == "b2b":
-            if diagnostic_package_id is None:
-                raise AppError(
-                    status_code=400,
-                    error_code="DIAGNOSTIC_PACKAGE_REQUIRED",
-                    message="Diagnostic package must be selected for B2B engagements",
-                )
-        else:
-            if diagnostic_package_id is None:
-                diagnostic_package_id = DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
-        engagement.diagnostic_package_id = diagnostic_package_id
+        engagement.diagnostic_package_id = payload.diagnostic_package_id
         engagement.city = payload.city
+        engagement.address = payload.address
+        engagement.pincode = payload.pincode
         engagement.slot_duration = payload.slot_duration
         engagement.start_date = payload.start_date
         engagement.end_date = payload.end_date
@@ -391,11 +371,14 @@ class EngagementsService:
         user_first_name: str | None,
         engagement_date: date,
         city: str | None,
-        assessment_package_id: int,
-        diagnostic_package_id: int = DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
+        assessment_package_id: int | None,
+        diagnostic_package_id: int | None = None,
+        engagement_type: EngagementKind = EngagementKind.bio_ai,
+        address: str | None = None,
+        pincode: str | None = None,
     ) -> Engagement:
         """Create a B2C engagement with no onboarding assistants assigned by default.
-        
+
         B2C engagements are created automatically during public user onboarding.
         Onboarding assistant assignments can be added later if needed.
         """
@@ -407,10 +390,12 @@ class EngagementsService:
             metsights_engagement_id=None,
             organization_id=None,
             engagement_code=_generate_engagement_code(),
-            engagement_type="healthcamp",
+            engagement_type=engagement_type,
             assessment_package_id=assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
             city=city,
+            address=address,
+            pincode=pincode,
             slot_duration=20,
             start_date=engagement_date,
             end_date=engagement_date,

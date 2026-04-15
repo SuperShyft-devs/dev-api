@@ -30,7 +30,7 @@ async def test_enroll_user_in_engagement_does_not_increment_participant_count_by
     await test_db_session.execute(
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count, organization_id) "
-            "VALUES (9001, 'Camp', 'ENG9001', 'healthcamp', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0, NULL)"
+            "VALUES (9001, 'Camp', 'ENG9001', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0, NULL)"
         )
     )
     await test_db_session.commit()

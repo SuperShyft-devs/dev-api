@@ -8,6 +8,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from modules.checklists.schemas import ChecklistReadiness
+from modules.engagements.enums import EngagementKind
 
 
 class EngagementCreateRequest(BaseModel):
@@ -15,12 +16,13 @@ class EngagementCreateRequest(BaseModel):
 
     engagement_name: Optional[str] = Field(default=None, max_length=200)
     organization_id: int = Field(gt=0)
-    engagement_type: str = Field(min_length=1, max_length=50)
+    engagement_type: EngagementKind
     engagement_code: Optional[str] = Field(default=None, max_length=50)
-    assessment_package_id: int = Field(gt=0)
-    # Optional on the request so the service can raise a domain error for B2B.
+    assessment_package_id: Optional[int] = Field(default=None, gt=0)
     diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
     city: Optional[str] = Field(default=None, max_length=100)
+    address: Optional[str] = Field(default=None, max_length=500)
+    pincode: Optional[str] = Field(default=None, max_length=20)
     slot_duration: int = Field(gt=0, le=480)
     start_date: date
     end_date: date
@@ -31,10 +33,12 @@ class EngagementUpdateRequest(BaseModel):
 
     engagement_name: Optional[str] = Field(default=None, max_length=200)
     organization_id: int = Field(gt=0)
-    engagement_type: str = Field(min_length=1, max_length=50)
-    assessment_package_id: int = Field(gt=0)
+    engagement_type: EngagementKind
+    assessment_package_id: Optional[int] = Field(default=None, gt=0)
     diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
     city: Optional[str] = Field(default=None, max_length=100)
+    address: Optional[str] = Field(default=None, max_length=500)
+    pincode: Optional[str] = Field(default=None, max_length=20)
     slot_duration: int = Field(gt=0, le=480)
     start_date: date
     end_date: date
@@ -53,9 +57,11 @@ class EngagementListItem(BaseModel):
     organization_id: Optional[int] = None
     engagement_code: str
     engagement_type: Optional[str] = None
-    assessment_package_id: int
-    diagnostic_package_id: int
+    assessment_package_id: Optional[int] = None
+    diagnostic_package_id: Optional[int] = None
     city: Optional[str] = None
+    address: Optional[str] = None
+    pincode: Optional[str] = None
     slot_duration: Optional[int] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None

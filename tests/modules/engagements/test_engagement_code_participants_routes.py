@@ -9,7 +9,6 @@ import pytest
 from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
-from modules.diagnostics.models import DiagnosticPackage
 from modules.users.models import User
 from modules.engagements.models import Engagement, EngagementTimeSlot
 from modules.assessments.models import AssessmentPackage
@@ -23,17 +22,6 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
     """Seed a test employee."""
-    # Seed required diagnostic package for engagements (b2b requires non-null FK).
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=1,
-            reference_id="REF1",
-            package_name="Diag Package",
-            diagnostic_provider="test_provider",
-            status="active",
-            bookings_count=0,
-        )
-    )
     user = User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active")
     test_db_session.add(user)
     await test_db_session.flush()
@@ -91,7 +79,7 @@ async def test_get_engagement_code_participants_returns_empty_list_when_no_parti
         Engagement(
             engagement_id=3001,
             engagement_code="ENG3001",
-            engagement_type="b2b",
+            engagement_type="doctor",
             assessment_package_id=101,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -135,7 +123,7 @@ async def test_get_engagement_code_participants_returns_participants_from_engage
         Engagement(
             engagement_id=3002,
             engagement_code="ENG3002",
-            engagement_type="b2b",
+            engagement_type="doctor",
             assessment_package_id=102,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -236,7 +224,7 @@ async def test_get_engagement_code_participants_returns_distinct_users(async_cli
         Engagement(
             engagement_id=3003,
             engagement_code="ENG3003",
-            engagement_type="b2b",
+            engagement_type="doctor",
             assessment_package_id=103,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -315,7 +303,7 @@ async def test_get_engagement_code_participants_validates_pagination_params(asyn
         Engagement(
             engagement_id=3004,
             engagement_code="ENG3004",
-            engagement_type="b2b",
+            engagement_type="doctor",
             assessment_package_id=104,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -361,7 +349,7 @@ async def test_get_engagement_code_participants_paginates_results(async_client, 
         Engagement(
             engagement_id=3005,
             engagement_code="ENG3005",
-            engagement_type="b2b",
+            engagement_type="doctor",
             assessment_package_id=105,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -458,7 +446,7 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
         Engagement(
             engagement_id=3006,
             engagement_code="ENG3006",
-            engagement_type="b2b",
+            engagement_type="doctor",
             assessment_package_id=106,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -472,7 +460,7 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
         Engagement(
             engagement_id=3007,
             engagement_code="ENG3007",
-            engagement_type="b2b",
+            engagement_type="doctor",
             assessment_package_id=106,
             diagnostic_package_id=1,
             slot_duration=20,

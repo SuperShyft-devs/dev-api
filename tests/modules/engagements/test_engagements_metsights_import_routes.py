@@ -51,7 +51,7 @@ async def _seed_packages_and_engagement(
         text(
             f"INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             f"assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count, organization_id) "
-            f"VALUES ({engagement_id}, 'Import Camp', '{engagement_code}', 'healthcamp', 1, 1, 'BLR', 60, {sd}, {ed}, 'active', 0, NULL)"
+            f"VALUES ({engagement_id}, 'Import Camp', '{engagement_code}', 'bio_ai', 1, 1, 'BLR', 60, {sd}, {ed}, 'active', 0, NULL)"
         )
     )
     await test_db_session.commit()

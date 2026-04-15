@@ -150,6 +150,8 @@ class UsersRepository:
                 Engagement.engagement_type.label("engagement_type"),
                 Engagement.slot_duration.label("slot_duration"),
                 Engagement.city.label("engagement_city"),
+                Engagement.address.label("engagement_address"),
+                Engagement.pincode.label("engagement_pincode"),
                 Engagement.organization_id.label("organization_id"),
                 Organization.name.label("organization_name"),
                 User.address.label("user_address"),

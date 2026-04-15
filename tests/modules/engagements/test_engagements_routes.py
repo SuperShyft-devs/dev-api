@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pytest
+from sqlalchemy import text
 
 from core.config import settings
 from core.security import create_jwt_token
@@ -38,27 +39,30 @@ async def _seed_organization(test_db_session, *, organization_id: int, name: str
 
 
 async def _seed_assessment_package(test_db_session, *, package_id: int, package_code: str = "PKG1"):
-    from modules.assessments.models import AssessmentPackage
-    test_db_session.add(
-        AssessmentPackage(
-            package_id=package_id,
-            package_code=package_code,
-            display_name=f"Test Package {package_id}",
-            status="active",
-        )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (:pid, :pcode, :dname, 'active') ON CONFLICT (package_id) DO UPDATE SET "
+            "package_code = EXCLUDED.package_code, display_name = EXCLUDED.display_name, status = EXCLUDED.status"
+        ),
+        {"pid": package_id, "pcode": package_code, "dname": f"Test Package {package_id}"},
     )
     await test_db_session.commit()
 
 
 async def _seed_diagnostic_package(test_db_session, *, diagnostic_package_id: int):
-    from modules.diagnostics.models import DiagnosticPackage
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=diagnostic_package_id,
-            package_name=f"Test Diagnostic Package {diagnostic_package_id}",
-            diagnostic_provider="test_provider",
-            status="active",
-        )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, bookings_count) "
+            "VALUES (:did, :ref, :pname, 'test_provider', 'active', 0) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
+            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
+            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status"
+        ),
+        {
+            "did": diagnostic_package_id,
+            "ref": f"REF{diagnostic_package_id}",
+            "pname": f"Test Diagnostic Package {diagnostic_package_id}",
+        },
     )
     await test_db_session.commit()
 
@@ -68,7 +72,7 @@ async def test_create_engagement_requires_auth(async_client):
     payload = {
         "engagement_name": "Camp",
         "organization_id": 1,
-        "engagement_type": "healthcamp",
+        "engagement_type": "bio_ai",
         "assessment_package_id": 1,
         "diagnostic_package_id": 1,
         "city": "BLR",
@@ -89,7 +93,7 @@ async def test_create_engagement_requires_employee(async_client, test_db_session
     payload = {
         "engagement_name": "Camp",
         "organization_id": 1,
-        "engagement_type": "healthcamp",
+        "engagement_type": "bio_ai",
         "assessment_package_id": 1,
         "diagnostic_package_id": 1,
         "city": "BLR",
@@ -112,7 +116,7 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
     payload = {
         "engagement_name": "Camp",
         "organization_id": 1,
-        "engagement_type": "healthcamp",
+        "engagement_type": "bio_ai",
         "assessment_package_id": 1,
         "diagnostic_package_id": 1,
         "city": "BLR",
@@ -129,17 +133,15 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
-async def test_create_engagement_requires_diagnostic_package_for_b2b(async_client, test_db_session):
+async def test_create_engagement_allows_null_diagnostic_package(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7008, employee_id=15)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
-    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
 
     payload = {
         "engagement_name": "Camp",
         "organization_id": 1,
-        "engagement_type": "b2b",
+        "engagement_type": "doctor",
         "assessment_package_id": 1,
-        # diagnostic_package_id intentionally omitted to simulate "not selected"
         "city": "BLR",
         "slot_duration": 20,
         "start_date": "2026-02-01",
@@ -147,11 +149,7 @@ async def test_create_engagement_requires_diagnostic_package_for_b2b(async_clien
     }
 
     response = await async_client.post("/engagements", headers=_auth_header(7008), json=payload)
-    assert response.status_code == 400
-    assert response.json() == {
-        "error_code": "DIAGNOSTIC_PACKAGE_REQUIRED",
-        "message": "Diagnostic package must be selected for B2B engagements",
-    }
+    assert response.status_code == 201
 
 
 @pytest.mark.asyncio
@@ -172,7 +170,7 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
             metsights_engagement_id=None,
             organization_id=1,
             engagement_code="CODE1",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="BLR",
@@ -190,7 +188,7 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
             metsights_engagement_id=None,
             organization_id=2,
             engagement_code="CODE2",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="DEL",
@@ -235,7 +233,7 @@ async def test_get_engagement_details_returns_row(async_client, test_db_session)
             metsights_engagement_id=None,
             organization_id=1,
             engagement_code="CODE3",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="BLR",
@@ -271,7 +269,7 @@ async def test_update_engagement_updates_fields(async_client, test_db_session):
             metsights_engagement_id=None,
             organization_id=1,
             engagement_code="CODE4",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="BLR",
@@ -287,7 +285,7 @@ async def test_update_engagement_updates_fields(async_client, test_db_session):
     payload = {
         "engagement_name": "New",
         "organization_id": 1,
-        "engagement_type": "healthcamp",
+        "engagement_type": "bio_ai",
         "assessment_package_id": 1,
         "diagnostic_package_id": 1,
         "city": "Pune",
@@ -338,7 +336,7 @@ async def test_get_occupied_slots_by_engagement_code_returns_grouped_slots(async
             metsights_engagement_id=None,
             organization_id=1,
             engagement_code="ENG9101",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="BLR",
@@ -420,7 +418,7 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
             metsights_engagement_id=None,
             organization_id=None,
             engagement_code="B2C1",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="BLR",
@@ -440,7 +438,7 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
             metsights_engagement_id=None,
             organization_id=99,
             engagement_code="B2B1",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="BLR",
@@ -460,7 +458,7 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
             metsights_engagement_id=None,
             organization_id=None,
             engagement_code="B2C2",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="BLR",
@@ -526,7 +524,7 @@ async def test_patch_engagement_status_changes_status(async_client, test_db_sess
             metsights_engagement_id=None,
             organization_id=1,
             engagement_code="CODE5",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="BLR",

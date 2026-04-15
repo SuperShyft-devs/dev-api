@@ -9,7 +9,6 @@ import pytest
 from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
-from modules.diagnostics.models import DiagnosticPackage
 from modules.users.models import User
 from modules.engagements.models import Engagement, EngagementTimeSlot
 from modules.assessments.models import AssessmentPackage
@@ -24,18 +23,6 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
     """Seed a test employee."""
-    # Seed required diagnostic package for engagements (b2b requires non-null FK).
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=1,
-            reference_id="REF1",
-            package_name="Diag Package",
-            diagnostic_provider="test_provider",
-            status="active",
-            bookings_count=0,
-        )
-    )
-
     user = User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active")
     test_db_session.add(user)
     await test_db_session.flush()
@@ -98,7 +85,7 @@ async def test_get_public_participants_returns_empty_list_when_no_participants(a
             engagement_id=5001,
             organization_id=None,  # B2C engagement
             engagement_code="B2C5001",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=201,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -141,7 +128,7 @@ async def test_get_public_participants_returns_participants_from_b2c_engagements
             engagement_id=5002,
             organization_id=None,  # B2C engagement
             engagement_code="B2C5002",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=202,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -245,7 +232,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
             engagement_id=5003,
             organization_id=None,  # B2C engagement
             engagement_code="B2C5003",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=203,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -260,7 +247,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
             engagement_id=5004,
             organization_id=None,  # B2C engagement
             engagement_code="B2C5004",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=203,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -400,7 +387,7 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
             engagement_id=5005,
             organization_id=None,  # B2C engagement
             engagement_code="B2C5005",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=204,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -417,7 +404,7 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
             engagement_id=5006,
             organization_id=2001,  # B2B engagement
             engagement_code="B2B5006",
-            engagement_type="b2b",
+            engagement_type="doctor",
             assessment_package_id=204,
             diagnostic_package_id=1,
             slot_duration=20,
@@ -530,7 +517,7 @@ async def test_get_public_participants_paginates_results(async_client, test_db_s
             engagement_id=5007,
             organization_id=None,  # B2C engagement
             engagement_code="B2C5007",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=205,
             diagnostic_package_id=1,
             slot_duration=20,

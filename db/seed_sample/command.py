@@ -214,12 +214,12 @@ SAMPLE_DIAGNOSTIC_PACKAGES: tuple[SeedDiagnosticPackage, ...] = (
 )
 
 SAMPLE_ENGAGEMENTS: tuple[SeedEngagement, ...] = (
-    SeedEngagement(401, "Zenith Annual Healthcamp", "METS-401", 301, "HC-MUM-2026", "b2b", 11, 21, "Mumbai", 30, date(2026, 3, 10), date(2026, 3, 15), "active", 3),
-    SeedEngagement(402, "Apex Leadership Drive", "METS-402", 302, "FIN-BLR-2026", "b2b", 12, 22, "Hyderabad", 45, date(2026, 3, 20), date(2026, 3, 27), "active", 2),
-    SeedEngagement(403, "Nimbus Wellness Week", "METS-403", 303, "WELL-NMB-2026", "b2b", 13, 21, "Bengaluru", 30, date(2026, 2, 10), date(2026, 2, 14), "inactive", 1),
-    SeedEngagement(404, "Open Community Camp", "METS-404", None, "OPEN-CARE-2026", "healthcamp", 11, 1, "Mumbai", 20, date(2026, 3, 5), date(2026, 3, 25), "active", 2),
-    SeedEngagement(405, "City Pop-up Screening", "METS-405", None, "CITY-POP-2026", "healthcamp", 11, 1, "Hyderabad", 20, date(2026, 1, 15), date(2026, 1, 20), "inactive", 1),
-    SeedEngagement(406, "Legacy Recall Camp", "METS-406", 304, "LEG-RECALL-2026", "b2b", 11, 21, "Kolkata", 30, date(2025, 12, 1), date(2025, 12, 3), "archived", 0),
+    SeedEngagement(401, "Zenith Annual Healthcamp", "METS-401", 301, "HC-MUM-2026", "doctor", 11, 21, "Mumbai", 30, date(2026, 3, 10), date(2026, 3, 15), "active", 3),
+    SeedEngagement(402, "Apex Leadership Drive", "METS-402", 302, "FIN-BLR-2026", "doctor", 12, 22, "Hyderabad", 45, date(2026, 3, 20), date(2026, 3, 27), "active", 2),
+    SeedEngagement(403, "Nimbus Wellness Week", "METS-403", 303, "WELL-NMB-2026", "doctor", 13, 21, "Bengaluru", 30, date(2026, 2, 10), date(2026, 2, 14), "inactive", 1),
+    SeedEngagement(404, "Open Community Camp", "METS-404", None, "OPEN-CARE-2026", "bio_ai", 11, 1, "Mumbai", 20, date(2026, 3, 5), date(2026, 3, 25), "active", 2),
+    SeedEngagement(405, "City Pop-up Screening", "METS-405", None, "CITY-POP-2026", "bio_ai", 11, 1, "Hyderabad", 20, date(2026, 1, 15), date(2026, 1, 20), "inactive", 1),
+    SeedEngagement(406, "Legacy Recall Camp", "METS-406", 304, "LEG-RECALL-2026", "doctor", 11, 21, "Kolkata", 30, date(2025, 12, 1), date(2025, 12, 3), "archived", 0),
 )
 
 SAMPLE_CATEGORIES: tuple[SeedCategory, ...] = (

@@ -71,6 +71,7 @@ from modules.assessments.packages_router import router as assessment_packages_ro
 from modules.questionnaire.router import router as questionnaire_router
 from modules.reports.router import router as reports_router
 from modules.platform_settings.router import router as platform_settings_router
+from modules.bookings.router import router as bookings_router
 
 
 def _project_root() -> Path:
@@ -248,6 +249,7 @@ async def fastapi_app(test_db_session: AsyncSession, auth_service, otp_sender: C
     app.include_router(questionnaire_router)
     app.include_router(reports_router)
     app.include_router(platform_settings_router)
+    app.include_router(bookings_router)
 
     async def _get_test_db():
         yield test_db_session

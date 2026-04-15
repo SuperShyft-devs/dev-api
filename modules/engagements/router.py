@@ -22,7 +22,7 @@ from modules.engagements.schemas import (
     EngagementUpdateRequest,
     OnboardingAssistantsAddRequest,
 )
-from modules.engagements.service import EngagementsService, DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
+from modules.engagements.service import EngagementsService
 from modules.users.dependencies import get_users_service
 from modules.users.service import UsersService
 
@@ -98,10 +98,12 @@ async def list_engagements(
                 "metsights_engagement_id": engagement.metsights_engagement_id,
                 "organization_id": engagement.organization_id,
                 "engagement_code": engagement.engagement_code,
-                "engagement_type": engagement.engagement_type,
+                "engagement_type": engagement.engagement_type.value if engagement.engagement_type else None,
                 "assessment_package_id": engagement.assessment_package_id,
-                        "diagnostic_package_id": engagement.diagnostic_package_id or DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
+                "diagnostic_package_id": engagement.diagnostic_package_id,
                 "city": engagement.city,
+                "address": engagement.address,
+                "pincode": engagement.pincode,
                 "slot_duration": engagement.slot_duration,
                 "start_date": engagement.start_date,
                 "end_date": engagement.end_date,
@@ -172,10 +174,12 @@ async def get_engagement_details(
             "metsights_engagement_id": engagement.metsights_engagement_id,
             "organization_id": engagement.organization_id,
             "engagement_code": engagement.engagement_code,
-            "engagement_type": engagement.engagement_type,
+            "engagement_type": engagement.engagement_type.value if engagement.engagement_type else None,
             "assessment_package_id": engagement.assessment_package_id,
-            "diagnostic_package_id": engagement.diagnostic_package_id or DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
+            "diagnostic_package_id": engagement.diagnostic_package_id,
             "city": engagement.city,
+            "address": engagement.address,
+            "pincode": engagement.pincode,
             "slot_duration": engagement.slot_duration,
             "start_date": engagement.start_date,
             "end_date": engagement.end_date,

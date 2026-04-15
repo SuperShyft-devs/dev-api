@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Column, Date, ForeignKey, Integer, String, Time, UniqueConstraint, Index
+from sqlalchemy import Column, Date, Enum as SAEnum, ForeignKey, Integer, String, Time, UniqueConstraint, Index
 
 from db.base import Base
+from modules.engagements.enums import EngagementKind
+
+
+_engagement_kind = SAEnum(
+    EngagementKind,
+    name="engagement_kind",
+    native_enum=True,
+    values_callable=lambda obj: [e.value for e in obj],
+    validate_strings=True,
+    create_type=False,
+)
 
 
 class Engagement(Base):
@@ -17,10 +28,11 @@ class Engagement(Base):
     metsights_engagement_id = Column(String, nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.organization_id"), nullable=True)
     engagement_code = Column(String, nullable=False)
-    engagement_type = Column(String)
-    assessment_package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=False)
-    # Always required: B2C defaults to 1 in service, B2B must be selected by admin.
-    diagnostic_package_id = Column(Integer, ForeignKey("diagnostic_package.diagnostic_package_id"), nullable=False)
+    engagement_type = Column(_engagement_kind, nullable=True)
+    assessment_package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=True)
+    diagnostic_package_id = Column(Integer, ForeignKey("diagnostic_package.diagnostic_package_id"), nullable=True)
+    address = Column(String, nullable=True)
+    pincode = Column(String, nullable=True)
     city = Column(String)
     slot_duration = Column(Integer)
     start_date = Column(Date)

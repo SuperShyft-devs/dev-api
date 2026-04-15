@@ -42,7 +42,7 @@ async def test_add_onboarding_assistant_creates_assignment(test_db_session):
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (6001, 'Camp', 'ENG6001', 'healthcamp', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
+            "VALUES (6001, 'Camp', 'ENG6001', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
         )
     )
     await test_db_session.commit()
@@ -102,7 +102,7 @@ async def test_add_multiple_onboarding_assistants_to_one_engagement(test_db_sess
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (6002, 'Camp2', 'ENG6002', 'healthcamp', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
+            "VALUES (6002, 'Camp2', 'ENG6002', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
         )
     )
     await test_db_session.commit()
@@ -152,7 +152,7 @@ async def test_duplicate_assignment_prevented_by_unique_constraint(test_db_sessi
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (6003, 'Camp3', 'ENG6003', 'healthcamp', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
+            "VALUES (6003, 'Camp3', 'ENG6003', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
         )
     )
     await test_db_session.commit()
@@ -203,7 +203,7 @@ async def test_list_onboarding_assistants_returns_all_assignments(test_db_sessio
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (6004, 'Camp4', 'ENG6004', 'healthcamp', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
+            "VALUES (6004, 'Camp4', 'ENG6004', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
         )
     )
     await test_db_session.commit()
@@ -251,7 +251,7 @@ async def test_remove_onboarding_assistant_deletes_assignment(test_db_session):
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (6005, 'Camp5', 'ENG6005', 'healthcamp', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
+            "VALUES (6005, 'Camp5', 'ENG6005', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
         )
     )
     await test_db_session.commit()
@@ -300,7 +300,7 @@ async def test_remove_nonexistent_assignment_returns_false(test_db_session):
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (6006, 'Camp6', 'ENG6006', 'healthcamp', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
+            "VALUES (6006, 'Camp6', 'ENG6006', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
         )
     )
     await test_db_session.commit()
@@ -342,7 +342,7 @@ async def test_get_onboarding_assistant_assignment_returns_specific_assignment(t
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (6007, 'Camp7', 'ENG6007', 'healthcamp', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
+            "VALUES (6007, 'Camp7', 'ENG6007', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
         )
     )
     await test_db_session.commit()
@@ -409,7 +409,7 @@ async def test_b2c_engagement_created_without_onboarding_assistants(test_db_sess
             engagement_id=6008,
             engagement_name="B2C-Test",
             engagement_code="B2C6008",
-            engagement_type="healthcamp",
+            engagement_type="bio_ai",
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="Mumbai",

@@ -25,8 +25,11 @@ from modules.metsights.service import MetsightsService
 from modules.platform_settings.service import PlatformSettingsService
 from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
+from modules.engagements.enums import EngagementKind
 from modules.users.schemas import (
+    BookBioAiBatchRequest,
     BookBioAiRequest,
+    BookBloodTestBatchRequest,
     EmployeeCreateUserRequest,
     EmployeeUpdateUserRequest,
     EngagementUserOnboardRequest,
@@ -140,16 +143,20 @@ class UsersService:
 
         slots = []
         for row in rows:
-            engagement_type = (row.engagement_type or "").strip().lower()
-            if engagement_type != "b2b":
-                engagement_type = "b2c"
+            is_b2b = row.organization_id is not None
+            engagement_type = "b2b" if is_b2b else "b2c"
 
             slot_duration_minutes = int(row.slot_duration or 0)
             slot_start_dt = datetime.combine(row.engagement_date, row.slot_start_time)
             slot_end_dt = slot_start_dt + timedelta(minutes=slot_duration_minutes)
 
-            is_b2b = engagement_type == "b2b"
-            location_display = row.engagement_city if is_b2b else (row.user_address or row.user_city or "")
+            eng_addr = (getattr(row, "engagement_address", None) or "").strip()
+            if eng_addr:
+                location_display = eng_addr
+            elif is_b2b:
+                location_display = (row.engagement_city or "") or ""
+            else:
+                location_display = (row.user_address or row.user_city or "") or ""
 
             slots.append(
                 {
@@ -521,6 +528,300 @@ class UsersService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request") from exc
 
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    async def _get_user_bookable_by_primary(
+        self,
+        db: AsyncSession,
+        *,
+        primary_user_id: int,
+        target_user_id: int,
+    ) -> User:
+        """Return the target user row if the primary account may book on their behalf."""
+
+        if target_user_id == primary_user_id:
+            row = await self._repository.get_user_by_id(db, primary_user_id)
+            if row is None:
+                raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+            return row
+
+        row = await self._repository.get_user_by_id(db, target_user_id)
+        if row is None or row.parent_id != primary_user_id:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to book for this user",
+            )
+        return row
+
+    async def _book_bio_ai_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        blood_collection_date: date,
+        blood_collection_time_slot: str,
+        diagnostic_package_id: int | None,
+        address: str | None,
+        pincode: str | None,
+        city: str | None,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> UserOnboardResponse:
+        """Bio AI booking for one user (engagement + slot + assessment + Metsights when configured)."""
+
+        if self._engagements_service is None:
+            raise RuntimeError("Engagements service is required")
+        if self._platform_settings_service is None:
+            raise RuntimeError("Platform settings service is required")
+        if self._assessments_service is None:
+            raise RuntimeError("Assessments service is required")
+
+        await self._ensure_metsights_profile_id(db, user=user)
+
+        if not user.is_participant:
+            await self._repository.update_user_partial(db, user.user_id, {"is_participant": True})
+            user.is_participant = True
+
+        assessment_package_id, default_diagnostic_id = await self._platform_settings_service.resolve_b2c_default_package_ids(
+            db
+        )
+        resolved_diagnostic = diagnostic_package_id if diagnostic_package_id is not None else default_diagnostic_id
+        await self._platform_settings_service.ensure_active_b2c_packages(db, assessment_package_id, resolved_diagnostic)
+
+        eng_city = (city or "").strip() or user.city
+        engagement = await self._engagements_service.create_b2c_engagement(
+            db,
+            user_first_name=user.first_name,
+            engagement_date=blood_collection_date,
+            city=eng_city,
+            assessment_package_id=assessment_package_id,
+            diagnostic_package_id=resolved_diagnostic,
+            engagement_type=EngagementKind.bio_ai,
+            address=address,
+            pincode=pincode,
+        )
+
+        slot_start = self._parse_time_slot(blood_collection_time_slot)
+        time_slot = await self._engagements_service.enroll_user_in_engagement(
+            db,
+            engagement=engagement,
+            user_id=user.user_id,
+            engagement_date=blood_collection_date,
+            slot_start_time=slot_start,
+            increment_participant_count=False,
+        )
+
+        metsights_record_id: str | None = None
+        if (settings.METSIGHTS_API_KEY or "").strip():
+            fresh_user = await self._repository.get_user_by_id(db, user.user_id)
+            if fresh_user is None:
+                raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
+            profile_id = (fresh_user.metsights_profile_id or "").strip()
+            if not profile_id:
+                raise AppError(
+                    status_code=422,
+                    error_code="METSIGHTS_PROFILE_REQUIRED",
+                    message="Profile is incomplete for health record sync; provide first name, last name, phone, and gender",
+                )
+            if self._metsights_service is None:
+                raise RuntimeError("Metsights service is required")
+
+            package = await self._assessments_service.get_package_by_id(db, assessment_package_id)
+            assessment_type_code = (getattr(package, "assessment_type_code", None) or "").strip() if package else ""
+            if not assessment_type_code:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Assessment package is missing Metsights assessment type",
+                )
+            metsights_record_id = await self._metsights_service.create_record_for_profile(
+                profile_id=profile_id,
+                assessment_type_code=assessment_type_code,
+            )
+
+        ap_id = engagement.assessment_package_id
+        if ap_id is None:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment package is required for Bio AI booking")
+
+        assessment_instance = await self._assessments_service.ensure_instance_assigned(
+            db,
+            user_id=user.user_id,
+            engagement_id=engagement.engagement_id,
+            package_id=int(ap_id),
+            ip_address=ip_address,
+            user_agent=user_agent,
+            endpoint=endpoint,
+            metsights_record_id=metsights_record_id,
+        )
+
+        if self._audit_service is None:
+            raise RuntimeError("Audit service is required")
+        await self._audit_service.log_event(
+            db,
+            action="USER_BOOK_BIO_AI",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user.user_id,
+            session_id=None,
+        )
+
+        return UserOnboardResponse(
+            user_id=user.user_id,
+            created=False,
+            is_participant=True,
+            engagement_id=engagement.engagement_id,
+            engagement_code=engagement.engagement_code,
+            time_slot_id=time_slot.time_slot_id,
+            assessment_instance_id=assessment_instance.assessment_instance_id,
+            metsights_record_id=assessment_instance.metsights_record_id,
+        )
+
+    async def _book_blood_test_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        blood_collection_date: date,
+        blood_collection_time_slot: str,
+        diagnostic_package_id: int,
+        address: str,
+        pincode: str,
+        city: str,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> UserOnboardResponse:
+        """Diagnostic-only booking: engagement + slot (no assessment instance, no Metsights)."""
+
+        if self._engagements_service is None:
+            raise RuntimeError("Engagements service is required")
+        if self._platform_settings_service is None:
+            raise RuntimeError("Platform settings service is required")
+
+        if not user.is_participant:
+            await self._repository.update_user_partial(db, user.user_id, {"is_participant": True})
+            user.is_participant = True
+
+        await self._platform_settings_service.ensure_active_diagnostic_package(db, diagnostic_package_id)
+
+        engagement = await self._engagements_service.create_b2c_engagement(
+            db,
+            user_first_name=user.first_name,
+            engagement_date=blood_collection_date,
+            city=city,
+            assessment_package_id=None,
+            diagnostic_package_id=diagnostic_package_id,
+            engagement_type=EngagementKind.diagnostic,
+            address=address,
+            pincode=pincode,
+        )
+
+        slot_start = self._parse_time_slot(blood_collection_time_slot)
+        time_slot = await self._engagements_service.enroll_user_in_engagement(
+            db,
+            engagement=engagement,
+            user_id=user.user_id,
+            engagement_date=blood_collection_date,
+            slot_start_time=slot_start,
+            increment_participant_count=False,
+        )
+
+        if self._audit_service is None:
+            raise RuntimeError("Audit service is required")
+        await self._audit_service.log_event(
+            db,
+            action="USER_BOOK_BLOOD_TEST",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user.user_id,
+            session_id=None,
+        )
+
+        return UserOnboardResponse(
+            user_id=user.user_id,
+            created=False,
+            is_participant=True,
+            engagement_id=engagement.engagement_id,
+            engagement_code=engagement.engagement_code,
+            time_slot_id=time_slot.time_slot_id,
+            assessment_instance_id=None,
+            metsights_record_id=None,
+        )
+
+    async def book_bio_ai_batch_for_primary(
+        self,
+        db: AsyncSession,
+        *,
+        actor: User,
+        payload: BookBioAiBatchRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> list[UserOnboardResponse]:
+        if actor.parent_id is not None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="Batch booking is only available for primary accounts",
+            )
+        results: list[UserOnboardResponse] = []
+        for m in payload.members:
+            target = await self._get_user_bookable_by_primary(db, primary_user_id=actor.user_id, target_user_id=m.user_id)
+            results.append(
+                await self._book_bio_ai_for_user(
+                    db,
+                    user=target,
+                    blood_collection_date=m.blood_collection_date,
+                    blood_collection_time_slot=m.blood_collection_time_slot,
+                    diagnostic_package_id=m.diagnostic_package_id,
+                    address=m.address,
+                    pincode=m.pincode,
+                    city=m.city,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    endpoint=endpoint,
+                )
+            )
+        return results
+
+    async def book_blood_test_batch_for_primary(
+        self,
+        db: AsyncSession,
+        *,
+        actor: User,
+        payload: BookBloodTestBatchRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> list[UserOnboardResponse]:
+        if actor.parent_id is not None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="Batch booking is only available for primary accounts",
+            )
+        results: list[UserOnboardResponse] = []
+        for m in payload.members:
+            target = await self._get_user_bookable_by_primary(db, primary_user_id=actor.user_id, target_user_id=m.user_id)
+            results.append(
+                await self._book_blood_test_for_user(
+                    db,
+                    user=target,
+                    blood_collection_date=m.blood_collection_date,
+                    blood_collection_time_slot=m.blood_collection_time_slot,
+                    diagnostic_package_id=m.diagnostic_package_id,
+                    address=m.address,
+                    pincode=m.pincode,
+                    city=m.city,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    endpoint=endpoint,
+                )
+            )
+        return results
 
     def _create_metsights_profile(self, user: User) -> None:
         """Legacy placeholder.
@@ -923,9 +1224,12 @@ class UsersService:
             db,
             user_first_name=user.first_name,
             engagement_date=payload.blood_collection_date,
-            city=user.city,
+            city=payload.city or user.city,
             assessment_package_id=assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
+            engagement_type=EngagementKind.bio_ai,
+            address=payload.address,
+            pincode=payload.pincode,
         )
 
         # Enroll the user by booking a time slot.
@@ -1015,108 +1319,18 @@ class UsersService:
     ) -> UserOnboardResponse:
         """B2C Bio AI booking for an existing JWT user (new engagement + slot + assessment instance)."""
 
-        if self._engagements_service is None:
-            raise RuntimeError("Engagements service is required")
-        if self._platform_settings_service is None:
-            raise RuntimeError("Platform settings service is required")
-        if self._assessments_service is None:
-            raise RuntimeError("Assessments service is required")
-
-        await self._ensure_metsights_profile_id(db, user=user)
-
-        if not user.is_participant:
-            await self._repository.update_user_partial(db, user.user_id, {"is_participant": True})
-            user.is_participant = True
-
-        assessment_package_id, default_diagnostic_id = await self._platform_settings_service.resolve_b2c_default_package_ids(
-            db
-        )
-        diagnostic_package_id = (
-            payload.diagnostic_package_id if payload.diagnostic_package_id is not None else default_diagnostic_id
-        )
-        await self._platform_settings_service.ensure_active_b2c_packages(
-            db, assessment_package_id, diagnostic_package_id
-        )
-
-        engagement = await self._engagements_service.create_b2c_engagement(
+        return await self._book_bio_ai_for_user(
             db,
-            user_first_name=user.first_name,
-            engagement_date=payload.blood_collection_date,
-            city=user.city,
-            assessment_package_id=assessment_package_id,
-            diagnostic_package_id=diagnostic_package_id,
-        )
-
-        slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
-        time_slot = await self._engagements_service.enroll_user_in_engagement(
-            db,
-            engagement=engagement,
-            user_id=user.user_id,
-            engagement_date=payload.blood_collection_date,
-            slot_start_time=slot_start,
-            increment_participant_count=False,
-        )
-
-        metsights_record_id: str | None = None
-        if (settings.METSIGHTS_API_KEY or "").strip():
-            fresh_user = await self._repository.get_user_by_id(db, user.user_id)
-            if fresh_user is None:
-                raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
-            profile_id = (fresh_user.metsights_profile_id or "").strip()
-            if not profile_id:
-                raise AppError(
-                    status_code=422,
-                    error_code="METSIGHTS_PROFILE_REQUIRED",
-                    message="Profile is incomplete for health record sync; provide first name, last name, phone, and gender",
-                )
-            if self._metsights_service is None:
-                raise RuntimeError("Metsights service is required")
-
-            package = await self._assessments_service.get_package_by_id(db, assessment_package_id)
-            assessment_type_code = (getattr(package, "assessment_type_code", None) or "").strip() if package else ""
-            if not assessment_type_code:
-                raise AppError(
-                    status_code=422,
-                    error_code="INVALID_STATE",
-                    message="Assessment package is missing Metsights assessment type",
-                )
-            metsights_record_id = await self._metsights_service.create_record_for_profile(
-                profile_id=profile_id,
-                assessment_type_code=assessment_type_code,
-            )
-
-        assessment_instance = await self._assessments_service.ensure_instance_assigned(
-            db,
-            user_id=user.user_id,
-            engagement_id=engagement.engagement_id,
-            package_id=engagement.assessment_package_id,
+            user=user,
+            blood_collection_date=payload.blood_collection_date,
+            blood_collection_time_slot=payload.blood_collection_time_slot,
+            diagnostic_package_id=payload.diagnostic_package_id,
+            address=payload.address,
+            pincode=payload.pincode,
+            city=payload.city,
             ip_address=ip_address,
             user_agent=user_agent,
             endpoint=endpoint,
-            metsights_record_id=metsights_record_id,
-        )
-
-        if self._audit_service is None:
-            raise RuntimeError("Audit service is required")
-        await self._audit_service.log_event(
-            db,
-            action="USER_BOOK_BIO_AI",
-            endpoint=endpoint,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            user_id=user.user_id,
-            session_id=None,
-        )
-
-        return UserOnboardResponse(
-            user_id=user.user_id,
-            created=False,
-            is_participant=True,
-            engagement_id=engagement.engagement_id,
-            engagement_code=engagement.engagement_code,
-            time_slot_id=time_slot.time_slot_id,
-            assessment_instance_id=assessment_instance.assessment_instance_id,
-            metsights_record_id=assessment_instance.metsights_record_id,
         )
 
     async def onboard_user_for_engagement(
