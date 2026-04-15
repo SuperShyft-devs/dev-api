@@ -25,7 +25,7 @@ from modules.metsights.service import MetsightsService
 from modules.platform_settings.service import PlatformSettingsService
 from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
-from modules.engagements.enums import EngagementKind
+from modules.engagements.models import EngagementKind
 from modules.users.schemas import (
     BookBioAiBatchRequest,
     BookBioAiRequest,

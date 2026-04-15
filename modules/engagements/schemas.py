@@ -8,7 +8,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from modules.checklists.schemas import ChecklistReadiness
-from modules.engagements.enums import EngagementKind
+from modules.engagements.models import EngagementKind
 
 
 class EngagementCreateRequest(BaseModel):

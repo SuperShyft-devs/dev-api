@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+import enum
+
 from sqlalchemy import Column, Date, Enum as SAEnum, ForeignKey, Integer, String, Time, UniqueConstraint, Index
 
 from db.base import Base
-from modules.engagements.enums import EngagementKind
+
+
+class EngagementKind(str, enum.Enum):
+    """PostgreSQL enum `engagement_kind` / column `engagements.engagement_type`."""
+
+    bio_ai = "bio_ai"
+    diagnostic = "diagnostic"
+    doctor = "doctor"
+    nutritionist = "nutritionist"
 
 
 _engagement_kind = SAEnum(

@@ -19,8 +19,7 @@ from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.checklists.schemas import ChecklistReadiness
 from modules.employee.service import EmployeeContext
-from modules.engagements.enums import EngagementKind
-from modules.engagements.models import Engagement, EngagementTimeSlot
+from modules.engagements.models import Engagement, EngagementKind, EngagementTimeSlot
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.schemas import EngagementCreateRequest, EngagementUpdateRequest
 from modules.organizations.repository import OrganizationsRepository

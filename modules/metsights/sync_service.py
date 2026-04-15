@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.diagnostics.models import DiagnosticPackage
 from modules.assessments.service import AssessmentsService
-from modules.engagements.enums import EngagementKind
+from modules.engagements.models import EngagementKind
 from modules.engagements.service import EngagementsService
 from modules.metsights.service import MetsightsService
 from modules.platform_settings.service import PlatformSettingsService
