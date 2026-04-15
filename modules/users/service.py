@@ -809,9 +809,6 @@ class UsersService:
             if await self._is_protected_employee_user(db, candidate_user_id):
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="User cannot be deleted")
 
-            if await self._repository.get_employee_by_user_id(db, candidate_user_id) is not None:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Employee user cannot be deleted")
-
         await self._repository.delete_user_related_data(db, user_ids_to_delete)
         deleted_count = await self._repository.delete_users_by_ids(db, user_ids_to_delete)
 

@@ -5,13 +5,15 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
+from sqlalchemy import select
 
 from core.config import settings
 from core.security import create_jwt_token
 from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance
 from modules.auth.models import AuthOtpSession, AuthToken
 from modules.employee.models import Employee
-from modules.engagements.models import Engagement, EngagementTimeSlot
+from modules.engagements.models import Engagement, EngagementTimeSlot, OnboardingAssistantAssignment
+from modules.organizations.models import Organization
 from modules.payments.models import Booking, Order, Payment
 from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireResponse
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
@@ -351,3 +353,69 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     assert await test_db_session.get(Order, 9971) is None
     assert await test_db_session.get(Payment, 9972) is None
     assert await test_db_session.get(SupportTicket, 9973) is None
+
+
+@pytest.mark.asyncio
+async def test_employee_delete_user_removes_employee_row_org_refs_and_onboarding(async_client, test_db_session):
+    """Deleting a user who is also an employee clears employee FKs and the employee row."""
+    actor_user_id = 99020
+    target_user_id = 99071
+    engagement_id = 9810
+    org_id = 88110
+    target_employee_id = 19701
+
+    test_db_session.add(User(age=30, user_id=actor_user_id, phone="9902000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=19120, user_id=actor_user_id, role="admin", status="active"))
+
+    test_db_session.add(User(age=30, user_id=target_user_id, phone="9907100000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=target_employee_id, user_id=target_user_id, role="ops", status="active"))
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id,
+            engagement_code="ENG9810",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            status="active",
+        )
+    )
+    test_db_session.add(
+        Organization(
+            organization_id=org_id,
+            name="DelEmpOrg",
+            organization_type="corporate",
+            status="active",
+            bd_employee_id=target_employee_id,
+            created_employee_id=target_employee_id,
+            updated_employee_id=target_employee_id,
+        )
+    )
+    test_db_session.add(
+        OnboardingAssistantAssignment(
+            onboarding_assistant_id=99801,
+            employee_id=target_employee_id,
+            engagement_id=engagement_id,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.delete(f"/users/{target_user_id}", headers=_auth_header(actor_user_id))
+    assert response.status_code == 200
+
+    assert await test_db_session.get(User, target_user_id) is None
+    assert await test_db_session.get(Employee, target_employee_id) is None
+
+    remaining = await test_db_session.get(Organization, org_id)
+    assert remaining is not None
+    assert remaining.bd_employee_id is None
+    assert remaining.created_employee_id is None
+    assert remaining.updated_employee_id is None
+
+    rows = (
+        await test_db_session.execute(
+            select(OnboardingAssistantAssignment).where(OnboardingAssistantAssignment.employee_id == target_employee_id)
+        )
+    ).scalars().all()
+    assert rows == []

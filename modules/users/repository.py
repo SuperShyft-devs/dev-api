@@ -9,7 +9,7 @@ from typing import Optional
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -405,6 +405,28 @@ class UsersRepository:
                     )
                 )
                 await db.execute(delete(Engagement).where(Engagement.engagement_id.in_(orphan_engagement_ids)))
+
+        # Employee rows reference users; organizations and onboarding assignments reference employee.
+        employee_ids_subq = select(Employee.employee_id).where(Employee.user_id.in_(user_ids))
+        await db.execute(
+            delete(OnboardingAssistantAssignment).where(OnboardingAssistantAssignment.employee_id.in_(employee_ids_subq))
+        )
+        await db.execute(
+            update(Organization)
+            .where(Organization.bd_employee_id.in_(employee_ids_subq))
+            .values(bd_employee_id=None)
+        )
+        await db.execute(
+            update(Organization)
+            .where(Organization.created_employee_id.in_(employee_ids_subq))
+            .values(created_employee_id=None)
+        )
+        await db.execute(
+            update(Organization)
+            .where(Organization.updated_employee_id.in_(employee_ids_subq))
+            .values(updated_employee_id=None)
+        )
+        await db.execute(delete(Employee).where(Employee.user_id.in_(user_ids)))
 
     async def delete_users_by_ids(self, db: AsyncSession, user_ids: list[int]) -> int:
         if not user_ids:
