@@ -26,12 +26,16 @@ class UploadsService:
         self._media_base_url = settings.MEDIA_BASE_URL.rstrip("/")
         self._user_max_bytes = settings.USER_PROFILE_PHOTO_MAX_MB * 1024 * 1024
         self._org_max_bytes = settings.ORG_LOGO_MAX_MB * 1024 * 1024
+        self._expert_max_bytes = settings.EXPERT_PROFILE_PHOTO_MAX_MB * 1024 * 1024
 
     async def save_user_profile_photo(self, file: UploadFile) -> str:
         return await self._save_image(file, folder="users", max_bytes=self._user_max_bytes)
 
     async def save_organization_logo(self, file: UploadFile) -> str:
         return await self._save_image(file, folder="organizations", max_bytes=self._org_max_bytes)
+
+    async def save_expert_profile_photo(self, file: UploadFile) -> str:
+        return await self._save_image(file, folder="experts", max_bytes=self._expert_max_bytes)
 
     async def _save_image(self, file: UploadFile, *, folder: str, max_bytes: int) -> str:
         content_type = (file.content_type or "").lower().strip()

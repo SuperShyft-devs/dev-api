@@ -30,3 +30,4 @@ from modules.checklists import models as _checklists_models  # noqa: F401, E402
 from modules.reports import models as _reports_models  # noqa: F401, E402
 from modules.platform_settings import models as _platform_settings_models  # noqa: F401, E402
 from modules.payments import models as _payments_models  # noqa: F401, E402
+from modules.experts import models as _experts_models  # noqa: F401, E402

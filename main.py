@@ -23,6 +23,7 @@ from modules.reports.router import router as reports_router
 from modules.platform_settings.router import router as platform_settings_router
 from modules.payments.routes import router as payments_router
 from modules.bookings.router import router as bookings_router
+from modules.experts.router import router as experts_router
 
 # Configure logging
 configure_logging()
@@ -64,6 +65,7 @@ app.include_router(reports_router)
 app.include_router(platform_settings_router)
 app.include_router(payments_router)
 app.include_router(bookings_router)
+app.include_router(experts_router)
 
 _payment_test_dir = Path(__file__).resolve().parent / "static" / "payment-test"
 if _payment_test_dir.is_dir():

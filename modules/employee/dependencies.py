@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.dependencies import get_current_user, get_current_user_bearer_or_query
+from core.dependencies import authenticate_bearer_user, get_current_user, get_current_user_bearer_or_query
 from core.exceptions import AppError
 from db.session import get_db
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext, EmployeeService
+
+
+_optional_http_bearer = HTTPBearer(auto_error=False)
 
 
 def get_employee_service() -> EmployeeService:
@@ -62,3 +66,22 @@ async def get_current_employee_bearer_or_query(
     """Active employee context; JWT via Authorization header or ?access_token= (for browser downloads)."""
 
     return await employee_service.get_active_employee_by_user_id(db, current_user.user_id)
+
+
+async def get_optional_employee_if_authenticated(
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_optional_http_bearer),
+    employee_service: EmployeeService = Depends(get_employee_service),
+) -> EmployeeContext | None:
+    """Bearer optional: active employee if token belongs to an employee, else None (no 401)."""
+
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        return None
+    try:
+        user = await authenticate_bearer_user(db, credentials, access_token=None)
+    except AppError:
+        return None
+    try:
+        return await employee_service.get_active_employee_by_user_id(db, user.user_id)
+    except AppError:
+        return None

@@ -71,6 +71,7 @@ class Settings:
     MEDIA_BASE_URL: str = os.getenv("MEDIA_BASE_URL", "http://localhost:8000/media")
     USER_PROFILE_PHOTO_MAX_MB: int = int(os.getenv("USER_PROFILE_PHOTO_MAX_MB", "2"))
     ORG_LOGO_MAX_MB: int = int(os.getenv("ORG_LOGO_MAX_MB", "5"))
+    EXPERT_PROFILE_PHOTO_MAX_MB: int = int(os.getenv("EXPERT_PROFILE_PHOTO_MAX_MB", "2"))
 
     # Metsights integration settings
     METSIGHTS_BASE_URL: str = os.getenv("METSIGHTS_BASE_URL", "https://api.metsights.com")
