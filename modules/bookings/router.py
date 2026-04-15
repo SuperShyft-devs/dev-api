@@ -42,7 +42,7 @@ async def book_bio_ai_batch(
         endpoint=str(request.url.path),
     )
     await db.commit()
-    return success_response({"results": [r.model_dump() for r in results]})
+    return success_response({"results": [r.model_dump(exclude_none=True) for r in results]})
 
 
 @router.post("/blood-test")
@@ -62,4 +62,4 @@ async def book_blood_test_batch(
         endpoint=str(request.url.path),
     )
     await db.commit()
-    return success_response({"results": [r.model_dump() for r in results]})
+    return success_response({"results": [r.model_dump(exclude_none=True) for r in results]})

@@ -284,8 +284,8 @@ async def test_book_blood_test_batch_no_assessment_instance(async_client, test_d
     response = await async_client.post("/book/blood-test", headers=_auth_header(920030), json=payload)
     assert response.status_code == 200
     row = response.json()["data"]["results"][0]
-    assert row["assessment_instance_id"] is None
-    assert row["metsights_record_id"] is None
+    assert "assessment_instance_id" not in row
+    assert "metsights_record_id" not in row
     assert row["engagement_id"] is not None
 
     eng = (
