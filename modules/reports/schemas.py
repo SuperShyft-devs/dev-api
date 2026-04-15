@@ -80,6 +80,11 @@ class RiskAnalysisListResponse(BaseModel):
     diseases: list[DiseaseListItem]
 
 
+class BioAiPdfResponse(BaseModel):
+    assessment_id: int
+    report_url: str
+
+
 class DiseaseDetailResponse(BaseModel):
     code: str
     name: str

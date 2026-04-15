@@ -99,6 +99,26 @@ async def get_blood_parameters_report(
     return success_response([group.model_dump() for group in blood_parameter_groups])
 
 
+@router.get("/{assessment_id}/bio-ai/pdf")
+async def get_bio_ai_pdf_report(
+    assessment_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    reports_service: ReportsService = Depends(get_reports_service),
+):
+    response = await reports_service.get_bio_ai_pdf_for_user(
+        db,
+        assessment_id=assessment_id,
+        user_id=user.user_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(response.model_dump())
+
+
 @router.get("/trends")
 async def get_blood_parameter_trends(
     blood_parameter: str,

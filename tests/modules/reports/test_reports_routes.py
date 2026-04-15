@@ -37,12 +37,14 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 
 class _FakeMetsightsService:
-    def __init__(self, payload, should_fail: bool = False, report_payload=None):
+    def __init__(self, payload, should_fail: bool = False, report_payload=None, pdf_payload=None):
         self.payload = payload
         self.should_fail = should_fail
         self.calls = 0
         self.report_payload = report_payload
         self.report_calls = 0
+        self.pdf_payload = pdf_payload
+        self.pdf_calls = 0
 
     async def get_blood_parameters(self, *, record_id: str):
         self.calls += 1
@@ -56,9 +58,20 @@ class _FakeMetsightsService:
             raise AssertionError("get_report was not expected in this test")
         return self.report_payload
 
+    async def get_report_pdf(self, *, record_id: str, assessment_type_code: str | None = None):
+        self.pdf_calls += 1
+        if self.pdf_payload is None:
+            raise AssertionError("get_report_pdf was not expected in this test")
+        if self.should_fail:
+            raise AssertionError("Metsights should not be called in this test")
+        return self.pdf_payload
+
 
 class _FailingMetsightsService:
     async def get_blood_parameters(self, *, record_id: str):
+        raise RuntimeError("simulated metsights failure")
+
+    async def get_report_pdf(self, *, record_id: str, assessment_type_code: str | None = None):
         raise RuntimeError("simulated metsights failure")
 
 
@@ -309,6 +322,193 @@ async def test_get_blood_parameters_requires_metsights_record_id(
         "error_code": "INVALID_STATE",
         "message": "Metsights record id is missing for this assessment",
     }
+
+
+@pytest.mark.asyncio
+async def test_get_bio_ai_pdf_returns_cached_without_metsights(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=98101,
+        user_id=38101,
+        engagement_id=48101,
+        record_id="PDFCACHED1",
+        assessment_type_code="2",
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=71001,
+            user_id=38101,
+            engagement_id=48101,
+            assessment_instance_id=98101,
+            blood_parameters={"haemoglobin": 13.0, "haemoglobin_unit": "g/dL"},
+            report_url="https://cdn.example.com/cached.pdf",
+        )
+    )
+    await test_db_session.commit()
+
+    fake_metsights = _FakeMetsightsService(payload={}, should_fail=True)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/98101/bio-ai/pdf", headers=_auth_header(38101))
+    assert response.status_code == 200
+    assert response.json()["data"] == {
+        "assessment_id": 98101,
+        "report_url": "https://cdn.example.com/cached.pdf",
+    }
+    assert fake_metsights.pdf_calls == 0
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_bio_ai_pdf_fetches_and_caches_on_miss(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=98102,
+        user_id=38102,
+        engagement_id=48102,
+        record_id="PDFMISS02",
+        assessment_type_code="2",
+    )
+    fake_metsights = _FakeMetsightsService(
+        payload={},
+        pdf_payload={"file": "https://cdn.metsights.com/reports/PDFMISS02.pdf"},
+    )
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    r1 = await async_client.get("/reports/98102/bio-ai/pdf", headers=_auth_header(38102))
+    assert r1.status_code == 200
+    assert r1.json()["data"]["report_url"] == "https://cdn.metsights.com/reports/PDFMISS02.pdf"
+    assert fake_metsights.pdf_calls == 1
+
+    r2 = await async_client.get("/reports/98102/bio-ai/pdf", headers=_auth_header(38102))
+    assert r2.status_code == 200
+    assert fake_metsights.pdf_calls == 1
+
+    saved = await test_db_session.execute(
+        select(IndividualHealthReport).where(IndividualHealthReport.assessment_instance_id == 98102)
+    )
+    report = saved.scalar_one_or_none()
+    assert report is not None
+    assert report.report_url == "https://cdn.metsights.com/reports/PDFMISS02.pdf"
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_bio_ai_pdf_requires_metsights_record_id(
+    async_client,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=98103,
+        user_id=38103,
+        engagement_id=48103,
+        record_id=None,
+        assessment_type_code="2",
+    )
+    response = await async_client.get("/reports/98103/bio-ai/pdf", headers=_auth_header(38103))
+    assert response.status_code == 422
+    assert response.json() == {
+        "error_code": "INVALID_STATE",
+        "message": "Metsights record id is missing for this assessment",
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_bio_ai_pdf_wrong_user_returns_404(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=98104,
+        user_id=38104,
+        engagement_id=48104,
+        record_id="PDFWRONG04",
+        assessment_type_code="2",
+    )
+    test_db_session.add(User(user_id=38114, phone="3811400000", age=30, gender="male", status="active"))
+    await test_db_session.commit()
+    fake_metsights = _FakeMetsightsService(
+        payload={},
+        pdf_payload={"file": "https://cdn.example.com/x.pdf"},
+    )
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/98104/bio-ai/pdf", headers=_auth_header(38114))
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "ASSESSMENT_NOT_FOUND"
+    assert fake_metsights.pdf_calls == 0
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_bio_ai_pdf_fitprint_fetches_pdf(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=98105,
+        user_id=38105,
+        engagement_id=48105,
+        record_id="FITPDF05",
+        package_code="MY_FITNESS_PRINT",
+        assessment_type_code="7",
+    )
+    fake_metsights = _FakeMetsightsService(
+        payload={},
+        pdf_payload={"file": "https://cdn.metsights.com/reports/fitness/FITPDF05.pdf"},
+    )
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/98105/bio-ai/pdf", headers=_auth_header(38105))
+    assert response.status_code == 200
+    assert response.json()["data"]["report_url"] == "https://cdn.metsights.com/reports/fitness/FITPDF05.pdf"
+    assert fake_metsights.pdf_calls == 1
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
 
 @pytest.mark.asyncio

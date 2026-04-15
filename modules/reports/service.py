@@ -20,6 +20,7 @@ from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.reports.repository import ReportsRepository
 from modules.questionnaire.healthy_habits_service import HealthyHabitsService
 from modules.reports.schemas import (
+    BioAiPdfResponse,
     BloodParameterGroupInReportResponse,
     BloodParameterTestInReportResponse,
     DiseaseDetailResponse,
@@ -147,6 +148,98 @@ class ReportsService:
             diagnostic_package_id=diagnostic_package_id,
             user_gender=normalized_gender,
         )
+
+    async def get_bio_ai_pdf_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_id: int,
+        user_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> BioAiPdfResponse:
+        row = await self._assessments_repository.get_instance_for_user_with_engagement(
+            db,
+            assessment_instance_id=assessment_id,
+            user_id=user_id,
+        )
+        if row is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+
+        assessment_instance, package, _engagement = row
+        if package is None:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Assessment package is missing",
+            )
+
+        existing_report = await self._repository.get_individual_report_by_assessment(
+            db,
+            assessment_instance_id=assessment_id,
+        )
+
+        cached = (existing_report.report_url if existing_report is not None else None) or ""
+        if cached.strip():
+            await self._require_audit_service().log_event(
+                db,
+                action="USER_FETCH_BIO_AI_PDF_REPORT",
+                endpoint=endpoint,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                user_id=user_id,
+                session_id=None,
+            )
+            return BioAiPdfResponse(assessment_id=assessment_id, report_url=cached.strip())
+
+        record_id = (assessment_instance.metsights_record_id or "").strip()
+        if not record_id:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Metsights record id is missing for this assessment",
+            )
+
+        pdf_payload = await self._metsights_service.get_report_pdf(
+            record_id=record_id,
+            assessment_type_code=package.assessment_type_code,
+        )
+        pdf_dict = pdf_payload if isinstance(pdf_payload, dict) else {}
+        file_url = pdf_dict.get("file")
+        if not isinstance(file_url, str) or not file_url.strip():
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Metsights did not return a PDF URL for this record",
+            )
+        report_url = file_url.strip()
+
+        if existing_report is None:
+            report = IndividualHealthReport(
+                user_id=assessment_instance.user_id,
+                engagement_id=assessment_instance.engagement_id,
+                assessment_instance_id=assessment_instance.assessment_instance_id,
+                reports=None,
+                blood_parameters=None,
+                report_url=report_url,
+            )
+            await self._repository.create_individual_report(db, report)
+        else:
+            existing_report.report_url = report_url
+            await self._repository.update_individual_report(db, existing_report)
+
+        await self._require_audit_service().log_event(
+            db,
+            action="USER_FETCH_BIO_AI_PDF_REPORT",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id,
+            session_id=None,
+        )
+
+        return BioAiPdfResponse(assessment_id=assessment_id, report_url=report_url)
 
     @staticmethod
     def _top_healthy_profile_group_names(
