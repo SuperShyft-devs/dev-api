@@ -797,14 +797,24 @@ class UsersService:
     ) -> dict:
         self._ensure_employee_access(employee)
 
-        if employee.user_id == user_id:
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="You cannot delete your own account")
-
         user = await self._repository.get_user_by_id(db, user_id)
         if user is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
         user_ids_to_delete = await self._repository.list_descendant_user_ids(db, user_id)
+        if employee.user_id in user_ids_to_delete:
+            if employee.user_id == user_id:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="You cannot delete your own account",
+                )
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="You cannot delete this user: your account is in the same family tree and would be removed.",
+            )
+
         for candidate_user_id in user_ids_to_delete:
             if await self._is_protected_employee_user(db, candidate_user_id):
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="User cannot be deleted")

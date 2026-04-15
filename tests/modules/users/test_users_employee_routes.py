@@ -419,3 +419,33 @@ async def test_employee_delete_user_removes_employee_row_org_refs_and_onboarding
         )
     ).scalars().all()
     assert rows == []
+
+
+@pytest.mark.asyncio
+async def test_employee_delete_user_rejects_self_delete(async_client, test_db_session):
+    uid = 99202
+    test_db_session.add(User(age=30, user_id=uid, phone="9920200000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=19202, user_id=uid, role="admin", status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.delete(f"/users/{uid}", headers=_auth_header(uid))
+    assert response.status_code == 400
+    assert "own account" in (response.json().get("message") or "").lower()
+
+
+@pytest.mark.asyncio
+async def test_employee_delete_user_rejects_when_actor_in_deleted_subtree(async_client, test_db_session):
+    parent_id = 99230
+    child_id = 99231
+    test_db_session.add(User(age=30, user_id=parent_id, phone="9923000000", status="active"))
+    test_db_session.add(
+        User(age=30, user_id=child_id, phone="9923100000", status="active", parent_id=parent_id, relationship="child")
+    )
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=19231, user_id=child_id, role="admin", status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.delete(f"/users/{parent_id}", headers=_auth_header(child_id))
+    assert response.status_code == 400
+    assert "family tree" in (response.json().get("message") or "").lower()
