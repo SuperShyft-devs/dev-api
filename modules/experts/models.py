@@ -14,7 +14,7 @@ class Expert(Base):
     expert_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     expert_type = Column(String, nullable=False)
-    display_name = Column(String, nullable=False)
+    specialization = Column(String, nullable=False)
     profile_photo = Column(String, nullable=True)
     rating = Column(Numeric(3, 2), nullable=False, server_default="0")
     review_count = Column(Integer, nullable=False, server_default="0")

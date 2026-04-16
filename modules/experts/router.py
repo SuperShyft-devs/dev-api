@@ -48,7 +48,7 @@ def _expert_dict(expert) -> dict:
         "expert_id": expert.expert_id,
         "user_id": expert.user_id,
         "expert_type": expert.expert_type,
-        "display_name": expert.display_name,
+        "specialization": expert.specialization,
         "profile_photo": expert.profile_photo,
         "rating": _decimal_to_float(expert.rating),
         "review_count": expert.review_count,

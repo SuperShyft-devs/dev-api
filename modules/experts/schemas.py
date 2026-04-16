@@ -15,7 +15,7 @@ ConsultationModeLiteral = Literal["video", "voice", "chat"]
 class ExpertCreateRequest(BaseModel):
     user_id: int = Field(gt=0)
     expert_type: ExpertTypeLiteral
-    display_name: str = Field(min_length=1, max_length=200)
+    specialization: str = Field(min_length=1, max_length=200)
     profile_photo: Optional[str] = Field(default=None, max_length=500)
     experience_years: Optional[int] = Field(default=None, ge=0, le=80)
     qualifications: Optional[str] = Field(default=None, max_length=500)
@@ -41,7 +41,7 @@ class ExpertCreateRequest(BaseModel):
 class ExpertUpdateRequest(BaseModel):
     user_id: int = Field(gt=0)
     expert_type: ExpertTypeLiteral
-    display_name: str = Field(min_length=1, max_length=200)
+    specialization: str = Field(min_length=1, max_length=200)
     profile_photo: Optional[str] = Field(default=None, max_length=500)
     experience_years: Optional[int] = Field(default=None, ge=0, le=80)
     qualifications: Optional[str] = Field(default=None, max_length=500)

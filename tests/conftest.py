@@ -54,6 +54,7 @@ from modules.questionnaire import models as _questionnaire_models  # noqa: F401
 from modules.diagnostics import models as _diagnostics_models  # noqa: F401
 from modules.reports import models as _reports_models  # noqa: F401
 from modules.platform_settings import models as _platform_settings_models  # noqa: F401
+from modules.experts import models as _experts_models  # noqa: F401
 
 from core.config import settings
 from core.exceptions import add_exception_handlers
@@ -72,6 +73,7 @@ from modules.questionnaire.router import router as questionnaire_router
 from modules.reports.router import router as reports_router
 from modules.platform_settings.router import router as platform_settings_router
 from modules.bookings.router import router as bookings_router
+from modules.experts.router import router as experts_router
 
 
 def _project_root() -> Path:
@@ -250,6 +252,7 @@ async def fastapi_app(test_db_session: AsyncSession, auth_service, otp_sender: C
     app.include_router(reports_router)
     app.include_router(platform_settings_router)
     app.include_router(bookings_router)
+    app.include_router(experts_router)
 
     async def _get_test_db():
         yield test_db_session
@@ -331,6 +334,9 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
         await test_db_session.execute(text("DELETE FROM questionnaire_categories WHERE category_id > 5"))
         await test_db_session.execute(text("DELETE FROM user_preferences WHERE user_id NOT IN (1, 2)"))
     await test_db_session.execute(text("DELETE FROM organizations"))
+    await test_db_session.execute(text("DELETE FROM expert_reviews"))
+    await test_db_session.execute(text("DELETE FROM expert_expertise_tags"))
+    await test_db_session.execute(text("DELETE FROM experts"))
 
     if _use_isolated_test_db:
         await test_db_session.execute(text("DELETE FROM employee WHERE user_id NOT IN (1, 2)"))

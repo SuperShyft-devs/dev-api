@@ -124,7 +124,7 @@ class ExpertsService:
         expert = Expert(
             user_id=payload.user_id,
             expert_type=payload.expert_type,
-            display_name=payload.display_name.strip(),
+            specialization=payload.specialization.strip(),
             profile_photo=payload.profile_photo,
             experience_years=payload.experience_years,
             qualifications=payload.qualifications,
@@ -169,7 +169,7 @@ class ExpertsService:
 
         expert.user_id = payload.user_id
         expert.expert_type = payload.expert_type
-        expert.display_name = payload.display_name.strip()
+        expert.specialization = payload.specialization.strip()
         expert.profile_photo = payload.profile_photo
         expert.experience_years = payload.experience_years
         expert.qualifications = payload.qualifications
