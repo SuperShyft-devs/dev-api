@@ -29,7 +29,7 @@ def get_assessment_packages_service() -> AssessmentPackagesService:
 
 
 def get_assessment_package_categories_service() -> AssessmentPackageCategoriesService:
-    """Service used by employee-only assessment package category routes."""
+    """Service used by assessment package category routes (employee) and user GET /assessments/{id}/status."""
 
     audit_service = AuditService(AuditRepository())
 

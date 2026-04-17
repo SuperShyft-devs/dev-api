@@ -115,26 +115,26 @@ class AssessmentPackageCategoriesService:
             )
         return categories
 
-    async def list_categories_for_package_for_me(
+    async def list_category_completion_for_assessment_instance(
         self,
         db: AsyncSession,
         *,
         user_id: int,
-        package_id: int,
+        assessment_instance_id: int,
     ) -> list[dict]:
-        package_id = _normalize_int(package_id)
+        """Package categories for the instance's package, with per-category complete/incomplete for that instance."""
+        assessment_instance_id = _normalize_int(assessment_instance_id)
 
-        package = await self._repository.get_package_by_id(db, package_id=package_id)
-        if package is None:
-            raise AppError(status_code=404, error_code="ASSESSMENT_PACKAGE_NOT_FOUND", message="Package does not exist")
-
-        assessment_instance = await self._repository.get_latest_instance_for_user_package(
+        row = await self._repository.get_instance_for_user(
             db,
+            assessment_instance_id=assessment_instance_id,
             user_id=user_id,
-            package_id=package_id,
         )
-        if assessment_instance is None:
+        if row is None:
             raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+
+        instance, _package = row
+        package_id = int(instance.package_id)
 
         links = await self._repository.list_package_categories(db, package_id=package_id)
         categories: list[dict] = []
@@ -144,7 +144,7 @@ class AssessmentPackageCategoriesService:
                 continue
             progress = await self._repository.get_category_progress(
                 db,
-                assessment_instance_id=assessment_instance.assessment_instance_id,
+                assessment_instance_id=int(instance.assessment_instance_id),
                 category_id=category.category_id,
             )
             status = "incomplete"

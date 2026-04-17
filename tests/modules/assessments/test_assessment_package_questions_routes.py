@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
+from sqlalchemy import select
 
 from core.config import settings
 from core.security import create_jwt_token
@@ -31,6 +32,24 @@ async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1)
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
     await test_db_session.commit()
+
+
+async def _ensure_diagnostic_package_one(test_db_session):
+    result = await test_db_session.execute(
+        select(DiagnosticPackage).where(DiagnosticPackage.diagnostic_package_id == 1)
+    )
+    if result.scalar_one_or_none() is None:
+        test_db_session.add(
+            DiagnosticPackage(
+                diagnostic_package_id=1,
+                reference_id="REF1",
+                package_name="Diag Package",
+                diagnostic_provider="test_provider",
+                status="active",
+                bookings_count=0,
+            )
+        )
+        await test_db_session.flush()
 
 
 @pytest.mark.asyncio
@@ -70,7 +89,7 @@ async def test_list_package_categories_allows_employee(async_client, test_db_ses
 
 
 @pytest.mark.asyncio
-async def test_list_my_package_categories_returns_incomplete_by_default(async_client, test_db_session):
+async def test_get_assessment_categories_status_returns_incomplete_by_default(async_client, test_db_session):
     test_db_session.add(User(user_id=8103, age=30, phone="8103000000", status="active"))
     test_db_session.add(AssessmentPackage(package_id=6102, package_code="PKM", display_name="My Package", status="active"))
     test_db_session.add(
@@ -79,16 +98,7 @@ async def test_list_my_package_categories_returns_incomplete_by_default(async_cl
     await test_db_session.commit()
 
     test_db_session.add(AssessmentPackageCategory(package_id=6102, category_id=7102))
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=1,
-            reference_id="REF1",
-            package_name="Diag Package",
-            diagnostic_provider="test_provider",
-            status="active",
-            bookings_count=0,
-        )
-    )
+    await _ensure_diagnostic_package_one(test_db_session)
     test_db_session.add(
         Engagement(
             engagement_id=6200,
@@ -113,13 +123,13 @@ async def test_list_my_package_categories_returns_incomplete_by_default(async_cl
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/assessment-packages/me/6102/categories", headers=_auth_header(8103))
+    response = await async_client.get("/assessments/6201/status", headers=_auth_header(8103))
     assert response.status_code == 200
     assert response.json()["data"][0]["status"] == "incomplete"
 
 
 @pytest.mark.asyncio
-async def test_list_my_package_categories_returns_complete_from_progress(async_client, test_db_session):
+async def test_get_assessment_categories_status_returns_complete_from_progress(async_client, test_db_session):
     test_db_session.add(User(user_id=8104, age=30, phone="8104000000", status="active"))
     test_db_session.add(AssessmentPackage(package_id=6103, package_code="PKC", display_name="Complete Package", status="active"))
     test_db_session.add(
@@ -128,16 +138,7 @@ async def test_list_my_package_categories_returns_complete_from_progress(async_c
     await test_db_session.commit()
 
     test_db_session.add(AssessmentPackageCategory(package_id=6103, category_id=7103))
-    test_db_session.add(
-        DiagnosticPackage(
-            diagnostic_package_id=1,
-            reference_id="REF1",
-            package_name="Diag Package",
-            diagnostic_provider="test_provider",
-            status="active",
-            bookings_count=0,
-        )
-    )
+    await _ensure_diagnostic_package_one(test_db_session)
     test_db_session.add(
         Engagement(
             engagement_id=6300,
@@ -171,7 +172,7 @@ async def test_list_my_package_categories_returns_complete_from_progress(async_c
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/assessment-packages/me/6103/categories", headers=_auth_header(8104))
+    response = await async_client.get("/assessments/6202/status", headers=_auth_header(8104))
     assert response.status_code == 200
     assert response.json()["data"][0]["status"] == "complete"
 

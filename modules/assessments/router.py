@@ -9,7 +9,11 @@ from common.responses import success_response
 from core.exceptions import AppError
 from core.dependencies import get_current_user
 from db.session import get_db
-from modules.assessments.dependencies import get_assessments_service
+from modules.assessments.dependencies import (
+    get_assessment_package_categories_service,
+    get_assessments_service,
+)
+from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
 from modules.assessments.schemas import AssessmentStatusUpdateRequest, MetsightsRecordIdUpdate
 from modules.assessments.service import AssessmentsService
 from modules.employee.dependencies import get_current_employee, get_optional_employee
@@ -116,6 +120,22 @@ async def import_metsights_questionnaire_answers(
     )
     await db.commit()
     return success_response(result)
+
+
+@router.get("/{assessment_instance_id}/status")
+async def get_assessment_categories_status(
+    assessment_instance_id: int,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    categories_service: AssessmentPackageCategoriesService = Depends(get_assessment_package_categories_service),
+):
+    """Per-category completion for this assessment instance (same payload shape as the former package-scoped list)."""
+    data = await categories_service.list_category_completion_for_assessment_instance(
+        db,
+        user_id=user.user_id,
+        assessment_instance_id=assessment_instance_id,
+    )
+    return success_response(data)
 
 
 @router.patch("/{assessment_instance_id}/status")

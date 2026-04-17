@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
-from core.dependencies import get_current_user
 from core.exceptions import AppError
 from db.session import get_db
 from modules.assessments.dependencies import (
@@ -181,21 +180,6 @@ async def list_package_categories(
     data = await service.list_categories_for_package(
         db,
         employee=employee,
-        package_id=package_id,
-    )
-    return success_response(data)
-
-
-@router.get("/me/{package_id}/categories")
-async def list_my_package_categories(
-    package_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-    service: AssessmentPackageCategoriesService = Depends(get_assessment_package_categories_service),
-):
-    data = await service.list_categories_for_package_for_me(
-        db,
-        user_id=current_user.user_id,
         package_id=package_id,
     )
     return success_response(data)
