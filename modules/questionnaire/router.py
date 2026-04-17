@@ -418,8 +418,9 @@ async def reorder_category_questions(
 
 # User-facing endpoints for questionnaire responses
 
-@management_router.get("/{category_id}")
+@management_router.get("/{assessment_instance_id}/category/{category_id}")
 async def get_questionnaire(
+    assessment_instance_id: int,
     category_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -430,14 +431,16 @@ async def get_questionnaire(
     result = await service.get_questionnaire_for_user(
         db,
         user_id=current_user.user_id,
+        assessment_instance_id=assessment_instance_id,
         category_id=category_id,
     )
-    
+
     return success_response(result)
 
 
-@management_router.put("/{category_id}/responses")
+@management_router.put("/{assessment_instance_id}/category/{category_id}/responses")
 async def upsert_questionnaire_responses(
+    assessment_instance_id: int,
     category_id: int,
     payload: QuestionnaireResponsesUpsertRequest,
     request: Request,
@@ -446,24 +449,24 @@ async def upsert_questionnaire_responses(
     service: QuestionnaireService = Depends(get_questionnaire_user_service),
 ):
     """Create or update draft answers for a category questionnaire."""
-    # Convert schema to dict for service layer
     responses_data = [
         {"question_id": item.question_id, "answer": item.normalized_answer()}
         for item in payload.responses
     ]
-    
+
     await service.upsert_responses_for_user(
         db,
         user_id=current_user.user_id,
+        assessment_instance_id=assessment_instance_id,
         category_id=category_id,
         responses=responses_data,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
-    
+
     await db.commit()
-    
+
     return success_response({"message": "Responses saved successfully"})
 
 

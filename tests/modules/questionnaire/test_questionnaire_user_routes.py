@@ -143,13 +143,13 @@ async def test_list_category_questions_allows_user_and_returns_only_active(async
     assert data[0]["question_id"] == 8991
 
 
-# ==================== GET /questionnaire/{category_id} Tests ====================
+# ==================== GET /questionnaire/{assessment_instance_id}/category/{category_id} Tests ====================
 
 
 @pytest.mark.asyncio
 async def test_get_questionnaire_requires_auth(async_client):
     """Test that authentication is required."""
-    response = await async_client.get("/questionnaire/1")
+    response = await async_client.get("/questionnaire/1/category/1")
     assert response.status_code == 401
     assert response.json()["error_code"] == "AUTH_FAILED"
 
@@ -159,7 +159,7 @@ async def test_get_questionnaire_returns_404_when_assessment_not_found(async_cli
     """Test 404 when assessment instance does not exist."""
     await _seed_user(test_db_session, user_id=5001)
 
-    response = await async_client.get("/questionnaire/99999", headers=_auth_header(5001))
+    response = await async_client.get("/questionnaire/99999/category/1", headers=_auth_header(5001))
     assert response.status_code == 404
     assert response.json()["error_code"] == "ASSESSMENT_NOT_FOUND"
 
@@ -193,8 +193,8 @@ async def test_get_questionnaire_returns_404_when_category_not_mapped_for_user(a
     test_db_session.add(AssessmentPackageCategory(package_id=1001, category_id=7001))
     await test_db_session.commit()
 
-    # User 5002 has no mapped instance for this category
-    response = await async_client.get("/questionnaire/7001", headers=_auth_header(5002))
+    # User 5002 does not own assessment instance 2001
+    response = await async_client.get("/questionnaire/2001/category/7001", headers=_auth_header(5002))
     assert response.status_code == 404
     assert response.json()["error_code"] == "ASSESSMENT_NOT_FOUND"
 
@@ -222,12 +222,15 @@ async def test_get_questionnaire_returns_empty_questions_when_no_package_questio
     test_db_session.add(AssessmentPackageCategory(package_id=1002, category_id=7002))
     await test_db_session.commit()
 
-    response = await async_client.get("/questionnaire/7002", headers=_auth_header(5004))
+    response = await async_client.get("/questionnaire/2002/category/7002", headers=_auth_header(5004))
     assert response.status_code == 200
 
     data = response.json()["data"]
     assert data["assessment_instance_id"] == 2002
-    assert data["status"] == "active"
+    assert data["assessment_status"] == "active"
+    assert data["assessment_package"] == "Empty Package"
+    assert data["category"] == "Category 7002"
+    assert data["category_status"] == "active"
     assert data["questions"] == []
 
 
@@ -284,12 +287,15 @@ async def test_get_questionnaire_returns_questions_without_answers(async_client,
     test_db_session.add(instance)
     await test_db_session.commit()
 
-    response = await async_client.get("/questionnaire/7003", headers=_auth_header(5005))
+    response = await async_client.get("/questionnaire/2003/category/7003", headers=_auth_header(5005))
     assert response.status_code == 200
 
     data = response.json()["data"]
     assert data["assessment_instance_id"] == 2003
-    assert data["status"] == "active"
+    assert data["assessment_status"] == "active"
+    assert data["assessment_package"] == "Test Package"
+    assert data["category"] == "Category 7003"
+    assert data["category_status"] == "active"
     assert len(data["questions"]) == 2
 
     # Check first question
@@ -360,7 +366,7 @@ async def test_get_questionnaire_returns_questions_with_existing_answers(async_c
     test_db_session.add(response_row)
     await test_db_session.commit()
 
-    response = await async_client.get("/questionnaire/7004", headers=_auth_header(5006))
+    response = await async_client.get("/questionnaire/2004/category/7004", headers=_auth_header(5006))
     assert response.status_code == 200
 
     data = response.json()["data"]
@@ -415,7 +421,7 @@ async def test_get_questionnaire_skips_inactive_questions(async_client, test_db_
     test_db_session.add(instance)
     await test_db_session.commit()
 
-    response = await async_client.get("/questionnaire/7005", headers=_auth_header(5007))
+    response = await async_client.get("/questionnaire/2005/category/7005", headers=_auth_header(5007))
     assert response.status_code == 200
 
     data = response.json()["data"]
@@ -485,7 +491,7 @@ async def test_get_questionnaire_applies_parent_answer_visibility(async_client, 
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/questionnaire/7701", headers=_auth_header(5071))
+    response = await async_client.get("/questionnaire/2701/category/7701", headers=_auth_header(5071))
     assert response.status_code == 200
     questions = response.json()["data"]["questions"]
     by_id = {row["question_id"]: row for row in questions}
@@ -557,7 +563,7 @@ async def test_get_questionnaire_prefills_and_uses_preferences_for_visibility(as
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/questionnaire/7702", headers=_auth_header(5072))
+    response = await async_client.get("/questionnaire/2702/category/7702", headers=_auth_header(5072))
     assert response.status_code == 200
     questions = response.json()["data"]["questions"]
     by_id = {row["question_id"]: row for row in questions}
@@ -575,13 +581,13 @@ async def test_get_questionnaire_prefills_and_uses_preferences_for_visibility(as
     await test_db_session.commit()
 
 
-# ==================== PUT /questionnaire/{category_id}/responses Tests ====================
+# ==================== PUT /questionnaire/{assessment_instance_id}/category/{category_id}/responses Tests ====================
 
 
 @pytest.mark.asyncio
 async def test_upsert_responses_requires_auth(async_client):
     """Test that authentication is required."""
-    response = await async_client.put("/questionnaire/1/responses", json={"responses": []})
+    response = await async_client.put("/questionnaire/1/category/1/responses", json={"responses": []})
     assert response.status_code == 401
 
 
@@ -591,11 +597,11 @@ async def test_upsert_responses_validates_payload(async_client, test_db_session)
     await _seed_user(test_db_session, user_id=5008)
 
     # Empty responses array
-    response = await async_client.put("/questionnaire/1/responses", headers=_auth_header(5008), json={"responses": []})
+    response = await async_client.put("/questionnaire/1/category/1/responses", headers=_auth_header(5008), json={"responses": []})
     assert response.status_code == 400
 
     # Missing responses field
-    response = await async_client.put("/questionnaire/1/responses", headers=_auth_header(5008), json={})
+    response = await async_client.put("/questionnaire/1/category/1/responses", headers=_auth_header(5008), json={})
     assert response.status_code == 400
 
 
@@ -605,7 +611,7 @@ async def test_upsert_responses_returns_404_when_assessment_not_found(async_clie
     await _seed_user(test_db_session, user_id=5009)
 
     payload = {"responses": [{"question_id": 1, "answer": "test"}]}
-    response = await async_client.put("/questionnaire/99999/responses", headers=_auth_header(5009), json=payload)
+    response = await async_client.put("/questionnaire/99999/category/1/responses", headers=_auth_header(5009), json=payload)
     assert response.status_code == 404
 
 
@@ -632,7 +638,7 @@ async def test_upsert_responses_returns_404_when_category_not_mapped_for_user(as
     await test_db_session.commit()
 
     payload = {"responses": [{"question_id": 1, "answer": "test"}]}
-    response = await async_client.put("/questionnaire/7006/responses", headers=_auth_header(5010), json=payload)
+    response = await async_client.put("/questionnaire/2006/category/7006/responses", headers=_auth_header(5010), json=payload)
     assert response.status_code == 404
 
 
@@ -658,9 +664,48 @@ async def test_upsert_responses_returns_422_when_assessment_completed(async_clie
     await test_db_session.commit()
 
     payload = {"responses": [{"question_id": 1, "answer": "test"}]}
-    response = await async_client.put("/questionnaire/7007/responses", headers=_auth_header(5012), json=payload)
+    response = await async_client.put("/questionnaire/2007/category/7007/responses", headers=_auth_header(5012), json=payload)
     assert response.status_code == 422
     assert response.json()["error_code"] == "INVALID_STATE"
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_returns_422_when_assessment_not_active(async_client, test_db_session):
+    """Draft saves are rejected when assessment instance status is not active (and not completed)."""
+    await _seed_user(test_db_session, user_id=5030)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=1020, package_code="PKG_ON_HOLD", display_name="On Hold Package", status="active")
+    category = QuestionnaireCategory(category_id=7020, category_key="cat_7020", display_name="Category 7020", status="active")
+    test_db_session.add(package)
+    test_db_session.add(category)
+    await test_db_session.commit()
+    q1 = QuestionnaireDefinition(
+        question_id=3020,
+        question_key="q3020_on_hold",
+        question_text="Text question",
+        question_type="text",
+        status="active",
+    )
+    test_db_session.add(q1)
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=9990, category_id=7020, question_id=3020)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=1020, category_id=7020))
+    instance = AssessmentInstance(
+        assessment_instance_id=2020,
+        user_id=5030,
+        package_id=1020,
+        engagement_id=1,
+        status="on_hold",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    payload = {"responses": [{"question_id": 3020, "answer": "x"}]}
+    response = await async_client.put("/questionnaire/2020/category/7020/responses", headers=_auth_header(5030), json=payload)
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "INVALID_STATE"
+    assert response.json()["message"] == "Assessment is not active"
 
 
 @pytest.mark.asyncio
@@ -686,7 +731,7 @@ async def test_upsert_responses_returns_422_when_question_not_in_package(async_c
 
     # Try to answer a question that's not in the package
     payload = {"responses": [{"question_id": 99999, "answer": "test"}]}
-    response = await async_client.put("/questionnaire/7008/responses", headers=_auth_header(5013), json=payload)
+    response = await async_client.put("/questionnaire/2008/category/7008/responses", headers=_auth_header(5013), json=payload)
     assert response.status_code == 422
     assert "does not belong" in response.json()["message"]
 
@@ -725,7 +770,7 @@ async def test_upsert_responses_returns_422_when_question_inactive(async_client,
     await test_db_session.commit()
 
     payload = {"responses": [{"question_id": 3006, "answer": "test"}]}
-    response = await async_client.put("/questionnaire/7009/responses", headers=_auth_header(5014), json=payload)
+    response = await async_client.put("/questionnaire/2009/category/7009/responses", headers=_auth_header(5014), json=payload)
     assert response.status_code == 422
     assert "not available" in response.json()["message"]
 
@@ -790,7 +835,7 @@ async def test_upsert_responses_rejects_hidden_question(async_client, test_db_se
             {"question_id": 3706, "answer": 3},
         ]
     }
-    response = await async_client.put("/questionnaire/7703/responses", headers=_auth_header(5073), json=payload)
+    response = await async_client.put("/questionnaire/2703/category/7703/responses", headers=_auth_header(5073), json=payload)
     assert response.status_code == 422
     assert response.json()["message"] == "Question is not currently visible"
 
@@ -828,12 +873,12 @@ async def test_upsert_scale_response_requires_value_and_unit(async_client, test_
     await test_db_session.commit()
 
     invalid_payload = {"responses": [{"question_id": 3710, "answer": {"value": 180}}]}
-    invalid = await async_client.put("/questionnaire/7710/responses", headers=_auth_header(5074), json=invalid_payload)
+    invalid = await async_client.put("/questionnaire/2710/category/7710/responses", headers=_auth_header(5074), json=invalid_payload)
     assert invalid.status_code == 422
     assert "unit" in invalid.json()["message"].lower()
 
     valid_payload = {"responses": [{"question_id": 3710, "answer": {"value": 180, "unit": "cm"}}]}
-    valid = await async_client.put("/questionnaire/7710/responses", headers=_auth_header(5074), json=valid_payload)
+    valid = await async_client.put("/questionnaire/2710/category/7710/responses", headers=_auth_header(5074), json=valid_payload)
     assert valid.status_code == 200
 
 
@@ -869,7 +914,7 @@ async def test_upsert_scale_response_rejects_unknown_unit(async_client, test_db_
     await test_db_session.commit()
 
     payload = {"responses": [{"question_id": 3711, "answer": {"value": 72, "unit": "lb"}}]}
-    response = await async_client.put("/questionnaire/7711/responses", headers=_auth_header(5075), json=payload)
+    response = await async_client.put("/questionnaire/2711/category/7711/responses", headers=_auth_header(5075), json=payload)
     assert response.status_code == 422
     assert "not allowed" in response.json()["message"].lower()
 
@@ -921,7 +966,7 @@ async def test_upsert_responses_creates_new_responses(async_client, test_db_sess
             {"question_id": 3008, "answer": 42},
         ]
     }
-    response = await async_client.put("/questionnaire/7010/responses", headers=_auth_header(5015), json=payload)
+    response = await async_client.put("/questionnaire/2010/category/7010/responses", headers=_auth_header(5015), json=payload)
     assert response.status_code == 200
     assert "saved successfully" in response.json()["data"]["message"]
 
@@ -983,7 +1028,7 @@ async def test_upsert_responses_updates_existing_responses(async_client, test_db
 
     # Update the response
     payload = {"responses": [{"question_id": 3009, "answer": "New answer"}]}
-    response = await async_client.put("/questionnaire/7011/responses", headers=_auth_header(5016), json=payload)
+    response = await async_client.put("/questionnaire/2011/category/7011/responses", headers=_auth_header(5016), json=payload)
     assert response.status_code == 200
 
     # Verify response was updated

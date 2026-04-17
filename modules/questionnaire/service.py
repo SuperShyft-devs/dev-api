@@ -329,32 +329,51 @@ class QuestionnaireService:
                 answers_by_key[question_key] = answer
         return visibility
 
-    async def _resolve_instance_for_user_category(
+    async def _require_user_instance_category(
         self,
         db: AsyncSession,
         *,
         user_id: int,
+        assessment_instance_id: int,
         category_id: int,
     ):
+        """Return (instance, package) for a user-owned assessment that includes the category."""
         from modules.assessments.repository import AssessmentsRepository
 
         assessments_repo = AssessmentsRepository()
-        instances = await assessments_repo.list_instances_for_user_category(
+        row = await assessments_repo.get_instance_for_user(
             db,
+            assessment_instance_id=assessment_instance_id,
             user_id=user_id,
-            category_id=category_id,
         )
-        if not instances:
+        if row is None:
             raise AppError(
                 status_code=404,
                 error_code="ASSESSMENT_NOT_FOUND",
                 message="Assessment does not exist",
             )
+        instance, package = row
+        link = await assessments_repo.get_package_category_link(
+            db,
+            package_id=instance.package_id,
+            category_id=category_id,
+        )
+        if link is None:
+            raise AppError(
+                status_code=404,
+                error_code="ASSESSMENT_NOT_FOUND",
+                message="Assessment does not exist",
+            )
+        return instance, package
 
-        active = [row for row in instances if (row.status or "").lower() == "active"]
-        if active:
-            return active[0]
-        return instances[0]
+    @staticmethod
+    def _assessment_package_label(package) -> str:
+        if package is None:
+            return ""
+        dn = (package.display_name or "").strip()
+        if dn:
+            return dn
+        return (package.package_code or "").strip() or ""
 
     async def serialize_question_definition(self, db: AsyncSession, row: QuestionnaireDefinition) -> dict:
         return await self._serialize_question(db, row)
@@ -877,20 +896,43 @@ class QuestionnaireService:
         db: AsyncSession,
         *,
         user_id: int,
+        assessment_instance_id: int,
         category_id: int,
     ) -> dict:
         """Get category questionnaire questions and existing draft answers for a user."""
-        instance = await self._resolve_instance_for_user_category(
+        from modules.assessments.repository import AssessmentsRepository
+
+        instance, package = await self._require_user_instance_category(
             db,
             user_id=user_id,
+            assessment_instance_id=assessment_instance_id,
             category_id=category_id,
         )
+
+        category_row = await self._repository.get_category_by_id(db, category_id)
+        category_label = (category_row.display_name or "").strip() if category_row is not None else ""
+
+        assessments_repo = AssessmentsRepository()
+        progress = await assessments_repo.get_category_progress(
+            db,
+            assessment_instance_id=int(instance.assessment_instance_id),
+            category_id=category_id,
+        )
+        category_status = (progress.status or "active") if progress is not None else "active"
+
+        assessment_status = instance.status or "active"
+        meta_top = {
+            "assessment_instance_id": int(instance.assessment_instance_id),
+            "assessment_package": self._assessment_package_label(package),
+            "category": category_label,
+            "assessment_status": assessment_status,
+            "category_status": category_status,
+        }
 
         questions = await self._list_active_questions_for_category(db, category_id=category_id)
         if not questions:
             return {
-                "assessment_instance_id": instance.assessment_instance_id,
-                "status": instance.status or "active",
+                **meta_top,
                 "questions": [],
             }
 
@@ -959,8 +1001,7 @@ class QuestionnaireService:
             )
 
         return {
-            "assessment_instance_id": instance.assessment_instance_id,
-            "status": instance.status or "active",
+            **meta_top,
             "questions": questions_with_answers,
         }
 
@@ -969,6 +1010,7 @@ class QuestionnaireService:
         db: AsyncSession,
         *,
         user_id: int,
+        assessment_instance_id: int,
         category_id: int,
         responses: list[dict],
         ip_address: str,
@@ -977,30 +1019,36 @@ class QuestionnaireService:
     ) -> None:
         """Create or update draft answers for a user.
         
-        Security: Validates ownership and that assessment is not completed.
+        Security: Validates ownership and that the assessment instance is active.
         Business rules:
-        - Assessment must be active (not completed)
+        - Assessment instance status must be active
         - Questions must belong to the assessment package
         - Questions must be active
         - Responses are stored as JSON (no interpretation)
         """
         from modules.questionnaire.models import QuestionnaireResponse
 
-        instance = await self._resolve_instance_for_user_category(
+        instance, _package = await self._require_user_instance_category(
             db,
             user_id=user_id,
+            assessment_instance_id=assessment_instance_id,
             category_id=category_id,
         )
 
-        # Check if already completed
         current_status = (instance.status or "").lower()
         if current_status == "completed":
             raise AppError(
                 status_code=422,
                 error_code="INVALID_STATE",
-                message="Assessment is already completed"
+                message="Assessment is already completed",
             )
-        
+        if current_status != "active":
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Assessment is not active",
+            )
+
         category_question_rows = await self._repository.list_questions_by_category(db, category_id=category_id)
         valid_question_ids = {int(row.question_id) for row in category_question_rows}
         category_questions = await self._list_active_questions_for_category(db, category_id=category_id)
