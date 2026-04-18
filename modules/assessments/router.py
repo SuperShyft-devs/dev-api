@@ -102,6 +102,30 @@ async def get_assessment_details(
     )
 
 
+@router.post("/{assessment_instance_id}/submit")
+async def submit_assessment(
+    assessment_instance_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    assessments_service: AssessmentsService = Depends(get_assessments_service),
+    sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
+):
+    """Finalize questionnaire: push answers to Metsights (when applicable), mark responses and assessment completed."""
+
+    data = await assessments_service.submit_assessment_for_user(
+        db,
+        user_id=user.user_id,
+        assessment_instance_id=assessment_instance_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+        metsights_sync=sync_service,
+    )
+    await db.commit()
+    return success_response(data)
+
+
 @router.post("/{assessment_instance_id}/metsights/import-answers")
 async def import_metsights_questionnaire_answers(
     assessment_instance_id: int,
@@ -110,7 +134,7 @@ async def import_metsights_questionnaire_answers(
     employee=Depends(get_optional_employee),
     sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
 ):
-    """Pull Metsights per-type questionnaire resources (GET + OPTIONS) and upsert responses using semantic option values."""
+    """Pull Metsights per-type questionnaire resources (GET + OPTIONS) and upsert responses (field keys + choice/unit codes match seed)."""
 
     result = await sync_service.import_questionnaire_answers_for_instance(
         db,

@@ -1,7 +1,8 @@
 """Questionnaire HTTP routes.
 
 Employee endpoints manage question/category definitions; authenticated users
-fill and submit questionnaires under the same `/questionnaire` prefix.
+fill draft questionnaires under the `/questionnaire` prefix. Final submit is
+``POST /assessments/{assessment_instance_id}/submit``.
 """
 
 from __future__ import annotations
@@ -468,33 +469,6 @@ async def upsert_questionnaire_responses(
     await db.commit()
 
     return success_response({"message": "Responses saved successfully"})
-
-
-@management_router.post("/{assessment_instance_id}/submit")
-async def submit_questionnaire(
-    assessment_instance_id: int,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-    service: QuestionnaireService = Depends(get_questionnaire_user_service),
-):
-    """Submit questionnaire and mark assessment as completed.
-    
-    Security: User authentication required. Access control enforced in service layer.
-    This action is final and triggers Metsights integration.
-    """
-    await service.submit_questionnaire_for_user(
-        db,
-        user_id=current_user.user_id,
-        assessment_instance_id=assessment_instance_id,
-        ip_address=_client_ip(request),
-        user_agent=request.headers.get("User-Agent", "unknown"),
-        endpoint=str(request.url.path),
-    )
-    
-    await db.commit()
-    
-    return success_response({"message": "Questionnaire submitted successfully"})
 
 
 router.include_router(management_router)

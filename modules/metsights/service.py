@@ -304,6 +304,119 @@ class MetsightsService:
         envelope = MetsightsEnvelope.model_validate(payload)
         return envelope.data
 
+    async def patch_record_subresource(
+        self,
+        *,
+        record_id: str,
+        resource: str,
+        body: dict[str, Any],
+    ) -> dict[str, Any]:
+        """PATCH /records/:record_id/:resource/ — partial update (questionnaire sections)."""
+
+        rid = (record_id or "").strip()
+        res = (resource or "").strip().strip("/")
+        if not rid or not res:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Metsights record id is missing")
+        self._require_api_key()
+        try:
+            payload = await self._client.patch_record_resource(record_id=rid, resource=res, data=body)
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 404:
+                raise AppError(
+                    status_code=404,
+                    error_code="RECORD_NOT_FOUND",
+                    message="Metsights record not found",
+                ) from exc
+            if status_code == 403:
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Metsights authorization failed",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
+        envelope = MetsightsEnvelope.model_validate(payload)
+        data = envelope.data
+        return data if isinstance(data, dict) else {}
+
+    def _raise_metsights_record_http(self, exc: httpx.HTTPStatusError) -> None:
+        status_code = exc.response.status_code
+        if status_code == 404:
+            raise AppError(
+                status_code=404,
+                error_code="RECORD_NOT_FOUND",
+                message="Metsights record not found",
+            ) from exc
+        if status_code == 403:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights authorization failed",
+            ) from exc
+        raise AppError(
+            status_code=503,
+            error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+            message="Metsights request failed",
+        ) from exc
+
+    async def upsert_record_subresource(
+        self,
+        *,
+        record_id: str,
+        resource: str,
+        body: dict[str, Any],
+    ) -> dict[str, Any]:
+        """POST when the sub-resource has not been created yet; otherwise PATCH.
+
+        Metsights returns 404 on PATCH if no row exists yet for ``physical-measurement``, ``vitals``,
+        ``diet-lifestyle-parameters``, or ``fitness-parameters`` (create with POST first).
+        """
+
+        rid = (record_id or "").strip()
+        res = (resource or "").strip().strip("/")
+        if not rid or not res:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Metsights record id is missing")
+        self._require_api_key()
+
+        existing = await self.get_record_subresource_or_none(record_id=rid, resource=res)
+
+        def _parse_payload(payload: dict[str, Any]) -> dict[str, Any]:
+            envelope = MetsightsEnvelope.model_validate(payload)
+            data = envelope.data
+            return data if isinstance(data, dict) else {}
+
+        try:
+            if existing is None:
+                try:
+                    payload = await self._client.post_record_resource(record_id=rid, resource=res, data=body)
+                except httpx.HTTPStatusError as exc_post:
+                    if exc_post.response.status_code in (400, 409):
+                        payload = await self._client.patch_record_resource(record_id=rid, resource=res, data=body)
+                    else:
+                        self._raise_metsights_record_http(exc_post)
+            else:
+                payload = await self._client.patch_record_resource(record_id=rid, resource=res, data=body)
+            return _parse_payload(payload)
+        except httpx.HTTPStatusError as exc:
+            self._raise_metsights_record_http(exc)
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
     async def get_or_create_profile_id(
         self,
         *,

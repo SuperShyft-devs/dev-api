@@ -63,27 +63,143 @@ _METADATA_FIELDS = frozenset(
     }
 )
 
-# (measurement_field_name, metsights_unit_code) -> unit aligned with ``questionnaire_options.option_value`` when possible.
-_METSIGHTS_UNIT_TO_CANONICAL: dict[tuple[str, str], str] = {
-    ("height", "0"): "cm",
-    ("height", "1"): "ft_in",
-    ("weight", "0"): "kg",
-    ("weight", "1"): "lb",
-    ("waist_circumference", "0"): "cm",
-    ("waist_circumference", "1"): "in",
-    ("hip_circumference", "0"): "cm",
-    ("hip_circumference", "1"): "in",
-    ("body_fat", "0"): "%",
-    ("bmi", "0"): "kg/m²",
-    ("systolic_blood_pressure", "0"): "mmhg",
-    ("diastolic_blood_pressure", "0"): "mmhg",
-    ("heart_rate", "0"): "bpm",
-    ("resting_heart_rate", "0"): "bpm",
-    ("respiratory_rate", "0"): "breaths/min",
-    ("hrv_sdnn", "0"): "ms",
-    ("daily_active_duration", "0"): "min",
-    ("weight_loss_goal", "0"): "kg",
+# (measurement_field_name, metsights_unit_choice_code) -> ``questionnaire_options.option_value`` (Metsights OPTIONS codes).
+_METSIGHTS_UNIT_CODE_TO_DB_OPTION: dict[tuple[str, str], str] = {
+    ("height", "0"): "0",
+    ("height", "2"): "2",
+    ("weight", "0"): "0",
+    ("weight", "1"): "1",
+    ("waist_circumference", "0"): "0",
+    ("waist_circumference", "1"): "1",
+    ("hip_circumference", "0"): "0",
+    ("hip_circumference", "1"): "1",
+    ("body_fat", "0"): "0",
+    ("bmi", "0"): "0",
+    ("systolic_blood_pressure", "0"): "0",
+    ("diastolic_blood_pressure", "0"): "0",
+    ("heart_rate", "0"): "0",
+    ("respiratory_rate", "0"): "0",
+    ("hrv_sdnn", "0"): "0",
+    ("daily_active_duration", "0"): "0",
+    ("daily_active_duration", "1"): "1",
+    ("weight_loss_goal", "0"): "0",
+    ("weight_loss_goal", "1"): "1",
 }
+
+# Keys accepted by Metsights record PATCH payloads (aligned with OPTIONS / diet-lifestyle-parameters / fitness-parameters).
+_METSIGHTS_SUBMIT_PHYSICAL_KEYS = frozenset({"height", "weight", "waist_circumference", "hip_circumference", "body_fat"})
+_METSIGHTS_SUBMIT_VITALS_KEYS = frozenset({"systolic_blood_pressure", "diastolic_blood_pressure"})
+_METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS = frozenset(
+    {
+        "living_region",
+        "diet_preference",
+        "food_groups",
+        "healthy_breakfast_frequency",
+        "fresh_fruit_frequency",
+        "fresh_vegetable_frequency",
+        "baked_goods_frequency",
+        "red_meat_frequency",
+        "butter_dish_frequency",
+        "dessert_frequency",
+        "caffeine_frequency",
+        "caffeine_type",
+        "iodized_salt_status",
+        "extra_salt_frequency",
+        "sitting_hours",
+        "physical_activity_frequency",
+        "sleeping_hours",
+        "alcohol_frequency",
+        "tobacco_frequency",
+        "family_health_history",
+        "family_health_history_other",
+        "diagnosed_diseases",
+        "diagnosed_diseases_other",
+        "diagnosed_diseases_medications",
+        "diagnosed_diseases_medications_other",
+    }
+)
+_METSIGHTS_SUBMIT_FITNESS_ONLY_KEYS = frozenset(
+    {
+        "exercise_frequency_week",
+        "exercise_level",
+        "daily_active_duration",
+        "water_intake_frequency",
+        "sickness_frequency",
+        "health_priorities",
+        "goal_preference",
+    }
+)
+
+
+def _question_type_for_submit(raw: str | None) -> str:
+    t = (raw or "").strip().lower()
+    return {"multi_choice": "multiple_choice"}.get(t, t)
+
+
+def _answer_to_metsights_fields(question_key: str, question_type: str, answer: Any) -> dict[str, Any]:
+    """Map one DB answer to Metsights JSON keys (may include sibling ``*_unit`` for scales)."""
+
+    qkey = (question_key or "").strip()
+    if not qkey:
+        return {}
+    qtype = _question_type_for_submit(question_type)
+
+    if qtype == "scale":
+        if not isinstance(answer, dict):
+            return {}
+        raw_val = answer.get("value")
+        unit_raw = answer.get("unit")
+        if raw_val is None or unit_raw is None or str(unit_raw).strip() == "":
+            return {}
+        try:
+            val = float(raw_val)
+        except (TypeError, ValueError):
+            return {}
+        return {qkey: val, f"{qkey}_unit": str(unit_raw).strip()}
+
+    if qtype == "text":
+        s = str(answer).strip() if answer is not None else ""
+        if not s:
+            return {}
+        return {qkey: s}
+
+    if qtype == "multiple_choice":
+        if not isinstance(answer, list):
+            return {}
+        seq = [str(x).strip() for x in answer if x is not None and str(x).strip() != ""]
+        if not seq:
+            return {}
+        return {qkey: seq}
+
+    if qtype == "single_choice":
+        if answer is None:
+            return {}
+        if qkey == "iodized_salt_status":
+            if isinstance(answer, bool):
+                return {qkey: answer}
+            low = str(answer).strip().lower()
+            if low in ("true", "1", "yes"):
+                return {qkey: True}
+            if low in ("false", "0", "no"):
+                return {qkey: False}
+            return {}
+        s = str(answer).strip()
+        if not s:
+            return {}
+        return {qkey: s}
+
+    return {}
+
+
+def _pick_metsights_payload_for_bases(merged: dict[str, Any], bases: frozenset[str]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for base in bases:
+        if base in merged:
+            out[base] = merged[base]
+        uk = f"{base}_unit"
+        if uk in merged:
+            out[uk] = merged[uk]
+    return out
 
 
 def _normalize_metsights_type_code(record_row: dict[str, Any]) -> str | None:
@@ -245,9 +361,9 @@ def _scale_answer_mapped(
         return None
     ukey = str(unit_raw).strip()
     unit_codes = choice_maps.get(unit_key) or {}
-    canonical = _METSIGHTS_UNIT_TO_CANONICAL.get((field, ukey))
+    canonical = _METSIGHTS_UNIT_CODE_TO_DB_OPTION.get((field, ukey))
     if canonical is None:
-        canonical = _METSIGHTS_UNIT_TO_CANONICAL.get((field, ukey.lower()))
+        canonical = _METSIGHTS_UNIT_CODE_TO_DB_OPTION.get((field, ukey.lower()))
     if canonical is None:
         ulab = unit_codes.get(ukey)
         if ulab:
@@ -642,4 +758,84 @@ class MetsightsSyncService:
             "responses_upserted": imported,
             "skipped_categories": [],
             "skipped_questions": skipped_questions,
+        }
+
+    async def push_questionnaire_to_metsights_for_submit(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        current_user_id: int,
+    ) -> dict[str, Any]:
+        """POST or PATCH Metsights record subresources from local ``questionnaire_responses`` (submit path)."""
+
+        instance = await self._assessments.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
+        if instance is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+        if int(instance.user_id) != int(current_user_id):
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        mrid = (instance.metsights_record_id or "").strip()
+        package = await self._assessments.get_package_by_id(db, int(instance.package_id))
+        if package is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_PACKAGE_NOT_FOUND", message="Assessment package not found")
+
+        type_code = (package.assessment_type_code or "").strip()
+        if type_code not in ("1", "2", "7"):
+            return {"pushed": False, "reason": "assessment_type_has_no_metsights_questionnaire_resources"}
+
+        if not mrid:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Assessment has no Metsights record id; cannot push questionnaire",
+            )
+
+        responses = await self._questionnaire.list_responses_for_instance(
+            db,
+            assessment_instance_id=assessment_instance_id,
+        )
+        qids = list({int(r.question_id) for r in responses})
+        defs_map = await self._questionnaire.get_definitions_by_ids(db, question_ids=qids)
+
+        merged: dict[str, Any] = {}
+        for resp in responses:
+            qdef = defs_map.get(int(resp.question_id))
+            if qdef is None:
+                continue
+            key = (qdef.question_key or "").strip()
+            if not key:
+                continue
+            merged.update(_answer_to_metsights_fields(key, str(qdef.question_type or ""), resp.answer))
+
+        patched: list[str] = []
+
+        async def _patch_section(resource: str, body: dict[str, Any]) -> None:
+            payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
+            if not payload:
+                return
+            payload["is_complete"] = True
+            await self._metsights.upsert_record_subresource(record_id=mrid, resource=resource, body=payload)
+            patched.append(resource)
+
+        if type_code in ("1", "2"):
+            phys = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_PHYSICAL_KEYS)
+            vit = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_VITALS_KEYS)
+            diet = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS)
+            await _patch_section("physical-measurement", phys)
+            await _patch_section("vitals", vit)
+            await _patch_section("diet-lifestyle-parameters", diet)
+        elif type_code == "7":
+            bases = _METSIGHTS_SUBMIT_PHYSICAL_KEYS | _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS | _METSIGHTS_SUBMIT_FITNESS_ONLY_KEYS
+            fit = _pick_metsights_payload_for_bases(merged, bases)
+            await _patch_section("fitness-parameters", fit)
+
+        return {
+            "assessment_instance_id": assessment_instance_id,
+            "metsights_record_id": mrid,
+            "resources_patched": patched,
         }

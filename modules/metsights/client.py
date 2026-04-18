@@ -151,6 +151,36 @@ class MetsightsClient:
                 return {"detail": "Unexpected response", "data": None}
             return payload
 
+    async def patch_record_resource(self, *, record_id: str, resource: str, data: dict[str, Any]) -> dict[str, Any]:
+        base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
+        url = f"{base_url}/records/{record_id.strip().strip('/')}/{resource.strip('/')}/"
+        headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
+        timeout = settings.METSIGHTS_TIMEOUT_SECONDS
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.patch(url, headers=headers, json=data)
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                return {"detail": "Unexpected response", "data": None}
+            return payload
+
+    async def post_record_resource(self, *, record_id: str, resource: str, data: dict[str, Any]) -> dict[str, Any]:
+        """POST creates a sub-resource (first questionnaire submission per Metsights Records API)."""
+
+        base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
+        url = f"{base_url}/records/{record_id.strip().strip('/')}/{resource.strip('/')}/"
+        headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
+        timeout = settings.METSIGHTS_TIMEOUT_SECONDS
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(url, headers=headers, json=data)
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                return {"detail": "Unexpected response", "data": None}
+            return payload
+
     async def get_record_detail(self, *, record_id: str) -> dict[str, Any]:
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
         safe_rid = (record_id or "").strip().strip("/")

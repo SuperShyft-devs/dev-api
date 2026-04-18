@@ -1267,7 +1267,7 @@ class UsersService:
                         profile_id=profile_id,
                         assessment_type_code=assessment_type_code,
                     )
-                    await self._assessments_service.ensure_instance_assigned(
+                    assessment_instance = await self._assessments_service.ensure_instance_assigned(
                         db,
                         user_id=user.user_id,
                         engagement_id=engagement.engagement_id,
@@ -1298,6 +1298,7 @@ class UsersService:
             session_id=None,
         )
 
+        mid = (assessment_instance.metsights_record_id or "").strip() or None
         return UserOnboardResponse(
             user_id=user.user_id,
             created=created,
@@ -1305,6 +1306,8 @@ class UsersService:
             engagement_id=engagement.engagement_id,
             engagement_code=engagement.engagement_code,
             time_slot_id=time_slot.time_slot_id,
+            assessment_instance_id=int(assessment_instance.assessment_instance_id),
+            metsights_record_id=mid,
         )
 
     async def book_bio_ai_for_authenticated_user(
@@ -1428,7 +1431,7 @@ class UsersService:
                         profile_id=profile_id,
                         assessment_type_code=assessment_type_code,
                     )
-                    await self._assessments_service.ensure_instance_assigned(
+                    assessment_instance = await self._assessments_service.ensure_instance_assigned(
                         db,
                         user_id=user.user_id,
                         engagement_id=engagement.engagement_id,
@@ -1459,6 +1462,7 @@ class UsersService:
             session_id=None,
         )
 
+        mid = (assessment_instance.metsights_record_id or "").strip() or None
         return UserOnboardResponse(
             user_id=user.user_id,
             created=created,
@@ -1466,6 +1470,8 @@ class UsersService:
             engagement_id=engagement.engagement_id,
             engagement_code=engagement.engagement_code,
             time_slot_id=time_slot.time_slot_id,
+            assessment_instance_id=int(assessment_instance.assessment_instance_id),
+            metsights_record_id=mid,
         )
 
     def _metsights_csv_cell(self, raw_row: dict[str, str], colmap: dict[str, str], key: str) -> str:

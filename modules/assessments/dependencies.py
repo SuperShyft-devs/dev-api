@@ -17,6 +17,7 @@ from modules.questionnaire.repository import QuestionnaireRepository
 def get_assessments_service() -> AssessmentsService:
     return AssessmentsService(
         repository=AssessmentsRepository(),
+        questionnaire_repository=QuestionnaireRepository(),
         audit_service=AuditService(AuditRepository()),
     )
 

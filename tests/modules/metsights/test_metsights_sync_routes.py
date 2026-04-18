@@ -115,7 +115,7 @@ async def test_sync_then_import_stores_metsights_codes(async_client, test_db_ses
     options_payload = {
         "detail": "ok",
         "data": {
-            "living_region": {"choices": {"1": "Inland", "0": "Coastal"}},
+            "living_region": {"choices": {"1": "Inland region", "0": "Coastal region"}},
             "diet_preference": {"choices": {"0": "Veg", "1": "Non-Veg"}},
             "food_groups": {"choices": {"0": "Whole grains", "3": "Pulses / Legumes"}},
         },
@@ -172,4 +172,4 @@ async def test_sync_then_import_stores_metsights_codes(async_client, test_db_ses
     ).first()
     assert row is not None
     ans = row[0]
-    assert ans == "inland" or (isinstance(ans, str) and ans.strip('"') == "inland")
+    assert ans == "1" or (isinstance(ans, str) and ans.strip('"') == "1")

@@ -15,6 +15,7 @@ from modules.assessments.models import AssessmentCategoryProgress, AssessmentIns
 from modules.assessments.repository import AssessmentsRepository
 from modules.assessments.schemas import MetsightsRecordIdUpdate
 from modules.employee.service import EmployeeContext
+from modules.questionnaire.repository import QuestionnaireRepository
 
 
 _ALLOWED_USER_ASSESSMENT_STATUSES = {"active", "completed"}
@@ -25,8 +26,15 @@ def _normalize_status(value: str | None) -> str:
 
 
 class AssessmentsService:
-    def __init__(self, repository: AssessmentsRepository, audit_service: AuditService | None = None):
+    def __init__(
+        self,
+        repository: AssessmentsRepository,
+        *,
+        questionnaire_repository: QuestionnaireRepository | None = None,
+        audit_service: AuditService | None = None,
+    ):
         self._repository = repository
+        self._questionnaire = questionnaire_repository
         self._audit_service = audit_service
 
     async def ensure_instance_assigned(
@@ -353,3 +361,89 @@ class AssessmentsService:
         if updated is None:
             raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
         return updated
+
+    async def submit_assessment_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        assessment_instance_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+        metsights_sync: object | None = None,
+    ) -> dict[str, Any]:
+        """Mark questionnaire responses submitted, category progress and instance completed; push answers to Metsights."""
+
+        if self._questionnaire is None:
+            raise RuntimeError("QuestionnaireRepository is required for submit_assessment_for_user")
+
+        instance = await self._repository.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
+        if instance is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+
+        if int(instance.user_id) != int(user_id):
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        current_status = (instance.status or "").lower()
+        if current_status == "completed":
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment is already completed")
+        if current_status != "active":
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment is not active")
+
+        if metsights_sync is not None:
+            await metsights_sync.push_questionnaire_to_metsights_for_submit(
+                db,
+                assessment_instance_id=assessment_instance_id,
+                current_user_id=user_id,
+            )
+
+        now = datetime.now(timezone.utc)
+        responses = await self._questionnaire.list_responses_for_instance(
+            db,
+            assessment_instance_id=assessment_instance_id,
+        )
+        for response in responses:
+            response.submitted_at = now
+            await self._questionnaire.update_response(db, response)
+
+        package_categories = await self._repository.list_package_categories(db, package_id=instance.package_id)
+        for link in package_categories:
+            progress = await self._repository.get_category_progress(
+                db,
+                assessment_instance_id=assessment_instance_id,
+                category_id=link.category_id,
+            )
+            if progress is None:
+                progress = AssessmentCategoryProgress(
+                    assessment_instance_id=assessment_instance_id,
+                    category_id=link.category_id,
+                    status="complete",
+                    completed_at=now,
+                )
+                await self._repository.create_category_progress(db, progress)
+            else:
+                progress.status = "complete"
+                progress.completed_at = now
+                await self._repository.update_category_progress(db, progress)
+
+        instance.status = "completed"
+        instance.completed_at = now
+        await self._repository.update_instance(db, instance)
+
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="USER_SUBMIT_ASSESSMENT",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id,
+            session_id=None,
+        )
+
+        return {"message": "Assessment submitted successfully"}

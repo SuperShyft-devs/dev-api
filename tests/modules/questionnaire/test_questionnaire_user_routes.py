@@ -1043,13 +1043,13 @@ async def test_upsert_responses_updates_existing_responses(async_client, test_db
     assert updated.submitted_at is None
 
 
-# ==================== POST /questionnaire/{assessment_instance_id}/submit Tests ====================
+# ==================== POST /assessments/{assessment_instance_id}/submit Tests ====================
 
 
 @pytest.mark.asyncio
 async def test_submit_questionnaire_requires_auth(async_client):
     """Test that authentication is required."""
-    response = await async_client.post("/questionnaire/1/submit")
+    response = await async_client.post("/assessments/1/submit")
     assert response.status_code == 401
 
 
@@ -1058,7 +1058,7 @@ async def test_submit_questionnaire_returns_404_when_assessment_not_found(async_
     """Test 404 when assessment instance does not exist."""
     await _seed_user(test_db_session, user_id=5017)
 
-    response = await async_client.post("/questionnaire/99999/submit", headers=_auth_header(5017))
+    response = await async_client.post("/assessments/99999/submit", headers=_auth_header(5017))
     assert response.status_code == 404
 
 
@@ -1081,7 +1081,7 @@ async def test_submit_questionnaire_returns_403_when_not_owner(async_client, tes
     test_db_session.add(instance)
     await test_db_session.commit()
 
-    response = await async_client.post("/questionnaire/2012/submit", headers=_auth_header(5018))
+    response = await async_client.post("/assessments/2012/submit", headers=_auth_header(5018))
     assert response.status_code == 403
 
 
@@ -1103,7 +1103,7 @@ async def test_submit_questionnaire_returns_422_when_already_completed(async_cli
     test_db_session.add(instance)
     await test_db_session.commit()
 
-    response = await async_client.post("/questionnaire/2013/submit", headers=_auth_header(5020))
+    response = await async_client.post("/assessments/2013/submit", headers=_auth_header(5020))
     assert response.status_code == 422
     assert "already completed" in response.json()["message"]
 
@@ -1126,7 +1126,7 @@ async def test_submit_questionnaire_returns_422_when_not_active(async_client, te
     test_db_session.add(instance)
     await test_db_session.commit()
 
-    response = await async_client.post("/questionnaire/2014/submit", headers=_auth_header(5021))
+    response = await async_client.post("/assessments/2014/submit", headers=_auth_header(5021))
     assert response.status_code == 422
     assert "not active" in response.json()["message"]
 
@@ -1174,9 +1174,9 @@ async def test_submit_questionnaire_marks_assessment_completed(async_client, tes
     test_db_session.add(response_row)
     await test_db_session.commit()
 
-    response = await async_client.post("/questionnaire/2015/submit", headers=_auth_header(5022))
+    response = await async_client.post("/assessments/2015/submit", headers=_auth_header(5022))
     assert response.status_code == 200
-    assert "submitted successfully" in response.json()["data"]["message"]
+    assert "submitted successfully" in response.json()["data"]["message"].lower()
 
     # Verify assessment is completed
     await test_db_session.refresh(instance)
@@ -1206,7 +1206,7 @@ async def test_submit_questionnaire_with_no_responses(async_client, test_db_sess
     test_db_session.add(instance)
     await test_db_session.commit()
 
-    response = await async_client.post("/questionnaire/2016/submit", headers=_auth_header(5023))
+    response = await async_client.post("/assessments/2016/submit", headers=_auth_header(5023))
     assert response.status_code == 200
 
     # Verify assessment is completed
