@@ -9,6 +9,9 @@ from core.exceptions import add_exception_handlers
 from core.logging import configure_logging, request_id_middleware
 from modules.auth.router import router as auth_router
 from modules.engagements.router import router as engagements_router
+from modules.engagements.assessment_packages_router import (
+    router as engagement_assessment_packages_router,
+)
 from modules.checklists.router import router as checklists_router
 from modules.organizations.router import router as organizations_router
 from modules.users.router import router as users_router
@@ -53,6 +56,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(organizations_router)
 app.include_router(engagements_router)
+app.include_router(engagement_assessment_packages_router)
 app.include_router(checklists_router)
 app.include_router(employees_router)
 app.include_router(assessments_router)

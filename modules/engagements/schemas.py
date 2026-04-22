@@ -81,3 +81,9 @@ class OnboardingAssistantsAddRequest(BaseModel):
     """Request to assign employees as onboarding assistants."""
 
     employee_ids: list[int] = Field(..., min_length=1)
+
+
+class EngagementAssessmentPackageAddRequest(BaseModel):
+    """Request to add an additional assessment package to an engagement."""
+
+    package_code: str = Field(..., min_length=1, max_length=100)

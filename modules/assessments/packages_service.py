@@ -98,17 +98,14 @@ class AssessmentPackagesService:
 
         return package
 
-    async def list_packages_for_employee(
+    async def list_packages(
         self,
         db,
         *,
-        employee: EmployeeContext,
         page: int,
         limit: int,
         status: str | None,
     ) -> tuple[list[AssessmentPackage], int]:
-        self._ensure_employee_access(employee)
-
         status_value = None
         if status is not None:
             normalized = _normalize_status(status)
@@ -120,15 +117,12 @@ class AssessmentPackagesService:
         total = await self._repository.count_packages(db, status=status_value)
         return packages, total
 
-    async def get_package_details_for_employee(
+    async def get_package_details(
         self,
         db,
         *,
-        employee: EmployeeContext,
         package_id: int,
     ) -> AssessmentPackage:
-        self._ensure_employee_access(employee)
-
         package = await self._repository.get_package_by_id(db, package_id=package_id)
         if package is None:
             raise AppError(status_code=404, error_code="ASSESSMENT_PACKAGE_NOT_FOUND", message="Package does not exist")

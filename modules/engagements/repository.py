@@ -140,6 +140,26 @@ class EngagementsRepository:
         )
         return result.scalar_one_or_none() is not None
 
+    async def list_distinct_participant_ids_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> list[int]:
+        """Return distinct user_ids of participants enrolled in an engagement.
+
+        Pulls from ``engagement_time_slots`` — same source of truth used by
+        other participant lookups in this repo.
+        """
+
+        result = await db.execute(
+            select(EngagementTimeSlot.user_id)
+            .distinct()
+            .where(EngagementTimeSlot.engagement_id == engagement_id)
+            .order_by(EngagementTimeSlot.user_id.asc())
+        )
+        return [int(v) for v in result.scalars().all()]
+
     async def add_onboarding_assistant(
         self,
         db: AsyncSession,

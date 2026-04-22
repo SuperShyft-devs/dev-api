@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
+from core.dependencies import get_current_user
 from core.exceptions import AppError
 from db.session import get_db
 from modules.assessments.dependencies import (
@@ -73,15 +74,14 @@ async def list_assessment_packages(
     limit: int = 20,
     status: str | None = None,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    user=Depends(get_current_user),
     packages_service: AssessmentPackagesService = Depends(get_assessment_packages_service),
 ):
     if page < 1 or limit < 1 or limit > 100:
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-    rows, total = await packages_service.list_packages_for_employee(
+    rows, total = await packages_service.list_packages(
         db,
-        employee=employee,
         page=page,
         limit=limit,
         status=status,
@@ -106,10 +106,10 @@ async def list_assessment_packages(
 async def get_assessment_package_details(
     package_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    user=Depends(get_current_user),
     packages_service: AssessmentPackagesService = Depends(get_assessment_packages_service),
 ):
-    package = await packages_service.get_package_details_for_employee(db, employee=employee, package_id=package_id)
+    package = await packages_service.get_package_details(db, package_id=package_id)
 
     return success_response(
         {

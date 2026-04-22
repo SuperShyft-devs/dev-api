@@ -5,7 +5,7 @@ Only database queries belong here.
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
@@ -48,6 +48,19 @@ class ReportsRepository:
         db.add(report)
         await db.flush()
         return report
+
+    async def delete_individual_reports_for_instance(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+    ) -> int:
+        result = await db.execute(
+            delete(IndividualHealthReport).where(
+                IndividualHealthReport.assessment_instance_id == assessment_instance_id
+            )
+        )
+        return int(result.rowcount or 0)
 
     async def list_individual_reports_for_user_with_assessment(
         self,

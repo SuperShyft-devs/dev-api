@@ -189,6 +189,68 @@ class AssessmentsRepository:
         await db.flush()
         return instance
 
+    async def list_distinct_packages_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> list[AssessmentPackage]:
+        """Return unique ``AssessmentPackage`` rows that back assessment instances of an engagement.
+
+        Dedupes by ``package_id``. Packages are pulled only from
+        ``assessment_instances`` (not from ``engagements.assessment_package_id``).
+        """
+
+        result = await db.execute(
+            select(AssessmentPackage)
+            .join(AssessmentInstance, AssessmentInstance.package_id == AssessmentPackage.package_id)
+            .where(AssessmentInstance.engagement_id == engagement_id)
+            .distinct()
+            .order_by(AssessmentPackage.package_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_instances_for_engagement_and_package(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        package_id: int,
+    ) -> list[AssessmentInstance]:
+        result = await db.execute(
+            select(AssessmentInstance)
+            .where(AssessmentInstance.engagement_id == engagement_id)
+            .where(AssessmentInstance.package_id == package_id)
+            .order_by(AssessmentInstance.assessment_instance_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def delete_category_progress_for_instance(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+    ) -> int:
+        result = await db.execute(
+            delete(AssessmentCategoryProgress).where(
+                AssessmentCategoryProgress.assessment_instance_id == assessment_instance_id
+            )
+        )
+        return int(result.rowcount or 0)
+
+    async def delete_instance(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+    ) -> int:
+        result = await db.execute(
+            delete(AssessmentInstance).where(
+                AssessmentInstance.assessment_instance_id == assessment_instance_id
+            )
+        )
+        return int(result.rowcount or 0)
+
 
     async def get_package_by_id(self, db: AsyncSession, *, package_id: int) -> AssessmentPackage | None:
         result = await db.execute(select(AssessmentPackage).where(AssessmentPackage.package_id == package_id))
