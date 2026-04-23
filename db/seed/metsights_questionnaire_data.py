@@ -94,6 +94,16 @@ METSIGHTS_QUESTIONS: tuple[SeedQuestion, ...] = (
     SeedQuestion(37, "sickness_frequency", "How often do you fall sick in a year?", "single_choice", True, False, None, "active"),
     SeedQuestion(38, "systolic_blood_pressure", "Systolic Blood Pressure", "scale", True, False, "Top number of your blood pressure reading", "active"),
     SeedQuestion(39, "diastolic_blood_pressure", "Diastolic Blood Pressure", "scale", True, False, "Bottom number of your blood pressure reading", "active"),
+    SeedQuestion(
+        40,
+        "weight_loss_goal",
+        "What is your desired weight loss goal in upcoming months?",
+        "scale",
+        False,
+        False,
+        "FitPrint only; paired with weight_loss_goal_unit (kg/lb).",
+        "active",
+    ),
 )
 
 
@@ -115,6 +125,10 @@ def _build_category_questions() -> tuple[SeedCategoryQuestion, ...]:
     for q in range(38, 40):
         links.append(SeedCategoryQuestion(lid, 5, q))
         lid += 1
+    # weight_loss_goal (Q40) belongs to the Lifestyle & Habits section so it
+    # imports cleanly for the FitPrint package (which maps to categories 1/2/3/4).
+    links.append(SeedCategoryQuestion(lid, 3, 40))
+    lid += 1
     return tuple(links)
 
 
@@ -373,6 +387,7 @@ _OPT_SPEC: list[tuple[int, list[tuple[str, str]]]] = [
     ),
     (38, [("0", "mmHG")]),
     (39, [("0", "mmHG")]),
+    (40, [("0", "kg"), ("1", "lb")]),
 ]
 
 
@@ -388,7 +403,10 @@ def _build_options() -> tuple[SeedOption, ...]:
 
 METSIGHTS_OPTIONS: tuple[SeedOption, ...] = _build_options()
 
-# Package 1–2: all five sections. Package 3 (FitPrint): Metsights fitness-parameters + anthropometry overlap; no vitals API.
+# Package 1–2: all five sections.
+# Package 3 (FitPrint) mirrors the Metsights ``/fitness-parameters/`` payload,
+# which includes Anthropometry (1), Family History (2), Lifestyle & Habits (3),
+# and Nutrition Log (4). Vitals (5) are not captured for FitPrint.
 METSIGHTS_PACKAGE_CATEGORIES: tuple[SeedPackageCategory, ...] = (
     SeedPackageCategory(10001, 1, 1),
     SeedPackageCategory(10002, 1, 2),
@@ -403,4 +421,5 @@ METSIGHTS_PACKAGE_CATEGORIES: tuple[SeedPackageCategory, ...] = (
     SeedPackageCategory(10011, 3, 1),
     SeedPackageCategory(10012, 3, 3),
     SeedPackageCategory(10013, 3, 4),
+    SeedPackageCategory(10014, 3, 2),
 )

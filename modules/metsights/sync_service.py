@@ -391,6 +391,18 @@ def _resources_for_assessment_type(type_code: str) -> list[str]:
     return []
 
 
+# Metsights returns ``405 Method Not Allowed`` for ``GET`` on some sub-resources
+# (e.g. ``/vitals/`` and ``/fitness-parameters/``). Those endpoints are still readable
+# via ``GET /records/:id/`` under these nested keys, so we fall back to the record
+# detail payload when the sub-resource GET is unavailable or empty.
+_RESOURCE_TO_DETAIL_FIELD: dict[str, str] = {
+    "physical-measurement": "physical_measurement",
+    "vitals": "vital_parameter",
+    "diet-lifestyle-parameters": "diet_lifestyle_parameter",
+    "fitness-parameters": "fitness_parameter",
+}
+
+
 class MetsightsSyncService:
     def __init__(
         self,
@@ -619,7 +631,21 @@ class MetsightsSyncService:
 
         imported = 0
         skipped_questions: list[str] = []
-        got_vitals_payload = False
+        record_detail_cache: dict[str, Any] | None = None
+        record_detail_fetched = False
+
+        async def _get_record_detail_cached() -> dict[str, Any] | None:
+            nonlocal record_detail_cache, record_detail_fetched
+            if record_detail_fetched:
+                return record_detail_cache
+            record_detail_fetched = True
+            try:
+                detail = await self._metsights.get_record_detail(record_id=mrid)
+            except AppError:
+                record_detail_cache = None
+                return None
+            record_detail_cache = detail if isinstance(detail, dict) else None
+            return record_detail_cache
 
         async def _ingest_payload(
             resource: str,
@@ -727,30 +753,39 @@ class MetsightsSyncService:
                     )
                 imported += 1
 
+        def _payload_has_answer(payload: dict[str, Any]) -> bool:
+            for fn, rv in payload.items():
+                if fn in _METADATA_FIELDS or str(fn).endswith("_unit"):
+                    continue
+                if rv is None or rv == [] or rv == "":
+                    continue
+                return True
+            return False
+
         for resource in resources:
             payload = await self._metsights.get_record_subresource_or_none(record_id=mrid, resource=resource)
+            source = resource
+
+            # Fallback: Metsights returns 405 for GET on some sub-resources
+            # (e.g. ``/fitness-parameters/`` and ``/vitals/``). Read the same data
+            # from the record detail envelope in that case, or when the sub-resource
+            # simply has no usable answers yet (e.g. FitPrint records always go here
+            # because their fitness parameters are only exposed via record detail).
+            if not isinstance(payload, dict) or not _payload_has_answer(payload):
+                detail = await _get_record_detail_cached()
+                if isinstance(detail, dict):
+                    nested_key = _RESOURCE_TO_DETAIL_FIELD.get(resource)
+                    nested = detail.get(nested_key) if nested_key else None
+                    if isinstance(nested, dict) and _payload_has_answer(nested):
+                        payload = nested
+                        source = f"record_detail.{nested_key}"
+
             if not isinstance(payload, dict):
                 continue
-            if resource == "vitals":
-                for fn, rv in payload.items():
-                    if fn in _METADATA_FIELDS or str(fn).endswith("_unit"):
-                        continue
-                    if rv is not None and rv != []:
-                        got_vitals_payload = True
-                        break
 
             opt_env = await self._metsights.options_record_subresource(record_id=mrid, resource=resource)
             choice_maps = _build_field_choice_maps(opt_env if isinstance(opt_env, dict) else {})
-            await _ingest_payload(resource, payload, choice_maps)
-
-        if type_code in ("1", "2") and not got_vitals_payload:
-            detail = await self._metsights.get_record_detail(record_id=mrid)
-            if isinstance(detail, dict):
-                vp = detail.get("vital_parameter")
-                if isinstance(vp, dict) and vp:
-                    opt_env = await self._metsights.options_record_subresource(record_id=mrid, resource="vitals")
-                    cm = _build_field_choice_maps(opt_env if isinstance(opt_env, dict) else {})
-                    await _ingest_payload("record_detail.vital_parameter", vp, cm)
+            await _ingest_payload(source, payload, choice_maps)
 
         return {
             "assessment_instance_id": assessment_instance_id,
