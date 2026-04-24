@@ -1,12 +1,15 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from core.config import settings
 from core.exceptions import add_exception_handlers
 from core.logging import configure_logging, request_id_middleware
+from core.rate_limit import limiter
 from modules.auth.router import router as auth_router
 from modules.engagements.router import router as engagements_router
 from modules.engagements.assessment_packages_router import (
@@ -40,6 +43,11 @@ app = FastAPI(
 )
 
 add_exception_handlers(app)
+
+# Rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.middleware("http")(request_id_middleware)
 
 # Apply CORS policy from environment configuration
@@ -50,6 +58,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response: Response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    if settings.is_production():
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    return response
+
+
+@app.middleware("http")
+async def request_size_limit_middleware(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > _MAX_REQUEST_BODY_BYTES:
+        return Response(status_code=413, content="Request body too large")
+    return await call_next(request)
+
 
 # Include routers
 app.include_router(auth_router)

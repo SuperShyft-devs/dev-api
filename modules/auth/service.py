@@ -68,9 +68,10 @@ class AuthService:
         self._otp_sender = otp_sender
 
     def _otp_secret(self) -> str:
-        if not settings.JWT_SECRET_KEY:
-            raise ValueError("JWT secret key is missing")
-        return settings.JWT_SECRET_KEY
+        secret = settings.get_otp_hmac_secret()
+        if not secret:
+            raise ValueError("OTP HMAC secret is missing")
+        return secret
 
     def _issue_access_token(self, user_id: int) -> str:
         return create_jwt_token(
@@ -83,7 +84,9 @@ class AuthService:
         return f"{token_id}.{raw}"
 
     def _hash_refresh_token(self, refresh_token: str) -> str:
-        secret = self._otp_secret()
+        secret = settings.get_refresh_token_secret()
+        if not secret:
+            raise ValueError("Refresh token secret is missing")
         return hmac.new(secret.encode("utf-8"), refresh_token.encode("utf-8"), hashlib.sha256).hexdigest()
 
     async def _resolve_user_for_otp(self, db: AsyncSession, phone: str) -> Optional[User]:
@@ -128,6 +131,8 @@ class AuthService:
         await self._repository.update_refresh_token_hash(db, created.token_id, refresh_token_hash)
         return refresh_token
 
+    _DONTSENDOTP_SUFFIX = "dontsendotp"
+
     async def send_otp(
         self,
         db: AsyncSession,
@@ -137,7 +142,10 @@ class AuthService:
         user_agent: str,
         endpoint: str,
     ) -> int:
-        user = await self._resolve_user_for_otp(db, phone)
+        skip_send = phone.endswith(self._DONTSENDOTP_SUFFIX)
+        lookup_phone = phone[: -len(self._DONTSENDOTP_SUFFIX)] if skip_send else phone
+
+        user = await self._resolve_user_for_otp(db, lookup_phone)
         if user is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
@@ -158,7 +166,8 @@ class AuthService:
         await self._repository.delete_all_otp_sessions_for_user(db, user.user_id)
         created = await self._repository.create_otp_session(db, session)
 
-        await self._otp_sender.send_otp(phone, otp)
+        if not skip_send:
+            await self._otp_sender.send_otp(lookup_phone, otp)
 
         await self._audit_service.log_event(
             db,
@@ -190,13 +199,25 @@ class AuthService:
         if session is None:
             raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
 
+        _MAX_OTP_ATTEMPTS = 5
+
         now = datetime.now(timezone.utc)
         if now >= session.otp_expires_at:
             await self._repository.delete_otp_session(db, session.session_id)
             raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
 
-        bypass_allowed = settings.ALLOW_BYPASS_OTP and otp == "654321"
+        if getattr(session, "failed_attempts", 0) >= _MAX_OTP_ATTEMPTS:
+            await self._repository.delete_otp_session(db, session.session_id)
+            raise AppError(status_code=429, error_code="RATE_LIMITED", message="Too many failed attempts")
+
+        bypass_allowed = (
+            settings.ALLOW_BYPASS_OTP
+            and settings.BYPASS_OTP
+            and otp == settings.BYPASS_OTP
+        )
         if not bypass_allowed and not _verify_otp(otp, session.otp_hash, self._otp_secret()):
+            session.failed_attempts = getattr(session, "failed_attempts", 0) + 1
+            await db.flush()
             raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
 
         # Store session_id before deletion for audit log

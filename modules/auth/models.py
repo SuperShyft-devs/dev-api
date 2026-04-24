@@ -22,6 +22,7 @@ class AuthOtpSession(Base):
     otp_hash = Column(String, nullable=False)
     otp_expires_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False)
+    failed_attempts = Column(Integer, nullable=False, server_default="0", default=0)
 
 
 class AuthToken(Base):

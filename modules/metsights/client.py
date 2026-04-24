@@ -2,19 +2,82 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import httpx
 
 from core.config import settings
 
+_SAFE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+_ALLOWED_RESOURCES = frozenset({
+    "anthropometrics",
+    "assessments",
+    "blood-biomarkers",
+    "blood-pressure",
+    "body-composition",
+    "cardiac-health",
+    "cardio-metabolic-risk",
+    "clinical-chemistry",
+    "complete-blood-count",
+    "diabetes",
+    "diet-plan",
+    "endocrinology",
+    "exercise-plan",
+    "fitness-assessment",
+    "glucose-tolerance",
+    "haematology",
+    "health-risk",
+    "hematology",
+    "hepatic",
+    "immunology",
+    "kidney",
+    "lifestyle",
+    "lipid-profile",
+    "liver-function",
+    "metabolic-health",
+    "musculo-skeletal",
+    "nutrition",
+    "obesity",
+    "overall-health",
+    "physical-activity",
+    "pulmonary-function",
+    "questionnaire",
+    "renal-function",
+    "serology",
+    "sleep",
+    "stress",
+    "thyroid",
+    "thyroid-function",
+    "urinalysis",
+    "vitals",
+    "well-being",
+})
+
+
+def _validate_record_id(record_id: str) -> str:
+    rid = (record_id or "").strip().strip("/")
+    if not rid or not _SAFE_ID_PATTERN.match(rid):
+        raise ValueError(f"Invalid record_id: {record_id!r}")
+    return rid
+
+
+def _validate_resource(resource: str) -> str:
+    res = (resource or "").strip().strip("/")
+    if not res or not _SAFE_ID_PATTERN.match(res):
+        raise ValueError(f"Invalid resource: {resource!r}")
+    return res
+
 
 class MetsightsClient:
     """Thin HTTP client for Metsights resources."""
 
     async def get_record_resource(self, *, record_id: str, resource: str) -> dict[str, Any]:
+        rid = _validate_record_id(record_id)
+        res = _validate_resource(resource)
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
-        url = f"{base_url}/records/{record_id}/{resource.strip('/')}/"
+        url = f"{base_url}/records/{rid}/{res}/"
         headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
         timeout = settings.METSIGHTS_TIMEOUT_SECONDS
 
@@ -27,8 +90,10 @@ class MetsightsClient:
             return payload
 
     async def options_record_resource(self, *, record_id: str, resource: str) -> dict[str, Any]:
+        rid = _validate_record_id(record_id)
+        res = _validate_resource(resource)
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
-        url = f"{base_url}/records/{record_id}/{resource.strip('/')}/"
+        url = f"{base_url}/records/{rid}/{res}/"
         headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
         timeout = settings.METSIGHTS_TIMEOUT_SECONDS
 
@@ -41,12 +106,13 @@ class MetsightsClient:
             return payload
 
     async def get_report(self, *, record_id: str, assessment_type_code: str | None) -> dict[str, Any]:
+        rid = _validate_record_id(record_id)
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
         type_code = (assessment_type_code or "").strip()
         if type_code == "7":
-            url = f"{base_url}/reports/fitness-reports/{record_id}/"
+            url = f"{base_url}/reports/fitness-reports/{rid}/"
         else:
-            url = f"{base_url}/reports/{record_id}/"
+            url = f"{base_url}/reports/{rid}/"
         headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
         timeout = settings.METSIGHTS_TIMEOUT_SECONDS
 
@@ -59,12 +125,13 @@ class MetsightsClient:
             return payload
 
     async def get_report_pdf(self, *, record_id: str, assessment_type_code: str | None) -> dict[str, Any]:
+        rid = _validate_record_id(record_id)
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
         type_code = (assessment_type_code or "").strip()
         if type_code == "7":
-            url = f"{base_url}/reports/fitness-reports/{record_id}/pdf/"
+            url = f"{base_url}/reports/fitness-reports/{rid}/pdf/"
         else:
-            url = f"{base_url}/reports/{record_id}/pdf/"
+            url = f"{base_url}/reports/{rid}/pdf/"
         headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
         timeout = settings.METSIGHTS_TIMEOUT_SECONDS
 
@@ -109,8 +176,9 @@ class MetsightsClient:
             return payload
 
     async def create_profile_record(self, *, profile_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        pid = _validate_record_id(profile_id)
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
-        url = f"{base_url}/profiles/{profile_id}/records/"
+        url = f"{base_url}/profiles/{pid}/records/"
         headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
         timeout = settings.METSIGHTS_TIMEOUT_SECONDS
 
@@ -130,9 +198,9 @@ class MetsightsClient:
         code: str | None = None,
         search: str | None = None,
     ) -> dict[str, Any]:
+        pid = _validate_record_id(profile_id)
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
-        safe_pid = (profile_id or "").strip().strip("/")
-        url = f"{base_url}/profiles/{safe_pid}/records/"
+        url = f"{base_url}/profiles/{pid}/records/"
         headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
         timeout = settings.METSIGHTS_TIMEOUT_SECONDS
         params: dict[str, Any] = {}
@@ -152,8 +220,10 @@ class MetsightsClient:
             return payload
 
     async def patch_record_resource(self, *, record_id: str, resource: str, data: dict[str, Any]) -> dict[str, Any]:
+        rid = _validate_record_id(record_id)
+        res = _validate_resource(resource)
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
-        url = f"{base_url}/records/{record_id.strip().strip('/')}/{resource.strip('/')}/"
+        url = f"{base_url}/records/{rid}/{res}/"
         headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
         timeout = settings.METSIGHTS_TIMEOUT_SECONDS
 
@@ -168,8 +238,10 @@ class MetsightsClient:
     async def post_record_resource(self, *, record_id: str, resource: str, data: dict[str, Any]) -> dict[str, Any]:
         """POST creates a sub-resource (first questionnaire submission per Metsights Records API)."""
 
+        rid = _validate_record_id(record_id)
+        res = _validate_resource(resource)
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
-        url = f"{base_url}/records/{record_id.strip().strip('/')}/{resource.strip('/')}/"
+        url = f"{base_url}/records/{rid}/{res}/"
         headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
         timeout = settings.METSIGHTS_TIMEOUT_SECONDS
 
@@ -182,9 +254,9 @@ class MetsightsClient:
             return payload
 
     async def get_record_detail(self, *, record_id: str) -> dict[str, Any]:
+        rid = _validate_record_id(record_id)
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
-        safe_rid = (record_id or "").strip().strip("/")
-        url = f"{base_url}/records/{safe_rid}/"
+        url = f"{base_url}/records/{rid}/"
         headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
         timeout = settings.METSIGHTS_TIMEOUT_SECONDS
 

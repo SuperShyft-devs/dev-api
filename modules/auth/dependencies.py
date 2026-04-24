@@ -32,7 +32,12 @@ def get_auth_service() -> AuthService:
             country_code=settings.OTP_COUNTRY_CODE,
             timeout_seconds=float(settings.OTP_WEBHOOK_TIMEOUT_SECONDS),
         )
-    elif settings.OTP_LOG_TO_TERMINAL and settings.is_development():
+    elif settings.OTP_LOG_TO_TERMINAL:
+        if settings.is_production():
+            raise RuntimeError(
+                "OTP_LOG_TO_TERMINAL must not be True in production -- "
+                "DevelopmentOtpSender would leak OTPs to stdout/logs"
+            )
         otp_sender = DevelopmentOtpSender()
     else:
         otp_sender = StubOtpSender()

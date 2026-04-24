@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import uuid4
 
+import filetype
 from fastapi import UploadFile
 
 from core.config import settings
@@ -48,6 +49,15 @@ class UploadsService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="File is required")
         if len(payload) > max_bytes:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="File is too large")
+
+        kind = filetype.guess(payload)
+        detected_mime = kind.mime if kind else None
+        if detected_mime != content_type:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="File content does not match declared type",
+            )
 
         target_dir = self._media_root / folder
         target_dir.mkdir(parents=True, exist_ok=True)

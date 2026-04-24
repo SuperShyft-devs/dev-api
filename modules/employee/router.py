@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common.excel_db_export import export_public_schema_to_xlsx_bytes
 from common.responses import success_response
 from core.exceptions import AppError
+from core.network import get_client_ip
 from db.session import get_db
 from modules.employee.dependencies import (
     get_current_employee,
@@ -32,17 +33,6 @@ from modules.employee.service import EmployeeContext, EmployeeService
 router = APIRouter(prefix="/employees", tags=["employees"])
 
 
-def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-
-    if request.client is None:
-        return "unknown"
-
-    return request.client.host
-
-
 @router.post("", status_code=201)
 async def create_employee(
     payload: EmployeeCreateRequest,
@@ -55,7 +45,7 @@ async def create_employee(
         db,
         employee=employee,
         payload=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -159,7 +149,7 @@ async def update_employee(
         employee=employee,
         employee_id=employee_id,
         payload=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -182,7 +172,7 @@ async def update_employee_status(
         employee=employee,
         employee_id=employee_id,
         status=payload.status,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )

@@ -11,13 +11,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Tuple
 
 import secrets
-from jose import jwt
-from jose.exceptions import ExpiredSignatureError, JWTError
+import jwt as pyjwt
 
 from core.config import settings
 
 
 _ALLOWED_ALGORITHM = "HS256"
+_JWT_ISSUER = "supershyft"
+_JWT_AUDIENCE = "supershyft-api"
 
 
 def _base64url_encode(data: bytes) -> str:
@@ -37,7 +38,7 @@ def create_jwt_token(
     secret_key: Optional[str] = None,
     algorithm: str = _ALLOWED_ALGORITHM,
 ) -> str:
-    """Create a signed JWT using a standard library (python-jose)."""
+    """Create a signed JWT using PyJWT."""
     if algorithm != _ALLOWED_ALGORITHM:
         raise ValueError("Unsupported algorithm")
 
@@ -49,8 +50,10 @@ def create_jwt_token(
     payload_copy = dict(payload)
     payload_copy["iat"] = int(now.timestamp())
     payload_copy["exp"] = int((now + expires_delta).timestamp())
+    payload_copy["iss"] = _JWT_ISSUER
+    payload_copy["aud"] = _JWT_AUDIENCE
 
-    return jwt.encode(payload_copy, secret, algorithm=_ALLOWED_ALGORITHM)
+    return pyjwt.encode(payload_copy, secret, algorithm=_ALLOWED_ALGORITHM)
 
 
 def decode_and_verify_jwt(
@@ -58,7 +61,7 @@ def decode_and_verify_jwt(
     secret_key: Optional[str] = None,
     algorithm: str = _ALLOWED_ALGORITHM,
 ) -> Dict[str, Any]:
-    """Decode and verify a JWT using a standard library (python-jose)."""
+    """Decode and verify a JWT using PyJWT."""
     if algorithm != _ALLOWED_ALGORITHM:
         raise ValueError("Unsupported algorithm")
 
@@ -66,19 +69,22 @@ def decode_and_verify_jwt(
     if not secret:
         raise ValueError("JWT secret key is missing")
 
-    # Keep error messages stable for callers and tests.
     try:
-        payload = jwt.decode(token, secret, algorithms=[_ALLOWED_ALGORITHM])
-    except ExpiredSignatureError as exc:
+        payload = pyjwt.decode(
+            token,
+            secret,
+            algorithms=[_ALLOWED_ALGORITHM],
+            audience=_JWT_AUDIENCE,
+            issuer=_JWT_ISSUER,
+        )
+    except pyjwt.ExpiredSignatureError as exc:
         raise ValueError("Token has expired") from exc
-    except JWTError as exc:
+    except pyjwt.InvalidTokenError as exc:
         message = str(exc).lower()
 
-        # Format issues are usually "not enough segments".
         if "segments" in message or "format" in message:
             raise ValueError("Invalid token format") from exc
 
-        # Signature / key problems.
         if "signature" in message or "verify" in message or "key" in message:
             raise ValueError("Invalid token signature") from exc
 

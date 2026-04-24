@@ -106,11 +106,28 @@ class PaymentsService:
         *,
         payer_user_id: int,
         items: list[tuple[int, str, int]],
+        authenticated_user_id: int,
     ) -> dict[str, Any]:
         try:
             payer_result = await db.execute(select(User).where(User.user_id == payer_user_id))
-            if payer_result.scalar_one_or_none() is None:
+            payer_user = payer_result.scalar_one_or_none()
+            if payer_user is None:
                 return {"_error": (400, "User not found")}
+
+            is_self = payer_user_id == authenticated_user_id
+            is_family = (
+                payer_user.parent_id == authenticated_user_id
+                or (payer_user.parent_id is None and False)
+            )
+            if not is_self:
+                auth_result = await db.execute(select(User).where(User.user_id == authenticated_user_id))
+                auth_user = auth_result.scalar_one_or_none()
+                is_family = (
+                    (payer_user.parent_id == authenticated_user_id)
+                    or (auth_user is not None and auth_user.parent_id == payer_user_id)
+                )
+            if not is_self and not is_family:
+                return {"_error": (403, "Not authorized to create orders for this user")}
 
             bookings_created: list[Booking] = []
             total_paise = 0
@@ -360,11 +377,27 @@ class PaymentsService:
         *,
         booking_id: int,
         include_user_detail: bool = False,
+        requesting_user_id: int | None = None,
+        is_employee: bool = False,
     ) -> dict[str, Any] | None:
         booking_result = await db.execute(select(Booking).where(Booking.booking_id == booking_id))
         booking = booking_result.scalar_one_or_none()
         if booking is None:
             return None
+
+        if not is_employee and requesting_user_id is not None:
+            if booking.user_id != requesting_user_id:
+                order_link_res = await db.execute(
+                    select(_booking_order_link.c.oid).where(_booking_order_link.c.bid == booking_id).limit(1)
+                )
+                oid = order_link_res.scalar_one_or_none()
+                is_payer = False
+                if oid is not None:
+                    order_res = await db.execute(select(Order).where(Order.order_id == oid))
+                    order = order_res.scalar_one_or_none()
+                    is_payer = order is not None and order.user_id == requesting_user_id
+                if not is_payer:
+                    return None
 
         order_ids_sq = select(_booking_order_link.c.oid).where(_booking_order_link.c.bid == booking_id)
         pay_result = await db.execute(

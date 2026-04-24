@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common.responses import success_response
 from core.dependencies import get_current_user
 from core.exceptions import AppError
+from core.network import get_client_ip
+from core.rate_limit import limiter
 from db.session import get_db
 from modules.users.dependencies import get_participant_journey_service, get_users_service
 from modules.users.participant_journey_service import ParticipantJourneyService
@@ -36,18 +38,8 @@ from modules.users.service import UsersService
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-
-    if request.client is None:
-        return "unknown"
-
-    return request.client.host
-
-
 @router.post("/public/onboard")
+@limiter.limit("3/minute")
 async def public_onboard_user(
     payload: PublicUserOnboardRequest,
     request: Request,
@@ -57,7 +49,7 @@ async def public_onboard_user(
     result = await users_service.public_onboard_user(
         db,
         payload=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -67,6 +59,7 @@ async def public_onboard_user(
 
 
 @router.post("/code/{engagement_code}/onboard")
+@limiter.limit("3/minute")
 async def onboard_user_for_engagement(
     engagement_code: str,
     payload: EngagementUserOnboardRequest,
@@ -78,7 +71,7 @@ async def onboard_user_for_engagement(
         db,
         engagement_code=engagement_code,
         payload=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -138,7 +131,7 @@ async def book_bio_ai_for_current_user(
         db,
         user=current_user,
         payload=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -185,7 +178,7 @@ async def create_my_sub_profile(
         db,
         current_user=current_user,
         data=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -221,7 +214,7 @@ async def update_my_sub_profile(
         current_user=current_user,
         target_user_id=user_id,
         data=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -255,7 +248,7 @@ async def unlink_my_profile(
         db,
         current_user=current_user,
         data=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -299,7 +292,7 @@ async def update_me(
         db,
         user_id=current_user.user_id,
         payload=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -340,7 +333,7 @@ async def get_my_preferences(
     preference = await users_service.get_user_preferences(
         db,
         user_id=current_user.user_id,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -374,7 +367,7 @@ async def update_my_preferences(
         db,
         user_id=current_user.user_id,
         data=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -411,6 +404,7 @@ async def get_my_status(
 
 
 @router.post("")
+@limiter.limit("5/minute")
 async def employee_create_user(
     payload: EmployeeCreateUserRequest,
     request: Request,
@@ -420,7 +414,7 @@ async def employee_create_user(
     user = await users_service.create_user_by_employee(
         db,
         payload=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -522,7 +516,7 @@ async def sync_user_metsights_completed_records(
         current_user_id=current_user.user_id,
         employee_ok=employee is not None,
         engagement_code=payload.engagement_code,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -595,7 +589,7 @@ async def employee_update_user(
         employee=employee,
         user_id=user_id,
         payload=payload,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -616,7 +610,7 @@ async def employee_deactivate_user(
         db,
         employee=employee,
         user_id=user_id,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -637,7 +631,7 @@ async def employee_delete_user(
         db,
         employee=employee,
         user_id=user_id,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )

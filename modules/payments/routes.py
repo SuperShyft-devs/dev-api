@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
-from core.dependencies import get_optional_user
+from core.dependencies import get_current_user, get_optional_user
 from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_current_employee, get_employee_service
@@ -52,6 +52,7 @@ async def create_order(
     body: CreateOrderRequest,
     db: AsyncSession = Depends(get_db),
     service: PaymentsService = Depends(get_payments_service),
+    current_user=Depends(get_current_user),
 ):
     try:
         result = await service.create_order(
@@ -60,6 +61,7 @@ async def create_order(
             items=[
                 (line.user_id, line.entity_type.strip(), line.entity_id) for line in body.items
             ],
+            authenticated_user_id=current_user.user_id,
         )
         err = result.get("_error")
         if err:
@@ -79,6 +81,7 @@ async def verify_payment(
     body: VerifyPaymentRequest,
     db: AsyncSession = Depends(get_db),
     service: PaymentsService = Depends(get_payments_service),
+    current_user=Depends(get_current_user),
 ):
     try:
         result = await service.verify_payment(
@@ -112,6 +115,7 @@ async def payment_failed(
     body: FailedPaymentRequest,
     db: AsyncSession = Depends(get_db),
     service: PaymentsService = Depends(get_payments_service),
+    current_user=Depends(get_current_user),
 ):
     try:
         result = await service.record_failure(
@@ -173,22 +177,23 @@ async def booking_status(
     booking_id: int,
     db: AsyncSession = Depends(get_db),
     service: PaymentsService = Depends(get_payments_service),
-    user=Depends(get_optional_user),
+    user=Depends(get_current_user),
     employee_service: EmployeeService = Depends(get_employee_service),
 ):
-    include_user_detail = False
-    if user is not None:
-        try:
-            await employee_service.get_active_employee_by_user_id(db, user.user_id)
-            include_user_detail = True
-        except AppError:
-            include_user_detail = False
+    is_employee = False
+    try:
+        await employee_service.get_active_employee_by_user_id(db, user.user_id)
+        is_employee = True
+    except AppError:
+        pass
 
     try:
         data = await service.get_booking_status(
             db,
             booking_id=booking_id,
-            include_user_detail=include_user_detail,
+            include_user_detail=is_employee,
+            requesting_user_id=user.user_id,
+            is_employee=is_employee,
         )
         if data is None:
             return JSONResponse(

@@ -1362,7 +1362,7 @@ class UsersService:
 
         engagement = await self._engagements_service.get_by_code(db, code)
         if engagement is None:
-            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
         email = str(payload.email) if payload.email is not None else None
 

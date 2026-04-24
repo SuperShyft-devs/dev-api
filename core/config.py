@@ -65,6 +65,7 @@ class Settings:
         "ALLOW_BYPASS_OTP",
         os.getenv("allow_bypass_otp", "False"),
     ).lower() == "true"
+    BYPASS_OTP: str = os.getenv("BYPASS_OTP", "")
 
     # Media upload settings
     MEDIA_ROOT: str = os.getenv("MEDIA_ROOT", "/var/www/backend/media")
@@ -78,9 +79,22 @@ class Settings:
     METSIGHTS_API_KEY: str = os.getenv("METSIGHTS_API_KEY", "")
     METSIGHTS_TIMEOUT_SECONDS: int = int(os.getenv("METSIGHTS_TIMEOUT_SECONDS", "15"))
 
+    # Separate HMAC secrets (fall back to JWT_SECRET_KEY if not set)
+    OTP_HMAC_SECRET: str = os.getenv("OTP_HMAC_SECRET", "")
+    REFRESH_TOKEN_SECRET: str = os.getenv("REFRESH_TOKEN_SECRET", "")
+
     # Razorpay (server-side secret; never expose RAZORPAY_KEY_SECRET to clients)
     RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")
     RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")
+
+    # Trusted proxy list (comma-separated IPs). When set, X-Forwarded-For is
+    # only trusted if the TCP peer is in this list; otherwise request.client.host
+    # is used. Leave empty to always use request.client.host.
+    TRUSTED_PROXIES: list = [
+        p.strip()
+        for p in os.getenv("TRUSTED_PROXIES", "").split(",")
+        if p.strip()
+    ]
     
     @classmethod
     def validate(cls) -> None:
@@ -104,6 +118,21 @@ class Settings:
             raise ValueError(
                 f"Missing required environment variables: {', '.join(missing)}"
             )
+
+        _KNOWN_PLACEHOLDERS = {
+            "your-secret-key-here-change-in-production",
+            "changeme",
+            "secret",
+        }
+        if cls.JWT_SECRET_KEY.lower() in _KNOWN_PLACEHOLDERS:
+            raise ValueError(
+                "JWT_SECRET_KEY must be changed from its placeholder value"
+            )
+
+        if cls.is_production() and cls.DEBUG:
+            raise ValueError(
+                "DEBUG must not be True when APP_ENVIRONMENT is 'production'"
+            )
     
     @classmethod
     def is_production(cls) -> bool:
@@ -119,6 +148,16 @@ class Settings:
     def is_testing(cls) -> bool:
         """Check if running in test environment."""
         return cls.APP_ENVIRONMENT.lower() == "testing"
+
+    @classmethod
+    def get_otp_hmac_secret(cls) -> str:
+        """Return dedicated OTP HMAC secret, falling back to JWT_SECRET_KEY."""
+        return cls.OTP_HMAC_SECRET or cls.JWT_SECRET_KEY
+
+    @classmethod
+    def get_refresh_token_secret(cls) -> str:
+        """Return dedicated refresh-token HMAC secret, falling back to JWT_SECRET_KEY."""
+        return cls.REFRESH_TOKEN_SECRET or cls.JWT_SECRET_KEY
 
 
 # Create a singleton instance

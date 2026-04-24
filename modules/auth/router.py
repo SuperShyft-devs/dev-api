@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
 from core.dependencies import get_current_user
+from core.network import get_client_ip
+from core.rate_limit import limiter
 from db.session import get_db
 from modules.auth.dependencies import get_auth_service
 from modules.auth.schemas import (
@@ -21,18 +23,8 @@ from modules.auth.service import AuthService
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-
-    if request.client is None:
-        return "unknown"
-
-    return request.client.host
-
-
 @router.post("/send-otp")
+@limiter.limit("5/minute")
 async def send_otp(
     payload: SendOtpRequest,
     request: Request,
@@ -42,7 +34,7 @@ async def send_otp(
     session_id = await auth_service.send_otp(
         db,
         phone=payload.phone,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -51,6 +43,7 @@ async def send_otp(
 
 
 @router.post("/verify-otp")
+@limiter.limit("10/minute")
 async def verify_otp(
     payload: VerifyOtpRequest,
     request: Request,
@@ -61,7 +54,7 @@ async def verify_otp(
         db,
         phone=payload.phone,
         otp=payload.otp,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -88,7 +81,7 @@ async def refresh_token(
     tokens = await auth_service.refresh_tokens(
         db,
         refresh_token=payload.refresh_token,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -114,7 +107,7 @@ async def logout(
     await auth_service.logout(
         db,
         refresh_token=payload.refresh_token,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
@@ -134,7 +127,7 @@ async def switch_account(
         db,
         current_user_id=current_user.user_id,
         target_user_id=target_user_id,
-        ip_address=_client_ip(request),
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
