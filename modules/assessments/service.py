@@ -372,6 +372,7 @@ class AssessmentsService:
         user_agent: str,
         endpoint: str,
         metsights_sync: object | None = None,
+        source_assessment_instance_ids: list[int] | None = None,
     ) -> dict[str, Any]:
         """Mark questionnaire responses submitted, category progress and instance completed; push answers to Metsights."""
 
@@ -400,6 +401,7 @@ class AssessmentsService:
                 db,
                 assessment_instance_id=assessment_instance_id,
                 current_user_id=user_id,
+                source_assessment_instance_ids=source_assessment_instance_ids,
             )
 
         now = datetime.now(timezone.utc)

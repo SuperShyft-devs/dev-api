@@ -46,6 +46,10 @@ class MetsightsRecordIdUpdate(BaseModel):
         return stripped
 
 
+class AssessmentSubmitRequest(BaseModel):
+    source_assessment_instance_ids: list[int] | None = None
+
+
 class AssessmentPackageCreateRequest(BaseModel):
     package_code: str = Field(min_length=1, max_length=50)
     display_name: str = Field(min_length=1, max_length=200)

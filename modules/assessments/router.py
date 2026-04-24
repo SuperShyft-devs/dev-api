@@ -14,7 +14,7 @@ from modules.assessments.dependencies import (
     get_assessments_service,
 )
 from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
-from modules.assessments.schemas import AssessmentStatusUpdateRequest, MetsightsRecordIdUpdate
+from modules.assessments.schemas import AssessmentStatusUpdateRequest, AssessmentSubmitRequest, MetsightsRecordIdUpdate
 from modules.assessments.service import AssessmentsService
 from modules.employee.dependencies import get_current_employee, get_optional_employee
 from modules.metsights.dependencies import get_metsights_sync_service
@@ -106,12 +106,15 @@ async def get_assessment_details(
 async def submit_assessment(
     assessment_instance_id: int,
     request: Request,
+    body: AssessmentSubmitRequest | None = None,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
     assessments_service: AssessmentsService = Depends(get_assessments_service),
     sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
 ):
     """Finalize questionnaire: push answers to Metsights (when applicable), mark responses and assessment completed."""
+
+    source_ids = body.source_assessment_instance_ids if body else None
 
     data = await assessments_service.submit_assessment_for_user(
         db,
@@ -121,6 +124,7 @@ async def submit_assessment(
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
         metsights_sync=sync_service,
+        source_assessment_instance_ids=source_ids,
     )
     await db.commit()
     return success_response(data)

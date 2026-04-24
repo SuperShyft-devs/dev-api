@@ -801,8 +801,15 @@ class MetsightsSyncService:
         *,
         assessment_instance_id: int,
         current_user_id: int,
+        source_assessment_instance_ids: list[int] | None = None,
     ) -> dict[str, Any]:
-        """POST or PATCH Metsights record subresources from local ``questionnaire_responses`` (submit path)."""
+        """POST or PATCH Metsights record subresources from local ``questionnaire_responses`` (submit path).
+
+        When *source_assessment_instance_ids* is provided, responses are aggregated
+        from all listed instances (order matters -- later entries win on duplicate
+        question keys).  The target instance's ``metsights_record_id`` and package
+        type determine *where* the data is pushed.
+        """
 
         instance = await self._assessments.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
         if instance is None:
@@ -830,10 +837,38 @@ class MetsightsSyncService:
                 message="Assessment has no Metsights record id; cannot push questionnaire",
             )
 
-        responses = await self._questionnaire.list_responses_for_instance(
+        # Determine which instance ids to pull responses from.
+        effective_source_ids: list[int]
+        if source_assessment_instance_ids:
+            for src_id in source_assessment_instance_ids:
+                if int(src_id) == int(assessment_instance_id):
+                    continue
+                src = await self._assessments.get_instance_by_id(db, assessment_instance_id=int(src_id))
+                if src is None:
+                    raise AppError(
+                        status_code=422,
+                        error_code="INVALID_STATE",
+                        message=f"Source assessment instance {src_id} does not exist",
+                    )
+                if int(src.user_id) != int(current_user_id):
+                    raise AppError(
+                        status_code=422,
+                        error_code="INVALID_STATE",
+                        message=f"Source assessment instance {src_id} belongs to a different user",
+                    )
+            effective_source_ids = list(source_assessment_instance_ids)
+        else:
+            effective_source_ids = [assessment_instance_id]
+
+        responses = await self._questionnaire.list_responses_for_instances(
             db,
-            assessment_instance_id=assessment_instance_id,
+            assessment_instance_ids=effective_source_ids,
         )
+
+        # Build an ordered list so that responses from later source ids overwrite earlier ones.
+        source_order = {sid: idx for idx, sid in enumerate(effective_source_ids)}
+        responses.sort(key=lambda r: (source_order.get(int(r.assessment_instance_id), 0), int(r.response_id)))
+
         qids = list({int(r.question_id) for r in responses})
         defs_map = await self._questionnaire.get_definitions_by_ids(db, question_ids=qids)
 

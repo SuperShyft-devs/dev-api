@@ -322,6 +322,24 @@ class QuestionnaireRepository:
         result = await db.execute(query)
         return list(result.scalars().all())
 
+    async def list_responses_for_instances(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_ids: list[int],
+    ) -> list[QuestionnaireResponse]:
+        if not assessment_instance_ids:
+            return []
+        result = await db.execute(
+            select(QuestionnaireResponse)
+            .where(QuestionnaireResponse.assessment_instance_id.in_(assessment_instance_ids))
+            .order_by(
+                QuestionnaireResponse.assessment_instance_id.asc(),
+                QuestionnaireResponse.question_id.asc(),
+            )
+        )
+        return list(result.scalars().all())
+
     async def create_response(
         self,
         db: AsyncSession,
