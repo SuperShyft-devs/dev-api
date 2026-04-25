@@ -35,6 +35,7 @@ class DiagnosticPackage(Base):
     is_most_popular = Column(Boolean, nullable=False, default=False, server_default="false")
     gender_suitability = Column(String)
     status = Column(String, default="active", server_default="active")
+    package_for = Column(String, nullable=False, default="public", server_default="public")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     reasons = relationship(
@@ -168,6 +169,7 @@ class DiagnosticTestGroup(Base):
     original_price = Column(Numeric(10, 2))
     is_most_popular = Column(Boolean, nullable=False, default=False, server_default="false")
     gender_suitability = Column(String)
+    package_for = Column(String, nullable=False, default="public", server_default="public")
 
     tests = relationship(
         "DiagnosticTestGroupTest",

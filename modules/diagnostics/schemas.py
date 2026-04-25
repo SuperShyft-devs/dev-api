@@ -19,6 +19,11 @@ class PackageListType(str, Enum):
     CUSTOM_PACKAGE = "custom_package"
 
 
+class PackageForType(str, Enum):
+    PUBLIC = "public"
+    CAMP = "camp"
+
+
 class FilterChipForSchema(str, Enum):
     PUBLIC_PACKAGE = "public_package"
     CUSTOM_PACKAGE = "custom_package"
@@ -37,6 +42,7 @@ class DiagnosticPackageCreate(BaseModel):
     is_most_popular: Optional[bool] = None
     gender_suitability: Optional[str] = None
     reference_id: Optional[str] = None
+    package_for: Optional[PackageForType] = None
 
 
 class DiagnosticPackageUpdate(BaseModel):
@@ -51,6 +57,7 @@ class DiagnosticPackageUpdate(BaseModel):
     is_most_popular: Optional[bool] = None
     gender_suitability: Optional[str] = None
     reference_id: Optional[str] = None
+    package_for: Optional[PackageForType] = None
 
 
 class DiagnosticPackageStatusUpdate(BaseModel):
@@ -72,6 +79,7 @@ class DiagnosticPackageResponse(BaseModel):
     original_price: Optional[float] = None
     is_most_popular: Optional[bool] = None
     gender_suitability: Optional[str] = None
+    package_for: Optional[str] = None
     status: Optional[str] = None
     created_at: Optional[datetime] = None
     discount_percent: Optional[int] = None
@@ -224,6 +232,7 @@ class TestGroupCreate(BaseModel):
     original_price: Optional[float] = None
     is_most_popular: Optional[bool] = None
     gender_suitability: Optional[str] = None
+    package_for: Optional[PackageForType] = None
 
 
 class TestGroupUpdate(BaseModel):
@@ -233,6 +242,7 @@ class TestGroupUpdate(BaseModel):
     original_price: Optional[float] = None
     is_most_popular: Optional[bool] = None
     gender_suitability: Optional[str] = None
+    package_for: Optional[PackageForType] = None
 
 
 class TestGroupResponse(BaseModel):
@@ -245,6 +255,7 @@ class TestGroupResponse(BaseModel):
     original_price: Optional[float] = None
     is_most_popular: Optional[bool] = None
     gender_suitability: Optional[str] = None
+    package_for: Optional[str] = None
     tests: list[HealthParameterResponse] = Field(default_factory=list)
     filter_chips: list[PackageFilterChipResponse] = Field(default_factory=list)
 
@@ -341,6 +352,7 @@ class DiagnosticPackageListItem(BaseModel):
     discount_percent: Optional[int] = None
     is_most_popular: Optional[bool] = None
     gender_suitability: Optional[str] = None
+    package_for: Optional[str] = None
     status: Optional[str] = None
     tags: list[TagResponse] = Field(default_factory=list)
     filter_chips: list[PackageFilterChipResponse] = Field(default_factory=list)

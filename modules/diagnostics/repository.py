@@ -39,6 +39,7 @@ class DiagnosticsRepository:
         active_only: bool = True,
         public_only: bool = False,
         created_by_user_id: int | None = None,
+        package_for: str | None = None,
     ) -> list[DiagnosticPackage]:
         query = (
             select(DiagnosticPackage)
@@ -52,6 +53,9 @@ class DiagnosticsRepository:
 
         if active_only:
             query = query.where(DiagnosticPackage.status == "active")
+
+        if package_for is not None:
+            query = query.where(DiagnosticPackage.package_for == package_for)
 
         if public_only:
             query = query.where(DiagnosticPackage.created_by_user_id.is_(None))
@@ -171,6 +175,12 @@ class DiagnosticsRepository:
         db.add(package)
         await db.flush()
         return package
+
+    async def delete_package(self, db: AsyncSession, *, package_id: int) -> int:
+        result = await db.execute(
+            delete(DiagnosticPackage).where(DiagnosticPackage.diagnostic_package_id == package_id)
+        )
+        return int(result.rowcount or 0)
 
     async def get_all_filter_chips(
         self,
@@ -489,11 +499,14 @@ class DiagnosticsRepository:
         db: AsyncSession,
         *,
         filter_chip_key: str | None = None,
+        package_for: str | None = None,
     ) -> list[tuple[DiagnosticTestGroup, int]]:
         query = (
             select(DiagnosticTestGroup, func.count(DiagnosticTestGroupTest.id))
             .outerjoin(DiagnosticTestGroupTest, DiagnosticTestGroupTest.group_id == DiagnosticTestGroup.group_id)
         )
+        if package_for is not None:
+            query = query.where(DiagnosticTestGroup.package_for == package_for)
         if filter_chip_key is not None:
             chip_sub = (
                 select(DiagnosticPackageFilterChipLink.group_id)

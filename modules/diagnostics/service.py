@@ -42,6 +42,7 @@ from modules.diagnostics.schemas import (
     HealthParameterCreate,
     HealthParameterResponse,
     HealthParameterUpdate,
+    PackageForType,
     PackageTestsResponse,
     ParameterType,
     PreparationCreate,
@@ -70,6 +71,7 @@ _ALLOWED_COLLECTION_TYPES = {"home_collection", "centre_visit"}
 _ALLOWED_GENDER_VALUES = {"male", "female", "both"}
 _ALLOWED_STATUS_VALUES = {"active", "inactive"}
 _ALLOWED_CHIP_FOR = {e.value for e in FilterChipForSchema}
+_ALLOWED_PACKAGE_FOR = {e.value for e in PackageForType}
 
 
 def _discount_percent(price: float | None, original_price: float | None) -> int | None:
@@ -150,6 +152,13 @@ class DiagnosticsService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         if gender is not None:
             payload["gender_suitability"] = gender
+
+    def _validate_package_for_field(self, payload: dict) -> None:
+        pf = self._normalize_lower(payload.get("package_for"))
+        if pf is not None and pf not in _ALLOWED_PACKAGE_FOR:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        if pf is not None:
+            payload["package_for"] = pf
 
     def _validate_optional_gender_field(self, payload: dict) -> None:
         gender = self._normalize_lower(payload.get("gender_suitability"))
@@ -286,6 +295,7 @@ class DiagnosticsService:
             original_price=original_price,
             is_most_popular=bool(row.is_most_popular),
             gender_suitability=row.gender_suitability,
+            package_for=row.package_for,
             tests=[self._to_health_parameter_response(test_row) for test_row in tests_value],
             filter_chips=self._group_filter_chip_link_responses(chip_links),
         )
@@ -313,6 +323,7 @@ class DiagnosticsService:
             original_price=original_price,
             is_most_popular=row.is_most_popular,
             gender_suitability=row.gender_suitability,
+            package_for=row.package_for,
             status=row.status,
             created_at=row.created_at,
             discount_percent=_discount_percent(price, original_price),
@@ -334,6 +345,7 @@ class DiagnosticsService:
         active_only: bool = True,
         list_type: str = "public_package",
         requesting_user_id: int | None = None,
+        package_for: str | None = None,
     ) -> list[DiagnosticPackageListItem]:
         gender_value = self._normalize_lower(gender)
         tag_value = self._normalize(tag)
@@ -347,6 +359,10 @@ class DiagnosticsService:
         public_only = list_type == "public_package"
         created_by_user_id = None if public_only else requesting_user_id
 
+        resolved_package_for = package_for
+        if resolved_package_for is None and public_only and active_only:
+            resolved_package_for = "public"
+
         rows = await self._repository.get_all_packages(
             db,
             gender=gender_value,
@@ -355,6 +371,7 @@ class DiagnosticsService:
             active_only=active_only,
             public_only=public_only,
             created_by_user_id=created_by_user_id,
+            package_for=resolved_package_for,
         )
         pkg_ids = [r.diagnostic_package_id for r in rows]
         counts = await self._repository.count_distinct_tests_for_packages(db, package_ids=pkg_ids)
@@ -379,6 +396,7 @@ class DiagnosticsService:
                     discount_percent=_discount_percent(price, original_price),
                     is_most_popular=row.is_most_popular,
                     gender_suitability=row.gender_suitability,
+                    package_for=row.package_for,
                     status=row.status,
                     tags=[self._to_tag_response(tag_row) for tag_row in tags],
                     filter_chips=self._package_filter_chip_responses(row),
@@ -452,7 +470,9 @@ class DiagnosticsService:
             payload["created_by_user_id"] = current_user_id
 
         self._validate_package_common_fields(payload)
+        self._validate_package_for_field(payload)
         payload.setdefault("status", "active")
+        payload.setdefault("package_for", "public")
 
         package = DiagnosticPackage(**payload)
         package = await self._repository.create_package(db, package)
@@ -501,6 +521,7 @@ class DiagnosticsService:
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
             payload["package_name"] = name
         self._validate_package_common_fields(payload)
+        self._validate_package_for_field(payload)
 
         updated = await self._repository.update_package(db, package_id=package_id, data=payload)
         if updated is None:
@@ -689,9 +710,9 @@ class DiagnosticsService:
         )
         return {"deleted": True}
 
-    async def get_all_groups(self, db, *, filter_chip: str | None = None) -> list[TestGroupResponse]:
+    async def get_all_groups(self, db, *, filter_chip: str | None = None, package_for: str | None = None) -> list[TestGroupResponse]:
         chip_key_value = self._normalize(filter_chip)
-        rows = await self._repository.get_all_groups(db, filter_chip_key=chip_key_value)
+        rows = await self._repository.get_all_groups(db, filter_chip_key=chip_key_value, package_for=package_for)
         return [self._to_group_response(group, tests=[], test_count=test_count) for group, test_count in rows]
 
     async def get_group_detail(self, db, *, group_id: int) -> TestGroupResponse:
@@ -719,6 +740,8 @@ class DiagnosticsService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         payload["group_name"] = group_name
         self._validate_optional_gender_field(payload)
+        self._validate_package_for_field(payload)
+        payload.setdefault("package_for", "public")
 
         created = await self._repository.create_group(db, DiagnosticTestGroup(**payload))
         await self._require_audit_service().log_event(
@@ -755,6 +778,7 @@ class DiagnosticsService:
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
             payload["group_name"] = group_name
         self._validate_optional_gender_field(payload)
+        self._validate_package_for_field(payload)
 
         updated = await self._repository.update_group(db, group_id=group_id, data=payload)
         if updated is None:
@@ -1106,6 +1130,31 @@ class DiagnosticsService:
             session_id=None,
         )
         return await self._package_response_with_test_count(db, updated)
+
+    async def delete_package(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        package_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> None:
+        self._ensure_employee_access(employee)
+        existing = await self._repository.get_package_by_id_basic(db, package_id=package_id)
+        if existing is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
+        await self._repository.delete_package(db, package_id=package_id)
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_DELETE_DIAGNOSTIC_PACKAGE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
 
     async def get_filter_chips(self, db, *, chip_for: str | None = None) -> list[FilterChipResponse]:
         scope = self._normalize_lower(chip_for) if chip_for is not None else "public_package"

@@ -61,6 +61,7 @@ async def list_diagnostic_packages(
     filter_chip: str | None = None,
     package_list_type: PackageListType = Query(default=PackageListType.PUBLIC_PACKAGE, alias="type"),
     include_inactive: bool = Query(default=False),
+    package_for: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
@@ -84,6 +85,7 @@ async def list_diagnostic_packages(
         active_only=active_only,
         list_type=package_list_type.value,
         requesting_user_id=requesting_user_id,
+        package_for=package_for,
     )
     return success_response([item.model_dump() for item in data])
 
@@ -246,6 +248,26 @@ async def update_package_status(
     )
     await db.commit()
     return success_response(updated.model_dump())
+
+
+@router.delete("/diagnostic-packages/{package_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_package(
+    package_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    await diagnostics_service.delete_package(
+        db,
+        employee=employee,
+        package_id=package_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/diagnostic-packages/{package_id}/reasons", status_code=201)
@@ -628,11 +650,12 @@ async def delete_health_parameter(
 @router.get("/diagnostic-test-groups")
 async def list_diagnostic_test_groups(
     filter_chip: str | None = Query(default=None),
+    package_for: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
     diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
 ):
-    data = await diagnostics_service.get_all_groups(db, filter_chip=filter_chip)
+    data = await diagnostics_service.get_all_groups(db, filter_chip=filter_chip, package_for=package_for)
     return success_response([item.model_dump() for item in data])
 
 
