@@ -9,7 +9,7 @@ from common.responses import success_response
 from core.dependencies import get_current_user
 from db.session import get_db
 from modules.reports.dependencies import get_reports_service
-from modules.reports.schemas import BloodParameterTrendResponse
+from modules.reports.schemas import BloodParameterTrendResponse, HealthSpanIndexRequest
 from modules.reports.service import ReportsService
 
 
@@ -117,6 +117,25 @@ async def get_bio_ai_pdf_report(
     )
     await db.commit()
     return success_response(response.model_dump())
+
+
+@router.post("/{assessment_instance_id}/health-span-index")
+async def get_health_span_index(
+    assessment_instance_id: int,
+    body: HealthSpanIndexRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    reports_service: ReportsService = Depends(get_reports_service),
+):
+    response = await reports_service.get_health_span_index(
+        db,
+        assessment_instance_id=assessment_instance_id,
+        user_id=user.user_id,
+        source_assessment_instance_ids=body.source_assessment_instance_ids,
+        include_details=body.include_details,
+    )
+    await db.commit()
+    return success_response(response.model_dump(exclude_none=not body.include_details))
 
 
 @router.get("/trends")

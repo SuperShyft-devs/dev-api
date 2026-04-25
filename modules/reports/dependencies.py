@@ -24,4 +24,5 @@ def get_reports_service() -> ReportsService:
         audit_service=AuditService(AuditRepository()),
         session_factory=AsyncSessionLocal,
         healthy_habits_service=HealthyHabitsService(questionnaire_repository),
+        questionnaire_repository=questionnaire_repository,
     )

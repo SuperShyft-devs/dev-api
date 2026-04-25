@@ -6,9 +6,11 @@ import asyncio
 from datetime import date, datetime, timezone
 from typing import Any
 
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from core.config import settings
 from core.exceptions import AppError
 from db.session import AsyncSessionLocal
 from modules.assessments.models import AssessmentInstance
@@ -19,6 +21,7 @@ from modules.metsights.service import MetsightsService
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.reports.repository import ReportsRepository
 from modules.questionnaire.healthy_habits_service import HealthyHabitsService
+from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.schemas import (
     BioAiPdfResponse,
     BloodParameterGroupInReportResponse,
@@ -26,11 +29,19 @@ from modules.reports.schemas import (
     DiseaseDetailResponse,
     DiseaseListItem,
     DiseaseOverview,
+    FitPrintParameter,
+    FitPrintParameterRange,
+    HealthSpanFitnessDetail,
+    HealthSpanIndexResponse,
+    HealthSpanLifestyleDetail,
+    HealthSpanNutritionDetail,
     HealthyHabitItem,
+    NutrientDetail,
     OverviewReportResponse,
     PositiveWins,
     RiskAnalysisItem,
     RiskAnalysisListResponse,
+    WaterDetail,
 )
 
 
@@ -51,6 +62,7 @@ class ReportsService:
         audit_service: AuditService | None = None,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
         healthy_habits_service: HealthyHabitsService | None = None,
+        questionnaire_repository: QuestionnaireRepository | None = None,
     ):
         self._repository = repository
         self._assessments_repository = assessments_repository
@@ -59,6 +71,7 @@ class ReportsService:
         self._audit_service = audit_service
         self._session_factory = session_factory or AsyncSessionLocal
         self._healthy_habits_service = healthy_habits_service
+        self._questionnaire_repository = questionnaire_repository
 
     def _require_audit_service(self) -> AuditService:
         if self._audit_service is None:
@@ -734,6 +747,337 @@ class ReportsService:
             )
 
         return groups
+
+    # ------------------------------------------------------------------
+    # Health Span Index
+    # ------------------------------------------------------------------
+
+    _NUTRITION_API_QUESTION_KEYS = [
+        "exercise_frequency_week",
+        "exercise_level",
+        "healthy_breakfast_frequency",
+        "diet_preference",
+        "food_groups",
+        "fresh_fruit_frequency",
+        "fresh_vegetable_frequency",
+        "baked_goods_frequency",
+        "red_meat_frequency",
+        "butter_dish_frequency",
+        "dessert_frequency",
+        "caffeine_frequency",
+        "water_intake_frequency",
+        "tobacco_frequency",
+        "alcohol_frequency",
+        "sickness_frequency",
+    ]
+
+    async def _call_nutrition_api(self, payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            async with httpx.AsyncClient(timeout=settings.NUTRITION_API_TIMEOUT_SECONDS) as client:
+                response = await client.post(
+                    settings.NUTRITION_API_URL,
+                    json=payload,
+                    headers={"X-API-Key": settings.NUTRITION_API_KEY},
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data if isinstance(data, dict) else {}
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Nutrition API request failed",
+            ) from exc
+
+    async def _build_questionnaire_lookup(
+        self,
+        db: AsyncSession,
+        *,
+        source_assessment_instance_ids: list[int],
+    ) -> tuple[dict[str, Any], dict[str, int]]:
+        """Build a question_key -> answer dict from questionnaire responses across multiple instances.
+
+        Returns (lookup, key_to_question_id) where key_to_question_id maps question_key -> question_id
+        for option label resolution. Later instance ids override earlier ones for the same question_key.
+        """
+        if self._questionnaire_repository is None:
+            raise RuntimeError("QuestionnaireRepository is required for health span index")
+
+        responses = await self._questionnaire_repository.list_responses_for_instances(
+            db,
+            assessment_instance_ids=source_assessment_instance_ids,
+        )
+        if not responses:
+            return {}, {}
+
+        question_ids = list({int(r.question_id) for r in responses})
+        definitions = await self._questionnaire_repository.get_definitions_by_ids(
+            db, question_ids=question_ids,
+        )
+
+        lookup: dict[str, Any] = {}
+        key_to_question_id: dict[str, int] = {}
+        for r in responses:
+            defn = definitions.get(int(r.question_id))
+            if defn is None or not defn.question_key:
+                continue
+            lookup[defn.question_key] = r.answer
+            key_to_question_id[defn.question_key] = int(defn.question_id)
+        return lookup, key_to_question_id
+
+    def _build_nutrition_api_payload(self, lookup: dict[str, Any]) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        for key in self._NUTRITION_API_QUESTION_KEYS:
+            val = lookup.get(key)
+            if val is None:
+                continue
+            if isinstance(val, list):
+                payload[key] = [str(v) for v in val]
+            else:
+                payload[key] = str(val)
+        return payload
+
+    @staticmethod
+    def _extract_questionnaire_value(lookup: dict[str, Any], key: str) -> str | None:
+        val = lookup.get(key)
+        if val is None:
+            return None
+        if isinstance(val, dict):
+            raw = val.get("value")
+            return str(raw) if raw is not None else None
+        if isinstance(val, list):
+            return ", ".join(str(v) for v in val)
+        return str(val)
+
+    async def _resolve_option_label(
+        self,
+        db: AsyncSession,
+        *,
+        lookup: dict[str, Any],
+        key_to_question_id: dict[str, int],
+        question_key: str,
+    ) -> str | None:
+        """Resolve a single_choice answer's option_value to its display_name."""
+        val = lookup.get(question_key)
+        if val is None:
+            return None
+        qid = key_to_question_id.get(question_key)
+        if qid is None or self._questionnaire_repository is None:
+            return str(val)
+        options = await self._questionnaire_repository.list_options_for_question(db, question_id=qid)
+        option_map = {opt.option_value: opt.display_name for opt in options}
+        if isinstance(val, list):
+            labels = [option_map.get(str(v), str(v)) for v in val]
+            return ", ".join(labels)
+        return option_map.get(str(val), str(val))
+
+    @staticmethod
+    def _extract_fitprint_parameter(
+        params_list: Any,
+        parameter_name: str,
+    ) -> FitPrintParameter | None:
+        """Extract a full parameter object from a FitPrint report parameters list."""
+        if not isinstance(params_list, list):
+            return None
+        for p in params_list:
+            if not isinstance(p, dict):
+                continue
+            if p.get("parameter") != parameter_name:
+                continue
+            raw_val = p.get("value")
+            value = float(raw_val) if isinstance(raw_val, (int, float)) else None
+            healthy_range_str = p.get("healthy_range")
+            healthy_range: FitPrintParameterRange | None = None
+            if isinstance(healthy_range_str, str) and "–" in healthy_range_str:
+                parts = healthy_range_str.split("–")
+                try:
+                    healthy_range = FitPrintParameterRange(
+                        min=float(parts[0].strip()),
+                        max=float(parts[1].strip()),
+                    )
+                except (ValueError, IndexError):
+                    pass
+            return FitPrintParameter(
+                parameter=p.get("parameter"),
+                code=p.get("code"),
+                value=value,
+                unit=p.get("unit"),
+                healthy_range=healthy_range,
+                status=p.get("status"),
+            )
+        return None
+
+    async def get_health_span_index(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        user_id: int,
+        source_assessment_instance_ids: list[int],
+        include_details: bool,
+    ) -> HealthSpanIndexResponse:
+        # Step 1: Validate that the assessment is FitPrint (type_code "7")
+        row = await self._assessments_repository.get_instance_for_user(
+            db,
+            assessment_instance_id=assessment_instance_id,
+            user_id=user_id,
+        )
+        if row is None:
+            raise AppError(
+                status_code=404,
+                error_code="ASSESSMENT_NOT_FOUND",
+                message="Assessment does not exist",
+            )
+
+        assessment_instance, package = row
+        if package is None:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Assessment package is missing",
+            )
+
+        assessment_type_code = (package.assessment_type_code or "").strip()
+        if assessment_type_code != "7":
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_ASSESSMENT_TYPE",
+                message="Health Span Index is only available for FitPrint assessments",
+            )
+
+        # Step 2: Get or fetch the FitPrint report (cache in individual_health_report)
+        existing_report = await self._repository.get_individual_report_by_assessment(
+            db,
+            assessment_instance_id=assessment_instance_id,
+        )
+
+        if existing_report is not None and existing_report.reports is not None:
+            report_data: Any = existing_report.reports
+        else:
+            record_id = (assessment_instance.metsights_record_id or "").strip()
+            if not record_id:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Metsights record id is missing for this assessment",
+                )
+
+            report_data = await self._metsights_service.get_report(
+                record_id=record_id,
+                assessment_type_code="7",
+            )
+
+            if existing_report is None:
+                existing_report = IndividualHealthReport(
+                    user_id=assessment_instance.user_id,
+                    engagement_id=assessment_instance.engagement_id,
+                    assessment_instance_id=assessment_instance.assessment_instance_id,
+                    reports=report_data,
+                    blood_parameters=None,
+                )
+                await self._repository.create_individual_report(db, existing_report)
+            else:
+                existing_report.reports = report_data
+                await self._repository.update_individual_report(db, existing_report)
+
+        report_dict = report_data if isinstance(report_data, dict) else {}
+
+        # Step 3: Extract scores from the FitPrint report
+        fitness_spec = report_dict.get("fitness_specification") or {}
+        activity_spec = report_dict.get("activity_specification") or {}
+
+        raw_lifestyle = fitness_spec.get("score") if isinstance(fitness_spec, dict) else None
+        lifestyle_score = float(raw_lifestyle) if isinstance(raw_lifestyle, (int, float)) else None
+
+        raw_fitness = activity_spec.get("score") if isinstance(activity_spec, dict) else None
+        fitness_score = float(raw_fitness) if isinstance(raw_fitness, (int, float)) else None
+
+        # Step 4: Load questionnaire responses
+        lookup, key_to_question_id = await self._build_questionnaire_lookup(
+            db,
+            source_assessment_instance_ids=source_assessment_instance_ids,
+        )
+
+        # Step 5: Call the nutrition API
+        nutrition_payload = self._build_nutrition_api_payload(lookup)
+        nutrition_response = await self._call_nutrition_api(nutrition_payload)
+        nutrition_score_raw = nutrition_response.get("nutrition_score")
+        nutrition_score = float(nutrition_score_raw) if isinstance(nutrition_score_raw, (int, float)) else None
+
+        # Step 6: Build the response
+        if not include_details:
+            return HealthSpanIndexResponse(
+                lifestyle_score=lifestyle_score,
+                nutrition_score=nutrition_score,
+                fitness_score=fitness_score,
+            )
+
+        # Fitness details
+        blood_pressure = self._extract_questionnaire_value(lookup, "systolic_blood_pressure")
+        waist = self._extract_questionnaire_value(lookup, "waist_circumference")
+
+        activity_params = activity_spec.get("parameters") if isinstance(activity_spec, dict) else None
+        bmr_param = self._extract_fitprint_parameter(activity_params, "Basal Metabolic Rate")
+
+        fitness_params = fitness_spec.get("parameters") if isinstance(fitness_spec, dict) else None
+        body_fat_param = self._extract_fitprint_parameter(fitness_params, "Estimated Body Fat")
+
+        fitness_detail = HealthSpanFitnessDetail(
+            blood_pressure=blood_pressure,
+            basal_metabolic_rate=bmr_param,
+            waist=waist,
+            estimated_body_fat=body_fat_param,
+        )
+
+        # Nutrition details
+        def _nutrient(key: str) -> NutrientDetail | None:
+            raw = nutrition_response.get(key)
+            if not isinstance(raw, dict):
+                return None
+            return NutrientDetail(
+                estimated_low=raw.get("estimated_low"),
+                estimated_high=raw.get("estimated_high"),
+                ideal_low=raw.get("ideal_low"),
+                ideal_high=raw.get("ideal_high"),
+                status=raw.get("status"),
+            )
+
+        water_raw = nutrition_response.get("water")
+        water_detail: WaterDetail | None = None
+        if isinstance(water_raw, dict):
+            water_detail = WaterDetail(
+                estimated_litres=water_raw.get("estimated_litres"),
+                ideal_low_litres=water_raw.get("ideal_low_litres"),
+                ideal_high_litres=water_raw.get("ideal_high_litres"),
+                status=water_raw.get("status"),
+            )
+
+        nutrition_detail = HealthSpanNutritionDetail(
+            carbs=_nutrient("carbs"),
+            fats=_nutrient("fats"),
+            protein=_nutrient("protein"),
+            fibre=_nutrient("fibre"),
+            water=water_detail,
+        )
+
+        # Lifestyle details (resolve option_value -> display_name)
+        resolve = self._resolve_option_label
+        lifestyle_detail = HealthSpanLifestyleDetail(
+            physical_activity=await resolve(db, lookup=lookup, key_to_question_id=key_to_question_id, question_key="physical_activity_frequency"),
+            smoke=await resolve(db, lookup=lookup, key_to_question_id=key_to_question_id, question_key="tobacco_frequency"),
+            alcohol=await resolve(db, lookup=lookup, key_to_question_id=key_to_question_id, question_key="alcohol_frequency"),
+            sleep=await resolve(db, lookup=lookup, key_to_question_id=key_to_question_id, question_key="sleeping_hours"),
+            family_history=await resolve(db, lookup=lookup, key_to_question_id=key_to_question_id, question_key="family_health_history"),
+        )
+
+        return HealthSpanIndexResponse(
+            lifestyle_score=lifestyle_score,
+            nutrition_score=nutrition_score,
+            fitness_score=fitness_score,
+            fitness=fitness_detail,
+            nutrition=nutrition_detail,
+            lifestyle=lifestyle_detail,
+        )
 
     async def _get_or_create_sync_state(self, db: AsyncSession, *, user_id: int) -> ReportsUserSyncState:
         state = await self._repository.get_user_sync_state(db, user_id=user_id)

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 
@@ -103,3 +101,72 @@ class DiseaseDetailResponse(BaseModel):
     effects_when_low: str | None = None
     what_to_do_when_low: str | None = None
     what_to_do_when_high: str | None = None
+
+
+# --- Health Span Index ---
+
+
+class HealthSpanIndexRequest(BaseModel):
+    source_assessment_instance_ids: list[int]
+    include_details: bool = False
+
+
+class NutrientDetail(BaseModel):
+    estimated_low: float | None = None
+    estimated_high: float | None = None
+    ideal_low: float | None = None
+    ideal_high: float | None = None
+    status: str | None = None
+
+
+class WaterDetail(BaseModel):
+    estimated_litres: float | None = None
+    ideal_low_litres: float | None = None
+    ideal_high_litres: float | None = None
+    status: str | None = None
+
+
+class FitPrintParameterRange(BaseModel):
+    min: float | None = None
+    max: float | None = None
+
+
+class FitPrintParameter(BaseModel):
+    parameter: str | None = None
+    code: str | None = None
+    value: float | None = None
+    unit: str | None = None
+    healthy_range: FitPrintParameterRange | None = None
+    status: str | None = None
+
+
+class HealthSpanFitnessDetail(BaseModel):
+    blood_pressure: str | None = None
+    basal_metabolic_rate: FitPrintParameter | None = None
+    waist: str | None = None
+    estimated_body_fat: FitPrintParameter | None = None
+
+
+class HealthSpanNutritionDetail(BaseModel):
+    carbs: NutrientDetail | None = None
+    fats: NutrientDetail | None = None
+    protein: NutrientDetail | None = None
+    fibre: NutrientDetail | None = None
+    water: WaterDetail | None = None
+
+
+class HealthSpanLifestyleDetail(BaseModel):
+    physical_activity: str | None = None
+    smoke: str | None = None
+    alcohol: str | None = None
+    sleep: str | None = None
+    family_history: str | None = None
+
+
+class HealthSpanIndexResponse(BaseModel):
+    lifestyle_score: float | None = None
+    nutrition_score: float | None = None
+    fitness_score: float | None = None
+    fitness: HealthSpanFitnessDetail | None = None
+    nutrition: HealthSpanNutritionDetail | None = None
+    lifestyle: HealthSpanLifestyleDetail | None = None

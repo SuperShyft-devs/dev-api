@@ -103,6 +103,21 @@ class QuestionnaireRepository:
         )
         return list(result.scalars().all())
 
+    async def list_options_for_question_ids(
+        self,
+        db: AsyncSession,
+        *,
+        question_ids: list[int],
+    ) -> list[QuestionnaireOption]:
+        if not question_ids:
+            return []
+        result = await db.execute(
+            select(QuestionnaireOption)
+            .where(QuestionnaireOption.question_id.in_(question_ids))
+            .order_by(QuestionnaireOption.question_id.asc(), QuestionnaireOption.option_id.asc())
+        )
+        return list(result.scalars().all())
+
     async def replace_options_for_question(
         self,
         db: AsyncSession,
