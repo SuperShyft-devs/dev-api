@@ -31,9 +31,7 @@ from db.seed.diagnostics_csv import resolve_diagnostics_csv_dir
 from db.seed.diagnostics_operations import (
     reset_diagnostics_sequences,
     seed_diagnostics_reference_from_csv_dir,
-    upsert_diagnostic_package_samples,
 )
-from db.seed.diagnostics_seed_tables import DIAG_SAMPLES
 from db.seed.operations import (
     delete_options_for_question_ids,
     reset_sequences,
@@ -85,7 +83,6 @@ async def seed_reference_data(*, yes: bool) -> None:
 
             csv_dir = resolve_diagnostics_csv_dir()
             await seed_diagnostics_reference_from_csv_dir(session, csv_dir)
-            await upsert_diagnostic_package_samples(session, DIAG_SAMPLES)
             await upsert_default_platform_settings(session)
 
             await reset_sequences(session)

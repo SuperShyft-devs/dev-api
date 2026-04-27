@@ -1,0 +1,35 @@
+filter_chip_id,chip_key,display_name,display_order,status,chip_for
+2,general_health,General Health,,active,custom_package
+3,progressive_tests,Progressive tests,,active,custom_package
+4,hormones,Hormones,,active,custom_package
+5,vitamins,Vitamins,,active,custom_package
+6,cancerr,Cancer,,active,custom_package
+7,allergies,Allergies,,active,custom_package
+15,allergy,Allergy,9,active,public_package
+13,immunity,Immunity,7,active,public_package
+1,cancer,Cancer,2,active,public_package
+25,thyroid,Thyroid,19,active,public_package
+8,popular,Popular,1,active,public_package
+10,vitamins_public,Vitamins,4,active,public_package
+20,kidney,Kidney,14,active,public_package
+27,balance,Balance,21,active,public_package
+11,men,Men,5,active,public_package
+28,reproductive,Reproductive,22,active,public_package
+21,pcos,PCOS,15,active,public_package
+18,heart,Heart,12,active,public_package
+19,liver,Liver,13,active,public_package
+22,fertile,Fertility,16,active,public_package
+12,sleep,Sleep,6,active,public_package
+14,women,Women,8,active,public_package
+9,bio_age,Bio Age,3,active,public_package
+17,muscle,Muscle,11,active,public_package
+16,hormones_1,Hormones,10,active,public_package
+29,menstrual-health,Menstrual health,23,active,public_package
+24,insulin-res,Insulin-resistance,18,active,public_package
+26,women-health,Women health,20,active,public_package
+23,cycle,Cycle,17,active,public_package
+30,premium,Premium,,active,public_package
+31,longevity,Longevity,,active,public_package
+32,adv,Advanced,,active,public_package
+33,preventive,Preventive,,active,public_package
+34,fb,Fullbody,,active,public_package

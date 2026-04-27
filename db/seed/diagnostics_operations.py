@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -14,6 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.diagnostics.models import (
     DiagnosticPackage,
+    DiagnosticPackageFilterChip,
+    DiagnosticPackageFilterChipLink,
+    DiagnosticPackagePreparation,
     DiagnosticPackageReason,
     DiagnosticPackageSample,
     DiagnosticPackageTag,
@@ -77,6 +81,20 @@ def _parse_created_at(value: str | None) -> datetime | None:
         return None
 
 
+def _parse_json_cell(value: str | None) -> list | dict | None:
+    """Parse a JSON cell from CSV (e.g. preparation ``steps``). Empty → None."""
+    if value is None or not str(value).strip():
+        return None
+    s = str(value).strip()
+    try:
+        out = json.loads(s)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(out, (list, dict)):
+        return out
+    return None
+
+
 async def _apply_health_parameter_row(session: AsyncSession, raw: dict[str, str | None]) -> None:
     tid = _int(raw.get("test_id"))
     if tid is None:
@@ -112,6 +130,23 @@ async def _apply_health_parameter_row(session: AsyncSession, raw: dict[str, str 
     row.moderate_risk_higher_range_female = _dec(raw.get("moderate_risk_higher_range_female"))
     row.high_risk_lower_range_female = _dec(raw.get("high_risk_lower_range_female"))
     row.high_risk_higher_range_female = _dec(raw.get("high_risk_higher_range_female"))
+    # Legacy export column names (single male/female bounds → low-risk band)
+    if row.low_risk_lower_range_male is None:
+        row.low_risk_lower_range_male = _dec(raw.get("lower_range_male"))
+    if row.low_risk_higher_range_male is None:
+        row.low_risk_higher_range_male = _dec(raw.get("higher_range_male"))
+    if row.low_risk_lower_range_female is None:
+        row.low_risk_lower_range_female = _dec(raw.get("lower_range_female"))
+    if row.low_risk_higher_range_female is None:
+        row.low_risk_higher_range_female = _dec(raw.get("higher_range_female"))
+
+    row.price = _dec(raw.get("price"))
+    row.original_price = _dec(raw.get("original_price"))
+    imp_hp = raw.get("is_most_popular")
+    row.is_most_popular = (
+        _bool_cell(imp_hp) if imp_hp is not None and str(imp_hp).strip() != "" else False
+    )
+    row.gender_suitability = _str_or_none(raw.get("gender_suitability"))
 
     def _txt(key: str) -> str | None:
         v = raw.get(key)
@@ -301,6 +336,13 @@ async def upsert_diagnostic_groups_from_csv(session: AsyncSession, csv_path: Pat
                 session.add(row)
             row.group_name = (raw.get("group_name") or "").strip() or row.group_name
             row.display_order = _int(raw.get("display_order"))
+            row.price = _dec(raw.get("price"))
+            row.original_price = _dec(raw.get("original_price"))
+            imp_g = raw.get("is_most_popular")
+            row.is_most_popular = (
+                _bool_cell(imp_g) if imp_g is not None and str(imp_g).strip() != "" else False
+            )
+            row.gender_suitability = _str_or_none(raw.get("gender_suitability"))
 
 
 async def upsert_diagnostic_group_tests_from_csv(session: AsyncSession, csv_path: Path) -> None:
@@ -394,6 +436,98 @@ async def upsert_diagnostic_package_test_groups_from_csv(session: AsyncSession, 
             row.display_order = _int(raw.get("display_order"))
 
 
+async def upsert_diagnostic_package_samples_from_csv(session: AsyncSession, csv_path: Path) -> None:
+    if not csv_path.is_file():
+        raise FileNotFoundError(f"Missing diagnostic_package_samples CSV: {csv_path}")
+
+    with csv_path.open(newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for raw in reader:
+            sid = _int(raw.get("sample_id"))
+            if sid is None:
+                continue
+            row = await session.get(DiagnosticPackageSample, sid)
+            if row is None:
+                row = DiagnosticPackageSample(sample_id=sid)
+                session.add(row)
+            pkg_id = _int(raw.get("diagnostic_package_id"))
+            if pkg_id is None:
+                continue
+            row.diagnostic_package_id = pkg_id
+            row.sample_type = (raw.get("sample_type") or "").strip() or row.sample_type
+            row.description = _str_or_none(raw.get("description"))
+            row.display_order = _int(raw.get("display_order"))
+
+
+async def upsert_diagnostic_package_preparations_from_csv(session: AsyncSession, csv_path: Path) -> None:
+    if not csv_path.is_file():
+        raise FileNotFoundError(f"Missing diagnostic_package_preparations CSV: {csv_path}")
+
+    with csv_path.open(newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for raw in reader:
+            pid = _int(raw.get("preparation_id"))
+            if pid is None:
+                continue
+            row = await session.get(DiagnosticPackagePreparation, pid)
+            if row is None:
+                row = DiagnosticPackagePreparation(preparation_id=pid)
+                session.add(row)
+            pkg_id = _int(raw.get("diagnostic_package_id"))
+            if pkg_id is None:
+                continue
+            row.diagnostic_package_id = pkg_id
+            row.preparation_title = (raw.get("preparation_title") or "").strip() or row.preparation_title
+            row.steps = _parse_json_cell(raw.get("steps"))
+            row.display_order = _int(raw.get("display_order"))
+
+
+async def upsert_diagnostic_package_filters_chips_from_csv(session: AsyncSession, csv_path: Path) -> None:
+    if not csv_path.is_file():
+        raise FileNotFoundError(f"Missing diagnostic_package_filters_chips CSV: {csv_path}")
+
+    with csv_path.open(newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for raw in reader:
+            fid = _int(raw.get("filter_chip_id"))
+            if fid is None:
+                continue
+            row = await session.get(DiagnosticPackageFilterChip, fid)
+            if row is None:
+                row = DiagnosticPackageFilterChip(filter_chip_id=fid)
+                session.add(row)
+            row.chip_key = (raw.get("chip_key") or "").strip() or row.chip_key
+            row.display_name = (raw.get("display_name") or "").strip() or row.display_name
+            row.display_order = _int(raw.get("display_order"))
+            st = raw.get("status")
+            row.status = st.strip() if st and str(st).strip() else "active"
+            cf = raw.get("chip_for")
+            row.chip_for = cf.strip() if cf and str(cf).strip() else "public_package"
+
+
+async def upsert_diagnostic_package_filter_chip_links_from_csv(session: AsyncSession, csv_path: Path) -> None:
+    if not csv_path.is_file():
+        raise FileNotFoundError(f"Missing diagnostic_package_filter_chip_links CSV: {csv_path}")
+
+    with csv_path.open(newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for raw in reader:
+            lid = _int(raw.get("link_id"))
+            if lid is None:
+                continue
+            row = await session.get(DiagnosticPackageFilterChipLink, lid)
+            if row is None:
+                row = DiagnosticPackageFilterChipLink(link_id=lid)
+                session.add(row)
+            row.diagnostic_package_id = _int(raw.get("diagnostic_package_id"))
+            row.group_id = _int(raw.get("group_id"))
+            chip_id = _int(raw.get("filter_chip_id"))
+            if chip_id is None:
+                continue
+            row.filter_chip_id = chip_id
+            row.display_order = _int(raw.get("display_order"))
+
+
 def validate_diagnostics_csv_fks(directory: Path) -> list[str]:
     """Read CSVs on disk and return human-readable FK warnings (no DB)."""
     warnings: list[str] = []
@@ -453,6 +587,51 @@ def validate_diagnostics_csv_fks(directory: Path) -> list[str]:
                 f"diagnostic_package_tags: diagnostic_package_id {pid} not in diagnostic_package.csv"
             )
 
+    chip_rows = _read("diagnostic_package_filters_chips.csv")
+    chip_ids = {
+        int(r["filter_chip_id"])
+        for r in chip_rows
+        if r.get("filter_chip_id", "").strip().isdigit()
+    }
+
+    for r in _read("diagnostic_package_samples.csv"):
+        pid = r.get("diagnostic_package_id", "").strip()
+        if pid.isdigit() and int(pid) not in pkg_ids:
+            warnings.append(
+                f"diagnostic_package_samples: diagnostic_package_id {pid} not in diagnostic_package.csv"
+            )
+
+    for r in _read("diagnostic_package_preparations.csv"):
+        pid = r.get("diagnostic_package_id", "").strip()
+        if pid.isdigit() and int(pid) not in pkg_ids:
+            warnings.append(
+                f"diagnostic_package_preparations: diagnostic_package_id {pid} not in diagnostic_package.csv"
+            )
+
+    for r in _read("diagnostic_package_filter_chip_links.csv"):
+        cid = r.get("filter_chip_id", "").strip()
+        if cid.isdigit() and int(cid) not in chip_ids:
+            warnings.append(
+                f"diagnostic_package_filter_chip_links: filter_chip_id {cid} "
+                f"not in diagnostic_package_filters_chips.csv"
+            )
+        pkg_cell = r.get("diagnostic_package_id", "").strip()
+        grp_cell = r.get("group_id", "").strip()
+        if pkg_cell.isdigit() and int(pkg_cell) not in pkg_ids:
+            warnings.append(
+                f"diagnostic_package_filter_chip_links: diagnostic_package_id {pkg_cell} "
+                f"not in diagnostic_package.csv"
+            )
+        if grp_cell.isdigit() and int(grp_cell) not in grp_ids:
+            warnings.append(
+                f"diagnostic_package_filter_chip_links: group_id {grp_cell} not in diagnostic_test_groups.csv"
+            )
+        if not pkg_cell and not grp_cell:
+            lid = r.get("link_id", "?")
+            warnings.append(
+                f"diagnostic_package_filter_chip_links: link_id {lid} has neither diagnostic_package_id nor group_id"
+            )
+
     return sorted(set(warnings))
 
 
@@ -464,6 +643,10 @@ REQUIRED_DIAGNOSTICS_CSV_FILES: tuple[str, ...] = (
     "diagnostic_package_test_groups.csv",
     "diagnostic_package_tags.csv",
     "diagnostic_package_reasons.csv",
+    "diagnostic_package_samples.csv",
+    "diagnostic_package_preparations.csv",
+    "diagnostic_package_filters_chips.csv",
+    "diagnostic_package_filter_chip_links.csv",
 )
 
 
@@ -483,11 +666,21 @@ async def seed_diagnostics_reference_from_csv_dir(session: AsyncSession, directo
     await upsert_diagnostic_packages_from_csv(session, d / "diagnostic_package.csv")
     await upsert_health_parameters_from_csv(session, d / "health_parameters.csv")
     await upsert_diagnostic_groups_from_csv(session, d / "diagnostic_test_groups.csv")
+    await upsert_diagnostic_package_filters_chips_from_csv(
+        session, d / "diagnostic_package_filters_chips.csv"
+    )
     await upsert_diagnostic_group_tests_from_csv(session, d / "diagnostic_test_group_tests.csv")
     await upsert_diagnostic_package_reasons_from_csv(session, d / "diagnostic_package_reasons.csv")
     await upsert_diagnostic_package_tags_from_csv(session, d / "diagnostic_package_tags.csv")
+    await upsert_diagnostic_package_samples_from_csv(session, d / "diagnostic_package_samples.csv")
+    await upsert_diagnostic_package_preparations_from_csv(
+        session, d / "diagnostic_package_preparations.csv"
+    )
     await upsert_diagnostic_package_test_groups_from_csv(
         session, d / "diagnostic_package_test_groups.csv"
+    )
+    await upsert_diagnostic_package_filter_chip_links_from_csv(
+        session, d / "diagnostic_package_filter_chip_links.csv"
     )
 
 
@@ -567,6 +760,9 @@ async def reset_diagnostics_sequences(session: AsyncSession) -> None:
         ("diagnostic_package_reasons", "reason_id"),
         ("diagnostic_package_tags", "tag_id"),
         ("diagnostic_package_samples", "sample_id"),
+        ("diagnostic_package_preparations", "preparation_id"),
+        ("diagnostic_package_filters_chips", "filter_chip_id"),
+        ("diagnostic_package_filter_chip_links", "link_id"),
     ]
     for table, col in stmts:
         await session.execute(

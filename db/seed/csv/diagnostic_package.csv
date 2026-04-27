@@ -1,26 +1,55 @@
-diagnostic_package_id,reference_id,package_name,diagnostic_provider,package_info,no_of_tests,status,created_at,report_duration_hours,collection_type,about_text,bookings_count,price,original_price,is_most_popular,gender_suitability
-10,,Haemogram,,,,inactive,2026-03-25 18:31:31,,,,0,,,FALSE,
-1,,Full Body Checkup,Healthians,,120,inactive,2026-03-17 7:03:01,48,home_collection,About this package,2000,2000,5000,TRUE,both
-6,,Supershyft Basic,,,,active,2026-03-25 17:50:44,,home_collection,"This package is designed to give you a comprehensive snapshot of your health through key blood markers. It helps identify early signs of imbalances, deficiencies, or underlying conditions often before symptoms appear.
+diagnostic_package_id,reference_id,package_name,diagnostic_provider,package_info,status,created_at,report_duration_hours,collection_type,about_text,bookings_count,price,original_price,is_most_popular,gender_suitability,created_by_user_id
+10,,Haemogram,,,inactive,2026-03-25 18:31:31,,,,0,,,FALSE,,
+1,,Full Body Checkup,Healthians,,inactive,2026-03-17 7:03:01,48,home_collection,About this package,2000,2000,5000,TRUE,both,
+13,,Female Cancer Screening,,,active,2026-04-02 13:04:27,,home_collection,"This package is designed to support early detection of cancer risks specific to women through targeted blood markers. It focuses on identifying subtle changes in the body that may indicate early warning signs, often before symptoms appear.
 
-By analyzing essential biomarkers, this test supports proactive health management, allowing you to make informed decisions about your lifestyle, nutrition, and overall well-being.",0,,,FALSE,both
-7,,Supershyft Core,,,,active,2026-03-25 17:50:44,,home_collection,"This package offers a comprehensive view of your health by combining essential blood tests with key vitamin markers. It helps uncover hidden deficiencies, metabolic imbalances, and early signs of lifestyle-related conditions often before noticeable symptoms arise.
+With a preventive and proactive approach, this package helps monitor key health indicators while supporting overall wellness and long-term health.",0,700,1499,FALSE,female,
+15,,Allergy Package by ELISA Method,,,inactive,2026-04-02 13:18:35,,home_collection,"The Allergy Comprehensive Package is designed to identify a wide range of allergic triggers using the ELISA method, covering environmental, food, and lifestyle-related allergens.
 
-With insights into organ function, blood health, sugar levels, and vital nutrients, this test empowers you to take a proactive approach to your well-being, energy levels, and long-term health.",0,,,FALSE,both
-8,,Supershyft Elite Men,,,,active,2026-03-25 17:50:44,,home_collection,"This is a Men Peak Package is designed to give a complete picture of men’s health, combining essential blood tests with key vitamins like Vitamin D and B12, along with ESR to detect inflammation.
+By analyzing total IgE levels along with multiple allergen profiles, this package helps detect sensitivities that may be affecting your daily life often without clear or immediate symptoms. It provides a detailed understanding of your body’s immune response, enabling better management of allergies and overall well-being.",0,3500,6500,FALSE,both,
+6,,Supershyft Basic,,,active,2026-03-25 17:50:44,24,home_collection,"This package is designed to give you a comprehensive snapshot of your health through key blood markers. It helps identify early signs of imbalances, deficiencies, or underlying conditions often before symptoms appear.
 
-It helps uncover early signs of fatigue, hormonal imbalance, metabolic issues, and underlying infections—supporting stronger energy, endurance, and overall vitality.",0,,,FALSE,male
-9,,Supershyft Elite Women,,,,active,2026-03-25 17:50:44,,home_collection,"This is a Women Peak Package is crafted to support women’s overall wellness with a comprehensive set of blood tests, including Iron Profile and Homocysteine, along with essential vitamins like D3 and B12.
+By analyzing essential biomarkers, this test supports proactive health management, allowing you to make informed decisions about your lifestyle, nutrition, and overall well-being.",3,1000,1500,FALSE,both,
+7,,Supershyft Core,,,active,2026-03-25 17:50:44,,home_collection,"This package offers a comprehensive view of your health by combining essential blood tests with key vitamin markers. It helps uncover hidden deficiencies, metabolic imbalances, and early signs of lifestyle-related conditions often before noticeable symptoms arise.
 
-It focuses on nutritional balance, heart health, and metabolic function—helping detect deficiencies and risks that commonly affect women’s energy, immunity, and long-term health.",0,,,FALSE,female
-11,,Supershyft Peak Men,,,,active,2026-04-02 12:59:16,,home_collection,"An advanced full-body diagnostic suite crafted for those who prioritize precision, prevention, and peak health. This package integrates critical biomarkers across endocrine, metabolic, and systemic functions to uncover subtle imbalances before they become concerns. Designed with a premium preventive approach, it empowers you with clarity, control, and confidence in your health decisions. A perfect choice for individuals committed to optimizing longevity and overall well-being.",0,,,FALSE,male
-12,,Supershyft Peak Women,,,,active,2026-04-02 13:01:33,,home_collection,"A meticulously curated comprehensive health panel designed to deliver deep insights into your metabolic, hormonal, and cardiovascular health. This package brings together advanced biomarkers and essential diagnostics to provide a 360° view of your body’s internal balance. Ideal for individuals seeking proactive health management and early risk detection, it blends precision with preventive care. Every parameter has been thoughtfully included to support long-term wellness, performance, and vitality.",0,,,FALSE,female
-13,,Female Cancer Screening,,,,active,2026-04-02 13:04:27,,home_collection,"This package is designed to support early detection of cancer risks specific to women through targeted blood markers. It focuses on identifying subtle changes in the body that may indicate early warning signs, often before symptoms appear.
+With insights into organ function, blood health, sugar levels, and vital nutrients, this test empowers you to take a proactive approach to your well-being, energy levels, and long-term health.",4,1499,2000,FALSE,both,
+14,,Male Cancer Screening,,,active,2026-04-02 13:06:13,,home_collection,"This package is tailored to detect early indicators of cancer risks commonly associated with men. It uses specific blood markers to identify abnormalities at an early stage, supporting timely diagnosis and intervention.
 
-With a preventive and proactive approach, this package helps monitor key health indicators while supporting overall wellness and long-term health.",0,,,FALSE,female
-14,,Male Cancer Screening,,,,active,2026-04-02 13:06:13,,home_collection,"This package is tailored to detect early indicators of cancer risks commonly associated with men. It uses specific blood markers to identify abnormalities at an early stage, supporting timely diagnosis and intervention.
+This package is designed to help men take a proactive approach to their health and stay ahead of potential risks.",0,600,1499,FALSE,male,
+12,,Peak Performance Women,,,active,2026-04-02 13:01:33,,home_collection,"A meticulously curated comprehensive health panel designed to deliver deep insights into your metabolic, hormonal, and cardiovascular health. This package brings together advanced biomarkers and essential diagnostics to provide a 360° view of your body’s internal balance. Ideal for individuals seeking proactive health management and early risk detection, it blends precision with preventive care. Every parameter has been thoughtfully included to support long-term wellness, performance, and vitality.",0,1950,3999,FALSE,female,
+9,,Elite Performance Women,,,active,2026-03-25 17:50:44,,home_collection,"This is a Women Elite Package is crafted to support women’s overall wellness with a comprehensive set of blood tests, including Iron Profile and Homocysteine, along with essential vitamins like D3 and B12.
 
-This package is designed to help men take a proactive approach to their health and stay ahead of potential risks.",0,,,FALSE,male
-15,,Allergy Package by ELISA Method,,,,active,2026-04-02 13:18:35,,home_collection,"The Allergy Comprehensive Package is designed to identify a wide range of allergic triggers using the ELISA method, covering environmental, food, and lifestyle-related allergens.
+It focuses on nutritional balance, heart health, and metabolic function—helping detect deficiencies and risks that commonly affect women’s energy, immunity, and long-term health.",0,1200,3499,FALSE,female,
+11,,Peak Performance Men,,,active,2026-04-02 12:59:16,,home_collection,"An advanced full-body diagnostic suite crafted for those who prioritize precision, prevention, and peak health. This package integrates critical biomarkers across endocrine, metabolic, and systemic functions to uncover subtle imbalances before they become concerns. Designed with a premium preventive approach, it empowers you with clarity, control, and confidence in your health decisions. A perfect choice for individuals committed to optimizing longevity and overall well-being.",0,1728,3999,FALSE,male,
+8,,Elite Performance Men,,,active,2026-03-25 17:50:44,,home_collection,"This is a Men Peak Package is designed to give a complete picture of men’s health, combining essential blood tests with key vitamins like Vitamin D and B12, along with ESR to detect inflammation.
 
-By analyzing total IgE levels along with multiple allergen profiles, this package helps detect sensitivities that may be affecting your daily life often without clear or immediate symptoms. It provides a detailed understanding of your body’s immune response, enabling better management of allergies and overall well-being.",0,,,FALSE,both
+It helps uncover early signs of fatigue, hormonal imbalance, metabolic issues, and underlying infections—supporting stronger energy, endurance, and overall vitality.",0,1100,2999,FALSE,male,
+20,,Progressive Tests,,,inactive,2026-04-27 6:19:45,,,"This package is designed to give you a comprehensive snapshot of your health through key blood markers. It helps identify early signs of imbalances, deficiencies, or underlying conditions often before symptoms appear.
+
+By analyzing essential biomarkers, this test supports proactive health management, allowing you to make informed decisions about your lifestyle, nutrition, and overall well-being.",0,,,FALSE,,
+18,,Women Hair Health,,,inactive,2026-04-24 13:14:47,,,,0,,,FALSE,female,
+19,,Men Hair Health,,,inactive,2026-04-24 14:59:42,,,,0,,,FALSE,,
+16,,Genz ♂,,,inactive,2026-04-24 10:39:18,,,"This package is designed to give a complete picture of your internal health by analyzing key biomarkers across metabolism, hormones, nutrition, and organ function.
+
+It combines essential tests like lipid profile, liver and kidney function, hormones, vitamins, and blood markers to detect early imbalances that can affect your energy, mood, fitness, and overall well-being.",0,2499,3000,FALSE,male,
+21,,Genz ♀,,,inactive,2026-04-27 6:27:26,,,"This package is designed to give a complete picture of your internal health by analyzing key biomarkers across metabolism, hormones, nutrition, and organ function.
+
+It combines essential tests like lipid profile, liver and kidney function, hormones, vitamins, and blood markers to detect early imbalances that can affect your energy, mood, fitness, and overall well-being.",0,2599,3199,FALSE,,
+17,,DDecor ♂,Healthians,,active,2026-04-24 10:53:39,,,,0,1549,1699,FALSE,male,
+22,,Menstrual Health,,,inactive,2026-04-27 7:00:15,,,"This package is designed to evaluate hormonal balance and metabolic factors that directly influence menstrual health and cycle regularity.
+
+It includes key reproductive hormones such as FSH, LH, Estradiol, Prolactin, and Testosterone (total & free), along with thyroid function and insulin levels, helping identify underlying causes of irregular cycles, PCOS risk, or hormonal imbalances.
+
+By combining hormone, metabolic, and blood health markers, this package provides a comprehensive view of factors affecting your menstrual cycle, energy levels, and overall reproductive health.",0,1799,2249,FALSE,,
+23,,Fatigue,,,inactive,2026-04-27 7:04:30,,,"This package is designed to identify the underlying causes of persistent fatigue, low energy, and burnout by evaluating key markers related to metabolism, hormones, nutrition, and organ function.
+
+It analyzes stress levels (cortisol), blood health, thyroid function, and essential nutrients like iron, B12, and vitamin D that directly impact energy production.
+
+By combining metabolic markers (glucose, insulin, HbA1c) with electrolyte balance and liver function, this package helps uncover hidden imbalances affecting your daily energy and recovery.",0,1399,1899,FALSE,,
+24,,DDecor ♀,,,active,2026-04-27 9:40:33,,,,0,1549,1799,FALSE,female,
+26,,C-Suite ♂,,,active,2026-04-27 11:17:27,,,"This package combines advanced diagnostics such as cardiac risk markers, cancer screening indicators, hormonal profiling, insulin resistance, and allergy testing with core organ function and nutritional markers.
+
+Built for individuals seeking a deeper understanding of their health, this package helps detect early signs of chronic conditions, immune responses, and metabolic imbalances enabling proactive and personalized health management.",0,9999,12000,FALSE,,
+25,,C-Suite ♀,,,active,2026-04-27 9:48:24,,,"This package combines advanced diagnostics such as cardiac risk markers, cancer screening indicators, hormonal profiling, insulin resistance, and allergy testing with core organ function and nutritional markers.
+
+Built for individuals seeking a deeper understanding of their health, this package helps detect early signs of chronic conditions, immune responses, and metabolic imbalances enabling proactive and personalized health management.",0,10999,13000,FALSE,female,
