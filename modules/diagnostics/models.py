@@ -220,10 +220,19 @@ class HealthParameter(Base):
     is_most_popular = Column(Boolean, nullable=False, default=False, server_default="false")
     gender_suitability = Column(String)
 
-    lower_range_male = Column(Numeric(12, 4), nullable=True)
-    higher_range_male = Column(Numeric(12, 4), nullable=True)
-    lower_range_female = Column(Numeric(12, 4), nullable=True)
-    higher_range_female = Column(Numeric(12, 4), nullable=True)
+    low_risk_lower_range_male = Column(Numeric(12, 4), nullable=True)
+    low_risk_higher_range_male = Column(Numeric(12, 4), nullable=True)
+    moderate_risk_lower_range_male = Column(Numeric(12, 4), nullable=True)
+    moderate_risk_higher_range_male = Column(Numeric(12, 4), nullable=True)
+    high_risk_lower_range_male = Column(Numeric(12, 4), nullable=True)
+    high_risk_higher_range_male = Column(Numeric(12, 4), nullable=True)
+
+    low_risk_lower_range_female = Column(Numeric(12, 4), nullable=True)
+    low_risk_higher_range_female = Column(Numeric(12, 4), nullable=True)
+    moderate_risk_lower_range_female = Column(Numeric(12, 4), nullable=True)
+    moderate_risk_higher_range_female = Column(Numeric(12, 4), nullable=True)
+    high_risk_lower_range_female = Column(Numeric(12, 4), nullable=True)
+    high_risk_higher_range_female = Column(Numeric(12, 4), nullable=True)
 
     causes_when_high = Column(Text, nullable=True)
     causes_when_low = Column(Text, nullable=True)

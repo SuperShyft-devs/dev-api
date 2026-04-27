@@ -671,10 +671,18 @@ class ReportsService:
             risk_score_scaled=risk_score_scaled,
             lifestyle_contribution=lifestyle_contribution,
             disease_percentile=disease_percentile,
-            lower_range_male=hp.lower_range_male if hp is not None else None,
-            higher_range_male=hp.higher_range_male if hp is not None else None,
-            lower_range_female=hp.lower_range_female if hp is not None else None,
-            higher_range_female=hp.higher_range_female if hp is not None else None,
+            low_risk_lower_range_male=hp.low_risk_lower_range_male if hp is not None else None,
+            low_risk_higher_range_male=hp.low_risk_higher_range_male if hp is not None else None,
+            moderate_risk_lower_range_male=hp.moderate_risk_lower_range_male if hp is not None else None,
+            moderate_risk_higher_range_male=hp.moderate_risk_higher_range_male if hp is not None else None,
+            high_risk_lower_range_male=hp.high_risk_lower_range_male if hp is not None else None,
+            high_risk_higher_range_male=hp.high_risk_higher_range_male if hp is not None else None,
+            low_risk_lower_range_female=hp.low_risk_lower_range_female if hp is not None else None,
+            low_risk_higher_range_female=hp.low_risk_higher_range_female if hp is not None else None,
+            moderate_risk_lower_range_female=hp.moderate_risk_lower_range_female if hp is not None else None,
+            moderate_risk_higher_range_female=hp.moderate_risk_higher_range_female if hp is not None else None,
+            high_risk_lower_range_female=hp.high_risk_lower_range_female if hp is not None else None,
+            high_risk_higher_range_female=hp.high_risk_higher_range_female if hp is not None else None,
             causes_when_high=hp.causes_when_high if hp is not None else None,
             causes_when_low=hp.causes_when_low if hp is not None else None,
             effects_when_high=hp.effects_when_high if hp is not None else None,
@@ -720,11 +728,11 @@ class ReportsService:
                 lower_range: float | None = None
                 higher_range: float | None = None
                 if user_gender == "male":
-                    lower_range = float(test.lower_range_male) if test.lower_range_male is not None else None
-                    higher_range = float(test.higher_range_male) if test.higher_range_male is not None else None
+                    lower_range = float(test.low_risk_lower_range_male) if test.low_risk_lower_range_male is not None else None
+                    higher_range = float(test.low_risk_higher_range_male) if test.low_risk_higher_range_male is not None else None
                 elif user_gender == "female":
-                    lower_range = float(test.lower_range_female) if test.lower_range_female is not None else None
-                    higher_range = float(test.higher_range_female) if test.higher_range_female is not None else None
+                    lower_range = float(test.low_risk_lower_range_female) if test.low_risk_lower_range_female is not None else None
+                    higher_range = float(test.low_risk_higher_range_female) if test.low_risk_higher_range_female is not None else None
 
                 tests.append(
                     BloodParameterTestInReportResponse(

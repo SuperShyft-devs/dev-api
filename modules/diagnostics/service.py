@@ -222,15 +222,13 @@ class DiagnosticsService:
             display_order=row.display_order,
         )
 
+    @staticmethod
+    def _dec_to_float(val) -> float | None:
+        return float(val) if val is not None else None
+
     def _to_health_parameter_response(self, row: HealthParameter) -> HealthParameterResponse:
-        lower_range_male = float(row.lower_range_male) if row.lower_range_male is not None else None
-        higher_range_male = float(row.higher_range_male) if row.higher_range_male is not None else None
-        lower_range_female = float(row.lower_range_female) if row.lower_range_female is not None else None
-        higher_range_female = float(row.higher_range_female) if row.higher_range_female is not None else None
         pt = row.parameter_type
         parameter_type = ParameterType(pt.value) if isinstance(pt, ORMParameterType) else ParameterType(pt)
-        price = float(row.price) if row.price is not None else None
-        original_price = float(row.original_price) if row.original_price is not None else None
         return HealthParameterResponse(
             test_id=row.test_id,
             parameter_type=parameter_type,
@@ -238,10 +236,18 @@ class DiagnosticsService:
             parameter_key=row.parameter_key,
             unit=row.unit,
             meaning=row.meaning,
-            lower_range_male=lower_range_male,
-            higher_range_male=higher_range_male,
-            lower_range_female=lower_range_female,
-            higher_range_female=higher_range_female,
+            low_risk_lower_range_male=self._dec_to_float(row.low_risk_lower_range_male),
+            low_risk_higher_range_male=self._dec_to_float(row.low_risk_higher_range_male),
+            moderate_risk_lower_range_male=self._dec_to_float(row.moderate_risk_lower_range_male),
+            moderate_risk_higher_range_male=self._dec_to_float(row.moderate_risk_higher_range_male),
+            high_risk_lower_range_male=self._dec_to_float(row.high_risk_lower_range_male),
+            high_risk_higher_range_male=self._dec_to_float(row.high_risk_higher_range_male),
+            low_risk_lower_range_female=self._dec_to_float(row.low_risk_lower_range_female),
+            low_risk_higher_range_female=self._dec_to_float(row.low_risk_higher_range_female),
+            moderate_risk_lower_range_female=self._dec_to_float(row.moderate_risk_lower_range_female),
+            moderate_risk_higher_range_female=self._dec_to_float(row.moderate_risk_higher_range_female),
+            high_risk_lower_range_female=self._dec_to_float(row.high_risk_lower_range_female),
+            high_risk_higher_range_female=self._dec_to_float(row.high_risk_higher_range_female),
             causes_when_high=row.causes_when_high,
             causes_when_low=row.causes_when_low,
             effects_when_high=row.effects_when_high,
@@ -250,8 +256,8 @@ class DiagnosticsService:
             what_to_do_when_high=row.what_to_do_when_high,
             is_available=bool(row.is_available),
             display_order=row.display_order,
-            price=price,
-            original_price=original_price,
+            price=self._dec_to_float(row.price),
+            original_price=self._dec_to_float(row.original_price),
             is_most_popular=bool(row.is_most_popular),
             gender_suitability=row.gender_suitability,
         )

@@ -91,10 +91,18 @@ class DiseaseDetailResponse(BaseModel):
     risk_score_scaled: int
     lifestyle_contribution: int | None
     disease_percentile: int | None
-    lower_range_male: float | None = None
-    higher_range_male: float | None = None
-    lower_range_female: float | None = None
-    higher_range_female: float | None = None
+    low_risk_lower_range_male: float | None = None
+    low_risk_higher_range_male: float | None = None
+    moderate_risk_lower_range_male: float | None = None
+    moderate_risk_higher_range_male: float | None = None
+    high_risk_lower_range_male: float | None = None
+    high_risk_higher_range_male: float | None = None
+    low_risk_lower_range_female: float | None = None
+    low_risk_higher_range_female: float | None = None
+    moderate_risk_lower_range_female: float | None = None
+    moderate_risk_higher_range_female: float | None = None
+    high_risk_lower_range_female: float | None = None
+    high_risk_higher_range_female: float | None = None
     causes_when_high: str | None = None
     causes_when_low: str | None = None
     effects_when_high: str | None = None

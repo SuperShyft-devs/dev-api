@@ -100,10 +100,18 @@ async def _apply_health_parameter_row(session: AsyncSession, raw: dict[str, str 
     row.unit = u.strip() if u and str(u).strip() else None
     m = raw.get("meaning")
     row.meaning = m.strip() if m and str(m).strip() else None
-    row.lower_range_male = _dec(raw.get("lower_range_male"))
-    row.higher_range_male = _dec(raw.get("higher_range_male"))
-    row.lower_range_female = _dec(raw.get("lower_range_female"))
-    row.higher_range_female = _dec(raw.get("higher_range_female"))
+    row.low_risk_lower_range_male = _dec(raw.get("low_risk_lower_range_male"))
+    row.low_risk_higher_range_male = _dec(raw.get("low_risk_higher_range_male"))
+    row.moderate_risk_lower_range_male = _dec(raw.get("moderate_risk_lower_range_male"))
+    row.moderate_risk_higher_range_male = _dec(raw.get("moderate_risk_higher_range_male"))
+    row.high_risk_lower_range_male = _dec(raw.get("high_risk_lower_range_male"))
+    row.high_risk_higher_range_male = _dec(raw.get("high_risk_higher_range_male"))
+    row.low_risk_lower_range_female = _dec(raw.get("low_risk_lower_range_female"))
+    row.low_risk_higher_range_female = _dec(raw.get("low_risk_higher_range_female"))
+    row.moderate_risk_lower_range_female = _dec(raw.get("moderate_risk_lower_range_female"))
+    row.moderate_risk_higher_range_female = _dec(raw.get("moderate_risk_higher_range_female"))
+    row.high_risk_lower_range_female = _dec(raw.get("high_risk_lower_range_female"))
+    row.high_risk_higher_range_female = _dec(raw.get("high_risk_higher_range_female"))
 
     def _txt(key: str) -> str | None:
         v = raw.get(key)
