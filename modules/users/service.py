@@ -511,7 +511,7 @@ class UsersService:
         - "HH:MM"
         - "HH:MM:SS"
 
-        We only store the start time in `engagement_time_slots.slot_start_time`.
+        We only store the start time in `engagement_participants.slot_start_time`.
         """
 
         value = (slot or "").strip()
@@ -673,7 +673,7 @@ class UsersService:
             is_participant=True,
             engagement_id=engagement.engagement_id,
             engagement_code=engagement.engagement_code,
-            time_slot_id=time_slot.time_slot_id,
+            engagement_participant_id=time_slot.engagement_participant_id,
             assessment_instance_id=assessment_instance.assessment_instance_id,
             metsights_record_id=assessment_instance.metsights_record_id,
         )
@@ -746,7 +746,7 @@ class UsersService:
             is_participant=True,
             engagement_id=engagement.engagement_id,
             engagement_code=engagement.engagement_code,
-            time_slot_id=time_slot.time_slot_id,
+            engagement_participant_id=time_slot.engagement_participant_id,
             assessment_instance_id=None,
             metsights_record_id=None,
         )
@@ -1232,7 +1232,6 @@ class UsersService:
             pincode=payload.pincode,
         )
 
-        # Enroll the user by booking a time slot.
         slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
         time_slot = await self._engagements_service.enroll_user_in_engagement(
             db,
@@ -1241,9 +1240,12 @@ class UsersService:
             engagement_date=payload.blood_collection_date,
             slot_start_time=slot_start,
             increment_participant_count=False,
+            participants_employee_id=payload.participants_employee_id,
+            want_doctor_consultation=payload.want_doctor_consultation,
+            want_nutritionist_consultation=payload.want_nutritionist_consultation,
+            want_doctor_and_nutritionist_consultation=payload.want_doctor_and_nutritionist_consultation,
         )
 
-        # Create assessment instance for this user and engagement.
         if self._assessments_service is None:
             raise RuntimeError("Assessments service is required")
         assessment_instance = await self._assessments_service.ensure_instance_assigned(
@@ -1305,7 +1307,7 @@ class UsersService:
             is_participant=True,
             engagement_id=engagement.engagement_id,
             engagement_code=engagement.engagement_code,
-            time_slot_id=time_slot.time_slot_id,
+            engagement_participant_id=time_slot.engagement_participant_id,
             assessment_instance_id=int(assessment_instance.assessment_instance_id),
             metsights_record_id=mid,
         )
@@ -1398,7 +1400,6 @@ class UsersService:
         await self._ensure_metsights_profile_id(db, user=user)
 
         slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
-        # Enroll the user by booking a time slot.
         time_slot = await self._engagements_service.enroll_user_in_engagement(
             db,
             engagement=engagement,
@@ -1406,9 +1407,12 @@ class UsersService:
             engagement_date=payload.blood_collection_date,
             slot_start_time=slot_start,
             increment_participant_count=False,
+            participants_employee_id=payload.participants_employee_id,
+            want_doctor_consultation=payload.want_doctor_consultation,
+            want_nutritionist_consultation=payload.want_nutritionist_consultation,
+            want_doctor_and_nutritionist_consultation=payload.want_doctor_and_nutritionist_consultation,
         )
 
-        # Create assessment instance for this user and engagement.
         if self._assessments_service is None:
             raise RuntimeError("Assessments service is required")
         assessment_instance = await self._assessments_service.ensure_instance_assigned(
@@ -1469,7 +1473,7 @@ class UsersService:
             is_participant=True,
             engagement_id=engagement.engagement_id,
             engagement_code=engagement.engagement_code,
-            time_slot_id=time_slot.time_slot_id,
+            engagement_participant_id=time_slot.engagement_participant_id,
             assessment_instance_id=int(assessment_instance.assessment_instance_id),
             metsights_record_id=mid,
         )

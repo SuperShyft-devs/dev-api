@@ -12,7 +12,7 @@ from core.security import create_jwt_token
 from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance
 from modules.auth.models import AuthOtpSession, AuthToken
 from modules.employee.models import Employee
-from modules.engagements.models import Engagement, EngagementTimeSlot, OnboardingAssistantAssignment
+from modules.engagements.models import Engagement, EngagementParticipant, OnboardingAssistantAssignment
 from modules.organizations.models import Organization
 from modules.payments.models import Booking, Order, Payment
 from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireResponse
@@ -210,8 +210,8 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     await test_db_session.commit()
 
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=9901,
+        EngagementParticipant(
+            engagement_participant_id=9901,
             engagement_id=9801,
             user_id=target_user_id,
             engagement_date=date(2026, 1, 1),
@@ -341,7 +341,7 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
 
     assert await test_db_session.get(User, target_user_id) is None
     assert await test_db_session.get(AssessmentInstance, 9951) is None
-    assert await test_db_session.get(EngagementTimeSlot, 9901) is None
+    assert await test_db_session.get(EngagementParticipant, 9901) is None
     assert await test_db_session.get(QuestionnaireResponse, 9963) is None
     assert await test_db_session.get(AssessmentCategoryProgress, 9964) is None
     assert await test_db_session.get(IndividualHealthReport, 9965) is None

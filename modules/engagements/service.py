@@ -2,7 +2,7 @@
 
 Business rules:
 - Engagement creation
-- Enrolling users by creating `engagement_time_slots`
+- Enrolling users by creating `engagement_participants`
 - Updating `participant_count`
 """
 
@@ -19,7 +19,7 @@ from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.checklists.schemas import ChecklistReadiness
 from modules.employee.service import EmployeeContext
-from modules.engagements.models import Engagement, EngagementKind, EngagementTimeSlot
+from modules.engagements.models import Engagement, EngagementKind, EngagementParticipant
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.schemas import EngagementCreateRequest, EngagementUpdateRequest
 from modules.organizations.repository import OrganizationsRepository
@@ -410,7 +410,7 @@ class EngagementsService:
         user_id: int,
         engagement_id: int,
     ) -> bool:
-        return await self._repository.has_slot_for_user_engagement(
+        return await self._repository.has_participant_for_user_engagement(
             db, user_id=user_id, engagement_id=engagement_id
         )
 
@@ -423,7 +423,11 @@ class EngagementsService:
         engagement_date: date,
         slot_start_time: time,
         increment_participant_count: bool = False,
-    ) -> EngagementTimeSlot:
+        participants_employee_id: str | None = None,
+        want_doctor_consultation: bool | None = None,
+        want_nutritionist_consultation: bool | None = None,
+        want_doctor_and_nutritionist_consultation: bool | None = None,
+    ) -> EngagementParticipant:
         if (engagement.status or "").lower() != "active":
             raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is no longer active")
 
@@ -431,13 +435,17 @@ class EngagementsService:
             engagement.participant_count = int(engagement.participant_count or 0) + 1
             await self._repository.update_engagement(db, engagement)
 
-        slot = EngagementTimeSlot(
+        participant = EngagementParticipant(
             engagement_id=engagement.engagement_id,
             user_id=user_id,
             engagement_date=engagement_date,
             slot_start_time=slot_start_time,
+            participants_employee_id=participants_employee_id,
+            want_doctor_consultation=want_doctor_consultation,
+            want_nutritionist_consultation=want_nutritionist_consultation,
+            want_doctor_and_nutritionist_consultation=want_doctor_and_nutritionist_consultation,
         )
-        return await self._repository.create_time_slot(db, slot)
+        return await self._repository.create_participant(db, participant)
 
     async def list_participants_for_engagement_code(
         self,

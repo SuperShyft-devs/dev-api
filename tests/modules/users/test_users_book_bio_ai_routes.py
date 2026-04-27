@@ -71,7 +71,7 @@ async def test_book_bio_ai_creates_engagement_slot_instance(async_client, test_d
     assert data["created"] is False
     assert data["is_participant"] is True
     assert data["engagement_id"] is not None
-    assert data["time_slot_id"] is not None
+    assert data["engagement_participant_id"] is not None
     assert data["assessment_instance_id"] is not None
     assert data.get("metsights_record_id") in (None, "")
 

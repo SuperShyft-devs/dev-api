@@ -300,7 +300,7 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     await test_db_session.execute(text("DELETE FROM individual_health_report"))
     await test_db_session.execute(text("DELETE FROM organization_health_report"))
     await test_db_session.execute(text("DELETE FROM reports_user_sync_state"))
-    await test_db_session.execute(text("DELETE FROM engagement_time_slots"))
+    await test_db_session.execute(text("DELETE FROM engagement_participants"))
     await test_db_session.execute(text("DELETE FROM assessment_instances"))
     await test_db_session.execute(text("DELETE FROM onboarding_assistant_assignment"))
     await test_db_session.execute(text("DELETE FROM platform_settings"))

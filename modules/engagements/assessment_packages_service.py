@@ -80,7 +80,7 @@ class EngagementAssessmentPackagesService:
     ) -> None:
         if employee is not None:
             return
-        is_participant = await self._engagements.has_slot_for_user_engagement(
+        is_participant = await self._engagements.has_participant_for_user_engagement(
             db,
             user_id=user_id,
             engagement_id=engagement_id,

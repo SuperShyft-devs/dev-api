@@ -315,7 +315,7 @@ async def test_get_occupied_slots_by_engagement_code_is_public(async_client):
 
 @pytest.mark.asyncio
 async def test_get_occupied_slots_by_engagement_code_returns_grouped_slots(async_client, test_db_session):
-    from modules.engagements.models import Engagement, EngagementTimeSlot
+    from modules.engagements.models import Engagement, EngagementParticipant
     from modules.users.models import User
     from datetime import time
 
@@ -351,22 +351,22 @@ async def test_get_occupied_slots_by_engagement_code_returns_grouped_slots(async
 
     test_db_session.add_all(
         [
-            EngagementTimeSlot(
-                time_slot_id=1,
+            EngagementParticipant(
+                engagement_participant_id=1,
                 engagement_id=9101,
                 user_id=1001,
                 engagement_date=date(2026, 2, 1),
                 slot_start_time=time(10, 0),
             ),
-            EngagementTimeSlot(
-                time_slot_id=2,
+            EngagementParticipant(
+                engagement_participant_id=2,
                 engagement_id=9101,
                 user_id=1002,
                 engagement_date=date(2026, 2, 1),
                 slot_start_time=time(10, 20),
             ),
-            EngagementTimeSlot(
-                time_slot_id=3,
+            EngagementParticipant(
+                engagement_participant_id=3,
                 engagement_id=9101,
                 user_id=1003,
                 engagement_date=date(2026, 2, 2),
@@ -398,7 +398,7 @@ async def test_get_public_occupied_slots_is_public(async_client, test_db_session
 
 @pytest.mark.asyncio
 async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, test_db_session):
-    from modules.engagements.models import Engagement, EngagementTimeSlot
+    from modules.engagements.models import Engagement, EngagementParticipant
     from modules.users.models import User
     from datetime import time
 
@@ -474,22 +474,22 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
 
     test_db_session.add_all(
         [
-            EngagementTimeSlot(
-                time_slot_id=10,
+            EngagementParticipant(
+                engagement_participant_id=10,
                 engagement_id=9201,
                 user_id=1001,
                 engagement_date=date(2026, 2, 1),
                 slot_start_time=time(9, 0),
             ),
-            EngagementTimeSlot(
-                time_slot_id=11,
+            EngagementParticipant(
+                engagement_participant_id=11,
                 engagement_id=9202,
                 user_id=1001,
                 engagement_date=date(2026, 2, 1),
                 slot_start_time=time(9, 20),
             ),
-            EngagementTimeSlot(
-                time_slot_id=12,
+            EngagementParticipant(
+                engagement_participant_id=12,
                 engagement_id=9203,
                 user_id=1001,
                 engagement_date=date(2026, 2, 1),

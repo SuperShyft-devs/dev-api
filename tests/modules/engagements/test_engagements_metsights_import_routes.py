@@ -122,8 +122,8 @@ async def test_import_metsights_csv_uses_end_date_when_start_null(async_client, 
     slot = (
         await test_db_session.execute(
             text(
-                "SELECT engagement_date, slot_start_time::text FROM engagement_time_slots "
-                "WHERE engagement_id = 8802 ORDER BY time_slot_id DESC LIMIT 1"
+                "SELECT engagement_date, slot_start_time::text FROM engagement_participants "
+                "WHERE engagement_id = 8802 ORDER BY engagement_participant_id DESC LIMIT 1"
             )
         )
     ).first()

@@ -10,7 +10,7 @@ from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
 from modules.users.models import User
-from modules.engagements.models import Engagement, EngagementTimeSlot
+from modules.engagements.models import Engagement, EngagementParticipant
 from modules.assessments.models import AssessmentPackage
 
 
@@ -164,8 +164,8 @@ async def test_get_engagement_code_participants_returns_participants_from_engage
 
     # Enroll participants in engagement
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=4001,
+        EngagementParticipant(
+            engagement_participant_id=4001,
             engagement_id=3002,
             user_id=8001,
             slot_start_time=time(9, 0),
@@ -173,8 +173,8 @@ async def test_get_engagement_code_participants_returns_participants_from_engage
         )
     )
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=4002,
+        EngagementParticipant(
+            engagement_participant_id=4002,
             engagement_id=3002,
             user_id=8002,
             slot_start_time=time(9, 30),
@@ -253,8 +253,8 @@ async def test_get_engagement_code_participants_returns_distinct_users(async_cli
 
     # Enroll same user in multiple slots (should appear only once)
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=4003,
+        EngagementParticipant(
+            engagement_participant_id=4003,
             engagement_id=3003,
             user_id=8003,
             slot_start_time=time(9, 0),
@@ -262,8 +262,8 @@ async def test_get_engagement_code_participants_returns_distinct_users(async_cli
         )
     )
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=4004,
+        EngagementParticipant(
+            engagement_participant_id=4004,
             engagement_id=3003,
             user_id=8003,
             slot_start_time=time(10, 0),
@@ -381,8 +381,8 @@ async def test_get_engagement_code_participants_paginates_results(async_client, 
     for i in range(1, 6):
         user_id = 8100 + i
         test_db_session.add(
-            EngagementTimeSlot(
-                time_slot_id=4100 + i,
+            EngagementParticipant(
+                engagement_participant_id=4100 + i,
                 engagement_id=3005,
                 user_id=user_id,
                 slot_start_time=time(9, i * 10),
@@ -497,8 +497,8 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
 
     # Enroll participants
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=4201,
+        EngagementParticipant(
+            engagement_participant_id=4201,
             engagement_id=3006,
             user_id=8201,
             slot_start_time=time(9, 0),
@@ -506,8 +506,8 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
         )
     )
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=4202,
+        EngagementParticipant(
+            engagement_participant_id=4202,
             engagement_id=3007,
             user_id=8202,
             slot_start_time=time(9, 0),

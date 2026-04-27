@@ -18,7 +18,7 @@ from core.config import settings
 from modules.assessments.models import AssessmentPackage, AssessmentPackageCategory
 from modules.diagnostics.models import DiagnosticPackage
 from modules.employee.models import Employee
-from modules.engagements.models import Engagement, EngagementTimeSlot, OnboardingAssistantAssignment
+from modules.engagements.models import Engagement, EngagementParticipant, OnboardingAssistantAssignment
 from modules.organizations.models import Organization
 from modules.questionnaire.models import (
     QuestionnaireCategory,
@@ -164,12 +164,16 @@ class SeedOnboardingAssignment:
 
 
 @dataclass(frozen=True)
-class SeedTimeSlot:
-    time_slot_id: int
+class SeedParticipant:
+    engagement_participant_id: int
     engagement_id: int
     user_id: int
     slot_start_time: time
     engagement_date: date
+    participants_employee_id: str | None = None
+    want_doctor_consultation: bool | None = None
+    want_nutritionist_consultation: bool | None = None
+    want_doctor_and_nutritionist_consultation: bool | None = None
 
 
 SAMPLE_USERS: tuple[SeedUser, ...] = (
@@ -271,16 +275,16 @@ SAMPLE_ASSIGNMENTS: tuple[SeedOnboardingAssignment, ...] = (
     SeedOnboardingAssignment(704, 205, 404),
 )
 
-SAMPLE_TIME_SLOTS: tuple[SeedTimeSlot, ...] = (
-    SeedTimeSlot(801, 401, 1101, time(10, 0), date(2026, 3, 11)),
-    SeedTimeSlot(802, 401, 1102, time(10, 30), date(2026, 3, 11)),
-    SeedTimeSlot(803, 401, 1104, time(11, 0), date(2026, 3, 12)),
-    SeedTimeSlot(804, 402, 1103, time(15, 0), date(2026, 3, 22)),
-    SeedTimeSlot(805, 402, 1104, time(15, 45), date(2026, 3, 22)),
-    SeedTimeSlot(806, 404, 1105, time(9, 30), date(2026, 3, 8)),
-    SeedTimeSlot(807, 404, 1102, time(9, 50), date(2026, 3, 8)),
-    SeedTimeSlot(808, 405, 1101, time(10, 20), date(2026, 1, 17)),
-    SeedTimeSlot(809, 403, 1103, time(14, 0), date(2026, 2, 12)),
+SAMPLE_PARTICIPANTS: tuple[SeedParticipant, ...] = (
+    SeedParticipant(801, 401, 1101, time(10, 0), date(2026, 3, 11)),
+    SeedParticipant(802, 401, 1102, time(10, 30), date(2026, 3, 11)),
+    SeedParticipant(803, 401, 1104, time(11, 0), date(2026, 3, 12)),
+    SeedParticipant(804, 402, 1103, time(15, 0), date(2026, 3, 22)),
+    SeedParticipant(805, 402, 1104, time(15, 45), date(2026, 3, 22)),
+    SeedParticipant(806, 404, 1105, time(9, 30), date(2026, 3, 8)),
+    SeedParticipant(807, 404, 1102, time(9, 50), date(2026, 3, 8)),
+    SeedParticipant(808, 405, 1101, time(10, 20), date(2026, 1, 17)),
+    SeedParticipant(809, 403, 1103, time(14, 0), date(2026, 2, 12)),
 )
 
 
@@ -539,16 +543,20 @@ async def _upsert_assignments(
         row.engagement_id = seed.engagement_id
 
 
-async def _upsert_time_slots(session: AsyncSession, slots: Iterable[SeedTimeSlot]) -> None:
+async def _upsert_participants(session: AsyncSession, slots: Iterable[SeedParticipant]) -> None:
     for seed in slots:
-        row = await session.get(EngagementTimeSlot, seed.time_slot_id)
+        row = await session.get(EngagementParticipant, seed.engagement_participant_id)
         if row is None:
-            row = EngagementTimeSlot(time_slot_id=seed.time_slot_id)
+            row = EngagementParticipant(engagement_participant_id=seed.engagement_participant_id)
             session.add(row)
         row.engagement_id = seed.engagement_id
         row.user_id = seed.user_id
         row.slot_start_time = seed.slot_start_time
         row.engagement_date = seed.engagement_date
+        row.participants_employee_id = seed.participants_employee_id
+        row.want_doctor_consultation = seed.want_doctor_consultation
+        row.want_nutritionist_consultation = seed.want_nutritionist_consultation
+        row.want_doctor_and_nutritionist_consultation = seed.want_doctor_and_nutritionist_consultation
 
 
 async def _reset_sequences(session: AsyncSession) -> None:
@@ -565,7 +573,7 @@ async def _reset_sequences(session: AsyncSession) -> None:
         ("questionnaire_category_questions", "id"),
         ("assessment_package_categories", "id"),
         ("onboarding_assistant_assignment", "onboarding_assistant_id"),
-        ("engagement_time_slots", "time_slot_id"),
+        ("engagement_participants", "engagement_participant_id"),
     )
 
     for table_name, id_column in sequence_specs:
@@ -611,7 +619,7 @@ async def seed_sample_data(*, yes: bool) -> None:
             await _upsert_question_options(session, SAMPLE_QUESTION_OPTIONS, question_id_map)
             await _upsert_package_categories(session, SAMPLE_PACKAGE_CATEGORIES)
             await _upsert_assignments(session, SAMPLE_ASSIGNMENTS)
-            await _upsert_time_slots(session, SAMPLE_TIME_SLOTS)
+            await _upsert_participants(session, SAMPLE_PARTICIPANTS)
             await _reset_sequences(session)
 
             print("Seeded sample data")

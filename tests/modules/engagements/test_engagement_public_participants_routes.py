@@ -10,7 +10,7 @@ from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
 from modules.users.models import User
-from modules.engagements.models import Engagement, EngagementTimeSlot
+from modules.engagements.models import Engagement, EngagementParticipant
 from modules.assessments.models import AssessmentPackage
 from modules.organizations.models import Organization
 
@@ -169,8 +169,8 @@ async def test_get_public_participants_returns_participants_from_b2c_engagements
 
     # Enroll participants in B2C engagement
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=6001,
+        EngagementParticipant(
+            engagement_participant_id=6001,
             engagement_id=5002,
             user_id=7001,
             slot_start_time=time(9, 0),
@@ -178,8 +178,8 @@ async def test_get_public_participants_returns_participants_from_b2c_engagements
         )
     )
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=6002,
+        EngagementParticipant(
+            engagement_participant_id=6002,
             engagement_id=5002,
             user_id=7002,
             slot_start_time=time(9, 30),
@@ -300,8 +300,8 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
 
     # User 7003 enrolled in both engagements (should appear only once)
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=6003,
+        EngagementParticipant(
+            engagement_participant_id=6003,
             engagement_id=5003,
             user_id=7003,
             slot_start_time=time(9, 0),
@@ -309,8 +309,8 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
         )
     )
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=6004,
+        EngagementParticipant(
+            engagement_participant_id=6004,
             engagement_id=5004,
             user_id=7003,
             slot_start_time=time(10, 0),
@@ -320,8 +320,8 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
 
     # User 7004 enrolled only in first engagement
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=6005,
+        EngagementParticipant(
+            engagement_participant_id=6005,
             engagement_id=5003,
             user_id=7004,
             slot_start_time=time(9, 30),
@@ -331,8 +331,8 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
 
     # User 7005 enrolled only in second engagement
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=6006,
+        EngagementParticipant(
+            engagement_participant_id=6006,
             engagement_id=5004,
             user_id=7005,
             slot_start_time=time(10, 30),
@@ -445,8 +445,8 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
 
     # Enroll user in B2C engagement
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=6007,
+        EngagementParticipant(
+            engagement_participant_id=6007,
             engagement_id=5005,
             user_id=7006,
             slot_start_time=time(9, 0),
@@ -456,8 +456,8 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
     
     # Enroll user in B2B engagement
     test_db_session.add(
-        EngagementTimeSlot(
-            time_slot_id=6008,
+        EngagementParticipant(
+            engagement_participant_id=6008,
             engagement_id=5006,
             user_id=7007,
             slot_start_time=time(9, 0),
@@ -549,8 +549,8 @@ async def test_get_public_participants_paginates_results(async_client, test_db_s
     for i in range(1, 6):
         user_id = 7100 + i
         test_db_session.add(
-            EngagementTimeSlot(
-                time_slot_id=6100 + i,
+            EngagementParticipant(
+                engagement_participant_id=6100 + i,
                 engagement_id=5007,
                 user_id=user_id,
                 slot_start_time=time(9, i * 10),

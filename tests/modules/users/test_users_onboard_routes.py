@@ -79,7 +79,7 @@ async def test_public_onboard_updates_only_missing_fields(async_client, test_db_
 
 
 @pytest.mark.asyncio
-async def test_public_onboard_creates_engagement_time_slot_and_assessment_instance(async_client, test_db_session):
+async def test_public_onboard_creates_engagement_participant_and_assessment_instance(async_client, test_db_session):
     # Seed active assessment package used by B2C onboarding.
     await test_db_session.execute(
         text(
@@ -114,7 +114,7 @@ async def test_public_onboard_creates_engagement_time_slot_and_assessment_instan
     data = response.json()["data"]
     assert data["is_participant"] is True
     assert data["engagement_id"] is not None
-    assert data["time_slot_id"] is not None
+    assert data["engagement_participant_id"] is not None
 
     engagement_id = data["engagement_id"]
 
@@ -139,9 +139,9 @@ async def test_public_onboard_creates_engagement_time_slot_and_assessment_instan
     slot_row = (
         await test_db_session.execute(
             text(
-                "SELECT engagement_id, user_id, engagement_date, slot_start_time FROM engagement_time_slots WHERE time_slot_id = :tid"
+                "SELECT engagement_id, user_id, engagement_date, slot_start_time FROM engagement_participants WHERE engagement_participant_id = :tid"
             ),
-            {"tid": data["time_slot_id"]},
+            {"tid": data["engagement_participant_id"]},
         )
     ).first()
 

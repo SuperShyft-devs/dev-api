@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import Column, Date, Enum as SAEnum, ForeignKey, Integer, String, Time, UniqueConstraint, Index
+from sqlalchemy import Boolean, Column, Date, Enum as SAEnum, ForeignKey, Integer, String, Time, UniqueConstraint, Index
 
 from db.base import Base
 
@@ -67,13 +67,17 @@ class OnboardingAssistantAssignment(Base):
     )
 
 
-class EngagementTimeSlot(Base):
-    """SQLAlchemy model for `engagement_time_slots` table."""
+class EngagementParticipant(Base):
+    """SQLAlchemy model for `engagement_participants` table."""
 
-    __tablename__ = "engagement_time_slots"
+    __tablename__ = "engagement_participants"
 
-    time_slot_id = Column(Integer, primary_key=True)
+    engagement_participant_id = Column(Integer, primary_key=True)
     engagement_id = Column(Integer, ForeignKey("engagements.engagement_id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     slot_start_time = Column(Time, nullable=False)
     engagement_date = Column(Date, nullable=False)
+    participants_employee_id = Column(String, nullable=True)
+    want_doctor_consultation = Column(Boolean, nullable=True)
+    want_nutritionist_consultation = Column(Boolean, nullable=True)
+    want_doctor_and_nutritionist_consultation = Column(Boolean, nullable=True)

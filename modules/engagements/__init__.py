@@ -2,7 +2,7 @@
 
 Owns:
 - engagements
-- engagement_time_slots
+- engagement_participants
 
-This module is responsible for engagement lifecycle and slot enrollment.
+This module is responsible for engagement lifecycle and participant enrollment.
 """

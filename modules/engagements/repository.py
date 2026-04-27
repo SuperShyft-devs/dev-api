@@ -8,7 +8,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.engagements.models import Engagement, EngagementTimeSlot, OnboardingAssistantAssignment
+from modules.engagements.models import Engagement, EngagementParticipant, OnboardingAssistantAssignment
 
 
 class EngagementsRepository:
@@ -30,9 +30,9 @@ class EngagementsRepository:
         """
 
         query = (
-            select(EngagementTimeSlot.engagement_date, EngagementTimeSlot.slot_start_time)
-            .where(EngagementTimeSlot.engagement_id == engagement_id)
-            .order_by(EngagementTimeSlot.engagement_date.asc(), EngagementTimeSlot.slot_start_time.asc())
+            select(EngagementParticipant.engagement_date, EngagementParticipant.slot_start_time)
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .order_by(EngagementParticipant.engagement_date.asc(), EngagementParticipant.slot_start_time.asc())
         )
         result = await db.execute(query)
         return list(result.all())
@@ -45,11 +45,11 @@ class EngagementsRepository:
         """
 
         query = (
-            select(EngagementTimeSlot.engagement_date, EngagementTimeSlot.slot_start_time)
-            .join(Engagement, Engagement.engagement_id == EngagementTimeSlot.engagement_id)
+            select(EngagementParticipant.engagement_date, EngagementParticipant.slot_start_time)
+            .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
             .where(Engagement.status == "active")
             .where(Engagement.organization_id.is_(None))
-            .order_by(EngagementTimeSlot.engagement_date.asc(), EngagementTimeSlot.slot_start_time.asc())
+            .order_by(EngagementParticipant.engagement_date.asc(), EngagementParticipant.slot_start_time.asc())
         )
         result = await db.execute(query)
         return list(result.all())
@@ -120,12 +120,12 @@ class EngagementsRepository:
         await db.flush()
         return engagement
 
-    async def create_time_slot(self, db: AsyncSession, slot: EngagementTimeSlot) -> EngagementTimeSlot:
+    async def create_participant(self, db: AsyncSession, slot: EngagementParticipant) -> EngagementParticipant:
         db.add(slot)
         await db.flush()
         return slot
 
-    async def has_slot_for_user_engagement(
+    async def has_participant_for_user_engagement(
         self,
         db: AsyncSession,
         *,
@@ -133,9 +133,9 @@ class EngagementsRepository:
         engagement_id: int,
     ) -> bool:
         result = await db.execute(
-            select(EngagementTimeSlot.time_slot_id)
-            .where(EngagementTimeSlot.user_id == user_id)
-            .where(EngagementTimeSlot.engagement_id == engagement_id)
+            select(EngagementParticipant.engagement_participant_id)
+            .where(EngagementParticipant.user_id == user_id)
+            .where(EngagementParticipant.engagement_id == engagement_id)
             .limit(1)
         )
         return result.scalar_one_or_none() is not None
@@ -148,15 +148,15 @@ class EngagementsRepository:
     ) -> list[int]:
         """Return distinct user_ids of participants enrolled in an engagement.
 
-        Pulls from ``engagement_time_slots`` — same source of truth used by
+        Pulls from ``engagement_participants`` — same source of truth used by
         other participant lookups in this repo.
         """
 
         result = await db.execute(
-            select(EngagementTimeSlot.user_id)
+            select(EngagementParticipant.user_id)
             .distinct()
-            .where(EngagementTimeSlot.engagement_id == engagement_id)
-            .order_by(EngagementTimeSlot.user_id.asc())
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .order_by(EngagementParticipant.user_id.asc())
         )
         return [int(v) for v in result.scalars().all()]
 
@@ -287,9 +287,9 @@ class EngagementsRepository:
         from sqlalchemy import func
 
         query = (
-            select(func.count(func.distinct(EngagementTimeSlot.user_id)))
+            select(func.count(func.distinct(EngagementParticipant.user_id)))
             .select_from(Engagement)
-            .join(EngagementTimeSlot, EngagementTimeSlot.engagement_id == Engagement.engagement_id)
+            .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
             .where(Engagement.engagement_code == engagement_code)
         )
 
@@ -321,8 +321,8 @@ class EngagementsRepository:
             )
             .distinct()
             .select_from(Engagement)
-            .join(EngagementTimeSlot, EngagementTimeSlot.engagement_id == Engagement.engagement_id)
-            .join(User, User.user_id == EngagementTimeSlot.user_id)
+            .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
+            .join(User, User.user_id == EngagementParticipant.user_id)
             .where(Engagement.engagement_code == engagement_code)
             .order_by(User.user_id.asc())
             .offset(offset)
@@ -343,9 +343,9 @@ class EngagementsRepository:
         from sqlalchemy import func
 
         query = (
-            select(func.count(func.distinct(EngagementTimeSlot.user_id)))
+            select(func.count(func.distinct(EngagementParticipant.user_id)))
             .select_from(Engagement)
-            .join(EngagementTimeSlot, EngagementTimeSlot.engagement_id == Engagement.engagement_id)
+            .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
             .where(Engagement.organization_id.is_(None))
         )
 
@@ -379,8 +379,8 @@ class EngagementsRepository:
             )
             .distinct()
             .select_from(Engagement)
-            .join(EngagementTimeSlot, EngagementTimeSlot.engagement_id == Engagement.engagement_id)
-            .join(User, User.user_id == EngagementTimeSlot.user_id)
+            .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
+            .join(User, User.user_id == EngagementParticipant.user_id)
             .where(Engagement.organization_id.is_(None))
             .order_by(User.user_id.asc())
             .offset(offset)

@@ -87,12 +87,12 @@ class OrganizationsRepository:
     ) -> int:
         """Count distinct users enrolled across all engagements for an organization."""
         from sqlalchemy import func, select
-        from modules.engagements.models import Engagement, EngagementTimeSlot
+        from modules.engagements.models import Engagement, EngagementParticipant
 
         query = (
-            select(func.count(func.distinct(EngagementTimeSlot.user_id)))
+            select(func.count(func.distinct(EngagementParticipant.user_id)))
             .select_from(Engagement)
-            .join(EngagementTimeSlot, EngagementTimeSlot.engagement_id == Engagement.engagement_id)
+            .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
             .where(Engagement.organization_id == organization_id)
         )
 
@@ -109,7 +109,7 @@ class OrganizationsRepository:
     ) -> list[tuple]:
         """Fetch distinct users enrolled across all engagements for an organization."""
         from sqlalchemy import select, distinct
-        from modules.engagements.models import Engagement, EngagementTimeSlot
+        from modules.engagements.models import Engagement, EngagementParticipant
         from modules.users.models import User
 
         offset = (page - 1) * limit
@@ -126,8 +126,8 @@ class OrganizationsRepository:
             )
             .distinct()
             .select_from(Engagement)
-            .join(EngagementTimeSlot, EngagementTimeSlot.engagement_id == Engagement.engagement_id)
-            .join(User, User.user_id == EngagementTimeSlot.user_id)
+            .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
+            .join(User, User.user_id == EngagementParticipant.user_id)
             .where(Engagement.organization_id == organization_id)
             .order_by(User.user_id.asc())
             .offset(offset)

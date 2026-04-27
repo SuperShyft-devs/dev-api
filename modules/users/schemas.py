@@ -227,6 +227,11 @@ class PublicUserOnboardRequest(BaseModel):
     blood_collection_date: date
     blood_collection_time_slot: str = Field(min_length=1, max_length=20)
 
+    participants_employee_id: Optional[str] = Field(default=None, max_length=100)
+    want_doctor_consultation: Optional[bool] = None
+    want_nutritionist_consultation: Optional[bool] = None
+    want_doctor_and_nutritionist_consultation: Optional[bool] = None
+
     @validator("age")
     def age_must_be_valid(cls, v):
         if v < 1 or v > 120:
@@ -259,6 +264,11 @@ class EngagementUserOnboardRequest(BaseModel):
     blood_collection_date: date
     blood_collection_time_slot: str = Field(min_length=1, max_length=20)
 
+    participants_employee_id: Optional[str] = Field(default=None, max_length=100)
+    want_doctor_consultation: Optional[bool] = None
+    want_nutritionist_consultation: Optional[bool] = None
+    want_doctor_and_nutritionist_consultation: Optional[bool] = None
+
     @validator("age")
     def age_must_be_valid(cls, v):
         if v < 1 or v > 120:
@@ -272,7 +282,7 @@ class UserOnboardResponse(BaseModel):
     is_participant: bool
     engagement_id: Optional[int] = None
     engagement_code: Optional[str] = None
-    time_slot_id: Optional[int] = None
+    engagement_participant_id: Optional[int] = None
     assessment_instance_id: Optional[int] = None
     metsights_record_id: Optional[str] = None
 
