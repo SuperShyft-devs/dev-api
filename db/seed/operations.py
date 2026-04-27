@@ -369,6 +369,39 @@ async def reset_sequences(session: AsyncSession) -> None:
         """
         )
     )
+    await session.execute(
+        text(
+            """
+        SELECT setval(
+            pg_get_serial_sequence('engagements', 'engagement_id'),
+            COALESCE((SELECT MAX(engagement_id) FROM engagements), 1),
+            true
+        )
+        """
+        )
+    )
+    await session.execute(
+        text(
+            """
+        SELECT setval(
+            pg_get_serial_sequence('engagement_participants', 'engagement_participant_id'),
+            COALESCE((SELECT MAX(engagement_participant_id) FROM engagement_participants), 1),
+            true
+        )
+        """
+        )
+    )
+    await session.execute(
+        text(
+            """
+        SELECT setval(
+            pg_get_serial_sequence('assessment_instances', 'assessment_instance_id'),
+            COALESCE((SELECT MAX(assessment_instance_id) FROM assessment_instances), 1),
+            true
+        )
+        """
+        )
+    )
 
 
 async def upsert_default_platform_settings(session: AsyncSession) -> None:

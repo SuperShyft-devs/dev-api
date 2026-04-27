@@ -7,6 +7,8 @@ Production guidance (aligned with instructions/*):
 - Run after migrations.
 
 Entrypoint: `python -m db.seed --yes`
+
+Also loads ``db/seed/users.txt`` (multi-JSON): profiles, admin employees, and B2C visits.
 """
 
 from __future__ import annotations
@@ -45,6 +47,7 @@ from db.seed.operations import (
     upsert_questions,
     upsert_users,
 )
+from db.seed.users import seed_users
 
 
 async def seed_reference_data(*, yes: bool) -> None:
@@ -84,6 +87,9 @@ async def seed_reference_data(*, yes: bool) -> None:
             csv_dir = resolve_diagnostics_csv_dir()
             await seed_diagnostics_reference_from_csv_dir(session, csv_dir)
             await upsert_default_platform_settings(session)
+
+            n = await seed_users(session)
+            print(f"Seeded db/seed/users.txt ({n} profile(s), admin employees, B2C visits)")
 
             await reset_sequences(session)
             await reset_diagnostics_sequences(session)
