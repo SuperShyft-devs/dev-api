@@ -176,7 +176,7 @@ class EngagementsService:
 
         engagement = Engagement(
             engagement_name=payload.engagement_name,
-            metsights_engagement_id=None,
+            metsights_engagement_id=payload.metsights_engagement_id,
             organization_id=payload.organization_id,
             engagement_code=code,
             engagement_type=payload.engagement_type,

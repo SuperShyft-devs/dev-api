@@ -15,6 +15,7 @@ class EngagementCreateRequest(BaseModel):
     """Create a new B2B engagement."""
 
     engagement_name: Optional[str] = Field(default=None, max_length=200)
+    metsights_engagement_id: Optional[str] = Field(default=None, max_length=200)
     organization_id: int = Field(gt=0)
     engagement_type: EngagementKind
     engagement_code: Optional[str] = Field(default=None, max_length=50)
