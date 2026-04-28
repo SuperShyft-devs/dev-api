@@ -6,7 +6,7 @@ Auth may only use it for existence checks.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 import csv
 import io
@@ -903,6 +903,66 @@ class UsersService:
 
         await self._repository.update_user_partial(db, user.user_id, {"metsights_profile_id": profile_id})
 
+    def _select_latest_metsights_record_id(self, records: list[dict[str, Any]]) -> str | None:
+        def _sort_key(row: dict[str, Any]) -> tuple[str, str]:
+            date_value = str(row.get("date") or "").strip()
+            created_value = str(row.get("created_at") or "").strip()
+            return (date_value, created_value)
+
+        valid_rows = [row for row in records if isinstance(row, dict)]
+        if not valid_rows:
+            return None
+        latest = max(valid_rows, key=_sort_key)
+        record_id = str(latest.get("id") or "").strip()
+        return record_id or None
+
+    async def _create_metsights_profile_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        engagement,
+    ) -> str | None:
+        if self._metsights_service is None:
+            return None
+        if not bool(engagement.create_profile_on_metsights):
+            return (user.metsights_profile_id or "").strip() or None
+
+        engagement_metsights_id = (engagement.metsights_engagement_id or "").strip()
+        first_name = (user.first_name or "").strip()
+        last_name = (user.last_name or "").strip()
+        phone = self._normalize_phone_for_metsights(user.phone)
+        gender = self._to_metsights_gender(user.gender)
+        if not engagement_metsights_id:
+            logger.warning(
+                "Metsights profile creation skipped for engagement_id=%s: metsights_engagement_id is missing",
+                engagement.engagement_id,
+            )
+            return (user.metsights_profile_id or "").strip() or None
+        if not first_name or not last_name or not phone or gender is None:
+            logger.warning(
+                "Metsights profile creation skipped for user_id=%s engagement_id=%s: missing required user fields",
+                user.user_id,
+                engagement.engagement_id,
+            )
+            return (user.metsights_profile_id or "").strip() or None
+
+        dob = user.date_of_birth.isoformat() if user.date_of_birth is not None else None
+        email = (user.email or "").strip() if user.email else None
+        profile_id = await self._metsights_service.create_profile_for_engagement(
+            engagement_id=engagement_metsights_id,
+            first_name=first_name,
+            last_name=last_name,
+            phone=phone,
+            email=email,
+            gender=gender,
+            date_of_birth=dob,
+            age=user.age,
+        )
+        await self._repository.update_user_partial(db, user.user_id, {"metsights_profile_id": profile_id})
+        user.metsights_profile_id = profile_id
+        return profile_id
+
     async def create_user_by_employee(
         self,
         db: AsyncSession,
@@ -1402,7 +1462,6 @@ class UsersService:
             patch_data={**patch_data, "is_participant": True, "referred_by": code},
             create_data=create_data,
         )
-        await self._ensure_metsights_profile_id(db, user=user)
 
         slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
         time_slot = await self._engagements_service.enroll_user_in_engagement(
@@ -1418,22 +1477,101 @@ class UsersService:
             want_doctor_consultation=payload.want_doctor_consultation,
             want_nutritionist_consultation=payload.want_nutritionist_consultation,
             want_doctor_and_nutritionist_consultation=payload.want_doctor_and_nutritionist_consultation,
-            is_metsights_profile_created=bool((user.metsights_profile_id or "").strip()),
+            is_metsights_profile_created=False,
+            is_profile_created_on_metsights=False,
+            is_primary_record_id_synced=False,
+            is_fitprint_record_id_synced=False,
         )
 
+        assessment_instance = None
         if self._assessments_service is None:
             raise RuntimeError("Assessments service is required")
-        assessment_instance = await self._assessments_service.ensure_instance_assigned(
-            db,
-            user_id=user.user_id,
-            engagement_id=engagement.engagement_id,
-            package_id=engagement.assessment_package_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            endpoint=endpoint,
-        )
+        try:
+            assessment_instance = await self._assessments_service.ensure_instance_assigned(
+                db,
+                user_id=user.user_id,
+                engagement_id=engagement.engagement_id,
+                package_id=engagement.assessment_package_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                endpoint=endpoint,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Assessment assignment failed for user_id=%s engagement_id=%s: %s",
+                user.user_id,
+                engagement.engagement_id,
+                str(exc),
+            )
 
-        if self._metsights_service is not None and not (assessment_instance.metsights_record_id or "").strip():
+        metsights_record_id: str | None = None
+        try:
+            profile_id = await self._create_metsights_profile_for_engagement(db, user=user, engagement=engagement)
+            if profile_id:
+                await self._engagements_service.update_participant_sync_flags(
+                    db,
+                    participant=time_slot,
+                    is_profile_created_on_metsights=True,
+                )
+                records_payload = await self._metsights_service.list_profile_records(profile_id=profile_id)
+                records = records_payload if isinstance(records_payload, list) else []
+                latest_record_id = self._select_latest_metsights_record_id(records)
+                if latest_record_id and assessment_instance is not None:
+                    assessment_instance = await self._assessments_service.ensure_instance_assigned(
+                        db,
+                        user_id=user.user_id,
+                        engagement_id=engagement.engagement_id,
+                        package_id=engagement.assessment_package_id,
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        endpoint=endpoint,
+                        metsights_record_id=latest_record_id,
+                    )
+                    metsights_record_id = latest_record_id
+                    await self._engagements_service.update_participant_sync_flags(
+                        db,
+                        participant=time_slot,
+                        is_primary_record_id_synced=True,
+                    )
+
+                if bool(engagement.enroll_for_fitprint_full):
+                    fitprint_record_id = await self._metsights_service.create_record_for_profile(
+                        profile_id=profile_id,
+                        assessment_type_code="7",
+                    )
+                    fitprint_package = await self._assessments_service.get_package_by_assessment_type_code(
+                        db,
+                        assessment_type_code="7",
+                    )
+                    if fitprint_package is not None:
+                        await self._assessments_service.ensure_instance_assigned(
+                            db,
+                            user_id=user.user_id,
+                            engagement_id=engagement.engagement_id,
+                            package_id=int(fitprint_package.package_id),
+                            ip_address=ip_address,
+                            user_agent=user_agent,
+                            endpoint=endpoint,
+                            metsights_record_id=fitprint_record_id,
+                        )
+                        await self._engagements_service.update_participant_sync_flags(
+                            db,
+                            participant=time_slot,
+                            is_fitprint_record_id_synced=True,
+                        )
+        except Exception as exc:
+            logger.warning(
+                "Metsights sync failed for user_id=%s engagement_id=%s: %s",
+                user.user_id,
+                engagement.engagement_id,
+                str(exc),
+            )
+
+        if (
+            self._metsights_service is not None
+            and assessment_instance is not None
+            and not (assessment_instance.metsights_record_id or "").strip()
+        ):
             try:
                 package = await self._assessments_service.get_package_by_id(db, engagement.assessment_package_id)
                 assessment_type_code = (getattr(package, "assessment_type_code", None) or "").strip() if package else ""
@@ -1453,6 +1591,12 @@ class UsersService:
                         endpoint=endpoint,
                         metsights_record_id=record_id,
                     )
+                    await self._engagements_service.update_participant_sync_flags(
+                        db,
+                        participant=time_slot,
+                        is_primary_record_id_synced=True,
+                    )
+                    metsights_record_id = record_id
             except Exception as exc:
                 logger.warning(
                     "Metsights record creation failed for user_id=%s engagement_id=%s: %s",
@@ -1482,8 +1626,8 @@ class UsersService:
             engagement_id=engagement.engagement_id,
             engagement_code=engagement.engagement_code,
             engagement_participant_id=time_slot.engagement_participant_id,
-            assessment_instance_id=int(assessment_instance.assessment_instance_id),
-            metsights_record_id=mid,
+            assessment_instance_id=int(assessment_instance.assessment_instance_id) if assessment_instance is not None else None,
+            metsights_record_id=metsights_record_id or mid,
         )
 
     def _metsights_csv_cell(self, raw_row: dict[str, str], colmap: dict[str, str], key: str) -> str:

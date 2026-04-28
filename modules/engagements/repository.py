@@ -125,6 +125,11 @@ class EngagementsRepository:
         await db.flush()
         return slot
 
+    async def update_participant(self, db: AsyncSession, participant: EngagementParticipant) -> EngagementParticipant:
+        db.add(participant)
+        await db.flush()
+        return participant
+
     async def has_participant_for_user_engagement(
         self,
         db: AsyncSession,
@@ -329,6 +334,9 @@ class EngagementsRepository:
                 EngagementParticipant.want_nutritionist_consultation,
                 EngagementParticipant.want_doctor_and_nutritionist_consultation,
                 EngagementParticipant.is_metsights_profile_created,
+                EngagementParticipant.is_profile_created_on_metsights,
+                EngagementParticipant.is_primary_record_id_synced,
+                EngagementParticipant.is_fitprint_record_id_synced,
             )
             .select_from(Engagement)
             .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
@@ -397,6 +405,9 @@ class EngagementsRepository:
                 EngagementParticipant.want_nutritionist_consultation,
                 EngagementParticipant.want_doctor_and_nutritionist_consultation,
                 EngagementParticipant.is_metsights_profile_created,
+                EngagementParticipant.is_profile_created_on_metsights,
+                EngagementParticipant.is_primary_record_id_synced,
+                EngagementParticipant.is_fitprint_record_id_synced,
             )
             .select_from(Engagement)
             .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)

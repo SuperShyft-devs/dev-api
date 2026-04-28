@@ -449,7 +449,7 @@ class MetsightsService:
             "first_name": safe_first,
             "last_name": safe_last,
             "phone": safe_phone,
-            "gender": safe_gender,
+            "gender": int(safe_gender),
         }
         if safe_email:
             payload["email"] = safe_email
@@ -474,7 +474,7 @@ class MetsightsService:
             return profile_id
         except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code
-            if status_code == 403:
+            if status_code in (401, 403):
                 raise AppError(
                     status_code=503,
                     error_code="EXTERNAL_SERVICE_UNAVAILABLE",
@@ -538,6 +538,79 @@ class MetsightsService:
                 error_code="EXTERNAL_SERVICE_UNAVAILABLE",
                 message="Metsights request failed",
             ) from exc
+
+    async def create_profile_for_engagement(
+        self,
+        *,
+        engagement_id: str,
+        first_name: str,
+        last_name: str,
+        phone: str,
+        email: str | None,
+        gender: str,
+        date_of_birth: str | None,
+        age: int | None,
+    ) -> str:
+        self._require_api_key()
+        safe_engagement_id = (engagement_id or "").strip()
+        safe_first = (first_name or "").strip()
+        safe_last = (last_name or "").strip()
+        safe_phone = (phone or "").strip()
+        safe_gender = (gender or "").strip()
+        safe_email = (email or "").strip() if email is not None else None
+        safe_dob = (date_of_birth or "").strip() if date_of_birth is not None else None
+
+        if not safe_engagement_id:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Metsights engagement id is missing")
+        if not safe_first or not safe_last or not safe_phone or not safe_gender:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Missing required profile fields")
+
+        payload: dict[str, Any] = {
+            "first_name": safe_first,
+            "last_name": safe_last,
+            "phone": safe_phone,
+            "gender": int(safe_gender),
+        }
+        if safe_email:
+            payload["email"] = safe_email
+        if safe_dob:
+            payload["date_of_birth"] = safe_dob
+        elif age is not None:
+            payload["age"] = int(age)
+        else:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="DOB or age is required")
+
+        try:
+            created = await self._client.create_profile_for_engagement(engagement_id=safe_engagement_id, data=payload)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (401, 403):
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Metsights authorization failed",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
+        envelope = MetsightsEnvelope.model_validate(created)
+        data = envelope.data if isinstance(envelope.data, dict) else {}
+        profile_id = str(data.get("id") or "").strip()
+        if not profile_id:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights profile creation returned no id",
+            )
+        return profile_id
 
     async def create_record_for_profile(self, *, profile_id: str, assessment_type_code: str) -> str:
         safe_profile_id = (profile_id or "").strip()

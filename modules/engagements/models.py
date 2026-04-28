@@ -49,6 +49,8 @@ class Engagement(Base):
     end_date = Column(Date)
     status = Column(String)
     participant_count = Column(Integer)
+    create_profile_on_metsights = Column(Boolean, nullable=False, default=False, server_default="false")
+    enroll_for_fitprint_full = Column(Boolean, nullable=False, default=False, server_default="false")
 
 
 class OnboardingAssistantAssignment(Base):
@@ -84,3 +86,6 @@ class EngagementParticipant(Base):
     want_nutritionist_consultation = Column(Boolean, nullable=True)
     want_doctor_and_nutritionist_consultation = Column(Boolean, nullable=True)
     is_metsights_profile_created = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_profile_created_on_metsights = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_primary_record_id_synced = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_fitprint_record_id_synced = Column(Boolean, nullable=False, default=False, server_default="false")

@@ -157,6 +157,23 @@ class MetsightsClient:
                 return {"detail": "Unexpected response", "data": None}
             return payload
 
+    async def create_profile_for_engagement(self, *, engagement_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        eid = str(engagement_id or "").strip()
+        if not eid:
+            raise ValueError("engagement_id is required")
+        base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
+        url = f"{base_url}/engagements/{eid}/register/"
+        headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
+        timeout = settings.METSIGHTS_TIMEOUT_SECONDS
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(url, headers=headers, json=data)
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                return {"detail": "Unexpected response", "data": None}
+            return payload
+
     async def list_profiles(self, *, search: str | None) -> dict[str, Any]:
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
         url = f"{base_url}/profiles/"

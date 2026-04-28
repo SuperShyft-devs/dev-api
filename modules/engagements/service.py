@@ -190,6 +190,8 @@ class EngagementsService:
             end_date=payload.end_date,
             status="active",
             participant_count=0,
+            create_profile_on_metsights=payload.create_profile_on_metsights,
+            enroll_for_fitprint_full=payload.enroll_for_fitprint_full,
         )
 
         engagement = await self._repository.create_engagement(db, engagement)
@@ -310,6 +312,8 @@ class EngagementsService:
         engagement.start_date = payload.start_date
         engagement.end_date = payload.end_date
         engagement.metsights_engagement_id = payload.metsights_engagement_id
+        engagement.create_profile_on_metsights = payload.create_profile_on_metsights
+        engagement.enroll_for_fitprint_full = payload.enroll_for_fitprint_full
 
         engagement = await self._repository.update_engagement(db, engagement)
 
@@ -400,6 +404,8 @@ class EngagementsService:
             end_date=engagement_date,
             status="active",
             participant_count=0,
+            create_profile_on_metsights=False,
+            enroll_for_fitprint_full=False,
         )
         return await self._repository.create_engagement(db, engagement)
 
@@ -430,6 +436,9 @@ class EngagementsService:
         want_nutritionist_consultation: bool | None = None,
         want_doctor_and_nutritionist_consultation: bool | None = None,
         is_metsights_profile_created: bool = False,
+        is_profile_created_on_metsights: bool = False,
+        is_primary_record_id_synced: bool = False,
+        is_fitprint_record_id_synced: bool = False,
     ) -> EngagementParticipant:
         if (engagement.status or "").lower() != "active":
             raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is no longer active")
@@ -450,8 +459,29 @@ class EngagementsService:
             want_nutritionist_consultation=want_nutritionist_consultation,
             want_doctor_and_nutritionist_consultation=want_doctor_and_nutritionist_consultation,
             is_metsights_profile_created=is_metsights_profile_created,
+            is_profile_created_on_metsights=is_profile_created_on_metsights,
+            is_primary_record_id_synced=is_primary_record_id_synced,
+            is_fitprint_record_id_synced=is_fitprint_record_id_synced,
         )
         return await self._repository.create_participant(db, participant)
+
+    async def update_participant_sync_flags(
+        self,
+        db: AsyncSession,
+        *,
+        participant: EngagementParticipant,
+        is_profile_created_on_metsights: bool | None = None,
+        is_primary_record_id_synced: bool | None = None,
+        is_fitprint_record_id_synced: bool | None = None,
+    ) -> EngagementParticipant:
+        if is_profile_created_on_metsights is not None:
+            participant.is_profile_created_on_metsights = is_profile_created_on_metsights
+            participant.is_metsights_profile_created = is_profile_created_on_metsights
+        if is_primary_record_id_synced is not None:
+            participant.is_primary_record_id_synced = is_primary_record_id_synced
+        if is_fitprint_record_id_synced is not None:
+            participant.is_fitprint_record_id_synced = is_fitprint_record_id_synced
+        return await self._repository.update_participant(db, participant)
 
     async def list_participants_for_engagement_code(
         self,
@@ -513,6 +543,9 @@ class EngagementsService:
                 want_nutritionist_consultation,
                 want_doctor_and_nutritionist_consultation,
                 is_metsights_profile_created,
+                is_profile_created_on_metsights,
+                is_primary_record_id_synced,
+                is_fitprint_record_id_synced,
             ) = row
             result.append({
                 "engagement_participant_id": engagement_participant_id,
@@ -533,6 +566,9 @@ class EngagementsService:
                 "want_nutritionist_consultation": want_nutritionist_consultation,
                 "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
                 "is_metsights_profile_created": is_metsights_profile_created,
+                "is_profile_created_on_metsights": is_profile_created_on_metsights,
+                "is_primary_record_id_synced": is_primary_record_id_synced,
+                "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
             })
 
         return result, total
@@ -584,6 +620,9 @@ class EngagementsService:
                 want_nutritionist_consultation,
                 want_doctor_and_nutritionist_consultation,
                 is_metsights_profile_created,
+                is_profile_created_on_metsights,
+                is_primary_record_id_synced,
+                is_fitprint_record_id_synced,
             ) = row
             result.append({
                 "engagement_participant_id": engagement_participant_id,
@@ -604,6 +643,9 @@ class EngagementsService:
                 "want_nutritionist_consultation": want_nutritionist_consultation,
                 "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
                 "is_metsights_profile_created": is_metsights_profile_created,
+                "is_profile_created_on_metsights": is_profile_created_on_metsights,
+                "is_primary_record_id_synced": is_primary_record_id_synced,
+                "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
             })
 
         return result, total

@@ -109,6 +109,8 @@ async def list_engagements(
                 "end_date": engagement.end_date,
                 "status": engagement.status,
                 "participant_count": engagement.participant_count,
+                "create_profile_on_metsights": engagement.create_profile_on_metsights,
+                "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
                 "readiness": readiness.model_dump(mode="json"),
             }
         )
@@ -185,6 +187,8 @@ async def get_engagement_details(
             "end_date": engagement.end_date,
             "status": engagement.status,
             "participant_count": engagement.participant_count,
+            "create_profile_on_metsights": engagement.create_profile_on_metsights,
+            "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
         }
     )
 
