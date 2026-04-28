@@ -171,9 +171,12 @@ class SeedParticipant:
     slot_start_time: time
     engagement_date: date
     participants_employee_id: str | None = None
+    participant_department: str | None = None
+    participant_blood_group: str | None = None
     want_doctor_consultation: bool | None = None
     want_nutritionist_consultation: bool | None = None
     want_doctor_and_nutritionist_consultation: bool | None = None
+    is_metsights_profile_created: bool = False
 
 
 SAMPLE_USERS: tuple[SeedUser, ...] = (
@@ -554,9 +557,12 @@ async def _upsert_participants(session: AsyncSession, slots: Iterable[SeedPartic
         row.slot_start_time = seed.slot_start_time
         row.engagement_date = seed.engagement_date
         row.participants_employee_id = seed.participants_employee_id
+        row.participant_department = seed.participant_department
+        row.participant_blood_group = seed.participant_blood_group
         row.want_doctor_consultation = seed.want_doctor_consultation
         row.want_nutritionist_consultation = seed.want_nutritionist_consultation
         row.want_doctor_and_nutritionist_consultation = seed.want_doctor_and_nutritionist_consultation
+        row.is_metsights_profile_created = seed.is_metsights_profile_created
 
 
 async def _reset_sequences(session: AsyncSession) -> None:

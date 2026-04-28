@@ -105,6 +105,8 @@ async def test_public_onboard_creates_engagement_participant_and_assessment_inst
         "city": "Delhi",
         "blood_collection_date": "2026-02-01",
         "blood_collection_time_slot": "10:00",
+        "participant_department": "Engineering",
+        "participant_blood_group": "O+",
         "referred_by": "",
     }
 
@@ -139,7 +141,8 @@ async def test_public_onboard_creates_engagement_participant_and_assessment_inst
     slot_row = (
         await test_db_session.execute(
             text(
-                "SELECT engagement_id, user_id, engagement_date, slot_start_time FROM engagement_participants WHERE engagement_participant_id = :tid"
+                "SELECT engagement_id, user_id, engagement_date, slot_start_time, participant_department, participant_blood_group, is_metsights_profile_created "
+                "FROM engagement_participants WHERE engagement_participant_id = :tid"
             ),
             {"tid": data["engagement_participant_id"]},
         )
@@ -148,6 +151,9 @@ async def test_public_onboard_creates_engagement_participant_and_assessment_inst
     assert slot_row.engagement_id == engagement_id
     assert str(slot_row.engagement_date) == "2026-02-01"
     assert str(slot_row.slot_start_time)[:5] == "10:00"
+    assert slot_row.participant_department == "Engineering"
+    assert slot_row.participant_blood_group == "O+"
+    assert slot_row.is_metsights_profile_created is False
 
     instance_row = (
         await test_db_session.execute(
@@ -204,6 +210,8 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
         "city": "BLR",
         "blood_collection_date": "2026-02-01",
         "blood_collection_time_slot": "11:00",
+        "participant_department": "HR",
+        "participant_blood_group": "B+",
     }
 
     response = await async_client.post("/users/code/ENG12345/onboard", json=payload)
@@ -211,6 +219,19 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
 
     data = response.json()["data"]
     assert data["engagement_id"] == 3001
+
+    slot_row = (
+        await test_db_session.execute(
+            text(
+                "SELECT participant_department, participant_blood_group, is_metsights_profile_created "
+                "FROM engagement_participants WHERE engagement_participant_id = :pid"
+            ),
+            {"pid": data["engagement_participant_id"]},
+        )
+    ).first()
+    assert slot_row.participant_department == "HR"
+    assert slot_row.participant_blood_group == "B+"
+    assert slot_row.is_metsights_profile_created is False
 
     engagement_row = (
         await test_db_session.execute(

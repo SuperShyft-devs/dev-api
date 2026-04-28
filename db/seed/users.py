@@ -378,9 +378,12 @@ async def _seed_one_engagement_per_user(
         engagement_date=slot_date,
         slot_start_time=slot_start,
         participants_employee_id=None,
+        participant_department=None,
+        participant_blood_group=None,
         want_doctor_consultation=None,
         want_nutritionist_consultation=None,
         want_doctor_and_nutritionist_consultation=None,
+        is_metsights_profile_created=False,
     )
     await er.create_participant(session, participant)
 

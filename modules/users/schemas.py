@@ -228,6 +228,8 @@ class PublicUserOnboardRequest(BaseModel):
     blood_collection_time_slot: str = Field(min_length=1, max_length=20)
 
     participants_employee_id: Optional[str] = Field(default=None, max_length=100)
+    participant_department: Optional[str] = Field(default=None, max_length=100)
+    participant_blood_group: Optional[str] = Field(default=None, max_length=20)
     want_doctor_consultation: Optional[bool] = None
     want_nutritionist_consultation: Optional[bool] = None
     want_doctor_and_nutritionist_consultation: Optional[bool] = None
@@ -265,6 +267,8 @@ class EngagementUserOnboardRequest(BaseModel):
     blood_collection_time_slot: str = Field(min_length=1, max_length=20)
 
     participants_employee_id: Optional[str] = Field(default=None, max_length=100)
+    participant_department: Optional[str] = Field(default=None, max_length=100)
+    participant_blood_group: Optional[str] = Field(default=None, max_length=20)
     want_doctor_consultation: Optional[bool] = None
     want_nutritionist_consultation: Optional[bool] = None
     want_doctor_and_nutritionist_consultation: Optional[bool] = None

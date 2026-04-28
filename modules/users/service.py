@@ -610,6 +610,7 @@ class UsersService:
             engagement_date=blood_collection_date,
             slot_start_time=slot_start,
             increment_participant_count=False,
+            is_metsights_profile_created=bool((user.metsights_profile_id or "").strip()),
         )
 
         metsights_record_id: str | None = None
@@ -726,6 +727,7 @@ class UsersService:
             engagement_date=blood_collection_date,
             slot_start_time=slot_start,
             increment_participant_count=False,
+            is_metsights_profile_created=bool((user.metsights_profile_id or "").strip()),
         )
 
         if self._audit_service is None:
@@ -1241,9 +1243,12 @@ class UsersService:
             slot_start_time=slot_start,
             increment_participant_count=False,
             participants_employee_id=payload.participants_employee_id,
+            participant_department=payload.participant_department,
+            participant_blood_group=payload.participant_blood_group,
             want_doctor_consultation=payload.want_doctor_consultation,
             want_nutritionist_consultation=payload.want_nutritionist_consultation,
             want_doctor_and_nutritionist_consultation=payload.want_doctor_and_nutritionist_consultation,
+            is_metsights_profile_created=bool((user.metsights_profile_id or "").strip()),
         )
 
         if self._assessments_service is None:
@@ -1408,9 +1413,12 @@ class UsersService:
             slot_start_time=slot_start,
             increment_participant_count=False,
             participants_employee_id=payload.participants_employee_id,
+            participant_department=payload.participant_department,
+            participant_blood_group=payload.participant_blood_group,
             want_doctor_consultation=payload.want_doctor_consultation,
             want_nutritionist_consultation=payload.want_nutritionist_consultation,
             want_doctor_and_nutritionist_consultation=payload.want_doctor_and_nutritionist_consultation,
+            is_metsights_profile_created=bool((user.metsights_profile_id or "").strip()),
         )
 
         if self._assessments_service is None:
@@ -1577,6 +1585,7 @@ class UsersService:
             engagement_date=slot_date,
             slot_start_time=slot_time,
             increment_participant_count=True,
+            is_metsights_profile_created=bool((user.metsights_profile_id or "").strip()),
         )
 
         try:

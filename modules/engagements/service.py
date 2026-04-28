@@ -424,9 +424,12 @@ class EngagementsService:
         slot_start_time: time,
         increment_participant_count: bool = False,
         participants_employee_id: str | None = None,
+        participant_department: str | None = None,
+        participant_blood_group: str | None = None,
         want_doctor_consultation: bool | None = None,
         want_nutritionist_consultation: bool | None = None,
         want_doctor_and_nutritionist_consultation: bool | None = None,
+        is_metsights_profile_created: bool = False,
     ) -> EngagementParticipant:
         if (engagement.status or "").lower() != "active":
             raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is no longer active")
@@ -441,9 +444,12 @@ class EngagementsService:
             engagement_date=engagement_date,
             slot_start_time=slot_start_time,
             participants_employee_id=participants_employee_id,
+            participant_department=participant_department,
+            participant_blood_group=participant_blood_group,
             want_doctor_consultation=want_doctor_consultation,
             want_nutritionist_consultation=want_nutritionist_consultation,
             want_doctor_and_nutritionist_consultation=want_doctor_and_nutritionist_consultation,
+            is_metsights_profile_created=is_metsights_profile_created,
         )
         return await self._repository.create_participant(db, participant)
 
