@@ -462,7 +462,7 @@ class EngagementsService:
         page: int,
         limit: int,
     ) -> tuple[list[dict], int]:
-        """Fetch all distinct users enrolled in a specific engagement by code.
+        """Fetch participant enrollment rows for a specific engagement by code.
         
         This endpoint is for employees only.
         """
@@ -485,7 +485,7 @@ class EngagementsService:
             limit=limit,
         )
 
-        # Count total distinct participants
+        # Count total participant enrollment rows
         total = await self._repository.count_participants_by_engagement_code(
             db,
             engagement_code=engagement_code,
@@ -494,8 +494,29 @@ class EngagementsService:
         # Transform tuple results to dictionary format
         result = []
         for row in participants:
-            user_id, first_name, last_name, phone, email, city, status = row
+            (
+                engagement_participant_id,
+                engagement_id,
+                user_id,
+                first_name,
+                last_name,
+                phone,
+                email,
+                city,
+                status,
+                slot_start_time,
+                engagement_date,
+                participants_employee_id,
+                participant_department,
+                participant_blood_group,
+                want_doctor_consultation,
+                want_nutritionist_consultation,
+                want_doctor_and_nutritionist_consultation,
+                is_metsights_profile_created,
+            ) = row
             result.append({
+                "engagement_participant_id": engagement_participant_id,
+                "engagement_id": engagement_id,
                 "user_id": user_id,
                 "first_name": first_name,
                 "last_name": last_name,
@@ -503,6 +524,15 @@ class EngagementsService:
                 "email": email,
                 "city": city,
                 "status": status,
+                "slot_start_time": slot_start_time.isoformat() if slot_start_time is not None else None,
+                "engagement_date": engagement_date.isoformat() if engagement_date is not None else None,
+                "participants_employee_id": participants_employee_id,
+                "participant_department": participant_department,
+                "participant_blood_group": participant_blood_group,
+                "want_doctor_consultation": want_doctor_consultation,
+                "want_nutritionist_consultation": want_nutritionist_consultation,
+                "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
+                "is_metsights_profile_created": is_metsights_profile_created,
             })
 
         return result, total
@@ -515,7 +545,7 @@ class EngagementsService:
         page: int,
         limit: int,
     ) -> tuple[list[dict], int]:
-        """Fetch all distinct users enrolled in all B2C engagements.
+        """Fetch participant enrollment rows in all B2C engagements.
         
         This endpoint is for employees only.
         B2C engagements are engagements with no organization_id.
@@ -529,14 +559,35 @@ class EngagementsService:
             limit=limit,
         )
 
-        # Count total distinct participants
+        # Count total participant enrollment rows
         total = await self._repository.count_participants_for_b2c_engagements(db)
 
         # Transform tuple results to dictionary format
         result = []
         for row in participants:
-            user_id, first_name, last_name, phone, email, city, status = row
+            (
+                engagement_participant_id,
+                engagement_id,
+                user_id,
+                first_name,
+                last_name,
+                phone,
+                email,
+                city,
+                status,
+                slot_start_time,
+                engagement_date,
+                participants_employee_id,
+                participant_department,
+                participant_blood_group,
+                want_doctor_consultation,
+                want_nutritionist_consultation,
+                want_doctor_and_nutritionist_consultation,
+                is_metsights_profile_created,
+            ) = row
             result.append({
+                "engagement_participant_id": engagement_participant_id,
+                "engagement_id": engagement_id,
                 "user_id": user_id,
                 "first_name": first_name,
                 "last_name": last_name,
@@ -544,6 +595,15 @@ class EngagementsService:
                 "email": email,
                 "city": city,
                 "status": status,
+                "slot_start_time": slot_start_time.isoformat() if slot_start_time is not None else None,
+                "engagement_date": engagement_date.isoformat() if engagement_date is not None else None,
+                "participants_employee_id": participants_employee_id,
+                "participant_department": participant_department,
+                "participant_blood_group": participant_blood_group,
+                "want_doctor_consultation": want_doctor_consultation,
+                "want_nutritionist_consultation": want_nutritionist_consultation,
+                "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
+                "is_metsights_profile_created": is_metsights_profile_created,
             })
 
         return result, total

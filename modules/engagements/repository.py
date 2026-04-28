@@ -283,11 +283,11 @@ class EngagementsRepository:
         *,
         engagement_code: str,
     ) -> int:
-        """Count distinct users enrolled in a specific engagement by code."""
+        """Count participant enrollment rows for a specific engagement by code."""
         from sqlalchemy import func
 
         query = (
-            select(func.count(func.distinct(EngagementParticipant.user_id)))
+            select(func.count(EngagementParticipant.engagement_participant_id))
             .select_from(Engagement)
             .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
             .where(Engagement.engagement_code == engagement_code)
@@ -304,13 +304,15 @@ class EngagementsRepository:
         page: int,
         limit: int,
     ) -> list[tuple]:
-        """Fetch distinct users enrolled in a specific engagement by code."""
+        """Fetch participant enrollment rows for a specific engagement by code."""
         from modules.users.models import User
 
         offset = (page - 1) * limit
 
         query = (
             select(
+                EngagementParticipant.engagement_participant_id,
+                EngagementParticipant.engagement_id,
                 User.user_id,
                 User.first_name,
                 User.last_name,
@@ -318,13 +320,21 @@ class EngagementsRepository:
                 User.email,
                 User.city,
                 User.status,
+                EngagementParticipant.slot_start_time,
+                EngagementParticipant.engagement_date,
+                EngagementParticipant.participants_employee_id,
+                EngagementParticipant.participant_department,
+                EngagementParticipant.participant_blood_group,
+                EngagementParticipant.want_doctor_consultation,
+                EngagementParticipant.want_nutritionist_consultation,
+                EngagementParticipant.want_doctor_and_nutritionist_consultation,
+                EngagementParticipant.is_metsights_profile_created,
             )
-            .distinct()
             .select_from(Engagement)
             .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
             .join(User, User.user_id == EngagementParticipant.user_id)
             .where(Engagement.engagement_code == engagement_code)
-            .order_by(User.user_id.asc())
+            .order_by(EngagementParticipant.engagement_participant_id.asc())
             .offset(offset)
             .limit(limit)
         )
@@ -336,14 +346,14 @@ class EngagementsRepository:
         self,
         db: AsyncSession,
     ) -> int:
-        """Count distinct users enrolled in all B2C engagements.
+        """Count participant enrollment rows in all B2C engagements.
         
         B2C engagements are engagements with no organization_id.
         """
         from sqlalchemy import func
 
         query = (
-            select(func.count(func.distinct(EngagementParticipant.user_id)))
+            select(func.count(EngagementParticipant.engagement_participant_id))
             .select_from(Engagement)
             .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
             .where(Engagement.organization_id.is_(None))
@@ -359,7 +369,7 @@ class EngagementsRepository:
         page: int,
         limit: int,
     ) -> list[tuple]:
-        """Fetch distinct users enrolled in all B2C engagements.
+        """Fetch participant enrollment rows in all B2C engagements.
         
         B2C engagements are engagements with no organization_id.
         """
@@ -369,6 +379,8 @@ class EngagementsRepository:
 
         query = (
             select(
+                EngagementParticipant.engagement_participant_id,
+                EngagementParticipant.engagement_id,
                 User.user_id,
                 User.first_name,
                 User.last_name,
@@ -376,13 +388,21 @@ class EngagementsRepository:
                 User.email,
                 User.city,
                 User.status,
+                EngagementParticipant.slot_start_time,
+                EngagementParticipant.engagement_date,
+                EngagementParticipant.participants_employee_id,
+                EngagementParticipant.participant_department,
+                EngagementParticipant.participant_blood_group,
+                EngagementParticipant.want_doctor_consultation,
+                EngagementParticipant.want_nutritionist_consultation,
+                EngagementParticipant.want_doctor_and_nutritionist_consultation,
+                EngagementParticipant.is_metsights_profile_created,
             )
-            .distinct()
             .select_from(Engagement)
             .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
             .join(User, User.user_id == EngagementParticipant.user_id)
             .where(Engagement.organization_id.is_(None))
-            .order_by(User.user_id.asc())
+            .order_by(EngagementParticipant.engagement_participant_id.asc())
             .offset(offset)
             .limit(limit)
         )
