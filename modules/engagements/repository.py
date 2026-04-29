@@ -5,7 +5,7 @@ Only database queries live here.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.engagements.models import Engagement, EngagementParticipant, OnboardingAssistantAssignment
@@ -288,11 +288,10 @@ class EngagementsRepository:
         *,
         engagement_code: str,
     ) -> int:
-        """Count participant enrollment rows for a specific engagement by code."""
-        from sqlalchemy import func
+        """Count distinct users enrolled for a specific engagement code."""
 
         query = (
-            select(func.count(EngagementParticipant.engagement_participant_id))
+            select(func.count(func.distinct(EngagementParticipant.user_id)))
             .select_from(Engagement)
             .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
             .where(Engagement.engagement_code == engagement_code)
@@ -314,7 +313,7 @@ class EngagementsRepository:
 
         offset = (page - 1) * limit
 
-        query = (
+        ranked_rows = (
             select(
                 EngagementParticipant.engagement_participant_id,
                 EngagementParticipant.engagement_id,
@@ -337,12 +336,45 @@ class EngagementsRepository:
                 EngagementParticipant.is_profile_created_on_metsights,
                 EngagementParticipant.is_primary_record_id_synced,
                 EngagementParticipant.is_fitprint_record_id_synced,
+                func.row_number()
+                .over(
+                    partition_by=EngagementParticipant.user_id,
+                    order_by=EngagementParticipant.engagement_participant_id.desc(),
+                )
+                .label("rn"),
             )
             .select_from(Engagement)
             .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
             .join(User, User.user_id == EngagementParticipant.user_id)
             .where(Engagement.engagement_code == engagement_code)
-            .order_by(EngagementParticipant.engagement_participant_id.asc())
+        ).subquery()
+
+        query = (
+            select(
+                ranked_rows.c.engagement_participant_id,
+                ranked_rows.c.engagement_id,
+                ranked_rows.c.user_id,
+                ranked_rows.c.first_name,
+                ranked_rows.c.last_name,
+                ranked_rows.c.phone,
+                ranked_rows.c.email,
+                ranked_rows.c.city,
+                ranked_rows.c.status,
+                ranked_rows.c.slot_start_time,
+                ranked_rows.c.engagement_date,
+                ranked_rows.c.participants_employee_id,
+                ranked_rows.c.participant_department,
+                ranked_rows.c.participant_blood_group,
+                ranked_rows.c.want_doctor_consultation,
+                ranked_rows.c.want_nutritionist_consultation,
+                ranked_rows.c.want_doctor_and_nutritionist_consultation,
+                ranked_rows.c.is_metsights_profile_created,
+                ranked_rows.c.is_profile_created_on_metsights,
+                ranked_rows.c.is_primary_record_id_synced,
+                ranked_rows.c.is_fitprint_record_id_synced,
+            )
+            .where(ranked_rows.c.rn == 1)
+            .order_by(ranked_rows.c.engagement_participant_id.asc())
             .offset(offset)
             .limit(limit)
         )
@@ -354,14 +386,12 @@ class EngagementsRepository:
         self,
         db: AsyncSession,
     ) -> int:
-        """Count participant enrollment rows in all B2C engagements.
+        """Count distinct users enrolled in all B2C engagements.
         
         B2C engagements are engagements with no organization_id.
         """
-        from sqlalchemy import func
-
         query = (
-            select(func.count(EngagementParticipant.engagement_participant_id))
+            select(func.count(func.distinct(EngagementParticipant.user_id)))
             .select_from(Engagement)
             .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
             .where(Engagement.organization_id.is_(None))
@@ -385,7 +415,7 @@ class EngagementsRepository:
 
         offset = (page - 1) * limit
 
-        query = (
+        ranked_rows = (
             select(
                 EngagementParticipant.engagement_participant_id,
                 EngagementParticipant.engagement_id,
@@ -408,12 +438,45 @@ class EngagementsRepository:
                 EngagementParticipant.is_profile_created_on_metsights,
                 EngagementParticipant.is_primary_record_id_synced,
                 EngagementParticipant.is_fitprint_record_id_synced,
+                func.row_number()
+                .over(
+                    partition_by=EngagementParticipant.user_id,
+                    order_by=EngagementParticipant.engagement_participant_id.desc(),
+                )
+                .label("rn"),
             )
             .select_from(Engagement)
             .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
             .join(User, User.user_id == EngagementParticipant.user_id)
             .where(Engagement.organization_id.is_(None))
-            .order_by(EngagementParticipant.engagement_participant_id.asc())
+        ).subquery()
+
+        query = (
+            select(
+                ranked_rows.c.engagement_participant_id,
+                ranked_rows.c.engagement_id,
+                ranked_rows.c.user_id,
+                ranked_rows.c.first_name,
+                ranked_rows.c.last_name,
+                ranked_rows.c.phone,
+                ranked_rows.c.email,
+                ranked_rows.c.city,
+                ranked_rows.c.status,
+                ranked_rows.c.slot_start_time,
+                ranked_rows.c.engagement_date,
+                ranked_rows.c.participants_employee_id,
+                ranked_rows.c.participant_department,
+                ranked_rows.c.participant_blood_group,
+                ranked_rows.c.want_doctor_consultation,
+                ranked_rows.c.want_nutritionist_consultation,
+                ranked_rows.c.want_doctor_and_nutritionist_consultation,
+                ranked_rows.c.is_metsights_profile_created,
+                ranked_rows.c.is_profile_created_on_metsights,
+                ranked_rows.c.is_primary_record_id_synced,
+                ranked_rows.c.is_fitprint_record_id_synced,
+            )
+            .where(ranked_rows.c.rn == 1)
+            .order_by(ranked_rows.c.engagement_participant_id.asc())
             .offset(offset)
             .limit(limit)
         )
