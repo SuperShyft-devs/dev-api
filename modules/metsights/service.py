@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
@@ -10,6 +11,8 @@ from core.config import settings
 from core.exceptions import AppError
 from modules.metsights.client import MetsightsClient
 from modules.metsights.schemas import MetsightsEnvelope
+
+logger = logging.getLogger(__name__)
 
 
 class MetsightsService:
@@ -401,8 +404,27 @@ class MetsightsService:
                 try:
                     payload = await self._client.post_record_resource(record_id=rid, resource=res, data=body)
                 except httpx.HTTPStatusError as exc_post:
-                    if exc_post.response.status_code in (400, 409):
+                    if exc_post.response.status_code == 409:
                         payload = await self._client.patch_record_resource(record_id=rid, resource=res, data=body)
+                    elif exc_post.response.status_code == 400:
+                        try:
+                            error_body = exc_post.response.json()
+                        except Exception:
+                            error_body = exc_post.response.text
+                        logger.warning(
+                            "Metsights POST /records/%s/%s/ returned 400: %s — payload was: %s",
+                            rid, res, error_body, body,
+                        )
+                        try:
+                            payload = await self._client.patch_record_resource(record_id=rid, resource=res, data=body)
+                        except httpx.HTTPStatusError as exc_patch:
+                            if exc_patch.response.status_code == 404:
+                                raise AppError(
+                                    status_code=422,
+                                    error_code="METSIGHTS_VALIDATION_ERROR",
+                                    message=f"Metsights rejected data for {res}: {error_body}",
+                                ) from exc_post
+                            raise
                     else:
                         self._raise_metsights_record_http(exc_post)
             else:

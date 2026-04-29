@@ -114,7 +114,7 @@ async def submit_assessment(
 ):
     """Finalize questionnaire: push answers to Metsights (when applicable), mark responses and assessment completed."""
 
-    source_ids = body.source_assessment_instance_ids if body else None
+    source_ids = body.effective_source_ids if body else None
 
     data = await assessments_service.submit_assessment_for_user(
         db,

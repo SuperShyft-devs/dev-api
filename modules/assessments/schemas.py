@@ -47,7 +47,20 @@ class MetsightsRecordIdUpdate(BaseModel):
 
 
 class AssessmentSubmitRequest(BaseModel):
-    source_assessment_instance_ids: list[int] | None = None
+    source_assessment_instance_ids: list[int] | None = Field(
+        default=None,
+        alias="source_assessment_instance_ids",
+    )
+    source_assessment_instance_id: list[int] | None = Field(
+        default=None,
+        exclude=True,
+    )
+
+    model_config = {"populate_by_name": True}
+
+    @property
+    def effective_source_ids(self) -> list[int] | None:
+        return self.source_assessment_instance_ids or self.source_assessment_instance_id
 
 
 class AssessmentPackageCreateRequest(BaseModel):

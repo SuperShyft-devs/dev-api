@@ -884,12 +884,22 @@ class MetsightsSyncService:
             merged.update(_answer_to_metsights_fields(key, str(qdef.question_type or ""), resp.answer))
 
         patched: list[str] = []
+        skipped_sections: list[str] = []
 
         async def _patch_section(resource: str, body: dict[str, Any]) -> None:
             payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
             if not payload:
+                logger.info(
+                    "Skipping Metsights %s for record %s: empty payload (no matching questionnaire keys)",
+                    resource, mrid,
+                )
+                skipped_sections.append(resource)
                 return
             payload["is_complete"] = True
+            logger.info(
+                "Pushing to Metsights %s for record %s: %s",
+                resource, mrid, payload,
+            )
             await self._metsights.upsert_record_subresource(record_id=mrid, resource=resource, body=payload)
             patched.append(resource)
 
@@ -904,6 +914,13 @@ class MetsightsSyncService:
             bases = _METSIGHTS_SUBMIT_PHYSICAL_KEYS | _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS | _METSIGHTS_SUBMIT_FITNESS_ONLY_KEYS
             fit = _pick_metsights_payload_for_bases(merged, bases)
             await _patch_section("fitness-parameters", fit)
+
+        if not patched and skipped_sections:
+            logger.warning(
+                "Metsights push for instance %s (record %s) produced no data — "
+                "all sections skipped. effective_source_ids=%s, response_count=%s, merged_keys=%s",
+                assessment_instance_id, mrid, effective_source_ids, len(responses), list(merged.keys()),
+            )
 
         return {
             "assessment_instance_id": assessment_instance_id,
