@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
+from modules.assessments.repository import AssessmentsRepository
 from modules.audit.service import AuditService
 from modules.checklists.schemas import ChecklistReadiness
 from modules.employee.service import EmployeeContext
@@ -23,6 +24,8 @@ from modules.engagements.models import Engagement, EngagementKind, EngagementPar
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.schemas import EngagementCreateRequest, EngagementUpdateRequest
 from modules.organizations.repository import OrganizationsRepository
+from modules.questionnaire.repository import QuestionnaireRepository
+from modules.reports.repository import ReportsRepository
 
 if TYPE_CHECKING:
     from modules.checklists.service import ChecklistsService
@@ -51,6 +54,9 @@ class EngagementsService:
         self._repository = repository
         self._audit_service = audit_service
         self._organizations_repository = organizations_repository
+        self._assessments_repository = AssessmentsRepository()
+        self._questionnaire_repository = QuestionnaireRepository()
+        self._reports_repository = ReportsRepository()
         self._checklists_service = None
 
     def lazy_checklists_service(self) -> ChecklistsService:
@@ -649,3 +655,90 @@ class EngagementsService:
             })
 
         return result, total
+
+    async def remove_participant_from_engagement_for_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        participant = await self._repository.get_participant_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant does not exist")
+
+        instances = await self._assessments_repository.list_instances_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+
+        deleted_reports = 0
+        deleted_questionnaire_responses = 0
+        deleted_category_progress = 0
+        deleted_instances = 0
+
+        for instance in instances:
+            instance_id = int(instance.assessment_instance_id)
+            deleted_reports += await self._reports_repository.delete_individual_reports_for_instance(
+                db,
+                assessment_instance_id=instance_id,
+            )
+            deleted_questionnaire_responses += await self._questionnaire_repository.delete_responses_for_instance(
+                db,
+                assessment_instance_id=instance_id,
+            )
+            deleted_category_progress += await self._assessments_repository.delete_category_progress_for_instance(
+                db,
+                assessment_instance_id=instance_id,
+            )
+            deleted_instances += await self._assessments_repository.delete_instance(
+                db,
+                assessment_instance_id=instance_id,
+            )
+
+        deleted_participants = await self._repository.delete_participants_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        engagement.participant_count = await self._repository.count_distinct_participants_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+        await self._repository.update_engagement(db, engagement)
+
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_DELETE_ENGAGEMENT_PARTICIPANT",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return {
+            "engagement_id": engagement_id,
+            "user_id": user_id,
+            "deleted_engagement_participants": deleted_participants,
+            "deleted_assessment_instances": deleted_instances,
+            "deleted_questionnaire_responses": deleted_questionnaire_responses,
+            "deleted_reports": deleted_reports,
+            "deleted_category_progress_rows": deleted_category_progress,
+        }

@@ -145,6 +145,51 @@ class EngagementsRepository:
         )
         return result.scalar_one_or_none() is not None
 
+    async def get_participant_for_user_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+    ) -> EngagementParticipant | None:
+        result = await db.execute(
+            select(EngagementParticipant)
+            .where(EngagementParticipant.user_id == user_id)
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .order_by(EngagementParticipant.engagement_participant_id.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def delete_participants_for_user_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+    ) -> int:
+        from sqlalchemy import delete as sql_delete
+
+        result = await db.execute(
+            sql_delete(EngagementParticipant)
+            .where(EngagementParticipant.user_id == user_id)
+            .where(EngagementParticipant.engagement_id == engagement_id)
+        )
+        return int(result.rowcount or 0)
+
+    async def count_distinct_participants_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> int:
+        result = await db.execute(
+            select(func.count(func.distinct(EngagementParticipant.user_id))).where(
+                EngagementParticipant.engagement_id == engagement_id
+            )
+        )
+        return int(result.scalar_one() or 0)
+
     async def list_distinct_participant_ids_for_engagement(
         self,
         db: AsyncSession,

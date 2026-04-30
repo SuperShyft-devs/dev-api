@@ -305,6 +305,21 @@ class AssessmentsRepository:
         result = await db.execute(query)
         return list(result.scalars().all())
 
+    async def list_instances_for_user_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+    ) -> list[AssessmentInstance]:
+        result = await db.execute(
+            select(AssessmentInstance)
+            .where(AssessmentInstance.user_id == user_id)
+            .where(AssessmentInstance.engagement_id == engagement_id)
+            .order_by(AssessmentInstance.assessment_instance_id.asc())
+        )
+        return list(result.scalars().all())
+
     async def count_packages(self, db: AsyncSession, *, status: str | None) -> int:
         query = select(func.count()).select_from(AssessmentPackage)
         if status is not None:
