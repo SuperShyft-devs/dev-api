@@ -24,6 +24,7 @@ from modules.assessments.packages_router import router as assessment_packages_ro
 from modules.questionnaire.router import router as questionnaire_router
 from modules.support.router import router as support_router
 from modules.diagnostics.router import router as diagnostics_router
+from modules.diagnostics.healthians.router import router as healthians_router
 from modules.uploads.router import router as uploads_router
 from modules.reports.router import router as reports_router
 from modules.platform_settings.router import router as platform_settings_router
@@ -95,6 +96,7 @@ app.include_router(assessment_packages_router)
 app.include_router(questionnaire_router)
 app.include_router(support_router)
 app.include_router(diagnostics_router)
+app.include_router(healthians_router)
 app.include_router(uploads_router)
 app.include_router(reports_router)
 app.include_router(platform_settings_router)

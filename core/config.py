@@ -88,6 +88,11 @@ class Settings:
     OTP_HMAC_SECRET: str = os.getenv("OTP_HMAC_SECRET", "")
     REFRESH_TOKEN_SECRET: str = os.getenv("REFRESH_TOKEN_SECRET", "")
 
+    # Healthians Bridge API
+    HEALTHIANS_BASE_URL: str = os.getenv("HEALTHIANS_BASE_URL", "https://hbridge.healthians.com/api")
+    HEALTHIANS_API_KEY: str = os.getenv("HEALTHIANS_API_KEY", "")
+    HEALTHIANS_SECRET_KEY: str = os.getenv("HEALTHIANS_SECRET_KEY", "")
+
     # Razorpay (server-side secret; never expose RAZORPAY_KEY_SECRET to clients)
     RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")
     RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")
