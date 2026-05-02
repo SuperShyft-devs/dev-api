@@ -233,6 +233,7 @@ class DiagnosticsService:
             test_id=row.test_id,
             parameter_type=parameter_type,
             test_name=row.test_name,
+            healthians_parameter_id=row.healthians_parameter_id,
             parameter_key=row.parameter_key,
             unit=row.unit,
             meaning=row.meaning,
@@ -319,6 +320,7 @@ class DiagnosticsService:
             reference_id=row.reference_id,
             package_name=row.package_name,
             diagnostic_provider=row.diagnostic_provider,
+            healthians_camp_id=row.healthians_camp_id,
             created_by_user_id=row.created_by_user_id,
             no_of_tests=no_of_tests,
             report_duration_hours=row.report_duration_hours,
@@ -394,6 +396,7 @@ class DiagnosticsService:
                 DiagnosticPackageListItem(
                     diagnostic_package_id=row.diagnostic_package_id,
                     package_name=row.package_name,
+                    healthians_camp_id=row.healthians_camp_id,
                     no_of_tests=n_tests,
                     report_duration_hours=row.report_duration_hours,
                     collection_type=row.collection_type,

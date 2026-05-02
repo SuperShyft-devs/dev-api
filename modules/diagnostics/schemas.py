@@ -32,6 +32,7 @@ class FilterChipForSchema(str, Enum):
 class DiagnosticPackageCreate(BaseModel):
     package_name: str = Field(min_length=1)
     diagnostic_provider: Optional[str] = None
+    healthians_camp_id: Optional[int] = None
     custom: bool = False
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
@@ -48,6 +49,7 @@ class DiagnosticPackageCreate(BaseModel):
 class DiagnosticPackageUpdate(BaseModel):
     package_name: Optional[str] = Field(default=None, min_length=1)
     diagnostic_provider: Optional[str] = None
+    healthians_camp_id: Optional[int] = None
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
     about_text: Optional[str] = None
@@ -69,6 +71,7 @@ class DiagnosticPackageResponse(BaseModel):
     reference_id: Optional[str] = None
     package_name: str
     diagnostic_provider: Optional[str] = None
+    healthians_camp_id: Optional[int] = None
     created_by_user_id: Optional[int] = None
     no_of_tests: Optional[int] = None
     report_duration_hours: Optional[int] = None
@@ -153,6 +156,7 @@ class TagResponse(BaseModel):
 class HealthParameterCreate(BaseModel):
     parameter_type: ParameterType = ParameterType.TEST
     test_name: str = Field(min_length=1)
+    healthians_parameter_id: Optional[int] = None
     parameter_key: Optional[str] = None
     unit: Optional[str] = None
     meaning: Optional[str] = None
@@ -185,6 +189,7 @@ class HealthParameterCreate(BaseModel):
 class HealthParameterUpdate(BaseModel):
     parameter_type: Optional[ParameterType] = None
     test_name: Optional[str] = None
+    healthians_parameter_id: Optional[int] = None
     parameter_key: Optional[str] = None
     unit: Optional[str] = None
     meaning: Optional[str] = None
@@ -220,6 +225,7 @@ class HealthParameterResponse(BaseModel):
     test_id: int
     parameter_type: ParameterType
     test_name: str
+    healthians_parameter_id: Optional[int] = None
     parameter_key: Optional[str] = None
     unit: Optional[str] = None
     meaning: Optional[str] = None
@@ -368,6 +374,7 @@ class DiagnosticPackageDetailResponse(DiagnosticPackageResponse):
 class DiagnosticPackageListItem(BaseModel):
     diagnostic_package_id: int
     package_name: str
+    healthians_camp_id: Optional[int] = None
     no_of_tests: Optional[int] = None
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None

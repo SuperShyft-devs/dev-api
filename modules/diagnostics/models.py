@@ -25,6 +25,7 @@ class DiagnosticPackage(Base):
     reference_id = Column(String)
     package_name = Column(String, nullable=False)
     diagnostic_provider = Column(String)
+    healthians_camp_id = Column(Integer, nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     report_duration_hours = Column(Integer)
     collection_type = Column(String)
@@ -219,6 +220,7 @@ class HealthParameter(Base):
     original_price = Column(Numeric(10, 2))
     is_most_popular = Column(Boolean, nullable=False, default=False, server_default="false")
     gender_suitability = Column(String)
+    healthians_parameter_id = Column(Integer, nullable=True)
 
     low_risk_lower_range_male = Column(Numeric(12, 4), nullable=True)
     low_risk_higher_range_male = Column(Numeric(12, 4), nullable=True)
