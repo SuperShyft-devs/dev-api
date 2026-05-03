@@ -141,7 +141,7 @@ async def test_public_onboard_creates_engagement_participant_and_assessment_inst
     slot_row = (
         await test_db_session.execute(
             text(
-                "SELECT engagement_id, user_id, engagement_date, slot_start_time, participant_department, participant_blood_group, is_metsights_profile_created "
+                "SELECT engagement_id, user_id, engagement_date, slot_start_time, participant_department, participant_blood_group, is_profile_created_on_metsights "
                 "FROM engagement_participants WHERE engagement_participant_id = :tid"
             ),
             {"tid": data["engagement_participant_id"]},
@@ -153,7 +153,7 @@ async def test_public_onboard_creates_engagement_participant_and_assessment_inst
     assert str(slot_row.slot_start_time)[:5] == "10:00"
     assert slot_row.participant_department == "Engineering"
     assert slot_row.participant_blood_group == "O+"
-    assert slot_row.is_metsights_profile_created is False
+    assert slot_row.is_profile_created_on_metsights is False
 
     instance_row = (
         await test_db_session.execute(
@@ -223,7 +223,7 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
     slot_row = (
         await test_db_session.execute(
             text(
-                "SELECT participant_department, participant_blood_group, is_metsights_profile_created "
+                "SELECT participant_department, participant_blood_group, is_profile_created_on_metsights "
                 "FROM engagement_participants WHERE engagement_participant_id = :pid"
             ),
             {"pid": data["engagement_participant_id"]},
@@ -231,7 +231,7 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
     ).first()
     assert slot_row.participant_department == "HR"
     assert slot_row.participant_blood_group == "B+"
-    assert slot_row.is_metsights_profile_created is False
+    assert slot_row.is_profile_created_on_metsights is False
 
     engagement_row = (
         await test_db_session.execute(

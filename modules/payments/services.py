@@ -107,6 +107,8 @@ class PaymentsService:
         payer_user_id: int,
         items: list[tuple[int, str, int]],
         authenticated_user_id: int,
+        booking_type: str | None = None,
+        metadata_by_user: dict[int, dict] | None = None,
     ) -> dict[str, Any]:
         try:
             payer_result = await db.execute(select(User).where(User.user_id == payer_user_id))
@@ -144,11 +146,14 @@ class PaymentsService:
                 line_paise, entity_name = resolved
                 total_paise += line_paise
 
+                member_meta = (metadata_by_user or {}).get(member_user_id)
                 booking = Booking(
                     user_id=member_user_id,
                     entity_type=entity_type,
                     entity_id=entity_id,
                     entity_name=entity_name,
+                    booking_type=booking_type,
+                    metadata_=member_meta,
                     amount_paise=line_paise,
                     currency="INR",
                     status="pending",
@@ -308,6 +313,10 @@ class PaymentsService:
                         .values(bookings_count=DiagnosticPackage.bookings_count + 1)
                     )
 
+            await db.flush()
+
+            await self._run_post_payment_fulfillment(db, bookings=bookings)
+
             await db.commit()
 
             sorted_ids = sorted(booking_ids)
@@ -370,6 +379,38 @@ class PaymentsService:
             logger.exception("record_failure failed: %s", exc)
             await db.rollback()
             return {"_error": (500, "Internal server error")}
+
+    async def _run_post_payment_fulfillment(
+        self,
+        db: AsyncSession,
+        *,
+        bookings: list[Booking],
+    ) -> None:
+        """Execute post-payment fulfillment for bookings that have a booking_type."""
+        fulfillment_bookings = [b for b in bookings if (b.booking_type or "").strip()]
+        if not fulfillment_bookings:
+            return
+
+        from modules.users.dependencies import get_users_service
+
+        users_service = get_users_service()
+        for booking in fulfillment_bookings:
+            try:
+                bt = (booking.booking_type or "").strip()
+                if bt == "bio_ai":
+                    await users_service.fulfill_bio_ai_booking(db, booking=booking)
+                elif bt == "blood_test":
+                    await users_service.fulfill_blood_test_booking(db, booking=booking)
+                else:
+                    logger.warning(
+                        "Unknown booking_type=%r for booking_id=%s; skipping fulfillment",
+                        bt, booking.booking_id,
+                    )
+            except Exception as exc:
+                logger.exception(
+                    "Post-payment fulfillment failed for booking_id=%s: %s",
+                    booking.booking_id, exc,
+                )
 
     async def get_booking_status(
         self,

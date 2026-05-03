@@ -383,7 +383,7 @@ async def _seed_one_engagement_per_user(
         want_doctor_consultation=None,
         want_nutritionist_consultation=None,
         want_doctor_and_nutritionist_consultation=None,
-        is_metsights_profile_created=False,
+        is_profile_created_on_metsights=False,
     )
     await er.create_participant(session, participant)
 

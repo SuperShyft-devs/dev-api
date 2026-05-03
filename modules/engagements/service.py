@@ -385,6 +385,8 @@ class EngagementsService:
         engagement_type: EngagementKind = EngagementKind.bio_ai,
         address: str | None = None,
         pincode: str | None = None,
+        create_profile_on_metsights: bool = False,
+        enroll_for_fitprint_full: bool = False,
     ) -> Engagement:
         """Create a B2C engagement with no onboarding assistants assigned by default.
 
@@ -410,8 +412,8 @@ class EngagementsService:
             end_date=engagement_date,
             status="active",
             participant_count=0,
-            create_profile_on_metsights=False,
-            enroll_for_fitprint_full=False,
+            create_profile_on_metsights=create_profile_on_metsights,
+            enroll_for_fitprint_full=enroll_for_fitprint_full,
         )
         return await self._repository.create_engagement(db, engagement)
 
@@ -441,7 +443,6 @@ class EngagementsService:
         want_doctor_consultation: bool | None = None,
         want_nutritionist_consultation: bool | None = None,
         want_doctor_and_nutritionist_consultation: bool | None = None,
-        is_metsights_profile_created: bool = False,
         is_profile_created_on_metsights: bool = False,
         is_primary_record_id_synced: bool = False,
         is_fitprint_record_id_synced: bool = False,
@@ -464,7 +465,6 @@ class EngagementsService:
             want_doctor_consultation=want_doctor_consultation,
             want_nutritionist_consultation=want_nutritionist_consultation,
             want_doctor_and_nutritionist_consultation=want_doctor_and_nutritionist_consultation,
-            is_metsights_profile_created=is_metsights_profile_created,
             is_profile_created_on_metsights=is_profile_created_on_metsights,
             is_primary_record_id_synced=is_primary_record_id_synced,
             is_fitprint_record_id_synced=is_fitprint_record_id_synced,
@@ -482,7 +482,6 @@ class EngagementsService:
     ) -> EngagementParticipant:
         if is_profile_created_on_metsights is not None:
             participant.is_profile_created_on_metsights = is_profile_created_on_metsights
-            participant.is_metsights_profile_created = is_profile_created_on_metsights
         if is_primary_record_id_synced is not None:
             participant.is_primary_record_id_synced = is_primary_record_id_synced
         if is_fitprint_record_id_synced is not None:
@@ -548,7 +547,6 @@ class EngagementsService:
                 want_doctor_consultation,
                 want_nutritionist_consultation,
                 want_doctor_and_nutritionist_consultation,
-                is_metsights_profile_created,
                 is_profile_created_on_metsights,
                 is_primary_record_id_synced,
                 is_fitprint_record_id_synced,
@@ -571,7 +569,6 @@ class EngagementsService:
                 "want_doctor_consultation": want_doctor_consultation,
                 "want_nutritionist_consultation": want_nutritionist_consultation,
                 "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
-                "is_metsights_profile_created": is_metsights_profile_created,
                 "is_profile_created_on_metsights": is_profile_created_on_metsights,
                 "is_primary_record_id_synced": is_primary_record_id_synced,
                 "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
@@ -625,7 +622,6 @@ class EngagementsService:
                 want_doctor_consultation,
                 want_nutritionist_consultation,
                 want_doctor_and_nutritionist_consultation,
-                is_metsights_profile_created,
                 is_profile_created_on_metsights,
                 is_primary_record_id_synced,
                 is_fitprint_record_id_synced,
@@ -648,7 +644,6 @@ class EngagementsService:
                 "want_doctor_consultation": want_doctor_consultation,
                 "want_nutritionist_consultation": want_nutritionist_consultation,
                 "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
-                "is_metsights_profile_created": is_metsights_profile_created,
                 "is_profile_created_on_metsights": is_profile_created_on_metsights,
                 "is_primary_record_id_synced": is_primary_record_id_synced,
                 "is_fitprint_record_id_synced": is_fitprint_record_id_synced,

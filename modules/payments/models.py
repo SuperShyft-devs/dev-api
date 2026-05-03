@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, func, text
+from sqlalchemy.dialects.postgresql import JSON
 
 from db.base import Base
 
@@ -19,6 +20,8 @@ class Booking(Base):
     entity_name = Column(String, nullable=False)
     amount_paise = Column(Integer, nullable=False)
     currency = Column(String, nullable=False, server_default=text("'INR'"))
+    booking_type = Column(String, nullable=True)
+    metadata_ = Column("metadata", JSON, nullable=True)
     status = Column(String, nullable=False, server_default=text("'pending'"))
     booked_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(

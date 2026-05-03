@@ -291,6 +291,18 @@ class UserOnboardResponse(BaseModel):
     metsights_record_id: Optional[str] = None
 
 
+class BookingPaymentResponse(BaseModel):
+    """Returned by POST /book/bio-ai and POST /book/blood-test after creating bookings + Razorpay order."""
+
+    booking_ids: list[int]
+    booking_id: int
+    razorpay_order_id: str
+    amount_paise: int
+    amount_rupees: float
+    currency: str = "INR"
+    key_id: str
+
+
 class UserStatusResponse(BaseModel):
     user_id: int
     status: str

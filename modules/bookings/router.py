@@ -33,7 +33,7 @@ async def book_bio_ai_batch(
     current_user=Depends(get_current_user),
     users_service: UsersService = Depends(get_users_service),
 ):
-    results = await users_service.book_bio_ai_batch_for_primary(
+    result = await users_service.book_bio_ai_batch_for_primary(
         db,
         actor=current_user,
         payload=payload,
@@ -41,8 +41,7 @@ async def book_bio_ai_batch(
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
-    await db.commit()
-    return success_response({"results": [r.model_dump(exclude_none=True) for r in results]})
+    return success_response(result.model_dump())
 
 
 @router.post("/blood-test")
@@ -53,7 +52,7 @@ async def book_blood_test_batch(
     current_user=Depends(get_current_user),
     users_service: UsersService = Depends(get_users_service),
 ):
-    results = await users_service.book_blood_test_batch_for_primary(
+    result = await users_service.book_blood_test_batch_for_primary(
         db,
         actor=current_user,
         payload=payload,
@@ -61,5 +60,4 @@ async def book_blood_test_batch(
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
-    await db.commit()
-    return success_response({"results": [r.model_dump(exclude_none=True) for r in results]})
+    return success_response(result.model_dump())

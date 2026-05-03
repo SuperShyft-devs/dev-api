@@ -85,7 +85,6 @@ class EngagementParticipant(Base):
     want_doctor_consultation = Column(Boolean, nullable=True)
     want_nutritionist_consultation = Column(Boolean, nullable=True)
     want_doctor_and_nutritionist_consultation = Column(Boolean, nullable=True)
-    is_metsights_profile_created = Column(Boolean, nullable=False, default=False, server_default="false")
     is_profile_created_on_metsights = Column(Boolean, nullable=False, default=False, server_default="false")
     is_primary_record_id_synced = Column(Boolean, nullable=False, default=False, server_default="false")
     is_fitprint_record_id_synced = Column(Boolean, nullable=False, default=False, server_default="false")

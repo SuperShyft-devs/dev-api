@@ -548,7 +548,7 @@ class MetsightsSyncService:
                         engagement_date=eng_date,
                         slot_start_time=default_slot,
                         increment_participant_count=True,
-                        is_metsights_profile_created=True,
+                        is_profile_created_on_metsights=True,
                     )
                 except AppError as exc:
                     errors.append({"metsights_record_id": mrid, "reason": str(exc.message)})

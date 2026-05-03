@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import text
@@ -15,6 +16,10 @@ from modules.users.models import User
 def _auth_header(user_id: int) -> dict[str, str]:
     token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
     return {"Authorization": f"Bearer {token}"}
+
+
+def _mock_razorpay_order(*, amount_paise: int, receipt: str):
+    return {"id": f"order_test_{receipt}", "amount": amount_paise, "currency": "INR"}
 
 
 @pytest.mark.asyncio
@@ -51,10 +56,10 @@ async def test_book_bio_ai_batch_rejects_sub_profile_actor(async_client, test_db
     )
     await test_db_session.execute(
         text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
-            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
+            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 500) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
             "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
-            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status"
+            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
         )
     )
     await test_db_session.commit()
@@ -102,7 +107,7 @@ async def test_book_bio_ai_batch_rejects_sub_profile_actor(async_client, test_db
 
 
 @pytest.mark.asyncio
-async def test_book_bio_ai_batch_primary_books_self_and_child(async_client, test_db_session, monkeypatch):
+async def test_book_bio_ai_batch_returns_payment_info(async_client, test_db_session, monkeypatch):
     monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "")
 
     await test_db_session.execute(
@@ -114,10 +119,10 @@ async def test_book_bio_ai_batch_primary_books_self_and_child(async_client, test
     )
     await test_db_session.execute(
         text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) VALUES "
-            "(1, 'REF1', 'Diag 1', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) VALUES "
+            "(1, 'REF1', 'Diag 1', 'test_provider', 'active', 1000) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
             "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
-            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status"
+            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
         )
     )
     await test_db_session.commit()
@@ -169,14 +174,19 @@ async def test_book_bio_ai_batch_primary_books_self_and_child(async_client, test
             },
         ]
     }
-    response = await async_client.post("/book/bio-ai", headers=_auth_header(920010), json=payload)
+
+    with patch(
+        "modules.payments.services._create_razorpay_order_sync",
+        side_effect=_mock_razorpay_order,
+    ):
+        response = await async_client.post("/book/bio-ai", headers=_auth_header(920010), json=payload)
+
     assert response.status_code == 200
-    body = response.json()["data"]["results"]
-    assert len(body) == 2
-    assert body[0]["user_id"] == 920010
-    assert body[1]["user_id"] == 920011
-    assert body[0]["assessment_instance_id"] is not None
-    assert body[1]["assessment_instance_id"] is not None
+    data = response.json()["data"]
+    assert "razorpay_order_id" in data
+    assert len(data["booking_ids"]) == 2
+    assert data["amount_paise"] == 200000
+    assert data["currency"] == "INR"
 
 
 @pytest.mark.asyncio
@@ -192,10 +202,10 @@ async def test_book_bio_ai_batch_forbidden_for_unrelated_user(async_client, test
     )
     await test_db_session.execute(
         text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
-            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
+            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 500) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
             "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
-            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status"
+            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
         )
     )
     await test_db_session.commit()
@@ -243,13 +253,13 @@ async def test_book_bio_ai_batch_forbidden_for_unrelated_user(async_client, test
 
 
 @pytest.mark.asyncio
-async def test_book_blood_test_batch_no_assessment_instance(async_client, test_db_session):
+async def test_book_blood_test_batch_returns_payment_info(async_client, test_db_session):
     await test_db_session.execute(
         text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
-            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
+            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 750) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
             "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
-            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status"
+            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
         )
     )
     await test_db_session.commit()
@@ -281,21 +291,24 @@ async def test_book_blood_test_batch_no_assessment_instance(async_client, test_d
             }
         ]
     }
-    response = await async_client.post("/book/blood-test", headers=_auth_header(920030), json=payload)
-    assert response.status_code == 200
-    row = response.json()["data"]["results"][0]
-    assert "assessment_instance_id" not in row
-    assert "metsights_record_id" not in row
-    assert row["engagement_id"] is not None
 
-    eng = (
+    with patch(
+        "modules.payments.services._create_razorpay_order_sync",
+        side_effect=_mock_razorpay_order,
+    ):
+        response = await async_client.post("/book/blood-test", headers=_auth_header(920030), json=payload)
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert "razorpay_order_id" in data
+    assert data["amount_paise"] == 75000
+    assert len(data["booking_ids"]) == 1
+
+    booking_row = (
         await test_db_session.execute(
-            text(
-                "SELECT engagement_type, assessment_package_id FROM engagements WHERE engagement_id = :eid"
-            ),
-            {"eid": row["engagement_id"]},
+            text("SELECT booking_type, metadata FROM bookings WHERE booking_id = :bid"),
+            {"bid": data["booking_id"]},
         )
     ).first()
-    et = eng.engagement_type
-    assert (getattr(et, "value", et) == "diagnostic")
-    assert eng.assessment_package_id is None
+    assert booking_row.booking_type == "blood_test"
+    assert booking_row.metadata is not None

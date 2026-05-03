@@ -135,7 +135,6 @@ async def book_bio_ai_for_current_user(
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
-    await db.commit()
     return success_response(result.model_dump())
 
 
