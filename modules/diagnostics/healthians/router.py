@@ -34,10 +34,16 @@ async def get_healthians_constituents(
         )
     except Exception as exc:
         logger.exception("Healthians API error")
+        is_blocked = "403" in str(exc) or "blocked" in str(exc).lower()
         raise AppError(
             status_code=502,
-            error_code="HEALTHIANS_API_ERROR",
-            message=f"Failed to fetch data from Healthians: {exc}",
+            error_code="HEALTHIANS_IP_BLOCKED" if is_blocked else "HEALTHIANS_API_ERROR",
+            message=(
+                "Healthians is blocking requests from this server. "
+                "The server IP needs to be whitelisted by Healthians."
+                if is_blocked
+                else f"Failed to fetch data from Healthians: {exc}"
+            ),
         )
 
     constituents = [
