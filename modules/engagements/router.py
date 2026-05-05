@@ -339,6 +339,22 @@ async def remove_participant_from_engagement(
     return success_response(data)
 
 
+@router.get("/{engagement_id}/questionnaire-status")
+async def get_engagement_questionnaire_status(
+    engagement_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """Per-participant questionnaire draft/submitted status for an engagement."""
+    data = await engagements_service.get_questionnaire_status_for_engagement(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+    )
+    return success_response(data)
+
+
 @router.get("/{engagement_id}/onboarding-assistants")
 async def list_onboarding_assistants_for_engagement(
     engagement_id: int,

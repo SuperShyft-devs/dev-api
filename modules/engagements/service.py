@@ -737,3 +737,110 @@ class EngagementsService:
             "deleted_reports": deleted_reports,
             "deleted_category_progress_rows": deleted_category_progress,
         }
+
+    async def get_questionnaire_status_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+    ) -> dict:
+        """Return per-participant questionnaire completion status for an engagement.
+
+        The questionnaire lifecycle per assessment instance is:
+        - NOT STARTED: no questionnaire_responses rows exist
+        - DRAFTED (filled): responses exist with submitted_at = NULL (user saved progress)
+        - SUBMITTED: assessment instance status = "completed" (all responses got submitted_at set)
+
+        Returns a summary + per-participant breakdown grouped by user.
+        """
+        self._ensure_employee_access(employee)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+
+        from modules.assessments.models import AssessmentInstance, AssessmentPackage
+        from modules.users.models import User
+        from sqlalchemy import select
+
+        instances_query = (
+            select(
+                AssessmentInstance.assessment_instance_id,
+                AssessmentInstance.user_id,
+                AssessmentInstance.status,
+                AssessmentInstance.package_id,
+                AssessmentInstance.completed_at,
+                User.first_name,
+                User.last_name,
+                User.phone,
+                User.email,
+                AssessmentPackage.package_code,
+                AssessmentPackage.display_name.label("package_display_name"),
+            )
+            .join(User, User.user_id == AssessmentInstance.user_id)
+            .outerjoin(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .where(AssessmentInstance.engagement_id == engagement_id)
+            .order_by(User.first_name.asc(), User.last_name.asc(), AssessmentInstance.assessment_instance_id.asc())
+        )
+        result = await db.execute(instances_query)
+        instance_rows = result.all()
+
+        if not instance_rows:
+            return {"summary": {"drafted": 0, "submitted": 0, "not_started": 0}, "participants": []}
+
+        instance_ids = [row.assessment_instance_id for row in instance_rows]
+        responses = await self._questionnaire_repository.list_responses_for_instances(
+            db, assessment_instance_ids=instance_ids
+        )
+
+        response_counts: dict[int, int] = {}
+        for resp in responses:
+            inst_id = int(resp.assessment_instance_id)
+            response_counts[inst_id] = response_counts.get(inst_id, 0) + 1
+
+        participants: list[dict] = []
+        summary_drafted = 0
+        summary_submitted = 0
+        summary_not_started = 0
+
+        for row in instance_rows:
+            resp_count = response_counts.get(row.assessment_instance_id, 0)
+            is_completed = (row.status or "").lower() == "completed"
+
+            if is_completed:
+                questionnaire_state = "submitted"
+                summary_submitted += 1
+            elif resp_count > 0:
+                questionnaire_state = "drafted"
+                summary_drafted += 1
+            else:
+                questionnaire_state = "not_started"
+                summary_not_started += 1
+
+            participants.append({
+                "assessment_instance_id": row.assessment_instance_id,
+                "user_id": row.user_id,
+                "first_name": row.first_name,
+                "last_name": row.last_name,
+                "phone": row.phone,
+                "email": row.email,
+                "package_code": row.package_code,
+                "package_display_name": row.package_display_name,
+                "questionnaire_state": questionnaire_state,
+                "responses_count": resp_count,
+                "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+            })
+
+        return {
+            "summary": {
+                "drafted": summary_drafted,
+                "submitted": summary_submitted,
+                "not_started": summary_not_started,
+            },
+            "participants": participants,
+        }
