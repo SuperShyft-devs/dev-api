@@ -747,12 +747,14 @@ class EngagementsService:
     ) -> dict:
         """Return per-participant questionnaire completion status for an engagement.
 
+        Groups by user (participant) — a user may have multiple assessment instances
+        (one per package). The participant's overall state is the "best" across instances:
+          submitted > drafted > not_started
+
         The questionnaire lifecycle per assessment instance is:
         - NOT STARTED: no questionnaire_responses rows exist
         - DRAFTED (filled): responses exist with submitted_at = NULL (user saved progress)
         - SUBMITTED: assessment instance status = "completed" (all responses got submitted_at set)
-
-        Returns a summary + per-participant breakdown grouped by user.
         """
         self._ensure_employee_access(employee)
 
@@ -803,37 +805,69 @@ class EngagementsService:
             inst_id = int(resp.assessment_instance_id)
             response_counts[inst_id] = response_counts.get(inst_id, 0) + 1
 
+        # Group instances by user_id to determine per-participant state
+        user_data: dict[int, dict] = {}
+        for row in instance_rows:
+            uid = int(row.user_id)
+            resp_count = response_counts.get(row.assessment_instance_id, 0)
+            is_completed = (row.status or "").lower() == "completed"
+
+            if uid not in user_data:
+                user_data[uid] = {
+                    "user_id": uid,
+                    "first_name": row.first_name,
+                    "last_name": row.last_name,
+                    "phone": row.phone,
+                    "email": row.email,
+                    "has_submitted": False,
+                    "has_drafted": False,
+                    "total_responses": 0,
+                    "packages": [],
+                }
+
+            entry = user_data[uid]
+            entry["total_responses"] += resp_count
+            entry["packages"].append({
+                "package_code": row.package_code,
+                "package_display_name": row.package_display_name,
+                "questionnaire_state": (
+                    "submitted" if is_completed
+                    else "drafted" if resp_count > 0
+                    else "not_started"
+                ),
+                "responses_count": resp_count,
+            })
+
+            if is_completed:
+                entry["has_submitted"] = True
+            elif resp_count > 0:
+                entry["has_drafted"] = True
+
         participants: list[dict] = []
         summary_drafted = 0
         summary_submitted = 0
         summary_not_started = 0
 
-        for row in instance_rows:
-            resp_count = response_counts.get(row.assessment_instance_id, 0)
-            is_completed = (row.status or "").lower() == "completed"
-
-            if is_completed:
-                questionnaire_state = "submitted"
+        for entry in user_data.values():
+            if entry["has_submitted"]:
+                state = "submitted"
                 summary_submitted += 1
-            elif resp_count > 0:
-                questionnaire_state = "drafted"
+            elif entry["has_drafted"]:
+                state = "drafted"
                 summary_drafted += 1
             else:
-                questionnaire_state = "not_started"
+                state = "not_started"
                 summary_not_started += 1
 
             participants.append({
-                "assessment_instance_id": row.assessment_instance_id,
-                "user_id": row.user_id,
-                "first_name": row.first_name,
-                "last_name": row.last_name,
-                "phone": row.phone,
-                "email": row.email,
-                "package_code": row.package_code,
-                "package_display_name": row.package_display_name,
-                "questionnaire_state": questionnaire_state,
-                "responses_count": resp_count,
-                "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+                "user_id": entry["user_id"],
+                "first_name": entry["first_name"],
+                "last_name": entry["last_name"],
+                "phone": entry["phone"],
+                "email": entry["email"],
+                "questionnaire_state": state,
+                "total_responses": entry["total_responses"],
+                "packages": entry["packages"],
             })
 
         return {
