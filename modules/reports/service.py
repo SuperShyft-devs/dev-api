@@ -790,6 +790,31 @@ class ReportsService:
                 response.raise_for_status()
                 data = response.json()
                 return data if isinstance(data, dict) else {}
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            if 400 <= status < 500:
+                detail: str | None = None
+                try:
+                    body = exc.response.json()
+                    if isinstance(body, dict):
+                        raw_detail = body.get("detail")
+                        if isinstance(raw_detail, str):
+                            detail = raw_detail
+                        elif isinstance(raw_detail, list):
+                            # FastAPI-style validation error array from nutrition API.
+                            detail = str(raw_detail)[:500]
+                except Exception:
+                    detail = None
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message=detail or "Nutrition API rejected request payload",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Nutrition API request failed",
+            ) from exc
         except httpx.HTTPError as exc:
             raise AppError(
                 status_code=503,
