@@ -9,8 +9,10 @@ class BloodParameterTestInReportResponse(BaseModel):
     test_id: int
     test_name: str
     parameter_key: str | None = None
+    healthians_parameter_id: int | None = None
     unit: str | None = None
     value: float | None = None
+    machine_value: float | None = None
     lower_range: float | None = None
     higher_range: float | None = None
 
@@ -79,6 +81,11 @@ class RiskAnalysisListResponse(BaseModel):
 
 
 class BioAiPdfResponse(BaseModel):
+    assessment_id: int
+    report_url: str
+
+
+class DiagnosticPdfResponse(BaseModel):
     assessment_id: int
     report_url: str
 

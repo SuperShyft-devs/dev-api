@@ -25,6 +25,7 @@ _ALLOWED_RESOURCES = frozenset({
     "diet-plan",
     "endocrinology",
     "exercise-plan",
+    "fetch-collections",
     "fitness-assessment",
     "glucose-tolerance",
     "haematology",
@@ -142,6 +143,10 @@ class MetsightsClient:
             if not isinstance(payload, dict):
                 return {"detail": "Unexpected response", "data": None}
             return payload
+
+    async def get_record_fetch_collections(self, *, record_id: str) -> dict[str, Any]:
+        """GET /records/{record_id}/fetch-collections/ — sample collection details."""
+        return await self.get_record_resource(record_id=record_id, resource="fetch-collections")
 
     async def create_profile(self, *, data: dict[str, Any]) -> dict[str, Any]:
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")

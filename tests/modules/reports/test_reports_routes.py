@@ -37,7 +37,14 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 
 class _FakeMetsightsService:
-    def __init__(self, payload, should_fail: bool = False, report_payload=None, pdf_payload=None):
+    def __init__(
+        self,
+        payload,
+        should_fail: bool = False,
+        report_payload=None,
+        pdf_payload=None,
+        fetch_collections_payload=None,
+    ):
         self.payload = payload
         self.should_fail = should_fail
         self.calls = 0
@@ -45,6 +52,8 @@ class _FakeMetsightsService:
         self.report_calls = 0
         self.pdf_payload = pdf_payload
         self.pdf_calls = 0
+        self.fetch_collections_payload = fetch_collections_payload
+        self.fetch_collections_calls = 0
 
     async def get_blood_parameters(self, *, record_id: str):
         self.calls += 1
@@ -66,12 +75,23 @@ class _FakeMetsightsService:
             raise AssertionError("Metsights should not be called in this test")
         return self.pdf_payload
 
+    async def get_fetch_collections(self, *, record_id: str):
+        self.fetch_collections_calls += 1
+        if self.fetch_collections_payload is None:
+            raise AssertionError("get_fetch_collections was not expected in this test")
+        if self.should_fail:
+            raise AssertionError("Metsights should not be called in this test")
+        return self.fetch_collections_payload
+
 
 class _FailingMetsightsService:
     async def get_blood_parameters(self, *, record_id: str):
         raise RuntimeError("simulated metsights failure")
 
     async def get_report_pdf(self, *, record_id: str, assessment_type_code: str | None = None):
+        raise RuntimeError("simulated metsights failure")
+
+    async def get_fetch_collections(self, *, record_id: str):
         raise RuntimeError("simulated metsights failure")
 
 
@@ -284,7 +304,10 @@ async def test_get_blood_parameters_fetches_and_caches_on_miss(
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
-    response = await async_client.get("/reports/98002/blood-parameters", headers=_auth_header(3802))
+    response = await async_client.get(
+        "/reports/98002/blood-parameters?load_from=metsights",
+        headers=_auth_header(3802),
+    )
     assert response.status_code == 200
     body = response.json()["data"]
     glucose_test = next(t for g in body for t in g["tests"] if t["parameter_key"] == "glucose_fasting")
@@ -294,12 +317,12 @@ async def test_get_blood_parameters_fetches_and_caches_on_miss(
     assert glucose_test["higher_range"] == 110.0
     assert fake_metsights.calls == 1
 
+    # load_from=metsights does not save to DB
     saved = await test_db_session.execute(
         select(IndividualHealthReport).where(IndividualHealthReport.assessment_instance_id == 98002)
     )
     report = saved.scalar_one_or_none()
-    assert report is not None
-    assert report.blood_parameters["glucose_fasting"] == 91
+    assert report is None
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
 

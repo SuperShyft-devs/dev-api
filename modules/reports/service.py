@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from collections.abc import Callable, Coroutine
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -26,6 +28,7 @@ from modules.reports.schemas import (
     BioAiPdfResponse,
     BloodParameterGroupInReportResponse,
     BloodParameterTestInReportResponse,
+    DiagnosticPdfResponse,
     DiseaseDetailResponse,
     DiseaseListItem,
     DiseaseOverview,
@@ -43,6 +46,8 @@ from modules.reports.schemas import (
     RiskAnalysisListResponse,
     WaterDetail,
 )
+
+logger = logging.getLogger(__name__)
 
 
 _SYNC_IDLE = "idle"
@@ -63,6 +68,8 @@ class ReportsService:
         session_factory: async_sessionmaker[AsyncSession] | None = None,
         healthy_habits_service: HealthyHabitsService | None = None,
         questionnaire_repository: QuestionnaireRepository | None = None,
+        healthians_get_access_token: Callable[[], Coroutine[Any, Any, str]] | None = None,
+        healthians_get_booking_digital_value: Callable[[str, str], Coroutine[Any, Any, dict]] | None = None,
     ):
         self._repository = repository
         self._assessments_repository = assessments_repository
@@ -72,11 +79,105 @@ class ReportsService:
         self._session_factory = session_factory or AsyncSessionLocal
         self._healthy_habits_service = healthy_habits_service
         self._questionnaire_repository = questionnaire_repository
+        self._healthians_get_access_token = healthians_get_access_token
+        self._healthians_get_booking_digital_value = healthians_get_booking_digital_value
 
     def _require_audit_service(self) -> AuditService:
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
         return self._audit_service
+
+    @staticmethod
+    def _match_customer_by_name(
+        data_list: list[Any],
+        first_name: str,
+        last_name: str,
+    ) -> dict[str, Any] | None:
+        """Find the customer entry whose name matches the user (case-insensitive, tokenised)."""
+        target_full = f"{first_name} {last_name}".strip().lower()
+        target_tokens = set(target_full.split())
+
+        best: dict[str, Any] | None = None
+        best_score = 0
+
+        for entry in data_list:
+            if not isinstance(entry, dict):
+                continue
+            customer_name = str(entry.get("customer_name") or "").strip().lower()
+            if not customer_name:
+                continue
+            if customer_name == target_full:
+                return entry
+            entry_tokens = set(customer_name.split())
+            overlap = len(target_tokens & entry_tokens)
+            if overlap > best_score:
+                best_score = overlap
+                best = entry
+
+        if best is not None and best_score >= 1:
+            return best
+        return data_list[0] if data_list else None
+
+    async def _fetch_blood_parameters_from_provider(
+        self,
+        *,
+        record_id: str,
+        user_first_name: str,
+        user_last_name: str,
+    ) -> dict[str, Any]:
+        """Fetch blood report from Healthians via Metsights fetch-collections booking id."""
+        if self._healthians_get_access_token is None or self._healthians_get_booking_digital_value is None:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Healthians integration is not configured",
+            )
+
+        collection_data = await self._metsights_service.get_fetch_collections(record_id=record_id)
+        reference_id = str(collection_data.get("reference_id") or "").strip()
+        if not reference_id:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Metsights collection is missing the provider reference id",
+            )
+
+        try:
+            access_token = await self._healthians_get_access_token()
+        except Exception as exc:
+            logger.error("Healthians auth failed: %s", exc)
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Healthians authentication failed",
+            ) from exc
+
+        try:
+            result = await self._healthians_get_booking_digital_value(access_token, reference_id)
+        except Exception as exc:
+            logger.error("Healthians getBookingDigitalValue failed: %s", exc)
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Healthians booking digital value request failed",
+            ) from exc
+
+        data_list = result.get("data")
+        if not isinstance(data_list, list) or not data_list:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Healthians returned no blood report data",
+            )
+
+        matched = self._match_customer_by_name(data_list, user_first_name, user_last_name)
+        if matched is None:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Could not match the user's blood report from Healthians",
+            )
+        return matched
 
     async def get_blood_parameters_for_user(
         self,
@@ -85,6 +186,10 @@ class ReportsService:
         assessment_id: int,
         user_id: int,
         user_gender: str | None,
+        user_first_name: str = "",
+        user_last_name: str = "",
+        load_from: str = "provider",
+        reload: int = 0,
         ip_address: str,
         user_agent: str,
         endpoint: str,
@@ -109,20 +214,57 @@ class ReportsService:
         normalized_gender = (user_gender or "").strip().lower() or None
         if normalized_gender not in {"male", "female"}:
             normalized_gender = None
+
+        record_id = (assessment_instance.metsights_record_id or "").strip()
+
+        # --- load_from=metsights: always live, never cache ---
+        if load_from == "metsights":
+            if not record_id:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Metsights record id is missing for this assessment",
+                )
+            blood_parameters = await self._metsights_service.get_blood_parameters(record_id=record_id)
+
+            await self._require_audit_service().log_event(
+                db,
+                action="USER_FETCH_BLOOD_PARAMETERS_REPORT",
+                endpoint=endpoint,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                user_id=user_id,
+                session_id=None,
+            )
+            return await self._build_blood_parameter_groups_report(
+                db=db,
+                blood_parameters=blood_parameters,
+                diagnostic_package_id=diagnostic_package_id,
+                user_gender=normalized_gender,
+                source="metsights",
+            )
+
+        # --- load_from=provider (default) ---
         existing_report = await self._repository.get_individual_report_by_assessment(
             db,
             assessment_instance_id=assessment_id,
         )
 
-        if existing_report is not None and existing_report.blood_parameters is not None:
+        use_cache = (
+            reload != 1
+            and existing_report is not None
+            and existing_report.blood_parameters is not None
+        )
+        if use_cache:
+            cached_source = self._detect_blood_parameters_source(existing_report.blood_parameters)
             return await self._build_blood_parameter_groups_report(
                 db=db,
                 blood_parameters=existing_report.blood_parameters,
                 diagnostic_package_id=diagnostic_package_id,
                 user_gender=normalized_gender,
+                source=cached_source,
             )
 
-        record_id = (assessment_instance.metsights_record_id or "").strip()
         if not record_id:
             raise AppError(
                 status_code=422,
@@ -130,7 +272,11 @@ class ReportsService:
                 message="Metsights record id is missing for this assessment",
             )
 
-        blood_parameters = await self._metsights_service.get_blood_parameters(record_id=record_id)
+        blood_parameters = await self._fetch_blood_parameters_from_provider(
+            record_id=record_id,
+            user_first_name=user_first_name,
+            user_last_name=user_last_name,
+        )
 
         if existing_report is None:
             report = IndividualHealthReport(
@@ -160,7 +306,90 @@ class ReportsService:
             blood_parameters=blood_parameters,
             diagnostic_package_id=diagnostic_package_id,
             user_gender=normalized_gender,
+            source="provider",
         )
+
+    async def get_diagnostic_pdf_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_id: int,
+        user_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> DiagnosticPdfResponse:
+        row = await self._assessments_repository.get_instance_for_user_with_engagement(
+            db,
+            assessment_instance_id=assessment_id,
+            user_id=user_id,
+        )
+        if row is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+
+        assessment_instance, _package, _engagement = row
+
+        existing_report = await self._repository.get_individual_report_by_assessment(
+            db,
+            assessment_instance_id=assessment_id,
+        )
+
+        cached = (existing_report.diagnostic_report_url if existing_report is not None else None) or ""
+        if cached.strip():
+            await self._require_audit_service().log_event(
+                db,
+                action="USER_FETCH_DIAGNOSTIC_PDF_REPORT",
+                endpoint=endpoint,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                user_id=user_id,
+                session_id=None,
+            )
+            return DiagnosticPdfResponse(assessment_id=assessment_id, report_url=cached.strip())
+
+        record_id = (assessment_instance.metsights_record_id or "").strip()
+        if not record_id:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Metsights record id is missing for this assessment",
+            )
+
+        collection_data = await self._metsights_service.get_fetch_collections(record_id=record_id)
+        file_url = collection_data.get("file")
+        if not isinstance(file_url, str) or not file_url.strip():
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Diagnostic report PDF is not available for this record",
+            )
+        report_url = file_url.strip()
+
+        if existing_report is None:
+            report = IndividualHealthReport(
+                user_id=assessment_instance.user_id,
+                engagement_id=assessment_instance.engagement_id,
+                assessment_instance_id=assessment_instance.assessment_instance_id,
+                reports=None,
+                blood_parameters=None,
+                diagnostic_report_url=report_url,
+            )
+            await self._repository.create_individual_report(db, report)
+        else:
+            existing_report.diagnostic_report_url = report_url
+            await self._repository.update_individual_report(db, existing_report)
+
+        await self._require_audit_service().log_event(
+            db,
+            action="USER_FETCH_DIAGNOSTIC_PDF_REPORT",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id,
+            session_id=None,
+        )
+
+        return DiagnosticPdfResponse(assessment_id=assessment_id, report_url=report_url)
 
     async def get_bio_ai_pdf_for_user(
         self,
@@ -431,11 +660,13 @@ class ReportsService:
                 assessment_instance=assessment_instance,
                 individual_report=individual_report,
             )
+            detected_source = self._detect_blood_parameters_source(blood_raw)
             groups = await self._build_blood_parameter_groups_report(
                 db=db,
                 blood_parameters=blood_raw,
                 diagnostic_package_id=int(engagement.diagnostic_package_id),
                 user_gender=normalized_gender,
+                source=detected_source,
             )
             healthy_profiles = self._top_healthy_profile_group_names(groups)
 
@@ -691,7 +922,38 @@ class ReportsService:
             what_to_do_when_high=hp.what_to_do_when_high if hp is not None else None,
         )
 
+    @staticmethod
+    def _detect_blood_parameters_source(blood_parameters: Any) -> str:
+        """Return ``'provider'`` if the JSON looks like Healthians digital_data format,
+        or ``'metsights'`` for the flat Metsights format."""
+        if isinstance(blood_parameters, dict) and isinstance(blood_parameters.get("digital_data"), list):
+            return "provider"
+        return "metsights"
+
     async def _build_blood_parameter_groups_report(
+        self,
+        *,
+        db: AsyncSession,
+        blood_parameters: Any,
+        diagnostic_package_id: int,
+        user_gender: str | None,
+        source: str = "provider",
+    ) -> list[BloodParameterGroupInReportResponse]:
+        if source == "metsights":
+            return await self._build_from_metsights_data(
+                db=db,
+                blood_parameters=blood_parameters,
+                diagnostic_package_id=diagnostic_package_id,
+                user_gender=user_gender,
+            )
+        return await self._build_from_provider_data(
+            db=db,
+            blood_parameters=blood_parameters,
+            diagnostic_package_id=diagnostic_package_id,
+            user_gender=user_gender,
+        )
+
+    async def _build_from_metsights_data(
         self,
         *,
         db: AsyncSession,
@@ -700,8 +962,6 @@ class ReportsService:
         user_gender: str | None,
     ) -> list[BloodParameterGroupInReportResponse]:
         raw: dict[str, Any] = blood_parameters if isinstance(blood_parameters, dict) else {}
-
-        # Use diagnostic reference data for the scheduled diagnostic package.
         package_tests = await self._diagnostics_service.get_package_tests(db=db, package_id=diagnostic_package_id)
 
         groups: list[BloodParameterGroupInReportResponse] = []
@@ -739,8 +999,106 @@ class ReportsService:
                         test_id=test.test_id,
                         test_name=test.test_name,
                         parameter_key=parameter_key,
+                        healthians_parameter_id=test.healthians_parameter_id,
                         unit=unit,
                         value=value,
+                        machine_value=None,
+                        lower_range=lower_range,
+                        higher_range=higher_range,
+                    )
+                )
+
+            groups.append(
+                BloodParameterGroupInReportResponse(
+                    group_name=group.group_name,
+                    test_count=len(tests),
+                    tests=tests,
+                )
+            )
+
+        return groups
+
+    @staticmethod
+    def _build_digital_data_lookup(blood_parameters: Any) -> dict[str, dict[str, Any]]:
+        """Build a lookup from parameter_id -> digital_data entry."""
+        if not isinstance(blood_parameters, dict):
+            return {}
+        digital_data = blood_parameters.get("digital_data")
+        if not isinstance(digital_data, list):
+            return {}
+        lookup: dict[str, dict[str, Any]] = {}
+        for entry in digital_data:
+            if not isinstance(entry, dict):
+                continue
+            pid = str(entry.get("parameter_id") or "").strip()
+            if pid:
+                lookup[pid] = entry
+        return lookup
+
+    async def _build_from_provider_data(
+        self,
+        *,
+        db: AsyncSession,
+        blood_parameters: Any,
+        diagnostic_package_id: int,
+        user_gender: str | None,
+    ) -> list[BloodParameterGroupInReportResponse]:
+        dd_lookup = self._build_digital_data_lookup(blood_parameters)
+        package_tests = await self._diagnostics_service.get_package_tests(db=db, package_id=diagnostic_package_id)
+
+        groups: list[BloodParameterGroupInReportResponse] = []
+        for group in package_tests.groups:
+            tests: list[BloodParameterTestInReportResponse] = []
+            for test in group.tests:
+                if test.healthians_parameter_id is None:
+                    continue
+
+                entry = dd_lookup.get(str(test.healthians_parameter_id))
+
+                value: float | None = None
+                machine_value: float | None = None
+                unit: str | None = None
+                lower_range: float | None = None
+                higher_range: float | None = None
+
+                if entry is not None:
+                    raw_val = entry.get("value")
+                    if raw_val is not None:
+                        try:
+                            value = float(raw_val)
+                        except (TypeError, ValueError):
+                            pass
+                    raw_mv = entry.get("machine_value")
+                    if raw_mv is not None:
+                        try:
+                            machine_value = float(raw_mv)
+                        except (TypeError, ValueError):
+                            pass
+                    raw_unit = entry.get("unit")
+                    if isinstance(raw_unit, str) and raw_unit.strip():
+                        unit = raw_unit.strip()
+                    raw_min = entry.get("min_range")
+                    if raw_min is not None:
+                        try:
+                            lower_range = float(raw_min)
+                        except (TypeError, ValueError):
+                            pass
+                    raw_max = entry.get("max_range")
+                    if raw_max is not None:
+                        try:
+                            higher_range = float(raw_max)
+                        except (TypeError, ValueError):
+                            pass
+
+                tests.append(
+                    BloodParameterTestInReportResponse(
+                        test_id=test.test_id,
+                        test_name=test.test_name,
+                        parameter_key=test.parameter_key,
+                        healthians_parameter_id=test.healthians_parameter_id,
+                        unit=unit,
+                        value=value,
+                        machine_value=machine_value,
                         lower_range=lower_range,
                         higher_range=higher_range,
                     )
@@ -1118,6 +1476,34 @@ class ReportsService:
             return state
         return await self._repository.create_user_sync_state(db, user_id=user_id)
 
+    @staticmethod
+    def _extract_from_provider_blood(
+        blood_parameters: dict[str, Any],
+        healthians_parameter_id: int | None,
+    ) -> tuple[float | None, str | None]:
+        """Extract (value, unit) from Healthians provider-format JSON for a given parameter id."""
+        if healthians_parameter_id is None:
+            return None, None
+        digital_data = blood_parameters.get("digital_data")
+        if not isinstance(digital_data, list):
+            return None, None
+        pid_str = str(healthians_parameter_id)
+        for entry in digital_data:
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("parameter_id") or "").strip() == pid_str:
+                raw_val = entry.get("value")
+                value: float | None = None
+                if raw_val is not None:
+                    try:
+                        value = float(raw_val)
+                    except (TypeError, ValueError):
+                        pass
+                raw_unit = entry.get("unit")
+                unit_val = raw_unit.strip() if isinstance(raw_unit, str) and raw_unit.strip() else None
+                return value, unit_val
+        return None, None
+
     async def _build_trend_payload(
         self,
         db: AsyncSession,
@@ -1130,6 +1516,11 @@ class ReportsService:
             user_id=user_id,
         )
 
+        hp = await self._diagnostics_service.get_health_parameter_by_parameter_key(
+            db, parameter_key=parameter_key,
+        )
+        healthians_pid: int | None = hp.healthians_parameter_id if hp is not None else None
+
         unit_key = f"{parameter_key}_unit"
         data_points: list[dict[str, Any]] = []
         unit: str | None = None
@@ -1138,17 +1529,28 @@ class ReportsService:
             blood_parameters = report.blood_parameters
             if not isinstance(blood_parameters, dict):
                 continue
-            raw_value = blood_parameters.get(parameter_key)
-            if raw_value is None:
-                continue
-            try:
-                numeric_value = float(raw_value)
-            except (TypeError, ValueError):
-                continue
 
-            raw_unit = blood_parameters.get(unit_key)
-            if unit is None and isinstance(raw_unit, str):
-                unit = raw_unit
+            detected = self._detect_blood_parameters_source(blood_parameters)
+
+            if detected == "provider":
+                numeric_value, entry_unit = self._extract_from_provider_blood(
+                    blood_parameters, healthians_pid,
+                )
+                if numeric_value is None:
+                    continue
+                if unit is None and entry_unit is not None:
+                    unit = entry_unit
+            else:
+                raw_value = blood_parameters.get(parameter_key)
+                if raw_value is None:
+                    continue
+                try:
+                    numeric_value = float(raw_value)
+                except (TypeError, ValueError):
+                    continue
+                raw_unit = blood_parameters.get(unit_key)
+                if unit is None and isinstance(raw_unit, str):
+                    unit = raw_unit
 
             point_date = assessment.completed_at or assessment.assigned_at
             if point_date is None:

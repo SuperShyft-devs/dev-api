@@ -45,6 +45,21 @@ async def get_access_token() -> str:
     return _cached_token
 
 
+async def get_booking_digital_value(access_token: str, booking_id: str) -> dict:
+    """Fetch digital blood report values for a Healthians booking."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{settings.HEALTHIANS_BASE_URL}/toast4health/getBookingDigitalValue",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"booking_id": str(booking_id)},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    if not data.get("status"):
+        raise RuntimeError(f"Healthians getBookingDigitalValue failed: {data}")
+    return data
+
+
 async def get_product_details(access_token: str, deal_type_id: int) -> dict:
     """Fetch product (package) details including constituents."""
     async with httpx.AsyncClient(timeout=15) as client:

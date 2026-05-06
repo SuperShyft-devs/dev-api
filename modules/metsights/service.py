@@ -175,6 +175,44 @@ class MetsightsService:
             return {}
         return payload
 
+    async def get_fetch_collections(self, *, record_id: str) -> dict[str, Any]:
+        """GET /records/{record_id}/fetch-collections/ — returns envelope ``data``."""
+        rid = (record_id or "").strip()
+        if not rid:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Metsights record id is missing")
+        self._require_api_key()
+        try:
+            payload = await self._client.get_record_fetch_collections(record_id=rid)
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 404:
+                raise AppError(
+                    status_code=422,
+                    error_code="BLOOD_SAMPLE_NOT_COLLECTED",
+                    message="Sample collection does not exist for this record",
+                ) from exc
+            if status_code == 403:
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Metsights authorization failed",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
+        envelope = MetsightsEnvelope.model_validate(payload)
+        data = envelope.data
+        return data if isinstance(data, dict) else {}
+
     async def get_blood_parameters(self, *, record_id: str) -> Any:
         normalized_record_id = (record_id or "").strip()
         if not normalized_record_id:
