@@ -119,7 +119,26 @@ class EngagementAssessmentPackagesService:
             db,
             engagement_id=engagement_id,
         )
-        return [_package_to_dict(p) for p in packages]
+
+        total_participants = await self._engagements.count_distinct_participants_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+
+        result: list[dict[str, Any]] = []
+        for p in packages:
+            assigned, synced = await self._assessments_repo.count_instances_for_engagement_and_package(
+                db,
+                engagement_id=engagement_id,
+                package_id=int(p.package_id),
+            )
+            d = _package_to_dict(p)
+            d["assigned_count"] = assigned
+            d["total_participants"] = total_participants
+            d["synced_count"] = synced
+            result.append(d)
+
+        return result
 
     async def add_package_to_engagement(
         self,
@@ -195,7 +214,49 @@ class EngagementAssessmentPackagesService:
                 engagement_id=engagement_id,
                 package_id=package_id,
             )
+
+            # If an instance already exists but is missing a Metsights record,
+            # try to create one and backfill before skipping.
             if existing is not None:
+                existing_rid = (existing.metsights_record_id or "").strip()
+                if not existing_rid and assessment_type_code:
+                    user = await self._users.get_user_by_id(db, participant_id)
+                    profile_id = (getattr(user, "metsights_profile_id", None) or "").strip() if user else ""
+                    if profile_id:
+                        try:
+                            new_rid = await self._metsights.create_record_for_profile(
+                                profile_id=profile_id,
+                                assessment_type_code=assessment_type_code,
+                            )
+                            if new_rid:
+                                await self._assessments_repo.set_metsights_record_id(
+                                    db,
+                                    assessment_instance_id=int(existing.assessment_instance_id),
+                                    metsights_record_id=new_rid,
+                                )
+                                existing.metsights_record_id = new_rid
+                        except AppError as exc:
+                            errors.append(
+                                {
+                                    "user_id": participant_id,
+                                    "stage": "metsights_backfill_record",
+                                    "reason": exc.message,
+                                }
+                            )
+                        except Exception as exc:  # pragma: no cover - defensive
+                            logger.exception(
+                                "Metsights backfill failed for user_id=%s instance_id=%s",
+                                participant_id,
+                                existing.assessment_instance_id,
+                            )
+                            errors.append(
+                                {
+                                    "user_id": participant_id,
+                                    "stage": "metsights_backfill_record",
+                                    "reason": str(exc),
+                                }
+                            )
+
                 skipped.append(
                     {
                         "user_id": participant_id,

@@ -210,6 +210,25 @@ class AssessmentsRepository:
         )
         return list(result.scalars().all())
 
+    async def count_instances_for_engagement_and_package(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        package_id: int,
+    ) -> tuple[int, int]:
+        """Return ``(total_instances, synced_instances)`` for an engagement + package."""
+        result = await db.execute(
+            select(
+                func.count(AssessmentInstance.assessment_instance_id),
+                func.count(AssessmentInstance.metsights_record_id),
+            )
+            .where(AssessmentInstance.engagement_id == engagement_id)
+            .where(AssessmentInstance.package_id == package_id)
+        )
+        row = result.one()
+        return int(row[0]), int(row[1])
+
     async def list_instances_for_engagement_and_package(
         self,
         db: AsyncSession,
