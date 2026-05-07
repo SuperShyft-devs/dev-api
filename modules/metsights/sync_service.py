@@ -206,6 +206,78 @@ def _pick_metsights_payload_for_bases(merged: dict[str, Any], bases: frozenset[s
     return out
 
 
+def _extract_valid_choices_from_options(options_envelope: dict[str, Any]) -> dict[str, set[str]]:
+    """Parse an OPTIONS response to extract valid choice values per field.
+
+    Returns ``{field_name: {valid_value_1, valid_value_2, ...}}`` for every
+    field that has a ``choices`` list (including ``child.choices`` for list
+    fields).  Fields without choices are not included.
+    """
+    result: dict[str, set[str]] = {}
+    actions = options_envelope.get("actions") if isinstance(options_envelope, dict) else None
+    if not isinstance(actions, dict):
+        return result
+    for method_actions in actions.values():
+        if not isinstance(method_actions, dict):
+            continue
+        for field_key, field_info in method_actions.items():
+            if not isinstance(field_info, dict):
+                continue
+            choices = field_info.get("choices")
+            child = field_info.get("child")
+            if isinstance(child, dict) and child.get("choices"):
+                choices = child["choices"]
+            if not isinstance(choices, list):
+                continue
+            valid = set()
+            for c in choices:
+                if isinstance(c, dict):
+                    v = c.get("value")
+                    if v is not None:
+                        valid.add(str(v).strip())
+                else:
+                    valid.add(str(c).strip())
+            if valid:
+                result[field_key] = valid
+    return result
+
+
+def _validate_payload_against_options(
+    payload: dict[str, Any],
+    valid_choices: dict[str, set[str]],
+) -> dict[str, Any]:
+    """Remove fields from *payload* whose values are not in valid Metsights choices.
+
+    - ``single_choice`` values are checked directly.
+    - ``list`` (multiple_choice) values have invalid items removed; empty lists are kept.
+    - ``scale`` / ``float`` / ``boolean`` fields without a choices entry are kept as-is.
+    - ``*_unit`` fields are validated against their own choices entry if present.
+    """
+    cleaned: dict[str, Any] = {}
+    for key, value in payload.items():
+        if key in _METADATA_FIELDS:
+            continue
+        allowed = valid_choices.get(key)
+        if allowed is None:
+            cleaned[key] = value
+            continue
+        if isinstance(value, list):
+            filtered = [v for v in value if str(v).strip() in allowed]
+            cleaned[key] = filtered
+        elif isinstance(value, bool):
+            if str(value) in allowed:
+                cleaned[key] = value
+            else:
+                logger.warning("Skipping field %s: bool value %r not in valid choices %s", key, value, allowed)
+        else:
+            sv = str(value).strip()
+            if sv in allowed:
+                cleaned[key] = value
+            else:
+                logger.warning("Skipping field %s: value %r not in valid choices %s", key, sv, allowed)
+    return cleaned
+
+
 def _normalize_metsights_type_code(record_row: dict[str, Any]) -> str | None:
     code = str(record_row.get("assessment_code") or "").strip().upper()
     if code in _ASSESSMENT_CODE_TO_TYPE_CODE:
@@ -800,6 +872,14 @@ class MetsightsSyncService:
             "skipped_questions": skipped_questions,
         }
 
+    async def _fetch_valid_choices_for_resource(self, record_id: str, resource: str) -> dict[str, set[str]]:
+        """Fetch OPTIONS for a Metsights resource and return valid choice sets."""
+        try:
+            opts = await self._metsights.options_record_subresource(record_id=record_id, resource=resource)
+            return _extract_valid_choices_from_options(opts)
+        except Exception:
+            return {}
+
     async def push_questionnaire_to_metsights_for_submit(
         self,
         db: AsyncSession,
@@ -899,6 +979,13 @@ class MetsightsSyncService:
                 )
                 skipped_sections.append(resource)
                 return
+            valid_choices = await self._fetch_valid_choices_for_resource(mrid, resource)
+            if valid_choices:
+                payload = _validate_payload_against_options(payload, valid_choices)
+                if not payload:
+                    logger.warning("Metsights %s for record %s: all fields invalid after validation", resource, mrid)
+                    skipped_sections.append(resource)
+                    return
             payload["is_complete"] = True
             logger.info(
                 "Pushing to Metsights %s for record %s: %s",
@@ -1003,6 +1090,13 @@ class MetsightsSyncService:
             payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
             if not payload:
                 return
+            valid_choices = await self._fetch_valid_choices_for_resource(mrid, resource)
+            if valid_choices:
+                payload = _validate_payload_against_options(payload, valid_choices)
+                if not payload:
+                    logger.warning("Metsights %s for record %s: all fields invalid after validation", resource, mrid)
+                    section_errors.append(resource)
+                    return
             try:
                 await self._metsights.upsert_record_subresource(record_id=mrid, resource=resource, body=payload)
                 patched.append(resource)

@@ -467,31 +467,23 @@ class MetsightsService:
                             )
                             cleaned = {k: v for k, v in data.items() if k not in bad}
                             if cleaned:
-                                return await _try_send(cleaned, is_retry=True)
-                        try:
-                            return await self._client.patch_record_resource(record_id=rid, resource=res, data=data)
-                        except httpx.HTTPStatusError as exc_patch:
-                            if exc_patch.response.status_code == 400 and not is_retry:
-                                bad2 = _extract_bad_fields(exc_patch)
-                                if bad2:
-                                    cleaned2 = {k: v for k, v in data.items() if k not in bad2}
-                                    if cleaned2:
-                                        logger.warning(
-                                            "Metsights PATCH /records/%s/%s/ rejected fields %s — retrying without them.",
-                                            rid, res, bad2,
-                                        )
-                                        return await _try_send(cleaned2, is_retry=True)
-                            if exc_patch.response.status_code == 404:
                                 try:
-                                    error_body = exc_post.response.json()
-                                except Exception:
-                                    error_body = exc_post.response.text
-                                raise AppError(
-                                    status_code=422,
-                                    error_code="METSIGHTS_VALIDATION_ERROR",
-                                    message=f"Metsights rejected data for {res}: {error_body}",
-                                ) from exc_post
-                            raise
+                                    return await _try_send(cleaned, is_retry=True)
+                                except (httpx.HTTPStatusError, AppError) as retry_exc:
+                                    logger.warning(
+                                        "Metsights POST /records/%s/%s/ retry also failed: %s",
+                                        rid, res, retry_exc,
+                                    )
+                                    raise
+                        try:
+                            error_body = exc_post.response.json()
+                        except Exception:
+                            error_body = exc_post.response.text
+                        raise AppError(
+                            status_code=422,
+                            error_code="METSIGHTS_VALIDATION_ERROR",
+                            message=f"Metsights rejected data for {res}: {error_body}",
+                        ) from exc_post
                     else:
                         self._raise_metsights_record_http(exc_post)
             else:
