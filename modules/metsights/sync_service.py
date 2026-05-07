@@ -166,10 +166,14 @@ def _answer_to_metsights_fields(question_key: str, question_type: str, answer: A
     if qtype == "multiple_choice":
         if not isinstance(answer, list):
             return {}
-        seq = [str(x).strip() for x in answer if x is not None and str(x).strip() != ""]
-        if not seq:
-            return {}
-        return {qkey: seq}
+        seq = [
+            str(x).strip()
+            for x in answer
+            if x is not None
+            and str(x).strip() != ""
+            and str(x).strip().lower() != "none"
+        ]
+        return {qkey: seq} if seq else {qkey: []}
 
     if qtype == "single_choice":
         if answer is None:
