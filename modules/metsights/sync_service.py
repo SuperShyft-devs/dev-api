@@ -939,6 +939,8 @@ class MetsightsSyncService:
 
         Unlike ``push_questionnaire_to_metsights_for_submit`` this skips user
         ownership checks so employees can push on behalf of participants.
+        Does NOT set ``is_complete`` since this is a data push, not a final submit.
+        Each section is pushed independently so one failure does not block others.
         Returns a summary dict; never raises on empty responses (just reports skipped).
         """
 
@@ -991,14 +993,21 @@ class MetsightsSyncService:
             return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "no_mappable_answers"}
 
         patched: list[str] = []
+        section_errors: list[str] = []
 
         async def _patch_section(resource: str, body: dict[str, Any]) -> None:
             payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
             if not payload:
                 return
-            payload["is_complete"] = True
-            await self._metsights.upsert_record_subresource(record_id=mrid, resource=resource, body=payload)
-            patched.append(resource)
+            try:
+                await self._metsights.upsert_record_subresource(record_id=mrid, resource=resource, body=payload)
+                patched.append(resource)
+            except Exception as exc:
+                logger.warning(
+                    "Metsights push %s for record %s failed: %s — payload was: %s",
+                    resource, mrid, exc, payload,
+                )
+                section_errors.append(resource)
 
         if type_code in ("1", "2"):
             phys = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_PHYSICAL_KEYS)
@@ -1015,6 +1024,7 @@ class MetsightsSyncService:
         return {
             "assessment_instance_id": assessment_instance_id,
             "metsights_record_id": mrid,
-            "pushed": True,
+            "pushed": len(patched) > 0,
             "resources_patched": patched,
+            "section_errors": section_errors,
         }
