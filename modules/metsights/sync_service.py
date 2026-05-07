@@ -206,14 +206,22 @@ def _pick_metsights_payload_for_bases(merged: dict[str, Any], bases: frozenset[s
     return out
 
 
-def _extract_valid_choices_from_options(options_envelope: dict[str, Any]) -> dict[str, set[str]]:
-    """Parse an OPTIONS response to extract valid choice values per field.
+class _FieldMeta:
+    """Metadata for a single Metsights OPTIONS field."""
+    __slots__ = ("valid_choices", "required")
 
-    Returns ``{field_name: {valid_value_1, valid_value_2, ...}}`` for every
-    field that has a ``choices`` list (including ``child.choices`` for list
-    fields).  Fields without choices are not included.
+    def __init__(self, valid_choices: set[str], required: bool):
+        self.valid_choices = valid_choices
+        self.required = required
+
+
+def _extract_field_metadata_from_options(options_envelope: dict[str, Any]) -> dict[str, _FieldMeta]:
+    """Parse an OPTIONS response to extract valid choice values and required flag per field.
+
+    Returns ``{field_name: _FieldMeta}`` for every field that has a ``choices``
+    list (including ``child.choices`` for list fields).
     """
-    result: dict[str, set[str]] = {}
+    result: dict[str, _FieldMeta] = {}
     actions = options_envelope.get("actions") if isinstance(options_envelope, dict) else None
     if not isinstance(actions, dict):
         return result
@@ -229,7 +237,7 @@ def _extract_valid_choices_from_options(options_envelope: dict[str, Any]) -> dic
                 choices = child["choices"]
             if not isinstance(choices, list):
                 continue
-            valid = set()
+            valid: set[str] = set()
             for c in choices:
                 if isinstance(c, dict):
                     v = c.get("value")
@@ -238,44 +246,76 @@ def _extract_valid_choices_from_options(options_envelope: dict[str, Any]) -> dic
                 else:
                     valid.add(str(c).strip())
             if valid:
-                result[field_key] = valid
+                required = bool(field_info.get("required", False))
+                if field_key not in result:
+                    result[field_key] = _FieldMeta(valid, required)
+                else:
+                    result[field_key].valid_choices |= valid
+                    result[field_key].required = result[field_key].required or required
     return result
 
 
 def _validate_payload_against_options(
     payload: dict[str, Any],
-    valid_choices: dict[str, set[str]],
+    field_meta: dict[str, _FieldMeta],
 ) -> dict[str, Any]:
-    """Remove fields from *payload* whose values are not in valid Metsights choices.
+    """Remove or remap fields whose values are not in valid Metsights choices.
 
-    - ``single_choice`` values are checked directly.
-    - ``list`` (multiple_choice) values have invalid items removed; empty lists are kept.
-    - ``scale`` / ``float`` / ``boolean`` fields without a choices entry are kept as-is.
-    - ``*_unit`` fields are validated against their own choices entry if present.
+    For **required** fields with invalid values, the closest numeric choice is
+    substituted so the POST does not fail on a missing required field.
+    For optional fields, invalid values are silently dropped.
     """
     cleaned: dict[str, Any] = {}
     for key, value in payload.items():
         if key in _METADATA_FIELDS:
             continue
-        allowed = valid_choices.get(key)
-        if allowed is None:
+        meta = field_meta.get(key)
+        if meta is None:
             cleaned[key] = value
             continue
+        allowed = meta.valid_choices
         if isinstance(value, list):
             filtered = [v for v in value if str(v).strip() in allowed]
             cleaned[key] = filtered
         elif isinstance(value, bool):
             if str(value) in allowed:
                 cleaned[key] = value
+            elif meta.required:
+                fallback = sorted(allowed)[0]
+                logger.warning("Remapping required field %s: bool %r -> %r", key, value, fallback)
+                cleaned[key] = fallback
             else:
-                logger.warning("Skipping field %s: bool value %r not in valid choices %s", key, value, allowed)
+                logger.warning("Skipping optional field %s: bool value %r not in valid choices", key, value)
         else:
             sv = str(value).strip()
             if sv in allowed:
                 cleaned[key] = value
+            elif meta.required:
+                fallback = _find_closest_choice(sv, allowed)
+                logger.warning("Remapping required field %s: %r -> %r (closest valid)", key, sv, fallback)
+                cleaned[key] = fallback
             else:
-                logger.warning("Skipping field %s: value %r not in valid choices %s", key, sv, allowed)
+                logger.warning("Skipping optional field %s: value %r not in valid choices %s", key, sv, allowed)
     return cleaned
+
+
+def _find_closest_choice(invalid_value: str, allowed: set[str]) -> str:
+    """Pick the numerically closest valid choice, falling back to the first sorted value."""
+    try:
+        target = int(invalid_value)
+    except (ValueError, TypeError):
+        return sorted(allowed)[0]
+    best: str | None = None
+    best_dist = float("inf")
+    for v in sorted(allowed):
+        try:
+            dist = abs(int(v) - target)
+        except (ValueError, TypeError):
+            continue
+        if dist < best_dist:
+            best_dist = dist
+            best = v
+    return best if best is not None else sorted(allowed)[0]
 
 
 def _normalize_metsights_type_code(record_row: dict[str, Any]) -> str | None:
@@ -872,11 +912,11 @@ class MetsightsSyncService:
             "skipped_questions": skipped_questions,
         }
 
-    async def _fetch_valid_choices_for_resource(self, record_id: str, resource: str) -> dict[str, set[str]]:
-        """Fetch OPTIONS for a Metsights resource and return valid choice sets."""
+    async def _fetch_field_metadata_for_resource(self, record_id: str, resource: str) -> dict[str, _FieldMeta]:
+        """Fetch OPTIONS for a Metsights resource and return field metadata."""
         try:
             opts = await self._metsights.options_record_subresource(record_id=record_id, resource=resource)
-            return _extract_valid_choices_from_options(opts)
+            return _extract_field_metadata_from_options(opts)
         except Exception:
             return {}
 
@@ -979,9 +1019,9 @@ class MetsightsSyncService:
                 )
                 skipped_sections.append(resource)
                 return
-            valid_choices = await self._fetch_valid_choices_for_resource(mrid, resource)
-            if valid_choices:
-                payload = _validate_payload_against_options(payload, valid_choices)
+            field_meta = await self._fetch_field_metadata_for_resource(mrid, resource)
+            if field_meta:
+                payload = _validate_payload_against_options(payload, field_meta)
                 if not payload:
                     logger.warning("Metsights %s for record %s: all fields invalid after validation", resource, mrid)
                     skipped_sections.append(resource)
@@ -1090,9 +1130,9 @@ class MetsightsSyncService:
             payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
             if not payload:
                 return
-            valid_choices = await self._fetch_valid_choices_for_resource(mrid, resource)
-            if valid_choices:
-                payload = _validate_payload_against_options(payload, valid_choices)
+            field_meta = await self._fetch_field_metadata_for_resource(mrid, resource)
+            if field_meta:
+                payload = _validate_payload_against_options(payload, field_meta)
                 if not payload:
                     logger.warning("Metsights %s for record %s: all fields invalid after validation", resource, mrid)
                     section_errors.append(resource)
