@@ -155,11 +155,20 @@ class FitPrintParameter(BaseModel):
     status: str | None = None
 
 
+class IdealRangeDetail(BaseModel):
+    low: float | None = None
+    high: float | None = None
+    unit: str | None = None
+
+
 class HealthSpanFitnessDetail(BaseModel):
-    blood_pressure: str | None = None
+    systolic_blood_pressure: str | None = None
+    diastolic_blood_pressure: str | None = None
     basal_metabolic_rate: FitPrintParameter | None = None
     waist: str | None = None
     estimated_body_fat: FitPrintParameter | None = None
+    ideal_waist: IdealRangeDetail | None = None
+    ideal_body_fat: IdealRangeDetail | None = None
 
 
 class HealthSpanNutritionDetail(BaseModel):

@@ -39,6 +39,7 @@ from modules.reports.schemas import (
     HealthSpanLifestyleDetail,
     HealthSpanNutritionDetail,
     HealthyHabitItem,
+    IdealRangeDetail,
     NutrientDetail,
     OverviewReportResponse,
     PositiveWins,
@@ -1216,7 +1217,49 @@ class ReportsService:
             key_to_question_id[defn.question_key] = int(defn.question_id)
         return lookup, key_to_question_id
 
-    def _build_nutrition_api_payload(self, lookup: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def _normalize_gender(value: Any) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip().lower()
+        if normalized in {"m", "male"}:
+            return "male"
+        if normalized in {"f", "female"}:
+            return "female"
+        return normalized or None
+
+    @staticmethod
+    def _extract_scale_answer(answer: Any) -> tuple[float | int | None, str | None]:
+        """Extract numeric scale value and unit from questionnaire answer."""
+        if not isinstance(answer, dict):
+            return None, None
+        raw_value = answer.get("value")
+        raw_unit = answer.get("unit")
+        if raw_value is None:
+            return None, str(raw_unit).strip() if raw_unit is not None and str(raw_unit).strip() else None
+        if isinstance(raw_value, bool):
+            return None, None
+        parsed_value: float | int | None = None
+        try:
+            parsed_numeric = float(raw_value)
+            parsed_value = int(parsed_numeric) if parsed_numeric.is_integer() else parsed_numeric
+        except (TypeError, ValueError):
+            parsed_value = None
+        parsed_unit = str(raw_unit).strip() if raw_unit is not None and str(raw_unit).strip() else None
+        return parsed_value, parsed_unit
+
+    @staticmethod
+    def _normalize_height_unit(value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if normalized in {"0", "cm"}:
+            return "cm"
+        if normalized in {"2", "ft/in", "ft", "feet"}:
+            return "ft/in"
+        return value.strip() or None
+
+    def _build_nutrition_api_payload(self, lookup: dict[str, Any], *, user_gender: str | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {}
         for key in self._NUTRITION_API_QUESTION_KEYS:
             val = lookup.get(key)
@@ -1226,6 +1269,19 @@ class ReportsService:
                 payload[key] = [str(v) for v in val]
             else:
                 payload[key] = str(val)
+
+        # New nutrition API contract requires these identity/anthropometry fields.
+        resolved_gender = self._normalize_gender(lookup.get("gender")) or self._normalize_gender(user_gender)
+        if resolved_gender is not None:
+            payload["gender"] = resolved_gender
+
+        height_value, height_unit = self._extract_scale_answer(lookup.get("height"))
+        if height_value is not None:
+            payload["height"] = height_value
+        normalized_height_unit = self._normalize_height_unit(height_unit)
+        if normalized_height_unit is not None:
+            payload["height_unit"] = normalized_height_unit
+
         return payload
 
     @staticmethod
@@ -1304,6 +1360,7 @@ class ReportsService:
         *,
         assessment_instance_id: int,
         user_id: int,
+        user_gender: str | None,
         source_assessment_instance_ids: list[int],
         include_details: bool,
     ) -> HealthSpanIndexResponse:
@@ -1390,7 +1447,7 @@ class ReportsService:
         )
 
         # Step 5: Call the nutrition API
-        nutrition_payload = self._build_nutrition_api_payload(lookup)
+        nutrition_payload = self._build_nutrition_api_payload(lookup, user_gender=user_gender)
         nutrition_response = await self._call_nutrition_api(nutrition_payload)
         nutrition_score_raw = nutrition_response.get("nutrition_score")
         nutrition_score = float(nutrition_score_raw) if isinstance(nutrition_score_raw, (int, float)) else None
@@ -1404,7 +1461,8 @@ class ReportsService:
             )
 
         # Fitness details
-        blood_pressure = self._extract_questionnaire_value(lookup, "systolic_blood_pressure")
+        systolic_blood_pressure = self._extract_questionnaire_value(lookup, "systolic_blood_pressure")
+        diastolic_blood_pressure = self._extract_questionnaire_value(lookup, "diastolic_blood_pressure")
         waist = self._extract_questionnaire_value(lookup, "waist_circumference")
 
         activity_params = activity_spec.get("parameters") if isinstance(activity_spec, dict) else None
@@ -1413,11 +1471,24 @@ class ReportsService:
         fitness_params = fitness_spec.get("parameters") if isinstance(fitness_spec, dict) else None
         body_fat_param = self._extract_fitprint_parameter(fitness_params, "Estimated Body Fat")
 
+        def _ideal_range(key: str) -> IdealRangeDetail | None:
+            raw = nutrition_response.get(key)
+            if not isinstance(raw, dict):
+                return None
+            return IdealRangeDetail(
+                low=raw.get("low"),
+                high=raw.get("high"),
+                unit=raw.get("unit"),
+            )
+
         fitness_detail = HealthSpanFitnessDetail(
-            blood_pressure=blood_pressure,
+            systolic_blood_pressure=systolic_blood_pressure,
+            diastolic_blood_pressure=diastolic_blood_pressure,
             basal_metabolic_rate=bmr_param,
             waist=waist,
             estimated_body_fat=body_fat_param,
+            ideal_waist=_ideal_range("ideal_waist"),
+            ideal_body_fat=_ideal_range("ideal_body_fat"),
         )
 
         # Nutrition details
