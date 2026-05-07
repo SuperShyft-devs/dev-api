@@ -466,21 +466,19 @@ class EngagementAssessmentPackagesService:
         db: AsyncSession,
         *,
         engagement_id: int,
+        target_package_id: int,
         employee: EmployeeContext,
         sync_service: MetsightsSyncService,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> dict[str, Any]:
-        """Push questionnaire answers to Metsights for every participant instance in an engagement.
+        """Push questionnaire answers to Metsights for a specific package's participants.
 
-        For each assessment instance:
-        - Skip if no questionnaire responses exist (participant hasn't filled anything).
-        - Skip if no metsights_record_id (nowhere to push).
-        - Otherwise push whatever answers exist (partial is fine).
-        - Collect all same-user instance ids as source_assessment_instance_ids so
-          answers from multiple packages (e.g. primary + fitprint) are merged into
-          the target record.
+        Only instances belonging to ``target_package_id`` are used as push targets.
+        All of a user's instance IDs within the engagement are passed as
+        ``source_assessment_instance_ids`` so answers from every package merge
+        into the target record.
         """
         if employee is None:
             raise AppError(
@@ -497,6 +495,14 @@ class EngagementAssessmentPackagesService:
                 message="Engagement does not exist",
             )
 
+        package = await self._assessments_repo.get_package_by_id(db, target_package_id)
+        if package is None:
+            raise AppError(
+                status_code=404,
+                error_code="PACKAGE_NOT_FOUND",
+                message="Assessment package does not exist",
+            )
+
         all_instances = await self._assessments_repo.list_all_instances_for_engagement(
             db,
             engagement_id=engagement_id,
@@ -505,8 +511,6 @@ class EngagementAssessmentPackagesService:
         if not all_instances:
             return {"pushed": 0, "skipped": 0, "errors": 0, "details": []}
 
-        # Group instances by user_id so we can pass all of a user's instance ids
-        # as source_assessment_instance_ids when pushing.
         from collections import defaultdict
         user_instances: dict[int, list] = defaultdict(list)
         for inst in all_instances:
@@ -518,10 +522,15 @@ class EngagementAssessmentPackagesService:
         details: list[dict[str, Any]] = []
 
         for user_id, instances in user_instances.items():
-            # Gather all instance ids for this user as source ids
             all_user_instance_ids = [int(i.assessment_instance_id) for i in instances]
 
-            for inst in instances:
+            target_instances = [
+                i for i in instances if int(i.package_id) == target_package_id
+            ]
+            if not target_instances:
+                continue
+
+            for inst in target_instances:
                 inst_id = int(inst.assessment_instance_id)
                 mrid = (inst.metsights_record_id or "").strip()
                 if not mrid:
@@ -541,9 +550,10 @@ class EngagementAssessmentPackagesService:
                         skipped += 1
                 except Exception as exc:
                     logger.exception(
-                        "Push questionnaire failed for instance_id=%s engagement_id=%s",
+                        "Push questionnaire failed for instance_id=%s engagement_id=%s package_id=%s",
                         inst_id,
                         engagement_id,
+                        target_package_id,
                     )
                     errors_count += 1
                     details.append({

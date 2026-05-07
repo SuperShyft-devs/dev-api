@@ -21,7 +21,10 @@ from modules.engagements.assessment_packages_service import (
     EngagementAssessmentPackagesService,
 )
 from modules.engagements.dependencies import get_engagement_assessment_packages_service
-from modules.engagements.schemas import EngagementAssessmentPackageAddRequest
+from modules.engagements.schemas import (
+    EngagementAssessmentPackageAddRequest,
+    EngagementPushQuestionnairesRequest,
+)
 from modules.metsights.dependencies import get_metsights_sync_service
 from modules.metsights.sync_service import MetsightsSyncService
 
@@ -112,6 +115,7 @@ async def remove_engagement_assessment_package(
 @router.post("/{engagement_id}/push-questionnaires")
 async def push_engagement_questionnaires(
     engagement_id: int,
+    payload: EngagementPushQuestionnairesRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
@@ -120,11 +124,12 @@ async def push_engagement_questionnaires(
     ),
     sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
 ):
-    """Push questionnaire answers to Metsights for all participants of an engagement (employee only)."""
+    """Push questionnaire answers to Metsights for a specific package's participants (employee only)."""
 
     data = await service.push_all_questionnaires_to_metsights(
         db,
         engagement_id=engagement_id,
+        target_package_id=payload.package_id,
         employee=employee,
         sync_service=sync_service,
         ip_address=_client_ip(request),

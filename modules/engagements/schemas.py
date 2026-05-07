@@ -94,3 +94,9 @@ class EngagementAssessmentPackageAddRequest(BaseModel):
     """Request to add an additional assessment package to an engagement."""
 
     package_code: str = Field(..., min_length=1, max_length=100)
+
+
+class EngagementPushQuestionnairesRequest(BaseModel):
+    """Request to push questionnaire answers for a specific package."""
+
+    package_id: int = Field(..., gt=0)
