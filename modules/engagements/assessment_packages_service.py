@@ -495,7 +495,7 @@ class EngagementAssessmentPackagesService:
                 message="Engagement does not exist",
             )
 
-        package = await self._assessments_repo.get_package_by_id(db, target_package_id)
+        package = await self._assessments_repo.get_package_by_id(db, package_id=target_package_id)
         if package is None:
             raise AppError(
                 status_code=404,
