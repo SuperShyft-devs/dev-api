@@ -521,6 +521,10 @@ class EngagementAssessmentPackagesService:
         errors_count = 0
         details: list[dict[str, Any]] = []
 
+        # Shared cache for Metsights OPTIONS metadata — fetched once and reused
+        # across all participants so we don't make 42×3 redundant HTTP calls.
+        options_cache: dict = {}
+
         for user_id, instances in user_instances.items():
             all_user_instance_ids = [int(i.assessment_instance_id) for i in instances]
 
@@ -542,6 +546,7 @@ class EngagementAssessmentPackagesService:
                         db,
                         assessment_instance_id=inst_id,
                         source_assessment_instance_ids=all_user_instance_ids,
+                        options_cache=options_cache,
                     )
                     if result.get("pushed"):
                         pushed += 1

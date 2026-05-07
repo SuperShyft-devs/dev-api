@@ -912,13 +912,28 @@ class MetsightsSyncService:
             "skipped_questions": skipped_questions,
         }
 
-    async def _fetch_field_metadata_for_resource(self, record_id: str, resource: str) -> dict[str, _FieldMeta]:
-        """Fetch OPTIONS for a Metsights resource and return field metadata."""
+    async def _fetch_field_metadata_for_resource(
+        self,
+        record_id: str,
+        resource: str,
+        cache: dict[str, dict[str, _FieldMeta]] | None = None,
+    ) -> dict[str, _FieldMeta]:
+        """Fetch OPTIONS for a Metsights resource and return field metadata.
+
+        When *cache* is provided, the result is stored under ``resource`` and
+        reused on subsequent calls with the same *resource* key.  This avoids
+        redundant OPTIONS calls when pushing multiple participants.
+        """
+        if cache is not None and resource in cache:
+            return cache[resource]
         try:
             opts = await self._metsights.options_record_subresource(record_id=record_id, resource=resource)
-            return _extract_field_metadata_from_options(opts)
+            result = _extract_field_metadata_from_options(opts)
         except Exception:
-            return {}
+            result = {}
+        if cache is not None:
+            cache[resource] = result
+        return result
 
     async def push_questionnaire_to_metsights_for_submit(
         self,
@@ -1065,6 +1080,7 @@ class MetsightsSyncService:
         *,
         assessment_instance_id: int,
         source_assessment_instance_ids: list[int] | None = None,
+        options_cache: dict[str, dict[str, _FieldMeta]] | None = None,
     ) -> dict[str, Any]:
         """Push local questionnaire answers to Metsights for a single instance (employee path).
 
@@ -1073,6 +1089,10 @@ class MetsightsSyncService:
         Does NOT set ``is_complete`` since this is a data push, not a final submit.
         Each section is pushed independently so one failure does not block others.
         Returns a summary dict; never raises on empty responses (just reports skipped).
+
+        Pass *options_cache* (a mutable dict) to reuse OPTIONS metadata across
+        multiple calls, avoiding redundant Metsights OPTIONS requests when
+        pushing an entire engagement.
         """
 
         instance = await self._assessments.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
@@ -1130,7 +1150,7 @@ class MetsightsSyncService:
             payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
             if not payload:
                 return
-            field_meta = await self._fetch_field_metadata_for_resource(mrid, resource)
+            field_meta = await self._fetch_field_metadata_for_resource(mrid, resource, cache=options_cache)
             if field_meta:
                 payload = _validate_payload_against_options(payload, field_meta)
                 if not payload:
