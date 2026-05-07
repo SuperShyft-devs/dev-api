@@ -30,6 +30,7 @@ from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
 from modules.engagements.repository import EngagementsRepository
 from modules.metsights.service import MetsightsService
+from modules.metsights.sync_service import MetsightsSyncService
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.repository import ReportsRepository
 from modules.users.repository import UsersRepository
@@ -458,4 +459,112 @@ class EngagementAssessmentPackagesService:
             "package_id": package_id,
             "package_code": package.package_code,
             "deleted_instances": deleted,
+        }
+
+    async def push_all_questionnaires_to_metsights(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        employee: EmployeeContext,
+        sync_service: MetsightsSyncService,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict[str, Any]:
+        """Push questionnaire answers to Metsights for every participant instance in an engagement.
+
+        For each assessment instance:
+        - Skip if no questionnaire responses exist (participant hasn't filled anything).
+        - Skip if no metsights_record_id (nowhere to push).
+        - Otherwise push whatever answers exist (partial is fine).
+        - Collect all same-user instance ids as source_assessment_instance_ids so
+          answers from multiple packages (e.g. primary + fitprint) are merged into
+          the target record.
+        """
+        if employee is None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        engagement = await self._engagements.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+
+        all_instances = await self._assessments_repo.list_all_instances_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+
+        if not all_instances:
+            return {"pushed": 0, "skipped": 0, "errors": 0, "details": []}
+
+        # Group instances by user_id so we can pass all of a user's instance ids
+        # as source_assessment_instance_ids when pushing.
+        from collections import defaultdict
+        user_instances: dict[int, list] = defaultdict(list)
+        for inst in all_instances:
+            user_instances[int(inst.user_id)].append(inst)
+
+        pushed = 0
+        skipped = 0
+        errors_count = 0
+        details: list[dict[str, Any]] = []
+
+        for user_id, instances in user_instances.items():
+            # Gather all instance ids for this user as source ids
+            all_user_instance_ids = [int(i.assessment_instance_id) for i in instances]
+
+            for inst in instances:
+                inst_id = int(inst.assessment_instance_id)
+                mrid = (inst.metsights_record_id or "").strip()
+                if not mrid:
+                    skipped += 1
+                    continue
+
+                try:
+                    result = await sync_service.push_questionnaire_for_instance(
+                        db,
+                        assessment_instance_id=inst_id,
+                        source_assessment_instance_ids=all_user_instance_ids,
+                    )
+                    if result.get("pushed"):
+                        pushed += 1
+                        details.append(result)
+                    else:
+                        skipped += 1
+                except Exception as exc:
+                    logger.exception(
+                        "Push questionnaire failed for instance_id=%s engagement_id=%s",
+                        inst_id,
+                        engagement_id,
+                    )
+                    errors_count += 1
+                    details.append({
+                        "assessment_instance_id": inst_id,
+                        "pushed": False,
+                        "reason": str(exc),
+                    })
+
+        await self._audit.log_event(
+            db,
+            action="EMPLOYEE_PUSH_ENGAGEMENT_QUESTIONNAIRES",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return {
+            "pushed": pushed,
+            "skipped": skipped,
+            "errors": errors_count,
+            "details": details,
         }

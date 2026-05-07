@@ -244,6 +244,19 @@ class AssessmentsRepository:
         )
         return list(result.scalars().all())
 
+    async def list_all_instances_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> list[AssessmentInstance]:
+        result = await db.execute(
+            select(AssessmentInstance)
+            .where(AssessmentInstance.engagement_id == engagement_id)
+            .order_by(AssessmentInstance.user_id.asc(), AssessmentInstance.assessment_instance_id.asc())
+        )
+        return list(result.scalars().all())
+
     async def delete_category_progress_for_instance(
         self,
         db: AsyncSession,

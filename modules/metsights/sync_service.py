@@ -927,3 +927,94 @@ class MetsightsSyncService:
             "metsights_record_id": mrid,
             "resources_patched": patched,
         }
+
+    async def push_questionnaire_for_instance(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        source_assessment_instance_ids: list[int] | None = None,
+    ) -> dict[str, Any]:
+        """Push local questionnaire answers to Metsights for a single instance (employee path).
+
+        Unlike ``push_questionnaire_to_metsights_for_submit`` this skips user
+        ownership checks so employees can push on behalf of participants.
+        Returns a summary dict; never raises on empty responses (just reports skipped).
+        """
+
+        instance = await self._assessments.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
+        if instance is None:
+            return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "instance_not_found"}
+
+        mrid = (instance.metsights_record_id or "").strip()
+        if not mrid:
+            return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "no_metsights_record_id"}
+
+        package = await self._assessments.get_package_by_id(db, int(instance.package_id))
+        if package is None:
+            return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "package_not_found"}
+
+        type_code = (package.assessment_type_code or "").strip()
+        if type_code not in ("1", "2", "7"):
+            return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "unsupported_assessment_type"}
+
+        effective_source_ids: list[int]
+        if source_assessment_instance_ids:
+            effective_source_ids = list(source_assessment_instance_ids)
+        else:
+            effective_source_ids = [assessment_instance_id]
+
+        responses = await self._questionnaire.list_responses_for_instances(
+            db,
+            assessment_instance_ids=effective_source_ids,
+        )
+        if not responses:
+            return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "no_responses"}
+
+        source_order = {sid: idx for idx, sid in enumerate(effective_source_ids)}
+        responses.sort(key=lambda r: (source_order.get(int(r.assessment_instance_id), 0), int(r.response_id)))
+
+        qids = list({int(r.question_id) for r in responses})
+        defs_map = await self._questionnaire.get_definitions_by_ids(db, question_ids=qids)
+
+        merged: dict[str, Any] = {}
+        for resp in responses:
+            qdef = defs_map.get(int(resp.question_id))
+            if qdef is None:
+                continue
+            key = (qdef.question_key or "").strip()
+            if not key:
+                continue
+            merged.update(_answer_to_metsights_fields(key, str(qdef.question_type or ""), resp.answer))
+
+        if not merged:
+            return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "no_mappable_answers"}
+
+        patched: list[str] = []
+
+        async def _patch_section(resource: str, body: dict[str, Any]) -> None:
+            payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
+            if not payload:
+                return
+            payload["is_complete"] = True
+            await self._metsights.upsert_record_subresource(record_id=mrid, resource=resource, body=payload)
+            patched.append(resource)
+
+        if type_code in ("1", "2"):
+            phys = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_PHYSICAL_KEYS)
+            vit = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_VITALS_KEYS)
+            diet = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS)
+            await _patch_section("physical-measurement", phys)
+            await _patch_section("vitals", vit)
+            await _patch_section("diet-lifestyle-parameters", diet)
+        elif type_code == "7":
+            bases = _METSIGHTS_SUBMIT_PHYSICAL_KEYS | _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS | _METSIGHTS_SUBMIT_FITNESS_ONLY_KEYS
+            fit = _pick_metsights_payload_for_bases(merged, bases)
+            await _patch_section("fitness-parameters", fit)
+
+        return {
+            "assessment_instance_id": assessment_instance_id,
+            "metsights_record_id": mrid,
+            "pushed": True,
+            "resources_patched": patched,
+        }
