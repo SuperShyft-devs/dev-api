@@ -1488,6 +1488,7 @@ class ReportsService:
             waist=waist,
             estimated_body_fat=body_fat_param,
             ideal_waist=_ideal_range("ideal_waist"),
+            ideal_bmr=_ideal_range("ideal_bmr"),
             ideal_body_fat=_ideal_range("ideal_body_fat"),
         )
 

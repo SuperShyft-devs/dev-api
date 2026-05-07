@@ -168,6 +168,7 @@ class HealthSpanFitnessDetail(BaseModel):
     waist: str | None = None
     estimated_body_fat: FitPrintParameter | None = None
     ideal_waist: IdealRangeDetail | None = None
+    ideal_bmr: IdealRangeDetail | None = None
     ideal_body_fat: IdealRangeDetail | None = None
 
 
