@@ -53,6 +53,34 @@ async def test_send_otp_returns_404_for_unknown_user(async_client):
 
 
 @pytest.mark.asyncio
+async def test_send_otp_with_dontsendotp_suffix_skips_dispatch(async_client, test_db_session):
+    test_db_session.add(User(user_id=1013, age=30, phone="7000000137", status="active"))
+    await test_db_session.commit()
+
+    sender = async_client._transport.app.state.otp_sender
+    sender.last_phone = None
+    sender.last_otp = None
+
+    response = await async_client.post("/auth/send-otp", json={"phone": "7000000137dontsendotp"})
+
+    assert response.status_code == 200
+    assert isinstance(response.json()["data"]["session_id"], int)
+    assert sender.last_phone is None
+    assert sender.last_otp is None
+
+
+@pytest.mark.asyncio
+async def test_send_otp_rejects_non_supported_phone_suffix(async_client, test_db_session):
+    test_db_session.add(User(user_id=1014, age=30, phone="7000000138", status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.post("/auth/send-otp", json={"phone": "7000000138abc"})
+
+    assert response.status_code == 400
+    assert response.json() == {"error_code": "INVALID_INPUT", "message": "Invalid request"}
+
+
+@pytest.mark.asyncio
 async def test_send_and_verify_otp_sub_profile_with_unique_phone(async_client, test_db_session):
     parent = User(
         user_id=9201,
