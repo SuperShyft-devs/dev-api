@@ -48,14 +48,10 @@ logger = logging.getLogger(__name__)
 _ALWAYS_ACTIVE_EMPLOYEE_ID = 1
 
 _METSIGHTS_HEADER_ALIASES: dict[str, str] = {
-    "id": "id",
-    "created date": "created_date",
-    "first name": "first_name",
-    "last name": "last_name",
-    "phone": "phone",
-    "email": "email",
-    "gender": "gender",
-    "age": "age",
+    "name": "name",
+    "number": "number",
+    "metsights_profile_id": "metsights_profile_id",
+    "record_id": "record_id",
 }
 
 
@@ -65,20 +61,8 @@ def _metsights_canonical_header(cell: str) -> str | None:
     return _METSIGHTS_HEADER_ALIASES.get(key)
 
 
-def _parse_csv_age(raw: str | None) -> int | None:
-    if raw is None or str(raw).strip() == "":
-        return None
-    try:
-        v = int(float(str(raw).strip()))
-    except ValueError:
-        return None
-    if 1 <= v <= 120:
-        return v
-    return None
-
-
 def _normalize_import_phone(raw: str | None) -> str:
-    s = (raw or "").strip().replace(" ", "").replace("-", "")
+    s = (raw or "").strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
     return s
 
 
@@ -1684,6 +1668,95 @@ class UsersService:
             return ""
         return (raw_row.get(h) or "").strip()
 
+    def _split_csv_name(self, raw_name: str) -> tuple[str | None, str | None]:
+        cleaned = (raw_name or "").strip()
+        if not cleaned:
+            return None, None
+        parts = [p for p in cleaned.split() if p]
+        if len(parts) == 1:
+            return parts[0], "Unknown"
+        return parts[0], " ".join(parts[1:])
+
+    def _normalize_gender_label(self, raw_gender: str | None) -> str | None:
+        g = (raw_gender or "").strip().lower()
+        if not g:
+            return None
+        if g in {"1", "male", "m"}:
+            return "Male"
+        if g in {"2", "female", "f"}:
+            return "Female"
+        return raw_gender
+
+    async def _get_or_create_user_from_metsights_profile(
+        self,
+        db: AsyncSession,
+        *,
+        profile_id: str,
+        csv_name: str,
+        csv_phone: str,
+        profile_data: dict[str, Any],
+        engagement_code: str | None,
+    ) -> User:
+        profile_phone = _normalize_import_phone(str(profile_data.get("phone") or ""))
+        profile_email_raw = str(profile_data.get("email") or "").strip()
+        profile_email = profile_email_raw if profile_email_raw and "@" in profile_email_raw else None
+        first_name = str(profile_data.get("first_name") or "").strip() or None
+        last_name = str(profile_data.get("last_name") or "").strip() or None
+        if not first_name or not last_name:
+            csv_first, csv_last = self._split_csv_name(csv_name)
+            first_name = first_name or csv_first
+            last_name = last_name or csv_last
+        gender = self._normalize_gender_label(str(profile_data.get("gender") or "").strip()) or None
+        age_value = profile_data.get("age")
+        try:
+            age = int(age_value) if age_value is not None else 30
+        except (TypeError, ValueError):
+            age = 30
+        if age < 1 or age > 120:
+            age = 30
+
+        dob_value = profile_data.get("date_of_birth")
+        dob = None
+        if isinstance(dob_value, str) and dob_value.strip():
+            try:
+                dob = date.fromisoformat(dob_value.strip())
+            except ValueError:
+                dob = None
+
+        normalized_csv_phone = _normalize_import_phone(csv_phone)
+        normalized_phone = profile_phone or normalized_csv_phone
+        if len(normalized_phone) < 5:
+            raise AppError(status_code=422, error_code="INVALID_INPUT", message="Invalid or missing phone")
+
+        existing = await self._repository.get_user_by_metsights_profile_id(db, profile_id)
+        if existing is None:
+            existing = await self._repository.get_user_by_phone(db, normalized_phone)
+        if existing is None and profile_email is not None:
+            existing = await self._repository.get_user_by_email(db, profile_email)
+
+        patch_data = {
+            "first_name": first_name,
+            "last_name": last_name,
+            "age": age,
+            "email": profile_email,
+            "date_of_birth": dob,
+            "gender": gender,
+            "referred_by": engagement_code or None,
+            "is_participant": True,
+            "metsights_profile_id": profile_id,
+        }
+        create_data = {
+            **patch_data,
+            "phone": normalized_phone,
+            "status": "active",
+        }
+
+        if existing is None:
+            user = User(**create_data)
+            return await self._repository.create_user(db, user)
+
+        return await self._repository.update_user_partial(db, existing.user_id, patch_data)
+
     async def _import_one_metsights_csv_row(
         self,
         db: AsyncSession,
@@ -1702,67 +1775,67 @@ class UsersService:
         def _out(status: str, reason: str = "") -> dict[str, str]:
             return {"status": status, "reason": reason}
 
-        metsights_id = self._metsights_csv_cell(raw_row, colmap, "id")
-        if not metsights_id:
-            return _out("failed", "Missing Metsights id")
+        csv_name = self._metsights_csv_cell(raw_row, colmap, "name")
+        csv_phone = self._metsights_csv_cell(raw_row, colmap, "number")
+        metsights_profile_id = self._metsights_csv_cell(raw_row, colmap, "metsights_profile_id")
+        metsights_record_id = self._metsights_csv_cell(raw_row, colmap, "record_id")
 
-        phone = _normalize_import_phone(self._metsights_csv_cell(raw_row, colmap, "phone"))
-        if len(phone) < 5:
-            return _out("failed", "Invalid or missing phone")
+        if not metsights_profile_id:
+            return _out("failed", "Missing metsights_profile_id")
+        if not metsights_record_id:
+            return _out("failed", "Missing record_id")
+        if not _normalize_import_phone(csv_phone):
+            return _out("failed", "Missing number")
 
-        age = _parse_csv_age(self._metsights_csv_cell(raw_row, colmap, "age"))
-        if age is None:
-            return _out("failed", "Invalid or missing age")
-
-        email_raw = self._metsights_csv_cell(raw_row, colmap, "email")
-        email = str(email_raw) if email_raw else None
-
-        first_name = self._metsights_csv_cell(raw_row, colmap, "first_name") or None
-        last_name = self._metsights_csv_cell(raw_row, colmap, "last_name") or None
-        gender_raw = self._metsights_csv_cell(raw_row, colmap, "gender")
-        gender = gender_raw or None
+        if self._metsights_service is None:
+            raise RuntimeError("Metsights service is required")
 
         if self._assessments_service is None or self._engagements_service is None:
             raise RuntimeError("Engagements and assessments services are required")
 
-        existing_ai = await self._assessments_service.get_instance_by_metsights_record_id(db, metsights_id)
+        try:
+            profile_detail = await self._metsights_service.get_profile_detail(profile_id=metsights_profile_id)
+        except AppError as exc:
+            return _out("failed", exc.message or "Failed to fetch Metsights profile")
+
+        if not isinstance(profile_detail, dict):
+            return _out("failed", "Invalid Metsights profile response")
+
+        try:
+            record_detail = await self._metsights_service.get_record_detail(record_id=metsights_record_id)
+        except AppError as exc:
+            return _out("failed", exc.message or "Failed to fetch Metsights record")
+
+        if not isinstance(record_detail, dict):
+            return _out("failed", "Invalid Metsights record response")
+
+        record_profile = record_detail.get("profile")
+        record_profile_id = str((record_profile or {}).get("id") or "").strip() if isinstance(record_profile, dict) else ""
+        if record_profile_id and record_profile_id != metsights_profile_id:
+            return _out("failed", "record_id does not belong to metsights_profile_id")
+
+        assessment_code = str(record_detail.get("assessment_code") or "").strip().upper()
+        if assessment_code and assessment_code != "MET_PRO":
+            return _out("failed", "record_id is not a MET_PRO assessment")
+
+        existing_ai = await self._assessments_service.get_instance_by_metsights_record_id(db, metsights_record_id)
         if existing_ai is not None:
             if existing_ai.engagement_id != engagement.engagement_id:
-                return _out("failed", "Metsights id already linked to another engagement")
+                return _out("failed", "record_id already linked to another engagement")
 
-        patch_data = {
-            "first_name": first_name,
-            "last_name": last_name,
-            "age": age,
-            "email": email,
-            "date_of_birth": None,
-            "gender": gender,
-            "address": None,
-            "pin_code": None,
-            "city": None,
-            "state": None,
-            "country": None,
-        }
         code = (engagement.engagement_code or "").strip()
-        create_data = {
-            **patch_data,
-            "phone": phone,
-            "referred_by": code or None,
-            "is_participant": True,
-            "status": "active",
-        }
-
-        user, _created = await self._get_or_create_user_for_onboarding(
+        user = await self._get_or_create_user_from_metsights_profile(
             db,
-            phone=phone,
-            email=email,
-            patch_data={**patch_data, "is_participant": True, "referred_by": code or None},
-            create_data=create_data,
+            profile_id=metsights_profile_id,
+            csv_name=csv_name,
+            csv_phone=csv_phone,
+            profile_data=profile_detail,
+            engagement_code=code or None,
         )
 
         if existing_ai is not None:
             if existing_ai.user_id != user.user_id:
-                return _out("failed", "Metsights id already linked to another user")
+                return _out("failed", "record_id already linked to another user")
             return _out("skipped", "Already imported for this engagement")
 
         if await self._engagements_service.user_has_slot_for_engagement(
@@ -1770,18 +1843,19 @@ class UsersService:
         ):
             return _out("skipped", "User already enrolled in this engagement")
 
-        await self._engagements_service.enroll_user_in_engagement(
+        participant = await self._engagements_service.enroll_user_in_engagement(
             db,
             engagement=engagement,
             user_id=user.user_id,
             engagement_date=slot_date,
             slot_start_time=slot_time,
             increment_participant_count=True,
-            is_profile_created_on_metsights=bool((user.metsights_profile_id or "").strip()),
+            is_profile_created_on_metsights=True,
+            is_primary_record_id_synced=False,
         )
 
         try:
-            await self._assessments_service.ensure_instance_assigned(
+            await self._assessments_service.create_instance_for_metsights_record(
                 db,
                 user_id=user.user_id,
                 engagement_id=engagement.engagement_id,
@@ -1789,10 +1863,17 @@ class UsersService:
                 ip_address=ip_address,
                 user_agent=user_agent,
                 endpoint=endpoint,
-                metsights_record_id=metsights_id,
+                metsights_record_id=metsights_record_id,
+                metsights_is_complete=bool(record_detail.get("is_complete")),
             )
         except AppError as exc:
             return _out("failed", exc.message or "Assessment assignment failed")
+
+        await self._engagements_service.update_participant_sync_flags(
+            db,
+            participant=participant,
+            is_primary_record_id_synced=True,
+        )
 
         return _out("imported", "")
 
@@ -1850,7 +1931,7 @@ class UsersService:
             if canon:
                 colmap[canon] = h
 
-        required = {"id", "phone", "age"}
+        required = {"name", "number", "metsights_profile_id", "record_id"}
         missing = required - colmap.keys()
         if missing:
             raise AppError(

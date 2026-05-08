@@ -74,6 +74,21 @@ def _validate_resource(resource: str) -> str:
 class MetsightsClient:
     """Thin HTTP client for Metsights resources."""
 
+    async def get_profile_detail(self, *, profile_id: str) -> dict[str, Any]:
+        pid = _validate_record_id(profile_id)
+        base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
+        url = f"{base_url}/profiles/{pid}/"
+        headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
+        timeout = settings.METSIGHTS_TIMEOUT_SECONDS
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                return {"detail": "Unexpected response", "data": None}
+            return payload
+
     async def get_record_resource(self, *, record_id: str, resource: str) -> dict[str, Any]:
         rid = _validate_record_id(record_id)
         res = _validate_resource(resource)

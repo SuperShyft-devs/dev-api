@@ -101,6 +101,13 @@ class UsersRepository:
         result = await db.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
 
+    async def get_user_by_metsights_profile_id(self, db: AsyncSession, metsights_profile_id: str) -> Optional[User]:
+        normalized = (metsights_profile_id or "").strip()
+        if not normalized:
+            return None
+        result = await db.execute(select(User).where(User.metsights_profile_id == normalized))
+        return result.scalar_one_or_none()
+
     async def get_profiles_as_primary(self, db: AsyncSession, user_id: int) -> list[User]:
         result = await db.execute(select(User).where(User.parent_id == user_id).order_by(User.user_id.asc()))
         return list(result.scalars().all())

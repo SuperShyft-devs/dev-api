@@ -89,13 +89,57 @@ class AuthService:
             raise ValueError("Refresh token secret is missing")
         return hmac.new(secret.encode("utf-8"), refresh_token.encode("utf-8"), hashlib.sha256).hexdigest()
 
-    async def _resolve_user_for_otp(self, db: AsyncSession, phone: str) -> Optional[User]:
+    def _phone_lookup_candidates(self, phone: str) -> list[str]:
+        raw = (phone or "").strip()
+        if not raw:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        allowed_symbols = set("0123456789+ -()")
+        if any(ch not in allowed_symbols for ch in raw):
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        digits = "".join(ch for ch in raw if ch.isdigit())
+        if len(digits) == 10:
+            base10 = digits
+        elif len(digits) == 12 and digits.startswith("91"):
+            base10 = digits[2:]
+        elif len(digits) == 11 and digits.startswith("0"):
+            base10 = digits[1:]
+        else:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        ordered = [base10, f"+91{base10}", f"91{base10}"]
+        if raw not in ordered:
+            ordered.insert(0, raw)
+        # Preserve order while de-duping.
+        return list(dict.fromkeys(ordered))
+
+    def _split_send_otp_phone(self, phone: str) -> tuple[list[str], bool]:
+        raw_phone = (phone or "").strip()
+        suffix = self._DONTSENDOTP_SUFFIX
+        lowered = raw_phone.lower()
+
+        skip_send = False
+        core = raw_phone
+        if lowered.endswith(suffix):
+            skip_send = True
+            core = raw_phone[: -len(suffix)].strip()
+        elif suffix in lowered:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        return self._phone_lookup_candidates(core), skip_send
+
+    async def _resolve_user_for_otp(self, db: AsyncSession, phone_candidates: list[str]) -> Optional[User]:
         """Pick the account that receives OTP for this phone.
 
         If any primary user has this phone, that user wins (shared family number).
         Otherwise exactly one linked profile with this phone must exist.
         """
-        rows = await self._repository.list_users_by_phone(db, phone)
+        rows_by_user_id: dict[int, User] = {}
+        for phone in phone_candidates:
+            for row in await self._repository.list_users_by_phone(db, phone):
+                rows_by_user_id[row.user_id] = row
+        rows = list(rows_by_user_id.values())
         if not rows:
             return None
         primaries = [u for u in rows if u.parent_id is None]
@@ -142,10 +186,9 @@ class AuthService:
         user_agent: str,
         endpoint: str,
     ) -> int:
-        skip_send = phone.endswith(self._DONTSENDOTP_SUFFIX)
-        lookup_phone = phone[: -len(self._DONTSENDOTP_SUFFIX)] if skip_send else phone
+        phone_candidates, skip_send = self._split_send_otp_phone(phone)
 
-        user = await self._resolve_user_for_otp(db, lookup_phone)
+        user = await self._resolve_user_for_otp(db, phone_candidates)
         if user is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
@@ -167,7 +210,8 @@ class AuthService:
         created = await self._repository.create_otp_session(db, session)
 
         if not skip_send:
-            await self._otp_sender.send_otp(lookup_phone, otp)
+            dispatch_phone = (user.phone or "").strip() or phone_candidates[0]
+            await self._otp_sender.send_otp(dispatch_phone, otp)
 
         await self._audit_service.log_event(
             db,
@@ -191,7 +235,8 @@ class AuthService:
         user_agent: str,
         endpoint: str,
     ) -> tuple[int, TokenPair]:
-        user = await self._resolve_user_for_otp(db, phone)
+        phone_candidates = self._phone_lookup_candidates(phone)
+        user = await self._resolve_user_for_otp(db, phone_candidates)
         if user is None:
             raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
 

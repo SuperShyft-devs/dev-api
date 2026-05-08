@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class SendOtpRequest(BaseModel):
-    phone: str = Field(..., min_length=10, max_length=21, pattern=r"^\d{10}(dontsendotp)?$")
+    phone: str = Field(..., min_length=10, max_length=32)
 
 
 class SendOtpResponse(BaseModel):

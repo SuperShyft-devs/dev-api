@@ -10,6 +10,7 @@ from sqlalchemy import text
 from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
+from modules.metsights.service import MetsightsService
 from modules.users.models import User
 
 
@@ -59,21 +60,40 @@ async def _seed_packages_and_engagement(
 
 def _csv_one_row(**kwargs) -> str:
     defaults = {
-        "id": "MSREC001",
-        "created": "2026-01-01",
-        "first": "Ann",
-        "last": "Bee",
-        "phone": "9876543210",
-        "email": "ann@example.com",
-        "gender": "F",
-        "age": "28",
+        "name": "Ann Bee",
+        "number": "9876543210",
+        "profile_id": "PROFILE001",
+        "record_id": "RECORD001",
     }
     defaults.update(kwargs)
     return (
-        "id,Created Date,First Name,Last Name,Phone #,Email,Gender,Age\n"
-        f"{defaults['id']},{defaults['created']},{defaults['first']},{defaults['last']},"
-        f"{defaults['phone']},{defaults['email']},{defaults['gender']},{defaults['age']}\n"
+        "name,number,metsights_profile_id,record_id\n"
+        f"{defaults['name']},{defaults['number']},{defaults['profile_id']},{defaults['record_id']}\n"
     )
+
+
+def _mock_metsights(monkeypatch):
+    async def _get_profile(self, *, profile_id: str):
+        return {
+            "id": profile_id,
+            "first_name": "Ann",
+            "last_name": "Bee",
+            "email": "ann@example.com",
+            "phone": "9876543210",
+            "gender": "Female",
+            "age": 28,
+        }
+
+    async def _get_record(self, *, record_id: str):
+        return {
+            "id": record_id,
+            "assessment_code": "MET_PRO",
+            "is_complete": False,
+            "profile": {"id": "PROFILE001"},
+        }
+
+    monkeypatch.setattr(MetsightsService, "get_profile_detail", _get_profile)
+    monkeypatch.setattr(MetsightsService, "get_record_detail", _get_record)
 
 
 @pytest.mark.asyncio
@@ -86,7 +106,8 @@ async def test_import_metsights_csv_requires_auth(async_client):
 
 
 @pytest.mark.asyncio
-async def test_import_metsights_csv_rejects_missing_dates(async_client, test_db_session):
+async def test_import_metsights_csv_rejects_missing_dates(async_client, test_db_session, monkeypatch):
+    _mock_metsights(monkeypatch)
     await _seed_employee(test_db_session, user_id=8801, employee_id=501)
     await _seed_packages_and_engagement(test_db_session, engagement_id=8801, start_date=None, end_date=None)
 
@@ -103,7 +124,8 @@ async def test_import_metsights_csv_rejects_missing_dates(async_client, test_db_
 
 
 @pytest.mark.asyncio
-async def test_import_metsights_csv_uses_end_date_when_start_null(async_client, test_db_session):
+async def test_import_metsights_csv_uses_end_date_when_start_null(async_client, test_db_session, monkeypatch):
+    _mock_metsights(monkeypatch)
     await _seed_employee(test_db_session, user_id=8802, employee_id=502)
     await _seed_packages_and_engagement(
         test_db_session, engagement_id=8802, engagement_code="IMP8802", start_date=None, end_date="2026-04-20"
@@ -112,7 +134,7 @@ async def test_import_metsights_csv_uses_end_date_when_start_null(async_client, 
     response = await async_client.post(
         "/engagements/8802/import/metsights-csv",
         headers=_auth_header(8802),
-        files={"file": ("a.csv", _csv_one_row(id="MSR1", phone="9111111111").encode("utf-8"), "text/csv")},
+        files={"file": ("a.csv", _csv_one_row(record_id="MSR1", profile_id="PROFILE001", number="9111111111").encode("utf-8"), "text/csv")},
     )
     assert response.status_code == 200
     data = response.json()["data"]
@@ -133,14 +155,15 @@ async def test_import_metsights_csv_uses_end_date_when_start_null(async_client, 
 
 
 @pytest.mark.asyncio
-async def test_import_metsights_csv_happy_path_and_record_id(async_client, test_db_session):
+async def test_import_metsights_csv_happy_path_and_record_id(async_client, test_db_session, monkeypatch):
+    _mock_metsights(monkeypatch)
     await _seed_employee(test_db_session, user_id=8803, employee_id=503)
     await _seed_packages_and_engagement(test_db_session, engagement_id=8803, engagement_code="IMP8803")
 
     response = await async_client.post(
         "/engagements/8803/import/metsights-csv",
         headers=_auth_header(8803),
-        files={"file": ("a.csv", _csv_one_row(id="MSHAPPY", phone="9222222222").encode("utf-8"), "text/csv")},
+        files={"file": ("a.csv", _csv_one_row(record_id="MSHAPPY", profile_id="PROFILE001", number="9222222222").encode("utf-8"), "text/csv")},
     )
     assert response.status_code == 200
     body = response.json()["data"]
@@ -170,8 +193,8 @@ async def test_import_metsights_csv_invalid_age_row_fails(async_client, test_db_
     await _seed_packages_and_engagement(test_db_session, engagement_id=8804, engagement_code="IMP8804")
 
     csv_bad_age = (
-        "id,Created Date,First Name,Last Name,Phone #,Email,Gender,Age\n"
-        "MSBAD,2026-01-01,X,Y,9333333333,x@y.com,M,\n"
+        "name,number,metsights_profile_id,record_id\n"
+        "X Y,,PROFILE001,MSBAD\n"
     )
     response = await async_client.post(
         "/engagements/8804/import/metsights-csv",
@@ -182,14 +205,15 @@ async def test_import_metsights_csv_invalid_age_row_fails(async_client, test_db_
     data = response.json()["data"]
     assert data["imported"] == 0
     assert data["failed"] == 1
-    assert "age" in (data["rows"][0].get("reason") or "").lower()
+    assert "number" in (data["rows"][0].get("reason") or "").lower()
 
 
 @pytest.mark.asyncio
-async def test_import_metsights_csv_idempotent_second_run(async_client, test_db_session):
+async def test_import_metsights_csv_idempotent_second_run(async_client, test_db_session, monkeypatch):
+    _mock_metsights(monkeypatch)
     await _seed_employee(test_db_session, user_id=8805, employee_id=505)
     await _seed_packages_and_engagement(test_db_session, engagement_id=8805, engagement_code="IMP8805")
-    content = _csv_one_row(id="MSIDEM", phone="9444444444").encode("utf-8")
+    content = _csv_one_row(record_id="MSIDEM", profile_id="PROFILE001", number="9444444444").encode("utf-8")
 
     r1 = await async_client.post(
         "/engagements/8805/import/metsights-csv",
@@ -209,13 +233,14 @@ async def test_import_metsights_csv_idempotent_second_run(async_client, test_db_
 
 
 @pytest.mark.asyncio
-async def test_import_metsights_csv_same_id_two_phones_conflicts(async_client, test_db_session):
+async def test_import_metsights_csv_same_id_two_phones_conflicts(async_client, test_db_session, monkeypatch):
+    _mock_metsights(monkeypatch)
     await _seed_employee(test_db_session, user_id=8806, employee_id=506)
     await _seed_packages_and_engagement(test_db_session, engagement_id=8806, engagement_code="IMP8806")
     csv_two = (
-        "id,Created Date,First Name,Last Name,Phone #,Email,Gender,Age\n"
-        "MSDUP,2026-01-01,A,B,9555555555,a@b.com,M,30\n"
-        "MSDUP,2026-01-01,C,D,9666666666,c@d.com,F,31\n"
+        "name,number,metsights_profile_id,record_id\n"
+        "A B,9555555555,PROFILE001,MSDUP\n"
+        "C D,9666666666,PROFILE001,MSDUP\n"
     )
     response = await async_client.post(
         "/engagements/8806/import/metsights-csv",
@@ -225,4 +250,5 @@ async def test_import_metsights_csv_same_id_two_phones_conflicts(async_client, t
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["imported"] == 1
-    assert data["failed"] == 1
+    assert data["failed"] == 0
+    assert data["skipped"] == 1

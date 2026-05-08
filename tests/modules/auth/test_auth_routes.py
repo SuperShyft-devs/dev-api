@@ -151,6 +151,33 @@ async def test_send_and_verify_otp_shared_phone_authenticates_parent(async_clien
 
 
 @pytest.mark.asyncio
+async def test_send_and_verify_otp_accepts_plus91_and_local_forms(async_client, test_db_session):
+    user = User(
+        user_id=9301,
+        age=31,
+        phone="+918103946120",
+        status="active",
+        email="user9301@example.com",
+        relationship="self",
+    )
+    test_db_session.add(user)
+    await test_db_session.commit()
+
+    send = await async_client.post("/auth/send-otp", json={"phone": "8103946120"})
+    assert send.status_code == 200
+
+    otp = async_client._transport.app.state.otp_sender.last_otp
+    assert otp is not None
+
+    verify = await async_client.post(
+        "/auth/verify-otp",
+        json={"phone": "+918103946120", "otp": otp},
+    )
+    assert verify.status_code == 200
+    assert verify.json()["data"]["user_id"] == 9301
+
+
+@pytest.mark.asyncio
 async def test_send_otp_ambiguous_when_multiple_linked_share_phone(async_client, test_db_session):
     parent = User(
         user_id=9205,

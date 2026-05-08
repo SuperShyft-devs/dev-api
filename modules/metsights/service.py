@@ -29,6 +29,44 @@ class MetsightsService:
                 message="Metsights integration is not configured",
             )
 
+    async def get_profile_detail(self, *, profile_id: str) -> Any:
+        """GET /profiles/:profile_id/ — profile details."""
+
+        pid = (profile_id or "").strip()
+        if not pid:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Metsights profile id is missing")
+        self._require_api_key()
+        try:
+            payload = await self._client.get_profile_detail(profile_id=pid)
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 404:
+                raise AppError(
+                    status_code=404,
+                    error_code="PROFILE_NOT_FOUND",
+                    message="Metsights profile not found",
+                ) from exc
+            if status_code == 403:
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Metsights authorization failed",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
+        envelope = MetsightsEnvelope.model_validate(payload)
+        return envelope.data
+
     async def list_profile_records(
         self,
         *,
