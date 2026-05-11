@@ -119,17 +119,31 @@ async def get_my_upcoming_slot(
     return success_response(result.model_dump())
 
 
-@router.post("/me/book-bio-ai")
-async def book_bio_ai_for_current_user(
+@router.post("/{user_id}/book-bio-ai")
+async def book_bio_ai_for_user(
+    user_id: int,
     payload: BookBioAiRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
+    employee: EmployeeContext | None = Depends(get_optional_employee),
     users_service: UsersService = Depends(get_users_service),
 ):
-    result = await users_service.book_bio_ai_for_authenticated_user(
+    """Bio AI booking for a user (self, family primary booking for a child, or staff on behalf of any user).
+
+    Creates a confirmed booking and runs fulfillment immediately. Does not create Razorpay orders or rows
+    in ``orders`` / ``order_bookings`` / ``payments``.
+
+    Response ``data`` matches ``POST /users/public/onboard`` (``user_id``, ``created``, ``is_participant``,
+    ``engagement_id``, ``engagement_code``, ``engagement_participant_id``, ``assessment_instance_id``, ``metsights_record_id``).
+    For this route ``created`` is always false (the user already exists).
+    """
+
+    result = await users_service.book_bio_ai_for_user_without_payment(
         db,
-        user=current_user,
+        current_user=current_user,
+        target_user_id=user_id,
+        employee=employee,
         payload=payload,
         ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),

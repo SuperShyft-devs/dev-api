@@ -6,7 +6,10 @@ Auth may only use it for existence checks.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from modules.employee.service import EmployeeContext
 
 import csv
 import io
@@ -14,7 +17,7 @@ import logging
 import random
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
@@ -619,6 +622,96 @@ class UsersService:
             key_id=result["key_id"],
         )
 
+    async def _create_bio_ai_bookings_without_payment(
+        self,
+        db: AsyncSession,
+        *,
+        members: list,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+        audit_user_id: int,
+        audit_action: str,
+    ) -> UserOnboardResponse:
+        """Create confirmed ``bookings`` rows, increment diagnostic counts, run Bio AI fulfillment — no Razorpay or ``orders``."""
+
+        from modules.diagnostics.models import DiagnosticPackage
+        from modules.payments.models import Booking
+        from modules.payments.services import _resolve_line_pricing
+
+        onboard: UserOnboardResponse | None = None
+
+        try:
+            for m in members:
+                row = await self._repository.get_user_by_id(db, m.user_id)
+                if row is None:
+                    raise AppError(status_code=400, error_code="INVALID_INPUT", message="User not found for line")
+
+                resolved = await _resolve_line_pricing(
+                    db, entity_type="diagnostic_package", entity_id=m.diagnostic_package_id
+                )
+                if isinstance(resolved, dict) and resolved.get("_error"):
+                    code, msg = resolved["_error"]
+                    raise AppError(status_code=code, error_code="PAYMENT_ERROR", message=msg)
+                line_paise, entity_name = resolved
+
+                meta = {
+                    "address": m.address,
+                    "pincode": m.pincode,
+                    "city": m.city,
+                    "blood_collection_date": m.blood_collection_date.isoformat(),
+                    "blood_collection_time_slot": m.blood_collection_time_slot,
+                    "diagnostic_package_id": m.diagnostic_package_id,
+                }
+
+                booking = Booking(
+                    user_id=m.user_id,
+                    entity_type="diagnostic_package",
+                    entity_id=m.diagnostic_package_id,
+                    entity_name=entity_name,
+                    booking_type="bio_ai",
+                    metadata_=meta,
+                    amount_paise=line_paise,
+                    currency="INR",
+                    status="confirmed",
+                )
+                db.add(booking)
+                await db.flush()
+
+                await db.execute(
+                    update(DiagnosticPackage)
+                    .where(DiagnosticPackage.diagnostic_package_id == booking.entity_id)
+                    .values(bookings_count=DiagnosticPackage.bookings_count + 1)
+                )
+
+                onboard = await self.fulfill_bio_ai_booking(db, booking=booking)
+                if onboard is None:
+                    raise AppError(
+                        status_code=500,
+                        error_code="FULFILLMENT_FAILED",
+                        message="Bio AI fulfillment could not complete",
+                    )
+
+            if self._audit_service is None:
+                raise RuntimeError("Audit service is required")
+            await self._audit_service.log_event(
+                db,
+                action=audit_action,
+                endpoint=endpoint,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                user_id=audit_user_id,
+                session_id=None,
+            )
+
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+
+        assert onboard is not None
+        return onboard
+
     async def book_bio_ai_batch_for_primary(
         self,
         db: AsyncSession,
@@ -664,8 +757,11 @@ class UsersService:
         db: AsyncSession,
         *,
         booking,
-    ) -> None:
-        """Post-payment fulfillment for a bio_ai booking."""
+    ) -> UserOnboardResponse | None:
+        """Post-payment fulfillment for a bio_ai booking.
+
+        Returns the same shape as public B2C onboard when successful; ``None`` if the booking user is missing.
+        """
         if self._engagements_service is None:
             raise RuntimeError("Engagements service is required")
         if self._platform_settings_service is None:
@@ -677,7 +773,7 @@ class UsersService:
         user = await self._repository.get_user_by_id(db, booking.user_id)
         if user is None:
             logger.warning("fulfill_bio_ai_booking: user_id=%s not found", booking.user_id)
-            return
+            return None
 
         if not user.is_participant:
             await self._repository.update_user_partial(db, user.user_id, {"is_participant": True})
@@ -746,8 +842,9 @@ class UsersService:
                 )
 
         ap_id = engagement.assessment_package_id
+        primary_instance = None
         if ap_id is not None:
-            await self._assessments_service.ensure_instance_assigned(
+            primary_instance = await self._assessments_service.ensure_instance_assigned(
                 db,
                 user_id=user.user_id,
                 engagement_id=engagement.engagement_id,
@@ -795,6 +892,26 @@ class UsersService:
                     "Metsights FitPrint record creation failed for user_id=%s: %s",
                     user.user_id, str(exc),
                 )
+
+        assessment_instance_id = (
+            int(primary_instance.assessment_instance_id) if primary_instance is not None else None
+        )
+        mid_out: str | None = None
+        if primary_instance is not None:
+            mid_out = (primary_instance.metsights_record_id or "").strip() or None
+        if not mid_out and metsights_record_id:
+            mid_out = (metsights_record_id or "").strip() or None
+
+        return UserOnboardResponse(
+            user_id=user.user_id,
+            created=False,
+            is_participant=True,
+            engagement_id=int(engagement.engagement_id),
+            engagement_code=engagement.engagement_code,
+            engagement_participant_id=int(time_slot.engagement_participant_id),
+            assessment_instance_id=assessment_instance_id,
+            metsights_record_id=mid_out,
+        )
 
     async def fulfill_blood_test_booking(
         self,
@@ -1397,43 +1514,65 @@ class UsersService:
             metsights_record_id=mid,
         )
 
-    async def book_bio_ai_for_authenticated_user(
+    async def book_bio_ai_for_user_without_payment(
         self,
         db: AsyncSession,
         *,
-        user: User,
+        current_user: User,
+        target_user_id: int,
+        employee: "EmployeeContext | None",
         payload: BookBioAiRequest,
         ip_address: str,
         user_agent: str,
         endpoint: str,
-    ) -> BookingPaymentResponse:
-        """B2C Bio AI booking for an existing JWT user — creates bookings + Razorpay order."""
+    ) -> UserOnboardResponse:
+        """Bio AI booking for ``target_user_id``: confirmed booking + immediate fulfillment; no payment tables."""
+
         from modules.users.schemas import BookBioAiMemberPayload
+
+        if employee is None:
+            if current_user.parent_id is not None:
+                raise AppError(
+                    status_code=403,
+                    error_code="FORBIDDEN",
+                    message="Batch booking is only available for primary accounts",
+                )
+            target = await self._get_user_bookable_by_primary(
+                db, primary_user_id=current_user.user_id, target_user_id=target_user_id
+            )
+        else:
+            target = await self._repository.get_user_by_id(db, target_user_id)
+            if target is None:
+                raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
         if self._platform_settings_service is None:
             raise RuntimeError("Platform settings service is required")
 
         _, default_diagnostic_id = await self._platform_settings_service.resolve_b2c_default_package_ids(db)
-        resolved_diagnostic = payload.diagnostic_package_id if payload.diagnostic_package_id is not None else default_diagnostic_id
+        resolved_diagnostic = (
+            payload.diagnostic_package_id if payload.diagnostic_package_id is not None else default_diagnostic_id
+        )
 
         member = BookBioAiMemberPayload(
-            user_id=user.user_id,
-            address=payload.address or user.address or "N/A",
-            pincode=payload.pincode or user.pin_code or "000000",
-            city=payload.city or user.city or "N/A",
+            user_id=target.user_id,
+            address=payload.address or target.address or "N/A",
+            pincode=payload.pincode or target.pin_code or "000000",
+            city=payload.city or target.city or "N/A",
             blood_collection_date=payload.blood_collection_date,
             blood_collection_time_slot=payload.blood_collection_time_slot,
             diagnostic_package_id=resolved_diagnostic,
         )
 
-        return await self._create_bookings_for_batch(
+        audit_action = "EMPLOYEE_BOOK_BIO_AI" if employee is not None else "USER_BOOK_BIO_AI"
+
+        return await self._create_bio_ai_bookings_without_payment(
             db,
-            actor=user,
             members=[member],
-            booking_type="bio_ai",
             ip_address=ip_address,
             user_agent=user_agent,
             endpoint=endpoint,
+            audit_user_id=current_user.user_id,
+            audit_action=audit_action,
         )
 
     async def onboard_user_for_engagement(
