@@ -365,6 +365,32 @@ class MetsightsSyncRecordsRequest(BaseModel):
     engagement_code: Optional[str] = Field(default=None, max_length=200)
 
 
+class ImportMetsightsProfilesRequest(BaseModel):
+    """Bulk import Metsights profiles into local users + B2C engagements (employee tooling)."""
+
+    metsights_profile_ids: list[str]
+
+    @validator("metsights_profile_ids")
+    def validate_profile_ids(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("metsights_profile_ids must not be empty")
+        if len(v) > 50:
+            raise ValueError("At most 50 metsights_profile_ids per request")
+        seen: set[str] = set()
+        out: list[str] = []
+        for raw in v:
+            s = (raw or "").strip()
+            if not s:
+                raise ValueError("metsights_profile_ids entries cannot be empty")
+            if s in seen:
+                continue
+            seen.add(s)
+            out.append(s)
+        if not out:
+            raise ValueError("metsights_profile_ids must not be empty")
+        return out
+
+
 class EmployeeUserListItem(BaseModel):
     user_id: int
     first_name: Optional[str] = None

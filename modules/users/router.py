@@ -22,6 +22,7 @@ from modules.users.schemas import (
     EmployeeCreateUserRequest,
     EmployeeUpdateUserRequest,
     EngagementUserOnboardRequest,
+    ImportMetsightsProfilesRequest,
     MetsightsSyncRecordsRequest,
     UpcomingSlotResponse,
     PublicUserOnboardRequest,
@@ -434,6 +435,29 @@ async def employee_create_user(
     await db.commit()
 
     return success_response({"user_id": user.user_id})
+
+
+@router.post("/import-metsights-profiles")
+@limiter.limit("5/minute")
+async def import_metsights_profiles(
+    payload: ImportMetsightsProfilesRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    users_service: UsersService = Depends(get_users_service),
+):
+    """Import Metsights profiles: upsert user, then one B2C engagement per non-FitPrint record (oldest first)."""
+
+    result = await users_service.import_metsights_profiles_by_employee(
+        db,
+        employee=employee,
+        metsights_profile_ids=payload.metsights_profile_ids,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
 
 
 @router.get("")

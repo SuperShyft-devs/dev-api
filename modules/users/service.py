@@ -25,6 +25,11 @@ from core.exceptions import AppError
 from modules.employee.models import Employee
 from modules.audit.service import AuditService
 from modules.metsights.service import MetsightsService
+from modules.metsights.sync_service import (
+    _normalize_metsights_type_code,
+    _parse_iso_date,
+    _resolve_active_diagnostic_package_id,
+)
 from modules.platform_settings.service import PlatformSettingsService
 from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
@@ -2110,3 +2115,226 @@ class UsersService:
             "failed": failed,
             "rows": rows_out,
         }
+
+    def _metsights_records_list_payload(self, data: Any) -> list[dict[str, Any]]:
+        if isinstance(data, list):
+            return [r for r in data if isinstance(r, dict)]
+        if isinstance(data, dict):
+            inner = data.get("results")
+            if isinstance(inner, list):
+                return [r for r in inner if isinstance(r, dict)]
+        return []
+
+    def _is_female_gender(self, gender: str | None) -> bool:
+        g = (gender or "").strip().lower()
+        return g in ("female", "2", "f")
+
+    async def import_metsights_profiles_by_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee,
+        metsights_profile_ids: list[str],
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict[str, Any]:
+        """Fetch Metsights profiles + records; upsert users; one B2C engagement per non-FitPrint record (oldest first)."""
+
+        self._ensure_employee_access(employee)
+        if self._metsights_service is None:
+            raise RuntimeError("Metsights service is required")
+        if self._engagements_service is None or self._assessments_service is None:
+            raise RuntimeError("Engagements and assessments services are required")
+        if self._platform_settings_service is None:
+            raise RuntimeError("Platform settings service is required")
+
+        _PEAK_DIAG_MALE = 17
+        _PEAK_DIAG_FEMALE = 24
+        default_slot = time(10, 0)
+        profiles_out: list[dict[str, Any]] = []
+
+        for profile_id in metsights_profile_ids:
+            profile_block: dict[str, Any] = {
+                "metsights_profile_id": profile_id,
+                "user_id": None,
+                "records": [],
+                "error": None,
+            }
+            try:
+                profile_detail = await self._metsights_service.get_profile_detail(profile_id=profile_id)
+            except AppError as exc:
+                profile_block["error"] = exc.message or "Failed to fetch Metsights profile"
+                profiles_out.append(profile_block)
+                continue
+
+            if not isinstance(profile_detail, dict):
+                profile_block["error"] = "Invalid Metsights profile response"
+                profiles_out.append(profile_block)
+                continue
+
+            first_name = str(profile_detail.get("first_name") or "").strip()
+            last_name = str(profile_detail.get("last_name") or "").strip()
+            csv_name = f"{first_name} {last_name}".strip() or "Participant"
+            csv_phone = str(profile_detail.get("phone") or "").strip()
+            if not csv_phone:
+                profile_block["error"] = "Metsights profile has no phone"
+                profiles_out.append(profile_block)
+                continue
+
+            user = await self._get_or_create_user_from_metsights_profile(
+                db,
+                profile_id=profile_id,
+                csv_name=csv_name,
+                csv_phone=csv_phone,
+                profile_data=profile_detail,
+                engagement_code=None,
+            )
+            profile_block["user_id"] = int(user.user_id)
+
+            try:
+                raw_records = await self._metsights_service.list_profile_records(profile_id=profile_id)
+            except AppError as exc:
+                profile_block["error"] = exc.message or "Failed to list Metsights records"
+                profiles_out.append(profile_block)
+                continue
+
+            rows = self._metsights_records_list_payload(raw_records)
+            rows.sort(
+                key=lambda r: (
+                    _parse_iso_date(r.get("date")),
+                    str(r.get("updated_at") or r.get("created_at") or ""),
+                    str(r.get("id") or ""),
+                )
+            )
+
+            for row in rows:
+                mrid = str(row.get("id") or "").strip()
+                rec_out: dict[str, Any] = {"metsights_record_id": mrid or None, "status": "", "reason": None}
+                if not mrid:
+                    rec_out["status"] = "skipped"
+                    rec_out["reason"] = "missing record id"
+                    profile_block["records"].append(rec_out)
+                    continue
+
+                existing_inst = await self._assessments_service.get_instance_by_metsights_record_id(
+                    db, metsights_record_id=mrid
+                )
+                if existing_inst is not None:
+                    rec_out["status"] = "skipped"
+                    rec_out["reason"] = "already imported"
+                    profile_block["records"].append(rec_out)
+                    continue
+
+                type_code = _normalize_metsights_type_code(row)
+                if type_code == "7":
+                    rec_out["status"] = "skipped"
+                    rec_out["reason"] = "fitprint"
+                    profile_block["records"].append(rec_out)
+                    continue
+                if not type_code:
+                    rec_out["status"] = "skipped"
+                    rec_out["reason"] = "unknown assessment type"
+                    profile_block["records"].append(rec_out)
+                    continue
+
+                package = await self._assessments_service.get_package_by_assessment_type_code(
+                    db,
+                    assessment_type_code=type_code,
+                )
+                if package is None:
+                    rec_out["status"] = "skipped"
+                    rec_out["reason"] = f"no active package for type {type_code}"
+                    profile_block["records"].append(rec_out)
+                    continue
+
+                try:
+                    record_detail = await self._metsights_service.get_record_detail(record_id=mrid)
+                except AppError as exc:
+                    rec_out["status"] = "error"
+                    rec_out["reason"] = exc.message or "Failed to fetch Metsights record"
+                    profile_block["records"].append(rec_out)
+                    continue
+
+                if not isinstance(record_detail, dict):
+                    rec_out["status"] = "error"
+                    rec_out["reason"] = "Invalid Metsights record response"
+                    profile_block["records"].append(rec_out)
+                    continue
+
+                record_profile = record_detail.get("profile")
+                record_profile_id = (
+                    str((record_profile or {}).get("id") or "").strip()
+                    if isinstance(record_profile, dict)
+                    else ""
+                )
+                if record_profile_id and record_profile_id != profile_id:
+                    rec_out["status"] = "error"
+                    rec_out["reason"] = "record does not belong to metsights_profile_id"
+                    profile_block["records"].append(rec_out)
+                    continue
+
+                diag_pref = _PEAK_DIAG_FEMALE if self._is_female_gender(user.gender) else _PEAK_DIAG_MALE
+                diag_id = await _resolve_active_diagnostic_package_id(db, diag_pref)
+                ap_id = int(package.package_id)
+                await self._platform_settings_service.ensure_active_b2c_packages(db, ap_id, diag_id)
+
+                engagement_date = _parse_iso_date(row.get("date"))
+                engagement = await self._engagements_service.create_b2c_engagement(
+                    db,
+                    user_first_name=user.first_name,
+                    engagement_date=engagement_date,
+                    city=user.city,
+                    assessment_package_id=ap_id,
+                    diagnostic_package_id=diag_id,
+                    engagement_type=EngagementKind.bio_ai,
+                    address=user.address,
+                    pincode=user.pin_code,
+                    create_profile_on_metsights=True,
+                    enroll_for_fitprint_full=False,
+                )
+
+                participant = await self._engagements_service.enroll_user_in_engagement(
+                    db,
+                    engagement=engagement,
+                    user_id=user.user_id,
+                    engagement_date=engagement_date,
+                    slot_start_time=default_slot,
+                    increment_participant_count=False,
+                    is_profile_created_on_metsights=True,
+                    is_primary_record_id_synced=False,
+                )
+
+                try:
+                    instance = await self._assessments_service.create_instance_for_metsights_record(
+                        db,
+                        user_id=user.user_id,
+                        engagement_id=engagement.engagement_id,
+                        package_id=ap_id,
+                        metsights_record_id=mrid,
+                        metsights_is_complete=bool(record_detail.get("is_complete")),
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        endpoint=endpoint,
+                    )
+                except AppError as exc:
+                    rec_out["status"] = "error"
+                    rec_out["reason"] = exc.message or "Assessment assignment failed"
+                    profile_block["records"].append(rec_out)
+                    continue
+
+                await self._engagements_service.update_participant_sync_flags(
+                    db,
+                    participant=participant,
+                    is_primary_record_id_synced=True,
+                )
+
+                rec_out["status"] = "imported"
+                rec_out["engagement_id"] = int(engagement.engagement_id)
+                rec_out["assessment_instance_id"] = int(instance.assessment_instance_id)
+                rec_out["diagnostic_package_id"] = int(diag_id)
+                profile_block["records"].append(rec_out)
+
+            profiles_out.append(profile_block)
+
+        return {"profiles": profiles_out}
