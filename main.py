@@ -26,6 +26,7 @@ from modules.support.router import router as support_router
 from modules.diagnostics.router import router as diagnostics_router
 from modules.diagnostics.healthians.router import router as healthians_router
 from modules.uploads.router import router as uploads_router
+from modules.uploads.user_pdf_router import router as user_pdf_upload_router
 from modules.reports.router import router as reports_router
 from modules.platform_settings.router import router as platform_settings_router
 from modules.payments.routes import router as payments_router
@@ -61,7 +62,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024  # 10 MB
+def _max_request_body_bytes() -> int:
+    return settings.MAX_REQUEST_BODY_MB * 1024 * 1024
 
 
 @app.middleware("http")
@@ -79,7 +81,7 @@ async def security_headers_middleware(request: Request, call_next):
 @app.middleware("http")
 async def request_size_limit_middleware(request: Request, call_next):
     content_length = request.headers.get("content-length")
-    if content_length and int(content_length) > _MAX_REQUEST_BODY_BYTES:
+    if content_length and int(content_length) > _max_request_body_bytes():
         return Response(status_code=413, content="Request body too large")
     return await call_next(request)
 
@@ -99,12 +101,29 @@ app.include_router(support_router)
 app.include_router(diagnostics_router)
 app.include_router(healthians_router)
 app.include_router(uploads_router)
+app.include_router(user_pdf_upload_router)
 app.include_router(reports_router)
 app.include_router(platform_settings_router)
 app.include_router(payments_router)
 app.include_router(bookings_router)
 app.include_router(experts_router)
 app.include_router(admin_temp_router)
+
+_media_root = Path(settings.MEDIA_ROOT)
+_media_root.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media",
+    StaticFiles(directory=str(_media_root)),
+    name="media",
+)
+
+_pdf_upload_dir = Path(__file__).resolve().parent / "static" / "pdf-upload"
+if _pdf_upload_dir.is_dir():
+    app.mount(
+        "/pdf-upload",
+        StaticFiles(directory=str(_pdf_upload_dir), html=True),
+        name="pdf-upload",
+    )
 
 _payment_test_dir = Path(__file__).resolve().parent / "static" / "payment-test"
 if _payment_test_dir.is_dir():
