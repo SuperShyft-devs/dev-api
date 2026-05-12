@@ -55,6 +55,24 @@ _SYNC_IDLE = "idle"
 _SYNC_IN_PROGRESS = "in_progress"
 _SYNC_FAILED = "failed"
 
+_BIO_AI_METSIGHTS_REPORT_URL_OVERRIDES: dict[str, str] = {
+    "https://storages.metsights.com/reports/D6E1178CCA4F488C_Deepa_Gupta_MHR.pdf": (
+        "https://api.supershyft.com/media/bio-ai/141a9b846e254200995dcbdcc1596ea5.pdf"
+    ),
+    "https://storages.metsights.com/reports/4334065C1F6F4027_Ms_Manali_Bhojwani_MHR.pdf": (
+        "https://api.supershyft.com/media/bio-ai/f2d73e35010d4eadbf38c2ca5c4e34c9.pdf"
+    ),
+    "https://storages.metsights.com/reports/5890D12E4C024F2D_Apoorv_Jain_MHR.pdf": (
+        "https://api.supershyft.com/media/bio-ai/91fd557d121f4768b8ad03d2e57ef0d3.pdf"
+    ),
+    "https://storages.metsights.com/reports/46D0D007925941B7_Kuldeep_Chobey_MHR.pdf": (
+        "https://api.supershyft.com/media/bio-ai/c7e12326b7ca4dbfa5b58dce6af5b3cd.pdf"
+    ),
+    "https://storages.metsights.com/reports/A45996FC284642C5_Akash_Gupta_MHR.pdf": (
+        "https://api.supershyft.com/media/bio-ai/9e529ee782984068813c511f7b944e26.pdf"
+    ),
+}
+
 
 class ReportsService:
     """Business logic for report retrieval and caching."""
@@ -434,7 +452,8 @@ class ReportsService:
                 user_id=user_id,
                 session_id=None,
             )
-            return BioAiPdfResponse(assessment_id=assessment_id, report_url=cached.strip())
+            report_url = _BIO_AI_METSIGHTS_REPORT_URL_OVERRIDES.get(cached.strip(), cached.strip())
+            return BioAiPdfResponse(assessment_id=assessment_id, report_url=report_url)
 
         record_id = (assessment_instance.metsights_record_id or "").strip()
         if not record_id:
@@ -456,7 +475,7 @@ class ReportsService:
                 error_code="INVALID_STATE",
                 message="Metsights did not return a PDF URL for this record",
             )
-        report_url = file_url.strip()
+        report_url = _BIO_AI_METSIGHTS_REPORT_URL_OVERRIDES.get(file_url.strip(), file_url.strip())
 
         if existing_report is None:
             report = IndividualHealthReport(
