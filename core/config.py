@@ -96,6 +96,10 @@ class Settings:
     HEALTHIANS_API_KEY: str = os.getenv("HEALTHIANS_API_KEY", "")
     HEALTHIANS_SECRET_KEY: str = os.getenv("HEALTHIANS_SECRET_KEY", "")
 
+    # Notification service (n8n webhooks)
+    NOTIFICATION_SERVICE_BASE_URL: str = os.getenv("NOTIFICATION_SERVICE_BASE_URL", "https://n8n.supershyft.com")
+    NOTIFICATION_SERVICE_TIMEOUT_SECONDS: int = int(os.getenv("NOTIFICATION_SERVICE_TIMEOUT_SECONDS", "15"))
+
     # Razorpay (server-side secret; never expose RAZORPAY_KEY_SECRET to clients)
     RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")
     RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")

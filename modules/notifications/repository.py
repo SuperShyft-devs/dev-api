@@ -1,0 +1,177 @@
+"""Notifications repository.
+
+Only database queries live here.
+"""
+
+from __future__ import annotations
+
+from sqlalchemy import func, select, update as sql_update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from modules.assessments.models import AssessmentInstance, AssessmentPackage
+from modules.notifications.models import Notification, NotificationService
+from modules.users.models import User
+
+
+class NotificationsRepository:
+    """Notification database queries."""
+
+    # ── NotificationService CRUD ────────────────────────────────────────
+
+    async def get_service_by_key(
+        self, db: AsyncSession, *, service_key: str
+    ) -> NotificationService | None:
+        result = await db.execute(
+            select(NotificationService).where(NotificationService.service_key == service_key)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_service_by_id(
+        self, db: AsyncSession, *, notification_service_id: int
+    ) -> NotificationService | None:
+        result = await db.execute(
+            select(NotificationService).where(
+                NotificationService.notification_service_id == notification_service_id
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def list_services(self, db: AsyncSession) -> list[NotificationService]:
+        result = await db.execute(
+            select(NotificationService).order_by(NotificationService.notification_service_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def create_service(
+        self, db: AsyncSession, service: NotificationService
+    ) -> NotificationService:
+        db.add(service)
+        await db.flush()
+        return service
+
+    async def update_service(
+        self, db: AsyncSession, service: NotificationService
+    ) -> NotificationService:
+        db.add(service)
+        await db.flush()
+        return service
+
+    # ── Notification CRUD ───────────────────────────────────────────────
+
+    async def create_notification(
+        self, db: AsyncSession, notification: Notification
+    ) -> Notification:
+        db.add(notification)
+        await db.flush()
+        return notification
+
+    async def get_notification_by_id(
+        self, db: AsyncSession, *, notification_id: int
+    ) -> Notification | None:
+        result = await db.execute(
+            select(Notification).where(Notification.notification_id == notification_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def update_notification(
+        self,
+        db: AsyncSession,
+        *,
+        notification_id: int,
+        values: dict,
+    ) -> None:
+        await db.execute(
+            sql_update(Notification)
+            .where(Notification.notification_id == notification_id)
+            .values(**values)
+        )
+        await db.flush()
+
+    async def list_notifications(
+        self,
+        db: AsyncSession,
+        *,
+        page: int,
+        limit: int,
+        status: str | None = None,
+        service_key: str | None = None,
+        user_id: int | None = None,
+        engagement_id: int | None = None,
+    ) -> list[Notification]:
+        offset = (page - 1) * limit
+        query = (
+            select(Notification)
+            .order_by(Notification.notification_id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        if status:
+            query = query.where(Notification.status == status)
+        if service_key:
+            query = query.where(Notification.service_key == service_key)
+        if user_id is not None:
+            query = query.where(Notification.user_id == user_id)
+        if engagement_id is not None:
+            query = query.where(Notification.engagement_id == engagement_id)
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+    async def count_notifications(
+        self,
+        db: AsyncSession,
+        *,
+        status: str | None = None,
+        service_key: str | None = None,
+        user_id: int | None = None,
+        engagement_id: int | None = None,
+    ) -> int:
+        query = select(func.count()).select_from(Notification)
+        if status:
+            query = query.where(Notification.status == status)
+        if service_key:
+            query = query.where(Notification.service_key == service_key)
+        if user_id is not None:
+            query = query.where(Notification.user_id == user_id)
+        if engagement_id is not None:
+            query = query.where(Notification.engagement_id == engagement_id)
+        result = await db.execute(query)
+        return int(result.scalar_one())
+
+    # ── User & Assessment helpers ───────────────────────────────────────
+
+    async def get_user_by_id(self, db: AsyncSession, *, user_id: int) -> User | None:
+        result = await db.execute(select(User).where(User.user_id == user_id))
+        return result.scalar_one_or_none()
+
+    async def get_assessment_instance_by_record_id(
+        self, db: AsyncSession, *, metsights_record_id: str
+    ) -> AssessmentInstance | None:
+        rid = (metsights_record_id or "").strip()
+        if not rid:
+            return None
+        result = await db.execute(
+            select(AssessmentInstance)
+            .where(AssessmentInstance.metsights_record_id == rid)
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_latest_metsights_instance_for_user(
+        self, db: AsyncSession, *, user_id: int
+    ) -> AssessmentInstance | None:
+        """Pick the latest metsights pro/basic assessment instance for the user."""
+        result = await db.execute(
+            select(AssessmentInstance)
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .where(AssessmentInstance.user_id == user_id)
+            .where(AssessmentInstance.metsights_record_id.isnot(None))
+            .where(AssessmentInstance.metsights_record_id != "")
+            .where(
+                func.lower(AssessmentPackage.assessment_type_code).in_(
+                    ["metsights_pro", "metsights_basic"]
+                )
+            )
+            .order_by(AssessmentInstance.assessment_instance_id.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()

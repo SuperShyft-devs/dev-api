@@ -33,6 +33,7 @@ from modules.payments.routes import router as payments_router
 from modules.bookings.router import router as bookings_router
 from modules.experts.router import router as experts_router
 from modules.admin_temp.router import router as admin_temp_router
+from modules.notifications.router import router as notifications_router
 
 # Configure logging
 configure_logging()
@@ -108,6 +109,7 @@ app.include_router(payments_router)
 app.include_router(bookings_router)
 app.include_router(experts_router)
 app.include_router(admin_temp_router)
+app.include_router(notifications_router)
 
 _media_root = Path(settings.MEDIA_ROOT)
 _media_root.mkdir(parents=True, exist_ok=True)
