@@ -179,6 +179,7 @@ class SeedDiagPackage:
     price: Decimal | None
     original_price: Decimal | None
     is_most_popular: bool
+    complementary_nutritionist: bool = False
     gender_suitability: str | None
 
 
@@ -252,6 +253,7 @@ async def upsert_diagnostic_packages(
         row.price = seed.price
         row.original_price = seed.original_price
         row.is_most_popular = seed.is_most_popular
+        row.complementary_nutritionist = seed.complementary_nutritionist
         row.gender_suitability = seed.gender_suitability
 
 
@@ -320,6 +322,10 @@ async def upsert_diagnostic_packages_from_csv(session: AsyncSession, csv_path: P
             imp = raw.get("is_most_popular")
             row.is_most_popular = (
                 _bool_cell(imp) if imp is not None and str(imp).strip() != "" else False
+            )
+            comp = raw.get("complementary_nutritionist")
+            row.complementary_nutritionist = (
+                _bool_cell(comp) if comp is not None and str(comp).strip() != "" else False
             )
             row.gender_suitability = _str_or_none(raw.get("gender_suitability"))
 
