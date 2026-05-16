@@ -1,7 +1,7 @@
 """Create notification_services and notifications tables.
 
-Revision ID: 0045_notifications_module
-Revises: 0044_booking_meta_col_drop
+Revision ID: 0046_notifications_module
+Revises: 0045_comp_nutritionist
 """
 
 from __future__ import annotations
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision = "0045_notifications_module"
-down_revision = "0044_booking_meta_col_drop"
+revision = "0046_notifications_module"
+down_revision = "0045_comp_nutritionist"
 branch_labels = None
 depends_on = None
 
