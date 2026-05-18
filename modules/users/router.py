@@ -502,6 +502,7 @@ async def employee_list_users(
                 "city": user.city,
                 "status": user.status,
                 "is_participant": user.is_participant,
+                "metsights_profile_id": user.metsights_profile_id,
                 "created_at": user.created_at,
                 "updated_at": user.updated_at,
             }

@@ -403,5 +403,6 @@ class EmployeeUserListItem(BaseModel):
     city: Optional[str] = None
     status: Optional[str] = None
     is_participant: Optional[bool] = None
+    metsights_profile_id: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
