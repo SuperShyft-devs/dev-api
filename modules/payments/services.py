@@ -6,7 +6,7 @@ import asyncio
 import hashlib
 import hmac
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -131,6 +131,66 @@ class PaymentsService:
             if not is_self and not is_family:
                 return {"_error": (403, "Not authorized to create orders for this user")}
 
+            # ── Idempotency: reuse an order from THIS session only ──
+            # Only reuse orders that:
+            #   1. Have status = "created"   (never attempted — not failed/dismissed)
+            #   2. Were created within the last 10 minutes  (same user session)
+            # This prevents stale orders from old sessions being permanently recycled,
+            # while still deduplicating the rapid bio-ai → payments/create-order
+            # double-call that SapnaShyft makes within milliseconds.
+            requested_lines = frozenset(
+                (uid, etype.strip(), eid) for uid, etype, eid in items
+            )
+            session_cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
+            fresh_orders_result = await db.execute(
+                select(Order)
+                .where(
+                    Order.user_id == payer_user_id,
+                    Order.status == "created",          # never attempted
+                    Order.created_at >= session_cutoff,  # within this session
+                )
+                .order_by(Order.order_id.desc())
+                .limit(5)
+            )
+            fresh_orders = list(fresh_orders_result.scalars().all())
+
+            for existing_order in fresh_orders:
+                linked_booking_ids = await _booking_ids_for_order(db, existing_order)
+                linked_bookings_result = await db.execute(
+                    select(Booking).where(Booking.booking_id.in_(linked_booking_ids))
+                )
+                linked_bookings = list(linked_bookings_result.scalars().all())
+
+                # Only reuse if every booking is still pending.
+                if not all(b.status == "pending" for b in linked_bookings):
+                    continue
+
+                # Exact match on (user_id, entity_type, entity_id) set.
+                existing_lines = frozenset(
+                    (b.user_id, (b.entity_type or "").strip(), b.entity_id)
+                    for b in linked_bookings
+                )
+                if existing_lines == requested_lines:
+                    logger.info(
+                        "create_order: reusing order_id=%s (razorpay=%s) "
+                        "for payer_user_id=%s — same session, same items",
+                        existing_order.order_id,
+                        existing_order.razorpay_order_id,
+                        payer_user_id,
+                    )
+                    sorted_ids = sorted(b.booking_id for b in linked_bookings)
+                    return {
+                        "success": True,
+                        "booking_ids": sorted_ids,
+                        "booking_id": sorted_ids[0],
+                        "razorpay_order_id": existing_order.razorpay_order_id,
+                        "amount_paise": existing_order.amount_paise,
+                        "amount_rupees": rupees_from_paise(existing_order.amount_paise),
+                        "currency": existing_order.currency or "INR",
+                        "key_id": settings.RAZORPAY_KEY_ID,
+                    }
+            # ── No reusable session order — create fresh bookings + Razorpay order ──
+
             bookings_created: list[Booking] = []
             total_paise = 0
 
@@ -219,6 +279,7 @@ class PaymentsService:
             logger.exception("create_order failed: %s", exc)
             await db.rollback()
             return {"_error": (500, "Internal server error")}
+
 
     async def verify_payment(
         self,
@@ -367,7 +428,26 @@ class PaymentsService:
             db.add(payment_row)
 
             order_row.status = "attempted"
-            order_row.updated_at = datetime.now(timezone.utc)
+            now_ts = datetime.now(timezone.utc)
+            order_row.updated_at = now_ts
+
+            # Mark all linked pending bookings as "failed" so the idempotency
+            # check in create_order does NOT reuse them on the next attempt.
+            # This ensures every new booking session after a failure creates a
+            # fresh booking row (visible as Pending → Awaiting in the admin).
+            failed_booking_ids = await _booking_ids_for_order(db, order_row)
+            if failed_booking_ids:
+                await db.execute(
+                    update(Booking)
+                    .where(Booking.booking_id.in_(failed_booking_ids))
+                    .where(Booking.status == "pending")
+                    .values(status="failed", updated_at=now_ts)
+                )
+                logger.info(
+                    "record_failure: marked %d booking(s) as failed for order_id=%s",
+                    len(failed_booking_ids),
+                    order_row.order_id,
+                )
 
             await db.commit()
 
@@ -386,21 +466,77 @@ class PaymentsService:
         *,
         bookings: list[Booking],
     ) -> None:
-        """Execute post-payment fulfillment for bookings that have a booking_type."""
-        fulfillment_bookings = [b for b in bookings if (b.booking_type or "").strip()]
-        if not fulfillment_bookings:
-            return
+        """Execute post-payment fulfillment for bookings.
 
+        When a booking has no booking_type (created by the direct
+        /payments/create-order route), we search for a "companion" booking — a
+        recently created booking for the same user + entity that was submitted via
+        /book/bio-ai and therefore carries a booking_type and full collection
+        metadata.  We use a lightweight proxy so the persisted booking row is not
+        mutated.
+        """
         from modules.users.dependencies import get_users_service
 
         users_service = get_users_service()
-        for booking in fulfillment_bookings:
+
+        for booking in bookings:
             try:
                 bt = (booking.booking_type or "").strip()
+                effective_booking = booking
+
+                # ── Resolve missing booking_type / metadata via companion booking ──────
+                if not bt and booking.entity_type == "diagnostic_package":
+                    companion_result = await db.execute(
+                        select(Booking)
+                        .where(
+                            Booking.user_id == booking.user_id,
+                            Booking.entity_type == "diagnostic_package",
+                            Booking.entity_id == booking.entity_id,
+                            Booking.booking_type.isnot(None),
+                            Booking.booking_type != "",
+                            Booking.booking_id != booking.booking_id,
+                        )
+                        .order_by(Booking.booking_id.desc())
+                        .limit(1)
+                    )
+                    companion = companion_result.scalar_one_or_none()
+                    if companion is not None:
+                        companion_meta = companion.metadata_ or {}
+                        if companion_meta.get("blood_collection_date"):
+                            resolved_bt = (companion.booking_type or "").strip()
+                            logger.info(
+                                "post_payment_fulfillment: booking_id=%s has no booking_type; "
+                                "using companion booking_id=%s (bt=%r)",
+                                booking.booking_id, companion.booking_id, resolved_bt,
+                            )
+
+                            class _BookingProxy:
+                                """Proxy that overrides booking_type and metadata_ only."""
+
+                                def __init__(self, base: Booking, booking_type: str, metadata_: dict) -> None:  # noqa: E501
+                                    self._base = base
+                                    self.booking_type = booking_type
+                                    self.metadata_ = metadata_
+
+                                def __getattr__(self, name: str):  # type: ignore[override]
+                                    return getattr(self._base, name)
+
+                            effective_booking = _BookingProxy(booking, resolved_bt, companion_meta)  # type: ignore[assignment]
+                            bt = resolved_bt
+
+                # ── Skip entirely if we still have no booking_type ───────────────────
+                if not bt:
+                    logger.warning(
+                        "post_payment_fulfillment: booking_id=%s has no booking_type "
+                        "and no companion booking with metadata was found; skipping",
+                        booking.booking_id,
+                    )
+                    continue
+
                 if bt == "bio_ai":
-                    await users_service.fulfill_bio_ai_booking(db, booking=booking)
+                    await users_service.fulfill_bio_ai_booking(db, booking=effective_booking)
                 elif bt == "blood_test":
-                    await users_service.fulfill_blood_test_booking(db, booking=booking)
+                    await users_service.fulfill_blood_test_booking(db, booking=effective_booking)
                 else:
                     logger.warning(
                         "Unknown booking_type=%r for booking_id=%s; skipping fulfillment",
