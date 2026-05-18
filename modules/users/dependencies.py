@@ -8,6 +8,7 @@ from modules.assessments.dependencies import get_assessments_service
 from modules.assessments.repository import AssessmentsRepository
 from modules.engagements.dependencies import get_engagements_service
 from modules.metsights.dependencies import get_metsights_service
+from modules.notifications.dependencies import get_notifications_service
 from modules.questionnaire.dependencies import get_questionnaire_user_service
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.platform_settings.dependencies import get_platform_settings_service_readonly
@@ -29,6 +30,7 @@ def get_users_service() -> UsersService:
         platform_settings_service=get_platform_settings_service_readonly(),
         metsights_service=get_metsights_service(),
         payments_service=PaymentsService(),
+        notifications_service=get_notifications_service(),
     )
 
 

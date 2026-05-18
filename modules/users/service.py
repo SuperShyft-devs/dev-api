@@ -116,6 +116,7 @@ class UsersService:
         platform_settings_service: PlatformSettingsService | None = None,
         metsights_service: MetsightsService | None = None,
         payments_service=None,
+        notifications_service=None,
     ):
         self._repository = repository
         self._audit_service = audit_service
@@ -124,6 +125,7 @@ class UsersService:
         self._platform_settings_service = platform_settings_service
         self._metsights_service = metsights_service
         self._payments_service = payments_service
+        self._notifications_service = notifications_service
 
     async def get_existing_user_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
         return await self._repository.get_user_by_phone(db, phone)
@@ -1373,6 +1375,71 @@ class UsersService:
         user = await self._repository.patch_missing_fields(db, user=existing, data=patch_data)
         return user, False
 
+    async def _notify_onboarding_assistants(
+        self,
+        db: AsyncSession,
+        *,
+        engagement,
+        payload,
+        source: str,
+    ) -> None:
+        """Fire-and-forget: send booking-alert-whatsapp to each onboarding assistant."""
+        if self._notifications_service is None or self._engagements_service is None:
+            return
+
+        try:
+            from modules.notifications.schemas import DispatchRequest
+
+            assistant_user_ids = await self._engagements_service.list_onboarding_assistant_user_ids(
+                db, engagement_id=engagement.engagement_id
+            )
+            if not assistant_user_ids:
+                return
+
+            first_name = getattr(payload, "first_name", None) or ""
+            last_name = getattr(payload, "last_name", None) or ""
+            name = f"{first_name} {last_name}".strip()
+            email_val = getattr(payload, "email", None)
+            email_str = str(email_val) if email_val else ""
+            collection_date = str(getattr(payload, "blood_collection_date", ""))
+            collection_time = str(getattr(payload, "blood_collection_time_slot", ""))
+
+            participant_details = {
+                "name": name,
+                "email": email_str,
+                "collection_date": collection_date,
+                "collection_time": collection_time,
+                "engagement": source,
+            }
+
+            for uid in assistant_user_ids:
+                try:
+                    dispatch_payload = DispatchRequest(
+                        service_key="booking-alert-whatsapp",
+                        user_id=uid,
+                        engagement_id=None,
+                        record_id=None,
+                        participant_details=participant_details,
+                    )
+                    await self._notifications_service.dispatch(
+                        db,
+                        payload=dispatch_payload,
+                        triggered_by_user_id=uid,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Onboarding assistant notification failed for user_id=%s engagement_id=%s: %s",
+                        uid,
+                        engagement.engagement_id,
+                        str(exc),
+                    )
+        except Exception as exc:
+            logger.warning(
+                "Onboarding assistant notification batch failed for engagement_id=%s: %s",
+                engagement.engagement_id,
+                str(exc),
+            )
+
     async def public_onboard_user(
         self,
         db: AsyncSession,
@@ -1515,6 +1582,13 @@ class UsersService:
             user_agent=user_agent,
             user_id=user.user_id,
             session_id=None,
+        )
+
+        await self._notify_onboarding_assistants(
+            db,
+            engagement=engagement,
+            payload=payload,
+            source="public",
         )
 
         mid = (assessment_instance.metsights_record_id or "").strip() or None
@@ -1802,6 +1876,13 @@ class UsersService:
             user_agent=user_agent,
             user_id=user.user_id,
             session_id=None,
+        )
+
+        await self._notify_onboarding_assistants(
+            db,
+            engagement=engagement,
+            payload=payload,
+            source=code,
         )
 
         mid = (assessment_instance.metsights_record_id or "").strip() or None

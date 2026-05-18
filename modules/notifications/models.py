@@ -19,6 +19,7 @@ class NotificationService(Base):
     webhook_path = Column(String, nullable=False)
     is_active = Column(Boolean, nullable=False, server_default="true")
     require_record_id = Column(Boolean, nullable=False, server_default="true")
+    require_participant_detail = Column(Boolean, nullable=False, server_default="false")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 

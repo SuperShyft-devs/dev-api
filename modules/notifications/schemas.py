@@ -10,6 +10,7 @@ class DispatchRequest(BaseModel):
     user_id: int
     engagement_id: int | None = None
     record_id: str | None = None
+    participant_details: dict | None = None
 
 
 class CallbackRequest(BaseModel):
@@ -25,6 +26,7 @@ class NotificationServiceCreate(BaseModel):
     webhook_path: str = Field(..., min_length=1)
     is_active: bool = True
     require_record_id: bool = True
+    require_participant_detail: bool = False
 
 
 class NotificationServiceUpdate(BaseModel):
@@ -33,3 +35,4 @@ class NotificationServiceUpdate(BaseModel):
     webhook_path: str | None = None
     is_active: bool | None = None
     require_record_id: bool | None = None
+    require_participant_detail: bool | None = None

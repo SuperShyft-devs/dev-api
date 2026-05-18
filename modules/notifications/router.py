@@ -48,6 +48,7 @@ def _service_dict(s) -> dict:
         "webhook_path": s.webhook_path,
         "is_active": s.is_active,
         "require_record_id": s.require_record_id,
+        "require_participant_detail": s.require_participant_detail,
         "created_at": s.created_at.isoformat() if s.created_at else None,
     }
 

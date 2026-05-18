@@ -297,6 +297,26 @@ class EngagementsRepository:
         result = await db.execute(query)
         return list(result.scalars().all())
 
+    async def list_onboarding_assistant_user_ids(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> list[int]:
+        """Return user_ids for all onboarding assistants assigned to an engagement."""
+        from modules.employee.models import Employee
+
+        query = (
+            select(Employee.user_id)
+            .join(
+                OnboardingAssistantAssignment,
+                OnboardingAssistantAssignment.employee_id == Employee.employee_id,
+            )
+            .where(OnboardingAssistantAssignment.engagement_id == engagement_id)
+        )
+        result = await db.execute(query)
+        return [int(uid) for uid in result.scalars().all()]
+
     async def create_onboarding_assistant_assignment(
         self,
         db: AsyncSession,

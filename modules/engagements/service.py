@@ -20,7 +20,7 @@ from modules.assessments.repository import AssessmentsRepository
 from modules.audit.service import AuditService
 from modules.checklists.schemas import ChecklistReadiness
 from modules.employee.service import EmployeeContext
-from modules.engagements.models import Engagement, EngagementKind, EngagementParticipant
+from modules.engagements.models import Engagement, EngagementKind, EngagementParticipant, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.schemas import EngagementCreateRequest, EngagementUpdateRequest
 from modules.organizations.repository import OrganizationsRepository
@@ -38,6 +38,7 @@ def _generate_engagement_code(length: int = 8) -> str:
 
 _ALLOWED_ENGAGEMENT_STATUS = {"active", "inactive", "archived"}
 DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID = 1
+_B2C_DEFAULT_ONBOARDING_ASSISTANT_EMPLOYEE_IDS = (1, 8)
 
 
 def _normalize_status(value: str | None) -> str:
@@ -415,7 +416,27 @@ class EngagementsService:
             create_profile_on_metsights=create_profile_on_metsights,
             enroll_for_fitprint_full=enroll_for_fitprint_full,
         )
-        return await self._repository.create_engagement(db, engagement)
+        engagement = await self._repository.create_engagement(db, engagement)
+
+        for emp_id in _B2C_DEFAULT_ONBOARDING_ASSISTANT_EMPLOYEE_IDS:
+            assignment = OnboardingAssistantAssignment(
+                engagement_id=engagement.engagement_id,
+                employee_id=emp_id,
+            )
+            await self._repository.create_onboarding_assistant_assignment(db, assignment)
+
+        return engagement
+
+    async def list_onboarding_assistant_user_ids(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> list[int]:
+        """Return user_ids of all onboarding assistants for an engagement."""
+        return await self._repository.list_onboarding_assistant_user_ids(
+            db, engagement_id=engagement_id
+        )
 
     async def user_has_slot_for_engagement(
         self,

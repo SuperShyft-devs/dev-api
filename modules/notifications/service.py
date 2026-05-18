@@ -76,6 +76,13 @@ class NotificationsService:
                 message="This service requires a record_id but none was found",
             )
 
+        if svc.require_participant_detail and not payload.participant_details:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="This service requires participant_details but none were provided",
+            )
+
         notification = Notification(
             service_key=svc.service_key,
             status="pending",
@@ -97,6 +104,8 @@ class NotificationsService:
             "email": user.email or "",
             "record_id": record_id,
         }
+        if payload.participant_details:
+            webhook_payload["participant_details"] = payload.participant_details
 
         try:
             async with httpx.AsyncClient(timeout=settings.NOTIFICATION_SERVICE_TIMEOUT_SECONDS) as client:
@@ -200,6 +209,7 @@ class NotificationsService:
             webhook_path=payload.webhook_path,
             is_active=payload.is_active,
             require_record_id=payload.require_record_id,
+            require_participant_detail=payload.require_participant_detail,
         )
         return await self._repo.create_service(db, svc)
 
@@ -227,6 +237,8 @@ class NotificationsService:
             svc.is_active = payload.is_active
         if payload.require_record_id is not None:
             svc.require_record_id = payload.require_record_id
+        if payload.require_participant_detail is not None:
+            svc.require_participant_detail = payload.require_participant_detail
         return await self._repo.update_service(db, svc)
 
     async def delete_notification(
