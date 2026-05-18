@@ -931,6 +931,16 @@ class UsersService:
             raise RuntimeError("Platform settings service is required")
 
         meta = booking.metadata_ or {}
+
+        # Guard: without a collection date and time we cannot create an engagement.
+        if not meta.get("blood_collection_date") or not meta.get("blood_collection_time_slot"):
+            logger.warning(
+                "fulfill_blood_test_booking: booking_id=%s is missing blood_collection_date "
+                "or blood_collection_time_slot in metadata; skipping engagement creation",
+                getattr(booking, "booking_id", "unknown"),
+            )
+            return
+
         user = await self._repository.get_user_by_id(db, booking.user_id)
         if user is None:
             logger.warning("fulfill_blood_test_booking: user_id=%s not found", booking.user_id)
