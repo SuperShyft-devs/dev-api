@@ -174,6 +174,7 @@ class SeedDiagPackage:
     created_at: datetime | None
     report_duration_hours: int | None
     collection_type: str | None
+    health_areas_covered: str | None = None
     about_text: str | None
     bookings_count: int | None
     price: Decimal | None
@@ -248,6 +249,7 @@ async def upsert_diagnostic_packages(
             row.created_at = seed.created_at
         row.report_duration_hours = seed.report_duration_hours
         row.collection_type = seed.collection_type
+        row.health_areas_covered = seed.health_areas_covered
         row.about_text = seed.about_text
         row.bookings_count = seed.bookings_count if seed.bookings_count is not None else 0
         row.price = seed.price
@@ -313,6 +315,10 @@ async def upsert_diagnostic_packages_from_csv(session: AsyncSession, csv_path: P
                 row.created_at = created
             row.report_duration_hours = _int(raw.get("report_duration_hours"))
             row.collection_type = _str_or_none(raw.get("collection_type"))
+            health_areas = raw.get("health_areas_covered")
+            row.health_areas_covered = (
+                health_areas.strip() if health_areas and str(health_areas).strip() else None
+            )
             about = raw.get("about_text")
             row.about_text = about.strip() if about and str(about).strip() else None
             bc = raw.get("bookings_count")

@@ -325,6 +325,7 @@ class DiagnosticsService:
             no_of_tests=no_of_tests,
             report_duration_hours=row.report_duration_hours,
             collection_type=row.collection_type,
+            health_areas_covered=row.health_areas_covered,
             about_text=row.about_text,
             bookings_count=row.bookings_count,
             price=price,

@@ -1,4 +1,4 @@
-diagnostic_package_id,reference_id,package_name,diagnostic_provider,healthians_camp_id,package_info,status,created_at,report_duration_hours,collection_type,about_text,bookings_count,price,original_price,is_most_popular,complementary_nutritionist,gender_suitability,created_by_user_id
+diagnostic_package_id,reference_id,package_name,diagnostic_provider,healthians_camp_id,package_info,status,created_at,report_duration_hours,collection_type,health_areas_covered,about_text,bookings_count,price,original_price,is_most_popular,complementary_nutritionist,gender_suitability,created_by_user_id
 10,,Haemogram,,,,inactive,2026-03-25 18:31:31,,,,0,,,FALSE,,
 1,,Full Body Checkup,Healthians,,,inactive,2026-03-17 7:03:01,48,home_collection,About this package,2000,2000,5000,TRUE,both,
 13,,Female Cancer Screening,,,,active,2026-04-02 13:04:27,,home_collection,"This package is designed to support early detection of cancer risks specific to women through targeted blood markers. It focuses on identifying subtle changes in the body that may indicate early warning signs, often before symptoms appear.

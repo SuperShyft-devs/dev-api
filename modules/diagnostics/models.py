@@ -29,6 +29,7 @@ class DiagnosticPackage(Base):
     created_by_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     report_duration_hours = Column(Integer)
     collection_type = Column(String)
+    health_areas_covered = Column(String)
     about_text = Column(Text)
     bookings_count = Column(Integer, nullable=False, default=0, server_default="0")
     price = Column(Numeric(10, 2))

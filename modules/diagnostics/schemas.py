@@ -36,6 +36,7 @@ class DiagnosticPackageCreate(BaseModel):
     custom: bool = False
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
+    health_areas_covered: Optional[str] = None
     about_text: Optional[str] = None
     bookings_count: Optional[int] = None
     price: Optional[float] = None
@@ -53,6 +54,7 @@ class DiagnosticPackageUpdate(BaseModel):
     healthians_camp_id: Optional[int] = None
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
+    health_areas_covered: Optional[str] = None
     about_text: Optional[str] = None
     bookings_count: Optional[int] = None
     price: Optional[float] = None
@@ -78,6 +80,7 @@ class DiagnosticPackageResponse(BaseModel):
     no_of_tests: Optional[int] = None
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
+    health_areas_covered: Optional[str] = None
     about_text: Optional[str] = None
     bookings_count: Optional[int] = None
     price: Optional[float] = None
