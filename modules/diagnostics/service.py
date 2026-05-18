@@ -332,6 +332,7 @@ class DiagnosticsService:
             original_price=original_price,
             is_most_popular=row.is_most_popular,
             complementary_nutritionist=row.complementary_nutritionist,
+            complementary_doctor=row.complementary_doctor,
             gender_suitability=row.gender_suitability,
             package_for=row.package_for,
             status=row.status,
@@ -408,6 +409,7 @@ class DiagnosticsService:
                     discount_percent=_discount_percent(price, original_price),
                     is_most_popular=row.is_most_popular,
                     complementary_nutritionist=row.complementary_nutritionist,
+                    complementary_doctor=row.complementary_doctor,
                     gender_suitability=row.gender_suitability,
                     package_for=row.package_for,
                     status=row.status,
@@ -486,6 +488,7 @@ class DiagnosticsService:
         self._validate_package_for_field(payload)
         payload.setdefault("status", "active")
         payload.setdefault("package_for", "public")
+        payload.setdefault("complementary_doctor", False)
 
         package = DiagnosticPackage(**payload)
         package = await self._repository.create_package(db, package)

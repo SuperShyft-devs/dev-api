@@ -43,6 +43,7 @@ class DiagnosticPackageCreate(BaseModel):
     original_price: Optional[float] = None
     is_most_popular: Optional[bool] = None
     complementary_nutritionist: Optional[bool] = None
+    complementary_doctor: bool = False
     gender_suitability: Optional[str] = None
     reference_id: Optional[str] = None
     package_for: Optional[PackageForType] = None
@@ -61,6 +62,7 @@ class DiagnosticPackageUpdate(BaseModel):
     original_price: Optional[float] = None
     is_most_popular: Optional[bool] = None
     complementary_nutritionist: Optional[bool] = None
+    complementary_doctor: Optional[bool] = None
     gender_suitability: Optional[str] = None
     reference_id: Optional[str] = None
     package_for: Optional[PackageForType] = None
@@ -87,6 +89,7 @@ class DiagnosticPackageResponse(BaseModel):
     original_price: Optional[float] = None
     is_most_popular: Optional[bool] = None
     complementary_nutritionist: Optional[bool] = None
+    complementary_doctor: Optional[bool] = None
     gender_suitability: Optional[str] = None
     package_for: Optional[str] = None
     status: Optional[str] = None
@@ -394,6 +397,7 @@ class DiagnosticPackageListItem(BaseModel):
     discount_percent: Optional[int] = None
     is_most_popular: Optional[bool] = None
     complementary_nutritionist: Optional[bool] = None
+    complementary_doctor: Optional[bool] = None
     gender_suitability: Optional[str] = None
     package_for: Optional[str] = None
     status: Optional[str] = None
