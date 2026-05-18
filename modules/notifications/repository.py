@@ -5,7 +5,7 @@ Only database queries live here.
 
 from __future__ import annotations
 
-from sqlalchemy import func, select, update as sql_update
+from sqlalchemy import delete, func, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
@@ -56,6 +56,25 @@ class NotificationsRepository:
         await db.flush()
         return service
 
+    async def delete_service(self, db: AsyncSession, *, notification_service_id: int) -> int:
+        result = await db.execute(
+            delete(NotificationService).where(
+                NotificationService.notification_service_id == notification_service_id
+            )
+        )
+        await db.flush()
+        return int(result.rowcount or 0)
+
+    async def count_notifications_for_service_key(
+        self, db: AsyncSession, *, service_key: str
+    ) -> int:
+        result = await db.execute(
+            select(func.count())
+            .select_from(Notification)
+            .where(Notification.service_key == service_key)
+        )
+        return int(result.scalar_one())
+
     # ── Notification CRUD ───────────────────────────────────────────────
 
     async def create_notification(
@@ -86,6 +105,13 @@ class NotificationsRepository:
             .values(**values)
         )
         await db.flush()
+
+    async def delete_notification(self, db: AsyncSession, *, notification_id: int) -> int:
+        result = await db.execute(
+            delete(Notification).where(Notification.notification_id == notification_id)
+        )
+        await db.flush()
+        return int(result.rowcount or 0)
 
     async def list_notifications(
         self,

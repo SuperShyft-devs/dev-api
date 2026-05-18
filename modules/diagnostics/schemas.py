@@ -318,6 +318,10 @@ class ReorderPackageGroupsRequest(BaseModel):
     group_ids: list[int] = Field(min_length=1)
 
 
+class ReorderPackagesRequest(BaseModel):
+    package_ids: list[int] = Field(min_length=1)
+
+
 class AssignGroupsToPackageResponse(BaseModel):
     diagnostic_package_id: int
     added_group_ids: list[int] = Field(default_factory=list)
@@ -380,6 +384,7 @@ class DiagnosticPackageDetailResponse(DiagnosticPackageResponse):
 class DiagnosticPackageListItem(BaseModel):
     diagnostic_package_id: int
     package_name: str
+    display_order: Optional[int] = None
     healthians_camp_id: Optional[int] = None
     no_of_tests: Optional[int] = None
     report_duration_hours: Optional[int] = None

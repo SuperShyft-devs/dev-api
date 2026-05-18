@@ -87,7 +87,10 @@ class DiagnosticsRepository:
             )
             query = query.where(DiagnosticPackage.diagnostic_package_id.in_(chip_package_subquery))
 
-        query = query.order_by(DiagnosticPackage.diagnostic_package_id.desc())
+        query = query.order_by(
+            DiagnosticPackage.display_order.asc().nulls_last(),
+            DiagnosticPackage.diagnostic_package_id.desc()
+        )
         result = await db.execute(query)
         return list(result.scalars().all())
 
@@ -181,6 +184,15 @@ class DiagnosticsRepository:
             delete(DiagnosticPackage).where(DiagnosticPackage.diagnostic_package_id == package_id)
         )
         return int(result.rowcount or 0)
+
+    async def reorder_packages(self, db: AsyncSession, *, package_ids: list[int]) -> None:
+        for index, package_id in enumerate(package_ids, start=1):
+            await db.execute(
+                sql_update(DiagnosticPackage)
+                .where(DiagnosticPackage.diagnostic_package_id == package_id)
+                .values(display_order=index)
+            )
+        await db.flush()
 
     async def get_all_filter_chips(
         self,

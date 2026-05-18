@@ -40,7 +40,7 @@ class DiagnosticPackage(Base):
     status = Column(String, default="active", server_default="active")
     package_for = Column(String, nullable=False, default="public", server_default="public")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
+    display_order = Column(Integer)
     reasons = relationship(
         "DiagnosticPackageReason",
         back_populates="package",

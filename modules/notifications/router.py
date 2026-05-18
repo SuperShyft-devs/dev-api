@@ -147,3 +147,29 @@ async def update_service(
     )
     await db.commit()
     return success_response(_service_dict(service))
+
+
+@router.delete("/services/{notification_service_id}")
+async def delete_service(
+    notification_service_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    svc: NotificationsService = Depends(get_notifications_service),
+):
+    result = await svc.delete_service(
+        db, notification_service_id=notification_service_id
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.delete("/{notification_id}")
+async def delete_notification(
+    notification_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    svc: NotificationsService = Depends(get_notifications_service),
+):
+    result = await svc.delete_notification(db, notification_id=notification_id)
+    await db.commit()
+    return success_response(result)

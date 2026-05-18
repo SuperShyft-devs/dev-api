@@ -27,6 +27,7 @@ from modules.diagnostics.schemas import (
     ReasonUpdate,
     ReorderGroupTestsRequest,
     ReorderPackageGroupsRequest,
+    ReorderPackagesRequest,
     SampleCreate,
     SampleUpdate,
     HealthParameterCreate,
@@ -248,6 +249,26 @@ async def update_package_status(
     )
     await db.commit()
     return success_response(updated.model_dump())
+
+
+@router.patch("/diagnostic-packages/order")
+async def reorder_packages(
+    payload: ReorderPackagesRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.reorder_packages(
+        db,
+        employee=employee,
+        package_ids=payload.package_ids,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
 
 
 @router.delete("/diagnostic-packages/{package_id}", status_code=status.HTTP_204_NO_CONTENT)

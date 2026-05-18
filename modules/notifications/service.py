@@ -228,3 +228,48 @@ class NotificationsService:
         if payload.require_record_id is not None:
             svc.require_record_id = payload.require_record_id
         return await self._repo.update_service(db, svc)
+
+    async def delete_notification(
+        self, db: AsyncSession, *, notification_id: int
+    ) -> dict:
+        notification = await self._repo.get_notification_by_id(
+            db, notification_id=notification_id
+        )
+        if notification is None:
+            raise AppError(
+                status_code=404, error_code="NOT_FOUND", message="Notification not found"
+            )
+        deleted = await self._repo.delete_notification(db, notification_id=notification_id)
+        if deleted < 1:
+            raise AppError(
+                status_code=404, error_code="NOT_FOUND", message="Notification not found"
+            )
+        return {"notification_id": notification_id, "deleted": True}
+
+    async def delete_service(
+        self, db: AsyncSession, *, notification_service_id: int
+    ) -> dict:
+        svc = await self._repo.get_service_by_id(
+            db, notification_service_id=notification_service_id
+        )
+        if svc is None:
+            raise AppError(
+                status_code=404, error_code="NOT_FOUND", message="Service not found"
+            )
+        in_use = await self._repo.count_notifications_for_service_key(
+            db, service_key=svc.service_key
+        )
+        if in_use > 0:
+            raise AppError(
+                status_code=409,
+                error_code="CONFLICT",
+                message="Cannot delete a service that has sent notifications. Delete those notifications first.",
+            )
+        deleted = await self._repo.delete_service(
+            db, notification_service_id=notification_service_id
+        )
+        if deleted < 1:
+            raise AppError(
+                status_code=404, error_code="NOT_FOUND", message="Service not found"
+            )
+        return {"notification_service_id": notification_service_id, "deleted": True}

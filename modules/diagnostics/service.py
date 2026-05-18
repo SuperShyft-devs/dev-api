@@ -398,6 +398,7 @@ class DiagnosticsService:
                 DiagnosticPackageListItem(
                     diagnostic_package_id=row.diagnostic_package_id,
                     package_name=row.package_name,
+                    display_order=row.display_order,
                     healthians_camp_id=row.healthians_camp_id,
                     no_of_tests=n_tests,
                     report_duration_hours=row.report_duration_hours,
@@ -550,6 +551,29 @@ class DiagnosticsService:
             session_id=None,
         )
         return await self._package_response_with_test_count(db, updated)
+
+    async def reorder_packages(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        package_ids: list[int],
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+        await self._repository.reorder_packages(db, package_ids=package_ids)
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_REORDER_DIAGNOSTIC_PACKAGES",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return {"reordered": True}
 
     async def list_parameters(
         self,
