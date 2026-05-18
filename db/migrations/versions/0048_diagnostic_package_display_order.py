@@ -1,6 +1,6 @@
 """Add display_order to diagnostic_package.
 
-Revision ID: 0048_diagnostic_package_display_order
+Revision ID: 0048_dx_pkg_display_order
 Revises: 0047_health_areas_covered
 """
 
@@ -10,7 +10,9 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision = "0048_diagnostic_package_display_order"
+# NOTE: `alembic_version.version_num` is VARCHAR(32) in this project,
+# so revision ids must be <= 32 characters.
+revision = "0048_dx_pkg_display_order"
 down_revision = "0047_health_areas_covered"
 branch_labels = None
 depends_on = None
