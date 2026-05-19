@@ -194,22 +194,35 @@ class MetsightsClient:
                 return {"detail": "Unexpected response", "data": None}
             return payload
 
-    async def list_profiles(self, *, search: str | None) -> dict[str, Any]:
-        base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
-        url = f"{base_url}/profiles/"
+    async def list_profiles(
+        self,
+        *,
+        search: str | None = None,
+        page: int | None = None,
+        next_url: str | None = None,
+        timeout_seconds: int | None = None,
+    ) -> dict[str, Any]:
         headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
-        timeout = settings.METSIGHTS_TIMEOUT_SECONDS
+        timeout = timeout_seconds if timeout_seconds is not None else settings.METSIGHTS_TIMEOUT_SECONDS
 
-        params: dict[str, Any] = {}
-        if search is not None and str(search).strip() != "":
-            params["search"] = str(search).strip()
+        if next_url is not None and str(next_url).strip() != "":
+            url = str(next_url).strip()
+            params: dict[str, Any] | None = None
+        else:
+            base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
+            url = f"{base_url}/profiles/"
+            params = {}
+            if search is not None and str(search).strip() != "":
+                params["search"] = str(search).strip()
+            if page is not None and page > 0:
+                params["page"] = page
 
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(url, headers=headers, params=params)
             response.raise_for_status()
             payload = response.json()
             if not isinstance(payload, dict):
-                return {"detail": "Unexpected response", "data": None}
+                return {"detail": "Unexpected response", "data": []}
             return payload
 
     async def create_profile_record(self, *, profile_id: str, data: dict[str, Any]) -> dict[str, Any]:

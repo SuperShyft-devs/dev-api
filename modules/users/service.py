@@ -2429,3 +2429,130 @@ class UsersService:
             profiles_out.append(profile_block)
 
         return {"profiles": profiles_out}
+
+    async def get_metsights_profile_import_stats(self, db: AsyncSession) -> dict[str, int]:
+        """Local user counts plus Metsights remote total from page 1."""
+
+        if self._metsights_service is None:
+            raise RuntimeError("Metsights service is required")
+
+        local_total = await self._repository.count_users(db)
+        local_with = await self._repository.count_users_with_metsights_profile_id(db)
+        local_without = max(0, local_total - local_with)
+
+        page = await self._metsights_service.list_profiles_page(page=1)
+        metsights_total = int(page.count or 0)
+        estimated_not_imported = max(0, metsights_total - local_with)
+
+        return {
+            "local_total_users": local_total,
+            "local_with_metsights_profile_id": local_with,
+            "local_without_metsights_profile_id": local_without,
+            "metsights_total": metsights_total,
+            "estimated_not_imported": estimated_not_imported,
+        }
+
+    async def import_metsights_profiles_page(self, db: AsyncSession, *, page: int) -> dict[str, Any]:
+        """Import one Metsights profiles list page into local users (profile only, no engagements)."""
+
+        if self._metsights_service is None:
+            raise RuntimeError("Metsights service is required")
+
+        ms_page = await self._metsights_service.list_profiles_page(page=page)
+        rows = ms_page.data
+
+        profile_ids = [str(row.get("id") or "").strip() for row in rows]
+        existing_by_ms_id = await self._repository.get_users_by_metsights_profile_ids(db, profile_ids)
+
+        created = 0
+        linked = 0
+        skipped = 0
+        failed = 0
+        failures: list[dict[str, str]] = []
+        skipped_items: list[dict[str, str]] = []
+        max_detail_items = 20
+
+        for row in rows:
+            profile_id = str(row.get("id") or "").strip()
+            if not profile_id:
+                failed += 1
+                if len(failures) < max_detail_items:
+                    failures.append({"metsights_profile_id": "", "reason": "Missing profile id"})
+                continue
+
+            if profile_id in existing_by_ms_id:
+                skipped += 1
+                if len(skipped_items) < max_detail_items:
+                    existing_user = existing_by_ms_id[profile_id]
+                    skipped_items.append(
+                        {
+                            "metsights_profile_id": profile_id,
+                            "reason": (
+                                f"Already linked — local user #{existing_user.user_id} "
+                                "has this metsights_profile_id"
+                            ),
+                        }
+                    )
+                continue
+
+            first_name = str(row.get("first_name") or "").strip()
+            last_name = str(row.get("last_name") or "").strip()
+            csv_name = f"{first_name} {last_name}".strip() or "Participant"
+            csv_phone = str(row.get("phone") or "").strip()
+            if not csv_phone:
+                failed += 1
+                if len(failures) < max_detail_items:
+                    failures.append({"metsights_profile_id": profile_id, "reason": "Metsights profile has no phone"})
+                continue
+
+            profile_phone = _normalize_import_phone(csv_phone)
+            profile_email_raw = str(row.get("email") or "").strip()
+            profile_email = profile_email_raw if profile_email_raw and "@" in profile_email_raw else None
+
+            existing_before: User | None = None
+            if profile_phone:
+                existing_before = await self._repository.get_user_by_phone(db, profile_phone)
+            if existing_before is None and profile_email is not None:
+                existing_before = await self._repository.get_user_by_email(db, profile_email)
+
+            try:
+                user = await self._get_or_create_user_from_metsights_profile(
+                    db,
+                    profile_id=profile_id,
+                    csv_name=csv_name,
+                    csv_phone=csv_phone,
+                    profile_data=row,
+                    engagement_code=None,
+                )
+            except AppError as exc:
+                failed += 1
+                if len(failures) < max_detail_items:
+                    failures.append(
+                        {"metsights_profile_id": profile_id, "reason": exc.message or "Import failed"}
+                    )
+                continue
+            except Exception as exc:
+                failed += 1
+                if len(failures) < max_detail_items:
+                    failures.append({"metsights_profile_id": profile_id, "reason": str(exc)})
+                continue
+
+            existing_by_ms_id[profile_id] = user
+            if existing_before is not None:
+                linked += 1
+            else:
+                created += 1
+
+        return {
+            "page": page,
+            "page_size": len(rows),
+            "metsights_total": int(ms_page.count or 0),
+            "metsights_next": ms_page.next,
+            "metsights_previous": ms_page.previous,
+            "created": created,
+            "linked": linked,
+            "skipped": skipped,
+            "failed": failed,
+            "failures": failures,
+            "skipped_items": skipped_items,
+        }

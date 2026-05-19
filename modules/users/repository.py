@@ -53,6 +53,31 @@ class UsersRepository:
         result = await db.execute(query)
         return int(result.scalar_one())
 
+    async def count_users_with_metsights_profile_id(self, db: AsyncSession) -> int:
+        query = (
+            select(func.count())
+            .select_from(User)
+            .where(User.metsights_profile_id.isnot(None))
+            .where(User.metsights_profile_id != "")
+        )
+        result = await db.execute(query)
+        return int(result.scalar_one())
+
+    async def get_users_by_metsights_profile_ids(
+        self, db: AsyncSession, metsights_profile_ids: list[str]
+    ) -> dict[str, User]:
+        normalized = list({(mid or "").strip() for mid in metsights_profile_ids if (mid or "").strip()})
+        if not normalized:
+            return {}
+        result = await db.execute(select(User).where(User.metsights_profile_id.in_(normalized)))
+        users = list(result.scalars().all())
+        out: dict[str, User] = {}
+        for user in users:
+            key = (user.metsights_profile_id or "").strip()
+            if key:
+                out[key] = user
+        return out
+
     async def list_users(
         self,
         db: AsyncSession,

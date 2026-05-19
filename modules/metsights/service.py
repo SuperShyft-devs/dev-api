@@ -10,7 +10,7 @@ import httpx
 from core.config import settings
 from core.exceptions import AppError
 from modules.metsights.client import MetsightsClient
-from modules.metsights.schemas import MetsightsEnvelope
+from modules.metsights.schemas import MetsightsEnvelope, MetsightsProfilesPage
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +66,48 @@ class MetsightsService:
 
         envelope = MetsightsEnvelope.model_validate(payload)
         return envelope.data
+
+    async def list_profiles_page(self, *, page: int = 1) -> MetsightsProfilesPage:
+        """GET /profiles/?page=N — paginated profile list."""
+
+        if page < 1:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="page must be >= 1")
+        self._require_api_key()
+        try:
+            payload = await self._client.list_profiles(
+                page=page,
+                timeout_seconds=settings.METSIGHTS_IMPORT_TIMEOUT_SECONDS,
+            )
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 403:
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Metsights authorization failed",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
+        raw_data = payload.get("data")
+        rows = raw_data if isinstance(raw_data, list) else []
+        normalized_rows = [row for row in rows if isinstance(row, dict)]
+        return MetsightsProfilesPage(
+            detail=payload.get("detail"),
+            count=int(payload.get("count") or 0),
+            next=payload.get("next"),
+            previous=payload.get("previous"),
+            data=normalized_rows,
+        )
 
     async def list_profile_records(
         self,
