@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
@@ -74,79 +73,30 @@ class MetsightsService:
         if page < 1:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="page must be >= 1")
         self._require_api_key()
-
-        max_attempts = 5
-        payload: dict[str, Any] | None = None
-        last_status_error: httpx.HTTPStatusError | None = None
-
-        for attempt in range(1, max_attempts + 1):
-            try:
-                payload = await self._client.list_profiles(
-                    page=page,
-                    timeout_seconds=settings.METSIGHTS_IMPORT_TIMEOUT_SECONDS,
-                )
-                break
-            except httpx.HTTPStatusError as exc:
-                last_status_error = exc
-                status_code = exc.response.status_code
-                if status_code == 403:
-                    raise AppError(
-                        status_code=503,
-                        error_code="EXTERNAL_SERVICE_UNAVAILABLE",
-                        message="Metsights authorization failed",
-                    ) from exc
-                if status_code in (429, 502, 503, 504) and attempt < max_attempts:
-                    retry_after_raw = (exc.response.headers.get("Retry-After") or "").strip()
-                    if retry_after_raw.isdigit():
-                        wait_sec = min(int(retry_after_raw), 120)
-                    else:
-                        wait_sec = min(30 * attempt, 120)
-                    logger.warning(
-                        "Metsights profiles page %s returned %s; retrying in %ss (attempt %s/%s)",
-                        page,
-                        status_code,
-                        wait_sec,
-                        attempt,
-                        max_attempts,
-                    )
-                    await asyncio.sleep(wait_sec)
-                    continue
+        try:
+            payload = await self._client.list_profiles(
+                page=page,
+                timeout_seconds=settings.METSIGHTS_IMPORT_TIMEOUT_SECONDS,
+            )
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 403:
                 raise AppError(
                     status_code=503,
                     error_code="EXTERNAL_SERVICE_UNAVAILABLE",
-                    message="Metsights request failed",
+                    message="Metsights authorization failed",
                 ) from exc
-            except httpx.HTTPError as exc:
-                if attempt < max_attempts:
-                    wait_sec = min(15 * attempt, 60)
-                    logger.warning(
-                        "Metsights profiles page %s request error; retrying in %ss (attempt %s/%s): %s",
-                        page,
-                        wait_sec,
-                        attempt,
-                        max_attempts,
-                        exc,
-                    )
-                    await asyncio.sleep(wait_sec)
-                    continue
-                raise AppError(
-                    status_code=503,
-                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
-                    message="Metsights request failed",
-                ) from exc
-
-        if payload is None:
-            if last_status_error is not None:
-                raise AppError(
-                    status_code=503,
-                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
-                    message="Metsights request failed",
-                ) from last_status_error
             raise AppError(
                 status_code=503,
                 error_code="EXTERNAL_SERVICE_UNAVAILABLE",
                 message="Metsights request failed",
-            )
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
 
         raw_data = payload.get("data")
         rows = raw_data if isinstance(raw_data, list) else []
