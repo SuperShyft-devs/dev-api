@@ -16,6 +16,7 @@ import random
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
@@ -57,6 +58,19 @@ _ALWAYS_ACTIVE_EMPLOYEE_ID = 1
 def _normalize_import_phone(raw: str | None) -> str:
     s = (raw or "").strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
     return s
+
+
+def _integrity_error_reason(exc: IntegrityError) -> str:
+    orig = getattr(exc, "orig", None)
+    if orig is not None:
+        text = str(orig)
+        if "uq_users_email_global" in text or "email" in text.lower():
+            return "Email already belongs to another user"
+        if "phone" in text.lower():
+            return "Phone already belongs to another user"
+        if len(text) <= 200:
+            return text
+    return "Database constraint violation"
 
 
 class UsersService:
@@ -1933,6 +1947,22 @@ class UsersService:
             )
         return subs[0] if subs else None
 
+    async def _email_safe_for_user_update(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        candidate: str | None,
+    ) -> str | None:
+        """Return *candidate* only when no other user row already owns that email."""
+
+        if not candidate:
+            return None
+        owner = await self._repository.get_user_by_email(db, candidate)
+        if owner is None or int(owner.user_id) == int(user_id):
+            return candidate
+        return None
+
     async def _email_for_metsights_sub_profile(
         self,
         db: AsyncSession,
@@ -2004,26 +2034,38 @@ class UsersService:
         if existing is None and profile_email is not None:
             existing = await self._repository.get_user_by_email(db, profile_email)
 
-        patch_data = {
+        patch_data: dict[str, Any] = {
             "first_name": first_name,
             "last_name": last_name,
             "age": age,
-            "email": profile_email,
             "date_of_birth": dob,
             "gender": gender,
             "referred_by": engagement_code or None,
             "is_participant": True,
             "metsights_profile_id": profile_id,
         }
-        create_data = {
-            **patch_data,
-            "phone": normalized_phone,
-            "status": "active",
-        }
 
         if existing is None:
-            user = User(**create_data)
+            create_email = profile_email
+            if profile_email is not None:
+                email_owner = await self._repository.get_user_by_email(db, profile_email)
+                if email_owner is not None:
+                    create_email = None
+            user = User(
+                **patch_data,
+                email=create_email,
+                phone=normalized_phone,
+                status="active",
+            )
             return await self._repository.create_user(db, user)
+
+        safe_email = await self._email_safe_for_user_update(
+            db,
+            user_id=int(existing.user_id),
+            candidate=profile_email,
+        )
+        if safe_email is not None:
+            patch_data["email"] = safe_email
 
         existing_ms_id = (existing.metsights_profile_id or "").strip()
         if existing_ms_id and existing_ms_id != profile_id:
@@ -2051,7 +2093,9 @@ class UsersService:
                     "email": sub_email,
                 },
             )
-            updated = await self._repository.update_user_partial(db, sub.user_id, patch_data)
+            # Sub-profile email is set at create time; do not overwrite with the parent's Metsights email.
+            sub_patch = {k: v for k, v in patch_data.items() if k != "email"}
+            updated = await self._repository.update_user_partial(db, sub.user_id, sub_patch)
             return updated if updated is not None else sub
 
         return await self._repository.update_user_partial(db, existing.user_id, patch_data)
@@ -2332,12 +2376,12 @@ class UsersService:
             if profile_id in existing_by_ms_id:
                 skipped += 1
                 if len(skipped_items) < max_detail_items:
-                    existing_user = existing_by_ms_id[profile_id]
+                    linked_user_id = int(existing_by_ms_id[profile_id].user_id)
                     skipped_items.append(
                         {
                             "metsights_profile_id": profile_id,
                             "reason": (
-                                f"Already linked — local user #{existing_user.user_id} "
+                                f"Already linked — local user #{linked_user_id} "
                                 "has this metsights_profile_id"
                             ),
                         }
@@ -2370,19 +2414,30 @@ class UsersService:
                 existing_before = await self._repository.get_user_by_email(db, profile_email)
 
             try:
-                user = await self._get_or_create_user_from_metsights_profile(
-                    db,
-                    profile_id=profile_id,
-                    csv_name=csv_name,
-                    csv_phone=csv_phone,
-                    profile_data=row,
-                    engagement_code=None,
-                )
+                async with db.begin_nested():
+                    user = await self._get_or_create_user_from_metsights_profile(
+                        db,
+                        profile_id=profile_id,
+                        csv_name=csv_name,
+                        csv_phone=csv_phone,
+                        profile_data=row,
+                        engagement_code=None,
+                    )
             except AppError as exc:
                 failed += 1
                 if len(failures) < max_detail_items:
                     failures.append(
                         {"metsights_profile_id": profile_id, "reason": exc.message or "Import failed"}
+                    )
+                continue
+            except IntegrityError as exc:
+                failed += 1
+                if len(failures) < max_detail_items:
+                    failures.append(
+                        {
+                            "metsights_profile_id": profile_id,
+                            "reason": _integrity_error_reason(exc),
+                        }
                     )
                 continue
             except Exception as exc:

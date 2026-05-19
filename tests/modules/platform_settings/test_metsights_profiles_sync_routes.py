@@ -344,6 +344,71 @@ async def test_metsights_profiles_import_page_creates_subprofile_when_ms_id_alre
 
 
 @pytest.mark.asyncio
+async def test_metsights_profiles_import_page_subprofile_does_not_steal_parent_email(
+    async_client, test_db_session, monkeypatch
+):
+    """Second Metsights profile on same phone must not assign the parent's email to the sub-profile."""
+
+    uid = 9213
+    await _seed_employee(test_db_session, user_id=uid, employee_id=9213)
+    phone = "9757476015"
+    shared_email = "vinod31.ghole@gmail.com"
+    existing_ms_id = "019e26f8-bc13-e9e2-2af3-5ba0464281df"
+    test_db_session.add(
+        User(
+            user_id=9214,
+            age=48,
+            phone=phone,
+            email=shared_email,
+            status="active",
+            metsights_profile_id=existing_ms_id,
+        )
+    )
+    await test_db_session.commit()
+
+    new_pid = "019e26f8-second-profile-same-phone"
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+    _mock_list_page(
+        monkeypatch,
+        count=1,
+        rows=[
+            {
+                "id": new_pid,
+                "first_name": "Vinod",
+                "last_name": "Dattaram Ghole",
+                "phone": f"+91{phone}",
+                "email": shared_email,
+                "gender": "1",
+                "age": 48,
+            }
+        ],
+    )
+
+    response = await async_client.post(
+        "/platform-settings/metsights-profiles/import-page",
+        headers=_auth_header(uid),
+        json={"page": 1},
+    )
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["failed"] == 0
+    assert body["linked"] == 1
+
+    sub = (
+        await test_db_session.execute(
+            text(
+                "SELECT user_id, parent_id, email, metsights_profile_id FROM users "
+                "WHERE metsights_profile_id = :p"
+            ),
+            {"p": new_pid},
+        )
+    ).one()
+    assert int(sub.parent_id) == 9214
+    assert sub.email != shared_email
+    assert sub.email is not None
+
+
+@pytest.mark.asyncio
 async def test_metsights_profiles_stats_503_without_api_key(async_client, test_db_session, monkeypatch):
     uid = 9208
     await _seed_employee(test_db_session, user_id=uid, employee_id=9208)
