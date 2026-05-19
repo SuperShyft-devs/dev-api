@@ -32,6 +32,7 @@ from modules.platform_settings.service import PlatformSettingsService
 from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
 from modules.engagements.models import EngagementKind
+from modules.engagements.service import _phone_lookup_candidates
 from modules.users.schemas import (
     BookBioAiBatchRequest,
     BookBioAiRequest,
@@ -1900,6 +1901,62 @@ class UsersService:
             return "Female"
         return raw_gender
 
+    async def _resolve_user_by_phone_for_import(self, db: AsyncSession, phone: str) -> User | None:
+        """Match local users when Metsights and DB store the same number in different formats (+91, 10-digit, etc.)."""
+
+        rows_by_user_id: dict[int, User] = {}
+        for candidate in _phone_lookup_candidates(phone):
+            user = await self._repository.get_user_by_phone(db, candidate)
+            if user is not None:
+                rows_by_user_id[int(user.user_id)] = user
+
+        rows = list(rows_by_user_id.values())
+        if not rows:
+            return None
+
+        primaries = [u for u in rows if u.parent_id is None]
+        if len(primaries) > 1:
+            raise AppError(
+                status_code=409,
+                error_code="AMBIGUOUS_PHONE",
+                message="Multiple accounts match this phone number",
+            )
+        if len(primaries) == 1:
+            return primaries[0]
+
+        subs = [u for u in rows if u.parent_id is not None]
+        if len(subs) > 1:
+            raise AppError(
+                status_code=409,
+                error_code="AMBIGUOUS_PHONE",
+                message="Multiple accounts match this phone number",
+            )
+        return subs[0] if subs else None
+
+    async def _email_for_metsights_sub_profile(
+        self,
+        db: AsyncSession,
+        *,
+        parent_user: User,
+        preferred_email: str | None,
+    ) -> str | None:
+        if preferred_email:
+            taken = await self._repository.get_user_by_email(db, preferred_email)
+            if taken is None:
+                return preferred_email
+
+        parent_email = (parent_user.email or "").strip()
+        if not parent_email or "@" not in parent_email:
+            return None
+
+        local_part, domain = parent_email.split("@", 1)
+        for _ in range(200):
+            suffix = random.randint(1000, 9999)
+            candidate = f"{local_part}+ms{suffix}@{domain}"
+            if await self._repository.get_user_by_email(db, candidate) is None:
+                return candidate
+        return None
+
     async def _get_or_create_user_from_metsights_profile(
         self,
         db: AsyncSession,
@@ -1943,7 +2000,7 @@ class UsersService:
 
         existing = await self._repository.get_user_by_metsights_profile_id(db, profile_id)
         if existing is None:
-            existing = await self._repository.get_user_by_phone(db, normalized_phone)
+            existing = await self._resolve_user_by_phone_for_import(db, normalized_phone)
         if existing is None and profile_email is not None:
             existing = await self._repository.get_user_by_email(db, profile_email)
 
@@ -1967,6 +2024,35 @@ class UsersService:
         if existing is None:
             user = User(**create_data)
             return await self._repository.create_user(db, user)
+
+        existing_ms_id = (existing.metsights_profile_id or "").strip()
+        if existing_ms_id and existing_ms_id != profile_id:
+            parent_user = existing
+            if existing.parent_id is not None:
+                parent_row = await self._repository.get_user_by_id(db, int(existing.parent_id))
+                if parent_row is not None:
+                    parent_user = parent_row
+
+            sub_email = await self._email_for_metsights_sub_profile(
+                db,
+                parent_user=parent_user,
+                preferred_email=profile_email,
+            )
+            sub = await self._repository.create_sub_profile(
+                db,
+                parent_user,
+                {
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "age": age,
+                    "date_of_birth": dob,
+                    "gender": gender,
+                    "phone": parent_user.phone,
+                    "email": sub_email,
+                },
+            )
+            updated = await self._repository.update_user_partial(db, sub.user_id, patch_data)
+            return updated if updated is not None else sub
 
         return await self._repository.update_user_partial(db, existing.user_id, patch_data)
 
@@ -2273,8 +2359,13 @@ class UsersService:
             profile_email = profile_email_raw if profile_email_raw and "@" in profile_email_raw else None
 
             existing_before: User | None = None
-            if profile_phone:
-                existing_before = await self._repository.get_user_by_phone(db, profile_phone)
+            if profile_phone or csv_phone:
+                try:
+                    existing_before = await self._resolve_user_by_phone_for_import(
+                        db, profile_phone or csv_phone
+                    )
+                except AppError:
+                    existing_before = None
             if existing_before is None and profile_email is not None:
                 existing_before = await self._repository.get_user_by_email(db, profile_email)
 

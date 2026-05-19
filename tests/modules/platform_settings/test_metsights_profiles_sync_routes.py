@@ -219,6 +219,131 @@ async def test_metsights_profiles_import_page_links_by_phone(async_client, test_
 
 
 @pytest.mark.asyncio
+async def test_metsights_profiles_import_page_links_10_digit_phone_without_country_code(
+    async_client, test_db_session, monkeypatch
+):
+    """Local 10-digit phone should match Metsights +91 format and receive metsights_profile_id."""
+
+    uid = 9209
+    await _seed_employee(test_db_session, user_id=uid, employee_id=9209)
+    local_phone = "8762830757"
+    test_db_session.add(User(user_id=9210, age=35, phone=local_phone, status="active"))
+    await test_db_session.commit()
+
+    pid = "019e3c22-link-10digit-uuid01"
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+    _mock_list_page(
+        monkeypatch,
+        count=1,
+        rows=[
+            {
+                "id": pid,
+                "first_name": "Ten",
+                "last_name": "Digit",
+                "phone": "+918762830757",
+                "email": "tendigit@example.com",
+                "gender": "1",
+                "age": 35,
+            }
+        ],
+    )
+
+    response = await async_client.post(
+        "/platform-settings/metsights-profiles/import-page",
+        headers=_auth_header(uid),
+        json={"page": 1},
+    )
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["linked"] == 1
+    assert body["created"] == 0
+
+    row = (
+        await test_db_session.execute(
+            text("SELECT metsights_profile_id, phone FROM users WHERE user_id = 9210"),
+        )
+    ).one()
+    assert row.metsights_profile_id == pid
+    assert row.phone == local_phone
+
+    count = (
+        await test_db_session.execute(
+            text("SELECT COUNT(*) AS c FROM users WHERE phone IN (:p1, :p2)"),
+            {"p1": local_phone, "p2": "+918762830757"},
+        )
+    ).one()
+    assert int(count.c) == 1
+
+
+@pytest.mark.asyncio
+async def test_metsights_profiles_import_page_creates_subprofile_when_ms_id_already_set(
+    async_client, test_db_session, monkeypatch
+):
+    uid = 9211
+    await _seed_employee(test_db_session, user_id=uid, employee_id=9211)
+    phone = "8761112222"
+    existing_ms_id = "ms-existing-on-primary"
+    test_db_session.add(
+        User(
+            user_id=9212,
+            age=40,
+            phone=phone,
+            status="active",
+            metsights_profile_id=existing_ms_id,
+        )
+    )
+    await test_db_session.commit()
+
+    new_pid = "019e3c22-second-ms-profile"
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+    _mock_list_page(
+        monkeypatch,
+        count=1,
+        rows=[
+            {
+                "id": new_pid,
+                "first_name": "Second",
+                "last_name": "Metsights",
+                "phone": f"+91{phone}",
+                "email": "second@example.com",
+                "gender": "2",
+                "age": 40,
+            }
+        ],
+    )
+
+    response = await async_client.post(
+        "/platform-settings/metsights-profiles/import-page",
+        headers=_auth_header(uid),
+        json={"page": 1},
+    )
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["linked"] == 1
+    assert body["created"] == 0
+
+    primary = (
+        await test_db_session.execute(
+            text("SELECT metsights_profile_id, parent_id FROM users WHERE user_id = 9212"),
+        )
+    ).one()
+    assert primary.metsights_profile_id == existing_ms_id
+    assert primary.parent_id is None
+
+    sub = (
+        await test_db_session.execute(
+            text(
+                "SELECT user_id, parent_id, metsights_profile_id FROM users "
+                "WHERE metsights_profile_id = :p"
+            ),
+            {"p": new_pid},
+        )
+    ).one()
+    assert int(sub.parent_id) == 9212
+    assert sub.metsights_profile_id == new_pid
+
+
+@pytest.mark.asyncio
 async def test_metsights_profiles_stats_503_without_api_key(async_client, test_db_session, monkeypatch):
     uid = 9208
     await _seed_employee(test_db_session, user_id=uid, employee_id=9208)
