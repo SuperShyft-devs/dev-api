@@ -174,14 +174,14 @@ class SeedDiagPackage:
     created_at: datetime | None
     report_duration_hours: int | None
     collection_type: str | None
-    health_areas_covered: str | None = None
     about_text: str | None
     bookings_count: int | None
     price: Decimal | None
     original_price: Decimal | None
     is_most_popular: bool
-    complementary_nutritionist: bool = False
     gender_suitability: str | None
+    health_areas_covered: str | None = None
+    complementary_nutritionist: bool = False
 
 
 @dataclass(frozen=True)
