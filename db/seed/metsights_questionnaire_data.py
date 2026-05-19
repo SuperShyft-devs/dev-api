@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from db.seed.questionnaire_field_config import EXTRA_OPTIONS, QUESTION_TYPE_OVERRIDES
 from db.seed.seed_dataclasses import (
     SeedCategory,
     SeedCategoryQuestion,
@@ -66,7 +67,7 @@ METSIGHTS_QUESTIONS: tuple[SeedQuestion, ...] = (
         17,
         "daily_active_duration",
         "How much time do you spend actively walking each day?",
-        "scale",
+        QUESTION_TYPE_OVERRIDES.get("daily_active_duration", "scale"),
         False,
         False,
         "Includes commuting, breaks, and household chores.",
@@ -75,7 +76,7 @@ METSIGHTS_QUESTIONS: tuple[SeedQuestion, ...] = (
     SeedQuestion(18, "sleeping_hours", "What is your average duration of good-quality sleep?", "single_choice", True, False, None, "active"),
     SeedQuestion(19, "alcohol_frequency", "What is your alcohol consumption?", "single_choice", False, False, None, "active"),
     SeedQuestion(20, "tobacco_frequency", "How often do you smoke cigarettes or tobacco?", "single_choice", False, False, None, "active"),
-    SeedQuestion(21, "health_priorities", "What are your primary health and wellness priorities?", "multiple_choice", True, False, "Choose top 2 priorities", "active"),
+    SeedQuestion(21, "health_priorities", "What are your primary health and wellness priorities?", QUESTION_TYPE_OVERRIDES.get("health_priorities", "multiple_choice"), True, False, "Choose your priority", "active"),
     SeedQuestion(22, "goal_preference", "What aspect of your lifestyle changes would you like to prioritize?", "single_choice", True, False, None, "active"),
     SeedQuestion(23, "diet_preference", "What type of diet do you primarily consume?", "single_choice", True, False, None, "active"),
     SeedQuestion(24, "food_groups", "Which of the following food groups do you consume every day?", "multiple_choice", True, False, None, "active"),
@@ -155,6 +156,7 @@ _OPT_SPEC: list[tuple[int, list[tuple[str, str]]]] = [
             ("6", "Stroke"),
             ("7", "Mental Health"),
             ("O", "Other"),
+            *EXTRA_OPTIONS.get("family_health_history", []),
         ],
     ),
     (
@@ -170,6 +172,7 @@ _OPT_SPEC: list[tuple[int, list[tuple[str, str]]]] = [
             ("6", "Stroke"),
             ("7", "Mental Health"),
             ("O", "Other"),
+            *EXTRA_OPTIONS.get("diagnosed_diseases", []),
         ],
     ),
     (
@@ -185,6 +188,7 @@ _OPT_SPEC: list[tuple[int, list[tuple[str, str]]]] = [
             ("6", "Stroke"),
             ("7", "Mental Health"),
             ("O", "Other"),
+            *EXTRA_OPTIONS.get("diagnosed_diseases_medications", []),
         ],
     ),
     (13, [("0", "Less than 1 hour"), ("1", "1-4 hours"), ("2", "More than 4 hours")]),
@@ -208,7 +212,8 @@ _OPT_SPEC: list[tuple[int, list[tuple[str, str]]]] = [
         ],
     ),
     (16, [("0", "Low-intensity"), ("1", "Moderate-intensity"), ("2", "High-intensity")]),
-    (17, [("0", "minutes daily"), ("1", "hours daily")]),
+    # Q17 options come from the config (type changed to single_choice).
+    (17, EXTRA_OPTIONS["daily_active_duration"]),
     (
         18,
         [
@@ -225,6 +230,7 @@ _OPT_SPEC: list[tuple[int, list[tuple[str, str]]]] = [
             ("1", "I quit alcohol"),
             ("2", "3 servings per week or less"),
             ("3", "More than 3 servings per week"),
+            *EXTRA_OPTIONS.get("alcohol_frequency", []),
         ],
     ),
     (
@@ -235,6 +241,7 @@ _OPT_SPEC: list[tuple[int, list[tuple[str, str]]]] = [
             ("2", "1 to 3 times a week"),
             ("3", "5 to 7 times a week"),
             ("4", "More than 7 times a week"),
+            *EXTRA_OPTIONS.get("tobacco_frequency", []),
         ],
     ),
     (
@@ -330,6 +337,7 @@ _OPT_SPEC: list[tuple[int, list[tuple[str, str]]]] = [
             ("0", "I do not drink coffee or tea"),
             ("1", "1-2 cups per day"),
             ("2", "More than 2 cups per day"),
+            *EXTRA_OPTIONS.get("caffeine_frequency", []),
         ],
     ),
     (

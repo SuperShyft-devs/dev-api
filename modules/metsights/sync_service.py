@@ -11,6 +11,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
+from db.seed.questionnaire_field_config import (
+    CHOICE_TO_METSIGHTS_VALUE,
+    DAILY_ACTIVE_DURATION_PUSH_MAP,
+    NONE_CLEARS_MULTISELECT_FIELDS,
+    SCALE_TO_CHOICE_CONVERTERS,
+)
 from modules.diagnostics.models import DiagnosticPackage
 from modules.assessments.service import AssessmentsService
 from modules.engagements.models import EngagementKind
@@ -80,8 +86,8 @@ _METSIGHTS_UNIT_CODE_TO_DB_OPTION: dict[tuple[str, str], str] = {
     ("heart_rate", "0"): "0",
     ("respiratory_rate", "0"): "0",
     ("hrv_sdnn", "0"): "0",
-    ("daily_active_duration", "0"): "0",
-    ("daily_active_duration", "1"): "1",
+    ("daily_active_duration", "0"): "0",  # kept for reverse-push only; import uses SCALE_TO_CHOICE_CONVERTERS
+    ("daily_active_duration", "1"): "1",  # kept for reverse-push only; import uses SCALE_TO_CHOICE_CONVERTERS
     ("weight_loss_goal", "0"): "0",
     ("weight_loss_goal", "1"): "1",
 }
@@ -166,6 +172,15 @@ def _answer_to_metsights_fields(question_key: str, question_type: str, answer: A
     if qtype == "multiple_choice":
         if not isinstance(answer, list):
             return {}
+
+        # Change 5: if the only selection is "none", skip the field entirely.
+        if qkey in NONE_CLEARS_MULTISELECT_FIELDS:
+            cleaned = [str(x).strip() for x in answer if x is not None and str(x).strip() not in ("", "none")]
+            if not cleaned:
+                # User chose "None" — send nothing to metsights.
+                return {}
+            return {qkey: cleaned}
+
         seq = [
             str(x).strip()
             for x in answer
@@ -178,6 +193,16 @@ def _answer_to_metsights_fields(question_key: str, question_type: str, answer: A
     if qtype == "single_choice":
         if answer is None:
             return {}
+
+        # Change 1: daily_active_duration — our bucket option_value → metsights float+unit.
+        if qkey == "daily_active_duration":
+            bucket = str(answer).strip()
+            mapping = DAILY_ACTIVE_DURATION_PUSH_MAP.get(bucket)
+            if mapping is None:
+                return {}
+            mets_val, mets_unit = mapping
+            return {qkey: mets_val, f"{qkey}_unit": mets_unit}
+
         if qkey == "iodized_salt_status":
             if isinstance(answer, bool):
                 return {qkey: answer}
@@ -187,9 +212,16 @@ def _answer_to_metsights_fields(question_key: str, question_type: str, answer: A
             if low in ("false", "0", "no"):
                 return {qkey: False}
             return {}
+
         s = str(answer).strip()
         if not s:
             return {}
+
+        # Changes 2/3/4: remap new option values to their metsights equivalents.
+        field_map = CHOICE_TO_METSIGHTS_VALUE.get(qkey)
+        if field_map and s in field_map:
+            s = field_map[s]
+
         return {qkey: s}
 
     return {}
@@ -805,6 +837,16 @@ class MetsightsSyncService:
                     if answer is None:
                         skipped_questions.append(f"{resource}.{field_name}")
                         continue
+                elif qtype == "single_choice" and field_name in SCALE_TO_CHOICE_CONVERTERS and isinstance(raw_val, (int, float)) and not isinstance(raw_val, bool):
+                    # Field was previously a scale type in metsights but is now a
+                    # single_choice in our DB.  Use the converter from the config.
+                    unit_key = f"{field_name}_unit"
+                    unit_raw = payload.get(unit_key, "0")
+                    converted = SCALE_TO_CHOICE_CONVERTERS[field_name](float(raw_val), str(unit_raw).strip())
+                    if converted is None:
+                        skipped_questions.append(f"{resource}.{field_name}:no_bucket")
+                        continue
+                    answer = converted
                 elif qtype == "text":
                     answer = str(raw_val).strip() if raw_val is not None else None
                     if not answer:
