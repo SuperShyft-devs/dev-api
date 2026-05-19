@@ -100,3 +100,30 @@ class EngagementPushQuestionnairesRequest(BaseModel):
     """Request to push questionnaire answers for a specific package."""
 
     package_id: int = Field(..., gt=0)
+
+
+class AssignParticipantsRow(BaseModel):
+    """One CSV row: Metsights record id + participant phone."""
+
+    metsights_record_id: str = Field(..., min_length=1, max_length=200)
+    phone: str = Field(..., min_length=1, max_length=50)
+
+
+class AssignParticipantsBatchRequest(BaseModel):
+    """Batch assign participants from parsed CSV rows."""
+
+    rows: list[AssignParticipantsRow] = Field(..., min_length=1, max_length=50)
+
+
+class AssignParticipantsRowResult(BaseModel):
+    metsights_record_id: str
+    phone: str
+    status: str
+    reason: Optional[str] = None
+    user_id: Optional[int] = None
+    assessment_instance_id: Optional[int] = None
+    newly_enrolled: Optional[bool] = None
+
+
+class AssignParticipantsBatchResponse(BaseModel):
+    results: list[AssignParticipantsRowResult]

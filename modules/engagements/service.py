@@ -11,12 +11,13 @@ from __future__ import annotations
 import secrets
 import string
 from datetime import date, time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.assessments.repository import AssessmentsRepository
+from modules.assessments.service import AssessmentsService
 from modules.audit.service import AuditService
 from modules.checklists.schemas import ChecklistReadiness
 from modules.employee.service import EmployeeContext
@@ -26,6 +27,8 @@ from modules.engagements.schemas import EngagementCreateRequest, EngagementUpdat
 from modules.organizations.repository import OrganizationsRepository
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.repository import ReportsRepository
+from modules.users.models import User
+from modules.users.repository import UsersRepository
 
 if TYPE_CHECKING:
     from modules.checklists.service import ChecklistsService
@@ -45,16 +48,57 @@ def _normalize_status(value: str | None) -> str:
     return (value or "").strip().lower()
 
 
+def _phone_lookup_candidates(phone: str) -> list[str]:
+    """Build ordered unique phone strings to match stored user.phone values."""
+
+    raw = (phone or "").strip()
+    if not raw:
+        return []
+
+    stripped = raw.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+    digits = "".join(ch for ch in raw if ch.isdigit())
+
+    ordered: list[str] = []
+    for value in (raw, stripped):
+        if value and value not in ordered:
+            ordered.append(value)
+
+    if len(digits) == 10:
+        for value in (digits, f"+91{digits}", f"91{digits}"):
+            if value not in ordered:
+                ordered.append(value)
+    elif len(digits) == 12 and digits.startswith("91"):
+        base10 = digits[2:]
+        for value in (base10, f"+91{base10}", f"91{base10}", f"+{digits}"):
+            if value not in ordered:
+                ordered.append(value)
+    elif len(digits) == 11 and digits.startswith("0"):
+        base10 = digits[1:]
+        for value in (base10, f"+91{base10}", f"91{base10}"):
+            if value not in ordered:
+                ordered.append(value)
+    elif digits.startswith("+") or (digits and len(digits) > 10):
+        plus = f"+{digits}" if not digits.startswith("+") else digits
+        if plus not in ordered:
+            ordered.append(plus)
+
+    return ordered
+
+
 class EngagementsService:
     def __init__(
         self,
         repository: EngagementsRepository,
         audit_service: AuditService | None = None,
         organizations_repository: OrganizationsRepository | None = None,
+        users_repository: UsersRepository | None = None,
+        assessments_service: AssessmentsService | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
         self._organizations_repository = organizations_repository
+        self._users_repository = users_repository or UsersRepository()
+        self._assessments_service = assessments_service
         self._assessments_repository = AssessmentsRepository()
         self._questionnaire_repository = QuestionnaireRepository()
         self._reports_repository = ReportsRepository()
@@ -899,3 +943,183 @@ class EngagementsService:
             },
             "participants": participants,
         }
+
+    async def _resolve_user_by_phone(self, db: AsyncSession, phone: str) -> User | None:
+        rows_by_user_id: dict[int, User] = {}
+        for candidate in _phone_lookup_candidates(phone):
+            user = await self._users_repository.get_user_by_phone(db, candidate)
+            if user is not None:
+                rows_by_user_id[int(user.user_id)] = user
+
+        rows = list(rows_by_user_id.values())
+        if not rows:
+            return None
+
+        primaries = [u for u in rows if u.parent_id is None]
+        if len(primaries) > 1:
+            raise AppError(
+                status_code=409,
+                error_code="AMBIGUOUS_PHONE",
+                message="Multiple accounts match this phone number",
+            )
+        if len(primaries) == 1:
+            return primaries[0]
+
+        subs = [u for u in rows if u.parent_id is not None]
+        if len(subs) > 1:
+            raise AppError(
+                status_code=409,
+                error_code="AMBIGUOUS_PHONE",
+                message="Multiple accounts match this phone number",
+            )
+        return subs[0] if subs else None
+
+    async def assign_participants_batch(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        rows: list[dict[str, str]],
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict[str, Any]:
+        """Enroll users by phone and assign assessment instances keyed by Metsights record id."""
+
+        self._ensure_employee_access(employee)
+
+        if self._assessments_service is None:
+            raise RuntimeError("Assessments service is required")
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        if (engagement.status or "").lower() != "active":
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is no longer active")
+
+        package_id = engagement.assessment_package_id
+        if package_id is None:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Engagement has no assessment package configured",
+            )
+
+        engagement_date = engagement.start_date or date.today()
+        default_slot = time(10, 0)
+        results: list[dict[str, Any]] = []
+
+        for row in rows:
+            mrid = (row.get("metsights_record_id") or "").strip()
+            phone_raw = (row.get("phone") or "").strip()
+            base: dict[str, Any] = {
+                "metsights_record_id": mrid or row.get("metsights_record_id", ""),
+                "phone": phone_raw or row.get("phone", ""),
+                "status": "error",
+                "reason": None,
+                "user_id": None,
+                "assessment_instance_id": None,
+                "newly_enrolled": None,
+            }
+
+            if not mrid:
+                base["status"] = "skipped"
+                base["reason"] = "missing_record_id"
+                results.append(base)
+                continue
+
+            if not phone_raw:
+                base["status"] = "skipped"
+                base["reason"] = "missing_phone"
+                results.append(base)
+                continue
+
+            base["metsights_record_id"] = mrid
+            base["phone"] = phone_raw
+
+            existing_inst = await self._assessments_service.get_instance_by_metsights_record_id(
+                db, metsights_record_id=mrid
+            )
+            if existing_inst is not None:
+                base["status"] = "skipped"
+                base["reason"] = "already_assigned"
+                base["assessment_instance_id"] = int(existing_inst.assessment_instance_id)
+                base["user_id"] = int(existing_inst.user_id)
+                results.append(base)
+                continue
+
+            try:
+                user = await self._resolve_user_by_phone(db, phone_raw)
+            except AppError as exc:
+                base["status"] = "error"
+                base["reason"] = exc.error_code or "ambiguous_phone"
+                results.append(base)
+                continue
+
+            if user is None:
+                base["status"] = "skipped"
+                base["reason"] = "user_not_found"
+                results.append(base)
+                continue
+
+            base["user_id"] = int(user.user_id)
+            newly_enrolled = False
+
+            try:
+                if not await self._repository.has_participant_for_user_engagement(
+                    db,
+                    user_id=user.user_id,
+                    engagement_id=engagement.engagement_id,
+                ):
+                    await self.enroll_user_in_engagement(
+                        db,
+                        engagement=engagement,
+                        user_id=user.user_id,
+                        engagement_date=engagement_date,
+                        slot_start_time=default_slot,
+                        increment_participant_count=True,
+                        is_primary_record_id_synced=False,
+                    )
+                    newly_enrolled = True
+
+                instance = await self._assessments_service.create_instance_for_metsights_record(
+                    db,
+                    user_id=user.user_id,
+                    engagement_id=engagement.engagement_id,
+                    package_id=int(package_id),
+                    metsights_record_id=mrid,
+                    metsights_is_complete=False,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    endpoint=endpoint,
+                )
+
+                participant = await self._repository.get_participant_for_user_engagement(
+                    db,
+                    user_id=user.user_id,
+                    engagement_id=engagement.engagement_id,
+                )
+                if participant is not None:
+                    await self.update_participant_sync_flags(
+                        db,
+                        participant=participant,
+                        is_primary_record_id_synced=True,
+                    )
+
+                base["status"] = "assigned"
+                base["assessment_instance_id"] = int(instance.assessment_instance_id)
+                base["newly_enrolled"] = newly_enrolled
+                if not newly_enrolled:
+                    base["reason"] = "already_enrolled"
+            except AppError as exc:
+                base["status"] = "error"
+                base["reason"] = exc.message or exc.error_code or "assignment_failed"
+            except Exception as exc:
+                base["status"] = "error"
+                base["reason"] = str(exc)
+
+            results.append(base)
+
+        return {"results": results}

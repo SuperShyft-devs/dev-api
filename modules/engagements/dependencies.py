@@ -29,6 +29,8 @@ def get_engagements_service() -> EngagementsService:
         repository=EngagementsRepository(),
         audit_service=audit_service,
         organizations_repository=organizations_repository,
+        users_repository=UsersRepository(),
+        assessments_service=get_assessments_service(),
     )
 
 

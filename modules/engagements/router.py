@@ -17,6 +17,7 @@ from modules.employee.service import EmployeeContext
 from modules.engagements.dependencies import get_engagements_service, get_onboarding_assistants_service
 from modules.engagements.onboarding_assistants_service import OnboardingAssistantsService
 from modules.engagements.schemas import (
+    AssignParticipantsBatchRequest,
     EngagementCreateRequest,
     EngagementStatusUpdateRequest,
     EngagementUpdateRequest,
@@ -289,6 +290,31 @@ async def remove_participant_from_engagement(
         employee=employee,
         engagement_id=engagement_id,
         user_id=user_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.post("/{engagement_id}/assign-participants-batch")
+async def assign_participants_batch(
+    engagement_id: int,
+    payload: AssignParticipantsBatchRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """Enroll users by phone and assign assessment instances from Metsights CSV rows."""
+
+    rows = [{"metsights_record_id": r.metsights_record_id, "phone": r.phone} for r in payload.rows]
+    data = await engagements_service.assign_participants_batch(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        rows=rows,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
