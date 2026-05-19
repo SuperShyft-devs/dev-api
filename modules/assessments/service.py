@@ -220,6 +220,13 @@ class AssessmentsService:
             db, metsights_record_id=metsights_record_id
         )
 
+    async def get_instances_by_metsights_record_ids(
+        self, db: AsyncSession, metsights_record_ids: list[str]
+    ) -> dict[str, AssessmentInstance]:
+        return await self._repository.get_instances_by_metsights_record_ids(
+            db, metsights_record_ids=metsights_record_ids
+        )
+
     async def get_instance_by_id(self, db: AsyncSession, *, assessment_instance_id: int) -> AssessmentInstance | None:
         return await self._repository.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
 

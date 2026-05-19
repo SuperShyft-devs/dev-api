@@ -161,6 +161,46 @@ class EngagementsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def list_enrolled_user_ids_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        user_ids: list[int],
+    ) -> set[int]:
+        ids = list({int(uid) for uid in user_ids if uid})
+        if not ids:
+            return set()
+        result = await db.execute(
+            select(EngagementParticipant.user_id)
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .where(EngagementParticipant.user_id.in_(ids))
+        )
+        return {int(row) for row in result.scalars().all()}
+
+    async def get_participants_map_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        user_ids: list[int],
+    ) -> dict[int, EngagementParticipant]:
+        ids = list({int(uid) for uid in user_ids if uid})
+        if not ids:
+            return {}
+        result = await db.execute(
+            select(EngagementParticipant)
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .where(EngagementParticipant.user_id.in_(ids))
+            .order_by(EngagementParticipant.engagement_participant_id.desc())
+        )
+        out: dict[int, EngagementParticipant] = {}
+        for row in result.scalars().all():
+            uid = int(row.user_id)
+            if uid not in out:
+                out[uid] = row
+        return out
+
     async def delete_participants_for_user_engagement(
         self,
         db: AsyncSession,

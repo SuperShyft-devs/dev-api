@@ -13,6 +13,7 @@ import string
 from datetime import date, time
 from typing import TYPE_CHECKING, Any
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
@@ -944,11 +945,21 @@ class EngagementsService:
             "participants": participants,
         }
 
-    async def _resolve_user_by_phone(self, db: AsyncSession, phone: str) -> User | None:
+    def _build_phone_lookup_index(self, users: list[User]) -> dict[str, list[User]]:
+        index: dict[str, list[User]] = {}
+        for user in users:
+            phone_key = (user.phone or "").strip()
+            if not phone_key:
+                continue
+            bucket = index.setdefault(phone_key, [])
+            if not any(int(row.user_id) == int(user.user_id) for row in bucket):
+                bucket.append(user)
+        return index
+
+    def _resolve_user_by_phone_from_index(self, phone: str, phone_index: dict[str, list[User]]) -> User | None:
         rows_by_user_id: dict[int, User] = {}
         for candidate in _phone_lookup_candidates(phone):
-            user = await self._users_repository.get_user_by_phone(db, candidate)
-            if user is not None:
+            for user in phone_index.get(candidate, []):
                 rows_by_user_id[int(user.user_id)] = user
 
         rows = list(rows_by_user_id.values())
@@ -973,6 +984,20 @@ class EngagementsService:
                 message="Multiple accounts match this phone number",
             )
         return subs[0] if subs else None
+
+    async def _preload_phone_lookup_index(self, db: AsyncSession, raw_phones: list[str]) -> dict[str, list[User]]:
+        candidates: list[str] = []
+        for phone in raw_phones:
+            candidates.extend(_phone_lookup_candidates(phone))
+        unique = list(dict.fromkeys(c for c in candidates if c))
+        if not unique:
+            return {}
+        users = await self._users_repository.list_users_by_phones(db, unique)
+        return self._build_phone_lookup_index(users)
+
+    async def _resolve_user_by_phone(self, db: AsyncSession, phone: str) -> User | None:
+        phone_index = await self._preload_phone_lookup_index(db, [phone])
+        return self._resolve_user_by_phone_from_index(phone, phone_index)
 
     async def assign_participants_batch(
         self,
@@ -1011,6 +1036,36 @@ class EngagementsService:
         default_slot = time(10, 0)
         results: list[dict[str, Any]] = []
 
+        mrids = [(row.get("metsights_record_id") or "").strip() for row in rows]
+        phones = [(row.get("phone") or "").strip() for row in rows if (row.get("phone") or "").strip()]
+
+        existing_by_mrid = await self._assessments_service.get_instances_by_metsights_record_ids(db, mrids)
+        phone_index = await self._preload_phone_lookup_index(db, phones)
+
+        resolved_users: dict[str, User | None] = {}
+        ambiguous_phones: set[str] = set()
+        for phone_raw in phones:
+            if phone_raw in resolved_users or phone_raw in ambiguous_phones:
+                continue
+            try:
+                resolved_users[phone_raw] = self._resolve_user_by_phone_from_index(phone_raw, phone_index)
+            except AppError:
+                ambiguous_phones.add(phone_raw)
+
+        candidate_user_ids = [
+            int(user.user_id) for user in resolved_users.values() if user is not None
+        ]
+        enrolled_user_ids = await self._repository.list_enrolled_user_ids_for_engagement(
+            db,
+            engagement_id=engagement.engagement_id,
+            user_ids=candidate_user_ids,
+        )
+        participants_by_user = await self._repository.get_participants_map_for_engagement(
+            db,
+            engagement_id=engagement.engagement_id,
+            user_ids=candidate_user_ids,
+        )
+
         for row in rows:
             mrid = (row.get("metsights_record_id") or "").strip()
             phone_raw = (row.get("phone") or "").strip()
@@ -1039,9 +1094,7 @@ class EngagementsService:
             base["metsights_record_id"] = mrid
             base["phone"] = phone_raw
 
-            existing_inst = await self._assessments_service.get_instance_by_metsights_record_id(
-                db, metsights_record_id=mrid
-            )
+            existing_inst = existing_by_mrid.get(mrid)
             if existing_inst is not None:
                 base["status"] = "skipped"
                 base["reason"] = "already_assigned"
@@ -1050,14 +1103,13 @@ class EngagementsService:
                 results.append(base)
                 continue
 
-            try:
-                user = await self._resolve_user_by_phone(db, phone_raw)
-            except AppError as exc:
+            if phone_raw in ambiguous_phones:
                 base["status"] = "error"
-                base["reason"] = exc.error_code or "ambiguous_phone"
+                base["reason"] = "ambiguous_phone"
                 results.append(base)
                 continue
 
+            user = resolved_users.get(phone_raw)
             if user is None:
                 base["status"] = "skipped"
                 base["reason"] = "user_not_found"
@@ -1066,47 +1118,52 @@ class EngagementsService:
 
             base["user_id"] = int(user.user_id)
             newly_enrolled = False
+            user_id = int(user.user_id)
 
             try:
-                if not await self._repository.has_participant_for_user_engagement(
-                    db,
-                    user_id=user.user_id,
-                    engagement_id=engagement.engagement_id,
-                ):
-                    await self.enroll_user_in_engagement(
-                        db,
-                        engagement=engagement,
-                        user_id=user.user_id,
-                        engagement_date=engagement_date,
-                        slot_start_time=default_slot,
-                        increment_participant_count=True,
-                        is_primary_record_id_synced=False,
-                    )
-                    newly_enrolled = True
+                async with db.begin_nested():
+                    if user_id not in enrolled_user_ids:
+                        await self.enroll_user_in_engagement(
+                            db,
+                            engagement=engagement,
+                            user_id=user_id,
+                            engagement_date=engagement_date,
+                            slot_start_time=default_slot,
+                            increment_participant_count=True,
+                            is_primary_record_id_synced=False,
+                        )
+                        newly_enrolled = True
+                        enrolled_user_ids.add(user_id)
 
-                instance = await self._assessments_service.create_instance_for_metsights_record(
-                    db,
-                    user_id=user.user_id,
-                    engagement_id=engagement.engagement_id,
-                    package_id=int(package_id),
-                    metsights_record_id=mrid,
-                    metsights_is_complete=False,
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    endpoint=endpoint,
-                )
-
-                participant = await self._repository.get_participant_for_user_engagement(
-                    db,
-                    user_id=user.user_id,
-                    engagement_id=engagement.engagement_id,
-                )
-                if participant is not None:
-                    await self.update_participant_sync_flags(
+                    instance = await self._assessments_service.create_instance_for_metsights_record(
                         db,
-                        participant=participant,
-                        is_primary_record_id_synced=True,
+                        user_id=user_id,
+                        engagement_id=engagement.engagement_id,
+                        package_id=int(package_id),
+                        metsights_record_id=mrid,
+                        metsights_is_complete=False,
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        endpoint=endpoint,
                     )
+                    existing_by_mrid[mrid] = instance
+
+                    participant = participants_by_user.get(user_id)
+                    if participant is None:
+                        participant = await self._repository.get_participant_for_user_engagement(
+                            db,
+                            user_id=user_id,
+                            engagement_id=engagement.engagement_id,
+                        )
+                        if participant is not None:
+                            participants_by_user[user_id] = participant
+
+                    if participant is not None:
+                        await self.update_participant_sync_flags(
+                            db,
+                            participant=participant,
+                            is_primary_record_id_synced=True,
+                        )
 
                 base["status"] = "assigned"
                 base["assessment_instance_id"] = int(instance.assessment_instance_id)
@@ -1116,6 +1173,9 @@ class EngagementsService:
             except AppError as exc:
                 base["status"] = "error"
                 base["reason"] = exc.message or exc.error_code or "assignment_failed"
+            except IntegrityError:
+                base["status"] = "error"
+                base["reason"] = "database_constraint_violation"
             except Exception as exc:
                 base["status"] = "error"
                 base["reason"] = str(exc)

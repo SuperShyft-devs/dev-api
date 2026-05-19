@@ -151,6 +151,25 @@ class AssessmentsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_instances_by_metsights_record_ids(
+        self,
+        db: AsyncSession,
+        *,
+        metsights_record_ids: list[str],
+    ) -> dict[str, AssessmentInstance]:
+        normalized = list({(rid or "").strip() for rid in metsights_record_ids if (rid or "").strip()})
+        if not normalized:
+            return {}
+        result = await db.execute(
+            select(AssessmentInstance).where(AssessmentInstance.metsights_record_id.in_(normalized))
+        )
+        out: dict[str, AssessmentInstance] = {}
+        for row in result.scalars().all():
+            key = (row.metsights_record_id or "").strip()
+            if key:
+                out[key] = row
+        return out
+
     async def get_instance_by_user_engagement_package(
         self,
         db: AsyncSession,
