@@ -81,7 +81,7 @@ class Settings:
     METSIGHTS_BASE_URL: str = os.getenv("METSIGHTS_BASE_URL", "https://api.metsights.com")
     METSIGHTS_API_KEY: str = os.getenv("METSIGHTS_API_KEY", "")
     METSIGHTS_TIMEOUT_SECONDS: int = int(os.getenv("METSIGHTS_TIMEOUT_SECONDS", "15"))
-    METSIGHTS_IMPORT_TIMEOUT_SECONDS: int = int(os.getenv("METSIGHTS_IMPORT_TIMEOUT_SECONDS", "30"))
+    METSIGHTS_IMPORT_TIMEOUT_SECONDS: int = int(os.getenv("METSIGHTS_IMPORT_TIMEOUT_SECONDS", "60"))
 
     # Nutrition API settings
     NUTRITION_API_URL: str = os.getenv("NUTRITION_API_URL", "https://nutrition.supershyft.com/calculate")

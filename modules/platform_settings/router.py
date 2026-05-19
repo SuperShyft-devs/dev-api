@@ -74,7 +74,7 @@ async def get_metsights_profiles_stats(
 
 
 @router.post("/metsights-profiles/import-page")
-@limiter.limit("60/minute")
+@limiter.limit("300/minute")
 async def import_metsights_profiles_page(
     payload: MetsightsProfilesImportPageRequest,
     request: Request,

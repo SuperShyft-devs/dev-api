@@ -118,6 +118,20 @@ class UsersRepository:
         result = await db.execute(select(User).where(User.phone == phone))
         return result.scalar_one_or_none()
 
+    async def list_users_by_phones(self, db: AsyncSession, phones: list[str]) -> list[User]:
+        normalized = list({(p or "").strip() for p in phones if (p or "").strip()})
+        if not normalized:
+            return []
+        result = await db.execute(select(User).where(User.phone.in_(normalized)))
+        return list(result.scalars().all())
+
+    async def list_users_by_emails(self, db: AsyncSession, emails: list[str]) -> list[User]:
+        normalized = list({(e or "").strip() for e in emails if (e or "").strip()})
+        if not normalized:
+            return []
+        result = await db.execute(select(User).where(User.email.in_(normalized)))
+        return list(result.scalars().all())
+
     async def get_user_by_id(self, db: AsyncSession, user_id: int) -> Optional[User]:
         result = await db.execute(select(User).where(User.user_id == user_id))
         return result.scalar_one_or_none()

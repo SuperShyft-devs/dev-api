@@ -1915,13 +1915,23 @@ class UsersService:
             return "Female"
         return raw_gender
 
-    async def _resolve_user_by_phone_for_import(self, db: AsyncSession, phone: str) -> User | None:
+    def _build_phone_lookup_index(self, users: list[User]) -> dict[str, list[User]]:
+        index: dict[str, list[User]] = {}
+        for user in users:
+            phone_key = (user.phone or "").strip()
+            if not phone_key:
+                continue
+            bucket = index.setdefault(phone_key, [])
+            if not any(int(row.user_id) == int(user.user_id) for row in bucket):
+                bucket.append(user)
+        return index
+
+    def _resolve_user_by_phone_from_index(self, phone: str, phone_index: dict[str, list[User]]) -> User | None:
         """Match local users when Metsights and DB store the same number in different formats (+91, 10-digit, etc.)."""
 
         rows_by_user_id: dict[int, User] = {}
         for candidate in _phone_lookup_candidates(phone):
-            user = await self._repository.get_user_by_phone(db, candidate)
-            if user is not None:
+            for user in phone_index.get(candidate, []):
                 rows_by_user_id[int(user.user_id)] = user
 
         rows = list(rows_by_user_id.values())
@@ -1947,6 +1957,31 @@ class UsersService:
             )
         return subs[0] if subs else None
 
+    async def _resolve_user_by_phone_for_import(self, db: AsyncSession, phone: str) -> User | None:
+        candidates = _phone_lookup_candidates(phone)
+        if not candidates:
+            return None
+        users = await self._repository.list_users_by_phones(db, candidates)
+        return self._resolve_user_by_phone_from_index(phone, self._build_phone_lookup_index(users))
+
+    async def _preload_phone_lookup_index(self, db: AsyncSession, raw_phones: list[str]) -> dict[str, list[User]]:
+        candidates: list[str] = []
+        for phone in raw_phones:
+            candidates.extend(_phone_lookup_candidates(phone))
+        unique = list(dict.fromkeys(c for c in candidates if c))
+        if not unique:
+            return {}
+        users = await self._repository.list_users_by_phones(db, unique)
+        return self._build_phone_lookup_index(users)
+
+    def _build_email_owner_index(self, users: list[User]) -> dict[str, int]:
+        owners: dict[str, int] = {}
+        for user in users:
+            email_key = (user.email or "").strip().lower()
+            if email_key:
+                owners[email_key] = int(user.user_id)
+        return owners
+
     async def _email_safe_for_user_update(
         self,
         db: AsyncSession,
@@ -1969,21 +2004,30 @@ class UsersService:
         *,
         parent_user: User,
         preferred_email: str | None,
+        metsights_profile_id: str,
+        email_owners: dict[str, int] | None = None,
     ) -> str | None:
-        if preferred_email:
-            taken = await self._repository.get_user_by_email(db, preferred_email)
-            if taken is None:
-                return preferred_email
+        def _is_free(email: str) -> bool:
+            key = email.strip().lower()
+            owner_id = (email_owners or {}).get(key)
+            return owner_id is None
+
+        if preferred_email and _is_free(preferred_email):
+            return preferred_email
 
         parent_email = (parent_user.email or "").strip()
         if not parent_email or "@" not in parent_email:
             return None
 
         local_part, domain = parent_email.split("@", 1)
-        for _ in range(200):
-            suffix = random.randint(1000, 9999)
-            candidate = f"{local_part}+ms{suffix}@{domain}"
-            if await self._repository.get_user_by_email(db, candidate) is None:
+        ms_suffix = (metsights_profile_id or "").replace("-", "")[:12] or str(parent_user.user_id)
+        deterministic = f"{local_part}+ms{parent_user.user_id}-{ms_suffix}@{domain}"
+        if _is_free(deterministic):
+            return deterministic
+
+        for attempt in range(5):
+            candidate = f"{local_part}+ms{parent_user.user_id}-{ms_suffix}-{attempt}@{domain}"
+            if _is_free(candidate):
                 return candidate
         return None
 
@@ -1996,6 +2040,8 @@ class UsersService:
         csv_phone: str,
         profile_data: dict[str, Any],
         engagement_code: str | None,
+        phone_index: dict[str, list[User]] | None = None,
+        email_owners: dict[str, int] | None = None,
     ) -> User:
         profile_phone = _normalize_import_phone(str(profile_data.get("phone") or ""))
         profile_email_raw = str(profile_data.get("email") or "").strip()
@@ -2030,9 +2076,16 @@ class UsersService:
 
         existing = await self._repository.get_user_by_metsights_profile_id(db, profile_id)
         if existing is None:
-            existing = await self._resolve_user_by_phone_for_import(db, normalized_phone)
+            if phone_index is not None:
+                existing = self._resolve_user_by_phone_from_index(normalized_phone, phone_index)
+            else:
+                existing = await self._resolve_user_by_phone_for_import(db, normalized_phone)
         if existing is None and profile_email is not None:
-            existing = await self._repository.get_user_by_email(db, profile_email)
+            owner_id = (email_owners or {}).get(profile_email.strip().lower())
+            if owner_id is not None:
+                existing = await self._repository.get_user_by_id(db, owner_id)
+            else:
+                existing = await self._repository.get_user_by_email(db, profile_email)
 
         patch_data: dict[str, Any] = {
             "first_name": first_name,
@@ -2048,8 +2101,8 @@ class UsersService:
         if existing is None:
             create_email = profile_email
             if profile_email is not None:
-                email_owner = await self._repository.get_user_by_email(db, profile_email)
-                if email_owner is not None:
+                owner_id = (email_owners or {}).get(profile_email.strip().lower())
+                if owner_id is not None:
                     create_email = None
             user = User(
                 **patch_data,
@@ -2059,11 +2112,11 @@ class UsersService:
             )
             return await self._repository.create_user(db, user)
 
-        safe_email = await self._email_safe_for_user_update(
-            db,
-            user_id=int(existing.user_id),
-            candidate=profile_email,
-        )
+        safe_email: str | None = None
+        if profile_email:
+            owner_id = (email_owners or {}).get(profile_email.strip().lower())
+            if owner_id is None or int(owner_id) == int(existing.user_id):
+                safe_email = profile_email
         if safe_email is not None:
             patch_data["email"] = safe_email
 
@@ -2079,6 +2132,8 @@ class UsersService:
                 db,
                 parent_user=parent_user,
                 preferred_email=profile_email,
+                metsights_profile_id=profile_id,
+                email_owners=email_owners,
             )
             sub = await self._repository.create_sub_profile(
                 db,
@@ -2357,6 +2412,24 @@ class UsersService:
         profile_ids = [str(row.get("id") or "").strip() for row in rows]
         existing_by_ms_id = await self._repository.get_users_by_metsights_profile_ids(db, profile_ids)
 
+        pending_phones: list[str] = []
+        pending_emails: list[str] = []
+        for row in rows:
+            profile_id = str(row.get("id") or "").strip()
+            if not profile_id or profile_id in existing_by_ms_id:
+                continue
+            csv_phone = str(row.get("phone") or "").strip()
+            if not csv_phone:
+                continue
+            pending_phones.append(_normalize_import_phone(csv_phone))
+            email_raw = str(row.get("email") or "").strip()
+            if email_raw and "@" in email_raw:
+                pending_emails.append(email_raw)
+
+        phone_index = await self._preload_phone_lookup_index(db, pending_phones)
+        email_users = await self._repository.list_users_by_emails(db, pending_emails)
+        email_owners = self._build_email_owner_index(email_users)
+
         created = 0
         linked = 0
         skipped = 0
@@ -2405,13 +2478,16 @@ class UsersService:
             existing_before: User | None = None
             if profile_phone or csv_phone:
                 try:
-                    existing_before = await self._resolve_user_by_phone_for_import(
-                        db, profile_phone or csv_phone
+                    existing_before = self._resolve_user_by_phone_from_index(
+                        profile_phone or csv_phone,
+                        phone_index,
                     )
                 except AppError:
                     existing_before = None
             if existing_before is None and profile_email is not None:
-                existing_before = await self._repository.get_user_by_email(db, profile_email)
+                owner_id = email_owners.get(profile_email.strip().lower())
+                if owner_id is not None:
+                    existing_before = await self._repository.get_user_by_id(db, owner_id)
 
             try:
                 async with db.begin_nested():
@@ -2422,6 +2498,8 @@ class UsersService:
                         csv_phone=csv_phone,
                         profile_data=row,
                         engagement_code=None,
+                        phone_index=phone_index,
+                        email_owners=email_owners,
                     )
             except AppError as exc:
                 failed += 1
@@ -2447,6 +2525,15 @@ class UsersService:
                 continue
 
             existing_by_ms_id[profile_id] = user
+            phone_key = (user.phone or "").strip()
+            if phone_key:
+                bucket = phone_index.setdefault(phone_key, [])
+                if not any(int(row.user_id) == int(user.user_id) for row in bucket):
+                    bucket.append(user)
+            email_key = (user.email or "").strip().lower()
+            if email_key:
+                email_owners[email_key] = int(user.user_id)
+
             if existing_before is not None:
                 linked += 1
             else:
