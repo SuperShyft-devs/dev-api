@@ -129,6 +129,23 @@ class UsersService:
     async def get_existing_user_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
         return await self._repository.get_user_by_phone(db, phone)
 
+    async def _has_phone_conflict(
+        self,
+        db: AsyncSession,
+        *,
+        phone: str,
+        exclude_user_id: int | None = None,
+    ) -> bool:
+        """True when another account already uses this phone (incl. +91 / 10-digit variants)."""
+
+        candidates = _phone_lookup_candidates(phone)
+        if not candidates:
+            return False
+        users = await self._repository.list_users_by_phones(db, candidates)
+        if exclude_user_id is None:
+            return bool(users)
+        return any(int(u.user_id) != int(exclude_user_id) for u in users)
+
     async def get_user_by_id(self, db: AsyncSession, user_id: int) -> Optional[User]:
         return await self._repository.get_user_by_id(db, user_id)
 
@@ -198,8 +215,11 @@ class UsersService:
 
         phone_to_use = data.phone or current_user.phone
         if data.phone is not None:
-            existing_phone = await self._repository.get_user_by_phone(db, data.phone)
-            if existing_phone is not None and existing_phone.user_id != current_user.user_id:
+            if await self._has_phone_conflict(
+                db,
+                phone=data.phone,
+                exclude_user_id=int(current_user.user_id),
+            ):
                 raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
 
         email_to_use = str(data.email) if data.email is not None else None
@@ -478,9 +498,13 @@ class UsersService:
         partial = payload.model_dump(exclude_unset=True)
         if "phone" in partial and partial["phone"] is not None:
             new_phone = partial["phone"].strip()
-            existing_phone = await self._repository.get_user_by_phone(db, new_phone)
-            if existing_phone is not None and existing_phone.user_id != user.user_id:
-                raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
+            if new_phone != (user.phone or "").strip():
+                if await self._has_phone_conflict(
+                    db,
+                    phone=new_phone,
+                    exclude_user_id=int(user.user_id),
+                ):
+                    raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
             payload_to_apply = payload.model_copy(update={"phone": new_phone})
 
         updated = await self._repository.update_user_profile(db, user=user, payload=payload_to_apply)
@@ -1126,12 +1150,12 @@ class UsersService:
         user_agent: str,
         endpoint: str,
     ) -> User:
-        existing = await self._repository.get_user_by_phone(db, payload.phone)
-        if existing is None and payload.email is not None:
-            existing = await self._repository.get_user_by_email(db, str(payload.email))
-
-        if existing is not None:
+        if await self._has_phone_conflict(db, phone=payload.phone):
             raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
+        if payload.email is not None:
+            existing_email = await self._repository.get_user_by_email(db, str(payload.email))
+            if existing_email is not None:
+                raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
 
         user = User(
             first_name=payload.first_name,
@@ -1236,9 +1260,9 @@ class UsersService:
             if (payload.status or "").strip().lower() != "active":
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="User must remain active")
 
-        existing = await self._repository.get_user_by_phone(db, payload.phone)
-        if existing is not None and existing.user_id != user_id:
-            raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
+        if (payload.phone or "").strip() != (user.phone or "").strip():
+            if await self._has_phone_conflict(db, phone=payload.phone, exclude_user_id=int(user_id)):
+                raise AppError(status_code=409, error_code="CONFLICT", message="User already exists")
 
         if payload.email is not None:
             existing_email = await self._repository.get_user_by_email(db, str(payload.email))

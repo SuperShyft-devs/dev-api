@@ -115,8 +115,30 @@ class UsersRepository:
         return user
 
     async def get_user_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
-        result = await db.execute(select(User).where(User.phone == phone))
-        return result.scalar_one_or_none()
+        """Return one user for an exact phone match (prefers primary over sub-profile)."""
+
+        normalized = (phone or "").strip()
+        if not normalized:
+            return None
+        result = await db.execute(select(User).where(User.phone == normalized))
+        rows = list(result.scalars().all())
+        if not rows:
+            return None
+        if len(rows) == 1:
+            return rows[0]
+        primaries = [u for u in rows if u.parent_id is None]
+        if len(primaries) == 1:
+            return primaries[0]
+        if primaries:
+            return primaries[0]
+        return rows[0]
+
+    async def list_users_by_phone_exact(self, db: AsyncSession, phone: str) -> list[User]:
+        normalized = (phone or "").strip()
+        if not normalized:
+            return []
+        result = await db.execute(select(User).where(User.phone == normalized))
+        return list(result.scalars().all())
 
     async def list_users_by_phones(self, db: AsyncSession, phones: list[str]) -> list[User]:
         normalized = list({(p or "").strip() for p in phones if (p or "").strip()})

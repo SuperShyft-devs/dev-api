@@ -57,6 +57,37 @@ async def test_update_me_updates_editable_fields(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
+async def test_update_me_allows_same_phone_when_subprofile_shares_number(async_client, test_db_session):
+    """Parent and sub-profile may share phone; updating other fields must not 500."""
+    parent = User(
+        user_id=1020,
+        age=30,
+        phone="+919876543210",
+        status="active",
+        first_name="Parent",
+    )
+    sub = User(
+        user_id=1021,
+        age=28,
+        phone="+919876543210",
+        status="active",
+        first_name="Sub",
+        parent_id=1020,
+    )
+    test_db_session.add_all([parent, sub])
+    await test_db_session.commit()
+
+    headers = _auth_header(1021)
+    response = await async_client.put(
+        "/users/me",
+        headers=headers,
+        json={"age": 28, "phone": "+919876543210", "first_name": "Sub Updated"},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["first_name"] == "Sub Updated"
+
+
+@pytest.mark.asyncio
 async def test_update_me_updates_phone(async_client, test_db_session):
     user = User(user_id=1010, age=30, phone="5555555555", status="active", first_name="A")
     test_db_session.add(user)
