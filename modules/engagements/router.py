@@ -276,6 +276,26 @@ async def get_public_engagement_participants(
     return success_response(participants, meta={"page": page, "limit": limit, "total": total})
 
 
+@router.delete("/{engagement_id}/participants")
+async def remove_all_participants_from_engagement(
+    engagement_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    data = await engagements_service.remove_all_participants_from_engagement_for_employee(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
 @router.delete("/{engagement_id}/participants/{user_id}")
 async def remove_participant_from_engagement(
     engagement_id: int,

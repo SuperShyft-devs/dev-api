@@ -717,31 +717,13 @@ class EngagementsService:
 
         return result, total
 
-    async def remove_participant_from_engagement_for_employee(
+    async def _purge_user_engagement_data(
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
-        engagement_id: int,
         user_id: int,
-        ip_address: str,
-        user_agent: str,
-        endpoint: str,
-    ) -> dict:
-        self._ensure_employee_access(employee)
-
-        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
-        if engagement is None:
-            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
-
-        participant = await self._repository.get_participant_for_user_engagement(
-            db,
-            user_id=user_id,
-            engagement_id=engagement_id,
-        )
-        if participant is None:
-            raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant does not exist")
-
+        engagement_id: int,
+    ) -> dict[str, int]:
         instances = await self._assessments_repository.list_instances_for_user_engagement(
             db,
             user_id=user_id,
@@ -777,6 +759,45 @@ class EngagementsService:
             user_id=user_id,
             engagement_id=engagement_id,
         )
+
+        return {
+            "deleted_engagement_participants": deleted_participants,
+            "deleted_assessment_instances": deleted_instances,
+            "deleted_questionnaire_responses": deleted_questionnaire_responses,
+            "deleted_reports": deleted_reports,
+            "deleted_category_progress_rows": deleted_category_progress,
+        }
+
+    async def remove_participant_from_engagement_for_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        participant = await self._repository.get_participant_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant does not exist")
+
+        purge = await self._purge_user_engagement_data(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
         engagement.participant_count = await self._repository.count_distinct_participants_for_engagement(
             db,
             engagement_id=engagement_id,
@@ -797,11 +818,82 @@ class EngagementsService:
         return {
             "engagement_id": engagement_id,
             "user_id": user_id,
-            "deleted_engagement_participants": deleted_participants,
-            "deleted_assessment_instances": deleted_instances,
-            "deleted_questionnaire_responses": deleted_questionnaire_responses,
-            "deleted_reports": deleted_reports,
-            "deleted_category_progress_rows": deleted_category_progress,
+            **purge,
+        }
+
+    async def remove_all_participants_from_engagement_for_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        """Remove every enrolled user from an engagement (same purge as single delete)."""
+
+        self._ensure_employee_access(employee)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        user_ids = await self._repository.list_distinct_participant_ids_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+
+        totals = {
+            "deleted_users": 0,
+            "deleted_engagement_participants": 0,
+            "deleted_assessment_instances": 0,
+            "deleted_questionnaire_responses": 0,
+            "deleted_reports": 0,
+            "deleted_category_progress_rows": 0,
+        }
+
+        for user_id in user_ids:
+            participant = await self._repository.get_participant_for_user_engagement(
+                db,
+                user_id=user_id,
+                engagement_id=engagement_id,
+            )
+            if participant is None:
+                continue
+
+            purge = await self._purge_user_engagement_data(
+                db,
+                user_id=user_id,
+                engagement_id=engagement_id,
+            )
+            totals["deleted_users"] += 1
+            totals["deleted_engagement_participants"] += purge["deleted_engagement_participants"]
+            totals["deleted_assessment_instances"] += purge["deleted_assessment_instances"]
+            totals["deleted_questionnaire_responses"] += purge["deleted_questionnaire_responses"]
+            totals["deleted_reports"] += purge["deleted_reports"]
+            totals["deleted_category_progress_rows"] += purge["deleted_category_progress_rows"]
+
+        engagement.participant_count = await self._repository.count_distinct_participants_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+        await self._repository.update_engagement(db, engagement)
+
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_DELETE_ALL_ENGAGEMENT_PARTICIPANTS",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return {
+            "engagement_id": engagement_id,
+            **totals,
         }
 
     async def get_questionnaire_status_for_engagement(
