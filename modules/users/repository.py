@@ -9,7 +9,7 @@ from typing import Optional
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import asc, delete, desc, func, or_, regexp_replace, right, select, update
+from sqlalchemy import asc, delete, desc, func, or_, select, update
 
 from common.listing import apply_sort, ilike_pattern, normalize_sort_dir
 from sqlalchemy.dialects.postgresql import insert
@@ -190,8 +190,8 @@ class UsersRepository:
 
     async def list_duplicate_phone_groups(self, db: AsyncSession) -> list[list[User]]:
         """Users grouped by last-10 phone digits when more than one user shares that key."""
-        digits_only = regexp_replace(User.phone, "[^0-9]", "", "g")
-        phone_key = right(digits_only, 10)
+        digits_only = func.regexp_replace(User.phone, "[^0-9]", "", "g")
+        phone_key = func.right(digits_only, 10)
         dup_keys_subq = (
             select(phone_key.label("phone_key"))
             .where(func.length(digits_only) >= 10)
@@ -202,8 +202,8 @@ class UsersRepository:
         result = await db.execute(
             select(User)
             .where(
-                func.length(regexp_replace(User.phone, "[^0-9]", "", "g")) >= 10,
-                right(regexp_replace(User.phone, "[^0-9]", "", "g"), 10).in_(
+                func.length(func.regexp_replace(User.phone, "[^0-9]", "", "g")) >= 10,
+                func.right(func.regexp_replace(User.phone, "[^0-9]", "", "g"), 10).in_(
                     select(dup_keys_subq.c.phone_key)
                 ),
             )
