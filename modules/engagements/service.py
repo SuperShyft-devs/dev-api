@@ -1119,6 +1119,7 @@ class EngagementsService:
             base["user_id"] = int(user.user_id)
             newly_enrolled = False
             user_id = int(user.user_id)
+            profile_on_metsights = bool((user.metsights_profile_id or "").strip())
 
             try:
                 async with db.begin_nested():
@@ -1130,6 +1131,7 @@ class EngagementsService:
                             engagement_date=engagement_date,
                             slot_start_time=default_slot,
                             increment_participant_count=True,
+                            is_profile_created_on_metsights=profile_on_metsights,
                             is_primary_record_id_synced=False,
                         )
                         newly_enrolled = True
@@ -1162,6 +1164,9 @@ class EngagementsService:
                         await self.update_participant_sync_flags(
                             db,
                             participant=participant,
+                            is_profile_created_on_metsights=(
+                                True if profile_on_metsights else None
+                            ),
                             is_primary_record_id_synced=True,
                         )
 

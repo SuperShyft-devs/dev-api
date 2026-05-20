@@ -209,6 +209,43 @@ async def test_assign_participants_batch_already_enrolled_still_assigns(async_cl
 
 
 @pytest.mark.asyncio
+async def test_assign_participants_batch_sets_profile_on_metsights_when_user_linked(
+    async_client, test_db_session
+):
+    await _seed_employee(test_db_session, user_id=8007)
+    await _seed_assessment_package(test_db_session)
+    await _seed_engagement(test_db_session)
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, age, phone, status, metsights_profile_id) "
+            "VALUES (5004, 30, '+919876543213', 'active', 'ms-profile-5004')"
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/engagements/9001/assign-participants-batch",
+        headers=_auth_header(8007),
+        json={"rows": [{"metsights_record_id": "NEWREC4", "phone": "+919876543213"}]},
+    )
+    assert response.status_code == 200
+    row = response.json()["data"]["results"][0]
+    assert row["status"] == "assigned"
+
+    flags = (
+        await test_db_session.execute(
+            text(
+                "SELECT is_profile_created_on_metsights, is_primary_record_id_synced "
+                "FROM engagement_participants WHERE engagement_id = 9001 AND user_id = 5004"
+            )
+        )
+    ).first()
+    assert flags.is_profile_created_on_metsights is True
+    assert flags.is_primary_record_id_synced is True
+
+
+@pytest.mark.asyncio
 async def test_assign_participants_batch_requires_assessment_package(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=8006)
     await _seed_assessment_package(test_db_session)
