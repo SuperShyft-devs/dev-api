@@ -79,13 +79,15 @@ async def list_employees(
     )
 
     data = []
-    for row in employees:
+    for row, first_name, last_name in employees:
         data.append(
             {
                 "employee_id": row.employee_id,
                 "user_id": row.user_id,
                 "role": row.role,
                 "status": row.status,
+                "first_name": first_name,
+                "last_name": last_name,
             }
         )
 
@@ -121,7 +123,9 @@ async def get_employee(
     employee: EmployeeContext = Depends(get_current_employee),
     employee_service: EmployeeService = Depends(get_employee_management_service),
 ):
-    row = await employee_service.get_employee_details(db, employee=employee, employee_id=employee_id)
+    row, first_name, last_name = await employee_service.get_employee_details(
+        db, employee=employee, employee_id=employee_id
+    )
 
     return success_response(
         {
@@ -129,6 +133,8 @@ async def get_employee(
             "user_id": row.user_id,
             "role": row.role,
             "status": row.status,
+            "first_name": first_name,
+            "last_name": last_name,
             "created_at": row.created_at,
             "updated_at": row.updated_at,
         }

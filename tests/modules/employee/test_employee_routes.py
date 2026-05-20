@@ -98,8 +98,10 @@ async def test_create_employee_creates_row(async_client, test_db_session):
 async def test_list_employees_paginates_and_filters(async_client, test_db_session):
     await _seed_admin_employee(test_db_session, user_id=8003, employee_id=12)
 
-    test_db_session.add(User(user_id=9100, phone="9100000000", age=30, status="active"))
-    test_db_session.add(User(user_id=9101, phone="9101000000", age=30, status="active"))
+    test_db_session.add(
+        User(user_id=9100, phone="9100000000", age=30, status="active", first_name="Alice", last_name="Admin")
+    )
+    test_db_session.add(User(user_id=9101, phone="9101000000", age=30, status="active", first_name="Bob", last_name="Ops"))
     await test_db_session.flush()
     test_db_session.add_all(
         [
@@ -120,12 +122,19 @@ async def test_list_employees_paginates_and_filters(async_client, test_db_sessio
     for row in body["data"]:
         assert (row["status"] or "").lower() == "active"
 
+    alice = next((r for r in body["data"] if r["employee_id"] == 100), None)
+    assert alice is not None
+    assert alice["first_name"] == "Alice"
+    assert alice["last_name"] == "Admin"
+
 
 @pytest.mark.asyncio
 async def test_get_employee_returns_details(async_client, test_db_session):
     await _seed_admin_employee(test_db_session, user_id=8004, employee_id=13)
 
-    test_db_session.add(User(user_id=9201, phone="9201000000", age=30, status="active"))
+    test_db_session.add(
+        User(user_id=9201, phone="9201000000", age=30, status="active", first_name="Carol", last_name="Operator")
+    )
     await test_db_session.flush()
     test_db_session.add(Employee(employee_id=201, user_id=9201, role="ops", status="active"))
     await test_db_session.commit()
@@ -134,6 +143,8 @@ async def test_get_employee_returns_details(async_client, test_db_session):
     assert response.status_code == 200
     assert response.json()["data"]["employee_id"] == 201
     assert response.json()["data"]["user_id"] == 9201
+    assert response.json()["data"]["first_name"] == "Carol"
+    assert response.json()["data"]["last_name"] == "Operator"
 
 
 @pytest.mark.asyncio

@@ -131,7 +131,7 @@ class EmployeeService:
         status: str | None,
         role: str | None,
         user_id: int | None,
-    ) -> tuple[list[Employee], int]:
+    ) -> tuple[list[tuple[Employee, str | None, str | None]], int]:
         self._ensure_admin(employee)
 
         status_value = None
@@ -164,10 +164,10 @@ class EmployeeService:
         *,
         employee: EmployeeContext,
         employee_id: int,
-    ) -> Employee:
+    ) -> tuple[Employee, str | None, str | None]:
         self._ensure_admin(employee)
 
-        row = await self._repository.get_by_id(db, employee_id)
+        row = await self._repository.get_by_id_with_user_names(db, employee_id)
         if row is None:
             raise AppError(status_code=404, error_code="EMPLOYEE_NOT_FOUND", message="Employee does not exist")
 

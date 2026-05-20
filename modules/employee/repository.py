@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.employee.models import Employee
+from modules.users.models import User
 
 
 class EmployeeRepository:
@@ -23,6 +24,20 @@ class EmployeeRepository:
     async def get_by_id(self, db: AsyncSession, employee_id: int) -> Optional[Employee]:
         result = await db.execute(select(Employee).where(Employee.employee_id == employee_id))
         return result.scalar_one_or_none()
+
+    async def get_by_id_with_user_names(
+        self, db: AsyncSession, employee_id: int
+    ) -> tuple[Employee, str | None, str | None] | None:
+        result = await db.execute(
+            select(Employee, User.first_name, User.last_name)
+            .join(User, User.user_id == Employee.user_id)
+            .where(Employee.employee_id == employee_id)
+        )
+        row = result.one_or_none()
+        if row is None:
+            return None
+        emp, first_name, last_name = row
+        return emp, first_name, last_name
 
     async def count_employees(
         self,
@@ -54,10 +69,12 @@ class EmployeeRepository:
         status: str | None = None,
         role: str | None = None,
         user_id: int | None = None,
-    ) -> list[Employee]:
+    ) -> list[tuple[Employee, str | None, str | None]]:
         offset = (page - 1) * limit
 
-        query = select(Employee)
+        query = select(Employee, User.first_name, User.last_name).join(
+            User, User.user_id == Employee.user_id
+        )
         if status is not None:
             query = query.where(Employee.status == status)
         if role is not None:
@@ -67,7 +84,7 @@ class EmployeeRepository:
 
         query = query.order_by(Employee.employee_id.desc()).offset(offset).limit(limit)
         result = await db.execute(query)
-        return list(result.scalars().all())
+        return list(result.all())
 
     async def create(self, db: AsyncSession, employee: Employee) -> Employee:
         db.add(employee)

@@ -352,7 +352,19 @@ class EngagementsService:
                     message=f"Organization with ID {payload.organization_id} does not exist",
                 )
 
+        code = (payload.engagement_code or "").strip()
+        if not code:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Engagement code cannot be empty")
+        existing_code = await self._repository.get_engagement_by_code(db, code)
+        if existing_code is not None and int(existing_code.engagement_id) != int(engagement.engagement_id):
+            raise AppError(
+                status_code=409,
+                error_code="DUPLICATE_ENGAGEMENT_CODE",
+                message="Engagement code already exists",
+            )
+
         engagement.engagement_name = payload.engagement_name
+        engagement.engagement_code = code
         engagement.organization_id = payload.organization_id
         engagement.engagement_type = payload.engagement_type
         engagement.assessment_package_id = payload.assessment_package_id

@@ -284,6 +284,7 @@ async def test_update_engagement_updates_fields(async_client, test_db_session):
 
     payload = {
         "engagement_name": "New",
+        "engagement_code": "CODE4-NEW",
         "organization_id": 1,
         "engagement_type": "bio_ai",
         "assessment_package_id": 1,
@@ -301,9 +302,72 @@ async def test_update_engagement_updates_fields(async_client, test_db_session):
     updated = await test_db_session.get(Engagement, 8301)
     assert updated is not None
     assert updated.engagement_name == "New"
+    assert updated.engagement_code == "CODE4-NEW"
     assert updated.city == "Pune"
     assert updated.slot_duration == 30
     assert updated.metsights_engagement_id == "MS1"
+
+
+@pytest.mark.asyncio
+async def test_update_engagement_rejects_duplicate_engagement_code(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7005, employee_id=13)
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    from modules.engagements.models import Engagement
+
+    test_db_session.add_all(
+        [
+            Engagement(
+                engagement_id=8302,
+                engagement_name="A",
+                organization_id=1,
+                engagement_code="TAKEN",
+                engagement_type="bio_ai",
+                assessment_package_id=1,
+                diagnostic_package_id=1,
+                city="BLR",
+                slot_duration=20,
+                start_date=date(2026, 2, 1),
+                end_date=date(2026, 2, 1),
+                status="active",
+                participant_count=0,
+            ),
+            Engagement(
+                engagement_id=8303,
+                engagement_name="B",
+                organization_id=1,
+                engagement_code="MINE",
+                engagement_type="bio_ai",
+                assessment_package_id=1,
+                diagnostic_package_id=1,
+                city="BLR",
+                slot_duration=20,
+                start_date=date(2026, 2, 1),
+                end_date=date(2026, 2, 1),
+                status="active",
+                participant_count=0,
+            ),
+        ]
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "engagement_name": "B",
+        "engagement_code": "TAKEN",
+        "organization_id": 1,
+        "engagement_type": "bio_ai",
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "city": "BLR",
+        "slot_duration": 20,
+        "start_date": "2026-02-01",
+        "end_date": "2026-02-01",
+    }
+
+    response = await async_client.put("/engagements/8303", headers=_auth_header(7005), json=payload)
+    assert response.status_code == 409
 
 
 @pytest.mark.asyncio

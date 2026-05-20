@@ -76,7 +76,7 @@ class OnboardingAssistantsService:
         employees: list[dict] = []
         for employee_id in employee_ids:
             try:
-                emp = await self._employee_service.get_employee_details(
+                emp, first_name, last_name = await self._employee_service.get_employee_details(
                     db,
                     employee=employee,
                     employee_id=employee_id,
@@ -93,6 +93,8 @@ class OnboardingAssistantsService:
                     "user_id": emp.user_id,
                     "role": emp.role,
                     "status": emp.status,
+                    "first_name": first_name,
+                    "last_name": last_name,
                 }
             )
 
