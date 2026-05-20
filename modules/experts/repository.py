@@ -5,13 +5,45 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.listing import apply_sort, ilike_pattern
 from modules.experts.models import Expert, ExpertExpertiseTag, ExpertReview
 
 
 class ExpertsRepository:
+    _EXPERT_SORT_COLUMNS = {
+        "expert_id": Expert.expert_id,
+        "expert_type": Expert.expert_type,
+        "specialization": Expert.specialization,
+        "status": Expert.status,
+        "experience_years": Expert.experience_years,
+    }
+
+    def _apply_expert_list_filters(
+        self,
+        query,
+        *,
+        expert_type: str | None,
+        status: str | None,
+        search: str | None = None,
+    ):
+        if expert_type is not None:
+            query = query.where(Expert.expert_type == expert_type)
+        if status is not None:
+            query = query.where(Expert.status == status)
+        if search is not None and search.strip():
+            pattern = ilike_pattern(search)
+            query = query.where(
+                or_(
+                    Expert.specialization.ilike(pattern),
+                    Expert.qualifications.ilike(pattern),
+                    Expert.about_text.ilike(pattern),
+                )
+            )
+        return query
+
     async def get_by_id(self, db: AsyncSession, expert_id: int) -> Expert | None:
         result = await db.execute(select(Expert).where(Expert.expert_id == expert_id))
         return result.scalar_one_or_none()
@@ -22,12 +54,10 @@ class ExpertsRepository:
         *,
         expert_type: str | None,
         status: str | None,
+        search: str | None = None,
     ) -> int:
         query = select(func.count()).select_from(Expert)
-        if expert_type is not None:
-            query = query.where(Expert.expert_type == expert_type)
-        if status is not None:
-            query = query.where(Expert.status == status)
+        query = self._apply_expert_list_filters(query, expert_type=expert_type, status=status, search=search)
         result = await db.execute(query)
         return int(result.scalar_one())
 
@@ -39,14 +69,21 @@ class ExpertsRepository:
         limit: int,
         expert_type: str | None,
         status: str | None,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[Expert]:
         offset = (page - 1) * limit
         query = select(Expert)
-        if expert_type is not None:
-            query = query.where(Expert.expert_type == expert_type)
-        if status is not None:
-            query = query.where(Expert.status == status)
-        query = query.order_by(Expert.expert_id.desc()).offset(offset).limit(limit)
+        query = self._apply_expert_list_filters(query, expert_type=expert_type, status=status, search=search)
+        query = apply_sort(
+            query,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            columns=self._EXPERT_SORT_COLUMNS,
+            default_column=Expert.expert_id,
+        )
+        query = query.offset(offset).limit(limit)
         result = await db.execute(query)
         return list(result.scalars().all())
 

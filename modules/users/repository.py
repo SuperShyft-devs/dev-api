@@ -9,7 +9,9 @@ from typing import Optional
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import asc, delete, desc, func, or_, regexp_replace, right, select, update
+
+from common.listing import apply_sort, ilike_pattern, normalize_sort_dir
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,17 +32,29 @@ from modules.support.models import SupportTicket
 class UsersRepository:
     """User database queries."""
 
-    async def count_users(
+    _USER_SORT_COLUMNS = {
+        "user_id": User.user_id,
+        "first_name": User.first_name,
+        "last_name": User.last_name,
+        "phone": User.phone,
+        "email": User.email,
+        "status": User.status,
+        "city": User.city,
+        "age": User.age,
+        "created_at": User.created_at,
+        "updated_at": User.updated_at,
+    }
+
+    def _apply_user_list_filters(
         self,
-        db: AsyncSession,
+        query,
         *,
         phone: str | None = None,
         email: str | None = None,
         status: str | None = None,
         is_participant: bool | None = None,
-    ) -> int:
-        query = select(func.count()).select_from(User)
-
+        search: str | None = None,
+    ):
         if phone is not None:
             query = query.where(User.phone == phone)
         if email is not None:
@@ -49,9 +63,59 @@ class UsersRepository:
             query = query.where(User.status == status)
         if is_participant is not None:
             query = query.where(User.is_participant == is_participant)
+        if search is not None and search.strip():
+            pattern = ilike_pattern(search)
+            full_name = func.trim(func.concat(func.coalesce(User.first_name, ""), " ", func.coalesce(User.last_name, "")))
+            query = query.where(
+                or_(
+                    User.first_name.ilike(pattern),
+                    User.last_name.ilike(pattern),
+                    full_name.ilike(pattern),
+                    User.phone.ilike(pattern),
+                    User.email.ilike(pattern),
+                )
+            )
+        return query
+
+    async def count_users(
+        self,
+        db: AsyncSession,
+        *,
+        phone: str | None = None,
+        email: str | None = None,
+        status: str | None = None,
+        is_participant: bool | None = None,
+        search: str | None = None,
+    ) -> int:
+        query = select(func.count()).select_from(User)
+        query = self._apply_user_list_filters(
+            query,
+            phone=phone,
+            email=email,
+            status=status,
+            is_participant=is_participant,
+            search=search,
+        )
 
         result = await db.execute(query)
         return int(result.scalar_one())
+
+    async def count_participant_metsights_stats(self, db: AsyncSession) -> tuple[int, int]:
+        """Return (participants_with_metsights_profile, total_participants)."""
+        base = select(func.count()).select_from(User).where(User.is_participant.is_(True))
+        total_result = await db.execute(base)
+        total_participants = int(total_result.scalar_one())
+
+        with_profile_query = (
+            select(func.count())
+            .select_from(User)
+            .where(User.is_participant.is_(True))
+            .where(User.metsights_profile_id.isnot(None))
+            .where(User.metsights_profile_id != "")
+        )
+        with_profile_result = await db.execute(with_profile_query)
+        with_profile = int(with_profile_result.scalar_one())
+        return with_profile, total_participants
 
     async def count_users_with_metsights_profile_id(self, db: AsyncSession) -> int:
         query = (
@@ -88,22 +152,72 @@ class UsersRepository:
         email: str | None = None,
         status: str | None = None,
         is_participant: bool | None = None,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[User]:
         offset = (page - 1) * limit
         query = select(User)
+        query = self._apply_user_list_filters(
+            query,
+            phone=phone,
+            email=email,
+            status=status,
+            is_participant=is_participant,
+            search=search,
+        )
 
-        if phone is not None:
-            query = query.where(User.phone == phone)
-        if email is not None:
-            query = query.where(User.email == email)
-        if status is not None:
-            query = query.where(User.status == status)
-        if is_participant is not None:
-            query = query.where(User.is_participant == is_participant)
+        sort_columns = dict(self._USER_SORT_COLUMNS)
+        if (sort_by or "").strip() == "name":
+            direction = asc if normalize_sort_dir(sort_dir) == "asc" else desc
+            query = query.order_by(
+                direction(User.first_name),
+                direction(User.last_name),
+                direction(User.user_id),
+            )
+        else:
+            query = apply_sort(
+                query,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                columns=sort_columns,
+                default_column=User.user_id,
+            )
 
-        query = query.order_by(User.user_id.desc()).offset(offset).limit(limit)
+        query = query.offset(offset).limit(limit)
         result = await db.execute(query)
         return list(result.scalars().all())
+
+    async def list_duplicate_phone_groups(self, db: AsyncSession) -> list[list[User]]:
+        """Users grouped by last-10 phone digits when more than one user shares that key."""
+        digits_only = regexp_replace(User.phone, "[^0-9]", "", "g")
+        phone_key = right(digits_only, 10)
+        dup_keys_subq = (
+            select(phone_key.label("phone_key"))
+            .where(func.length(digits_only) >= 10)
+            .group_by(phone_key)
+            .having(func.count() > 1)
+        ).subquery()
+
+        result = await db.execute(
+            select(User)
+            .where(
+                func.length(regexp_replace(User.phone, "[^0-9]", "", "g")) >= 10,
+                right(regexp_replace(User.phone, "[^0-9]", "", "g"), 10).in_(
+                    select(dup_keys_subq.c.phone_key)
+                ),
+            )
+            .order_by(User.user_id.asc())
+        )
+        users = list(result.scalars().all())
+        groups: dict[str, list[User]] = {}
+        for user in users:
+            digits = "".join(ch for ch in (user.phone or "") if ch.isdigit())
+            if len(digits) < 10:
+                continue
+            key = digits[-10:]
+            groups.setdefault(key, []).append(user)
+        return [sorted(group, key=lambda u: u.user_id) for group in groups.values() if len(group) > 1]
 
     async def update_user_full(self, db: AsyncSession, *, user: User, data: dict) -> User:
         for field_name, value in data.items():

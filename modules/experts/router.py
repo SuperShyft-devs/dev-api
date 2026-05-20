@@ -94,6 +94,9 @@ async def list_experts(
     limit: int = 20,
     expert_type: str | None = None,
     status: str | None = None,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext | None = Depends(get_optional_employee_if_authenticated),
     experts_service: ExpertsService = Depends(get_experts_service),
@@ -110,6 +113,9 @@ async def list_experts(
         limit=limit,
         expert_type=expert_type,
         status_query=status_param,
+        search=search,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
     )
     return success_response([_expert_dict(e) for e in experts], meta={"page": page, "limit": limit, "total": total})
 

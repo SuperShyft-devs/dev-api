@@ -460,6 +460,45 @@ async def import_metsights_profiles(
     return success_response(result)
 
 
+@router.get("/stats")
+async def employee_get_user_stats(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    users_service: UsersService = Depends(get_users_service),
+):
+    stats = await users_service.get_participant_metsights_stats_for_employee(db, employee=employee)
+    return success_response(stats)
+
+
+@router.get("/duplicates")
+async def employee_list_duplicate_users(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    users_service: UsersService = Depends(get_users_service),
+):
+    groups = await users_service.list_duplicate_phone_users_for_employee(db, employee=employee)
+    data = []
+    for group in groups:
+        data.append(
+            {
+                "key": "".join(ch for ch in (group[0].phone or "") if ch.isdigit())[-10:],
+                "users": [
+                    {
+                        "user_id": user.user_id,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "phone": user.phone,
+                        "email": user.email,
+                        "status": user.status,
+                    }
+                    for user in group
+                ],
+            }
+        )
+    data.sort(key=lambda g: len(g["users"]), reverse=True)
+    return success_response(data)
+
+
 @router.get("")
 async def employee_list_users(
     request: Request,
@@ -469,6 +508,9 @@ async def employee_list_users(
     email: str | None = None,
     status: str | None = None,
     is_participant: bool | None = None,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     users_service: UsersService = Depends(get_users_service),
@@ -485,6 +527,9 @@ async def employee_list_users(
         email=email,
         status=status,
         is_participant=is_participant,
+        search=search,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
     )
 
     data = []

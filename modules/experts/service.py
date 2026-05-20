@@ -62,6 +62,9 @@ class ExpertsService:
         limit: int,
         expert_type: str | None,
         status_query: str | None,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> tuple[list[Expert], int]:
         expert_type_filter = None
         if expert_type is not None:
@@ -85,11 +88,15 @@ class ExpertsService:
             limit=limit,
             expert_type=expert_type_filter,
             status=status_filter,
+            search=search,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
         total = await self._repository.count_experts(
             db,
             expert_type=expert_type_filter,
             status=status_filter,
+            search=search,
         )
         return experts, total
 

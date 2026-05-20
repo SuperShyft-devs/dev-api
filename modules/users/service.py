@@ -1207,6 +1207,9 @@ class UsersService:
         email: str | None,
         status: str | None,
         is_participant: bool | None,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> tuple[list[User], int]:
         self._ensure_employee_access(employee)
 
@@ -1218,6 +1221,9 @@ class UsersService:
             email=email,
             status=status,
             is_participant=is_participant,
+            search=search,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
 
         total = await self._repository.count_users(
@@ -1226,9 +1232,22 @@ class UsersService:
             email=email,
             status=status,
             is_participant=is_participant,
+            search=search,
         )
 
         return users, total
+
+    async def get_participant_metsights_stats_for_employee(self, db: AsyncSession, *, employee) -> dict:
+        self._ensure_employee_access(employee)
+        with_profile, total_participants = await self._repository.count_participant_metsights_stats(db)
+        return {
+            "with_metsights_profile": with_profile,
+            "total_participants": total_participants,
+        }
+
+    async def list_duplicate_phone_users_for_employee(self, db: AsyncSession, *, employee) -> list[list[User]]:
+        self._ensure_employee_access(employee)
+        return await self._repository.list_duplicate_phone_groups(db)
 
     async def get_user_details_for_employee(self, db: AsyncSession, *, employee, user_id: int) -> User:
         self._ensure_employee_access(employee)

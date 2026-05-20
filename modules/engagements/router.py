@@ -58,6 +58,16 @@ async def create_engagement(
     return success_response({"engagement_id": engagement.engagement_id})
 
 
+@router.get("/filter-options")
+async def get_engagement_filter_options(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    options = await engagements_service.get_engagement_filter_options_for_employee(db, employee=employee)
+    return success_response(options)
+
+
 @router.get("")
 async def list_engagements(
     request: Request,
@@ -66,6 +76,10 @@ async def list_engagements(
     org_id: int | None = None,
     status: str | None = None,
     city: str | None = None,
+    engagement_type: str | None = None,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
     date: date | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
@@ -83,6 +97,10 @@ async def list_engagements(
         status=status,
         city=city,
         on_date=date,
+        search=search,
+        engagement_type=engagement_type,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
     )
 
     data = []

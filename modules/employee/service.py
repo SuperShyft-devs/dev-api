@@ -131,6 +131,9 @@ class EmployeeService:
         status: str | None,
         role: str | None,
         user_id: int | None,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> tuple[list[tuple[Employee, str | None, str | None]], int]:
         self._ensure_admin(employee)
 
@@ -148,12 +151,16 @@ class EmployeeService:
             status=status_value,
             role=role,
             user_id=user_id,
+            search=search,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
         total = await self._repository.count_employees(
             db,
             status=status_value,
             role=role,
             user_id=user_id,
+            search=search,
         )
 
         return employees, total

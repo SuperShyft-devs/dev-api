@@ -56,6 +56,16 @@ async def create_organization(
     return success_response({"organization_id": organization.organization_id})
 
 
+@router.get("/filter-options")
+async def get_organization_filter_options(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    organizations_service: OrganizationsService = Depends(get_organizations_service),
+):
+    options = await organizations_service.get_organization_filter_options_for_employee(db, employee=employee)
+    return success_response(options)
+
+
 @router.get("")
 async def list_organizations(
     request: Request,
@@ -64,6 +74,11 @@ async def list_organizations(
     status: str | None = None,
     organization_type: str | None = None,
     bd_employee_id: int | None = None,
+    search: str | None = None,
+    city: str | None = None,
+    country: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     organizations_service: OrganizationsService = Depends(get_organizations_service),
@@ -79,6 +94,11 @@ async def list_organizations(
         status=status,
         organization_type=organization_type,
         bd_employee_id=bd_employee_id,
+        search=search,
+        city=city,
+        country=country,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
     )
 
     data = []

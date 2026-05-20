@@ -272,6 +272,10 @@ class EngagementsService:
         status: str | None,
         city: str | None,
         on_date,
+        search: str | None = None,
+        engagement_type: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> tuple[list[Engagement], int, dict[int, ChecklistReadiness]]:
         self._ensure_employee_access(employee)
 
@@ -290,6 +294,10 @@ class EngagementsService:
             status=status_value,
             city=city,
             on_date=on_date,
+            search=search,
+            engagement_type=engagement_type,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
 
         total = await self._repository.count_engagements(
@@ -298,6 +306,8 @@ class EngagementsService:
             status=status_value,
             city=city,
             on_date=on_date,
+            search=search,
+            engagement_type=engagement_type,
         )
 
         checklists = self.lazy_checklists_service()
@@ -306,6 +316,11 @@ class EngagementsService:
             readiness_by_id[row.engagement_id] = await checklists.get_engagement_readiness(db, row.engagement_id)
 
         return engagements, total, readiness_by_id
+
+    async def get_engagement_filter_options_for_employee(self, db: AsyncSession, *, employee: EmployeeContext) -> dict:
+        self._ensure_employee_access(employee)
+        types, cities = await self._repository.list_distinct_engagement_types_and_cities(db)
+        return {"engagement_types": types, "cities": cities}
 
     async def get_engagement_details_for_employee(
         self,

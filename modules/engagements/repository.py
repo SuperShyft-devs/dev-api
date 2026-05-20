@@ -5,14 +5,59 @@ Only database queries live here.
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.listing import apply_sort, ilike_pattern
 from modules.engagements.models import Engagement, EngagementParticipant, OnboardingAssistantAssignment
 
 
 class EngagementsRepository:
     """Engagement database queries."""
+
+    _ENGAGEMENT_SORT_COLUMNS = {
+        "engagement_id": Engagement.engagement_id,
+        "engagement_name": Engagement.engagement_name,
+        "engagement_code": Engagement.engagement_code,
+        "engagement_type": Engagement.engagement_type,
+        "city": Engagement.city,
+        "status": Engagement.status,
+        "start_date": Engagement.start_date,
+        "end_date": Engagement.end_date,
+    }
+
+    def _apply_engagement_list_filters(
+        self,
+        query,
+        *,
+        organization_id: int | None = None,
+        status: str | None = None,
+        city: str | None = None,
+        on_date=None,
+        search: str | None = None,
+        engagement_type: str | None = None,
+    ):
+        if organization_id is not None:
+            query = query.where(Engagement.organization_id == organization_id)
+        if status is not None:
+            query = query.where(Engagement.status == status)
+        if city is not None and city.strip():
+            query = query.where(func.lower(func.trim(Engagement.city)) == city.strip().lower())
+        if on_date is not None:
+            query = query.where(Engagement.start_date <= on_date).where(Engagement.end_date >= on_date)
+        if engagement_type is not None and engagement_type.strip():
+            type_text = func.lower(func.trim(cast(Engagement.engagement_type, String)))
+            query = query.where(type_text == engagement_type.strip().lower())
+        if search is not None and search.strip():
+            pattern = ilike_pattern(search)
+            query = query.where(
+                or_(
+                    Engagement.engagement_name.ilike(pattern),
+                    Engagement.engagement_code.ilike(pattern),
+                    Engagement.city.ilike(pattern),
+                )
+            )
+        return query
 
     async def get_engagement_by_code(self, db: AsyncSession, engagement_code: str) -> Engagement | None:
         result = await db.execute(select(Engagement).where(Engagement.engagement_code == engagement_code))
@@ -66,19 +111,19 @@ class EngagementsRepository:
         status: str | None = None,
         city: str | None = None,
         on_date=None,
+        search: str | None = None,
+        engagement_type: str | None = None,
     ) -> int:
-        from sqlalchemy import func
-
         query = select(func.count()).select_from(Engagement)
-
-        if organization_id is not None:
-            query = query.where(Engagement.organization_id == organization_id)
-        if status is not None:
-            query = query.where(Engagement.status == status)
-        if city is not None:
-            query = query.where(Engagement.city == city)
-        if on_date is not None:
-            query = query.where(Engagement.start_date <= on_date).where(Engagement.end_date >= on_date)
+        query = self._apply_engagement_list_filters(
+            query,
+            organization_id=organization_id,
+            status=status,
+            city=city,
+            on_date=on_date,
+            search=search,
+            engagement_type=engagement_type,
+        )
 
         result = await db.execute(query)
         return int(result.scalar_one())
@@ -93,22 +138,50 @@ class EngagementsRepository:
         status: str | None = None,
         city: str | None = None,
         on_date=None,
+        search: str | None = None,
+        engagement_type: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[Engagement]:
         offset = (page - 1) * limit
         query = select(Engagement)
-
-        if organization_id is not None:
-            query = query.where(Engagement.organization_id == organization_id)
-        if status is not None:
-            query = query.where(Engagement.status == status)
-        if city is not None:
-            query = query.where(Engagement.city == city)
-        if on_date is not None:
-            query = query.where(Engagement.start_date <= on_date).where(Engagement.end_date >= on_date)
-
-        query = query.order_by(Engagement.engagement_id.desc()).offset(offset).limit(limit)
+        query = self._apply_engagement_list_filters(
+            query,
+            organization_id=organization_id,
+            status=status,
+            city=city,
+            on_date=on_date,
+            search=search,
+            engagement_type=engagement_type,
+        )
+        query = apply_sort(
+            query,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            columns=self._ENGAGEMENT_SORT_COLUMNS,
+            default_column=Engagement.engagement_id,
+        )
+        query = query.offset(offset).limit(limit)
         result = await db.execute(query)
         return list(result.scalars().all())
+
+    async def list_distinct_engagement_types_and_cities(self, db: AsyncSession) -> tuple[list[str], list[str]]:
+        engagement_type_text = cast(Engagement.engagement_type, String)
+        type_result = await db.execute(
+            select(func.distinct(func.trim(engagement_type_text)))
+            .where(Engagement.engagement_type.isnot(None))
+            .where(func.trim(engagement_type_text) != "")
+            .order_by(func.trim(engagement_type_text).asc())
+        )
+        city_result = await db.execute(
+            select(func.distinct(func.trim(Engagement.city)))
+            .where(Engagement.city.isnot(None))
+            .where(func.trim(Engagement.city) != "")
+            .order_by(func.trim(Engagement.city).asc())
+        )
+        types = [str(v) for v in type_result.scalars().all() if v]
+        cities = [str(v) for v in city_result.scalars().all() if v]
+        return types, cities
 
     async def create_engagement(self, db: AsyncSession, engagement: Engagement) -> Engagement:
         db.add(engagement)

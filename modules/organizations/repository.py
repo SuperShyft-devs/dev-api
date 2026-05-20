@@ -7,14 +7,56 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.listing import apply_sort, ilike_pattern
 from modules.organizations.models import Organization
 
 
 class OrganizationsRepository:
     """Organization database queries."""
+
+    _ORG_SORT_COLUMNS = {
+        "organization_id": Organization.organization_id,
+        "name": Organization.name,
+        "city": Organization.city,
+        "country": Organization.country,
+        "status": Organization.status,
+        "organization_type": Organization.organization_type,
+    }
+
+    def _apply_org_list_filters(
+        self,
+        query,
+        *,
+        status: str | None = None,
+        organization_type: str | None = None,
+        bd_employee_id: int | None = None,
+        search: str | None = None,
+        city: str | None = None,
+        country: str | None = None,
+    ):
+        if status is not None:
+            query = query.where(Organization.status == status)
+        if organization_type is not None:
+            query = query.where(Organization.organization_type == organization_type)
+        if bd_employee_id is not None:
+            query = query.where(Organization.bd_employee_id == bd_employee_id)
+        if city is not None and city.strip():
+            query = query.where(func.lower(func.trim(Organization.city)) == city.strip().lower())
+        if country is not None and country.strip():
+            query = query.where(func.lower(func.trim(Organization.country)) == country.strip().lower())
+        if search is not None and search.strip():
+            pattern = ilike_pattern(search)
+            query = query.where(
+                or_(
+                    Organization.name.ilike(pattern),
+                    Organization.city.ilike(pattern),
+                    Organization.country.ilike(pattern),
+                )
+            )
+        return query
 
     async def get_by_id(self, db: AsyncSession, organization_id: int) -> Organization | None:
         result = await db.execute(select(Organization).where(Organization.organization_id == organization_id))
@@ -31,15 +73,20 @@ class OrganizationsRepository:
         status: str | None = None,
         organization_type: str | None = None,
         bd_employee_id: int | None = None,
+        search: str | None = None,
+        city: str | None = None,
+        country: str | None = None,
     ) -> int:
         query = select(func.count()).select_from(Organization)
-
-        if status is not None:
-            query = query.where(Organization.status == status)
-        if organization_type is not None:
-            query = query.where(Organization.organization_type == organization_type)
-        if bd_employee_id is not None:
-            query = query.where(Organization.bd_employee_id == bd_employee_id)
+        query = self._apply_org_list_filters(
+            query,
+            status=status,
+            organization_type=organization_type,
+            bd_employee_id=bd_employee_id,
+            search=search,
+            city=city,
+            country=country,
+        )
 
         result = await db.execute(query)
         return int(result.scalar_one())
@@ -53,20 +100,50 @@ class OrganizationsRepository:
         status: str | None = None,
         organization_type: str | None = None,
         bd_employee_id: int | None = None,
+        search: str | None = None,
+        city: str | None = None,
+        country: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> list[Organization]:
         offset = (page - 1) * limit
         query = select(Organization)
-
-        if status is not None:
-            query = query.where(Organization.status == status)
-        if organization_type is not None:
-            query = query.where(Organization.organization_type == organization_type)
-        if bd_employee_id is not None:
-            query = query.where(Organization.bd_employee_id == bd_employee_id)
-
-        query = query.order_by(Organization.organization_id.desc()).offset(offset).limit(limit)
+        query = self._apply_org_list_filters(
+            query,
+            status=status,
+            organization_type=organization_type,
+            bd_employee_id=bd_employee_id,
+            search=search,
+            city=city,
+            country=country,
+        )
+        query = apply_sort(
+            query,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            columns=self._ORG_SORT_COLUMNS,
+            default_column=Organization.organization_id,
+        )
+        query = query.offset(offset).limit(limit)
         result = await db.execute(query)
         return list(result.scalars().all())
+
+    async def list_distinct_cities_and_countries(self, db: AsyncSession) -> tuple[list[str], list[str]]:
+        city_result = await db.execute(
+            select(func.distinct(func.trim(Organization.city)))
+            .where(Organization.city.isnot(None))
+            .where(func.trim(Organization.city) != "")
+            .order_by(func.trim(Organization.city).asc())
+        )
+        country_result = await db.execute(
+            select(func.distinct(func.trim(Organization.country)))
+            .where(Organization.country.isnot(None))
+            .where(func.trim(Organization.country) != "")
+            .order_by(func.trim(Organization.country).asc())
+        )
+        cities = [str(v) for v in city_result.scalars().all() if v]
+        countries = [str(v) for v in country_result.scalars().all() if v]
+        return cities, countries
 
     async def create(self, db: AsyncSession, organization: Organization) -> Organization:
         db.add(organization)

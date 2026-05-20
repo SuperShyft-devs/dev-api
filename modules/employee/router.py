@@ -61,6 +61,9 @@ async def list_employees(
     status: str | None = None,
     role: str | None = None,
     user_id: int | None = None,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     employee_service: EmployeeService = Depends(get_employee_management_service),
@@ -76,6 +79,9 @@ async def list_employees(
         status=status,
         role=role,
         user_id=user_id,
+        search=search,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
     )
 
     data = []

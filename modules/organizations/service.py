@@ -113,6 +113,11 @@ class OrganizationsService:
         status: str | None,
         organization_type: str | None,
         bd_employee_id: int | None,
+        search: str | None = None,
+        city: str | None = None,
+        country: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
     ) -> tuple[list[Organization], int]:
         self._ensure_employee_access(employee)
 
@@ -130,14 +135,27 @@ class OrganizationsService:
             status=status_value,
             organization_type=organization_type,
             bd_employee_id=bd_employee_id,
+            search=search,
+            city=city,
+            country=country,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
         total = await self._repository.count_organizations(
             db,
             status=status_value,
             organization_type=organization_type,
             bd_employee_id=bd_employee_id,
+            search=search,
+            city=city,
+            country=country,
         )
         return organizations, total
+
+    async def get_organization_filter_options_for_employee(self, db, *, employee: EmployeeContext) -> dict:
+        self._ensure_employee_access(employee)
+        cities, countries = await self._repository.list_distinct_cities_and_countries(db)
+        return {"cities": cities, "countries": countries}
 
     async def get_organization_details_for_employee(
         self,
