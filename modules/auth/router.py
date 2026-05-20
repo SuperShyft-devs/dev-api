@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+
+from core.config import settings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -28,10 +30,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def send_otp(
     payload: SendOtpRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service),
 ):
-    session_id = await auth_service.send_otp(
+    session_id, dispatch_phone, otp_plain = await auth_service.send_otp(
         db,
         phone=payload.phone,
         ip_address=get_client_ip(request),
@@ -39,6 +42,13 @@ async def send_otp(
         endpoint=str(request.url.path),
     )
     await db.commit()
+
+    if dispatch_phone and otp_plain:
+        if settings.is_production():
+            background_tasks.add_task(auth_service.deliver_otp_sms, dispatch_phone, otp_plain)
+        else:
+            await auth_service.deliver_otp_sms(dispatch_phone, otp_plain)
+
     return success_response({"session_id": session_id})
 
 

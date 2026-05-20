@@ -14,7 +14,7 @@ async def test_verify_otp_fails_with_wrong_code(auth_service, test_db_session):
     test_db_session.add(User(user_id=1010, age=30, phone="5555555555", status="active"))
     await test_db_session.commit()
 
-    session_id = await auth_service.send_otp(
+    session_id, _, _ = await auth_service.send_otp(
         test_db_session,
         phone="5555555555",
         ip_address="1.1.1.1",

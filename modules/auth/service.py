@@ -185,7 +185,7 @@ class AuthService:
         ip_address: str,
         user_agent: str,
         endpoint: str,
-    ) -> int:
+    ) -> tuple[int, str | None, str | None]:
         phone_candidates, skip_send = self._split_send_otp_phone(phone)
 
         user = await self._resolve_user_for_otp(db, phone_candidates)
@@ -209,9 +209,9 @@ class AuthService:
         await self._repository.delete_all_otp_sessions_for_user(db, user.user_id)
         created = await self._repository.create_otp_session(db, session)
 
+        dispatch_phone: str | None = None
         if not skip_send:
             dispatch_phone = (user.phone or "").strip() or phone_candidates[0]
-            await self._otp_sender.send_otp(dispatch_phone, otp)
 
         await self._audit_service.log_event(
             db,
@@ -223,7 +223,11 @@ class AuthService:
             session_id=created.session_id,
         )
 
-        return created.session_id
+        return created.session_id, dispatch_phone, otp if dispatch_phone else None
+
+    async def deliver_otp_sms(self, phone: str, otp: str) -> None:
+        """Send OTP via external provider (may be slow; run in background in production)."""
+        await self._otp_sender.send_otp(phone, otp)
 
     async def verify_otp(
         self,
