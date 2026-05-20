@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import secrets
 import string
-from datetime import date, time
+from datetime import date, datetime, time, timezone
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.exc import IntegrityError
@@ -33,6 +33,7 @@ from modules.users.repository import UsersRepository
 
 if TYPE_CHECKING:
     from modules.checklists.service import ChecklistsService
+    from modules.metsights.service import MetsightsService
 
 
 def _generate_engagement_code(length: int = 8) -> str:
@@ -94,12 +95,14 @@ class EngagementsService:
         organizations_repository: OrganizationsRepository | None = None,
         users_repository: UsersRepository | None = None,
         assessments_service: AssessmentsService | None = None,
+        metsights_service: MetsightsService | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
         self._organizations_repository = organizations_repository
         self._users_repository = users_repository or UsersRepository()
         self._assessments_service = assessments_service
+        self._metsights_service = metsights_service
         self._assessments_repository = AssessmentsRepository()
         self._questionnaire_repository = QuestionnaireRepository()
         self._reports_repository = ReportsRepository()
@@ -1118,6 +1121,89 @@ class EngagementsService:
         phone_index = await self._preload_phone_lookup_index(db, [phone])
         return self._resolve_user_by_phone_from_index(phone, phone_index)
 
+    def _users_matching_phone_from_index(self, phone: str, phone_index: dict[str, list[User]]) -> list[User]:
+        rows_by_user_id: dict[int, User] = {}
+        for candidate in _phone_lookup_candidates(phone):
+            for user in phone_index.get(candidate, []):
+                rows_by_user_id[int(user.user_id)] = user
+        return list(rows_by_user_id.values())
+
+    def _resolve_user_by_phone_and_email_from_index(
+        self,
+        phone: str,
+        email: str | None,
+        phone_index: dict[str, list[User]],
+    ) -> User | None:
+        email_norm = (email or "").strip().lower()
+        if email_norm:
+            matched = [
+                u
+                for u in self._users_matching_phone_from_index(phone, phone_index)
+                if (u.email or "").strip().lower() == email_norm
+            ]
+            if not matched:
+                return None
+            if len(matched) > 1:
+                raise AppError(
+                    status_code=409,
+                    error_code="AMBIGUOUS_PHONE",
+                    message="Multiple accounts match this phone and email",
+                )
+            return matched[0]
+
+        return self._resolve_user_by_phone_from_index(phone, phone_index)
+
+    @staticmethod
+    def _metsights_records_list_payload(data: Any) -> list[dict[str, Any]]:
+        if isinstance(data, list):
+            return [r for r in data if isinstance(r, dict)]
+        if isinstance(data, dict):
+            inner = data.get("results")
+            if isinstance(inner, list):
+                return [r for r in inner if isinstance(r, dict)]
+        return []
+
+    @staticmethod
+    def _parse_metsights_datetime(raw: Any) -> datetime | None:
+        value = (str(raw).strip() if raw is not None else "")
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed
+
+    async def _load_metsights_record_created_at_index(
+        self,
+        profile_id: str,
+        *,
+        cache: dict[str, dict[str, datetime]],
+    ) -> dict[str, datetime]:
+        pid = (profile_id or "").strip()
+        if not pid:
+            return {}
+        if pid in cache:
+            return cache[pid]
+
+        if self._metsights_service is None:
+            raise RuntimeError("Metsights service is required")
+
+        raw_records = await self._metsights_service.list_profile_records(profile_id=pid)
+        rows = self._metsights_records_list_payload(raw_records)
+        index: dict[str, datetime] = {}
+        for row in rows:
+            mrid = str(row.get("id") or "").strip()
+            if not mrid:
+                continue
+            created_at = self._parse_metsights_datetime(row.get("created_at"))
+            if created_at is not None:
+                index[mrid] = created_at
+        cache[pid] = index
+        return index
+
     async def assign_participants_batch(
         self,
         db: AsyncSession,
@@ -1129,12 +1215,14 @@ class EngagementsService:
         user_agent: str,
         endpoint: str,
     ) -> dict[str, Any]:
-        """Enroll users by phone and assign assessment instances keyed by Metsights record id."""
+        """Enroll users by phone + email and assign assessment instances keyed by Metsights record id."""
 
         self._ensure_employee_access(employee)
 
         if self._assessments_service is None:
             raise RuntimeError("Assessments service is required")
+        if self._metsights_service is None:
+            raise RuntimeError("Metsights service is required")
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -1160,16 +1248,24 @@ class EngagementsService:
 
         existing_by_mrid = await self._assessments_service.get_instances_by_metsights_record_ids(db, mrids)
         phone_index = await self._preload_phone_lookup_index(db, phones)
+        metsights_record_created_at_cache: dict[str, dict[str, datetime]] = {}
 
-        resolved_users: dict[str, User | None] = {}
-        ambiguous_phones: set[str] = set()
-        for phone_raw in phones:
-            if phone_raw in resolved_users or phone_raw in ambiguous_phones:
+        resolved_users: dict[tuple[str, str], User | None] = {}
+        ambiguous_keys: set[tuple[str, str]] = set()
+        for row in rows:
+            phone_raw = (row.get("phone") or "").strip()
+            email_raw = (row.get("email") or "").strip()
+            if not phone_raw:
+                continue
+            key = (phone_raw, email_raw.lower())
+            if key in resolved_users or key in ambiguous_keys:
                 continue
             try:
-                resolved_users[phone_raw] = self._resolve_user_by_phone_from_index(phone_raw, phone_index)
+                resolved_users[key] = self._resolve_user_by_phone_and_email_from_index(
+                    phone_raw, email_raw, phone_index
+                )
             except AppError:
-                ambiguous_phones.add(phone_raw)
+                ambiguous_keys.add(key)
 
         candidate_user_ids = [
             int(user.user_id) for user in resolved_users.values() if user is not None
@@ -1188,9 +1284,11 @@ class EngagementsService:
         for row in rows:
             mrid = (row.get("metsights_record_id") or "").strip()
             phone_raw = (row.get("phone") or "").strip()
+            email_raw = (row.get("email") or "").strip()
             base: dict[str, Any] = {
                 "metsights_record_id": mrid or row.get("metsights_record_id", ""),
                 "phone": phone_raw or row.get("phone", ""),
+                "email": email_raw or row.get("email", ""),
                 "status": "error",
                 "reason": None,
                 "user_id": None,
@@ -1210,8 +1308,15 @@ class EngagementsService:
                 results.append(base)
                 continue
 
+            if not email_raw:
+                base["status"] = "skipped"
+                base["reason"] = "missing_email"
+                results.append(base)
+                continue
+
             base["metsights_record_id"] = mrid
             base["phone"] = phone_raw
+            base["email"] = email_raw
 
             existing_inst = existing_by_mrid.get(mrid)
             if existing_inst is not None:
@@ -1222,13 +1327,14 @@ class EngagementsService:
                 results.append(base)
                 continue
 
-            if phone_raw in ambiguous_phones:
+            lookup_key = (phone_raw, email_raw.lower())
+            if lookup_key in ambiguous_keys:
                 base["status"] = "error"
                 base["reason"] = "ambiguous_phone"
                 results.append(base)
                 continue
 
-            user = resolved_users.get(phone_raw)
+            user = resolved_users.get(lookup_key)
             if user is None:
                 base["status"] = "skipped"
                 base["reason"] = "user_not_found"
@@ -1239,6 +1345,7 @@ class EngagementsService:
             newly_enrolled = False
             user_id = int(user.user_id)
             profile_on_metsights = bool((user.metsights_profile_id or "").strip())
+            metsights_profile_id = (user.metsights_profile_id or "").strip()
 
             try:
                 async with db.begin_nested():
@@ -1256,6 +1363,25 @@ class EngagementsService:
                         newly_enrolled = True
                         enrolled_user_ids.add(user_id)
 
+                    if not metsights_profile_id:
+                        raise AppError(
+                            status_code=422,
+                            error_code="INVALID_STATE",
+                            message="User has no Metsights profile id",
+                        )
+
+                    record_index = await self._load_metsights_record_created_at_index(
+                        metsights_profile_id,
+                        cache=metsights_record_created_at_cache,
+                    )
+                    assigned_at = record_index.get(mrid)
+                    if assigned_at is None:
+                        raise AppError(
+                            status_code=404,
+                            error_code="RECORD_NOT_FOUND",
+                            message="Metsights record not found for profile",
+                        )
+
                     instance = await self._assessments_service.create_instance_for_metsights_record(
                         db,
                         user_id=user_id,
@@ -1266,6 +1392,7 @@ class EngagementsService:
                         ip_address=ip_address,
                         user_agent=user_agent,
                         endpoint=endpoint,
+                        assigned_at=assigned_at,
                     )
                     existing_by_mrid[mrid] = instance
 

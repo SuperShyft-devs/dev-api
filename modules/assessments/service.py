@@ -139,6 +139,7 @@ class AssessmentsService:
         ip_address: str,
         user_agent: str,
         endpoint: str,
+        assigned_at: datetime | None = None,
     ) -> AssessmentInstance:
         """Create an assessment instance keyed by Metsights record id.
 
@@ -166,13 +167,14 @@ class AssessmentsService:
 
         status = "completed" if metsights_is_complete else "active"
         completed_at = datetime.now(timezone.utc) if metsights_is_complete else None
+        resolved_assigned_at = assigned_at if assigned_at is not None else datetime.now(timezone.utc)
         instance = AssessmentInstance(
             user_id=user_id,
             engagement_id=engagement_id,
             package_id=package_id,
             status=status,
             metsights_record_id=mid,
-            assigned_at=datetime.now(timezone.utc),
+            assigned_at=resolved_assigned_at,
             completed_at=completed_at,
         )
         instance = await self._repository.create_instance(db, instance)

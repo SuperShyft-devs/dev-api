@@ -31,6 +31,7 @@ def get_engagements_service() -> EngagementsService:
         organizations_repository=organizations_repository,
         users_repository=UsersRepository(),
         assessments_service=get_assessments_service(),
+        metsights_service=MetsightsService(client=MetsightsClient()),
     )
 
 

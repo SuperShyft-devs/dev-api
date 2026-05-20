@@ -104,10 +104,11 @@ class EngagementPushQuestionnairesRequest(BaseModel):
 
 
 class AssignParticipantsRow(BaseModel):
-    """One CSV row: Metsights record id + participant phone."""
+    """One CSV row: Metsights record id + participant phone + email."""
 
     metsights_record_id: str = Field(..., min_length=1, max_length=200)
     phone: str = Field(..., min_length=1, max_length=50)
+    email: str = Field(..., min_length=1, max_length=255)
 
 
 class AssignParticipantsBatchRequest(BaseModel):
@@ -119,6 +120,7 @@ class AssignParticipantsBatchRequest(BaseModel):
 class AssignParticipantsRowResult(BaseModel):
     metsights_record_id: str
     phone: str
+    email: str
     status: str
     reason: Optional[str] = None
     user_id: Optional[int] = None

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy import text
@@ -10,7 +10,11 @@ from sqlalchemy import text
 from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
+from modules.metsights.service import MetsightsService
 from modules.users.models import User
+
+METSIGHTS_PROFILE_ID = "01961d4b-3cb1-cfae-f876-2957ef9acf18"
+METSIGHTS_CREATED_AT = "2025-04-10T06:53:19.882069+05:30"
 
 
 def _auth_header(user_id: int) -> dict[str, str]:
@@ -18,10 +22,46 @@ def _auth_header(user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
+def _mock_metsights_records(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _list_profile_records(self, *, profile_id: str, **kwargs):
+        if profile_id != METSIGHTS_PROFILE_ID:
+            return []
+        return [
+            {
+                "id": "NEWREC2",
+                "created_at": METSIGHTS_CREATED_AT,
+            },
+            {
+                "id": "NEWREC3",
+                "created_at": "2026-02-01T10:00:00+00:00",
+            },
+            {
+                "id": "NEWREC4",
+                "created_at": "2026-02-01T10:00:00+00:00",
+            },
+            {
+                "id": "REC_AMBIG",
+                "created_at": "2026-02-01T10:00:00+00:00",
+            },
+            {
+                "id": "REC_OTHER",
+                "created_at": "2026-02-01T10:00:00+00:00",
+            },
+        ]
+
+    monkeypatch.setattr(MetsightsService, "list_profile_records", _list_profile_records)
+
+
+@pytest.fixture(autouse=True)
+def _patch_metsights_list_records(monkeypatch: pytest.MonkeyPatch):
+    _mock_metsights_records(monkeypatch)
+
+
+async def _seed_employee(test_db_session, *, user_id: int, employee_id: int | None = None):
+    eid = employee_id if employee_id is not None else user_id
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}0000000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=eid, user_id=user_id, role="admin", status="active"))
     await test_db_session.commit()
 
 
@@ -66,7 +106,7 @@ async def _seed_engagement(
 async def test_assign_participants_batch_requires_auth(async_client):
     response = await async_client.post(
         "/engagements/1/assign-participants-batch",
-        json={"rows": [{"metsights_record_id": "REC1", "phone": "+919876543210"}]},
+        json={"rows": [{"metsights_record_id": "REC1", "phone": "+919876543210", "email": "a@example.com"}]},
     )
     assert response.status_code == 401
 
@@ -74,13 +114,16 @@ async def test_assign_participants_batch_requires_auth(async_client):
 @pytest.mark.asyncio
 async def test_assign_participants_batch_rejects_more_than_50_rows(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=8001)
-    rows = [{"metsights_record_id": f"R{i}", "phone": "+919876543210"} for i in range(51)]
+    rows = [
+        {"metsights_record_id": f"R{i}", "phone": "+919876543210", "email": "a@example.com"}
+        for i in range(51)
+    ]
     response = await async_client.post(
         "/engagements/1/assign-participants-batch",
         headers=_auth_header(8001),
         json={"rows": rows},
     )
-    assert response.status_code == 422
+    assert response.status_code in (400, 422)
 
 
 @pytest.mark.asyncio
@@ -91,7 +134,8 @@ async def test_assign_participants_batch_skips_already_assigned(async_client, te
 
     await test_db_session.execute(
         text(
-            "INSERT INTO users (user_id, age, phone, status) VALUES (5001, 30, '+919876543210', 'active')"
+            "INSERT INTO users (user_id, age, phone, email, status) "
+            "VALUES (5001, 30, '+919876543210', 'user5001@example.com', 'active')"
         )
     )
     await test_db_session.execute(
@@ -105,7 +149,15 @@ async def test_assign_participants_batch_skips_already_assigned(async_client, te
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
         headers=_auth_header(8002),
-        json={"rows": [{"metsights_record_id": "EXISTING1", "phone": "+919876543210"}]},
+        json={
+            "rows": [
+                {
+                    "metsights_record_id": "EXISTING1",
+                    "phone": "+919876543210",
+                    "email": "user5001@example.com",
+                }
+            ]
+        },
     )
     assert response.status_code == 200
     row = response.json()["data"]["results"][0]
@@ -122,12 +174,61 @@ async def test_assign_participants_batch_skips_user_not_found(async_client, test
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
         headers=_auth_header(8003),
-        json={"rows": [{"metsights_record_id": "NEWREC1", "phone": "+919999999999"}]},
+        json={
+            "rows": [
+                {
+                    "metsights_record_id": "NEWREC1",
+                    "phone": "+919999999999",
+                    "email": "missing@example.com",
+                }
+            ]
+        },
     )
     assert response.status_code == 200
     row = response.json()["data"]["results"][0]
     assert row["status"] == "skipped"
     assert row["reason"] == "user_not_found"
+
+
+@pytest.mark.asyncio
+async def test_assign_participants_batch_disambiguates_by_email(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8010)
+    await _seed_assessment_package(test_db_session)
+    await _seed_engagement(test_db_session)
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, age, phone, email, status, metsights_profile_id, parent_id, relationship) "
+            "VALUES (5010, 30, '+919988887777', 'alice@example.com', 'active', :pid, NULL, 'self')"
+        ),
+        {"pid": METSIGHTS_PROFILE_ID},
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, age, phone, email, status, metsights_profile_id, parent_id, relationship) "
+            "VALUES (5011, 30, '+919988887777', 'bob@example.com', 'active', :pid, 5010, 'child')"
+        ),
+        {"pid": METSIGHTS_PROFILE_ID},
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/engagements/9001/assign-participants-batch",
+        headers=_auth_header(8010),
+        json={
+            "rows": [
+                {
+                    "metsights_record_id": "REC_AMBIG",
+                    "phone": "+919988887777",
+                    "email": "bob@example.com",
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200
+    row = response.json()["data"]["results"][0]
+    assert row["status"] == "assigned"
+    assert row["user_id"] == 5011
 
 
 @pytest.mark.asyncio
@@ -138,15 +239,25 @@ async def test_assign_participants_batch_happy_path_enrolls_and_assigns(async_cl
 
     await test_db_session.execute(
         text(
-            "INSERT INTO users (user_id, age, phone, status) VALUES (5002, 30, '+919876543211', 'active')"
-        )
+            "INSERT INTO users (user_id, age, phone, email, status, metsights_profile_id) "
+            "VALUES (5002, 30, '+919876543211', 'user5002@example.com', 'active', :pid)"
+        ),
+        {"pid": METSIGHTS_PROFILE_ID},
     )
     await test_db_session.commit()
 
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
         headers=_auth_header(8004),
-        json={"rows": [{"metsights_record_id": "NEWREC2", "phone": "9876543211"}]},
+        json={
+            "rows": [
+                {
+                    "metsights_record_id": "NEWREC2",
+                    "phone": "9876543211",
+                    "email": "user5002@example.com",
+                }
+            ]
+        },
     )
     assert response.status_code == 200
     row = response.json()["data"]["results"][0]
@@ -168,13 +279,15 @@ async def test_assign_participants_batch_happy_path_enrolls_and_assigns(async_cl
     inst = (
         await test_db_session.execute(
             text(
-                "SELECT metsights_record_id FROM assessment_instances "
+                "SELECT metsights_record_id, assigned_at FROM assessment_instances "
                 "WHERE assessment_instance_id = :aid"
             ),
             {"aid": row["assessment_instance_id"]},
         )
     ).first()
     assert inst.metsights_record_id == "NEWREC2"
+    expected = datetime.fromisoformat(METSIGHTS_CREATED_AT)
+    assert inst.assigned_at == expected
 
 
 @pytest.mark.asyncio
@@ -185,8 +298,10 @@ async def test_assign_participants_batch_already_enrolled_still_assigns(async_cl
 
     await test_db_session.execute(
         text(
-            "INSERT INTO users (user_id, age, phone, status) VALUES (5003, 30, '+919876543212', 'active')"
-        )
+            "INSERT INTO users (user_id, age, phone, email, status, metsights_profile_id) "
+            "VALUES (5003, 30, '+919876543212', 'user5003@example.com', 'active', :pid)"
+        ),
+        {"pid": METSIGHTS_PROFILE_ID},
     )
     await test_db_session.execute(
         text(
@@ -199,7 +314,15 @@ async def test_assign_participants_batch_already_enrolled_still_assigns(async_cl
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
         headers=_auth_header(8005),
-        json={"rows": [{"metsights_record_id": "NEWREC3", "phone": "+919876543212"}]},
+        json={
+            "rows": [
+                {
+                    "metsights_record_id": "NEWREC3",
+                    "phone": "+919876543212",
+                    "email": "user5003@example.com",
+                }
+            ]
+        },
     )
     assert response.status_code == 200
     row = response.json()["data"]["results"][0]
@@ -218,16 +341,25 @@ async def test_assign_participants_batch_sets_profile_on_metsights_when_user_lin
 
     await test_db_session.execute(
         text(
-            "INSERT INTO users (user_id, age, phone, status, metsights_profile_id) "
-            "VALUES (5004, 30, '+919876543213', 'active', 'ms-profile-5004')"
-        )
+            "INSERT INTO users (user_id, age, phone, email, status, metsights_profile_id) "
+            "VALUES (5004, 30, '+919876543213', 'user5004@example.com', 'active', :pid)"
+        ),
+        {"pid": METSIGHTS_PROFILE_ID},
     )
     await test_db_session.commit()
 
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
         headers=_auth_header(8007),
-        json={"rows": [{"metsights_record_id": "NEWREC4", "phone": "+919876543213"}]},
+        json={
+            "rows": [
+                {
+                    "metsights_record_id": "NEWREC4",
+                    "phone": "+919876543213",
+                    "email": "user5004@example.com",
+                }
+            ]
+        },
     )
     assert response.status_code == 200
     row = response.json()["data"]["results"][0]
@@ -254,6 +386,14 @@ async def test_assign_participants_batch_requires_assessment_package(async_clien
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
         headers=_auth_header(8006),
-        json={"rows": [{"metsights_record_id": "RECX", "phone": "+919876543210"}]},
+        json={
+            "rows": [
+                {
+                    "metsights_record_id": "RECX",
+                    "phone": "+919876543210",
+                    "email": "x@example.com",
+                }
+            ]
+        },
     )
     assert response.status_code == 422

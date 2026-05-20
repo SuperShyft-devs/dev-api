@@ -345,9 +345,12 @@ async def assign_participants_batch(
     employee: EmployeeContext = Depends(get_current_employee),
     engagements_service: EngagementsService = Depends(get_engagements_service),
 ):
-    """Enroll users by phone and assign assessment instances from Metsights CSV rows."""
+    """Enroll users by phone + email and assign assessment instances from Metsights CSV rows."""
 
-    rows = [{"metsights_record_id": r.metsights_record_id, "phone": r.phone} for r in payload.rows]
+    rows = [
+        {"metsights_record_id": r.metsights_record_id, "phone": r.phone, "email": r.email}
+        for r in payload.rows
+    ]
     data = await engagements_service.assign_participants_batch(
         db,
         employee=employee,
