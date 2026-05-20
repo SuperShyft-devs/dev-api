@@ -14,6 +14,7 @@ from modules.metsights.service import MetsightsService
 from modules.users.models import User
 
 METSIGHTS_PROFILE_ID = "01961d4b-3cb1-cfae-f876-2957ef9acf18"
+OTHER_METSIGHTS_PROFILE_ID = "01961d4b-3cb1-cfae-f876-2957ef9acf19"
 METSIGHTS_CREATED_AT = "2025-04-10T06:53:19.882069+05:30"
 
 
@@ -24,6 +25,8 @@ def _auth_header(user_id: int) -> dict[str, str]:
 
 def _mock_metsights_records(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _list_profile_records(self, *, profile_id: str, **kwargs):
+        if profile_id == OTHER_METSIGHTS_PROFILE_ID:
+            return []
         if profile_id != METSIGHTS_PROFILE_ID:
             return []
         return [
@@ -191,7 +194,7 @@ async def test_assign_participants_batch_skips_user_not_found(async_client, test
 
 
 @pytest.mark.asyncio
-async def test_assign_participants_batch_disambiguates_by_email(async_client, test_db_session):
+async def test_assign_participants_batch_picks_user_whose_profile_has_record(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=8010)
     await _seed_assessment_package(test_db_session)
     await _seed_engagement(test_db_session)
@@ -199,9 +202,9 @@ async def test_assign_participants_batch_disambiguates_by_email(async_client, te
     await test_db_session.execute(
         text(
             "INSERT INTO users (user_id, age, phone, email, status, metsights_profile_id, parent_id, relationship) "
-            "VALUES (5010, 30, '+919988887777', 'alice@example.com', 'active', :pid, NULL, 'self')"
+            "VALUES (5010, 30, '+919988887777', 'alice@example.com', 'active', :other_pid, NULL, 'self')"
         ),
-        {"pid": METSIGHTS_PROFILE_ID},
+        {"other_pid": OTHER_METSIGHTS_PROFILE_ID},
     )
     await test_db_session.execute(
         text(
@@ -229,6 +232,60 @@ async def test_assign_participants_batch_disambiguates_by_email(async_client, te
     row = response.json()["data"]["results"][0]
     assert row["status"] == "assigned"
     assert row["user_id"] == 5011
+
+    alice_participant = (
+        await test_db_session.execute(
+            text(
+                "SELECT engagement_participant_id FROM engagement_participants "
+                "WHERE engagement_id = 9001 AND user_id = 5010"
+            )
+        )
+    ).first()
+    assert alice_participant is None
+
+
+@pytest.mark.asyncio
+async def test_assign_participants_batch_record_not_found_does_not_enroll(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8011)
+    await _seed_assessment_package(test_db_session)
+    await _seed_engagement(test_db_session)
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, age, phone, email, status, metsights_profile_id) "
+            "VALUES (5012, 30, '+919977776666', 'user5012@example.com', 'active', :pid)"
+        ),
+        {"pid": METSIGHTS_PROFILE_ID},
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/engagements/9001/assign-participants-batch",
+        headers=_auth_header(8011),
+        json={
+            "rows": [
+                {
+                    "metsights_record_id": "MISSING_RECORD",
+                    "phone": "+919977776666",
+                    "email": "user5012@example.com",
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200
+    row = response.json()["data"]["results"][0]
+    assert row["status"] == "error"
+    assert row["reason"] == "metsights_record_not_found"
+
+    participant = (
+        await test_db_session.execute(
+            text(
+                "SELECT engagement_participant_id FROM engagement_participants "
+                "WHERE engagement_id = 9001 AND user_id = 5012"
+            )
+        )
+    ).first()
+    assert participant is None
 
 
 @pytest.mark.asyncio

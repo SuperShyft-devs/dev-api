@@ -1204,6 +1204,45 @@ class EngagementsService:
         cache[pid] = index
         return index
 
+    async def _resolve_user_for_metsights_record_by_phone(
+        self,
+        *,
+        phone: str,
+        metsights_record_id: str,
+        phone_index: dict[str, list[User]],
+        metsights_record_created_at_cache: dict[str, dict[str, datetime]],
+    ) -> tuple[User | None, datetime | None, str | None]:
+        """Find a user among all accounts sharing *phone* whose Metsights profile contains *metsights_record_id*."""
+
+        mrid = (metsights_record_id or "").strip()
+        if not mrid:
+            return None, None, "missing_record_id"
+
+        candidates = self._users_matching_phone_from_index(phone, phone_index)
+        if not candidates:
+            return None, None, "user_not_found"
+
+        matched: list[tuple[User, datetime]] = []
+        seen_profile_ids: set[str] = set()
+        for user in sorted(candidates, key=lambda u: int(u.user_id)):
+            profile_id = (user.metsights_profile_id or "").strip()
+            if not profile_id or profile_id in seen_profile_ids:
+                continue
+            seen_profile_ids.add(profile_id)
+            record_index = await self._load_metsights_record_created_at_index(
+                profile_id,
+                cache=metsights_record_created_at_cache,
+            )
+            assigned_at = record_index.get(mrid)
+            if assigned_at is not None:
+                matched.append((user, assigned_at))
+
+        if not matched:
+            return None, None, "metsights_record_not_found"
+
+        user, assigned_at = matched[0]
+        return user, assigned_at, None
+
     async def assign_participants_batch(
         self,
         db: AsyncSession,
@@ -1215,7 +1254,12 @@ class EngagementsService:
         user_agent: str,
         endpoint: str,
     ) -> dict[str, Any]:
-        """Enroll users by phone + email and assign assessment instances keyed by Metsights record id."""
+        """Enroll users by phone and assign assessment instances keyed by Metsights record id.
+
+        For each CSV row, every user account with the same phone is checked against Metsights
+        (``GET /profiles/{profile_id}/records/``). The first user whose profile contains the
+        record id is enrolled and assigned. Database changes for a row are rolled back on failure.
+        """
 
         self._ensure_employee_access(employee)
 
@@ -1250,26 +1294,18 @@ class EngagementsService:
         phone_index = await self._preload_phone_lookup_index(db, phones)
         metsights_record_created_at_cache: dict[str, dict[str, datetime]] = {}
 
-        resolved_users: dict[tuple[str, str], User | None] = {}
-        ambiguous_keys: set[tuple[str, str]] = set()
+        candidate_user_ids: list[int] = []
+        seen_user_ids: set[int] = set()
         for row in rows:
             phone_raw = (row.get("phone") or "").strip()
-            email_raw = (row.get("email") or "").strip()
             if not phone_raw:
                 continue
-            key = (phone_raw, email_raw.lower())
-            if key in resolved_users or key in ambiguous_keys:
-                continue
-            try:
-                resolved_users[key] = self._resolve_user_by_phone_and_email_from_index(
-                    phone_raw, email_raw, phone_index
-                )
-            except AppError:
-                ambiguous_keys.add(key)
+            for user in self._users_matching_phone_from_index(phone_raw, phone_index):
+                uid = int(user.user_id)
+                if uid not in seen_user_ids:
+                    seen_user_ids.add(uid)
+                    candidate_user_ids.append(uid)
 
-        candidate_user_ids = [
-            int(user.user_id) for user in resolved_users.values() if user is not None
-        ]
         enrolled_user_ids = await self._repository.list_enrolled_user_ids_for_engagement(
             db,
             engagement_id=engagement.engagement_id,
@@ -1327,17 +1363,18 @@ class EngagementsService:
                 results.append(base)
                 continue
 
-            lookup_key = (phone_raw, email_raw.lower())
-            if lookup_key in ambiguous_keys:
-                base["status"] = "error"
-                base["reason"] = "ambiguous_phone"
-                results.append(base)
-                continue
-
-            user = resolved_users.get(lookup_key)
-            if user is None:
-                base["status"] = "skipped"
-                base["reason"] = "user_not_found"
+            user, assigned_at, resolve_reason = await self._resolve_user_for_metsights_record_by_phone(
+                phone=phone_raw,
+                metsights_record_id=mrid,
+                phone_index=phone_index,
+                metsights_record_created_at_cache=metsights_record_created_at_cache,
+            )
+            if user is None or assigned_at is None:
+                if resolve_reason == "user_not_found":
+                    base["status"] = "skipped"
+                else:
+                    base["status"] = "error"
+                base["reason"] = resolve_reason or "metsights_record_not_found"
                 results.append(base)
                 continue
 
@@ -1345,7 +1382,6 @@ class EngagementsService:
             newly_enrolled = False
             user_id = int(user.user_id)
             profile_on_metsights = bool((user.metsights_profile_id or "").strip())
-            metsights_profile_id = (user.metsights_profile_id or "").strip()
 
             try:
                 async with db.begin_nested():
@@ -1362,25 +1398,6 @@ class EngagementsService:
                         )
                         newly_enrolled = True
                         enrolled_user_ids.add(user_id)
-
-                    if not metsights_profile_id:
-                        raise AppError(
-                            status_code=422,
-                            error_code="INVALID_STATE",
-                            message="User has no Metsights profile id",
-                        )
-
-                    record_index = await self._load_metsights_record_created_at_index(
-                        metsights_profile_id,
-                        cache=metsights_record_created_at_cache,
-                    )
-                    assigned_at = record_index.get(mrid)
-                    if assigned_at is None:
-                        raise AppError(
-                            status_code=404,
-                            error_code="RECORD_NOT_FOUND",
-                            message="Metsights record not found for profile",
-                        )
 
                     instance = await self._assessments_service.create_instance_for_metsights_record(
                         db,
