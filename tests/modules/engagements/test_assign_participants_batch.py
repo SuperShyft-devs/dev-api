@@ -31,6 +31,10 @@ def _mock_metsights_records(monkeypatch: pytest.MonkeyPatch) -> None:
             return []
         return [
             {
+                "id": "24521A72DA0B",
+                "created_at": METSIGHTS_CREATED_AT,
+            },
+            {
                 "id": "NEWREC2",
                 "created_at": METSIGHTS_CREATED_AT,
             },
@@ -191,6 +195,42 @@ async def test_assign_participants_batch_skips_user_not_found(async_client, test
     row = response.json()["data"]["results"][0]
     assert row["status"] == "skipped"
     assert row["reason"] == "user_not_found"
+
+
+@pytest.mark.asyncio
+async def test_assign_participants_batch_assigns_without_email_via_phone_and_record(async_client, test_db_session):
+    """When email is empty, resolve user by phone + Metsights record id (not by email)."""
+    await _seed_employee(test_db_session, user_id=8012)
+    await _seed_assessment_package(test_db_session)
+    await _seed_engagement(test_db_session)
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, age, phone, email, status, metsights_profile_id) "
+            "VALUES (5013, 30, '7042729798', 'sushma.alt@example.com', 'active', :pid)"
+        ),
+        {"pid": METSIGHTS_PROFILE_ID},
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/engagements/9001/assign-participants-batch",
+        headers=_auth_header(8012),
+        json={
+            "rows": [
+                {
+                    "metsights_record_id": "24521A72DA0B",
+                    "phone": "7042729798",
+                    "email": "",
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200
+    row = response.json()["data"]["results"][0]
+    assert row["status"] == "assigned"
+    assert row["user_id"] == 5013
+    assert row["email"] == "sushma.alt@example.com"
 
 
 @pytest.mark.asyncio

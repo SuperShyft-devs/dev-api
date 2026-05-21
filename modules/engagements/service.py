@@ -1514,8 +1514,9 @@ class EngagementsService:
         """Enroll users by phone and assign assessment instances keyed by Metsights record id.
 
         For each CSV row, every user account with the same phone is checked against Metsights
-        (``GET /profiles/{profile_id}/records/``). The first user whose profile contains the
-        record id is enrolled and assigned. Database changes for a row are rolled back on failure.
+        (``GET /profiles/{profile_id}/records/``). The user whose profile contains the record id
+        from the CSV is enrolled and assigned. Email is optional; when absent, resolution uses only
+        phone + Metsights record id. Database changes for a row are rolled back on failure.
         """
 
         self._ensure_employee_access(employee)
@@ -1601,12 +1602,6 @@ class EngagementsService:
                 results.append(base)
                 continue
 
-            if not email_raw:
-                base["status"] = "skipped"
-                base["reason"] = "missing_email"
-                results.append(base)
-                continue
-
             base["metsights_record_id"] = mrid
             base["phone"] = phone_raw
             base["email"] = email_raw
@@ -1636,6 +1631,8 @@ class EngagementsService:
                 continue
 
             base["user_id"] = int(user.user_id)
+            if not email_raw:
+                base["email"] = (user.email or "").strip()
             newly_enrolled = False
             user_id = int(user.user_id)
             profile_on_metsights = bool((user.metsights_profile_id or "").strip())

@@ -113,8 +113,8 @@ class AssignParticipantsRow(BaseModel):
     """One CSV row: Metsights record id + participant phone + email."""
 
     metsights_record_id: str = Field(..., min_length=1, max_length=200)
-    phone: str = Field(..., min_length=1, max_length=50)
-    email: str = Field(..., min_length=1, max_length=255)
+    phone: str = Field(..., max_length=50)
+    email: str = Field(..., max_length=255)
 
 
 class AssignParticipantsBatchRequest(BaseModel):
