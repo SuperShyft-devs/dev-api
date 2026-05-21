@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -702,10 +702,28 @@ async def employee_deactivate_user(
     return success_response({"user_id": user.user_id, "status": user.status})
 
 
+@router.get("/{user_id}/delete-impact")
+async def employee_get_user_delete_impact(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    users_service: UsersService = Depends(get_users_service),
+):
+    """Engagements that would have no participants left after deleting this user (and sub-profiles)."""
+    result = await users_service.get_delete_user_impact_by_employee(
+        db, employee=employee, user_id=user_id
+    )
+    return success_response(result)
+
+
 @router.delete("/{user_id}")
 async def employee_delete_user(
     user_id: int,
     request: Request,
+    delete_orphan_engagements: bool = Query(
+        False,
+        description="When true, permanently delete engagements that would have no participants after this user is removed.",
+    ),
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     users_service: UsersService = Depends(get_users_service),
@@ -717,6 +735,7 @@ async def employee_delete_user(
         ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
+        delete_orphan_engagements=delete_orphan_engagements,
     )
     await db.commit()
     return success_response(result)

@@ -391,6 +391,16 @@ class ImportMetsightsProfilesRequest(BaseModel):
         return out
 
 
+class UserDeleteImpactEngagement(BaseModel):
+    engagement_id: int
+    engagement_code: str
+    engagement_name: Optional[str] = None
+
+
+class UserDeleteImpactResponse(BaseModel):
+    engagements_to_orphan: list[UserDeleteImpactEngagement]
+
+
 class EmployeeUserListItem(BaseModel):
     user_id: int
     first_name: Optional[str] = None

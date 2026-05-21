@@ -450,7 +450,50 @@ class UsersRepository:
 
         return sorted(all_ids)
 
-    async def delete_user_related_data(self, db: AsyncSession, user_ids: list[int]) -> None:
+    async def list_engagements_fully_owned_by_users(
+        self, db: AsyncSession, user_ids: list[int]
+    ) -> list[Engagement]:
+        """Engagements where every participant row belongs to one of user_ids."""
+        if not user_ids:
+            return []
+
+        total_by_engagement = (
+            select(
+                EngagementParticipant.engagement_id.label("engagement_id"),
+                func.count(EngagementParticipant.engagement_participant_id).label("total"),
+            )
+            .group_by(EngagementParticipant.engagement_id)
+            .subquery()
+        )
+        owned_by_users = (
+            select(
+                EngagementParticipant.engagement_id.label("engagement_id"),
+                func.count(EngagementParticipant.engagement_participant_id).label("owned"),
+            )
+            .where(EngagementParticipant.user_id.in_(user_ids))
+            .group_by(EngagementParticipant.engagement_id)
+            .subquery()
+        )
+
+        result = await db.execute(
+            select(Engagement)
+            .join(owned_by_users, Engagement.engagement_id == owned_by_users.c.engagement_id)
+            .join(
+                total_by_engagement,
+                Engagement.engagement_id == total_by_engagement.c.engagement_id,
+            )
+            .where(owned_by_users.c.owned == total_by_engagement.c.total)
+            .order_by(Engagement.engagement_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def delete_user_related_data(
+        self,
+        db: AsyncSession,
+        user_ids: list[int],
+        *,
+        delete_orphan_engagements: bool = False,
+    ) -> None:
         if not user_ids:
             return
 
@@ -529,7 +572,7 @@ class UsersRepository:
         await db.execute(delete(UserPreference).where(UserPreference.user_id.in_(user_ids)))
         await db.execute(delete(EngagementParticipant).where(EngagementParticipant.user_id.in_(user_ids)))
 
-        if engagement_ids:
+        if delete_orphan_engagements and engagement_ids:
             orphan_engagement_ids = list(
                 (
                     await db.execute(

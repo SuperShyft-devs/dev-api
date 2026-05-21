@@ -335,11 +335,15 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     )
     await test_db_session.commit()
 
-    response = await async_client.delete(f"/users/{target_user_id}", headers=_auth_header(actor_user_id))
+    response = await async_client.delete(
+        f"/users/{target_user_id}?delete_orphan_engagements=false",
+        headers=_auth_header(actor_user_id),
+    )
     assert response.status_code == 200
     assert response.json()["data"]["deleted_user_id"] == target_user_id
 
     assert await test_db_session.get(User, target_user_id) is None
+    assert await test_db_session.get(Engagement, 9801) is not None
     assert await test_db_session.get(AssessmentInstance, 9951) is None
     assert await test_db_session.get(EngagementParticipant, 9901) is None
     assert await test_db_session.get(QuestionnaireResponse, 9963) is None
@@ -353,6 +357,87 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     assert await test_db_session.get(Order, 9971) is None
     assert await test_db_session.get(Payment, 9972) is None
     assert await test_db_session.get(SupportTicket, 9973) is None
+
+
+@pytest.mark.asyncio
+async def test_employee_delete_user_impact_lists_engagements_fully_owned(async_client, test_db_session):
+    actor_user_id = 99011
+    target_user_id = 99052
+
+    test_db_session.add(User(age=30, user_id=actor_user_id, phone="9901100000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=19011, user_id=actor_user_id, role="admin", status="active"))
+    test_db_session.add(User(age=31, user_id=target_user_id, phone="9905200000", status="active"))
+    test_db_session.add(
+        Engagement(
+            engagement_id=9802,
+            engagement_code="ENG9802",
+            engagement_name="Solo Corp",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=9902,
+            engagement_id=9802,
+            user_id=target_user_id,
+            engagement_date=date(2026, 1, 1),
+            slot_start_time=time(10, 0),
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        f"/users/{target_user_id}/delete-impact",
+        headers=_auth_header(actor_user_id),
+    )
+    assert response.status_code == 200
+    orphans = response.json()["data"]["engagements_to_orphan"]
+    assert len(orphans) == 1
+    assert orphans[0]["engagement_id"] == 9802
+    assert orphans[0]["engagement_code"] == "ENG9802"
+
+
+@pytest.mark.asyncio
+async def test_employee_delete_user_deletes_orphan_engagement_when_requested(async_client, test_db_session):
+    actor_user_id = 99012
+    target_user_id = 99053
+
+    test_db_session.add(User(age=30, user_id=actor_user_id, phone="9901200000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=19012, user_id=actor_user_id, role="admin", status="active"))
+    test_db_session.add(User(age=31, user_id=target_user_id, phone="9905300000", status="active"))
+    test_db_session.add(
+        Engagement(
+            engagement_id=9803,
+            engagement_code="ENG9803",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=9903,
+            engagement_id=9803,
+            user_id=target_user_id,
+            engagement_date=date(2026, 1, 1),
+            slot_start_time=time(10, 0),
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.delete(
+        f"/users/{target_user_id}?delete_orphan_engagements=true",
+        headers=_auth_header(actor_user_id),
+    )
+    assert response.status_code == 200
+    assert await test_db_session.get(User, target_user_id) is None
+    assert await test_db_session.get(Engagement, 9803) is None
 
 
 @pytest.mark.asyncio

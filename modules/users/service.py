@@ -1344,16 +1344,13 @@ class UsersService:
 
         return updated
 
-    async def delete_user_by_employee(
+    async def _resolve_user_ids_for_employee_delete(
         self,
         db: AsyncSession,
         *,
         employee,
         user_id: int,
-        ip_address: str,
-        user_agent: str,
-        endpoint: str,
-    ) -> dict:
+    ) -> list[int]:
         self._ensure_employee_access(employee)
 
         user = await self._repository.get_user_by_id(db, user_id)
@@ -1378,7 +1375,52 @@ class UsersService:
             if await self._is_protected_employee_user(db, candidate_user_id):
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="User cannot be deleted")
 
-        await self._repository.delete_user_related_data(db, user_ids_to_delete)
+        return user_ids_to_delete
+
+    async def get_delete_user_impact_by_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee,
+        user_id: int,
+    ) -> dict:
+        user_ids_to_delete = await self._resolve_user_ids_for_employee_delete(
+            db, employee=employee, user_id=user_id
+        )
+        engagements = await self._repository.list_engagements_fully_owned_by_users(
+            db, user_ids_to_delete
+        )
+        return {
+            "engagements_to_orphan": [
+                {
+                    "engagement_id": e.engagement_id,
+                    "engagement_code": e.engagement_code,
+                    "engagement_name": e.engagement_name,
+                }
+                for e in engagements
+            ]
+        }
+
+    async def delete_user_by_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee,
+        user_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+        delete_orphan_engagements: bool = False,
+    ) -> dict:
+        user_ids_to_delete = await self._resolve_user_ids_for_employee_delete(
+            db, employee=employee, user_id=user_id
+        )
+
+        await self._repository.delete_user_related_data(
+            db,
+            user_ids_to_delete,
+            delete_orphan_engagements=delete_orphan_engagements,
+        )
         deleted_count = await self._repository.delete_users_by_ids(db, user_ids_to_delete)
 
         if self._audit_service is None:
