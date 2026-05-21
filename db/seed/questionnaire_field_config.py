@@ -185,4 +185,3 @@ NONE_CLEARS_MULTISELECT_FIELDS: frozenset[str] = frozenset({
     "diagnosed_diseases",
     "diagnosed_diseases_medications",
 })
-

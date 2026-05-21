@@ -303,6 +303,26 @@ class EngagementsRepository:
         )
         return int(result.scalar_one() or 0)
 
+    async def count_distinct_participants_by_engagement_ids(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_ids: list[int],
+    ) -> dict[int, int]:
+        if not engagement_ids:
+            return {}
+
+        result = await db.execute(
+            select(
+                EngagementParticipant.engagement_id,
+                func.count(func.distinct(EngagementParticipant.user_id)),
+            )
+            .where(EngagementParticipant.engagement_id.in_(engagement_ids))
+            .group_by(EngagementParticipant.engagement_id)
+        )
+        counts = {int(row[0]): int(row[1]) for row in result.all()}
+        return {eid: counts.get(eid, 0) for eid in engagement_ids}
+
     async def list_distinct_participant_ids_for_engagement(
         self,
         db: AsyncSession,
@@ -465,28 +485,22 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         engagement_code: str,
+        engagement_id: int,
     ) -> int:
-        """Count distinct users enrolled for a specific engagement code."""
+        """Count distinct users enrolled for a specific engagement."""
 
-        query = (
-            select(func.count(func.distinct(EngagementParticipant.user_id)))
-            .select_from(Engagement)
-            .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
-            .where(Engagement.engagement_code == engagement_code)
-        )
+        _ = engagement_code
+        return await self.count_distinct_participants_for_engagement(db, engagement_id=engagement_id)
 
-        result = await db.execute(query)
-        return int(result.scalar_one())
-
-    async def list_participants_by_engagement_code(
+    async def list_participants_by_engagement_id(
         self,
         db: AsyncSession,
         *,
-        engagement_code: str,
+        engagement_id: int,
         page: int,
         limit: int,
     ) -> list[tuple]:
-        """Fetch participant enrollment rows for a specific engagement by code."""
+        """Fetch participant enrollment rows for a specific engagement."""
         from modules.users.models import User
 
         offset = (page - 1) * limit
@@ -520,10 +534,9 @@ class EngagementsRepository:
                 )
                 .label("rn"),
             )
-            .select_from(Engagement)
-            .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
+            .select_from(EngagementParticipant)
             .join(User, User.user_id == EngagementParticipant.user_id)
-            .where(Engagement.engagement_code == engagement_code)
+            .where(EngagementParticipant.engagement_id == engagement_id)
         ).subquery()
 
         query = (
@@ -557,6 +570,24 @@ class EngagementsRepository:
 
         result = await db.execute(query)
         return list(result.all())
+
+    async def list_participants_by_engagement_code(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_code: str,
+        engagement_id: int,
+        page: int,
+        limit: int,
+    ) -> list[tuple]:
+        """Fetch participant enrollment rows for a specific engagement by code."""
+        _ = engagement_code
+        return await self.list_participants_by_engagement_id(
+            db,
+            engagement_id=engagement_id,
+            page=page,
+            limit=limit,
+        )
 
     async def count_participants_for_b2c_engagements(
         self,
