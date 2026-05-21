@@ -103,6 +103,12 @@ class EngagementPushQuestionnairesRequest(BaseModel):
     package_id: int = Field(..., gt=0)
 
 
+class EngagementConnectMetsightsRecordsRequest(BaseModel):
+    """Request to create Metsights records for existing assessment instances."""
+
+    package_id: int = Field(..., gt=0)
+
+
 class AssignParticipantsRow(BaseModel):
     """One CSV row: Metsights record id + participant phone + email."""
 

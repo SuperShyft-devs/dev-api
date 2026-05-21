@@ -63,6 +63,9 @@ from db.session import get_db
 from modules.auth.dependencies import get_auth_service
 from modules.auth.router import router as auth_router
 from modules.engagements.router import router as engagements_router
+from modules.engagements.assessment_packages_router import (
+    router as engagement_assessment_packages_router,
+)
 from modules.checklists.router import router as checklists_router
 from modules.organizations.router import router as organizations_router
 from modules.users.router import router as users_router
@@ -244,6 +247,7 @@ async def fastapi_app(test_db_session: AsyncSession, auth_service, otp_sender: C
     app.include_router(users_router)
     app.include_router(organizations_router)
     app.include_router(engagements_router)
+    app.include_router(engagement_assessment_packages_router)
     app.include_router(checklists_router)
     app.include_router(employees_router)
     app.include_router(assessments_router)

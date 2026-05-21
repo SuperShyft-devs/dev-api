@@ -5,6 +5,7 @@ Routes:
 - ``POST /engagements/{engagement_id}/assessment-packages`` — participant or employee
 - ``DELETE /engagements/{engagement_id}/assessment-packages/{package_code}`` — employee only
 - ``POST /engagements/{engagement_id}/push-questionnaires`` — employee only
+- ``POST /engagements/{engagement_id}/connect-metsights-records`` — employee only
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from modules.engagements.assessment_packages_service import (
 from modules.engagements.dependencies import get_engagement_assessment_packages_service
 from modules.engagements.schemas import (
     EngagementAssessmentPackageAddRequest,
+    EngagementConnectMetsightsRecordsRequest,
     EngagementPushQuestionnairesRequest,
 )
 from modules.metsights.dependencies import get_metsights_sync_service
@@ -132,6 +134,32 @@ async def push_engagement_questionnaires(
         target_package_id=payload.package_id,
         employee=employee,
         sync_service=sync_service,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.post("/{engagement_id}/connect-metsights-records")
+async def connect_engagement_metsights_records(
+    engagement_id: int,
+    payload: EngagementConnectMetsightsRecordsRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: EngagementAssessmentPackagesService = Depends(
+        get_engagement_assessment_packages_service
+    ),
+):
+    """Create Metsights records for existing assessment instances (employee only)."""
+
+    data = await service.connect_metsights_records_for_package(
+        db,
+        engagement_id=engagement_id,
+        package_id=payload.package_id,
+        employee=employee,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),

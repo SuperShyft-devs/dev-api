@@ -583,3 +583,143 @@ class EngagementAssessmentPackagesService:
             "errors": errors_count,
             "details": details,
         }
+
+    async def connect_metsights_records_for_package(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        package_id: int,
+        employee: EmployeeContext,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict[str, Any]:
+        """Create Metsights records for existing instances and store ``metsights_record_id``.
+
+        Does not create new ``assessment_instances``. Skips instances that already have a
+        record id or users without ``metsights_profile_id``.
+        """
+        if employee is None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        engagement = await self._engagements.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+
+        package = await self._assessments_repo.get_package_by_id(db, package_id=package_id)
+        if package is None:
+            raise AppError(
+                status_code=404,
+                error_code="PACKAGE_NOT_FOUND",
+                message="Assessment package does not exist",
+            )
+
+        assessment_type_code = (package.assessment_type_code or "").strip()
+        if not assessment_type_code:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Assessment package has no Metsights assessment type",
+            )
+
+        instances = await self._assessments_repo.list_instances_for_engagement_and_package(
+            db,
+            engagement_id=engagement_id,
+            package_id=package_id,
+        )
+
+        connected = 0
+        skipped = 0
+        failed = 0
+        results: list[dict[str, Any]] = []
+
+        for instance in instances:
+            inst_id = int(instance.assessment_instance_id)
+            user_id = int(instance.user_id)
+            base: dict[str, Any] = {
+                "user_id": user_id,
+                "assessment_instance_id": inst_id,
+                "status": "pending",
+                "metsights_record_id": None,
+                "reason": None,
+            }
+
+            existing_rid = (instance.metsights_record_id or "").strip()
+            if existing_rid:
+                base["status"] = "skipped"
+                base["reason"] = "already_connected"
+                base["metsights_record_id"] = existing_rid
+                skipped += 1
+                results.append(base)
+                continue
+
+            user = await self._users.get_user_by_id(db, user_id)
+            profile_id = (getattr(user, "metsights_profile_id", None) or "").strip() if user else ""
+            if not profile_id:
+                base["status"] = "skipped"
+                base["reason"] = "no_metsights_profile_id"
+                skipped += 1
+                results.append(base)
+                continue
+
+            try:
+                record_id = await self._metsights.create_record_for_profile(
+                    profile_id=profile_id,
+                    assessment_type_code=assessment_type_code,
+                )
+                await self._assessments_repo.set_metsights_record_id(
+                    db,
+                    assessment_instance_id=inst_id,
+                    metsights_record_id=record_id,
+                )
+                base["status"] = "connected"
+                base["metsights_record_id"] = record_id
+                connected += 1
+            except AppError as exc:
+                base["status"] = "error"
+                base["reason"] = exc.message or exc.error_code or "metsights_error"
+                failed += 1
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.exception(
+                    "Metsights connect failed for user_id=%s instance_id=%s engagement_id=%s package_id=%s",
+                    user_id,
+                    inst_id,
+                    engagement_id,
+                    package_id,
+                )
+                base["status"] = "error"
+                base["reason"] = str(exc)
+                failed += 1
+
+            results.append(base)
+
+        await self._audit.log_event(
+            db,
+            action="EMPLOYEE_CONNECT_ENGAGEMENT_METSIGHTS_RECORDS",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return {
+            "engagement_id": engagement_id,
+            "package_id": package_id,
+            "package_code": package.package_code,
+            "assessment_type_code": assessment_type_code,
+            "total": len(instances),
+            "connected": connected,
+            "skipped": skipped,
+            "failed": failed,
+            "results": results,
+        }
