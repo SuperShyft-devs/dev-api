@@ -385,6 +385,28 @@ async def assign_participants_batch(
     return success_response(data)
 
 
+@router.post("/{engagement_id}/create-metsights-profiles")
+async def create_metsights_profiles_for_engagement(
+    engagement_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """Create regular Metsights profiles for all participants missing ``metsights_profile_id``."""
+
+    data = await engagements_service.create_metsights_profiles_for_engagement_participants(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
 @router.get("/{engagement_id}/questionnaire-status")
 async def get_engagement_questionnaire_status(
     engagement_id: int,

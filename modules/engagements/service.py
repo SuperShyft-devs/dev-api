@@ -87,6 +87,32 @@ def _phone_lookup_candidates(phone: str) -> list[str]:
     return ordered
 
 
+def _normalize_phone_for_metsights(raw: str | None) -> str | None:
+    value = (raw or "").strip().replace(" ", "").replace("-", "")
+    if not value:
+        return None
+    if value.startswith("+"):
+        return value
+    digits = "".join(ch for ch in value if ch.isdigit())
+    if len(digits) == 10:
+        return f"+91{digits}"
+    return f"+{digits}" if digits else None
+
+
+def _to_metsights_gender(raw: str | None) -> str | None:
+    v = (raw or "").strip()
+    if not v:
+        return None
+    if v in {"1", "2"}:
+        return v
+    lowered = v.lower()
+    if lowered.startswith("m"):
+        return "1"
+    if lowered.startswith("f"):
+        return "2"
+    return None
+
+
 class EngagementsService:
     def __init__(
         self,
@@ -1586,3 +1612,146 @@ class EngagementsService:
             results.append(base)
 
         return {"results": results}
+
+    async def create_metsights_profiles_for_engagement_participants(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict[str, Any]:
+        """Create regular Metsights profiles (POST /profiles/) for enrolled participants.
+
+        Skips users who already have ``metsights_profile_id``. Does not use engagement registration.
+        """
+
+        _ = ip_address, user_agent, endpoint
+        self._ensure_employee_access(employee)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        if self._metsights_service is None:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights integration is not configured",
+            )
+
+        user_ids = await self._repository.list_distinct_participant_ids_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+
+        created = 0
+        skipped = 0
+        failed = 0
+        results: list[dict[str, Any]] = []
+
+        for user_id in user_ids:
+            base: dict[str, Any] = {"user_id": user_id, "status": "pending", "metsights_profile_id": None, "reason": None}
+            user = await self._users_repository.get_user_by_id(db, user_id)
+            if user is None:
+                base["status"] = "error"
+                base["reason"] = "user_not_found"
+                failed += 1
+                results.append(base)
+                continue
+
+            existing_profile_id = (user.metsights_profile_id or "").strip()
+            if existing_profile_id:
+                base["status"] = "skipped"
+                base["reason"] = "already_has_metsights_profile_id"
+                base["metsights_profile_id"] = existing_profile_id
+                skipped += 1
+                results.append(base)
+                continue
+
+            first_name = (user.first_name or "").strip()
+            last_name = (user.last_name or "").strip()
+            gender = _to_metsights_gender(user.gender)
+            phone = _normalize_phone_for_metsights(user.phone) or (user.phone or "").strip()
+            dob = user.date_of_birth.isoformat() if user.date_of_birth is not None else None
+            email = (user.email or "").strip() if user.email else None
+
+            if not first_name or not last_name or not phone or gender is None:
+                base["status"] = "error"
+                base["reason"] = "missing_required_user_fields"
+                failed += 1
+                results.append(base)
+                continue
+
+            if not dob and user.age is None:
+                base["status"] = "error"
+                base["reason"] = "missing_date_of_birth_or_age"
+                failed += 1
+                results.append(base)
+                continue
+
+            profile_id: str | None = None
+            candidate_phones = [phone]
+            raw_phone = (user.phone or "").strip()
+            if raw_phone and raw_phone not in candidate_phones:
+                candidate_phones.append(raw_phone)
+
+            last_error: str | None = None
+            for candidate_phone in candidate_phones:
+                try:
+                    profile_id = await self._metsights_service.get_or_create_profile_id(
+                        first_name=first_name,
+                        last_name=last_name,
+                        phone=candidate_phone,
+                        email=email,
+                        gender=gender,
+                        date_of_birth=dob,
+                        age=user.age,
+                    )
+                    if profile_id:
+                        break
+                except AppError as exc:
+                    last_error = exc.message or exc.error_code or "metsights_error"
+                except Exception as exc:
+                    last_error = str(exc)
+
+            if not profile_id:
+                base["status"] = "error"
+                base["reason"] = last_error or "metsights_profile_creation_failed"
+                failed += 1
+                results.append(base)
+                continue
+
+            await self._users_repository.update_user_partial(
+                db,
+                user_id,
+                {"metsights_profile_id": profile_id},
+            )
+
+            participant = await self._repository.get_participant_for_user_engagement(
+                db,
+                user_id=user_id,
+                engagement_id=engagement_id,
+            )
+            if participant is not None:
+                await self.update_participant_sync_flags(
+                    db,
+                    participant=participant,
+                    is_profile_created_on_metsights=True,
+                )
+
+            base["status"] = "created"
+            base["metsights_profile_id"] = profile_id
+            created += 1
+            results.append(base)
+
+        return {
+            "engagement_id": engagement_id,
+            "total": len(user_ids),
+            "created": created,
+            "skipped": skipped,
+            "failed": failed,
+            "results": results,
+        }
