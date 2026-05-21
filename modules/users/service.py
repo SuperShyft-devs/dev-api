@@ -1417,12 +1417,36 @@ class UsersService:
         user = await self._repository.patch_missing_fields(db, user=existing, data=patch_data)
         return user, False
 
+    @staticmethod
+    def _participant_details_from_onboard_payload(
+        payload: PublicUserOnboardRequest | EngagementUserOnboardRequest,
+        *,
+        source: str,
+    ) -> dict[str, str]:
+        first_name = payload.first_name or ""
+        last_name = payload.last_name or ""
+        name = f"{first_name} {last_name}".strip()
+        email_str = str(payload.email) if payload.email is not None else ""
+        age_str = str(payload.age) if payload.age is not None else ""
+        return {
+            "name": name,
+            "email": email_str,
+            "phone": str(payload.phone or ""),
+            "age": age_str,
+            "gender": str(payload.gender or ""),
+            "address": str(payload.address or ""),
+            "pincode": str(payload.pincode or ""),
+            "collection_date": str(payload.blood_collection_date),
+            "collection_time": str(payload.blood_collection_time_slot),
+            "engagement": source,
+        }
+
     async def _notify_onboarding_assistants(
         self,
         db: AsyncSession,
         *,
         engagement,
-        payload,
+        payload: PublicUserOnboardRequest | EngagementUserOnboardRequest,
         source: str,
     ) -> None:
         """Fire-and-forget: send booking-alert-whatsapp to each onboarding assistant."""
@@ -1438,21 +1462,9 @@ class UsersService:
             if not assistant_user_ids:
                 return
 
-            first_name = getattr(payload, "first_name", None) or ""
-            last_name = getattr(payload, "last_name", None) or ""
-            name = f"{first_name} {last_name}".strip()
-            email_val = getattr(payload, "email", None)
-            email_str = str(email_val) if email_val else ""
-            collection_date = str(getattr(payload, "blood_collection_date", ""))
-            collection_time = str(getattr(payload, "blood_collection_time_slot", ""))
-
-            participant_details = {
-                "name": name,
-                "email": email_str,
-                "collection_date": collection_date,
-                "collection_time": collection_time,
-                "engagement": source,
-            }
+            participant_details = self._participant_details_from_onboard_payload(
+                payload, source=source
+            )
 
             for uid in assistant_user_ids:
                 try:
