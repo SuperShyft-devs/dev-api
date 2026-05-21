@@ -339,6 +339,13 @@ class EngagementsService:
             engagement_type=engagement_type,
         )
 
+        counts_by_id = await self._repository.count_distinct_participants_by_engagement_ids(
+            db,
+            engagement_ids=[int(row.engagement_id) for row in engagements],
+        )
+        for row in engagements:
+            row.participant_count = counts_by_id.get(int(row.engagement_id), 0)
+
         checklists = self.lazy_checklists_service()
         readiness_by_id: dict[int, ChecklistReadiness] = {}
         for row in engagements:
@@ -364,7 +371,15 @@ class EngagementsService:
         if engagement is None:
             raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
 
+        await self._refresh_participant_count(db, engagement)
         return engagement
+
+    async def _refresh_participant_count(self, db: AsyncSession, engagement: Engagement) -> None:
+        engagement.participant_count = await self._repository.count_distinct_participants_for_engagement(
+            db,
+            engagement_id=int(engagement.engagement_id),
+        )
+        await self._repository.update_engagement(db, engagement)
 
     async def update_engagement_for_employee(
         self,
@@ -572,10 +587,6 @@ class EngagementsService:
         if (engagement.status or "").lower() != "active":
             raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is no longer active")
 
-        if increment_participant_count:
-            engagement.participant_count = int(engagement.participant_count or 0) + 1
-            await self._repository.update_engagement(db, engagement)
-
         participant = EngagementParticipant(
             engagement_id=engagement.engagement_id,
             user_id=user_id,
@@ -591,7 +602,9 @@ class EngagementsService:
             is_primary_record_id_synced=is_primary_record_id_synced,
             is_fitprint_record_id_synced=is_fitprint_record_id_synced,
         )
-        return await self._repository.create_participant(db, participant)
+        created = await self._repository.create_participant(db, participant)
+        await self._refresh_participant_count(db, engagement)
+        return created
 
     async def update_participant_sync_flags(
         self,
@@ -638,6 +651,7 @@ class EngagementsService:
         participants = await self._repository.list_participants_by_engagement_code(
             db,
             engagement_code=engagement_code,
+            engagement_id=int(engagement.engagement_id),
             page=page,
             limit=limit,
         )
@@ -646,6 +660,7 @@ class EngagementsService:
         total = await self._repository.count_participants_by_engagement_code(
             db,
             engagement_code=engagement_code,
+            engagement_id=int(engagement.engagement_id),
         )
 
         # Transform tuple results to dictionary format
@@ -676,6 +691,87 @@ class EngagementsService:
             result.append({
                 "engagement_participant_id": engagement_participant_id,
                 "engagement_id": engagement_id,
+                "user_id": user_id,
+                "first_name": first_name,
+                "last_name": last_name,
+                "phone": phone,
+                "email": email,
+                "city": city,
+                "status": status,
+                "slot_start_time": slot_start_time.isoformat() if slot_start_time is not None else None,
+                "engagement_date": engagement_date.isoformat() if engagement_date is not None else None,
+                "participants_employee_id": participants_employee_id,
+                "participant_department": participant_department,
+                "participant_blood_group": participant_blood_group,
+                "want_doctor_consultation": want_doctor_consultation,
+                "want_nutritionist_consultation": want_nutritionist_consultation,
+                "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
+                "is_profile_created_on_metsights": is_profile_created_on_metsights,
+                "is_primary_record_id_synced": is_primary_record_id_synced,
+                "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
+            })
+
+        return result, total
+
+    async def list_participants_for_engagement_id(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        page: int,
+        limit: int,
+    ) -> tuple[list[dict], int]:
+        """Fetch participant enrollment rows for a specific engagement by id."""
+
+        self._ensure_employee_access(employee)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+
+        participants = await self._repository.list_participants_by_engagement_id(
+            db,
+            engagement_id=engagement_id,
+            page=page,
+            limit=limit,
+        )
+        total = await self._repository.count_distinct_participants_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+
+        result = []
+        for row in participants:
+            (
+                engagement_participant_id,
+                row_engagement_id,
+                user_id,
+                first_name,
+                last_name,
+                phone,
+                email,
+                city,
+                status,
+                slot_start_time,
+                engagement_date,
+                participants_employee_id,
+                participant_department,
+                participant_blood_group,
+                want_doctor_consultation,
+                want_nutritionist_consultation,
+                want_doctor_and_nutritionist_consultation,
+                is_profile_created_on_metsights,
+                is_primary_record_id_synced,
+                is_fitprint_record_id_synced,
+            ) = row
+            result.append({
+                "engagement_participant_id": engagement_participant_id,
+                "engagement_id": row_engagement_id,
                 "user_id": user_id,
                 "first_name": first_name,
                 "last_name": last_name,
@@ -1611,6 +1707,7 @@ class EngagementsService:
 
             results.append(base)
 
+        await self._refresh_participant_count(db, engagement)
         return {"results": results}
 
     async def create_metsights_profiles_for_engagement_participants(

@@ -315,6 +315,31 @@ async def get_public_engagement_participants(
     return success_response(participants, meta={"page": page, "limit": limit, "total": total})
 
 
+@router.get("/{engagement_id}/participants")
+async def get_engagement_participants_by_id(
+    engagement_id: int,
+    page: int = 1,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """Get all distinct users enrolled in a specific engagement by id."""
+
+    if page < 1 or limit < 1 or limit > 100:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    participants, total = await engagements_service.list_participants_for_engagement_id(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        page=page,
+        limit=limit,
+    )
+
+    return success_response(participants, meta={"page": page, "limit": limit, "total": total})
+
+
 @router.delete("/{engagement_id}/participants")
 async def remove_all_participants_from_engagement(
     engagement_id: int,
