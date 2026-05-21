@@ -766,23 +766,14 @@ class EngagementsService:
         deleted_instances = 0
 
         for instance in instances:
-            instance_id = int(instance.assessment_instance_id)
-            deleted_reports += await self._reports_repository.delete_individual_reports_for_instance(
+            purge = await self._purge_assessment_instance(
                 db,
-                assessment_instance_id=instance_id,
+                assessment_instance_id=int(instance.assessment_instance_id),
             )
-            deleted_questionnaire_responses += await self._questionnaire_repository.delete_responses_for_instance(
-                db,
-                assessment_instance_id=instance_id,
-            )
-            deleted_category_progress += await self._assessments_repository.delete_category_progress_for_instance(
-                db,
-                assessment_instance_id=instance_id,
-            )
-            deleted_instances += await self._assessments_repository.delete_instance(
-                db,
-                assessment_instance_id=instance_id,
-            )
+            deleted_reports += purge["deleted_reports"]
+            deleted_questionnaire_responses += purge["deleted_questionnaire_responses"]
+            deleted_category_progress += purge["deleted_category_progress_rows"]
+            deleted_instances += purge["deleted_assessment_instances"]
 
         deleted_participants = await self._repository.delete_participants_for_user_engagement(
             db,
@@ -796,6 +787,150 @@ class EngagementsService:
             "deleted_questionnaire_responses": deleted_questionnaire_responses,
             "deleted_reports": deleted_reports,
             "deleted_category_progress_rows": deleted_category_progress,
+        }
+
+    async def _purge_assessment_instance(self, db: AsyncSession, *, assessment_instance_id: int) -> dict[str, int]:
+        instance_id = int(assessment_instance_id)
+        deleted_reports = await self._reports_repository.delete_individual_reports_for_instance(
+            db,
+            assessment_instance_id=instance_id,
+        )
+        deleted_questionnaire_responses = await self._questionnaire_repository.delete_responses_for_instance(
+            db,
+            assessment_instance_id=instance_id,
+        )
+        deleted_category_progress = await self._assessments_repository.delete_category_progress_for_instance(
+            db,
+            assessment_instance_id=instance_id,
+        )
+        deleted_instances = await self._assessments_repository.delete_instance(
+            db,
+            assessment_instance_id=instance_id,
+        )
+        return {
+            "deleted_assessment_instances": deleted_instances,
+            "deleted_questionnaire_responses": deleted_questionnaire_responses,
+            "deleted_reports": deleted_reports,
+            "deleted_category_progress_rows": deleted_category_progress,
+        }
+
+    async def _purge_engagement_scoped_data(self, db: AsyncSession, *, engagement_id: int) -> dict[str, int]:
+        """Delete all data tied to an engagement. Does not delete users."""
+
+        from sqlalchemy import delete, update
+
+        from modules.checklists.models import EngagementChecklist
+        from modules.notifications.models import Notification
+        from modules.reports.models import OrganizationHealthReport, ReportsUserSyncState
+
+        instances = await self._assessments_repository.list_all_instances_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+        instance_ids = [int(i.assessment_instance_id) for i in instances]
+
+        await db.execute(
+            update(Notification)
+            .where(Notification.engagement_id == engagement_id)
+            .values(engagement_id=None)
+        )
+        if instance_ids:
+            await db.execute(
+                update(Notification)
+                .where(Notification.assessment_instance_id.in_(instance_ids))
+                .values(assessment_instance_id=None)
+            )
+            await db.execute(
+                update(ReportsUserSyncState)
+                .where(ReportsUserSyncState.last_synced_assessment_instance_id.in_(instance_ids))
+                .values(last_synced_assessment_instance_id=None)
+            )
+
+        totals = {
+            "deleted_engagement_participants": 0,
+            "deleted_assessment_instances": 0,
+            "deleted_questionnaire_responses": 0,
+            "deleted_reports": 0,
+            "deleted_category_progress_rows": 0,
+            "deleted_organization_health_reports": 0,
+            "deleted_onboarding_assistant_assignments": 0,
+            "deleted_engagement_checklists": 0,
+        }
+
+        for instance in instances:
+            purge = await self._purge_assessment_instance(
+                db,
+                assessment_instance_id=int(instance.assessment_instance_id),
+            )
+            totals["deleted_assessment_instances"] += purge["deleted_assessment_instances"]
+            totals["deleted_questionnaire_responses"] += purge["deleted_questionnaire_responses"]
+            totals["deleted_reports"] += purge["deleted_reports"]
+            totals["deleted_category_progress_rows"] += purge["deleted_category_progress_rows"]
+
+        totals["deleted_engagement_participants"] = await self._repository.delete_all_participants_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+
+        org_report_result = await db.execute(
+            delete(OrganizationHealthReport).where(OrganizationHealthReport.engagement_id == engagement_id)
+        )
+        totals["deleted_organization_health_reports"] = int(org_report_result.rowcount or 0)
+
+        totals["deleted_onboarding_assistant_assignments"] = (
+            await self._repository.delete_all_onboarding_assignments_for_engagement(
+                db,
+                engagement_id=engagement_id,
+            )
+        )
+
+        checklist_result = await db.execute(
+            delete(EngagementChecklist).where(EngagementChecklist.engagement_id == engagement_id)
+        )
+        totals["deleted_engagement_checklists"] = int(checklist_result.rowcount or 0)
+
+        return totals
+
+    async def delete_engagement_for_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        """Permanently delete an engagement and all engagement-scoped data. Users are not deleted."""
+
+        self._ensure_employee_access(employee)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        purge = await self._purge_engagement_scoped_data(db, engagement_id=engagement_id)
+
+        deleted = await self._repository.delete_engagement_by_id(db, engagement_id=engagement_id)
+        if not deleted:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_DELETE_ENGAGEMENT",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return {
+            "engagement_id": engagement_id,
+            "engagement_code": engagement.engagement_code,
+            "engagement_name": engagement.engagement_name,
+            **purge,
         }
 
     async def remove_participant_from_engagement_for_employee(

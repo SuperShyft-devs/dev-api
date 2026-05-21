@@ -657,3 +657,37 @@ class EngagementsRepository:
 
         result = await db.execute(query)
         return list(result.all())
+
+    async def delete_all_participants_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> int:
+        from sqlalchemy import delete as sql_delete
+
+        result = await db.execute(
+            sql_delete(EngagementParticipant).where(EngagementParticipant.engagement_id == engagement_id)
+        )
+        return int(result.rowcount or 0)
+
+    async def delete_all_onboarding_assignments_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> int:
+        from sqlalchemy import delete as sql_delete
+
+        result = await db.execute(
+            sql_delete(OnboardingAssistantAssignment).where(
+                OnboardingAssistantAssignment.engagement_id == engagement_id
+            )
+        )
+        return int(result.rowcount or 0)
+
+    async def delete_engagement_by_id(self, db: AsyncSession, *, engagement_id: int) -> bool:
+        from sqlalchemy import delete as sql_delete
+
+        result = await db.execute(sql_delete(Engagement).where(Engagement.engagement_id == engagement_id))
+        return int(result.rowcount or 0) > 0

@@ -217,6 +217,27 @@ async def get_public_occupied_slots(
     return success_response({"occupied_slots": occupied})
 
 
+@router.delete("/{engagement_id}")
+async def delete_engagement(
+    engagement_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """Permanently delete an engagement and all engagement-scoped data. Users are not deleted."""
+    data = await engagements_service.delete_engagement_for_employee(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
 @router.patch("/{engagement_id}/status")
 async def update_engagement_status(
     engagement_id: int,

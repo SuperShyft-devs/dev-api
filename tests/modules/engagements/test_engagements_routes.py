@@ -611,3 +611,103 @@ async def test_patch_engagement_status_changes_status(async_client, test_db_sess
     updated = await test_db_session.get(Engagement, 8401)
     assert updated is not None
     assert (updated.status or "").lower() == "inactive"
+
+
+@pytest.mark.asyncio
+async def test_delete_engagement_requires_auth(async_client):
+    response = await async_client.delete("/engagements/1")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_delete_engagement_removes_scoped_data_but_not_users(async_client, test_db_session):
+    from datetime import time
+
+    from modules.assessments.models import AssessmentInstance
+    from modules.engagements.models import Engagement, EngagementParticipant
+    from modules.reports.models import IndividualHealthReport
+    from modules.users.models import User
+
+    await _seed_employee(test_db_session, user_id=7010, employee_id=20)
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    test_db_session.add(User(user_id=1010, age=30, phone="1010000000", status="active"))
+    await test_db_session.flush()
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=8501,
+            engagement_name="Delete Me",
+            metsights_engagement_id=None,
+            organization_id=1,
+            engagement_code="DEL8501",
+            engagement_type="bio_ai",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 1),
+            status="active",
+            participant_count=1,
+        )
+    )
+    await test_db_session.flush()
+
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=85001,
+            engagement_id=8501,
+            user_id=1010,
+            engagement_date=date(2026, 2, 1),
+            slot_start_time=time(10, 0),
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=85001,
+            user_id=1010,
+            engagement_id=8501,
+            package_id=1,
+            status="assigned",
+        )
+    )
+    await test_db_session.flush()
+
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=85001,
+            user_id=1010,
+            assessment_instance_id=85001,
+            engagement_id=8501,
+            reports={},
+            blood_parameters={},
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.delete("/engagements/8501", headers=_auth_header(7010))
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["engagement_id"] == 8501
+    assert body["deleted_engagement_participants"] >= 1
+    assert body["deleted_assessment_instances"] >= 1
+
+    assert await test_db_session.get(Engagement, 8501) is None
+    assert await test_db_session.get(User, 1010) is not None
+
+    participants = (
+        await test_db_session.execute(
+            text("SELECT COUNT(*) FROM engagement_participants WHERE engagement_id = 8501")
+        )
+    ).scalar_one()
+    assert participants == 0
+
+    instances = (
+        await test_db_session.execute(
+            text("SELECT COUNT(*) FROM assessment_instances WHERE engagement_id = 8501")
+        )
+    ).scalar_one()
+    assert instances == 0
