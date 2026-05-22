@@ -14,9 +14,11 @@ from core.exceptions import AppError
 from db.seed.questionnaire_field_config import (
     CHOICE_TO_METSIGHTS_VALUE,
     DAILY_ACTIVE_DURATION_PUSH_MAP,
+    METSIGHTS_PUSH_AS_LIST,
     NONE_CLEARS_MULTISELECT_FIELDS,
     SCALE_TO_CHOICE_CONVERTERS,
 )
+from modules.assessments.models import AssessmentInstance
 from modules.diagnostics.models import DiagnosticPackage
 from modules.assessments.service import AssessmentsService
 from modules.engagements.models import EngagementKind
@@ -133,8 +135,17 @@ _METSIGHTS_SUBMIT_FITNESS_ONLY_KEYS = frozenset(
         "sickness_frequency",
         "health_priorities",
         "goal_preference",
+        "weight_loss_goal",
     }
 )
+
+# Questionnaire sub-resources that should be marked complete when pushing (Metsights UI sections).
+_METSIGHTS_QUESTIONNAIRE_RESOURCES = frozenset({
+    "physical-measurement",
+    "vitals",
+    "diet-lifestyle-parameters",
+    "fitness-parameters",
+})
 
 
 def _question_type_for_submit(raw: str | None) -> str:
@@ -188,7 +199,7 @@ def _answer_to_metsights_fields(question_key: str, question_type: str, answer: A
             and str(x).strip() != ""
             and str(x).strip().lower() != "none"
         ]
-        return {qkey: seq} if seq else {qkey: []}
+        return {qkey: seq} if seq else {}
 
     if qtype == "single_choice":
         if answer is None:
@@ -205,12 +216,12 @@ def _answer_to_metsights_fields(question_key: str, question_type: str, answer: A
 
         if qkey == "iodized_salt_status":
             if isinstance(answer, bool):
-                return {qkey: answer}
+                return {qkey: "true" if answer else "false"}
             low = str(answer).strip().lower()
             if low in ("true", "1", "yes"):
-                return {qkey: True}
+                return {qkey: "true"}
             if low in ("false", "0", "no"):
-                return {qkey: False}
+                return {qkey: "false"}
             return {}
 
         s = str(answer).strip()
@@ -221,6 +232,9 @@ def _answer_to_metsights_fields(question_key: str, question_type: str, answer: A
         field_map = CHOICE_TO_METSIGHTS_VALUE.get(qkey)
         if field_map and s in field_map:
             s = field_map[s]
+
+        if qkey in METSIGHTS_PUSH_AS_LIST:
+            return {qkey: [s]}
 
         return {qkey: s}
 
@@ -310,7 +324,10 @@ def _validate_payload_against_options(
             filtered = [v for v in value if str(v).strip() in allowed]
             cleaned[key] = filtered
         elif isinstance(value, bool):
-            if str(value) in allowed:
+            bool_str = "true" if value else "false"
+            if bool_str in allowed:
+                cleaned[key] = bool_str
+            elif str(value) in allowed:
                 cleaned[key] = value
             elif meta.required:
                 fallback = sorted(allowed)[0]
@@ -954,6 +971,103 @@ class MetsightsSyncService:
             "skipped_questions": skipped_questions,
         }
 
+    async def _find_fitprint_instance_for_user_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+    ) -> AssessmentInstance | None:
+        """Return the user's FitPrint (type ``7``) instance in an engagement, if any."""
+
+        instances = await self._assessments.list_instances_for_engagement(db, engagement_id=int(engagement_id))
+        for inst in instances:
+            if int(inst.user_id) != int(user_id):
+                continue
+            package = await self._assessments.get_package_by_id(db, int(inst.package_id))
+            if package is None or (package.assessment_type_code or "").strip() != "7":
+                continue
+            if (inst.metsights_record_id or "").strip():
+                return inst
+        return None
+
+    async def _patch_metsights_sections(
+        self,
+        *,
+        record_id: str,
+        type_code: str,
+        merged: dict[str, Any],
+        mark_complete: bool,
+        options_cache: dict[str, dict[str, _FieldMeta]] | None,
+        patched: list[str],
+        skipped_sections: list[str],
+        section_errors: list[str] | None = None,
+    ) -> None:
+        """Push merged questionnaire fields to Metsights sub-resources for one record."""
+
+        mrid = (record_id or "").strip()
+        if not mrid:
+            return
+
+        async def _patch_section(resource: str, body: dict[str, Any]) -> None:
+            payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
+            if not payload:
+                logger.info(
+                    "Skipping Metsights %s for record %s: empty payload (no matching questionnaire keys)",
+                    resource,
+                    mrid,
+                )
+                skipped_sections.append(resource)
+                return
+            field_meta = await self._fetch_field_metadata_for_resource(mrid, resource, cache=options_cache)
+            if field_meta:
+                payload = _validate_payload_against_options(payload, field_meta)
+                if not payload:
+                    logger.warning(
+                        "Metsights %s for record %s: all fields invalid after validation",
+                        resource,
+                        mrid,
+                    )
+                    skipped_sections.append(resource)
+                    if section_errors is not None:
+                        section_errors.append(resource)
+                    return
+            if mark_complete and resource in _METSIGHTS_QUESTIONNAIRE_RESOURCES:
+                payload["is_complete"] = True
+            logger.info("Pushing to Metsights %s for record %s: %s", resource, mrid, payload)
+            try:
+                await self._metsights.upsert_record_subresource(record_id=mrid, resource=resource, body=payload)
+                patched.append(resource)
+            except Exception as exc:
+                logger.warning(
+                    "Metsights push %s for record %s failed: %s — payload was: %s",
+                    resource,
+                    mrid,
+                    exc,
+                    payload,
+                )
+                if section_errors is not None:
+                    section_errors.append(resource)
+                else:
+                    raise
+
+        tc = (type_code or "").strip()
+        if tc in ("1", "2"):
+            phys = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_PHYSICAL_KEYS)
+            vit = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_VITALS_KEYS)
+            diet = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS)
+            await _patch_section("physical-measurement", phys)
+            await _patch_section("vitals", vit)
+            await _patch_section("diet-lifestyle-parameters", diet)
+        elif tc == "7":
+            bases = (
+                _METSIGHTS_SUBMIT_PHYSICAL_KEYS
+                | _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS
+                | _METSIGHTS_SUBMIT_FITNESS_ONLY_KEYS
+            )
+            fit = _pick_metsights_payload_for_bases(merged, bases)
+            await _patch_section("fitness-parameters", fit)
+
     async def _fetch_field_metadata_for_resource(
         self,
         record_id: str,
@@ -1067,41 +1181,34 @@ class MetsightsSyncService:
         patched: list[str] = []
         skipped_sections: list[str] = []
 
-        async def _patch_section(resource: str, body: dict[str, Any]) -> None:
-            payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
-            if not payload:
-                logger.info(
-                    "Skipping Metsights %s for record %s: empty payload (no matching questionnaire keys)",
-                    resource, mrid,
-                )
-                skipped_sections.append(resource)
-                return
-            field_meta = await self._fetch_field_metadata_for_resource(mrid, resource)
-            if field_meta:
-                payload = _validate_payload_against_options(payload, field_meta)
-                if not payload:
-                    logger.warning("Metsights %s for record %s: all fields invalid after validation", resource, mrid)
-                    skipped_sections.append(resource)
-                    return
-            payload["is_complete"] = True
-            logger.info(
-                "Pushing to Metsights %s for record %s: %s",
-                resource, mrid, payload,
-            )
-            await self._metsights.upsert_record_subresource(record_id=mrid, resource=resource, body=payload)
-            patched.append(resource)
+        await self._patch_metsights_sections(
+            record_id=mrid,
+            type_code=type_code,
+            merged=merged,
+            mark_complete=True,
+            options_cache=None,
+            patched=patched,
+            skipped_sections=skipped_sections,
+        )
 
-        if type_code in ("1", "2"):
-            phys = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_PHYSICAL_KEYS)
-            vit = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_VITALS_KEYS)
-            diet = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS)
-            await _patch_section("physical-measurement", phys)
-            await _patch_section("vitals", vit)
-            await _patch_section("diet-lifestyle-parameters", diet)
-        elif type_code == "7":
-            bases = _METSIGHTS_SUBMIT_PHYSICAL_KEYS | _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS | _METSIGHTS_SUBMIT_FITNESS_ONLY_KEYS
-            fit = _pick_metsights_payload_for_bases(merged, bases)
-            await _patch_section("fitness-parameters", fit)
+        if type_code in ("1", "2") and instance.engagement_id is not None:
+            fitprint_inst = await self._find_fitprint_instance_for_user_engagement(
+                db,
+                user_id=int(current_user_id),
+                engagement_id=int(instance.engagement_id),
+            )
+            if fitprint_inst is not None:
+                fp_rid = (fitprint_inst.metsights_record_id or "").strip()
+                if fp_rid:
+                    await self._patch_metsights_sections(
+                        record_id=fp_rid,
+                        type_code="7",
+                        merged=merged,
+                        mark_complete=True,
+                        options_cache=None,
+                        patched=patched,
+                        skipped_sections=skipped_sections,
+                    )
 
         if not patched and skipped_sections:
             logger.warning(
@@ -1186,40 +1293,39 @@ class MetsightsSyncService:
             return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "no_mappable_answers"}
 
         patched: list[str] = []
+        skipped_sections: list[str] = []
         section_errors: list[str] = []
 
-        async def _patch_section(resource: str, body: dict[str, Any]) -> None:
-            payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
-            if not payload:
-                return
-            field_meta = await self._fetch_field_metadata_for_resource(mrid, resource, cache=options_cache)
-            if field_meta:
-                payload = _validate_payload_against_options(payload, field_meta)
-                if not payload:
-                    logger.warning("Metsights %s for record %s: all fields invalid after validation", resource, mrid)
-                    section_errors.append(resource)
-                    return
-            try:
-                await self._metsights.upsert_record_subresource(record_id=mrid, resource=resource, body=payload)
-                patched.append(resource)
-            except Exception as exc:
-                logger.warning(
-                    "Metsights push %s for record %s failed: %s — payload was: %s",
-                    resource, mrid, exc, payload,
-                )
-                section_errors.append(resource)
+        await self._patch_metsights_sections(
+            record_id=mrid,
+            type_code=type_code,
+            merged=merged,
+            mark_complete=True,
+            options_cache=options_cache,
+            patched=patched,
+            skipped_sections=skipped_sections,
+            section_errors=section_errors,
+        )
 
-        if type_code in ("1", "2"):
-            phys = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_PHYSICAL_KEYS)
-            vit = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_VITALS_KEYS)
-            diet = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS)
-            await _patch_section("physical-measurement", phys)
-            await _patch_section("vitals", vit)
-            await _patch_section("diet-lifestyle-parameters", diet)
-        elif type_code == "7":
-            bases = _METSIGHTS_SUBMIT_PHYSICAL_KEYS | _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS | _METSIGHTS_SUBMIT_FITNESS_ONLY_KEYS
-            fit = _pick_metsights_payload_for_bases(merged, bases)
-            await _patch_section("fitness-parameters", fit)
+        if type_code in ("1", "2") and instance.engagement_id is not None:
+            fitprint_inst = await self._find_fitprint_instance_for_user_engagement(
+                db,
+                user_id=int(instance.user_id),
+                engagement_id=int(instance.engagement_id),
+            )
+            if fitprint_inst is not None:
+                fp_rid = (fitprint_inst.metsights_record_id or "").strip()
+                if fp_rid:
+                    await self._patch_metsights_sections(
+                        record_id=fp_rid,
+                        type_code="7",
+                        merged=merged,
+                        mark_complete=True,
+                        options_cache=options_cache,
+                        patched=patched,
+                        skipped_sections=skipped_sections,
+                        section_errors=section_errors,
+                    )
 
         return {
             "assessment_instance_id": assessment_instance_id,

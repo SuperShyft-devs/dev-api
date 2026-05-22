@@ -430,3 +430,348 @@ async def test_submit_without_body_still_works(async_client, test_db_session, mo
     phys = [c for c in calls if c[1] == "physical-measurement"]
     assert len(phys) == 1
     assert phys[0][2].get("height") == 165.0
+
+
+def test_answer_to_metsights_field_conversions():
+    from modules.metsights.sync_service import _answer_to_metsights_fields
+
+    assert _answer_to_metsights_fields("iodized_salt_status", "single_choice", "true") == {
+        "iodized_salt_status": "true"
+    }
+    assert _answer_to_metsights_fields("health_priorities", "single_choice", "2") == {
+        "health_priorities": ["2"]
+    }
+    assert _answer_to_metsights_fields("tobacco_frequency", "single_choice", "5") == {
+        "tobacco_frequency": "1"
+    }
+    assert _answer_to_metsights_fields("daily_active_duration", "single_choice", "2") == {
+        "daily_active_duration": 1.0,
+        "daily_active_duration_unit": "1",
+    }
+    assert _answer_to_metsights_fields("family_health_history", "multiple_choice", ["none"]) == {}
+
+
+@pytest.mark.asyncio
+async def test_submit_pro_pushes_fitprint_sibling_fitness(async_client, test_db_session, monkeypatch):
+    await _ensure_test_engagement(test_db_session)
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+
+    calls: list[tuple[str, str, dict]] = []
+
+    async def _fake_upsert(self, *, record_id: str, resource: str, body: dict):
+        calls.append((record_id, resource, dict(body)))
+        return {}
+
+    async def _fake_options(self, *, record_id: str, resource: str):
+        if resource == "fitness-parameters":
+            return {
+                "actions": {
+                    "POST": {
+                        "exercise_frequency_week": {
+                            "required": True,
+                            "choices": [{"value": "2"}],
+                        },
+                    }
+                }
+            }
+        return {}
+
+    monkeypatch.setattr("modules.metsights.service.MetsightsService.upsert_record_subresource", _fake_upsert)
+    monkeypatch.setattr("modules.metsights.service.MetsightsService.options_record_subresource", _fake_options)
+
+    uid = 55270
+    await _seed_user(test_db_session, user_id=uid)
+    pro_pkg = 5630
+    fp_pkg = 5631
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pro_pkg,
+            package_code="MET_PRO_FP",
+            display_name="Pro FP",
+            assessment_type_code="2",
+            status="active",
+        )
+    )
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=fp_pkg,
+            package_code="FP_SIB",
+            display_name="FitPrint Sib",
+            assessment_type_code="7",
+            status="active",
+        )
+    )
+    test_db_session.add(AssessmentPackageCategory(package_id=pro_pkg, category_id=1))
+    test_db_session.add(AssessmentPackageCategory(package_id=fp_pkg, category_id=1))
+    await test_db_session.commit()
+
+    pro_aid = 5632
+    fp_rid = "MS-FP-SIB"
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=pro_aid,
+            user_id=uid,
+            package_id=pro_pkg,
+            engagement_id=1,
+            status="active",
+            metsights_record_id="MS-PRO-SIB",
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=5633,
+            user_id=uid,
+            package_id=fp_pkg,
+            engagement_id=1,
+            status="active",
+            metsights_record_id=fp_rid,
+        )
+    )
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=pro_aid,
+            question_id=15,
+            category_id=3,
+            answer="2",
+            submitted_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    r = await async_client.post(f"/assessments/{pro_aid}/submit", headers=_auth_header(uid))
+    assert r.status_code == 200
+
+    fit = [c for c in calls if c[0] == fp_rid and c[1] == "fitness-parameters"]
+    assert len(fit) == 1
+    assert fit[0][2].get("exercise_frequency_week") == "2"
+    assert fit[0][2].get("is_complete") is True
+
+
+def test_answer_to_metsights_field_conversions():
+    from modules.metsights.sync_service import _answer_to_metsights_fields
+
+    assert _answer_to_metsights_fields("iodized_salt_status", "single_choice", "true") == {
+        "iodized_salt_status": "true"
+    }
+    assert _answer_to_metsights_fields("health_priorities", "single_choice", "2") == {
+        "health_priorities": ["2"]
+    }
+    assert _answer_to_metsights_fields("tobacco_frequency", "single_choice", "5") == {
+        "tobacco_frequency": "1"
+    }
+    assert _answer_to_metsights_fields("daily_active_duration", "single_choice", "2") == {
+        "daily_active_duration": 1.0,
+        "daily_active_duration_unit": "1",
+    }
+    assert _answer_to_metsights_fields("family_health_history", "multiple_choice", ["none"]) == {}
+
+
+@pytest.mark.asyncio
+async def test_submit_pro_pushes_fitprint_sibling_fitness(async_client, test_db_session, monkeypatch):
+    await _ensure_test_engagement(test_db_session)
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+
+    calls: list[tuple[str, str, dict]] = []
+
+    async def _fake_upsert(self, *, record_id: str, resource: str, body: dict):
+        calls.append((record_id, resource, dict(body)))
+        return {}
+
+    async def _fake_options(self, *, record_id: str, resource: str):
+        if resource == "fitness-parameters":
+            return {
+                "actions": {
+                    "POST": {
+                        "exercise_frequency_week": {
+                            "required": True,
+                            "choices": [{"value": "2"}],
+                        },
+                    }
+                }
+            }
+        return {}
+
+    monkeypatch.setattr("modules.metsights.service.MetsightsService.upsert_record_subresource", _fake_upsert)
+    monkeypatch.setattr("modules.metsights.service.MetsightsService.options_record_subresource", _fake_options)
+
+    uid = 55270
+    await _seed_user(test_db_session, user_id=uid)
+    pro_pkg = 5630
+    fp_pkg = 5631
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pro_pkg,
+            package_code="MET_PRO_FP",
+            display_name="Pro FP",
+            assessment_type_code="2",
+            status="active",
+        )
+    )
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=fp_pkg,
+            package_code="FP_SIB",
+            display_name="FitPrint Sib",
+            assessment_type_code="7",
+            status="active",
+        )
+    )
+    test_db_session.add(AssessmentPackageCategory(package_id=pro_pkg, category_id=1))
+    test_db_session.add(AssessmentPackageCategory(package_id=fp_pkg, category_id=1))
+    await test_db_session.commit()
+
+    pro_aid = 5632
+    fp_rid = "MS-FP-SIB"
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=pro_aid,
+            user_id=uid,
+            package_id=pro_pkg,
+            engagement_id=1,
+            status="active",
+            metsights_record_id="MS-PRO-SIB",
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=5633,
+            user_id=uid,
+            package_id=fp_pkg,
+            engagement_id=1,
+            status="active",
+            metsights_record_id=fp_rid,
+        )
+    )
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=pro_aid,
+            question_id=15,
+            category_id=3,
+            answer="2",
+            submitted_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    r = await async_client.post(f"/assessments/{pro_aid}/submit", headers=_auth_header(uid))
+    assert r.status_code == 200
+
+    fit = [c for c in calls if c[0] == fp_rid and c[1] == "fitness-parameters"]
+    assert len(fit) == 1
+    assert fit[0][2].get("exercise_frequency_week") == "2"
+    assert fit[0][2].get("is_complete") is True
+
+
+def test_answer_to_metsights_field_conversions():
+    from modules.metsights.sync_service import _answer_to_metsights_fields
+
+    assert _answer_to_metsights_fields("iodized_salt_status", "single_choice", "true") == {
+        "iodized_salt_status": "true"
+    }
+    assert _answer_to_metsights_fields("health_priorities", "single_choice", "2") == {
+        "health_priorities": ["2"]
+    }
+    assert _answer_to_metsights_fields("tobacco_frequency", "single_choice", "5") == {
+        "tobacco_frequency": "1"
+    }
+    assert _answer_to_metsights_fields("daily_active_duration", "single_choice", "2") == {
+        "daily_active_duration": 1.0,
+        "daily_active_duration_unit": "1",
+    }
+    assert _answer_to_metsights_fields("family_health_history", "multiple_choice", ["none"]) == {}
+
+
+@pytest.mark.asyncio
+async def test_submit_pro_pushes_fitprint_sibling_fitness(async_client, test_db_session, monkeypatch):
+    await _ensure_test_engagement(test_db_session)
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+
+    calls: list[tuple[str, str, dict]] = []
+
+    async def _fake_upsert(self, *, record_id: str, resource: str, body: dict):
+        calls.append((record_id, resource, dict(body)))
+        return {}
+
+    async def _fake_options(self, *, record_id: str, resource: str):
+        if resource == "fitness-parameters":
+            return {
+                "actions": {
+                    "POST": {
+                        "exercise_frequency_week": {
+                            "required": True,
+                            "choices": [{"value": "2"}],
+                        },
+                    }
+                }
+            }
+        return {}
+
+    monkeypatch.setattr("modules.metsights.service.MetsightsService.upsert_record_subresource", _fake_upsert)
+    monkeypatch.setattr("modules.metsights.service.MetsightsService.options_record_subresource", _fake_options)
+
+    uid = 55270
+    await _seed_user(test_db_session, user_id=uid)
+    pro_pkg = 5630
+    fp_pkg = 5631
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pro_pkg,
+            package_code="MET_PRO_FP",
+            display_name="Pro FP",
+            assessment_type_code="2",
+            status="active",
+        )
+    )
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=fp_pkg,
+            package_code="FP_SIB",
+            display_name="FitPrint Sib",
+            assessment_type_code="7",
+            status="active",
+        )
+    )
+    test_db_session.add(AssessmentPackageCategory(package_id=pro_pkg, category_id=1))
+    test_db_session.add(AssessmentPackageCategory(package_id=fp_pkg, category_id=1))
+    await test_db_session.commit()
+
+    pro_aid = 5632
+    fp_rid = "MS-FP-SIB"
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=pro_aid,
+            user_id=uid,
+            package_id=pro_pkg,
+            engagement_id=1,
+            status="active",
+            metsights_record_id="MS-PRO-SIB",
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=5633,
+            user_id=uid,
+            package_id=fp_pkg,
+            engagement_id=1,
+            status="active",
+            metsights_record_id=fp_rid,
+        )
+    )
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=pro_aid,
+            question_id=15,
+            category_id=3,
+            answer="2",
+            submitted_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    r = await async_client.post(f"/assessments/{pro_aid}/submit", headers=_auth_header(uid))
+    assert r.status_code == 200
+
+    fit = [c for c in calls if c[0] == fp_rid and c[1] == "fitness-parameters"]
+    assert len(fit) == 1
+    assert fit[0][2].get("exercise_frequency_week") == "2"
+    assert fit[0][2].get("is_complete") is True

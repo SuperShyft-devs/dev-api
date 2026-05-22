@@ -37,6 +37,14 @@ class AssessmentsService:
         self._questionnaire = questionnaire_repository
         self._audit_service = audit_service
 
+    async def list_instances_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> list[AssessmentInstance]:
+        return await self._repository.list_all_instances_for_engagement(db, engagement_id=engagement_id)
+
     async def ensure_instance_assigned(
         self,
         db: AsyncSession,

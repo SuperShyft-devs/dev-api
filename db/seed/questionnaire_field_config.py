@@ -185,3 +185,9 @@ NONE_CLEARS_MULTISELECT_FIELDS: frozenset[str] = frozenset({
     "diagnosed_diseases",
     "diagnosed_diseases_medications",
 })
+
+# Fields stored as single_choice in our DB but Metsights expects a one-element array
+# (see RECORDS_API fitness-parameters: health_priorities).
+METSIGHTS_PUSH_AS_LIST: frozenset[str] = frozenset({
+    "health_priorities",
+})
