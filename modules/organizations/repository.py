@@ -198,7 +198,11 @@ class OrganizationsRepository:
                 User.last_name,
                 User.phone,
                 User.email,
+                User.address,
+                User.pin_code,
                 User.city,
+                User.state,
+                User.country,
                 User.status,
             )
             .distinct()

@@ -321,14 +321,30 @@ class OrganizationsService:
         # Transform tuple results to dictionary format
         result = []
         for row in participants:
-            user_id, first_name, last_name, phone, email, city, status = row
+            (
+                user_id,
+                first_name,
+                last_name,
+                phone,
+                email,
+                address,
+                pin_code,
+                city,
+                state,
+                country,
+                status,
+            ) = row
             result.append({
                 "user_id": user_id,
                 "first_name": first_name,
                 "last_name": last_name,
                 "phone": phone,
                 "email": email,
+                "address": address,
+                "pin_code": pin_code,
                 "city": city,
+                "state": state,
+                "country": country,
                 "status": status,
             })
 

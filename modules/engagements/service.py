@@ -113,6 +113,61 @@ def _to_metsights_gender(raw: str | None) -> str | None:
     return None
 
 
+def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
+    (
+        engagement_participant_id,
+        engagement_id,
+        user_id,
+        first_name,
+        last_name,
+        phone,
+        email,
+        address,
+        pin_code,
+        city,
+        state,
+        country,
+        status,
+        slot_start_time,
+        engagement_date,
+        participants_employee_id,
+        participant_department,
+        participant_blood_group,
+        want_doctor_consultation,
+        want_nutritionist_consultation,
+        want_doctor_and_nutritionist_consultation,
+        is_profile_created_on_metsights,
+        is_primary_record_id_synced,
+        is_fitprint_record_id_synced,
+    ) = row
+    return {
+        "engagement_participant_id": engagement_participant_id,
+        "engagement_id": engagement_id,
+        "user_id": user_id,
+        "first_name": first_name,
+        "last_name": last_name,
+        "phone": phone,
+        "email": email,
+        "address": address,
+        "pin_code": pin_code,
+        "city": city,
+        "state": state,
+        "country": country,
+        "status": status,
+        "slot_start_time": slot_start_time.isoformat() if slot_start_time is not None else None,
+        "engagement_date": engagement_date.isoformat() if engagement_date is not None else None,
+        "participants_employee_id": participants_employee_id,
+        "participant_department": participant_department,
+        "participant_blood_group": participant_blood_group,
+        "want_doctor_consultation": want_doctor_consultation,
+        "want_nutritionist_consultation": want_nutritionist_consultation,
+        "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
+        "is_profile_created_on_metsights": is_profile_created_on_metsights,
+        "is_primary_record_id_synced": is_primary_record_id_synced,
+        "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
+    }
+
+
 class EngagementsService:
     def __init__(
         self,
@@ -663,54 +718,7 @@ class EngagementsService:
             engagement_id=int(engagement.engagement_id),
         )
 
-        # Transform tuple results to dictionary format
-        result = []
-        for row in participants:
-            (
-                engagement_participant_id,
-                engagement_id,
-                user_id,
-                first_name,
-                last_name,
-                phone,
-                email,
-                city,
-                status,
-                slot_start_time,
-                engagement_date,
-                participants_employee_id,
-                participant_department,
-                participant_blood_group,
-                want_doctor_consultation,
-                want_nutritionist_consultation,
-                want_doctor_and_nutritionist_consultation,
-                is_profile_created_on_metsights,
-                is_primary_record_id_synced,
-                is_fitprint_record_id_synced,
-            ) = row
-            result.append({
-                "engagement_participant_id": engagement_participant_id,
-                "engagement_id": engagement_id,
-                "user_id": user_id,
-                "first_name": first_name,
-                "last_name": last_name,
-                "phone": phone,
-                "email": email,
-                "city": city,
-                "status": status,
-                "slot_start_time": slot_start_time.isoformat() if slot_start_time is not None else None,
-                "engagement_date": engagement_date.isoformat() if engagement_date is not None else None,
-                "participants_employee_id": participants_employee_id,
-                "participant_department": participant_department,
-                "participant_blood_group": participant_blood_group,
-                "want_doctor_consultation": want_doctor_consultation,
-                "want_nutritionist_consultation": want_nutritionist_consultation,
-                "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
-                "is_profile_created_on_metsights": is_profile_created_on_metsights,
-                "is_primary_record_id_synced": is_primary_record_id_synced,
-                "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
-            })
-
+        result = [_participant_enrollment_to_dict(row) for row in participants]
         return result, total
 
     async def list_participants_for_engagement_id(
@@ -745,53 +753,7 @@ class EngagementsService:
             engagement_id=engagement_id,
         )
 
-        result = []
-        for row in participants:
-            (
-                engagement_participant_id,
-                row_engagement_id,
-                user_id,
-                first_name,
-                last_name,
-                phone,
-                email,
-                city,
-                status,
-                slot_start_time,
-                engagement_date,
-                participants_employee_id,
-                participant_department,
-                participant_blood_group,
-                want_doctor_consultation,
-                want_nutritionist_consultation,
-                want_doctor_and_nutritionist_consultation,
-                is_profile_created_on_metsights,
-                is_primary_record_id_synced,
-                is_fitprint_record_id_synced,
-            ) = row
-            result.append({
-                "engagement_participant_id": engagement_participant_id,
-                "engagement_id": row_engagement_id,
-                "user_id": user_id,
-                "first_name": first_name,
-                "last_name": last_name,
-                "phone": phone,
-                "email": email,
-                "city": city,
-                "status": status,
-                "slot_start_time": slot_start_time.isoformat() if slot_start_time is not None else None,
-                "engagement_date": engagement_date.isoformat() if engagement_date is not None else None,
-                "participants_employee_id": participants_employee_id,
-                "participant_department": participant_department,
-                "participant_blood_group": participant_blood_group,
-                "want_doctor_consultation": want_doctor_consultation,
-                "want_nutritionist_consultation": want_nutritionist_consultation,
-                "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
-                "is_profile_created_on_metsights": is_profile_created_on_metsights,
-                "is_primary_record_id_synced": is_primary_record_id_synced,
-                "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
-            })
-
+        result = [_participant_enrollment_to_dict(row) for row in participants]
         return result, total
 
     async def list_participants_for_b2c_engagements(
@@ -819,54 +781,7 @@ class EngagementsService:
         # Count total participant enrollment rows
         total = await self._repository.count_participants_for_b2c_engagements(db)
 
-        # Transform tuple results to dictionary format
-        result = []
-        for row in participants:
-            (
-                engagement_participant_id,
-                engagement_id,
-                user_id,
-                first_name,
-                last_name,
-                phone,
-                email,
-                city,
-                status,
-                slot_start_time,
-                engagement_date,
-                participants_employee_id,
-                participant_department,
-                participant_blood_group,
-                want_doctor_consultation,
-                want_nutritionist_consultation,
-                want_doctor_and_nutritionist_consultation,
-                is_profile_created_on_metsights,
-                is_primary_record_id_synced,
-                is_fitprint_record_id_synced,
-            ) = row
-            result.append({
-                "engagement_participant_id": engagement_participant_id,
-                "engagement_id": engagement_id,
-                "user_id": user_id,
-                "first_name": first_name,
-                "last_name": last_name,
-                "phone": phone,
-                "email": email,
-                "city": city,
-                "status": status,
-                "slot_start_time": slot_start_time.isoformat() if slot_start_time is not None else None,
-                "engagement_date": engagement_date.isoformat() if engagement_date is not None else None,
-                "participants_employee_id": participants_employee_id,
-                "participant_department": participant_department,
-                "participant_blood_group": participant_blood_group,
-                "want_doctor_consultation": want_doctor_consultation,
-                "want_nutritionist_consultation": want_nutritionist_consultation,
-                "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
-                "is_profile_created_on_metsights": is_profile_created_on_metsights,
-                "is_primary_record_id_synced": is_primary_record_id_synced,
-                "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
-            })
-
+        result = [_participant_enrollment_to_dict(row) for row in participants]
         return result, total
 
     async def _purge_user_engagement_data(
