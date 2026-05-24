@@ -1308,6 +1308,56 @@ class UsersService:
 
         return updated
 
+    async def update_metsights_profile_id_by_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee,
+        user_id: int,
+        metsights_profile_id: str,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> User:
+        self._ensure_employee_access(employee)
+
+        user = await self._repository.get_user_by_id(db, user_id)
+        if user is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        normalized = (metsights_profile_id or "").strip()
+        value: str | None = normalized if normalized else None
+
+        if value is not None:
+            existing = await self._repository.get_user_by_metsights_profile_id(db, value)
+            if existing is not None and int(existing.user_id) != int(user_id):
+                raise AppError(
+                    status_code=409,
+                    error_code="CONFLICT",
+                    message="Another user already has this metsights_profile_id",
+                )
+
+        updated = await self._repository.update_user_partial(
+            db, user_id, {"metsights_profile_id": value}
+        )
+        if updated is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        if self._audit_service is None:
+            raise RuntimeError("Audit service is required")
+
+        await self._audit_service.log_event(
+            db,
+            action="EMPLOYEE_UPDATE_USER_METSIGHTS_PROFILE_ID",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return updated
+
     async def deactivate_user_by_employee(
         self,
         db: AsyncSession,

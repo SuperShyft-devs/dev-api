@@ -334,6 +334,12 @@ class EmployeeCreateUserRequest(BaseModel):
         return v
 
 
+class UpdateMetsightsProfileIdRequest(BaseModel):
+    """Set or clear a user's Metsights profile id (employee admin)."""
+
+    metsights_profile_id: str = ""
+
+
 class EmployeeUpdateUserRequest(BaseModel):
     age: int
     first_name: Optional[str] = Field(default=None, max_length=100)
