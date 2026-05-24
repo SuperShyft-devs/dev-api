@@ -296,19 +296,24 @@ class AssessmentsService:
         assessment_instance_id: int,
         user_id: int,
         status: str,
+        employee_ok: bool = False,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> AssessmentInstance:
-        row = await self._repository.get_instance_for_user(
-            db,
-            assessment_instance_id=assessment_instance_id,
-            user_id=user_id,
-        )
-        if row is None:
-            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
-
-        instance, _package = row
+        if employee_ok:
+            instance = await self._repository.get_instance_by_id(db, assessment_instance_id)
+            if instance is None:
+                raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+        else:
+            row = await self._repository.get_instance_for_user(
+                db,
+                assessment_instance_id=assessment_instance_id,
+                user_id=user_id,
+            )
+            if row is None:
+                raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+            instance, _package = row
 
         normalized = _normalize_status(status)
         if normalized not in _ALLOWED_USER_ASSESSMENT_STATUSES:
@@ -319,23 +324,34 @@ class AssessmentsService:
         if current == normalized:
             return instance
 
-        if current == "completed":
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment is already completed")
+        if employee_ok:
+            if current not in {"active", "completed"} or normalized not in {"active", "completed"}:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Assessment status change is not allowed",
+                )
+        else:
+            if current == "completed":
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment is already completed")
 
-        if current != "active":
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment is not active")
+            if current != "active":
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment is not active")
 
-        if normalized != "completed":
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment status change is not allowed")
+            if normalized != "completed":
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment status change is not allowed")
 
         instance.status = normalized
-        instance.completed_at = datetime.now(timezone.utc)
+        if normalized == "completed":
+            instance.completed_at = datetime.now(timezone.utc)
+        else:
+            instance.completed_at = None
         instance = await self._repository.update_instance(db, instance)
 
         audit = self._require_audit_service()
         await audit.log_event(
             db,
-            action="USER_UPDATE_ASSESSMENT_STATUS",
+            action="EMPLOYEE_UPDATE_ASSESSMENT_STATUS" if employee_ok else "USER_UPDATE_ASSESSMENT_STATUS",
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,

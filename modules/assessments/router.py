@@ -173,6 +173,7 @@ async def update_assessment_status(
     request: Request,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
+    employee=Depends(get_optional_employee),
     assessments_service: AssessmentsService = Depends(get_assessments_service),
 ):
     updated = await assessments_service.change_assessment_status_for_user(
@@ -180,6 +181,7 @@ async def update_assessment_status(
         assessment_instance_id=assessment_instance_id,
         user_id=user.user_id,
         status=payload.status,
+        employee_ok=employee is not None,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
