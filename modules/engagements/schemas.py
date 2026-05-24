@@ -36,7 +36,7 @@ class EngagementUpdateRequest(BaseModel):
 
     engagement_name: Optional[str] = Field(default=None, max_length=200)
     engagement_code: str = Field(min_length=1, max_length=50)
-    organization_id: int = Field(gt=0)
+    organization_id: Optional[int] = Field(default=None, gt=0)
     engagement_type: EngagementKind
     assessment_package_id: Optional[int] = Field(default=None, gt=0)
     diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
