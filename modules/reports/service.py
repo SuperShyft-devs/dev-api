@@ -782,6 +782,25 @@ class ReportsService:
 
         return report_data
 
+    async def _get_or_fetch_report_optional(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_id: int,
+        user_id: int,
+    ) -> Any | None:
+        """Return cached/fetched Metsights report, or None if unavailable (trends skip)."""
+        try:
+            return await self._get_or_fetch_report(
+                db,
+                assessment_id=assessment_id,
+                user_id=user_id,
+            )
+        except AppError as exc:
+            if exc.error_code in {"REPORT_NOT_FOUND", "INVALID_STATE"}:
+                return None
+            raise
+
     async def get_risk_analysis_for_user(
         self,
         db: AsyncSession,
@@ -1758,3 +1777,124 @@ class ReportsService:
             "latest_assessment_instance_id": latest_assessment_id,
         }
         return payload, meta, should_trigger
+
+    @staticmethod
+    def _matches_disease_code(*, requested: str, report_code: str) -> bool:
+        req = (requested or "").strip().lower()
+        code = (report_code or "").strip().lower()
+        if not req or not code:
+            return False
+        if code == req:
+            return True
+        if code.startswith(f"{req}/") or req.startswith(f"{code}/"):
+            return True
+        return False
+
+    @staticmethod
+    def _find_matching_disease_entry(diseases_raw: list[Any], *, disease_key: str) -> dict[str, Any] | None:
+        for entry in diseases_raw:
+            if not isinstance(entry, dict):
+                continue
+            code = str(entry.get("code") or "")
+            if ReportsService._matches_disease_code(requested=disease_key, report_code=code):
+                return entry
+        return None
+
+    @staticmethod
+    def _serialize_disease_trend_field(value: Any) -> Any:
+        if value is None or isinstance(value, (str, bool)):
+            return value
+        if isinstance(value, (int, float)):
+            return float(value) if isinstance(value, float) else int(value)
+        return value
+
+    @staticmethod
+    def _disease_entry_to_data_point(
+        entry: dict[str, Any],
+        *,
+        date_value: str,
+        engagement_id: int,
+    ) -> dict[str, Any]:
+        point: dict[str, Any] = {
+            "date": date_value,
+            "engagement_id": engagement_id,
+        }
+        for key, raw in entry.items():
+            point[key] = ReportsService._serialize_disease_trend_field(raw)
+        return point
+
+    async def _build_disease_trend_payload(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        disease_key: str,
+    ) -> dict[str, Any]:
+        rows = await self._repository.list_metsights_pro_basic_assessments_for_user(
+            db,
+            user_id=user_id,
+        )
+
+        hp = await self._diagnostics_service.get_health_parameter_by_parameter_key(
+            db, parameter_key=disease_key,
+        )
+        unit: str | None = hp.unit if hp is not None else None
+
+        data_points: list[dict[str, Any]] = []
+        for assessment, _package in rows:
+            report_data = await self._get_or_fetch_report_optional(
+                db,
+                assessment_id=int(assessment.assessment_instance_id),
+                user_id=user_id,
+            )
+            if report_data is None:
+                continue
+            report_dict = report_data if isinstance(report_data, dict) else {}
+            raw_diseases = report_dict.get("diseases", [])
+            diseases_raw: list[Any] = raw_diseases if isinstance(raw_diseases, list) else []
+
+            matched = self._find_matching_disease_entry(diseases_raw, disease_key=disease_key)
+            if matched is None:
+                continue
+
+            entry_unit = matched.get("unit")
+            if unit is None and isinstance(entry_unit, str) and entry_unit.strip():
+                unit = entry_unit.strip()
+
+            point_date = assessment.completed_at or assessment.assigned_at
+            if point_date is None:
+                continue
+            if isinstance(point_date, date):
+                date_value = point_date.isoformat()[:10]
+            else:
+                date_value = str(point_date)[:10]
+
+            data_points.append(
+                self._disease_entry_to_data_point(
+                    matched,
+                    date_value=date_value,
+                    engagement_id=int(assessment.engagement_id),
+                )
+            )
+
+        return {
+            "parameter": disease_key,
+            "unit": unit,
+            "data_points": data_points,
+        }
+
+    async def get_disease_trends_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        disease: str,
+    ) -> dict[str, Any]:
+        disease_key = (disease or "").strip().lower()
+        if not disease_key:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        return await self._build_disease_trend_payload(
+            db,
+            user_id=user_id,
+            disease_key=disease_key,
+        )

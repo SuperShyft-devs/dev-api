@@ -824,6 +824,352 @@ async def test_get_blood_parameter_trends_ignores_fitprint_for_staleness(
 
 
 @pytest.mark.asyncio
+async def test_get_disease_trends_returns_ordered_points(async_client, test_db_session):
+    test_db_session.add(User(user_id=3911, phone="3911000000", age=30, status="active"))
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=911,
+            package_code="MET_PRO",
+            display_name="MetSights Pro",
+            status="active",
+            assessment_type_code="2",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(Engagement(engagement_id=5911, engagement_code="ENG5911", assessment_package_id=911, diagnostic_package_id=1))
+    test_db_session.add(Engagement(engagement_id=5912, engagement_code="ENG5912", assessment_package_id=911, diagnostic_package_id=1))
+    test_db_session.add(Engagement(engagement_id=5913, engagement_code="ENG5913", assessment_package_id=911, diagnostic_package_id=1))
+    await test_db_session.flush()
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=99011,
+            user_id=3911,
+            package_id=911,
+            engagement_id=5911,
+            status="completed",
+            metsights_record_id="DTREND1",
+            assigned_at=datetime.now(timezone.utc),
+            completed_at=datetime(2024, 6, 6, tzinfo=timezone.utc),
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=99012,
+            user_id=3911,
+            package_id=911,
+            engagement_id=5912,
+            status="completed",
+            metsights_record_id="DTREND2",
+            assigned_at=datetime.now(timezone.utc),
+            completed_at=datetime(2024, 12, 26, tzinfo=timezone.utc),
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=99013,
+            user_id=3911,
+            package_id=911,
+            engagement_id=5913,
+            status="completed",
+            metsights_record_id="DTREND3",
+            assigned_at=datetime.now(timezone.utc),
+            completed_at=datetime(2025, 4, 18, tzinfo=timezone.utc),
+        )
+    )
+
+    disease_entry = {
+        "code": "pcos/pcod",
+        "name": "PCOS/PCOD",
+        "risk_status": "Moderate",
+        "risk_score_scaled": 40,
+    }
+    for report_id, instance_id, engagement_id, score in [
+        (71111, 99011, 5911, 38),
+        (71112, 99012, 5912, 42),
+        (71113, 99013, 5913, 45),
+    ]:
+        entry = {**disease_entry, "risk_score_scaled": score}
+        test_db_session.add(
+            IndividualHealthReport(
+                report_id=report_id,
+                user_id=3911,
+                engagement_id=engagement_id,
+                assessment_instance_id=instance_id,
+                reports={"diseases": [entry]},
+                blood_parameters=None,
+            )
+        )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        "/reports/trends?diseases=pcos",
+        headers=_auth_header(3911),
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["parameter"] == "pcos"
+    assert payload["unit"] is None
+    assert payload["data_points"] == [
+        {
+            "date": "2024-06-06",
+            "engagement_id": 5911,
+            "code": "pcos/pcod",
+            "name": "PCOS/PCOD",
+            "risk_status": "Moderate",
+            "risk_score_scaled": 38,
+        },
+        {
+            "date": "2024-12-26",
+            "engagement_id": 5912,
+            "code": "pcos/pcod",
+            "name": "PCOS/PCOD",
+            "risk_status": "Moderate",
+            "risk_score_scaled": 42,
+        },
+        {
+            "date": "2025-04-18",
+            "engagement_id": 5913,
+            "code": "pcos/pcod",
+            "name": "PCOS/PCOD",
+            "risk_status": "Moderate",
+            "risk_score_scaled": 45,
+        },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_disease_trends_returns_empty_when_no_points(async_client, test_db_session):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99021,
+        user_id=3921,
+        engagement_id=5921,
+        record_id="DTREND4",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=71221,
+            user_id=3921,
+            engagement_id=5921,
+            assessment_instance_id=99021,
+            reports={
+                "diseases": [
+                    {"code": "obesity", "name": "Obesity", "risk_score_scaled": 55},
+                ],
+            },
+            blood_parameters=None,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        "/reports/trends?diseases=pcos",
+        headers=_auth_header(3921),
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["parameter"] == "pcos"
+    assert payload["data_points"] == []
+
+
+@pytest.mark.asyncio
+async def test_get_disease_trends_fetches_from_metsights_when_missing_report(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99031,
+        user_id=3931,
+        engagement_id=5931,
+        record_id="DTREND_FETCH",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    met_report = {
+        "diseases": [
+            {"code": "pcos", "name": "PCOS", "risk_score_scaled": 51},
+        ],
+    }
+    fake_metsights = _FakeMetsightsService(payload={}, report_payload=met_report)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get(
+        "/reports/trends?diseases=pcos",
+        headers=_auth_header(3931),
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["parameter"] == "pcos"
+    assert len(payload["data_points"]) == 1
+    assert payload["data_points"][0]["risk_score_scaled"] == 51
+    assert payload["data_points"][0]["code"] == "pcos"
+    assert payload["data_points"][0]["engagement_id"] == 5931
+    assert fake_metsights.report_calls == 1
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_disease_trends_ignores_fitprint(async_client, test_db_session):
+    test_db_session.add(User(user_id=3955, phone="3955000000", age=30, status="active"))
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=955,
+            package_code="MET_PRO",
+            display_name="MetSights Pro",
+            status="active",
+            assessment_type_code="2",
+        )
+    )
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=956,
+            package_code="MY_FITNESS_PRINT",
+            display_name="FitPrint",
+            status="active",
+            assessment_type_code="7",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        Engagement(engagement_id=5955, engagement_code="ENG5955", assessment_package_id=955, diagnostic_package_id=1)
+    )
+    test_db_session.add(
+        Engagement(engagement_id=5956, engagement_code="ENG5956", assessment_package_id=956, diagnostic_package_id=1)
+    )
+    await test_db_session.flush()
+    now = datetime.now(timezone.utc)
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=99551,
+            user_id=3955,
+            package_id=955,
+            engagement_id=5955,
+            status="completed",
+            metsights_record_id="MSD1",
+            assigned_at=now,
+            completed_at=datetime(2025, 1, 10, tzinfo=timezone.utc),
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=99552,
+            user_id=3955,
+            package_id=956,
+            engagement_id=5956,
+            status="completed",
+            metsights_record_id="FPD1",
+            assigned_at=now,
+            completed_at=datetime(2025, 2, 10, tzinfo=timezone.utc),
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=71555,
+            user_id=3955,
+            engagement_id=5955,
+            assessment_instance_id=99551,
+            reports={"diseases": [{"code": "pcos", "name": "PCOS", "risk_score_scaled": 30}]},
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=71556,
+            user_id=3955,
+            engagement_id=5956,
+            assessment_instance_id=99552,
+            reports={"diseases": [{"code": "pcos", "name": "PCOS", "risk_score_scaled": 99}]},
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        "/reports/trends?diseases=pcos",
+        headers=_auth_header(3955),
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["parameter"] == "pcos"
+    assert payload["data_points"] == [
+        {
+            "date": "2025-01-10",
+            "engagement_id": 5955,
+            "code": "pcos",
+            "name": "PCOS",
+            "risk_score_scaled": 30,
+        },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_disease_trends_skips_when_metsights_report_not_found(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    """Metsights 404 for one record must not fail the whole trends response."""
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99041,
+        user_id=3941,
+        engagement_id=5941,
+        record_id="DTREND_404",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+
+    class _NotFoundMetsightsService(_FakeMetsightsService):
+        async def get_report(self, *, record_id: str, assessment_type_code: str | None = None):
+            from core.exceptions import AppError
+
+            raise AppError(
+                status_code=404,
+                error_code="REPORT_NOT_FOUND",
+                message="Report not found for this record",
+            )
+
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=_NotFoundMetsightsService(payload={}),
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get(
+        "/reports/trends?diseases=nafld",
+        headers=_auth_header(3941),
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["parameter"] == "nafld"
+    assert payload["data_points"] == []
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_report_trends_requires_exactly_one_query_param(async_client, test_db_session):
+    test_db_session.add(User(user_id=3960, phone="3960000000", age=30, status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.get("/reports/trends", headers=_auth_header(3960))
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_refresh_user_blood_parameters_success_advances_cursor(test_db_session):
     await _seed_assessment(
         test_db_session,
