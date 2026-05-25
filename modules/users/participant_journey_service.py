@@ -96,6 +96,7 @@ class ParticipantJourneyService:
                     "status": instance.status,
                     "assigned_at": _dt_iso(instance.assigned_at),
                     "completed_at": _dt_iso(instance.completed_at),
+                    "metsights_record_id": (instance.metsights_record_id or "").strip() or None,
                     "package_id": instance.package_id,
                     "package_code": getattr(package, "package_code", None) if package else None,
                     "package_display_name": getattr(package, "display_name", None) if package else None,

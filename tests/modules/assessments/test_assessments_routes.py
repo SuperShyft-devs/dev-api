@@ -243,6 +243,59 @@ async def test_patch_assessment_status_rejects_invalid_status(async_client, test
 
 
 @pytest.mark.asyncio
+async def test_patch_assessment_status_employee_can_revert_completed_to_active(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=3051, employee_id=3051)
+    test_db_session.add(User(user_id=3052, age=30, phone="3052000000", status="active"))
+    test_db_session.add(AssessmentPackage(package_id=99406, package_code="P6", display_name="P6", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(
+        Engagement(
+            engagement_id=911,
+            engagement_name="E911",
+            engagement_code="ENG911",
+            engagement_type="bio_ai",
+            assessment_package_id=99406,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=60,
+            status="active",
+            participant_count=0,
+        )
+    )
+    await test_db_session.flush()
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=96001,
+            user_id=3052,
+            package_id=99406,
+            engagement_id=911,
+            status="completed",
+            assigned_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(timezone.utc),
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/assessments/96001/status",
+        headers=_auth_header(3051),
+        json={"status": "active"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["assessment_instance_id"] == 96001
+    assert (body["status"] or "").lower() == "active"
+    assert body["completed_at"] is None
+
+    updated = await test_db_session.get(AssessmentInstance, 96001)
+    assert updated is not None
+    assert (updated.status or "").lower() == "active"
+    assert updated.completed_at is None
+
+
+@pytest.mark.asyncio
 async def test_patch_assessment_status_rejects_changes_after_completion(async_client, test_db_session):
     test_db_session.add(User(user_id=3041, age=30, phone="3041000000", status="active"))
     test_db_session.add(AssessmentPackage(package_id=99405, package_code="P5", display_name="P5", status="active"))

@@ -55,6 +55,7 @@ from modules.diagnostics import models as _diagnostics_models  # noqa: F401
 from modules.reports import models as _reports_models  # noqa: F401
 from modules.platform_settings import models as _platform_settings_models  # noqa: F401
 from modules.experts import models as _experts_models  # noqa: F401
+from modules.notifications import models as _notifications_models  # noqa: F401
 
 from core.config import settings
 from core.exceptions import add_exception_handlers
@@ -77,6 +78,7 @@ from modules.reports.router import router as reports_router
 from modules.platform_settings.router import router as platform_settings_router
 from modules.bookings.router import router as bookings_router
 from modules.experts.router import router as experts_router
+from modules.notifications.router import router as notifications_router
 
 
 def _project_root() -> Path:
@@ -257,6 +259,7 @@ async def fastapi_app(test_db_session: AsyncSession, auth_service, otp_sender: C
     app.include_router(platform_settings_router)
     app.include_router(bookings_router)
     app.include_router(experts_router)
+    app.include_router(notifications_router)
 
     async def _get_test_db():
         yield test_db_session
@@ -305,6 +308,7 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     await test_db_session.execute(text("DELETE FROM organization_health_report"))
     await test_db_session.execute(text("DELETE FROM reports_user_sync_state"))
     await test_db_session.execute(text("DELETE FROM engagement_participants"))
+    await test_db_session.execute(text("DELETE FROM notifications"))
     await test_db_session.execute(text("DELETE FROM assessment_instances"))
     await test_db_session.execute(text("DELETE FROM onboarding_assistant_assignment"))
     await test_db_session.execute(text("DELETE FROM platform_settings"))

@@ -31,6 +31,7 @@ from modules.users.schemas import (
     SubProfileUpdate,
     UnlinkRequest,
     UserPreferencesUpdate,
+    UpdateMetsightsProfileIdRequest,
     UpdateMyProfileRequest,
 )
 from modules.users.service import UsersService
@@ -652,8 +653,37 @@ async def employee_get_user(
             "referred_by": user.referred_by,
             "is_participant": user.is_participant,
             "status": user.status,
+            "metsights_profile_id": user.metsights_profile_id,
             "created_at": user.created_at,
             "updated_at": user.updated_at,
+        }
+    )
+
+
+@router.put("/{user_id}/metsights-profile-id")
+async def employee_update_metsights_profile_id(
+    user_id: int,
+    payload: UpdateMetsightsProfileIdRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    users_service: UsersService = Depends(get_users_service),
+):
+    user = await users_service.update_metsights_profile_id_by_employee(
+        db,
+        employee=employee,
+        user_id=user_id,
+        metsights_profile_id=payload.metsights_profile_id,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+
+    return success_response(
+        {
+            "user_id": user.user_id,
+            "metsights_profile_id": user.metsights_profile_id,
         }
     )
 

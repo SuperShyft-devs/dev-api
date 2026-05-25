@@ -456,8 +456,8 @@ class EngagementsService:
         if payload.start_date > payload.end_date:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-        # Validate that the organization exists
-        if self._organizations_repository is not None:
+        # Validate that the organization exists when one is provided (B2C engagements have no org).
+        if payload.organization_id is not None and self._organizations_repository is not None:
             organization = await self._organizations_repository.get_by_id(db, payload.organization_id)
             if organization is None:
                 raise AppError(

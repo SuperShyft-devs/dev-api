@@ -128,6 +128,62 @@ async def test_employee_update_user_updates_fields(async_client, test_db_session
 
 
 @pytest.mark.asyncio
+async def test_employee_update_metsights_profile_id(async_client, test_db_session):
+    test_db_session.add(User(age=30, user_id=9005, phone="9005000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=10004, user_id=9005, role="admin", status="active"))
+
+    test_db_session.add(
+        User(age=30, user_id=9302, phone="9302000000", status="active", metsights_profile_id=None)
+    )
+    await test_db_session.commit()
+
+    response = await async_client.put(
+        "/users/9302/metsights-profile-id",
+        headers=_auth_header(9005),
+        json={"metsights_profile_id": "ms-profile-9302"},
+    )
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["user_id"] == 9302
+    assert body["metsights_profile_id"] == "ms-profile-9302"
+
+    clear = await async_client.put(
+        "/users/9302/metsights-profile-id",
+        headers=_auth_header(9005),
+        json={"metsights_profile_id": ""},
+    )
+    assert clear.status_code == 200
+    assert clear.json()["data"]["metsights_profile_id"] is None
+
+    row = await test_db_session.get(User, 9302)
+    assert row is not None
+    assert row.metsights_profile_id is None
+
+
+@pytest.mark.asyncio
+async def test_employee_update_metsights_profile_id_rejects_duplicate(async_client, test_db_session):
+    test_db_session.add(User(age=30, user_id=9005, phone="9005000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=10004, user_id=9005, role="admin", status="active"))
+
+    test_db_session.add(
+        User(age=30, user_id=9303, phone="9303000000", status="active", metsights_profile_id="taken-ms-id")
+    )
+    test_db_session.add(
+        User(age=30, user_id=9304, phone="9304000000", status="active", metsights_profile_id=None)
+    )
+    await test_db_session.commit()
+
+    response = await async_client.put(
+        "/users/9304/metsights-profile-id",
+        headers=_auth_header(9005),
+        json={"metsights_profile_id": "taken-ms-id"},
+    )
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_employee_deactivate_user_sets_inactive(async_client, test_db_session):
     test_db_session.add(User(age=30, user_id=9006, phone="9006000000", status="active"))
     await test_db_session.flush()

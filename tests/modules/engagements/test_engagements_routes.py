@@ -309,6 +309,58 @@ async def test_update_engagement_updates_fields(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
+async def test_update_b2c_engagement_without_organization(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7005, employee_id=13)
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=2)
+
+    from modules.engagements.models import Engagement
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=8305,
+            engagement_name="B2C Camp",
+            metsights_engagement_id=None,
+            organization_id=None,
+            engagement_code="B2C-CODE",
+            engagement_type="bio_ai",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 5, 21),
+            end_date=date(2026, 5, 21),
+            status="active",
+            participant_count=0,
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "engagement_name": "B2C Camp",
+        "engagement_code": "B2C-CODE",
+        "organization_id": None,
+        "engagement_type": "bio_ai",
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 2,
+        "city": "BLR",
+        "slot_duration": 20,
+        "start_date": "2026-05-21",
+        "end_date": "2026-05-21",
+        "metsights_engagement_id": None,
+    }
+
+    response = await async_client.put("/engagements/8305", headers=_auth_header(7005), json=payload)
+    assert response.status_code == 200
+
+    updated = await test_db_session.get(Engagement, 8305)
+    assert updated is not None
+    assert updated.organization_id is None
+    assert updated.diagnostic_package_id == 2
+
+
+@pytest.mark.asyncio
 async def test_update_engagement_rejects_duplicate_engagement_code(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7005, employee_id=13)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization")

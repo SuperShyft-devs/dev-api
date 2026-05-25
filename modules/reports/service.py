@@ -55,6 +55,10 @@ _SYNC_IDLE = "idle"
 _SYNC_IN_PROGRESS = "in_progress"
 _SYNC_FAILED = "failed"
 
+_OVERVIEW_METABOLIC_AGE_OVERRIDES: dict[int, float] = {
+    1169: 52.0,
+}
+
 _BIO_AI_METSIGHTS_REPORT_URL_OVERRIDES: dict[str, str] = {
     "https://storages.metsights.com/reports/D6E1178CCA4F488C_Deepa_Gupta_MHR.pdf": (
         "https://api.supershyft.com/media/bio-ai/141a9b846e254200995dcbdcc1596ea5.pdf"
@@ -619,6 +623,8 @@ class ReportsService:
             metabolic_age = float(ma)
         else:
             metabolic_age = None
+        if assessment_id in _OVERVIEW_METABOLIC_AGE_OVERRIDES:
+            metabolic_age = _OVERVIEW_METABOLIC_AGE_OVERRIDES[assessment_id]
         dis = report_dict.get("diseases", [])
         diseases_raw: list[Any] = dis if isinstance(dis, list) else []
 

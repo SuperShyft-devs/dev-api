@@ -185,18 +185,27 @@ class NotificationsRepository:
     async def get_latest_metsights_instance_for_user(
         self, db: AsyncSession, *, user_id: int
     ) -> AssessmentInstance | None:
-        """Pick the latest metsights pro/basic assessment instance for the user."""
-        result = await db.execute(
+        """Pick the latest Metsights Basic/Pro instance with a record id for the user."""
+        # assessment_type_code in DB is Metsights type id ("1" = Basic, "2" = Pro), not a slug.
+        metsights_type_codes = ("1", "2")
+        base = (
             select(AssessmentInstance)
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .where(AssessmentInstance.user_id == user_id)
             .where(AssessmentInstance.metsights_record_id.isnot(None))
             .where(AssessmentInstance.metsights_record_id != "")
-            .where(
-                func.lower(AssessmentPackage.assessment_type_code).in_(
-                    ["metsights_pro", "metsights_basic"]
-                )
-            )
+        )
+        result = await db.execute(
+            base.where(AssessmentPackage.assessment_type_code.in_(metsights_type_codes))
+            .order_by(AssessmentInstance.assessment_instance_id.desc())
+            .limit(1)
+        )
+        instance = result.scalar_one_or_none()
+        if instance is not None:
+            return instance
+        # Fallback: any non–FitPrint instance with a Metsights record (exclude type "7").
+        result = await db.execute(
+            base.where(func.coalesce(AssessmentPackage.assessment_type_code, "") != "7")
             .order_by(AssessmentInstance.assessment_instance_id.desc())
             .limit(1)
         )
