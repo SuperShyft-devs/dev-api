@@ -182,18 +182,26 @@ class NotificationsRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_latest_metsights_instance_for_user(
-        self, db: AsyncSession, *, user_id: int
-    ) -> AssessmentInstance | None:
-        """Pick the latest Metsights Basic/Pro instance with a record id for the user."""
-        # assessment_type_code in DB is Metsights type id ("1" = Basic, "2" = Pro), not a slug.
+    def _metsights_instance_base_query(self, *, user_id: int, engagement_id: int | None = None):
+        """Shared filter for Metsights Basic/Pro instances with a record id."""
         metsights_type_codes = ("1", "2")
-        base = (
+        query = (
             select(AssessmentInstance)
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .where(AssessmentInstance.user_id == user_id)
             .where(AssessmentInstance.metsights_record_id.isnot(None))
             .where(AssessmentInstance.metsights_record_id != "")
+        )
+        if engagement_id is not None:
+            query = query.where(AssessmentInstance.engagement_id == engagement_id)
+        return query, metsights_type_codes
+
+    async def get_metsights_instance_for_user_engagement(
+        self, db: AsyncSession, *, user_id: int, engagement_id: int
+    ) -> AssessmentInstance | None:
+        """Pick the latest Metsights Basic/Pro instance with a record id for user + engagement."""
+        base, metsights_type_codes = self._metsights_instance_base_query(
+            user_id=user_id, engagement_id=engagement_id
         )
         result = await db.execute(
             base.where(AssessmentPackage.assessment_type_code.in_(metsights_type_codes))
@@ -203,7 +211,26 @@ class NotificationsRepository:
         instance = result.scalar_one_or_none()
         if instance is not None:
             return instance
-        # Fallback: any non–FitPrint instance with a Metsights record (exclude type "7").
+        result = await db.execute(
+            base.where(func.coalesce(AssessmentPackage.assessment_type_code, "") != "7")
+            .order_by(AssessmentInstance.assessment_instance_id.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_latest_metsights_instance_for_user(
+        self, db: AsyncSession, *, user_id: int
+    ) -> AssessmentInstance | None:
+        """Pick the latest Metsights Basic/Pro instance with a record id for the user."""
+        base, metsights_type_codes = self._metsights_instance_base_query(user_id=user_id)
+        result = await db.execute(
+            base.where(AssessmentPackage.assessment_type_code.in_(metsights_type_codes))
+            .order_by(AssessmentInstance.assessment_instance_id.desc())
+            .limit(1)
+        )
+        instance = result.scalar_one_or_none()
+        if instance is not None:
+            return instance
         result = await db.execute(
             base.where(func.coalesce(AssessmentPackage.assessment_type_code, "") != "7")
             .order_by(AssessmentInstance.assessment_instance_id.desc())

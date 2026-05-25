@@ -140,12 +140,98 @@ async def test_dispatch_resolves_record_id_from_metsights_basic_instance(
         json={
             "service_key": service_key,
             "user_id": 9502,
-            "engagement_id": None,
+            "engagement_id": 9501,
         },
     )
     assert response.status_code == 201, response.text
     assert webhook_calls
     assert webhook_calls[0]["json"]["record_id"] == "25D4C413C7D3"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_prefers_engagement_instance_over_other_engagements(
+    async_client, test_db_session, monkeypatch
+):
+    """When engagement_id is set, record_id must come from that engagement's Metsights instance."""
+    await _seed_employee(test_db_session, user_id=9521, employee_id=971)
+    await _seed_metsights_basic_package(test_db_session)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9521, engagement_code="ENG-NOTIF-9521")
+    await _seed_engagement(test_db_session, engagement_id=9522, engagement_code="ENG-NOTIF-9522")
+
+    test_db_session.add(User(user_id=9523, age=30, phone="9523000000", status="active"))
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9520,
+            user_id=9523,
+            package_id=1,
+            engagement_id=9522,
+            status="active",
+            metsights_record_id="OTHER-ENG-RECORD",
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9521,
+            user_id=9523,
+            package_id=1,
+            engagement_id=9521,
+            status="active",
+            metsights_record_id="TARGET-ENG-RECORD",
+        )
+    )
+    service_key = "bio_ai_report_whatsapp_eng"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
+            "VALUES (:sk, 'BioAI Report | Whatsapp', 'whatsapp', 'bio-ai-report', true, true, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_record_id = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_auth_header(9521),
+        json={
+            "service_key": service_key,
+            "user_id": 9523,
+            "engagement_id": 9521,
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert webhook_calls[0]["json"]["record_id"] == "TARGET-ENG-RECORD"
 
 
 @pytest.mark.asyncio

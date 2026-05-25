@@ -61,6 +61,15 @@ class NotificationsService:
             )
             if instance:
                 assessment_instance_id = instance.assessment_instance_id
+        elif payload.engagement_id is not None:
+            instance = await self._repo.get_metsights_instance_for_user_engagement(
+                db,
+                user_id=payload.user_id,
+                engagement_id=payload.engagement_id,
+            )
+            if instance:
+                assessment_instance_id = instance.assessment_instance_id
+                record_id = instance.metsights_record_id
         else:
             instance = await self._repo.get_latest_metsights_instance_for_user(
                 db, user_id=payload.user_id
