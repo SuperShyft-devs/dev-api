@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import re
 from datetime import date, datetime, time, timezone
 from typing import Any
@@ -14,6 +15,8 @@ from core.exceptions import AppError
 from db.seed.questionnaire_field_config import (
     CHOICE_TO_METSIGHTS_VALUE,
     DAILY_ACTIVE_DURATION_PUSH_MAP,
+    HEALTH_PRIORITIES_LABEL_TO_VALUE,
+    HEALTH_PRIORITIES_OPTION_VALUES,
     METSIGHTS_PUSH_AS_LIST,
     NONE_CLEARS_MULTISELECT_FIELDS,
     SCALE_TO_CHOICE_CONVERTERS,
@@ -153,6 +156,57 @@ def _question_type_for_submit(raw: str | None) -> str:
     return {"multi_choice": "multiple_choice"}.get(t, t)
 
 
+def _expand_health_priorities_for_metsights(selected: str) -> list[str]:
+    """Keep the user's single choice and add a second distinct Metsights option."""
+
+    primary = str(selected).strip()
+    if not primary or primary not in HEALTH_PRIORITIES_OPTION_VALUES:
+        return []
+    others = sorted(v for v in HEALTH_PRIORITIES_OPTION_VALUES if v != primary)
+    if not others:
+        return [primary]
+    secondary = random.choice(others)
+    return [primary, secondary]
+
+
+def _resolve_health_priority_option_code(raw: Any) -> str | None:
+    """Normalize a stored answer fragment to a Metsights option_value (0–5)."""
+
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s or s.lower() == "none":
+        return None
+    if s in HEALTH_PRIORITIES_OPTION_VALUES:
+        return s
+    by_label = HEALTH_PRIORITIES_LABEL_TO_VALUE.get(_normalize_label(s))
+    if by_label:
+        return by_label
+    fl = _label_fingerprint(s)
+    for label, code in HEALTH_PRIORITIES_LABEL_TO_VALUE.items():
+        if _label_fingerprint(label) == fl:
+            return code
+    return None
+
+
+def _health_priorities_to_metsights_fields(answer: Any) -> dict[str, Any]:
+    """Always send two distinct codes: user's selection plus a random other."""
+
+    primary: str | None = None
+    if isinstance(answer, list):
+        for item in answer:
+            primary = _resolve_health_priority_option_code(item)
+            if primary:
+                break
+    else:
+        primary = _resolve_health_priority_option_code(answer)
+
+    if not primary:
+        return {}
+    expanded = _expand_health_priorities_for_metsights(primary)
+    return {"health_priorities": expanded} if expanded else {}
+
+
 def _answer_to_metsights_fields(question_key: str, question_type: str, answer: Any) -> dict[str, Any]:
     """Map one DB answer to Metsights JSON keys (may include sibling ``*_unit`` for scales)."""
 
@@ -160,6 +214,10 @@ def _answer_to_metsights_fields(question_key: str, question_type: str, answer: A
     if not qkey:
         return {}
     qtype = _question_type_for_submit(question_type)
+
+    # UI may still store multiple_choice (array) or labels; expand before Metsights push.
+    if qkey == "health_priorities":
+        return _health_priorities_to_metsights_fields(answer)
 
     if qtype == "scale":
         if not isinstance(answer, dict):

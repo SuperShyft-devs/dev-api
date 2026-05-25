@@ -11,6 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 
+# MetSights Basic / Pro (excludes FitPrint and other types).
+_METSIGHTS_PRO_BASIC_TYPE_CODES = ("1", "2")
+
 
 class ReportsRepository:
     """Database access for reports."""
@@ -75,6 +78,27 @@ class ReportsRepository:
                 AssessmentInstance.assessment_instance_id == IndividualHealthReport.assessment_instance_id,
             )
             .where(IndividualHealthReport.user_id == user_id)
+            .order_by(
+                AssessmentInstance.completed_at.asc().nulls_last(),
+                AssessmentInstance.assigned_at.asc().nulls_last(),
+                AssessmentInstance.assessment_instance_id.asc(),
+            )
+        )
+        return list(result.all())
+
+    async def list_metsights_pro_basic_assessments_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+    ) -> list[tuple[AssessmentInstance, AssessmentPackage]]:
+        result = await db.execute(
+            select(AssessmentInstance, AssessmentPackage)
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .where(AssessmentInstance.user_id == user_id)
+            .where(AssessmentInstance.metsights_record_id.is_not(None))
+            .where(AssessmentInstance.metsights_record_id != "")
+            .where(AssessmentPackage.assessment_type_code.in_(_METSIGHTS_PRO_BASIC_TYPE_CODES))
             .order_by(
                 AssessmentInstance.completed_at.asc().nulls_last(),
                 AssessmentInstance.assigned_at.asc().nulls_last(),

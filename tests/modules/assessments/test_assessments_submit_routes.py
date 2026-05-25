@@ -438,9 +438,21 @@ def test_answer_to_metsights_field_conversions():
     assert _answer_to_metsights_fields("iodized_salt_status", "single_choice", "true") == {
         "iodized_salt_status": "true"
     }
-    assert _answer_to_metsights_fields("health_priorities", "single_choice", "2") == {
-        "health_priorities": ["2"]
-    }
+    hp = _answer_to_metsights_fields("health_priorities", "single_choice", "2")
+    assert hp["health_priorities"][0] == "2"
+    assert len(hp["health_priorities"]) == 2
+    assert len(set(hp["health_priorities"])) == 2
+    hp_multi = _answer_to_metsights_fields("health_priorities", "multiple_choice", ["3"])
+    assert hp_multi["health_priorities"][0] == "3"
+    assert len(hp_multi["health_priorities"]) == 2
+    assert len(set(hp_multi["health_priorities"])) == 2
+    hp_label = _answer_to_metsights_fields(
+        "health_priorities",
+        "multiple_choice",
+        ["Increasing Energy Levels"],
+    )
+    assert hp_label["health_priorities"][0] == "3"
+    assert len(hp_label["health_priorities"]) == 2
     assert _answer_to_metsights_fields("tobacco_frequency", "single_choice", "5") == {
         "tobacco_frequency": "1"
     }
@@ -553,9 +565,21 @@ def test_answer_to_metsights_field_conversions():
     assert _answer_to_metsights_fields("iodized_salt_status", "single_choice", "true") == {
         "iodized_salt_status": "true"
     }
-    assert _answer_to_metsights_fields("health_priorities", "single_choice", "2") == {
-        "health_priorities": ["2"]
-    }
+    hp = _answer_to_metsights_fields("health_priorities", "single_choice", "2")
+    assert hp["health_priorities"][0] == "2"
+    assert len(hp["health_priorities"]) == 2
+    assert len(set(hp["health_priorities"])) == 2
+    hp_multi = _answer_to_metsights_fields("health_priorities", "multiple_choice", ["3"])
+    assert hp_multi["health_priorities"][0] == "3"
+    assert len(hp_multi["health_priorities"]) == 2
+    assert len(set(hp_multi["health_priorities"])) == 2
+    hp_label = _answer_to_metsights_fields(
+        "health_priorities",
+        "multiple_choice",
+        ["Increasing Energy Levels"],
+    )
+    assert hp_label["health_priorities"][0] == "3"
+    assert len(hp_label["health_priorities"]) == 2
     assert _answer_to_metsights_fields("tobacco_frequency", "single_choice", "5") == {
         "tobacco_frequency": "1"
     }
@@ -668,9 +692,21 @@ def test_answer_to_metsights_field_conversions():
     assert _answer_to_metsights_fields("iodized_salt_status", "single_choice", "true") == {
         "iodized_salt_status": "true"
     }
-    assert _answer_to_metsights_fields("health_priorities", "single_choice", "2") == {
-        "health_priorities": ["2"]
-    }
+    hp = _answer_to_metsights_fields("health_priorities", "single_choice", "2")
+    assert hp["health_priorities"][0] == "2"
+    assert len(hp["health_priorities"]) == 2
+    assert len(set(hp["health_priorities"])) == 2
+    hp_multi = _answer_to_metsights_fields("health_priorities", "multiple_choice", ["3"])
+    assert hp_multi["health_priorities"][0] == "3"
+    assert len(hp_multi["health_priorities"]) == 2
+    assert len(set(hp_multi["health_priorities"])) == 2
+    hp_label = _answer_to_metsights_fields(
+        "health_priorities",
+        "multiple_choice",
+        ["Increasing Energy Levels"],
+    )
+    assert hp_label["health_priorities"][0] == "3"
+    assert len(hp_label["health_priorities"]) == 2
     assert _answer_to_metsights_fields("tobacco_frequency", "single_choice", "5") == {
         "tobacco_frequency": "1"
     }

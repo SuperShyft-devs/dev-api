@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
 from core.dependencies import get_current_user
+from core.exceptions import AppError
 from db.session import get_db
 from modules.reports.dependencies import get_reports_service
 from modules.reports.schemas import BloodParameterTrendResponse, HealthSpanIndexRequest
@@ -168,16 +169,35 @@ async def get_health_span_index(
 
 
 @router.get("/trends")
-async def get_blood_parameter_trends(
-    blood_parameter: str,
+async def get_report_trends(
+    blood_parameter: str | None = Query(default=None),
+    diseases: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
     reports_service: ReportsService = Depends(get_reports_service),
 ):
+    disease_key = (diseases or "").strip().lower()
+    parameter_key = (blood_parameter or "").strip().lower()
+    if bool(disease_key) == bool(parameter_key):
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message="Provide exactly one of blood_parameter or diseases",
+        )
+
+    if disease_key:
+        payload = await reports_service.get_disease_trends_for_user(
+            db,
+            user_id=user.user_id,
+            disease=disease_key,
+        )
+        await db.commit()
+        return success_response(payload)
+
     payload, meta, should_trigger = await reports_service.get_blood_parameter_trends_for_user(
         db,
         user_id=user.user_id,
-        blood_parameter=blood_parameter,
+        blood_parameter=parameter_key,
     )
     if should_trigger:
         await db.commit()

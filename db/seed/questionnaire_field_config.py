@@ -186,8 +186,29 @@ NONE_CLEARS_MULTISELECT_FIELDS: frozenset[str] = frozenset({
     "diagnosed_diseases_medications",
 })
 
-# Fields stored as single_choice in our DB but Metsights expects a one-element array
-# (see RECORDS_API fitness-parameters: health_priorities).
+# Metsights ``health_priorities`` accepts exactly two distinct choice codes.
+# Our UI is single_choice; sync expands the user's pick with a second random option.
+HEALTH_PRIORITIES_OPTION_VALUES: frozenset[str] = frozenset({
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+})
+
+# Map display labels (and loose variants) to Metsights option_value when clients
+# store the label instead of the code.
+HEALTH_PRIORITIES_LABEL_TO_VALUE: dict[str, str] = {
+    "weight loss": "0",
+    "building muscle mass": "1",
+    "improving metabolic health": "2",
+    "increasing energy levels": "3",
+    "increasing strength": "4",
+    "improving physical endurance": "5",
+}
+
+# Fields stored as single_choice in our DB but Metsights expects a list payload.
 METSIGHTS_PUSH_AS_LIST: frozenset[str] = frozenset({
     "health_priorities",
 })

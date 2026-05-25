@@ -307,9 +307,13 @@ class QuestionnaireService:
         questions: list[dict],
         answers_by_question_id: dict[int, object],
         preferences: dict[str, object],
+        extra_answers_by_key: dict[str, object] | None = None,
     ) -> dict[int, bool]:
         visibility: dict[int, bool] = {}
-        answers_by_key: dict[str, object] = {}
+        # Seed the running map with any cross-category answers provided by the caller
+        # so that visibility conditions referencing questions from other categories
+        # are evaluated correctly from the very first question.
+        answers_by_key: dict[str, object] = dict(extra_answers_by_key) if extra_answers_by_key else {}
         for question in questions:
             question_id = int(question["question_id"])
             question_key = _normalize_text(question.get("question_key"))
@@ -936,7 +940,7 @@ class QuestionnaireService:
                 "questions": [],
             }
 
-        # Get existing responses
+        # Get existing responses (across ALL categories for this instance)
         responses = await self._repository.list_responses_for_instance(
             db,
             assessment_instance_id=instance.assessment_instance_id,
@@ -946,14 +950,44 @@ class QuestionnaireService:
             await self._users_repository.get_preferences(db, user_id=user_id)
         )
 
+        # Pre-build a full answers_by_key map from ALL responses across all categories.
+        # This ensures cross-category visibility conditions (e.g. a question in category B
+        # whose visibility depends on a question in category A) evaluate correctly.
+        all_response_qids = list(responses_map.keys())
+        if all_response_qids:
+            all_qdefs = await self._repository.get_definitions_by_ids(db, question_ids=[int(q) for q in all_response_qids])
+        else:
+            all_qdefs = {}
+        full_answers_by_key: dict[str, object] = {}
+        for qid, ans in responses_map.items():
+            qdef = all_qdefs.get(int(qid))
+            if qdef is None:
+                continue
+            qkey = _normalize_text(qdef.question_key)
+            if qkey and ans is not None:
+                full_answers_by_key[qkey] = ans
+        # Also apply prefill answers for current-category questions not yet answered.
+        for _q in questions:
+            _qk = _normalize_text(_q.get("question_key"))
+            if _qk and _qk not in full_answers_by_key:
+                _prefill = self._resolve_prefill_answer(
+                    prefill_from=_q.get("prefill_from"),
+                    preferences=preferences,
+                )
+                if _prefill is not None:
+                    full_answers_by_key[_qk] = _prefill
+
         # Build response
         questions_with_answers = []
         visibility = self._compute_visibility_state(
             questions=questions,
             answers_by_question_id=responses_map,
             preferences=preferences,
+            extra_answers_by_key=full_answers_by_key,
         )
-        answers_by_key: dict[str, object] = {}
+        # Start with a copy of the full cross-category answers so per-question
+        # visibility checks (below) also benefit from all prior responses.
+        answers_by_key: dict[str, object] = dict(full_answers_by_key)
         for question in questions:
             question_id = int(question["question_id"])
             question_key = _normalize_text(question.get("question_key"))
@@ -1054,6 +1088,39 @@ class QuestionnaireService:
         category_questions = await self._list_active_questions_for_category(db, category_id=category_id)
         active_question_ids = {int(row["question_id"]) for row in category_questions}
 
+        # Load ALL existing responses across ALL categories for visibility evaluation.
+        # Using only the current category would break cross-category conditions
+        # (e.g. caffiene_type hidden when caffiene_frequency answered in another category).
+        all_existing_responses = await self._repository.list_responses_for_instance(
+            db,
+            assessment_instance_id=instance.assessment_instance_id,
+        )
+        # Build a full answers_by_key from all categories so visibility rules can reference
+        # answers from any category (not just the one being updated now).
+        all_existing_qids = [int(r.question_id) for r in all_existing_responses]
+        if all_existing_qids:
+            all_qdefs_map = await self._repository.get_definitions_by_ids(db, question_ids=all_existing_qids)
+        else:
+            all_qdefs_map = {}
+        full_answers_by_key_for_vis: dict[str, object] = {}
+        for r in all_existing_responses:
+            qdef = all_qdefs_map.get(int(r.question_id))
+            if qdef is None:
+                continue
+            qkey = _normalize_text(qdef.question_key)
+            if qkey and r.answer is not None:
+                full_answers_by_key_for_vis[qkey] = r.answer
+        # Incoming answers override stored ones for the visibility check.
+        questions_by_id = {int(row["question_id"]): row for row in category_questions}
+        for response_item in responses:
+            qid = int(response_item["question_id"])
+            qdef = questions_by_id.get(qid)
+            if qdef is None:
+                continue
+            qkey = _normalize_text(qdef.get("question_key"))
+            if qkey:
+                full_answers_by_key_for_vis[qkey] = response_item["answer"]
+
         existing_responses = await self._repository.list_responses_for_instance(
             db,
             assessment_instance_id=instance.assessment_instance_id,
@@ -1072,8 +1139,8 @@ class QuestionnaireService:
             questions=category_questions,
             answers_by_question_id=answers_for_visibility,
             preferences=preferences,
+            extra_answers_by_key=full_answers_by_key_for_vis,
         )
-        questions_by_id = {int(row["question_id"]): row for row in category_questions}
 
         # Validate all question IDs and ensure they're active
         for response_item in responses:
