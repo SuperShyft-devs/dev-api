@@ -9,7 +9,12 @@ from sqlalchemy import select
 
 from core.config import settings
 from core.security import create_jwt_token
-from modules.assessments.models import AssessmentInstance, AssessmentPackage, AssessmentPackageCategory
+from modules.assessments.models import (
+    AssessmentCategoryProgress,
+    AssessmentInstance,
+    AssessmentPackage,
+    AssessmentPackageCategory,
+)
 from modules.engagements.models import Engagement
 from modules.questionnaire.models import (
     QuestionnaireCategory,
@@ -1212,3 +1217,132 @@ async def test_submit_questionnaire_with_no_responses(async_client, test_db_sess
     # Verify assessment is completed
     await test_db_session.refresh(instance)
     assert instance.status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_marks_category_complete_when_all_required_answered(async_client, test_db_session):
+    """Saving all visible required answers should mark category progress complete for GET /assessments/{id}/status."""
+    await _seed_user(test_db_session, user_id=5040)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=9030, package_code="PKG9030", display_name="Test Package", status="active")
+    category = QuestionnaireCategory(category_id=8030, category_key="cat_8030", display_name="Category 8030", status="active")
+    test_db_session.add(package)
+    test_db_session.add(category)
+    await test_db_session.commit()
+    q_required = QuestionnaireDefinition(
+        question_id=4030,
+        question_key="q4030_req",
+        question_text="Required",
+        question_type="text",
+        is_required=True,
+        status="active",
+    )
+    q_optional = QuestionnaireDefinition(
+        question_id=4031,
+        question_key="q4031_opt",
+        question_text="Optional",
+        question_type="text",
+        is_required=False,
+        status="active",
+    )
+    test_db_session.add_all([q_required, q_optional])
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=8920, category_id=8030, question_id=4030)
+    await _map_question_to_category(test_db_session, mapping_id=8921, category_id=8030, question_id=4031)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=9030, category_id=8030))
+    instance = AssessmentInstance(
+        assessment_instance_id=9030,
+        user_id=5040,
+        package_id=9030,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    payload = {"responses": [{"question_id": 4030, "answer": "done"}]}
+    put_response = await async_client.put(
+        "/questionnaire/9030/category/8030/responses",
+        headers=_auth_header(5040),
+        json=payload,
+    )
+    assert put_response.status_code == 200
+
+    status_response = await async_client.get("/assessments/9030/status", headers=_auth_header(5040))
+    assert status_response.status_code == 200
+    categories = status_response.json()["data"]
+    assert len(categories) == 1
+    assert categories[0]["category_id"] == 8030
+    assert categories[0]["status"] == "complete"
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_keeps_category_incomplete_until_all_required_answered(async_client, test_db_session):
+    """Partial answers leave category status incomplete on GET /assessments/{id}/status."""
+    await _seed_user(test_db_session, user_id=5041)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=9031, package_code="PKG9031", display_name="Test Package", status="active")
+    category = QuestionnaireCategory(category_id=8031, category_key="cat_8031", display_name="Category 8031", status="active")
+    test_db_session.add(package)
+    test_db_session.add(category)
+    await test_db_session.commit()
+    q1 = QuestionnaireDefinition(
+        question_id=4032,
+        question_key="q4032_req",
+        question_text="Required 1",
+        question_type="text",
+        is_required=True,
+        status="active",
+    )
+    q2 = QuestionnaireDefinition(
+        question_id=4033,
+        question_key="q4033_req",
+        question_text="Required 2",
+        question_type="text",
+        is_required=True,
+        status="active",
+    )
+    test_db_session.add_all([q1, q2])
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=8922, category_id=8031, question_id=4032)
+    await _map_question_to_category(test_db_session, mapping_id=8923, category_id=8031, question_id=4033)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=9031, category_id=8031))
+    instance = AssessmentInstance(
+        assessment_instance_id=9031,
+        user_id=5041,
+        package_id=9031,
+        engagement_id=1,
+        status="active",
+    )
+    test_db_session.add(instance)
+    await test_db_session.commit()
+
+    payload = {"responses": [{"question_id": 4032, "answer": "only one"}]}
+    put_response = await async_client.put(
+        "/questionnaire/9031/category/8031/responses",
+        headers=_auth_header(5041),
+        json=payload,
+    )
+    assert put_response.status_code == 200
+
+    status_response = await async_client.get("/assessments/9031/status", headers=_auth_header(5041))
+    assert status_response.status_code == 200
+    assert status_response.json()["data"][0]["status"] == "incomplete"
+
+    complete_payload = {
+        "responses": [
+            {"question_id": 4032, "answer": "only one"},
+            {"question_id": 4033, "answer": "second"},
+        ]
+    }
+    put_response2 = await async_client.put(
+        "/questionnaire/9031/category/8031/responses",
+        headers=_auth_header(5041),
+        json=complete_payload,
+    )
+    assert put_response2.status_code == 200
+
+    status_response2 = await async_client.get("/assessments/9031/status", headers=_auth_header(5041))
+    assert status_response2.json()["data"][0]["status"] == "complete"

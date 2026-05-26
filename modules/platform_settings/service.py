@@ -107,3 +107,25 @@ class PlatformSettingsService:
             )
 
         return await self.get_b2c_onboarding_defaults(db)
+
+    async def log_maintenance_event(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        action: str,
+        endpoint: str,
+        ip_address: str,
+        user_agent: str,
+    ) -> None:
+        if self._audit_service is None:
+            return
+        await self._audit_service.log_event(
+            db,
+            action=action,
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )

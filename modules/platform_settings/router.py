@@ -17,6 +17,8 @@ from modules.platform_settings.schemas import (
     MetsightsProfilesImportPageRequest,
 )
 from modules.platform_settings.service import PlatformSettingsService
+from modules.questionnaire.dependencies import get_questionnaire_user_service_readonly
+from modules.questionnaire.service import QuestionnaireService
 from modules.users.dependencies import get_users_service
 from modules.users.service import UsersService
 
@@ -71,6 +73,30 @@ async def get_metsights_profiles_stats(
     _ = employee
     data = await users_service.get_metsights_profile_import_stats(db)
     return success_response(data)
+
+
+@router.post("/questionnaire-category-progress/refresh-all")
+@limiter.limit("30/minute")
+async def refresh_questionnaire_category_progress_all(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    questionnaire_service: QuestionnaireService = Depends(get_questionnaire_user_service_readonly),
+    platform_service: PlatformSettingsService = Depends(get_platform_settings_service),
+):
+    """Recompute per-category complete/incomplete for every assessment instance (employee backfill)."""
+
+    result = await questionnaire_service.refresh_all_category_progress(db)
+    await platform_service.log_maintenance_event(
+        db,
+        employee=employee,
+        action="EMPLOYEE_REFRESH_ALL_QUESTIONNAIRE_CATEGORY_PROGRESS",
+        endpoint=str(request.url.path),
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+    )
+    await db.commit()
+    return success_response(result)
 
 
 @router.post("/metsights-profiles/import-page")

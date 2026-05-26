@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy.exc import IntegrityError
@@ -409,6 +410,198 @@ class QuestionnaireService:
         }
         if unit not in allowed_units:
             raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer unit is not allowed")
+
+    @staticmethod
+    def _is_answer_provided(*, question: dict, answer: object) -> bool:
+        """Return whether an answer value counts as filled for completion tracking."""
+        if answer is None:
+            return False
+        question_type = _normalize_question_type(question.get("question_type"))
+        if question_type == _SCALE_TYPE:
+            if not isinstance(answer, dict):
+                return False
+            value = answer.get("value")
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                return False
+            return bool(_normalize_text(answer.get("unit")))
+        if isinstance(answer, str):
+            return bool(answer.strip())
+        if isinstance(answer, list):
+            return len(answer) > 0
+        if isinstance(answer, dict):
+            return len(answer) > 0
+        return True
+
+    async def _sync_category_progress_after_responses(
+        self,
+        db: AsyncSession,
+        *,
+        instance,
+        category_id: int,
+        user_id: int,
+    ) -> str:
+        """Update assessment_category_progress when all visible required questions are answered.
+
+        Returns one of: ``marked_complete``, ``marked_incomplete``, ``unchanged``.
+        """
+        from modules.assessments.models import AssessmentCategoryProgress
+        from modules.assessments.repository import AssessmentsRepository
+
+        category_questions = await self._list_active_questions_for_category(db, category_id=category_id)
+        if not category_questions:
+            return "unchanged"
+
+        all_responses = await self._repository.list_responses_for_instance(
+            db,
+            assessment_instance_id=instance.assessment_instance_id,
+        )
+        all_qids = [int(r.question_id) for r in all_responses]
+        all_qdefs_map = (
+            await self._repository.get_definitions_by_ids(db, question_ids=all_qids) if all_qids else {}
+        )
+        full_answers_by_key: dict[str, object] = {}
+        for response_row in all_responses:
+            qdef = all_qdefs_map.get(int(response_row.question_id))
+            if qdef is None:
+                continue
+            qkey = _normalize_text(qdef.question_key)
+            if qkey and response_row.answer is not None:
+                full_answers_by_key[qkey] = response_row.answer
+
+        category_answers_by_question_id: dict[int, object] = {
+            int(r.question_id): r.answer
+            for r in all_responses
+            if int(r.category_id) == int(category_id)
+        }
+        preferences = self._build_preferences_map(
+            await self._users_repository.get_preferences(db, user_id=user_id)
+        )
+        visibility = self._compute_visibility_state(
+            questions=category_questions,
+            answers_by_question_id=category_answers_by_question_id,
+            preferences=preferences,
+            extra_answers_by_key=full_answers_by_key,
+        )
+
+        all_required_answered = True
+        for question in category_questions:
+            question_id = int(question["question_id"])
+            if not bool(question.get("is_required")):
+                continue
+            if not visibility.get(question_id, False):
+                continue
+            answer = category_answers_by_question_id.get(question_id)
+            if answer is None:
+                answer = self._resolve_prefill_answer(
+                    prefill_from=question.get("prefill_from"),
+                    preferences=preferences,
+                )
+            if not self._is_answer_provided(question=question, answer=answer):
+                all_required_answered = False
+                break
+
+        assessments_repo = AssessmentsRepository()
+        progress = await assessments_repo.get_category_progress(
+            db,
+            assessment_instance_id=int(instance.assessment_instance_id),
+            category_id=category_id,
+        )
+        now = datetime.now(timezone.utc)
+        if all_required_answered:
+            if progress is None:
+                await assessments_repo.create_category_progress(
+                    db,
+                    AssessmentCategoryProgress(
+                        assessment_instance_id=int(instance.assessment_instance_id),
+                        category_id=category_id,
+                        status="complete",
+                        completed_at=now,
+                    ),
+                )
+                return "marked_complete"
+
+            current_status = (progress.status or "").strip().lower()
+            if current_status == "complete" and progress.completed_at is not None:
+                return "unchanged"
+
+            progress.status = "complete"
+            progress.completed_at = now
+            await assessments_repo.update_category_progress(db, progress)
+            return "marked_complete"
+
+        # GET /assessments/{id}/status already treats missing progress as incomplete.
+        if progress is None:
+            return "unchanged"
+
+        current_status = (progress.status or "").strip().lower()
+        if current_status != "complete":
+            return "unchanged"
+
+        progress.status = "incomplete"
+        progress.completed_at = None
+        await assessments_repo.update_category_progress(db, progress)
+        return "marked_incomplete"
+
+    async def refresh_category_progress_for_instance(
+        self,
+        db: AsyncSession,
+        *,
+        instance,
+    ) -> dict[str, int]:
+        from modules.assessments.repository import AssessmentsRepository
+
+        assessments_repo = AssessmentsRepository()
+        package_categories = await assessments_repo.list_package_categories(db, package_id=instance.package_id)
+        stats = {"marked_complete": 0, "marked_incomplete": 0, "unchanged": 0, "categories_synced": 0}
+        for link in package_categories:
+            stats["categories_synced"] += 1
+            outcome = await self._sync_category_progress_after_responses(
+                db,
+                instance=instance,
+                category_id=int(link.category_id),
+                user_id=int(instance.user_id),
+            )
+            stats[outcome] = int(stats.get(outcome, 0)) + 1
+        return stats
+
+    async def refresh_all_category_progress(
+        self,
+        db: AsyncSession,
+        *,
+        batch_size: int = 100,
+    ) -> dict[str, int]:
+        """Recompute per-category completion for every assessment instance (backfill)."""
+        from modules.assessments.repository import AssessmentsRepository
+
+        if batch_size < 1 or batch_size > 500:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid batch size")
+
+        assessments_repo = AssessmentsRepository()
+        total = await assessments_repo.count_all_instances(db)
+        summary = {
+            "assessment_instances_total": total,
+            "assessment_instances_processed": 0,
+            "categories_synced": 0,
+            "marked_complete": 0,
+            "marked_incomplete": 0,
+            "unchanged": 0,
+        }
+
+        offset = 0
+        while offset < total:
+            instances = await assessments_repo.list_all_instances(db, offset=offset, limit=batch_size)
+            if not instances:
+                break
+            for instance in instances:
+                summary["assessment_instances_processed"] += 1
+                row_stats = await self.refresh_category_progress_for_instance(db, instance=instance)
+                summary["categories_synced"] += int(row_stats["categories_synced"])
+                summary["marked_complete"] += int(row_stats["marked_complete"])
+                summary["marked_incomplete"] += int(row_stats["marked_incomplete"])
+                summary["unchanged"] += int(row_stats["unchanged"])
+            offset += batch_size
+
+        return summary
 
     async def create_question_definition(
         self,
@@ -1207,6 +1400,13 @@ class QuestionnaireService:
             user_agent=user_agent,
             user_id=user_id,
             session_id=None,
+        )
+
+        await self._sync_category_progress_after_responses(
+            db,
+            instance=instance,
+            category_id=category_id,
+            user_id=user_id,
         )
 
     def _serialize_healthy_habit_rule(self, row: QuestionnaireHealthyHabitRule) -> dict:
