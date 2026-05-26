@@ -15,6 +15,7 @@ from modules.platform_settings.schemas import (
     B2cOnboardingDefaultsRead,
     B2cOnboardingDefaultsUpdate,
     MetsightsProfilesImportPageRequest,
+    QuestionnaireCategoryProgressRefreshPageRequest,
 )
 from modules.platform_settings.service import PlatformSettingsService
 from modules.questionnaire.dependencies import get_questionnaire_user_service_readonly
@@ -75,6 +76,43 @@ async def get_metsights_profiles_stats(
     return success_response(data)
 
 
+@router.get("/questionnaire-category-progress/refresh-stats")
+async def get_questionnaire_category_progress_refresh_stats(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    questionnaire_service: QuestionnaireService = Depends(get_questionnaire_user_service_readonly),
+):
+    _ = employee
+    data = await questionnaire_service.get_category_progress_refresh_stats(db)
+    return success_response(data)
+
+
+@router.post("/questionnaire-category-progress/refresh-page")
+@limiter.limit("300/minute")
+async def refresh_questionnaire_category_progress_page(
+    payload: QuestionnaireCategoryProgressRefreshPageRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    questionnaire_service: QuestionnaireService = Depends(get_questionnaire_user_service_readonly),
+    platform_service: PlatformSettingsService = Depends(get_platform_settings_service),
+):
+    """Recompute category progress for one assessment instance (paginated backfill)."""
+
+    result = await questionnaire_service.refresh_category_progress_page(db, offset=payload.offset)
+    if not result.get("has_more"):
+        await platform_service.log_maintenance_event(
+            db,
+            employee=employee,
+            action="EMPLOYEE_REFRESH_ALL_QUESTIONNAIRE_CATEGORY_PROGRESS",
+            endpoint=str(request.url.path),
+            ip_address=_client_ip(request),
+            user_agent=request.headers.get("User-Agent", "unknown"),
+        )
+    await db.commit()
+    return success_response(result)
+
+
 @router.post("/questionnaire-category-progress/refresh-all")
 @limiter.limit("30/minute")
 async def refresh_questionnaire_category_progress_all(
@@ -84,7 +122,7 @@ async def refresh_questionnaire_category_progress_all(
     questionnaire_service: QuestionnaireService = Depends(get_questionnaire_user_service_readonly),
     platform_service: PlatformSettingsService = Depends(get_platform_settings_service),
 ):
-    """Recompute per-category complete/incomplete for every assessment instance (employee backfill)."""
+    """Recompute per-category complete/incomplete for every assessment instance (single long request)."""
 
     result = await questionnaire_service.refresh_all_category_progress(db)
     await platform_service.log_maintenance_event(

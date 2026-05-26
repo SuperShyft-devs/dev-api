@@ -564,13 +564,65 @@ class QuestionnaireService:
             stats[outcome] = int(stats.get(outcome, 0)) + 1
         return stats
 
+    async def get_category_progress_refresh_stats(self, db: AsyncSession) -> dict[str, int]:
+        from modules.assessments.repository import AssessmentsRepository
+
+        total = await AssessmentsRepository().count_all_instances(db)
+        return {"assessment_instances_total": total}
+
+    async def refresh_category_progress_page(
+        self,
+        db: AsyncSession,
+        *,
+        offset: int,
+    ) -> dict[str, int | bool | None]:
+        """Process exactly one assessment instance at ``offset`` (for paginated admin backfill)."""
+        from modules.assessments.repository import AssessmentsRepository
+
+        assessments_repo = AssessmentsRepository()
+        total = await assessments_repo.count_all_instances(db)
+        empty_result: dict[str, int | bool | None] = {
+            "offset": offset,
+            "next_offset": offset,
+            "assessment_instances_total": total,
+            "assessment_instance_id": None,
+            "processed": 0,
+            "categories_synced": 0,
+            "marked_complete": 0,
+            "marked_incomplete": 0,
+            "unchanged": 0,
+            "has_more": False,
+        }
+        if total == 0 or offset >= total:
+            return empty_result
+
+        instances = await assessments_repo.list_all_instances(db, offset=offset, limit=1)
+        if not instances:
+            return empty_result
+
+        instance = instances[0]
+        row_stats = await self.refresh_category_progress_for_instance(db, instance=instance)
+        next_offset = offset + 1
+        return {
+            "offset": offset,
+            "next_offset": next_offset,
+            "assessment_instances_total": total,
+            "assessment_instance_id": int(instance.assessment_instance_id),
+            "processed": 1,
+            "categories_synced": int(row_stats["categories_synced"]),
+            "marked_complete": int(row_stats["marked_complete"]),
+            "marked_incomplete": int(row_stats["marked_incomplete"]),
+            "unchanged": int(row_stats["unchanged"]),
+            "has_more": next_offset < total,
+        }
+
     async def refresh_all_category_progress(
         self,
         db: AsyncSession,
         *,
         batch_size: int = 100,
     ) -> dict[str, int]:
-        """Recompute per-category completion for every assessment instance (backfill)."""
+        """Recompute per-category completion for every assessment instance (single long request)."""
         from modules.assessments.repository import AssessmentsRepository
 
         if batch_size < 1 or batch_size > 500:
@@ -589,17 +641,17 @@ class QuestionnaireService:
 
         offset = 0
         while offset < total:
-            instances = await assessments_repo.list_all_instances(db, offset=offset, limit=batch_size)
-            if not instances:
+            page_result = await self.refresh_category_progress_page(db, offset=offset)
+            if int(page_result.get("processed") or 0) == 0:
                 break
-            for instance in instances:
-                summary["assessment_instances_processed"] += 1
-                row_stats = await self.refresh_category_progress_for_instance(db, instance=instance)
-                summary["categories_synced"] += int(row_stats["categories_synced"])
-                summary["marked_complete"] += int(row_stats["marked_complete"])
-                summary["marked_incomplete"] += int(row_stats["marked_incomplete"])
-                summary["unchanged"] += int(row_stats["unchanged"])
-            offset += batch_size
+            summary["assessment_instances_processed"] += 1
+            summary["categories_synced"] += int(page_result["categories_synced"])
+            summary["marked_complete"] += int(page_result["marked_complete"])
+            summary["marked_incomplete"] += int(page_result["marked_incomplete"])
+            summary["unchanged"] += int(page_result["unchanged"])
+            if not page_result.get("has_more"):
+                break
+            offset = int(page_result["next_offset"])
 
         return summary
 

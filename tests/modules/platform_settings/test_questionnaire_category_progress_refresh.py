@@ -79,6 +79,13 @@ async def _ensure_test_engagement(test_db_session, *, engagement_id: int = 1):
 async def test_refresh_category_progress_requires_auth(async_client):
     response = await async_client.post("/platform-settings/questionnaire-category-progress/refresh-all")
     assert response.status_code == 401
+    response_page = await async_client.post(
+        "/platform-settings/questionnaire-category-progress/refresh-page",
+        json={"offset": 0},
+    )
+    assert response_page.status_code == 401
+    response_stats = await async_client.get("/platform-settings/questionnaire-category-progress/refresh-stats")
+    assert response_stats.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -126,13 +133,23 @@ async def test_refresh_category_progress_marks_complete_for_existing_answers(asy
     )
     await test_db_session.commit()
 
-    refresh = await async_client.post(
-        "/platform-settings/questionnaire-category-progress/refresh-all",
+    stats = await async_client.get(
+        "/platform-settings/questionnaire-category-progress/refresh-stats",
         headers=_auth_header(uid),
     )
+    assert stats.status_code == 200
+    assert stats.json()["data"]["assessment_instances_total"] >= 1
+
+    refresh = await async_client.post(
+        "/platform-settings/questionnaire-category-progress/refresh-page",
+        headers=_auth_header(uid),
+        json={"offset": 0},
+    )
     assert refresh.status_code == 200
-    summary = refresh.json()["data"]
-    assert summary["marked_complete"] >= 1
+    page = refresh.json()["data"]
+    assert page["processed"] == 1
+    assert page["marked_complete"] >= 1
+    assert page["has_more"] is False
 
     status = await async_client.get("/assessments/9201/status", headers=_auth_header(uid))
     assert status.status_code == 200

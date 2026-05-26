@@ -19,6 +19,12 @@ class MetsightsProfilesImportPageRequest(BaseModel):
     page: int = Field(..., ge=1)
 
 
+class QuestionnaireCategoryProgressRefreshPageRequest(BaseModel):
+    """Zero-based offset of the next assessment instance to process (one instance per request)."""
+
+    offset: int = Field(0, ge=0)
+
+
 class MetsightsProfilesStatsRead(BaseModel):
     local_total_users: int
     local_with_metsights_profile_id: int
