@@ -554,22 +554,3 @@ class AssessmentsRepository:
         db.add(row)
         await db.flush()
         return row
-
-    async def count_all_instances(self, db: AsyncSession) -> int:
-        result = await db.execute(select(func.count()).select_from(AssessmentInstance))
-        return int(result.scalar_one())
-
-    async def list_all_instances(
-        self,
-        db: AsyncSession,
-        *,
-        offset: int,
-        limit: int,
-    ) -> list[AssessmentInstance]:
-        result = await db.execute(
-            select(AssessmentInstance)
-            .order_by(AssessmentInstance.assessment_instance_id.asc())
-            .offset(offset)
-            .limit(limit)
-        )
-        return list(result.scalars().all())

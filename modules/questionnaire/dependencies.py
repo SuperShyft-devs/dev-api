@@ -29,13 +29,3 @@ def get_questionnaire_user_service() -> QuestionnaireService:
         users_repository=UsersRepository(),
         audit_service=audit_service,
     )
-
-
-def get_questionnaire_user_service_readonly() -> QuestionnaireService:
-    """Questionnaire user service without audit (caller logs maintenance actions)."""
-
-    return QuestionnaireService(
-        repository=QuestionnaireRepository(),
-        users_repository=UsersRepository(),
-        audit_service=None,
-    )
