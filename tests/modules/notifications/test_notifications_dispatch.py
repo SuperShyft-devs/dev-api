@@ -235,6 +235,59 @@ async def test_dispatch_prefers_engagement_instance_over_other_engagements(
 
 
 @pytest.mark.asyncio
+async def test_dispatch_is_public_without_auth(async_client, test_db_session, monkeypatch):
+    """POST /notifications/dispatch does not require employee JWT."""
+    test_db_session.add(User(user_id=9531, age=30, phone="9531000000", status="active"))
+    service_key = "public_dispatch_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
+            "VALUES (:sk, 'Public Dispatch', 'whatsapp', 'public-dispatch', true, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_record_id = false"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        json={
+            "service_key": service_key,
+            "user_id": 9531,
+            "engagement_id": None,
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert webhook_calls
+
+
+@pytest.mark.asyncio
 async def test_dispatch_without_record_id_returns_400_when_required(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9511, employee_id=961)
     test_db_session.add(User(user_id=9512, age=30, phone="9512000000", status="active"))

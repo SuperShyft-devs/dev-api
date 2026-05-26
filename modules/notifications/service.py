@@ -38,7 +38,7 @@ class NotificationsService:
         db: AsyncSession,
         *,
         payload: DispatchRequest,
-        triggered_by_user_id: int,
+        triggered_by_user_id: int | None = None,
     ) -> dict:
         svc = await self._repo.get_service_by_key(db, service_key=payload.service_key)
         if svc is None or not svc.is_active:

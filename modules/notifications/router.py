@@ -66,16 +66,15 @@ async def notification_callback(
     return success_response(result)
 
 
-# ── Employee-only dispatch ──────────────────────────────────────────────
+# ── Public dispatch ───────────────────────────────────────────────────────
 
 @router.post("/dispatch", status_code=201)
 async def dispatch_notification(
     payload: DispatchRequest,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
     svc: NotificationsService = Depends(get_notifications_service),
 ):
-    result = await svc.dispatch(db, payload=payload, triggered_by_user_id=employee.user_id)
+    result = await svc.dispatch(db, payload=payload)
     await db.commit()
     return success_response(result)
 
