@@ -16,6 +16,8 @@ from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService
 from modules.metsights.client import MetsightsClient
 from modules.metsights.service import MetsightsService
+from modules.notifications.dependencies import get_notifications_service
+from modules.notifications.repository import NotificationsRepository
 from modules.organizations.repository import OrganizationsRepository
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.repository import ReportsRepository
@@ -32,6 +34,8 @@ def get_engagements_service() -> EngagementsService:
         users_repository=UsersRepository(),
         assessments_service=get_assessments_service(),
         metsights_service=MetsightsService(client=MetsightsClient()),
+        notifications_repository=NotificationsRepository(),
+        notifications_service=get_notifications_service(),
     )
 
 

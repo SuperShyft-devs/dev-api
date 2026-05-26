@@ -22,9 +22,11 @@ from modules.assessments.service import AssessmentsService
 from modules.audit.service import AuditService
 from modules.checklists.schemas import ChecklistReadiness
 from modules.employee.service import EmployeeContext
+from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
 from modules.engagements.models import Engagement, EngagementKind, EngagementParticipant, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.schemas import EngagementCreateRequest, EngagementUpdateRequest
+from modules.notifications.repository import NotificationsRepository
 from modules.organizations.repository import OrganizationsRepository
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.repository import ReportsRepository
@@ -34,6 +36,7 @@ from modules.users.repository import UsersRepository
 if TYPE_CHECKING:
     from modules.checklists.service import ChecklistsService
     from modules.metsights.service import MetsightsService
+    from modules.notifications.service import NotificationsService
 
 
 def _generate_engagement_code(length: int = 8) -> str:
@@ -48,6 +51,11 @@ _B2C_DEFAULT_ONBOARDING_ASSISTANT_EMPLOYEE_IDS = (1, 8)
 
 def _normalize_status(value: str | None) -> str:
     return (value or "").strip().lower()
+
+
+def _resolve_notification_service_key(raw: str | None) -> str:
+    key = (raw or "").strip()
+    return key or DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
 
 
 def _phone_lookup_candidates(phone: str) -> list[str]:
@@ -177,6 +185,8 @@ class EngagementsService:
         users_repository: UsersRepository | None = None,
         assessments_service: AssessmentsService | None = None,
         metsights_service: MetsightsService | None = None,
+        notifications_repository: NotificationsRepository | None = None,
+        notifications_service: "NotificationsService | None" = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
@@ -184,6 +194,8 @@ class EngagementsService:
         self._users_repository = users_repository or UsersRepository()
         self._assessments_service = assessments_service
         self._metsights_service = metsights_service
+        self._notifications_repository = notifications_repository or NotificationsRepository()
+        self._notifications_service = notifications_service
         self._assessments_repository = AssessmentsRepository()
         self._questionnaire_repository = QuestionnaireRepository()
         self._reports_repository = ReportsRepository()
@@ -222,6 +234,23 @@ class EngagementsService:
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
         return self._audit_service
+
+    async def _validate_notification_service_key(self, db: AsyncSession, raw: str | None) -> str:
+        service_key = _resolve_notification_service_key(raw)
+        svc = await self._notifications_repository.get_service_by_key(db, service_key=service_key)
+        if svc is None:
+            raise AppError(
+                status_code=404,
+                error_code="NOTIFICATION_SERVICE_NOT_FOUND",
+                message=f"Notification service '{service_key}' does not exist",
+            )
+        if not svc.is_active:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"Notification service '{service_key}' is not active",
+            )
+        return service_key
 
     async def get_by_code(self, db: AsyncSession, engagement_code: str) -> Engagement | None:
         return await self._repository.get_engagement_by_code(db, engagement_code)
@@ -310,6 +339,10 @@ class EngagementsService:
             else:
                 raise AppError(status_code=500, error_code="INTERNAL_ERROR", message="An unexpected error occurred")
 
+        notification_service_key = await self._validate_notification_service_key(
+            db, payload.notification_service_key
+        )
+
         engagement = Engagement(
             engagement_name=payload.engagement_name,
             metsights_engagement_id=payload.metsights_engagement_id,
@@ -328,6 +361,7 @@ class EngagementsService:
             participant_count=0,
             create_profile_on_metsights=payload.create_profile_on_metsights,
             enroll_for_fitprint_full=payload.enroll_for_fitprint_full,
+            notification_service_key=notification_service_key,
         )
 
         engagement = await self._repository.create_engagement(db, engagement)
@@ -492,6 +526,12 @@ class EngagementsService:
         engagement.metsights_engagement_id = payload.metsights_engagement_id
         engagement.create_profile_on_metsights = payload.create_profile_on_metsights
         engagement.enroll_for_fitprint_full = payload.enroll_for_fitprint_full
+        notif_key_raw = payload.notification_service_key
+        if notif_key_raw is None:
+            notif_key_raw = engagement.notification_service_key
+        engagement.notification_service_key = await self._validate_notification_service_key(
+            db, notif_key_raw
+        )
 
         engagement = await self._repository.update_engagement(db, engagement)
 
@@ -586,6 +626,7 @@ class EngagementsService:
             participant_count=0,
             create_profile_on_metsights=create_profile_on_metsights,
             enroll_for_fitprint_full=enroll_for_fitprint_full,
+            notification_service_key=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
         )
         engagement = await self._repository.create_engagement(db, engagement)
 
@@ -607,6 +648,41 @@ class EngagementsService:
         """Return user_ids of all onboarding assistants for an engagement."""
         return await self._repository.list_onboarding_assistant_user_ids(
             db, engagement_id=engagement_id
+        )
+
+    async def notify_onboarding_assistants_after_enrollment(
+        self,
+        db: AsyncSession,
+        *,
+        engagement: Engagement,
+        user: User,
+        source: str,
+        collection_date: str | None = None,
+        collection_time: str | None = None,
+    ) -> None:
+        if self._notifications_service is None:
+            return
+
+        from modules.notifications.onboarding_notify import (
+            notify_onboarding_assistants_on_enrollment,
+            participant_details_from_user,
+        )
+
+        participant_details = participant_details_from_user(
+            user,
+            source=source,
+            participant_user_id=int(user.user_id),
+            collection_date=collection_date,
+            collection_time=collection_time,
+        )
+        await notify_onboarding_assistants_on_enrollment(
+            db,
+            notifications_service=self._notifications_service,
+            notifications_repository=self._notifications_repository,
+            engagements_repository=self._repository,
+            engagement=engagement,
+            participant_user_id=int(user.user_id),
+            participant_details=participant_details,
         )
 
     async def user_has_slot_for_engagement(
@@ -1567,6 +1643,16 @@ class EngagementsService:
                         )
                         newly_enrolled = True
                         enrolled_user_ids.add(user_id)
+
+                    if newly_enrolled:
+                        await self.notify_onboarding_assistants_after_enrollment(
+                            db,
+                            engagement=engagement,
+                            user=user,
+                            source=engagement.engagement_code or "assign-participants",
+                            collection_date=engagement_date.isoformat(),
+                            collection_time=default_slot.isoformat(),
+                        )
 
                     instance = await self._assessments_service.create_instance_for_metsights_record(
                         db,

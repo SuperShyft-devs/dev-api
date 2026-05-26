@@ -113,6 +113,8 @@ class NotificationsService:
             "email": user.email or "",
             "record_id": record_id,
         }
+        if payload.engagement_id is not None:
+            webhook_payload["engagement_id"] = payload.engagement_id
         if payload.participant_details:
             webhook_payload["participant_details"] = payload.participant_details
 

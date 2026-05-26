@@ -932,6 +932,15 @@ class UsersService:
         if not mid_out and metsights_record_id:
             mid_out = (metsights_record_id or "").strip() or None
 
+        await self._notify_onboarding_assistants_for_user(
+            db,
+            engagement=engagement,
+            user=user,
+            source=engagement.engagement_code or "payment-fulfillment",
+            collection_date=str(meta.get("blood_collection_date") or ""),
+            collection_time=str(meta.get("blood_collection_time_slot") or ""),
+        )
+
         return UserOnboardResponse(
             user_id=user.user_id,
             created=False,
@@ -1000,6 +1009,15 @@ class UsersService:
             engagement_date=date.fromisoformat(meta["blood_collection_date"]),
             slot_start_time=slot_start,
             increment_participant_count=False,
+        )
+
+        await self._notify_onboarding_assistants_for_user(
+            db,
+            engagement=engagement,
+            user=user,
+            source=engagement.engagement_code or "payment-fulfillment",
+            collection_date=str(meta.get("blood_collection_date") or ""),
+            collection_time=str(meta.get("blood_collection_time_slot") or ""),
         )
 
     def _create_metsights_profile(self, user: User) -> None:
@@ -1514,6 +1532,7 @@ class UsersService:
         payload: PublicUserOnboardRequest | EngagementUserOnboardRequest,
         *,
         source: str,
+        participant_user_id: int,
     ) -> dict[str, str]:
         first_name = payload.first_name or ""
         last_name = payload.last_name or ""
@@ -1531,6 +1550,7 @@ class UsersService:
             "collection_date": str(payload.blood_collection_date),
             "collection_time": str(payload.blood_collection_time_slot),
             "engagement": source,
+            "participant_user_id": str(participant_user_id),
         }
 
     async def _notify_onboarding_assistants(
@@ -1538,53 +1558,63 @@ class UsersService:
         db: AsyncSession,
         *,
         engagement,
+        participant_user_id: int,
         payload: PublicUserOnboardRequest | EngagementUserOnboardRequest,
         source: str,
     ) -> None:
-        """Fire-and-forget: send booking-alert-whatsapp to each onboarding assistant."""
+        """Fire-and-forget: notify onboarding assistants using the engagement's service key."""
         if self._notifications_service is None or self._engagements_service is None:
             return
 
-        try:
-            from modules.notifications.schemas import DispatchRequest
+        from modules.notifications.onboarding_notify import notify_onboarding_assistants_on_enrollment
 
-            assistant_user_ids = await self._engagements_service.list_onboarding_assistant_user_ids(
-                db, engagement_id=engagement.engagement_id
-            )
-            if not assistant_user_ids:
-                return
+        participant_details = self._participant_details_from_onboard_payload(
+            payload, source=source, participant_user_id=participant_user_id
+        )
+        await notify_onboarding_assistants_on_enrollment(
+            db,
+            notifications_service=self._notifications_service,
+            notifications_repository=self._notifications_service._repo,
+            engagements_repository=self._engagements_service._repository,
+            engagement=engagement,
+            participant_user_id=participant_user_id,
+            participant_details=participant_details,
+        )
 
-            participant_details = self._participant_details_from_onboard_payload(
-                payload, source=source
-            )
+    async def _notify_onboarding_assistants_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        engagement,
+        user: User,
+        source: str,
+        collection_date: str | None = None,
+        collection_time: str | None = None,
+    ) -> None:
+        if self._notifications_service is None or self._engagements_service is None:
+            return
 
-            for uid in assistant_user_ids:
-                try:
-                    dispatch_payload = DispatchRequest(
-                        service_key="booking-alert-whatsapp",
-                        user_id=uid,
-                        engagement_id=None,
-                        record_id=None,
-                        participant_details=participant_details,
-                    )
-                    await self._notifications_service.dispatch(
-                        db,
-                        payload=dispatch_payload,
-                        triggered_by_user_id=uid,
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "Onboarding assistant notification failed for user_id=%s engagement_id=%s: %s",
-                        uid,
-                        engagement.engagement_id,
-                        str(exc),
-                    )
-        except Exception as exc:
-            logger.warning(
-                "Onboarding assistant notification batch failed for engagement_id=%s: %s",
-                engagement.engagement_id,
-                str(exc),
-            )
+        from modules.notifications.onboarding_notify import (
+            notify_onboarding_assistants_on_enrollment,
+            participant_details_from_user,
+        )
+
+        participant_details = participant_details_from_user(
+            user,
+            source=source,
+            participant_user_id=int(user.user_id),
+            collection_date=collection_date,
+            collection_time=collection_time,
+        )
+        await notify_onboarding_assistants_on_enrollment(
+            db,
+            notifications_service=self._notifications_service,
+            notifications_repository=self._notifications_service._repo,
+            engagements_repository=self._engagements_service._repository,
+            engagement=engagement,
+            participant_user_id=int(user.user_id),
+            participant_details=participant_details,
+        )
 
     async def public_onboard_user(
         self,
@@ -1733,6 +1763,7 @@ class UsersService:
         await self._notify_onboarding_assistants(
             db,
             engagement=engagement,
+            participant_user_id=int(user.user_id),
             payload=payload,
             source="public",
         )
@@ -2027,6 +2058,7 @@ class UsersService:
         await self._notify_onboarding_assistants(
             db,
             engagement=engagement,
+            participant_user_id=int(user.user_id),
             payload=payload,
             source=code,
         )
@@ -2489,6 +2521,15 @@ class UsersService:
                     increment_participant_count=False,
                     is_profile_created_on_metsights=True,
                     is_primary_record_id_synced=False,
+                )
+
+                await self._notify_onboarding_assistants_for_user(
+                    db,
+                    engagement=engagement,
+                    user=user,
+                    source=engagement.engagement_code or "metsights-import",
+                    collection_date=engagement_date.isoformat(),
+                    collection_time=default_slot.isoformat(),
                 )
 
                 try:

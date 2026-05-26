@@ -29,6 +29,7 @@ class EngagementCreateRequest(BaseModel):
     end_date: date
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
+    notification_service_key: str | None = Field(default=None, max_length=200)
 
 
 class EngagementUpdateRequest(BaseModel):
@@ -49,6 +50,7 @@ class EngagementUpdateRequest(BaseModel):
     metsights_engagement_id: Optional[str] = Field(default=None, max_length=200)
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
+    notification_service_key: str | None = Field(default=None, max_length=200)
 
 
 class EngagementStatusUpdateRequest(BaseModel):
@@ -75,6 +77,7 @@ class EngagementListItem(BaseModel):
     participant_count: Optional[int] = None
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
+    notification_service_key: str
     readiness: ChecklistReadiness
 
 

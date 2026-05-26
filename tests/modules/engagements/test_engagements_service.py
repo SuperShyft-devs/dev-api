@@ -24,13 +24,21 @@ async def test_enroll_user_in_engagement_does_not_increment_participant_count_by
             "VALUES (1, 'Test Diagnostic', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
         )
     )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
+            "VALUES ('booking-alert-whatsapp', 'Booking Alert', 'whatsapp', 'booking-alert', true, false, false) "
+            "ON CONFLICT (service_key) DO NOTHING"
+        )
+    )
     await test_db_session.commit()
     
     # Create engagement directly without organization_id (B2C engagement)
     await test_db_session.execute(
         text(
-            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count, organization_id) "
-            "VALUES (9001, 'Camp', 'ENG9001', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0, NULL)"
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count, organization_id, notification_service_key) "
+            "VALUES (9001, 'Camp', 'ENG9001', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0, NULL, 'booking-alert-whatsapp')"
         )
     )
     await test_db_session.commit()

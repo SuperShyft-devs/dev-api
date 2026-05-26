@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance
 from modules.assessments.repository import AssessmentsRepository
 from modules.employee.models import Employee
+from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
 from modules.engagements.models import Engagement, EngagementKind, EngagementParticipant
 from modules.engagements.repository import EngagementsRepository
 from modules.platform_settings.models import PlatformSettings
@@ -368,6 +369,7 @@ async def _seed_one_engagement_per_user(
         end_date=slot_date,
         status="active",
         participant_count=0,
+        notification_service_key=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
     )
     await er.create_engagement(session, engagement)
     eid = int(engagement.engagement_id)

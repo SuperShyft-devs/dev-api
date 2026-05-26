@@ -7,6 +7,7 @@ import enum
 from sqlalchemy import Boolean, Column, Date, Enum as SAEnum, ForeignKey, Integer, String, Time, UniqueConstraint, Index
 
 from db.base import Base
+from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
 
 
 class EngagementKind(str, enum.Enum):
@@ -51,6 +52,13 @@ class Engagement(Base):
     participant_count = Column(Integer)
     create_profile_on_metsights = Column(Boolean, nullable=False, default=False, server_default="false")
     enroll_for_fitprint_full = Column(Boolean, nullable=False, default=False, server_default="false")
+    notification_service_key = Column(
+        String,
+        ForeignKey("notification_services.service_key"),
+        nullable=False,
+        default=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
+        server_default="booking-alert-whatsapp",
+    )
 
 
 class OnboardingAssistantAssignment(Base):

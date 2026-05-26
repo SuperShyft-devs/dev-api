@@ -126,6 +126,7 @@ async def list_engagements(
                 "participant_count": engagement.participant_count,
                 "create_profile_on_metsights": engagement.create_profile_on_metsights,
                 "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
+                "notification_service_key": engagement.notification_service_key,
                 "readiness": readiness.model_dump(mode="json"),
             }
         )
@@ -166,6 +167,7 @@ async def get_engagement_details(
             "participant_count": engagement.participant_count,
             "create_profile_on_metsights": engagement.create_profile_on_metsights,
             "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
+            "notification_service_key": engagement.notification_service_key,
         }
     )
 

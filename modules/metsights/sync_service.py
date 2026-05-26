@@ -781,6 +781,17 @@ class MetsightsSyncService:
                     errors.append({"metsights_record_id": mrid, "reason": str(exc)})
                     continue
 
+                target_user = await self._users.get_user_by_id(db, target_user_id)
+                if target_user is not None:
+                    await self._engagements.notify_onboarding_assistants_after_enrollment(
+                        db,
+                        engagement=engagement,
+                        user=target_user,
+                        source=engagement.engagement_code or "metsights-sync",
+                        collection_date=eng_date.isoformat(),
+                        collection_time=default_slot.isoformat(),
+                    )
+
             ms_complete = bool(row.get("is_complete"))
 
             try:

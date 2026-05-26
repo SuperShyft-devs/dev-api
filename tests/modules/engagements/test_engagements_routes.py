@@ -50,6 +50,29 @@ async def _seed_assessment_package(test_db_session, *, package_id: int, package_
     await test_db_session.commit()
 
 
+async def _seed_notification_service(
+    test_db_session,
+    service_key: str = "booking-alert-whatsapp",
+    *,
+    require_participant_detail: bool = False,
+) -> None:
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
+            "VALUES (:sk, :dn, 'whatsapp', 'booking-alert', true, false, :rpd) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_participant_detail = :rpd"
+        ),
+        {"sk": service_key, "dn": service_key, "rpd": require_participant_detail},
+    )
+    await test_db_session.commit()
+
+
+@pytest.fixture(autouse=True)
+async def _seed_default_notification_service(test_db_session):
+    await _seed_notification_service(test_db_session)
+
+
 async def _seed_diagnostic_package(test_db_session, *, diagnostic_package_id: int):
     await test_db_session.execute(
         text(
@@ -130,6 +153,12 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
 
     engagement_id = response.json()["data"]["engagement_id"]
     assert isinstance(engagement_id, int)
+
+    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7002))
+    assert details.status_code == 200
+    body = details.json()
+    detail_data = body.get("data", body)
+    assert detail_data["notification_service_key"] == "booking-alert-whatsapp"
 
 
 @pytest.mark.asyncio
@@ -214,6 +243,7 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
 
     assert len(body["data"]) == 1
     assert body["data"][0]["engagement_id"] == 8101
+    assert body["data"][0]["notification_service_key"] == "booking-alert-whatsapp"
     assert body["data"][0]["assessment_package_id"] == 1
 
 
@@ -250,6 +280,7 @@ async def test_get_engagement_details_returns_row(async_client, test_db_session)
     assert response.status_code == 200
     body = response.json()["data"]
     assert body["engagement_id"] == 8201
+    assert body["notification_service_key"] == "booking-alert-whatsapp"
     assert body["assessment_package_id"] == 1
 
 
