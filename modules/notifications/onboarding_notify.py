@@ -71,7 +71,7 @@ async def notify_onboarding_assistants_on_enrollment(
     participant_user_id: int,
     participant_details: dict[str, str] | None,
 ) -> None:
-    """Dispatch the engagement's notification service to each onboarding assistant."""
+    """Dispatch the engagement's notification service to all onboarding assistants in one call."""
     service_key = (getattr(engagement, "notification_service_key", None) or "").strip()
     if not service_key:
         service_key = DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
@@ -111,39 +111,21 @@ async def notify_onboarding_assistants_on_enrollment(
         details = _with_participant_user_id(participant_details, participant_user_id)
 
         engagement_id = int(engagement.engagement_id)
-        record_id: str | None = None
-        participant_instance = await notifications_repository.get_metsights_instance_for_user_engagement(
-            db,
-            user_id=participant_user_id,
-            engagement_id=engagement_id,
-        )
-        if participant_instance is not None:
-            record_id = (participant_instance.metsights_record_id or "").strip() or None
 
-        for uid in assistant_user_ids:
-            try:
-                dispatch_payload = DispatchRequest(
-                    service_key=service_key,
-                    user_id=uid,
-                    engagement_id=engagement_id,
-                    record_id=record_id,
-                    participant_details=details,
-                )
-                await notifications_service.dispatch(
-                    db,
-                    payload=dispatch_payload,
-                    triggered_by_user_id=uid,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Onboarding assistant notification failed for user_id=%s engagement_id=%s: %s",
-                    uid,
-                    engagement.engagement_id,
-                    str(exc),
-                )
+        dispatch_payload = DispatchRequest(
+            service_key=service_key,
+            user_ids=assistant_user_ids,
+            engagement_id=engagement_id,
+            participant_details=details,
+        )
+        await notifications_service.dispatch(
+            db,
+            payload=dispatch_payload,
+            triggered_by_user_id=None,
+        )
     except Exception as exc:
         logger.warning(
-            "Onboarding assistant notification batch failed for engagement_id=%s: %s",
+            "Onboarding assistant notification failed for engagement_id=%s: %s",
             getattr(engagement, "engagement_id", None),
             str(exc),
         )

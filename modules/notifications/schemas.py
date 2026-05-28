@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class DispatchRequest(BaseModel):
     service_key: str = Field(..., min_length=1)
-    user_id: int
+    user_ids: list[int] = Field(..., min_length=1)
     engagement_id: int | None = None
     record_id: str | None = None
     participant_details: dict | None = None

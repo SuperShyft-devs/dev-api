@@ -139,13 +139,13 @@ async def test_dispatch_resolves_record_id_from_metsights_basic_instance(
         headers=_auth_header(9501),
         json={
             "service_key": service_key,
-            "user_id": 9502,
+            "user_ids": [9502],
             "engagement_id": 9501,
         },
     )
     assert response.status_code == 201, response.text
     assert webhook_calls
-    assert webhook_calls[0]["json"]["record_id"] == "25D4C413C7D3"
+    assert webhook_calls[0]["json"]["members"][0]["record_id"] == "25D4C413C7D3"
 
 
 @pytest.mark.asyncio
@@ -226,12 +226,12 @@ async def test_dispatch_prefers_engagement_instance_over_other_engagements(
         headers=_auth_header(9521),
         json={
             "service_key": service_key,
-            "user_id": 9523,
+            "user_ids": [9523],
             "engagement_id": 9521,
         },
     )
     assert response.status_code == 201, response.text
-    assert webhook_calls[0]["json"]["record_id"] == "TARGET-ENG-RECORD"
+    assert webhook_calls[0]["json"]["members"][0]["record_id"] == "TARGET-ENG-RECORD"
 
 
 @pytest.mark.asyncio
@@ -279,7 +279,7 @@ async def test_dispatch_is_public_without_auth(async_client, test_db_session, mo
         "/notifications/dispatch",
         json={
             "service_key": service_key,
-            "user_id": 9531,
+            "user_ids": [9531],
             "engagement_id": None,
         },
     )
@@ -308,7 +308,7 @@ async def test_dispatch_without_record_id_returns_400_when_required(async_client
         headers=_auth_header(9511),
         json={
             "service_key": missing_service_key,
-            "user_id": 9512,
+            "user_ids": [9512],
             "engagement_id": None,
         },
     )

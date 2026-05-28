@@ -48,41 +48,14 @@ class NotificationsService:
                 message=f"Notification service '{payload.service_key}' not found or inactive",
             )
 
-        user = await self._repo.get_user_by_id(db, user_id=payload.user_id)
-        if user is None:
-            raise AppError(status_code=404, error_code="NOT_FOUND", message="User not found")
-
-        assessment_instance_id: int | None = None
-        record_id: str | None = payload.record_id
-
-        if record_id:
-            instance = await self._repo.get_assessment_instance_by_record_id(
-                db, metsights_record_id=record_id
-            )
-            if instance:
-                assessment_instance_id = instance.assessment_instance_id
-        elif payload.engagement_id is not None:
-            instance = await self._repo.get_metsights_instance_for_user_engagement(
-                db,
-                user_id=payload.user_id,
-                engagement_id=payload.engagement_id,
-            )
-            if instance:
-                assessment_instance_id = instance.assessment_instance_id
-                record_id = instance.metsights_record_id
-        else:
-            instance = await self._repo.get_latest_metsights_instance_for_user(
-                db, user_id=payload.user_id
-            )
-            if instance:
-                assessment_instance_id = instance.assessment_instance_id
-                record_id = instance.metsights_record_id
-
-        if svc.require_record_id and not record_id:
+        users = await self._repo.get_users_by_ids(db, user_ids=payload.user_ids)
+        found_ids = {u.user_id for u in users}
+        missing_ids = [uid for uid in payload.user_ids if uid not in found_ids]
+        if missing_ids:
             raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message="This service requires a record_id but none was found",
+                status_code=404,
+                error_code="NOT_FOUND",
+                message=f"Users not found: {missing_ids}",
             )
 
         if svc.require_participant_detail and not payload.participant_details:
@@ -92,11 +65,57 @@ class NotificationsService:
                 message="This service requires participant_details but none were provided",
             )
 
+        members: list[dict] = []
+        assessment_instance_id: int | None = None
+
+        for user in users:
+            record_id: str | None = payload.record_id
+
+            if record_id:
+                instance = await self._repo.get_assessment_instance_by_record_id(
+                    db, metsights_record_id=record_id
+                )
+                if instance:
+                    assessment_instance_id = instance.assessment_instance_id
+            elif payload.engagement_id is not None:
+                instance = await self._repo.get_metsights_instance_for_user_engagement(
+                    db,
+                    user_id=user.user_id,
+                    engagement_id=payload.engagement_id,
+                )
+                if instance:
+                    assessment_instance_id = assessment_instance_id or instance.assessment_instance_id
+                    record_id = instance.metsights_record_id
+            else:
+                instance = await self._repo.get_latest_metsights_instance_for_user(
+                    db, user_id=user.user_id
+                )
+                if instance:
+                    assessment_instance_id = assessment_instance_id or instance.assessment_instance_id
+                    record_id = instance.metsights_record_id
+
+            if svc.require_record_id and not record_id:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message=f"This service requires a record_id but none was found for user_id={user.user_id}",
+                )
+
+            member: dict = {
+                "first_name": user.first_name or "",
+                "last_name": user.last_name or "",
+                "phone": user.phone or "",
+                "email": user.email or "",
+            }
+            if record_id:
+                member["record_id"] = record_id
+            members.append(member)
+
         notification = Notification(
             service_key=svc.service_key,
             status="pending",
             channel=svc.channel,
-            user_id=payload.user_id,
+            user={"user_ids": payload.user_ids},
             engagement_id=payload.engagement_id,
             assessment_instance_id=assessment_instance_id,
             message="Notification dispatch initiated",
@@ -105,13 +124,9 @@ class NotificationsService:
         notification = await self._repo.create_notification(db, notification)
 
         webhook_url = settings.NOTIFICATION_SERVICE_BASE_URL.rstrip("/") + "/" + svc.webhook_path.lstrip("/")
-        webhook_payload = {
+        webhook_payload: dict = {
             "notification_id": notification.notification_id,
-            "first_name": user.first_name or "",
-            "last_name": user.last_name or "",
-            "phone": user.phone or "",
-            "email": user.email or "",
-            "record_id": record_id,
+            "members": members,
         }
         if payload.engagement_id is not None:
             webhook_payload["engagement_id"] = payload.engagement_id

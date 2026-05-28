@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, func
 
 from db.base import Base
 
@@ -32,7 +32,7 @@ class Notification(Base):
     service_key = Column(String, ForeignKey("notification_services.service_key"), nullable=False)
     status = Column(String, nullable=False)
     channel = Column(String, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    user = Column(JSON, nullable=True)
     engagement_id = Column(Integer, ForeignKey("engagements.engagement_id"), nullable=True)
     assessment_instance_id = Column(
         Integer, ForeignKey("assessment_instances.assessment_instance_id"), nullable=True

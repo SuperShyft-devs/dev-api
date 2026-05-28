@@ -29,7 +29,7 @@ def _notification_dict(n) -> dict:
         "service_key": n.service_key,
         "status": n.status,
         "channel": n.channel,
-        "user_id": n.user_id,
+        "user": n.user,
         "engagement_id": n.engagement_id,
         "assessment_instance_id": n.assessment_instance_id,
         "message": n.message,

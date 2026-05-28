@@ -5,7 +5,8 @@ Only database queries live here.
 
 from __future__ import annotations
 
-from sqlalchemy import delete, func, select, update as sql_update
+from sqlalchemy import cast, delete, func, select, type_coerce, update as sql_update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
@@ -136,7 +137,9 @@ class NotificationsRepository:
         if service_key:
             query = query.where(Notification.service_key == service_key)
         if user_id is not None:
-            query = query.where(Notification.user_id == user_id)
+            query = query.where(
+                cast(Notification.user, JSONB)["user_ids"].contains(type_coerce([user_id], JSONB))
+            )
         if engagement_id is not None:
             query = query.where(Notification.engagement_id == engagement_id)
         result = await db.execute(query)
@@ -157,7 +160,9 @@ class NotificationsRepository:
         if service_key:
             query = query.where(Notification.service_key == service_key)
         if user_id is not None:
-            query = query.where(Notification.user_id == user_id)
+            query = query.where(
+                cast(Notification.user, JSONB)["user_ids"].contains(type_coerce([user_id], JSONB))
+            )
         if engagement_id is not None:
             query = query.where(Notification.engagement_id == engagement_id)
         result = await db.execute(query)
@@ -168,6 +173,12 @@ class NotificationsRepository:
     async def get_user_by_id(self, db: AsyncSession, *, user_id: int) -> User | None:
         result = await db.execute(select(User).where(User.user_id == user_id))
         return result.scalar_one_or_none()
+
+    async def get_users_by_ids(self, db: AsyncSession, *, user_ids: list[int]) -> list[User]:
+        if not user_ids:
+            return []
+        result = await db.execute(select(User).where(User.user_id.in_(user_ids)))
+        return list(result.scalars().all())
 
     async def get_assessment_instance_by_record_id(
         self, db: AsyncSession, *, metsights_record_id: str

@@ -108,6 +108,7 @@ async def test_notify_uses_engagement_service_key(test_db_session, monkeypatch):
     dispatch_mock.assert_awaited_once()
     payload = dispatch_mock.await_args.kwargs["payload"]
     assert payload.service_key == custom_key
+    assert payload.user_ids == [101]
     assert payload.engagement_id == 99001
     assert payload.participant_details["participant_user_id"] == "5001"
 
