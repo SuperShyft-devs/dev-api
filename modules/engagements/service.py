@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.phone import phone_lookup_candidates as _phone_lookup_candidates
 from core.exceptions import AppError
 from modules.assessments.repository import AssessmentsRepository
 from modules.assessments.service import AssessmentsService
@@ -56,43 +57,6 @@ def _normalize_status(value: str | None) -> str:
 def _resolve_notification_service_key(raw: str | None) -> str:
     key = (raw or "").strip()
     return key or DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
-
-
-def _phone_lookup_candidates(phone: str) -> list[str]:
-    """Build ordered unique phone strings to match stored user.phone values."""
-
-    raw = (phone or "").strip()
-    if not raw:
-        return []
-
-    stripped = raw.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-    digits = "".join(ch for ch in raw if ch.isdigit())
-
-    ordered: list[str] = []
-    for value in (raw, stripped):
-        if value and value not in ordered:
-            ordered.append(value)
-
-    if len(digits) == 10:
-        for value in (digits, f"+91{digits}", f"91{digits}"):
-            if value not in ordered:
-                ordered.append(value)
-    elif len(digits) == 12 and digits.startswith("91"):
-        base10 = digits[2:]
-        for value in (base10, f"+91{base10}", f"91{base10}", f"+{digits}"):
-            if value not in ordered:
-                ordered.append(value)
-    elif len(digits) == 11 and digits.startswith("0"):
-        base10 = digits[1:]
-        for value in (base10, f"+91{base10}", f"91{base10}"):
-            if value not in ordered:
-                ordered.append(value)
-    elif digits.startswith("+") or (digits and len(digits) > 10):
-        plus = f"+{digits}" if not digits.startswith("+") else digits
-        if plus not in ordered:
-            ordered.append(plus)
-
-    return ordered
 
 
 def _normalize_phone_for_metsights(raw: str | None) -> str | None:

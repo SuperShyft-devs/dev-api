@@ -78,6 +78,18 @@ async def test_whatapi_sender_leaves_twelve_digit_international_unchanged(monkey
 
 
 @pytest.mark.asyncio
+async def test_whatapi_sender_preserves_non_india_international_number(monkeypatch):
+    response = _FakeResponse(status_code=200, payload={"accepted": True})
+    fake_client = _FakeAsyncClient(response)
+    monkeypatch.setattr("modules.auth.providers.httpx.AsyncClient", lambda timeout: fake_client)
+
+    sender = WhatApiOtpSender(webhook_url="https://webhook.whatapi.in/webhook/test-token", country_code="91")
+    await sender.send_otp("+66961275268", "123456")
+
+    assert fake_client.last_params == {"number": "66961275268", "message": "otp,123456"}
+
+
+@pytest.mark.asyncio
 async def test_whatapi_sender_raises_when_not_accepted(monkeypatch):
     response = _FakeResponse(status_code=200, payload={"accepted": False})
     fake_client = _FakeAsyncClient(response)

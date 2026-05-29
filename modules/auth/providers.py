@@ -87,10 +87,11 @@ class WhatApiOtpSender(OtpSender):
         if len(digits_only) == 10:
             return f"{cc}{digits_only}"
 
-        if digits_only.startswith(cc) and len(digits_only) == len(cc) + 10:
+        if digits_only.startswith(cc):
             return digits_only
 
-        if digits_only.startswith(cc):
+        # Full international number (e.g. Thailand 66..., UAE 971..., etc.)
+        if len(digits_only) > 10:
             return digits_only
 
         return f"{cc}{digits_only}"

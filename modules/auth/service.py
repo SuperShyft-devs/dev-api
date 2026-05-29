@@ -27,10 +27,12 @@ from core.config import settings
 from core.exceptions import AppError
 from core.security import create_jwt_token, generate_secure_token
 
+from common.phone import phone_lookup_candidates
 from modules.audit.service import AuditService
 from modules.auth.providers import OtpSender
 from modules.auth.repository import AuthRepository
 from modules.auth.models import AuthOtpSession, AuthToken
+from modules.users.models import User
 from modules.users.service import UsersService
 
 
@@ -90,29 +92,7 @@ class AuthService:
         return hmac.new(secret.encode("utf-8"), refresh_token.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def _phone_lookup_candidates(self, phone: str) -> list[str]:
-        raw = (phone or "").strip()
-        if not raw:
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-
-        allowed_symbols = set("0123456789+ -()")
-        if any(ch not in allowed_symbols for ch in raw):
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-
-        digits = "".join(ch for ch in raw if ch.isdigit())
-        if len(digits) == 10:
-            base10 = digits
-        elif len(digits) == 12 and digits.startswith("91"):
-            base10 = digits[2:]
-        elif len(digits) == 11 and digits.startswith("0"):
-            base10 = digits[1:]
-        else:
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-
-        ordered = [base10, f"+91{base10}", f"91{base10}"]
-        if raw not in ordered:
-            ordered.insert(0, raw)
-        # Preserve order while de-duping.
-        return list(dict.fromkeys(ordered))
+        return phone_lookup_candidates(phone, strict=True)
 
     def _split_send_otp_phone(self, phone: str) -> tuple[list[str], bool]:
         raw_phone = (phone or "").strip()
