@@ -91,7 +91,7 @@ async def test_get_public_participants_returns_empty_list_when_no_participants(a
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=0,
         )
     )
@@ -134,7 +134,7 @@ async def test_get_public_participants_returns_participants_from_b2c_engagements
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=2,
         )
     )
@@ -238,7 +238,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=2,
         )
     )
@@ -253,7 +253,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
             slot_duration=20,
             start_date=date(2026, 4, 1),
             end_date=date(2026, 4, 30),
-            status="active",
+            status="running",
             participant_count=2,
         )
     )
@@ -393,7 +393,7 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=1,
         )
     )
@@ -410,7 +410,7 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=1,
         )
     )
@@ -523,7 +523,7 @@ async def test_get_public_participants_paginates_results(async_client, test_db_s
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=5,
         )
     )

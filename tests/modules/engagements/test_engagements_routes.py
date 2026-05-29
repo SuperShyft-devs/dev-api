@@ -206,7 +206,7 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
             slot_duration=20,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
-            status="active",
+            status="running",
             participant_count=0,
         )
     )
@@ -224,14 +224,14 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
             slot_duration=20,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 3),
-            status="inactive",
+            status="completed",
             participant_count=0,
         )
     )
     await test_db_session.commit()
 
     response = await async_client.get(
-        "/engagements?page=1&limit=10&org_id=1&status=active&city=BLR&date=2026-02-01",
+        "/engagements?page=1&limit=10&org_id=1&status=running&city=BLR&date=2026-02-01",
         headers=_auth_header(7003),
     )
 
@@ -270,7 +270,7 @@ async def test_get_engagement_details_returns_row(async_client, test_db_session)
             slot_duration=20,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
-            status="active",
+            status="running",
             participant_count=0,
         )
     )
@@ -307,7 +307,7 @@ async def test_update_engagement_updates_fields(async_client, test_db_session):
             slot_duration=20,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
-            status="active",
+            status="running",
             participant_count=0,
         )
     )
@@ -362,7 +362,7 @@ async def test_update_b2c_engagement_without_organization(async_client, test_db_
             slot_duration=20,
             start_date=date(2026, 5, 21),
             end_date=date(2026, 5, 21),
-            status="active",
+            status="running",
             participant_count=0,
         )
     )
@@ -414,7 +414,7 @@ async def test_update_engagement_rejects_duplicate_engagement_code(async_client,
                 slot_duration=20,
                 start_date=date(2026, 2, 1),
                 end_date=date(2026, 2, 1),
-                status="active",
+                status="running",
                 participant_count=0,
             ),
             Engagement(
@@ -429,7 +429,7 @@ async def test_update_engagement_rejects_duplicate_engagement_code(async_client,
                 slot_duration=20,
                 start_date=date(2026, 2, 1),
                 end_date=date(2026, 2, 1),
-                status="active",
+                status="running",
                 participant_count=0,
             ),
         ]
@@ -490,7 +490,7 @@ async def test_get_occupied_slots_by_engagement_code_returns_grouped_slots(async
             slot_duration=20,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 2),
-            status="active",
+            status="running",
             participant_count=0,
         )
     )
@@ -572,7 +572,7 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
             slot_duration=20,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
-            status="active",
+            status="running",
             participant_count=0,
         )
     )
@@ -592,7 +592,7 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
             slot_duration=20,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
-            status="active",
+            status="running",
             participant_count=0,
         )
     )
@@ -612,7 +612,7 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
             slot_duration=20,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
-            status="inactive",
+            status="completed",
             participant_count=0,
         )
     )
@@ -678,7 +678,7 @@ async def test_patch_engagement_status_changes_status(async_client, test_db_sess
             slot_duration=20,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
-            status="active",
+            status="running",
             participant_count=0,
         )
     )
@@ -687,13 +687,13 @@ async def test_patch_engagement_status_changes_status(async_client, test_db_sess
     response = await async_client.patch(
         "/engagements/8401/status",
         headers=_auth_header(7006),
-        json={"status": "inactive"},
+        json={"status": "completed"},
     )
     assert response.status_code == 200
 
     updated = await test_db_session.get(Engagement, 8401)
     assert updated is not None
-    assert (updated.status or "").lower() == "inactive"
+    assert (updated.status or "").lower() == "completed"
 
 
 @pytest.mark.asyncio
@@ -733,7 +733,7 @@ async def test_delete_engagement_removes_scoped_data_but_not_users(async_client,
             slot_duration=20,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
-            status="active",
+            status="running",
             participant_count=1,
         )
     )
@@ -830,7 +830,7 @@ async def test_delete_participant_clears_notification_refs_before_instance_delet
             slot_duration=20,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
-            status="active",
+            status="running",
             participant_count=1,
         )
     )

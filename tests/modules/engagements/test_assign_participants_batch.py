@@ -103,7 +103,7 @@ async def _seed_engagement(
             f"assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
             f"status, participant_count, organization_id) "
             f"VALUES ({engagement_id}, 'Camp', '{code}', 'bio_ai', {pkg_sql}, 1, 'BLR', 20, "
-            f"'2026-02-01', '2026-02-28', 'active', 0, NULL)"
+            f"'2026-02-01', '2026-02-28', 'running', 0, NULL)"
         )
     )
     await test_db_session.commit()

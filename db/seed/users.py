@@ -367,7 +367,7 @@ async def _seed_one_engagement_per_user(
         slot_duration=20,
         start_date=slot_date,
         end_date=slot_date,
-        status="active",
+        status="running",
         participant_count=0,
         notification_service_key=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
     )

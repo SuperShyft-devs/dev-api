@@ -168,11 +168,11 @@ class EngagementAssessmentPackagesService:
                 error_code="ENGAGEMENT_NOT_FOUND",
                 message="Engagement does not exist",
             )
-        if (engagement.status or "").lower() != "active":
+        if (engagement.status or "").lower() != "running":
             raise AppError(
                 status_code=422,
                 error_code="INVALID_STATE",
-                message="Engagement is no longer active",
+                message="Engagement is not running",
             )
 
         package = await self._assessments_repo.get_package_by_code(db, package_code=code)

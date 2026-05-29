@@ -196,7 +196,7 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
     await test_db_session.execute(
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3001, 'Camp', 'ENG12345', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
+            "VALUES (3001, 'Camp', 'ENG12345', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
         )
     )
     await test_db_session.commit()
@@ -283,13 +283,13 @@ async def test_engagement_onboard_prefers_payload_referred_by(async_client, test
     await test_db_session.execute(
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3201, 'Camp-A', 'ENGA', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
+            "VALUES (3201, 'Camp-A', 'ENGA', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
         )
     )
     await test_db_session.execute(
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3202, 'Camp-B', 'ENGB', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'active', 0)"
+            "VALUES (3202, 'Camp-B', 'ENGB', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
         )
     )
     await test_db_session.commit()
@@ -336,7 +336,7 @@ async def test_engagement_onboard_requires_active_engagement(async_client, test_
     await test_db_session.execute(
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3101, 'Camp', 'ENGINACT', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'inactive', 0)"
+            "VALUES (3101, 'Camp', 'ENGINACT', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'completed', 0)"
         )
     )
     await test_db_session.commit()
@@ -352,7 +352,7 @@ async def test_engagement_onboard_requires_active_engagement(async_client, test_
 
     response = await async_client.post("/users/code/ENGINACT/onboard", json=payload)
     assert response.status_code == 422
-    assert response.json() == {"error_code": "INVALID_STATE", "message": "Engagement is no longer active"}
+    assert response.json() == {"error_code": "INVALID_STATE", "message": "Engagement is not running"}
 
 
 @pytest.mark.asyncio

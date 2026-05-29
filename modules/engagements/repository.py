@@ -83,7 +83,7 @@ class EngagementsRepository:
         return list(result.all())
 
     async def list_occupied_slots_for_active_b2c_engagements(self, db: AsyncSession) -> list[tuple]:
-        """Return occupied slots for all active B2C engagements.
+        """Return occupied slots for all running B2C engagements.
 
         B2C engagements are engagements that do not belong to an organization.
         Each row is (engagement_date, slot_start_time).
@@ -92,7 +92,7 @@ class EngagementsRepository:
         query = (
             select(EngagementParticipant.engagement_date, EngagementParticipant.slot_start_time)
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
-            .where(Engagement.status == "active")
+            .where(Engagement.status == "running")
             .where(Engagement.organization_id.is_(None))
             .order_by(EngagementParticipant.engagement_date.asc(), EngagementParticipant.slot_start_time.asc())
         )

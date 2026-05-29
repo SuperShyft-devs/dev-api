@@ -42,7 +42,7 @@ async def _seed_engagement(test_db_session, *, engagement_id: int = 9101):
             "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
             "status, participant_count, organization_id) "
             "VALUES (:eid, 'Camp', 'ENG9101', 'bio_ai', 1, 1, 'BLR', 20, "
-            "'2026-02-01', '2026-02-28', 'active', 0, NULL)"
+            "'2026-02-01', '2026-02-28', 'running', 0, NULL)"
         ),
         {"eid": engagement_id},
     )

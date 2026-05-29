@@ -85,7 +85,7 @@ async def test_get_engagement_code_participants_returns_empty_list_when_no_parti
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=0,
         )
     )
@@ -129,7 +129,7 @@ async def test_get_engagement_code_participants_returns_participants_from_engage
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=2,
         )
     )
@@ -230,7 +230,7 @@ async def test_get_engagement_code_participants_returns_distinct_users(async_cli
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=1,
         )
     )
@@ -309,7 +309,7 @@ async def test_get_engagement_code_participants_validates_pagination_params(asyn
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=0,
         )
     )
@@ -355,7 +355,7 @@ async def test_get_engagement_code_participants_paginates_results(async_client, 
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=5,
         )
     )
@@ -452,7 +452,7 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=1,
         )
     )
@@ -466,7 +466,7 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
             slot_duration=20,
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
-            status="active",
+            status="running",
             participant_count=1,
         )
     )

@@ -45,7 +45,7 @@ def _generate_engagement_code(length: int = 8) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-_ALLOWED_ENGAGEMENT_STATUS = {"active", "inactive", "archived"}
+_ALLOWED_ENGAGEMENT_STATUS = {"running", "completed"}
 DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID = 1
 _B2C_DEFAULT_ONBOARDING_ASSISTANT_EMPLOYEE_IDS = (1, 8)
 
@@ -245,7 +245,7 @@ class EngagementsService:
         self,
         db: AsyncSession,
     ) -> dict[str, list[str]]:
-        """Return occupied slots for all active B2C engagements.
+        """Return occupied slots for all running B2C engagements.
 
         Public (no-auth) use-case.
         Output is grouped by date.
@@ -321,7 +321,7 @@ class EngagementsService:
             slot_duration=payload.slot_duration,
             start_date=payload.start_date,
             end_date=payload.end_date,
-            status="active",
+            status="running",
             participant_count=0,
             create_profile_on_metsights=payload.create_profile_on_metsights,
             enroll_for_fitprint_full=payload.enroll_for_fitprint_full,
@@ -586,7 +586,7 @@ class EngagementsService:
             slot_duration=20,
             start_date=engagement_date,
             end_date=engagement_date,
-            status="active",
+            status="running",
             participant_count=0,
             create_profile_on_metsights=create_profile_on_metsights,
             enroll_for_fitprint_full=enroll_for_fitprint_full,
@@ -679,8 +679,8 @@ class EngagementsService:
         is_primary_record_id_synced: bool = False,
         is_fitprint_record_id_synced: bool = False,
     ) -> EngagementParticipant:
-        if (engagement.status or "").lower() != "active":
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is no longer active")
+        if (engagement.status or "").lower() != "running":
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is not running")
 
         participant = EngagementParticipant(
             engagement_id=engagement.engagement_id,
@@ -1505,8 +1505,8 @@ class EngagementsService:
         if engagement is None:
             raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
 
-        if (engagement.status or "").lower() != "active":
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is no longer active")
+        if (engagement.status or "").lower() != "running":
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is not running")
 
         package_id = engagement.assessment_package_id
         if package_id is None:
