@@ -933,6 +933,7 @@ class EngagementsService:
 
     async def _purge_assessment_instance(self, db: AsyncSession, *, assessment_instance_id: int) -> dict[str, int]:
         instance_id = int(assessment_instance_id)
+        await self._detach_assessment_instance_references(db, assessment_instance_ids=[instance_id])
         deleted_reports = await self._reports_repository.delete_individual_reports_for_instance(
             db,
             assessment_instance_id=instance_id,
