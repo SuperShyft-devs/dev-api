@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -1272,7 +1273,7 @@ class QuestionnaireService:
 
         # Validate all question IDs and ensure they're active
         for response_item in responses:
-            question_id = response_item["question_id"]
+            question_id = int(response_item["question_id"])
 
             if question_id not in valid_question_ids:
                 raise AppError(
@@ -1286,14 +1287,21 @@ class QuestionnaireService:
                     error_code="INVALID_STATE",
                     message="Question is not available",
                 )
-            if not visible_questions.get(int(question_id), False):
+            if not visible_questions.get(question_id, False):
                 raise AppError(
                     status_code=422,
                     error_code="INVALID_STATE",
                     message="Question is not currently visible",
                 )
+            question_def = questions_by_id.get(question_id)
+            if question_def is None:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Question is not available",
+                )
             self._validate_answer_by_type(
-                question=questions_by_id[int(question_id)],
+                question=question_def,
                 answer=response_item["answer"],
             )
 
@@ -1337,12 +1345,21 @@ class QuestionnaireService:
             session_id=None,
         )
 
-        await self._sync_category_progress_after_responses(
-            db,
-            instance=instance,
-            category_id=category_id,
-            user_id=user_id,
-        )
+        try:
+            await self._sync_category_progress_after_responses(
+                db,
+                instance=instance,
+                category_id=category_id,
+                user_id=user_id,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger(__name__).warning(
+                "Failed to sync category progress after responses for instance %s / category %s: %s",
+                getattr(instance, "assessment_instance_id", None),
+                category_id,
+                exc,
+                exc_info=True,
+            )
 
     def _serialize_healthy_habit_rule(self, row: QuestionnaireHealthyHabitRule) -> dict:
         scale_min = row.scale_min
