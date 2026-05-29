@@ -302,8 +302,9 @@ class QuestionnaireRepository:
             .where(QuestionnaireResponse.assessment_instance_id == assessment_instance_id)
             .where(QuestionnaireResponse.category_id == category_id)
             .where(QuestionnaireResponse.question_id == question_id)
+            .limit(1)
         )
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def get_response_by_instance_and_question_id(
         self,
