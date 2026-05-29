@@ -5,7 +5,9 @@ Only database queries live here.
 
 from __future__ import annotations
 
-from sqlalchemy import String, cast, func, or_, select
+from datetime import date
+
+from sqlalchemy import String, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
@@ -738,3 +740,37 @@ class EngagementsRepository:
 
         result = await db.execute(sql_delete(Engagement).where(Engagement.engagement_id == engagement_id))
         return int(result.rowcount or 0) > 0
+
+    @staticmethod
+    def _running_engagement_status_filter():
+        return func.lower(func.trim(Engagement.status)) == "running"
+
+    async def count_running_engagements_past_end_date(
+        self,
+        db: AsyncSession,
+        *,
+        as_of: date,
+    ) -> int:
+        query = (
+            select(func.count())
+            .select_from(Engagement)
+            .where(self._running_engagement_status_filter())
+            .where(Engagement.end_date < as_of)
+        )
+        result = await db.execute(query)
+        return int(result.scalar_one())
+
+    async def bulk_complete_expired_engagements(
+        self,
+        db: AsyncSession,
+        *,
+        as_of: date,
+    ) -> int:
+        stmt = (
+            update(Engagement)
+            .where(self._running_engagement_status_filter())
+            .where(Engagement.end_date < as_of)
+            .values(status="completed")
+        )
+        result = await db.execute(stmt)
+        return int(result.rowcount or 0)

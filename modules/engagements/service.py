@@ -549,6 +549,46 @@ class EngagementsService:
 
         return engagement
 
+    async def complete_expired_engagements(
+        self,
+        db: AsyncSession,
+        *,
+        as_of: date | None = None,
+        dry_run: bool = False,
+        endpoint: str = "cron:complete-expired-engagements",
+        ip_address: str = "127.0.0.1",
+        user_agent: str = "complete-expired-engagements-job",
+    ) -> dict[str, int | str | bool]:
+        """Mark running engagements with end_date before as_of as completed."""
+        effective_as_of = as_of or date.today()
+
+        if dry_run:
+            updated_count = await self._repository.count_running_engagements_past_end_date(
+                db,
+                as_of=effective_as_of,
+            )
+        else:
+            updated_count = await self._repository.bulk_complete_expired_engagements(
+                db,
+                as_of=effective_as_of,
+            )
+            if updated_count and self._audit_service is not None:
+                await self._audit_service.log_event(
+                    db,
+                    action="SYSTEM_COMPLETE_EXPIRED_ENGAGEMENTS",
+                    endpoint=endpoint,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    user_id=None,
+                    session_id=None,
+                )
+
+        return {
+            "as_of": effective_as_of.isoformat(),
+            "updated_count": updated_count,
+            "dry_run": dry_run,
+        }
+
     async def create_b2c_engagement(
         self,
         db: AsyncSession,
