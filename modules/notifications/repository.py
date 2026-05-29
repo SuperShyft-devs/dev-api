@@ -5,11 +5,14 @@ Only database queries live here.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import cast, delete, func, select, type_coerce, update as sql_update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
+from modules.engagements.models import Engagement
 from modules.notifications.models import Notification, NotificationService
 from modules.users.models import User
 
@@ -114,16 +117,49 @@ class NotificationsRepository:
         await db.flush()
         return int(result.rowcount or 0)
 
+    def _apply_notification_list_filters(
+        self,
+        query,
+        *,
+        statuses: list[str] | None = None,
+        service_key: str | None = None,
+        channel: str | None = None,
+        user_id: int | None = None,
+        engagement_id: int | None = None,
+        dispatched_from: datetime | None = None,
+        dispatched_to: datetime | None = None,
+    ):
+        if statuses:
+            query = query.where(Notification.status.in_(statuses))
+        if service_key:
+            query = query.where(Notification.service_key == service_key)
+        if channel:
+            query = query.where(Notification.channel == channel)
+        if user_id is not None:
+            query = query.where(
+                cast(Notification.user, JSONB)["user_ids"].contains(type_coerce([user_id], JSONB))
+            )
+        if engagement_id is not None:
+            query = query.where(Notification.engagement_id == engagement_id)
+        if dispatched_from is not None:
+            query = query.where(Notification.dispatched_at >= dispatched_from)
+        if dispatched_to is not None:
+            query = query.where(Notification.dispatched_at <= dispatched_to)
+        return query
+
     async def list_notifications(
         self,
         db: AsyncSession,
         *,
         page: int,
         limit: int,
-        status: str | None = None,
+        statuses: list[str] | None = None,
         service_key: str | None = None,
+        channel: str | None = None,
         user_id: int | None = None,
         engagement_id: int | None = None,
+        dispatched_from: datetime | None = None,
+        dispatched_to: datetime | None = None,
     ) -> list[Notification]:
         offset = (page - 1) * limit
         query = (
@@ -132,16 +168,16 @@ class NotificationsRepository:
             .offset(offset)
             .limit(limit)
         )
-        if status:
-            query = query.where(Notification.status == status)
-        if service_key:
-            query = query.where(Notification.service_key == service_key)
-        if user_id is not None:
-            query = query.where(
-                cast(Notification.user, JSONB)["user_ids"].contains(type_coerce([user_id], JSONB))
-            )
-        if engagement_id is not None:
-            query = query.where(Notification.engagement_id == engagement_id)
+        query = self._apply_notification_list_filters(
+            query,
+            statuses=statuses,
+            service_key=service_key,
+            channel=channel,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            dispatched_from=dispatched_from,
+            dispatched_to=dispatched_to,
+        )
         result = await db.execute(query)
         return list(result.scalars().all())
 
@@ -149,24 +185,47 @@ class NotificationsRepository:
         self,
         db: AsyncSession,
         *,
-        status: str | None = None,
+        statuses: list[str] | None = None,
         service_key: str | None = None,
+        channel: str | None = None,
         user_id: int | None = None,
         engagement_id: int | None = None,
+        dispatched_from: datetime | None = None,
+        dispatched_to: datetime | None = None,
     ) -> int:
         query = select(func.count()).select_from(Notification)
-        if status:
-            query = query.where(Notification.status == status)
-        if service_key:
-            query = query.where(Notification.service_key == service_key)
-        if user_id is not None:
-            query = query.where(
-                cast(Notification.user, JSONB)["user_ids"].contains(type_coerce([user_id], JSONB))
-            )
-        if engagement_id is not None:
-            query = query.where(Notification.engagement_id == engagement_id)
+        query = self._apply_notification_list_filters(
+            query,
+            statuses=statuses,
+            service_key=service_key,
+            channel=channel,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            dispatched_from=dispatched_from,
+            dispatched_to=dispatched_to,
+        )
         result = await db.execute(query)
         return int(result.scalar_one())
+
+    async def get_services_by_keys(
+        self, db: AsyncSession, *, service_keys: list[str]
+    ) -> list[NotificationService]:
+        if not service_keys:
+            return []
+        result = await db.execute(
+            select(NotificationService).where(NotificationService.service_key.in_(service_keys))
+        )
+        return list(result.scalars().all())
+
+    async def get_engagements_by_ids(
+        self, db: AsyncSession, *, engagement_ids: list[int]
+    ) -> list[Engagement]:
+        if not engagement_ids:
+            return []
+        result = await db.execute(
+            select(Engagement).where(Engagement.engagement_id.in_(engagement_ids))
+        )
+        return list(result.scalars().all())
 
     # ── User & Assessment helpers ───────────────────────────────────────
 

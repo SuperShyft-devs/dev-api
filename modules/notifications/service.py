@@ -24,6 +24,25 @@ from modules.notifications.schemas import (
 
 logger = logging.getLogger(__name__)
 
+_VALID_NOTIFICATION_STATUSES = frozenset({"pending", "sent", "failed"})
+_VALID_NOTIFICATION_CHANNELS = frozenset({"email", "whatsapp"})
+
+
+def _parse_status_filter(status: str | None) -> list[str] | None:
+    if status is None or not status.strip():
+        return None
+    parts = [s.strip().lower() for s in status.split(",") if s.strip()]
+    if not parts:
+        return None
+    invalid = [s for s in parts if s not in _VALID_NOTIFICATION_STATUSES]
+    if invalid:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message=f"Invalid status filter: {', '.join(invalid)}",
+        )
+    return parts
+
 
 class NotificationsService:
     """Notification service layer."""
@@ -184,6 +203,85 @@ class NotificationsService:
 
     # ── Admin list ──────────────────────────────────────────────────────
 
+    @staticmethod
+    def _notification_base_dict(n: Notification) -> dict:
+        return {
+            "notification_id": n.notification_id,
+            "service_key": n.service_key,
+            "status": n.status,
+            "channel": n.channel,
+            "user": n.user,
+            "engagement_id": n.engagement_id,
+            "assessment_instance_id": n.assessment_instance_id,
+            "message": n.message,
+            "triggered_by_user_id": n.triggered_by_user_id,
+            "dispatched_at": n.dispatched_at.isoformat() if n.dispatched_at else None,
+            "completed_at": n.completed_at.isoformat() if n.completed_at else None,
+        }
+
+    async def _enrich_notification_list_items(
+        self, db: AsyncSession, items: list[Notification]
+    ) -> list[dict]:
+        if not items:
+            return []
+
+        service_keys: set[str] = set()
+        engagement_ids: set[int] = set()
+        user_ids: set[int] = set()
+
+        for n in items:
+            service_keys.add(n.service_key)
+            if n.engagement_id is not None:
+                engagement_ids.add(n.engagement_id)
+            if n.triggered_by_user_id is not None:
+                user_ids.add(n.triggered_by_user_id)
+            raw_user = n.user if isinstance(n.user, dict) else {}
+            for uid in raw_user.get("user_ids") or []:
+                if isinstance(uid, int):
+                    user_ids.add(uid)
+
+        services = await self._repo.get_services_by_keys(db, service_keys=list(service_keys))
+        service_by_key = {s.service_key: s for s in services}
+
+        engagements = await self._repo.get_engagements_by_ids(
+            db, engagement_ids=list(engagement_ids)
+        )
+        engagement_by_id = {e.engagement_id: e for e in engagements}
+
+        users = await self._repo.get_users_by_ids(db, user_ids=list(user_ids))
+        user_by_id = {u.user_id: u for u in users}
+
+        enriched: list[dict] = []
+        for n in items:
+            row = self._notification_base_dict(n)
+            svc = service_by_key.get(n.service_key)
+            row["service_display_name"] = svc.display_name if svc else n.service_key
+
+            raw_user = n.user if isinstance(n.user, dict) else {}
+            recipient_ids = [
+                uid for uid in (raw_user.get("user_ids") or []) if isinstance(uid, int)
+            ]
+            recipients: list[dict] = []
+            for uid in recipient_ids:
+                u = user_by_id.get(uid)
+                recipients.append(
+                    {
+                        "user_id": uid,
+                        "first_name": u.first_name if u else None,
+                        "last_name": u.last_name if u else None,
+                    }
+                )
+            row["recipients"] = recipients
+
+            engagement = (
+                engagement_by_id.get(n.engagement_id) if n.engagement_id is not None else None
+            )
+            row["engagement_name"] = engagement.engagement_name if engagement else None
+            row["engagement_code"] = engagement.engagement_code if engagement else None
+
+            enriched.append(row)
+        return enriched
+
     async def list_notifications(
         self,
         db: AsyncSession,
@@ -192,26 +290,36 @@ class NotificationsService:
         limit: int,
         status: str | None = None,
         service_key: str | None = None,
+        channel: str | None = None,
         user_id: int | None = None,
         engagement_id: int | None = None,
-    ) -> tuple[list[Notification], int]:
-        items = await self._repo.list_notifications(
-            db,
-            page=page,
-            limit=limit,
-            status=status,
-            service_key=service_key,
-            user_id=user_id,
-            engagement_id=engagement_id,
-        )
-        total = await self._repo.count_notifications(
-            db,
-            status=status,
-            service_key=service_key,
-            user_id=user_id,
-            engagement_id=engagement_id,
-        )
-        return items, total
+        dispatched_from: datetime | None = None,
+        dispatched_to: datetime | None = None,
+    ) -> tuple[list[dict], int]:
+        statuses = _parse_status_filter(status)
+        if channel is not None and channel.strip():
+            channel = channel.strip().lower()
+            if channel not in _VALID_NOTIFICATION_CHANNELS:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message=f"Invalid channel filter: {channel}",
+                )
+        else:
+            channel = None
+
+        filter_kwargs = {
+            "statuses": statuses,
+            "service_key": service_key,
+            "channel": channel,
+            "user_id": user_id,
+            "engagement_id": engagement_id,
+            "dispatched_from": dispatched_from,
+            "dispatched_to": dispatched_to,
+        }
+        items = await self._repo.list_notifications(db, page=page, limit=limit, **filter_kwargs)
+        total = await self._repo.count_notifications(db, **filter_kwargs)
+        return await self._enrich_notification_list_items(db, items), total
 
     # ── Service CRUD ────────────────────────────────────────────────────
 

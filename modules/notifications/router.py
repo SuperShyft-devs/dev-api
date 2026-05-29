@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,22 +23,6 @@ from modules.notifications.service import NotificationsService
 
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
-
-
-def _notification_dict(n) -> dict:
-    return {
-        "notification_id": n.notification_id,
-        "service_key": n.service_key,
-        "status": n.status,
-        "channel": n.channel,
-        "user": n.user,
-        "engagement_id": n.engagement_id,
-        "assessment_instance_id": n.assessment_instance_id,
-        "message": n.message,
-        "triggered_by_user_id": n.triggered_by_user_id,
-        "dispatched_at": n.dispatched_at.isoformat() if n.dispatched_at else None,
-        "completed_at": n.completed_at.isoformat() if n.completed_at else None,
-    }
 
 
 def _service_dict(s) -> dict:
@@ -87,8 +73,11 @@ async def list_notifications(
     limit: int = 20,
     status: str | None = None,
     service_key: str | None = None,
+    channel: str | None = None,
     user_id: int | None = None,
     engagement_id: int | None = None,
+    dispatched_from: datetime | None = None,
+    dispatched_to: datetime | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     svc: NotificationsService = Depends(get_notifications_service),
@@ -101,11 +90,14 @@ async def list_notifications(
         limit=limit,
         status=status,
         service_key=service_key,
+        channel=channel,
         user_id=user_id,
         engagement_id=engagement_id,
+        dispatched_from=dispatched_from,
+        dispatched_to=dispatched_to,
     )
     return success_response(
-        [_notification_dict(n) for n in items],
+        items,
         meta={"page": page, "limit": limit, "total": total},
     )
 
