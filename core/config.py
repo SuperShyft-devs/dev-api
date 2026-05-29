@@ -2,8 +2,14 @@
 Configuration module for Supershyft backend.
 """
 
+import logging
 import os
+
 from dotenv import load_dotenv
+
+from common.phone import phone_lookup_candidates
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -66,6 +72,7 @@ class Settings:
         os.getenv("allow_bypass_otp", "False"),
     ).lower() == "true"
     BYPASS_OTP: str = os.getenv("BYPASS_OTP", "")
+    BYPASS_OTP_BY_PHONE: str = os.getenv("BYPASS_OTP_BY_PHONE", "")
 
     # Media upload settings
     MEDIA_ROOT: str = os.getenv("MEDIA_ROOT", "/var/www/backend/media")
@@ -177,6 +184,38 @@ class Settings:
         """Return dedicated refresh-token HMAC secret, falling back to JWT_SECRET_KEY."""
         return cls.REFRESH_TOKEN_SECRET or cls.JWT_SECRET_KEY
 
+    def get_bypass_otp_by_phone(self) -> dict[str, str]:
+        """Map phone lookup candidates to bypass OTP codes from BYPASS_OTP_BY_PHONE."""
+        raw = self.BYPASS_OTP_BY_PHONE or ""
+        cache_key = getattr(self, "_bypass_otp_cache_key", None)
+        if cache_key == raw:
+            return getattr(self, "_bypass_otp_by_phone_index", {})
+        self._bypass_otp_cache_key = raw
+        self._bypass_otp_by_phone_index = self._build_bypass_otp_by_phone_index(raw)
+        return self._bypass_otp_by_phone_index
+
+    @staticmethod
+    def _build_bypass_otp_by_phone_index(raw: str) -> dict[str, str]:
+        index: dict[str, str] = {}
+        for segment in raw.split(","):
+            entry = segment.strip()
+            if not entry:
+                continue
+            if ":" not in entry:
+                logger.warning("Skipping invalid BYPASS_OTP_BY_PHONE entry (missing colon): %r", entry)
+                continue
+            phone_part, otp_part = entry.split(":", 1)
+            phone = phone_part.strip()
+            otp = otp_part.strip()
+            if not phone or not otp:
+                logger.warning("Skipping invalid BYPASS_OTP_BY_PHONE entry (empty phone or otp): %r", entry)
+                continue
+            for candidate in phone_lookup_candidates(phone, strict=False):
+                index[candidate] = otp
+        return index
+
 
 # Create a singleton instance
 settings = Settings()
+settings._bypass_otp_cache_key = None
+settings._bypass_otp_by_phone_index = {}

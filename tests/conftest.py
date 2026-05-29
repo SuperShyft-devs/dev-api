@@ -146,6 +146,9 @@ def _set_test_settings():
     settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 5
     settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS = 7
     settings.ALLOW_BYPASS_OTP = False
+    settings.BYPASS_OTP_BY_PHONE = ""
+    settings._bypass_otp_cache_key = None
+    settings._bypass_otp_by_phone_index = {}
 
 
 class CapturingOtpSender:

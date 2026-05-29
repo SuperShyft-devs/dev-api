@@ -47,6 +47,18 @@ def _verify_otp(otp: str, otp_hash: str, secret: str) -> bool:
     return hmac.compare_digest(derived, otp_hash)
 
 
+def _per_phone_bypass_allowed(phone_candidates: list[str], otp: str) -> bool:
+    """True when otp matches a BYPASS_OTP_BY_PHONE entry for one of the phone candidates."""
+    index = settings.get_bypass_otp_by_phone()
+    if not index:
+        return False
+    for candidate in phone_candidates:
+        expected = index.get(candidate)
+        if expected and hmac.compare_digest(otp, expected):
+            return True
+    return False
+
+
 @dataclass(frozen=True)
 class TokenPair:
     access_token: str
@@ -239,10 +251,10 @@ class AuthService:
             await self._repository.delete_otp_session(db, session.session_id)
             raise AppError(status_code=429, error_code="RATE_LIMITED", message="Too many failed attempts")
 
-        bypass_allowed = (
+        bypass_allowed = _per_phone_bypass_allowed(phone_candidates, otp) or (
             settings.ALLOW_BYPASS_OTP
             and settings.BYPASS_OTP
-            and otp == settings.BYPASS_OTP
+            and hmac.compare_digest(otp, settings.BYPASS_OTP)
         )
         if not bypass_allowed and not _verify_otp(otp, session.otp_hash, self._otp_secret()):
             session.failed_attempts = getattr(session, "failed_attempts", 0) + 1
