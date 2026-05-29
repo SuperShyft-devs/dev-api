@@ -794,3 +794,106 @@ async def test_delete_engagement_removes_scoped_data_but_not_users(async_client,
         )
     ).scalar_one()
     assert instances == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_participant_clears_notification_refs_before_instance_delete(
+    async_client, test_db_session
+):
+    """Participant purge must detach notifications that reference assessment instances."""
+
+    from datetime import time
+
+    from modules.assessments.models import AssessmentInstance
+    from modules.engagements.models import Engagement, EngagementParticipant
+    from modules.notifications.models import Notification
+
+    await _seed_employee(test_db_session, user_id=7020, employee_id=21)
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    test_db_session.add(User(user_id=1020, age=30, phone="1020000000", status="active"))
+    await test_db_session.flush()
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=8601,
+            engagement_name="Participant Delete",
+            metsights_engagement_id=None,
+            organization_id=1,
+            engagement_code="PD8601",
+            engagement_type="bio_ai",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 1),
+            status="active",
+            participant_count=1,
+        )
+    )
+    await test_db_session.flush()
+
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=86001,
+            engagement_id=8601,
+            user_id=1020,
+            engagement_date=date(2026, 2, 1),
+            slot_start_time=time(10, 0),
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=86001,
+            user_id=1020,
+            engagement_id=8601,
+            package_id=1,
+            status="assigned",
+        )
+    )
+    await test_db_session.flush()
+
+    test_db_session.add(
+        Notification(
+            service_key="booking-alert-whatsapp",
+            status="sent",
+            channel="whatsapp",
+            engagement_id=8601,
+            assessment_instance_id=86001,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.delete(
+        "/engagements/8601/participants/1020",
+        headers=_auth_header(7020),
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()["data"]
+    assert body["engagement_id"] == 8601
+    assert body["user_id"] == 1020
+    assert body["deleted_assessment_instances"] >= 1
+
+    participants = (
+        await test_db_session.execute(
+            text("SELECT COUNT(*) FROM engagement_participants WHERE engagement_id = 8601")
+        )
+    ).scalar_one()
+    assert participants == 0
+
+    instances = (
+        await test_db_session.execute(
+            text("SELECT COUNT(*) FROM assessment_instances WHERE engagement_id = 8601")
+        )
+    ).scalar_one()
+    assert instances == 0
+
+    notif_assessment_id = (
+        await test_db_session.execute(
+            text("SELECT assessment_instance_id FROM notifications WHERE engagement_id = 8601")
+        )
+    ).scalar_one()
+    assert notif_assessment_id is None

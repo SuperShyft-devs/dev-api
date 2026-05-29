@@ -860,6 +860,33 @@ class EngagementsService:
         result = [_participant_enrollment_to_dict(row) for row in participants]
         return result, total
 
+    async def _detach_assessment_instance_references(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_ids: list[int],
+    ) -> None:
+        """Clear FK references so assessment instances can be deleted."""
+
+        if not assessment_instance_ids:
+            return
+
+        from sqlalchemy import update
+
+        from modules.notifications.models import Notification
+        from modules.reports.models import ReportsUserSyncState
+
+        await db.execute(
+            update(Notification)
+            .where(Notification.assessment_instance_id.in_(assessment_instance_ids))
+            .values(assessment_instance_id=None)
+        )
+        await db.execute(
+            update(ReportsUserSyncState)
+            .where(ReportsUserSyncState.last_synced_assessment_instance_id.in_(assessment_instance_ids))
+            .values(last_synced_assessment_instance_id=None)
+        )
+
     async def _purge_user_engagement_data(
         self,
         db: AsyncSession,
@@ -872,6 +899,8 @@ class EngagementsService:
             user_id=user_id,
             engagement_id=engagement_id,
         )
+        instance_ids = [int(i.assessment_instance_id) for i in instances]
+        await self._detach_assessment_instance_references(db, assessment_instance_ids=instance_ids)
 
         deleted_reports = 0
         deleted_questionnaire_responses = 0
@@ -934,7 +963,7 @@ class EngagementsService:
 
         from modules.checklists.models import EngagementChecklist
         from modules.notifications.models import Notification
-        from modules.reports.models import OrganizationHealthReport, ReportsUserSyncState
+        from modules.reports.models import OrganizationHealthReport
 
         instances = await self._assessments_repository.list_all_instances_for_engagement(
             db,
@@ -947,17 +976,7 @@ class EngagementsService:
             .where(Notification.engagement_id == engagement_id)
             .values(engagement_id=None)
         )
-        if instance_ids:
-            await db.execute(
-                update(Notification)
-                .where(Notification.assessment_instance_id.in_(instance_ids))
-                .values(assessment_instance_id=None)
-            )
-            await db.execute(
-                update(ReportsUserSyncState)
-                .where(ReportsUserSyncState.last_synced_assessment_instance_id.in_(instance_ids))
-                .values(last_synced_assessment_instance_id=None)
-            )
+        await self._detach_assessment_instance_references(db, assessment_instance_ids=instance_ids)
 
         totals = {
             "deleted_engagement_participants": 0,
