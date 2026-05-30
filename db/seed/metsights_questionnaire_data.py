@@ -88,7 +88,7 @@ METSIGHTS_QUESTIONS: tuple[SeedQuestion, ...] = (
     SeedQuestion(30, "iodized_salt_status", "Do you use iodized salt in your diet?", "single_choice", True, False, None, "active"),
     SeedQuestion(31, "extra_salt_frequency", "How often do you add extra salt to your food?", "single_choice", True, False, None, "active"),
     SeedQuestion(32, "caffeine_frequency", "What's your coffee or tea intake?", "single_choice", False, False, None, "active"),
-    SeedQuestion(33, "caffeine_type", "What type of coffee or tea do you drink?", "single_choice", False, False, None, "active"),
+    SeedQuestion(33, "caffeine_type", "What type of coffee or tea do you drink?", QUESTION_TYPE_OVERRIDES.get("caffeine_type", "single_choice"), False, False, "Select all that apply", "active"),
     SeedQuestion(34, "butter_dish_frequency", "How frequently do you indulge in dishes rich in butter?", "single_choice", True, False, None, "active"),
     SeedQuestion(35, "red_meat_frequency", "How frequently do you consume red meat?", "single_choice", True, False, None, "active"),
     SeedQuestion(36, "water_intake_frequency", "How many glasses of water do you drink in a day?", "single_choice", True, False, None, "active"),

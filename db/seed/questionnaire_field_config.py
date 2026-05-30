@@ -25,6 +25,10 @@ QUESTION_TYPE_OVERRIDES: dict[str, str] = {
     # Change 6: health_priorities was multiple_choice; business requirement
     # changed to allow only one selection (single_choice).
     "health_priorities": "single_choice",
+    # Change 7: caffeine_type — users may select multiple beverage types, but
+    # Metsights only accepts a single value for this field.  Store all selections
+    # in our DB (multiple_choice) and pick one at random when pushing to Metsights.
+    "caffeine_type": "multiple_choice",
 }
 
 
@@ -211,4 +215,13 @@ HEALTH_PRIORITIES_LABEL_TO_VALUE: dict[str, str] = {
 # Fields stored as single_choice in our DB but Metsights expects a list payload.
 METSIGHTS_PUSH_AS_LIST: frozenset[str] = frozenset({
     "health_priorities",
+})
+
+# Change 7: caffeine_type
+#   Our DB stores all the user's selections as a multiple_choice list.
+#   Metsights only accepts a single value for this field, so when pushing we
+#   randomly pick one option from whatever the user selected.  This keeps the
+#   full multi-select visible in our backend while remaining API-compatible.
+RANDOM_SINGLE_FROM_MULTISELECT_FIELDS: frozenset[str] = frozenset({
+    "caffeine_type",
 })

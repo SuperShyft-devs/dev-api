@@ -19,6 +19,7 @@ from db.seed.questionnaire_field_config import (
     HEALTH_PRIORITIES_OPTION_VALUES,
     METSIGHTS_PUSH_AS_LIST,
     NONE_CLEARS_MULTISELECT_FIELDS,
+    RANDOM_SINGLE_FROM_MULTISELECT_FIELDS,
     SCALE_TO_CHOICE_CONVERTERS,
 )
 from modules.assessments.models import AssessmentInstance
@@ -249,6 +250,21 @@ def _answer_to_metsights_fields(question_key: str, question_type: str, answer: A
                 # User chose "None" — send nothing to metsights.
                 return {}
             return {qkey: cleaned}
+
+        # Change 7: fields where Metsights only accepts a single value but our DB
+        # stores all the user's selections (multiple_choice).  Pick one at random
+        # so every valid selection has an equal chance of being pushed.
+        if qkey in RANDOM_SINGLE_FROM_MULTISELECT_FIELDS:
+            seq = [
+                str(x).strip()
+                for x in answer
+                if x is not None
+                and str(x).strip() != ""
+                and str(x).strip().lower() != "none"
+            ]
+            if not seq:
+                return {}
+            return {qkey: random.choice(seq)}
 
         seq = [
             str(x).strip()
