@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
+from db.seed.questionnaire_field_config import QUESTION_TYPE_OVERRIDES
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
 from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireHealthyHabitRule
@@ -264,11 +265,15 @@ class QuestionnaireService:
             }
             for opt in options
         ]
+        question_type = row.question_type
+        if row.question_key and row.question_key in QUESTION_TYPE_OVERRIDES:
+            question_type = QUESTION_TYPE_OVERRIDES[row.question_key]
+
         return {
             "question_id": row.question_id,
             "question_key": row.question_key,
             "question_text": row.question_text,
-            "question_type": row.question_type,
+            "question_type": question_type,
             "is_required": bool(row.is_required),
             "is_read_only": bool(row.is_read_only),
             "help_text": row.help_text,
