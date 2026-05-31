@@ -101,8 +101,8 @@ async def test_dispatch_resolves_record_id_from_metsights_basic_instance(
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
-            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
-            "VALUES (:sk, 'BioAI Report | Whatsapp', 'whatsapp', 'bio-ai-report', true, true, false) "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'BioAI Report | Whatsapp', 'whatsapp', 'bio-ai-report', true, true, false, false) "
             "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_record_id = true"
         ),
         {"sk": service_key},
@@ -188,8 +188,8 @@ async def test_dispatch_prefers_engagement_instance_over_other_engagements(
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
-            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
-            "VALUES (:sk, 'BioAI Report | Whatsapp', 'whatsapp', 'bio-ai-report', true, true, false) "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'BioAI Report | Whatsapp', 'whatsapp', 'bio-ai-report', true, true, false, false) "
             "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_record_id = true"
         ),
         {"sk": service_key},
@@ -242,8 +242,8 @@ async def test_dispatch_is_public_without_auth(async_client, test_db_session, mo
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
-            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
-            "VALUES (:sk, 'Public Dispatch', 'whatsapp', 'public-dispatch', true, false, false) "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'Public Dispatch', 'whatsapp', 'public-dispatch', true, false, false, false) "
             "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_record_id = false"
         ),
         {"sk": service_key},
@@ -295,8 +295,8 @@ async def test_dispatch_without_record_id_returns_400_when_required(async_client
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
-            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
-            "VALUES (:sk, 'BioAI Report | Whatsapp', 'whatsapp', 'bio-ai-report', true, true, false) "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'BioAI Report | Whatsapp', 'whatsapp', 'bio-ai-report', true, true, false, false) "
             "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_record_id = true"
         ),
         {"sk": missing_service_key},
@@ -314,3 +314,140 @@ async def test_dispatch_without_record_id_returns_400_when_required(async_client
     )
     assert response.status_code == 400
     assert "record_id" in response.json()["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_requires_otp_when_service_flag_set(async_client, test_db_session):
+    test_db_session.add(User(user_id=9541, age=30, phone="9541000000", status="active"))
+    service_key = "otp_required_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'OTP Required', 'whatsapp', 'otp-required', true, false, false, true) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_otp = true, require_record_id = false"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        json={"service_key": service_key, "user_ids": [9541]},
+    )
+    assert response.status_code == 400
+    assert "otp" in response.json()["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_includes_otp_in_members_when_required(async_client, test_db_session, monkeypatch):
+    test_db_session.add(
+        User(
+            user_id=9542,
+            age=30,
+            phone="9542000000",
+            status="active",
+            email="user9542@example.com",
+            first_name="John",
+            last_name="Doe",
+        )
+    )
+    service_key = "otp_dispatch_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'OTP Dispatch', 'whatsapp', 'otp-dispatch', true, false, false, true) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_otp = true, require_record_id = false"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        json={"service_key": service_key, "user_ids": [9542], "otp": "787878"},
+    )
+    assert response.status_code == 201, response.text
+    assert webhook_calls
+    member = webhook_calls[0]["json"]["members"][0]
+    assert member["otp"] == "787878"
+    assert member["first_name"] == "John"
+    assert member["last_name"] == "Doe"
+    assert member["phone"] == "9542000000"
+    assert member["email"] == "user9542@example.com"
+    assert "record_id" not in member
+
+
+@pytest.mark.asyncio
+async def test_dispatch_omits_otp_in_members_when_not_required(async_client, test_db_session, monkeypatch):
+    test_db_session.add(User(user_id=9543, age=30, phone="9543000000", status="active"))
+    service_key = "otp_not_required_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'No OTP', 'whatsapp', 'no-otp', true, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_otp = false, require_record_id = false"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        json={"service_key": service_key, "user_ids": [9543], "otp": "787878"},
+    )
+    assert response.status_code == 201, response.text
+    member = webhook_calls[0]["json"]["members"][0]
+    assert "otp" not in member

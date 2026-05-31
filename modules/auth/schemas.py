@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SendOtpRequest(BaseModel):
-    phone: str = Field(..., min_length=10, max_length=32)
+    phone: str | None = Field(None, min_length=10, max_length=32)
+    email: str | None = Field(None, min_length=3, max_length=254)
+
+    @model_validator(mode="after")
+    def exactly_one_identifier(self) -> SendOtpRequest:
+        has_phone = self.phone is not None and self.phone.strip() != ""
+        has_email = self.email is not None and self.email.strip() != ""
+        if has_phone == has_email:
+            raise ValueError("Provide exactly one of phone or email")
+        return self
 
 
 class SendOtpResponse(BaseModel):
@@ -14,8 +23,17 @@ class SendOtpResponse(BaseModel):
 
 
 class VerifyOtpRequest(BaseModel):
-    phone: str = Field(..., min_length=5, max_length=20)
+    phone: str | None = Field(None, min_length=5, max_length=32)
+    email: str | None = Field(None, min_length=3, max_length=254)
     otp: str = Field(..., min_length=4, max_length=10)
+
+    @model_validator(mode="after")
+    def exactly_one_identifier(self) -> VerifyOtpRequest:
+        has_phone = self.phone is not None and self.phone.strip() != ""
+        has_email = self.email is not None and self.email.strip() != ""
+        if has_phone == has_email:
+            raise ValueError("Provide exactly one of phone or email")
+        return self
 
 
 class TokenPair(BaseModel):

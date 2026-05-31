@@ -57,15 +57,15 @@ async def test_send_otp_with_dontsendotp_suffix_skips_dispatch(async_client, tes
     test_db_session.add(User(user_id=1013, age=30, phone="7000000137", status="active"))
     await test_db_session.commit()
 
-    sender = async_client._transport.app.state.otp_sender
-    sender.last_phone = None
+    sender = async_client._transport.app.state.capturing_notifications_service
+    sender.last_dispatch = None
     sender.last_otp = None
 
     response = await async_client.post("/auth/send-otp", json={"phone": "7000000137dontsendotp"})
 
     assert response.status_code == 200
     assert isinstance(response.json()["data"]["session_id"], int)
-    assert sender.last_phone is None
+    assert sender.last_dispatch is None
     assert sender.last_otp is None
 
 
@@ -76,8 +76,8 @@ async def test_send_otp_with_dontsendotp_suffix_accepts_international_e164(async
     )
     await test_db_session.commit()
 
-    sender = async_client._transport.app.state.otp_sender
-    sender.last_phone = None
+    sender = async_client._transport.app.state.capturing_notifications_service
+    sender.last_dispatch = None
     sender.last_otp = None
 
     response = await async_client.post(
@@ -87,7 +87,7 @@ async def test_send_otp_with_dontsendotp_suffix_accepts_international_e164(async
 
     assert response.status_code == 200
     assert isinstance(response.json()["data"]["session_id"], int)
-    assert sender.last_phone is None
+    assert sender.last_dispatch is None
     assert sender.last_otp is None
 
 
@@ -101,7 +101,7 @@ async def test_send_and_verify_otp_accepts_thailand_plus66(async_client, test_db
     send = await async_client.post("/auth/send-otp", json={"phone": "+66961275269"})
     assert send.status_code == 200
 
-    otp = async_client._transport.app.state.otp_sender.last_otp
+    otp = async_client._transport.app.state.capturing_notifications_service.last_otp
     assert otp is not None
 
     verify = await async_client.post(
@@ -148,7 +148,7 @@ async def test_send_and_verify_otp_sub_profile_with_unique_phone(async_client, t
     send = await async_client.post("/auth/send-otp", json={"phone": "6100000002"})
     assert send.status_code == 200
 
-    otp = async_client._transport.app.state.otp_sender.last_otp
+    otp = async_client._transport.app.state.capturing_notifications_service.last_otp
     assert otp is not None
 
     verify = await async_client.post(
@@ -184,7 +184,7 @@ async def test_send_and_verify_otp_shared_phone_authenticates_parent(async_clien
     send = await async_client.post("/auth/send-otp", json={"phone": "6100000003"})
     assert send.status_code == 200
 
-    otp = async_client._transport.app.state.otp_sender.last_otp
+    otp = async_client._transport.app.state.capturing_notifications_service.last_otp
     verify = await async_client.post(
         "/auth/verify-otp",
         json={"phone": "6100000003", "otp": otp},
@@ -209,7 +209,7 @@ async def test_send_and_verify_otp_accepts_plus91_and_local_forms(async_client, 
     send = await async_client.post("/auth/send-otp", json={"phone": "8103946120"})
     assert send.status_code == 200
 
-    otp = async_client._transport.app.state.otp_sender.last_otp
+    otp = async_client._transport.app.state.capturing_notifications_service.last_otp
     assert otp is not None
 
     verify = await async_client.post(
@@ -264,7 +264,7 @@ async def test_verify_otp_issues_tokens_and_consumes_session(async_client, test_
     send = await async_client.post("/auth/send-otp", json={"phone": "8888888888"})
     session_id = send.json()["data"]["session_id"]
 
-    otp = async_client._transport.app.state.otp_sender.last_otp
+    otp = async_client._transport.app.state.capturing_notifications_service.last_otp
     assert otp is not None
 
     verify = await async_client.post(
@@ -306,7 +306,7 @@ async def test_refresh_token_rotates_refresh_token(async_client, test_db_session
     send = await async_client.post("/auth/send-otp", json={"phone": "7777777777"})
     session_id = send.json()["data"]["session_id"]
 
-    otp = async_client._transport.app.state.otp_sender.last_otp
+    otp = async_client._transport.app.state.capturing_notifications_service.last_otp
     assert otp is not None
 
     verify = await async_client.post("/auth/verify-otp", json={"phone": "7777777777", "otp": otp})
@@ -337,7 +337,7 @@ async def test_logout_invalidates_refresh_token(async_client, test_db_session):
     send = await async_client.post("/auth/send-otp", json={"phone": "6666666666"})
     session_id = send.json()["data"]["session_id"]
 
-    otp = async_client._transport.app.state.otp_sender.last_otp
+    otp = async_client._transport.app.state.capturing_notifications_service.last_otp
     assert otp is not None
 
     verify = await async_client.post("/auth/verify-otp", json={"phone": "6666666666", "otp": otp})
@@ -355,3 +355,73 @@ async def test_logout_invalidates_refresh_token(async_client, test_db_session):
         )
     ).scalar_one_or_none()
     assert audit_row is not None
+
+
+@pytest.mark.asyncio
+async def test_send_otp_dispatches_via_whatapi_service_key(async_client, test_db_session):
+    test_db_session.add(
+        User(user_id=9401, age=30, phone="9401000001", status="active", email="user9401@example.com")
+    )
+    await test_db_session.commit()
+
+    capture = async_client._transport.app.state.capturing_notifications_service
+    capture.last_dispatch = None
+
+    response = await async_client.post("/auth/send-otp", json={"phone": "9401000001"})
+    assert response.status_code == 200
+    assert capture.last_dispatch is not None
+    assert capture.last_dispatch["service_key"] == "whatapi-otp"
+    assert capture.last_dispatch["user_ids"] == [9401]
+    assert capture.last_otp is not None
+
+
+@pytest.mark.asyncio
+async def test_send_and_verify_otp_via_email(async_client, test_db_session):
+    test_db_session.add(
+        User(
+            user_id=9402,
+            age=30,
+            phone="9402000002",
+            status="active",
+            email="user9402@example.com",
+        )
+    )
+    await test_db_session.commit()
+
+    capture = async_client._transport.app.state.capturing_notifications_service
+    capture.last_dispatch = None
+
+    send = await async_client.post("/auth/send-otp", json={"email": "user9402@example.com"})
+    assert send.status_code == 200
+    assert capture.last_dispatch is not None
+    assert capture.last_dispatch["service_key"] == "email-otp"
+    assert capture.last_dispatch["user_ids"] == [9402]
+
+    otp = capture.last_otp
+    assert otp is not None
+
+    verify = await async_client.post(
+        "/auth/verify-otp",
+        json={"email": "user9402@example.com", "otp": otp},
+    )
+    assert verify.status_code == 200
+    assert verify.json()["data"]["user_id"] == 9402
+
+
+@pytest.mark.asyncio
+async def test_send_otp_returns_404_for_unknown_email(async_client):
+    response = await async_client.post("/auth/send-otp", json={"email": "unknown@example.com"})
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "USER_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_send_otp_rejects_both_phone_and_email(async_client, test_db_session):
+    test_db_session.add(User(user_id=9403, age=30, phone="9403000003", status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/auth/send-otp",
+        json={"phone": "9403000003", "email": "user9403@example.com"},
+    )
+    assert response.status_code == 400

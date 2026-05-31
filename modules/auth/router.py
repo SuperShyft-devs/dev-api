@@ -11,7 +11,7 @@ from common.responses import success_response
 from core.dependencies import get_current_user
 from core.network import get_client_ip
 from core.rate_limit import limiter
-from db.session import get_db
+from db.session import AsyncSessionLocal, get_db
 from modules.auth.dependencies import get_auth_service
 from modules.auth.schemas import (
     LogoutRequest,
@@ -19,10 +19,17 @@ from modules.auth.schemas import (
     SendOtpRequest,
     VerifyOtpRequest,
 )
-from modules.auth.service import AuthService
+from modules.auth.service import AuthService, OtpDelivery
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+async def _deliver_otp_background(delivery: OtpDelivery) -> None:
+    async with AsyncSessionLocal() as db:
+        auth_service = get_auth_service()
+        await auth_service.deliver_otp_via_notifications(db, delivery=delivery)
+        await db.commit()
 
 
 @router.post("/send-otp")
@@ -34,20 +41,22 @@ async def send_otp(
     db: AsyncSession = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service),
 ):
-    session_id, dispatch_phone, otp_plain = await auth_service.send_otp(
+    session_id, delivery = await auth_service.send_otp(
         db,
         phone=payload.phone,
+        email=payload.email,
         ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
     await db.commit()
 
-    if dispatch_phone and otp_plain:
+    if delivery is not None:
         if settings.is_production():
-            background_tasks.add_task(auth_service.deliver_otp_sms, dispatch_phone, otp_plain)
+            background_tasks.add_task(_deliver_otp_background, delivery)
         else:
-            await auth_service.deliver_otp_sms(dispatch_phone, otp_plain)
+            await auth_service.deliver_otp_via_notifications(db, delivery=delivery)
+            await db.commit()
 
     return success_response({"session_id": session_id})
 
@@ -63,6 +72,7 @@ async def verify_otp(
     user_id, tokens = await auth_service.verify_otp(
         db,
         phone=payload.phone,
+        email=payload.email,
         otp=payload.otp,
         ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),

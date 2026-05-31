@@ -84,6 +84,14 @@ class NotificationsService:
                 message="This service requires participant_details but none were provided",
             )
 
+        otp_value = (payload.otp or "").strip()
+        if svc.require_otp and not otp_value:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="This service requires otp but none was provided",
+            )
+
         members: list[dict] = []
         assessment_instance_id: int | None = None
 
@@ -128,6 +136,8 @@ class NotificationsService:
             }
             if record_id:
                 member["record_id"] = record_id
+            if svc.require_otp:
+                member["otp"] = otp_value
             members.append(member)
 
         notification = Notification(
@@ -344,6 +354,7 @@ class NotificationsService:
             is_active=payload.is_active,
             require_record_id=payload.require_record_id,
             require_participant_detail=payload.require_participant_detail,
+            require_otp=payload.require_otp,
         )
         return await self._repo.create_service(db, svc)
 
@@ -373,6 +384,8 @@ class NotificationsService:
             svc.require_record_id = payload.require_record_id
         if payload.require_participant_detail is not None:
             svc.require_participant_detail = payload.require_participant_detail
+        if payload.require_otp is not None:
+            svc.require_otp = payload.require_otp
         return await self._repo.update_service(db, svc)
 
     async def delete_notification(

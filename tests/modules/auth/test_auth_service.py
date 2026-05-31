@@ -14,7 +14,7 @@ async def test_verify_otp_fails_with_wrong_code(auth_service, test_db_session):
     test_db_session.add(User(user_id=1010, age=30, phone="5555555555", status="active"))
     await test_db_session.commit()
 
-    session_id, _, _ = await auth_service.send_otp(
+    session_id, delivery = await auth_service.send_otp(
         test_db_session,
         phone="5555555555",
         ip_address="1.1.1.1",
@@ -169,6 +169,39 @@ async def test_verify_otp_per_phone_bypass_wrong_otp_fails(auth_service, test_db
         settings.BYPASS_OTP_BY_PHONE = previous_by_phone
         settings._bypass_otp_cache_key = None
         settings._bypass_otp_by_phone_index = {}
+
+
+@pytest.mark.asyncio
+async def test_send_otp_via_email_resolves_user(auth_service, capturing_notifications_service, test_db_session):
+    test_db_session.add(
+        User(
+            user_id=1030,
+            age=30,
+            phone="5555555570",
+            status="active",
+            email="user1030@example.com",
+        )
+    )
+    await test_db_session.commit()
+
+    session_id, delivery = await auth_service.send_otp(
+        test_db_session,
+        email="user1030@example.com",
+        ip_address="1.1.1.1",
+        user_agent="pytest",
+        endpoint="/auth/send-otp",
+    )
+
+    assert session_id > 0
+    assert delivery is not None
+    assert delivery.user_id == 1030
+    assert delivery.service_key == "email-otp"
+    assert delivery.otp is not None
+
+    await auth_service.deliver_otp_via_notifications(test_db_session, delivery=delivery)
+    assert capturing_notifications_service.last_dispatch is not None
+    assert capturing_notifications_service.last_dispatch["service_key"] == "email-otp"
+    assert capturing_notifications_service.last_dispatch["otp"] == delivery.otp
 
 
 @pytest.mark.asyncio

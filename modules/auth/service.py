@@ -4,7 +4,7 @@ Business rules live here.
 
 Rules:
 - Users must already exist.
-- OTP is sent to phone.
+- OTP is sent via notification dispatch (phone or email).
 - OTP is time bound and single use.
 - OTP value is never logged.
 - Refresh tokens are stored hashed.
@@ -29,9 +29,10 @@ from core.security import create_jwt_token, generate_secure_token
 
 from common.phone import phone_lookup_candidates
 from modules.audit.service import AuditService
-from modules.auth.providers import OtpSender
 from modules.auth.repository import AuthRepository
 from modules.auth.models import AuthOtpSession, AuthToken
+from modules.notifications.schemas import DispatchRequest
+from modules.notifications.service import NotificationsService
 from modules.users.models import User
 from modules.users.service import UsersService
 
@@ -65,6 +66,13 @@ class TokenPair:
     refresh_token: str
 
 
+@dataclass(frozen=True)
+class OtpDelivery:
+    user_id: int
+    otp: str
+    service_key: str
+
+
 class AuthService:
     """Auth service layer."""
 
@@ -74,12 +82,12 @@ class AuthService:
         repository: AuthRepository,
         users_service: UsersService,
         audit_service: AuditService,
-        otp_sender: OtpSender,
+        notifications_service: NotificationsService,
     ):
         self._repository = repository
         self._users_service = users_service
         self._audit_service = audit_service
-        self._otp_sender = otp_sender
+        self._notifications_service = notifications_service
 
     def _otp_secret(self) -> str:
         secret = settings.get_otp_hmac_secret()
@@ -152,6 +160,12 @@ class AuthService:
             )
         return subs[0] if subs else None
 
+    async def _resolve_user_for_otp_by_email(self, db: AsyncSession, email: str) -> Optional[User]:
+        normalized = (email or "").strip().lower()
+        if not normalized:
+            return None
+        return await self._repository.get_user_by_email(db, normalized)
+
     async def _issue_refresh_token_for_user(self, db: AsyncSession, user_id: int) -> str:
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
@@ -173,14 +187,25 @@ class AuthService:
         self,
         db: AsyncSession,
         *,
-        phone: str,
+        phone: str | None = None,
+        email: str | None = None,
         ip_address: str,
         user_agent: str,
         endpoint: str,
-    ) -> tuple[int, str | None, str | None]:
-        phone_candidates, skip_send = self._split_send_otp_phone(phone)
+    ) -> tuple[int, OtpDelivery | None]:
+        skip_send = False
+        service_key: str | None = None
 
-        user = await self._resolve_user_for_otp(db, phone_candidates)
+        if phone is not None:
+            phone_candidates, skip_send = self._split_send_otp_phone(phone)
+            user = await self._resolve_user_for_otp(db, phone_candidates)
+            if not skip_send:
+                service_key = settings.OTP_PHONE_SERVICE_KEY
+        else:
+            user = await self._resolve_user_for_otp_by_email(db, email or "")
+            if not skip_send:
+                service_key = settings.OTP_EMAIL_SERVICE_KEY
+
         if user is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
@@ -201,9 +226,9 @@ class AuthService:
         await self._repository.delete_all_otp_sessions_for_user(db, user.user_id)
         created = await self._repository.create_otp_session(db, session)
 
-        dispatch_phone: str | None = None
-        if not skip_send:
-            dispatch_phone = (user.phone or "").strip() or phone_candidates[0]
+        delivery: OtpDelivery | None = None
+        if not skip_send and service_key:
+            delivery = OtpDelivery(user_id=user.user_id, otp=otp, service_key=service_key)
 
         await self._audit_service.log_event(
             db,
@@ -215,24 +240,41 @@ class AuthService:
             session_id=created.session_id,
         )
 
-        return created.session_id, dispatch_phone, otp if dispatch_phone else None
+        return created.session_id, delivery
 
-    async def deliver_otp_sms(self, phone: str, otp: str) -> None:
-        """Send OTP via external provider (may be slow; run in background in production)."""
-        await self._otp_sender.send_otp(phone, otp)
+    async def deliver_otp_via_notifications(
+        self,
+        db: AsyncSession,
+        *,
+        delivery: OtpDelivery,
+    ) -> None:
+        """Send OTP via notification dispatch."""
+        await self._notifications_service.dispatch(
+            db,
+            payload=DispatchRequest(
+                service_key=delivery.service_key,
+                user_ids=[delivery.user_id],
+                otp=delivery.otp,
+            ),
+        )
 
     async def verify_otp(
         self,
         db: AsyncSession,
         *,
-        phone: str,
+        phone: str | None = None,
+        email: str | None = None,
         otp: str,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> tuple[int, TokenPair]:
-        phone_candidates = self._phone_lookup_candidates(phone)
-        user = await self._resolve_user_for_otp(db, phone_candidates)
+        if phone is not None:
+            phone_candidates = self._phone_lookup_candidates(phone)
+            user = await self._resolve_user_for_otp(db, phone_candidates)
+        else:
+            phone_candidates = []
+            user = await self._resolve_user_for_otp_by_email(db, email or "")
         if user is None:
             raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
 

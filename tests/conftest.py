@@ -151,16 +151,41 @@ def _set_test_settings():
     settings._bypass_otp_by_phone_index = {}
 
 
-class CapturingOtpSender:
-    """OTP sender that captures OTP for tests."""
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Avoid cross-test rate limit failures on shared session-scoped app."""
+    from core.rate_limit import limiter
+
+    limiter.reset()
+    yield
+    limiter.reset()
+
+
+class CapturingNotificationsService:
+    """Notifications service mock that captures OTP dispatch calls for tests."""
 
     def __init__(self):
-        self.last_phone: str | None = None
+        self.last_dispatch: dict | None = None
         self.last_otp: str | None = None
 
-    async def send_otp(self, phone: str, otp: str) -> None:
-        self.last_phone = phone
-        self.last_otp = otp
+    async def dispatch(
+        self,
+        db: AsyncSession,
+        *,
+        payload,
+        triggered_by_user_id: int | None = None,
+    ) -> dict:
+        self.last_dispatch = {
+            "service_key": payload.service_key,
+            "user_ids": list(payload.user_ids),
+            "otp": payload.otp,
+        }
+        self.last_otp = payload.otp
+        return {
+            "notification_id": 1,
+            "status": "pending",
+            "message": "Webhook called successfully",
+        }
 
 
 async def _ensure_required_tables(connection) -> None:
@@ -218,13 +243,13 @@ async def test_db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest.fixture
-def otp_sender() -> CapturingOtpSender:
-    return CapturingOtpSender()
+def capturing_notifications_service() -> CapturingNotificationsService:
+    return CapturingNotificationsService()
 
 
 @pytest.fixture
-def auth_service(otp_sender: CapturingOtpSender):
-    """Real AuthService wired with a capturing OTP sender."""
+def auth_service(capturing_notifications_service: CapturingNotificationsService):
+    """Real AuthService wired with a capturing notifications service."""
 
     from modules.audit.repository import AuditRepository
     from modules.audit.service import AuditService
@@ -237,13 +262,17 @@ def auth_service(otp_sender: CapturingOtpSender):
         repository=AuthRepository(),
         users_service=UsersService(UsersRepository()),
         audit_service=AuditService(AuditRepository()),
-        otp_sender=otp_sender,
+        notifications_service=capturing_notifications_service,
     )
 
 
 @pytest_asyncio.fixture(loop_scope="session")
-async def fastapi_app(test_db_session: AsyncSession, auth_service, otp_sender: CapturingOtpSender) -> FastAPI:
-    """FastAPI app wired to the real DB and a capturing OTP sender."""
+async def fastapi_app(
+    test_db_session: AsyncSession,
+    auth_service,
+    capturing_notifications_service: CapturingNotificationsService,
+) -> FastAPI:
+    """FastAPI app wired to the real DB and a capturing notifications service."""
 
     app = FastAPI()
     add_exception_handlers(app)
@@ -270,7 +299,7 @@ async def fastapi_app(test_db_session: AsyncSession, auth_service, otp_sender: C
     app.dependency_overrides[get_db] = _get_test_db
     app.dependency_overrides[get_auth_service] = lambda: auth_service
 
-    app.state.otp_sender = otp_sender
+    app.state.capturing_notifications_service = capturing_notifications_service
 
     return app
 

@@ -11,6 +11,7 @@ class DispatchRequest(BaseModel):
     engagement_id: int | None = None
     record_id: str | None = None
     participant_details: dict | None = None
+    otp: str | None = None
 
 
 class CallbackRequest(BaseModel):
@@ -27,6 +28,7 @@ class NotificationServiceCreate(BaseModel):
     is_active: bool = True
     require_record_id: bool = True
     require_participant_detail: bool = False
+    require_otp: bool = False
 
 
 class NotificationServiceUpdate(BaseModel):
@@ -36,3 +38,4 @@ class NotificationServiceUpdate(BaseModel):
     is_active: bool | None = None
     require_record_id: bool | None = None
     require_participant_detail: bool | None = None
+    require_otp: bool | None = None
