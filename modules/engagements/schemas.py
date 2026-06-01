@@ -139,3 +139,13 @@ class AssignParticipantsRowResult(BaseModel):
 
 class AssignParticipantsBatchResponse(BaseModel):
     results: list[AssignParticipantsRowResult]
+
+
+class CreateMetsightsProfilesRequest(BaseModel):
+    """Request body for the create-metsights-profiles endpoint."""
+
+    mode: str = Field(
+        default="profile",
+        pattern=r"^(enrol_force|enrol|profile)$",
+        description="enrol_force: register all via engagement; enrol: register new only via engagement; profile: create standalone profiles for new only",
+    )

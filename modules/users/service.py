@@ -1128,12 +1128,6 @@ class UsersService:
         last_name = (user.last_name or "").strip()
         phone = self._normalize_phone_for_metsights(user.phone)
         gender = self._to_metsights_gender(user.gender)
-        if not engagement_metsights_id:
-            logger.warning(
-                "Metsights profile creation skipped for engagement_id=%s: metsights_engagement_id is missing",
-                engagement.engagement_id,
-            )
-            return (user.metsights_profile_id or "").strip() or None
         if not first_name or not last_name or not phone or gender is None:
             logger.warning(
                 "Metsights profile creation skipped for user_id=%s engagement_id=%s: missing required user fields",
@@ -1144,16 +1138,45 @@ class UsersService:
 
         dob = user.date_of_birth.isoformat() if user.date_of_birth is not None else None
         email = (user.email or "").strip() if user.email else None
-        profile_id = await self._metsights_service.create_profile_for_engagement(
-            engagement_id=engagement_metsights_id,
-            first_name=first_name,
-            last_name=last_name,
-            phone=phone,
-            email=email,
-            gender=gender,
-            date_of_birth=dob,
-            age=user.age,
-        )
+
+        if engagement_metsights_id:
+            profile_id = await self._metsights_service.create_profile_for_engagement(
+                engagement_id=engagement_metsights_id,
+                first_name=first_name,
+                last_name=last_name,
+                phone=phone,
+                email=email,
+                gender=gender,
+                date_of_birth=dob,
+                age=user.age,
+            )
+        else:
+            profile_id = await self._metsights_service.get_or_create_profile_id(
+                first_name=first_name,
+                last_name=last_name,
+                phone=phone,
+                email=email,
+                gender=gender,
+                date_of_birth=dob,
+                age=user.age,
+            )
+            if profile_id and self._assessments_service is not None and engagement.assessment_package_id:
+                package = await self._assessments_service.get_package_by_id(db, engagement.assessment_package_id)
+                assessment_type_code = (getattr(package, "assessment_type_code", None) or "").strip() if package else ""
+                if assessment_type_code:
+                    try:
+                        await self._metsights_service.create_record_for_profile(
+                            profile_id=profile_id,
+                            assessment_type_code=assessment_type_code,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "Metsights record creation failed for profile_id=%s assessment_type_code=%s: %s",
+                            profile_id,
+                            assessment_type_code,
+                            str(exc),
+                        )
+
         await self._repository.update_user_partial(db, user.user_id, {"metsights_profile_id": profile_id})
         user.metsights_profile_id = profile_id
         return profile_id

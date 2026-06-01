@@ -1738,13 +1738,20 @@ class EngagementsService:
         *,
         employee: EmployeeContext,
         engagement_id: int,
+        mode: str = "profile",
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> dict[str, Any]:
-        """Create regular Metsights profiles (POST /profiles/) for enrolled participants.
+        """Create Metsights profiles for enrolled participants.
 
-        Skips users who already have ``metsights_profile_id``. Does not use engagement registration.
+        Modes:
+        - ``enrol_force``: Register ALL participants via ``POST /engagements/{id}/register/``
+          (even if they already have ``metsights_profile_id``). Requires ``metsights_engagement_id``.
+        - ``enrol``: Register only participants without ``metsights_profile_id`` via engagement
+          registration. Requires ``metsights_engagement_id``.
+        - ``profile``: Create standalone profiles via ``POST /profiles/`` for participants
+          without ``metsights_profile_id``.
         """
 
         _ = ip_address, user_agent, endpoint
@@ -1761,10 +1768,20 @@ class EngagementsService:
                 message="Metsights integration is not configured",
             )
 
+        metsights_engagement_id = (engagement.metsights_engagement_id or "").strip()
+        if mode in ("enrol_force", "enrol") and not metsights_engagement_id:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Metsights Engagement ID is required for enrol mode",
+            )
+
         user_ids = await self._repository.list_distinct_participant_ids_for_engagement(
             db,
             engagement_id=engagement_id,
         )
+
+        skip_existing = mode != "enrol_force"
 
         created = 0
         skipped = 0
@@ -1782,7 +1799,7 @@ class EngagementsService:
                 continue
 
             existing_profile_id = (user.metsights_profile_id or "").strip()
-            if existing_profile_id:
+            if skip_existing and existing_profile_id:
                 base["status"] = "skipped"
                 base["reason"] = "already_has_metsights_profile_id"
                 base["metsights_profile_id"] = existing_profile_id
@@ -1812,29 +1829,47 @@ class EngagementsService:
                 continue
 
             profile_id: str | None = None
-            candidate_phones = [phone]
-            raw_phone = (user.phone or "").strip()
-            if raw_phone and raw_phone not in candidate_phones:
-                candidate_phones.append(raw_phone)
-
             last_error: str | None = None
-            for candidate_phone in candidate_phones:
+
+            if mode in ("enrol_force", "enrol"):
                 try:
-                    profile_id = await self._metsights_service.get_or_create_profile_id(
+                    profile_id = await self._metsights_service.create_profile_for_engagement(
+                        engagement_id=metsights_engagement_id,
                         first_name=first_name,
                         last_name=last_name,
-                        phone=candidate_phone,
+                        phone=phone,
                         email=email,
                         gender=gender,
                         date_of_birth=dob,
                         age=user.age,
                     )
-                    if profile_id:
-                        break
                 except AppError as exc:
                     last_error = exc.message or exc.error_code or "metsights_error"
                 except Exception as exc:
                     last_error = str(exc)
+            else:
+                candidate_phones = [phone]
+                raw_phone = (user.phone or "").strip()
+                if raw_phone and raw_phone not in candidate_phones:
+                    candidate_phones.append(raw_phone)
+
+                for candidate_phone in candidate_phones:
+                    try:
+                        profile_id = await self._metsights_service.get_or_create_profile_id(
+                            first_name=first_name,
+                            last_name=last_name,
+                            phone=candidate_phone,
+                            email=email,
+                            gender=gender,
+                            date_of_birth=dob,
+                            age=user.age,
+                        )
+                        if profile_id:
+                            break
+                    except AppError as exc:
+                        last_error = exc.message or exc.error_code or "metsights_error"
+                    except Exception as exc:
+                        last_error = str(exc)
 
             if not profile_id:
                 base["status"] = "error"

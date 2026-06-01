@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Body, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -18,6 +18,7 @@ from modules.engagements.dependencies import get_engagements_service, get_onboar
 from modules.engagements.onboarding_assistants_service import OnboardingAssistantsService
 from modules.engagements.schemas import (
     AssignParticipantsBatchRequest,
+    CreateMetsightsProfilesRequest,
     EngagementCreateRequest,
     EngagementStatusUpdateRequest,
     EngagementUpdateRequest,
@@ -416,16 +417,18 @@ async def assign_participants_batch(
 async def create_metsights_profiles_for_engagement(
     engagement_id: int,
     request: Request,
+    payload: CreateMetsightsProfilesRequest = Body(default_factory=CreateMetsightsProfilesRequest),
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     engagements_service: EngagementsService = Depends(get_engagements_service),
 ):
-    """Create regular Metsights profiles for all participants missing ``metsights_profile_id``."""
+    """Create Metsights profiles for participants. Modes: enrol_force, enrol, profile."""
 
     data = await engagements_service.create_metsights_profiles_for_engagement_participants(
         db,
         employee=employee,
         engagement_id=engagement_id,
+        mode=payload.mode,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
