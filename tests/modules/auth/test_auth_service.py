@@ -205,6 +205,60 @@ async def test_send_otp_via_email_resolves_user(auth_service, capturing_notifica
 
 
 @pytest.mark.asyncio
+async def test_resend_otp_builds_dual_channel_deliveries(auth_service, test_db_session):
+    test_db_session.add(
+        User(
+            user_id=1040,
+            age=30,
+            phone="5555555580",
+            status="active",
+            email="user1040@example.com",
+        )
+    )
+    await test_db_session.commit()
+
+    session_id, deliveries = await auth_service.resend_otp(
+        test_db_session,
+        phone="5555555580",
+        ip_address="1.1.1.1",
+        user_agent="pytest",
+        endpoint="/auth/resend-otp",
+    )
+
+    assert session_id > 0
+    assert len(deliveries) == 2
+    keys = {d.service_key for d in deliveries}
+    assert keys == {"whatapi-otp", "email-otp"}
+    assert deliveries[0].otp == deliveries[1].otp
+
+
+@pytest.mark.asyncio
+async def test_resend_otp_via_email_from_phone(auth_service, test_db_session):
+    test_db_session.add(
+        User(
+            user_id=1041,
+            age=30,
+            phone="5555555581",
+            status="active",
+            email="user1041@example.com",
+        )
+    )
+    await test_db_session.commit()
+
+    _, deliveries = await auth_service.resend_otp(
+        test_db_session,
+        phone="5555555581",
+        via="email",
+        ip_address="1.1.1.1",
+        user_agent="pytest",
+        endpoint="/auth/resend-otp",
+    )
+
+    assert len(deliveries) == 1
+    assert deliveries[0].service_key == "email-otp"
+
+
+@pytest.mark.asyncio
 async def test_verify_otp_per_phone_bypass_wrong_phone_fails(auth_service, test_db_session):
     test_db_session.add(User(user_id=1022, age=30, phone="5555555562", status="active"))
     await test_db_session.commit()

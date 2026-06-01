@@ -425,3 +425,206 @@ async def test_send_otp_rejects_both_phone_and_email(async_client, test_db_sessi
         json={"phone": "9403000003", "email": "user9403@example.com"},
     )
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_resend_otp_requires_phone_or_email(async_client):
+    response = await async_client.post("/auth/resend-otp", json={})
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_resend_otp_phone_only_dispatches_whatsapp_and_email(async_client, test_db_session):
+    test_db_session.add(
+        User(
+            user_id=9501,
+            age=30,
+            phone="9501000001",
+            status="active",
+            email="user9501@example.com",
+        )
+    )
+    await test_db_session.commit()
+
+    capture = async_client._transport.app.state.capturing_notifications_service
+    capture.reset_captures()
+
+    response = await async_client.post("/auth/resend-otp", json={"phone": "9501000001"})
+    assert response.status_code == 200
+    assert isinstance(response.json()["data"]["session_id"], int)
+    assert len(capture.dispatches) == 2
+    service_keys = {d["service_key"] for d in capture.dispatches}
+    assert service_keys == {"whatapi-otp", "email-otp"}
+    assert capture.dispatches[0]["otp"] == capture.dispatches[1]["otp"]
+
+    audit_rows = (
+        await test_db_session.execute(
+            select(DataAuditLog).where(
+                DataAuditLog.user_id == 9501,
+                DataAuditLog.action == "AUTH_RESEND_OTP",
+            )
+        )
+    ).scalars().all()
+    assert len(audit_rows) == 1
+
+
+@pytest.mark.asyncio
+async def test_resend_otp_email_only_dispatches_whatsapp_and_email(async_client, test_db_session):
+    test_db_session.add(
+        User(
+            user_id=9502,
+            age=30,
+            phone="9502000002",
+            status="active",
+            email="user9502@example.com",
+        )
+    )
+    await test_db_session.commit()
+
+    capture = async_client._transport.app.state.capturing_notifications_service
+    capture.reset_captures()
+
+    response = await async_client.post(
+        "/auth/resend-otp",
+        json={"email": "user9502@example.com"},
+    )
+    assert response.status_code == 200
+    assert len(capture.dispatches) == 2
+    service_keys = {d["service_key"] for d in capture.dispatches}
+    assert service_keys == {"whatapi-otp", "email-otp"}
+
+
+@pytest.mark.asyncio
+async def test_resend_otp_via_whatsapp_only(async_client, test_db_session):
+    test_db_session.add(
+        User(
+            user_id=9503,
+            age=30,
+            phone="9503000003",
+            status="active",
+            email="user9503@example.com",
+        )
+    )
+    await test_db_session.commit()
+
+    capture = async_client._transport.app.state.capturing_notifications_service
+    capture.reset_captures()
+
+    response = await async_client.post(
+        "/auth/resend-otp",
+        json={"phone": "9503000003", "via": "whatsapp"},
+    )
+    assert response.status_code == 200
+    assert len(capture.dispatches) == 1
+    assert capture.last_dispatch["service_key"] == "whatapi-otp"
+
+
+@pytest.mark.asyncio
+async def test_resend_otp_via_email_only_from_phone_lookup(async_client, test_db_session):
+    test_db_session.add(
+        User(
+            user_id=9504,
+            age=30,
+            phone="9504000004",
+            status="active",
+            email="user9504@example.com",
+        )
+    )
+    await test_db_session.commit()
+
+    capture = async_client._transport.app.state.capturing_notifications_service
+    capture.reset_captures()
+
+    response = await async_client.post(
+        "/auth/resend-otp",
+        json={"phone": "9504000004", "via": "email"},
+    )
+    assert response.status_code == 200
+    assert len(capture.dispatches) == 1
+    assert capture.last_dispatch["service_key"] == "email-otp"
+
+
+@pytest.mark.asyncio
+async def test_resend_otp_via_whatsapp_from_email_lookup(async_client, test_db_session):
+    test_db_session.add(
+        User(
+            user_id=9505,
+            age=30,
+            phone="9505000005",
+            status="active",
+            email="user9505@example.com",
+        )
+    )
+    await test_db_session.commit()
+
+    capture = async_client._transport.app.state.capturing_notifications_service
+    capture.reset_captures()
+
+    response = await async_client.post(
+        "/auth/resend-otp",
+        json={"email": "user9505@example.com", "via": "whatsapp"},
+    )
+    assert response.status_code == 200
+    assert len(capture.dispatches) == 1
+    assert capture.last_dispatch["service_key"] == "whatapi-otp"
+
+
+@pytest.mark.asyncio
+async def test_resend_otp_phone_only_without_email_sends_whatsapp_only(async_client, test_db_session):
+    test_db_session.add(User(user_id=9506, age=30, phone="9506000006", status="active"))
+    await test_db_session.commit()
+
+    capture = async_client._transport.app.state.capturing_notifications_service
+    capture.reset_captures()
+
+    response = await async_client.post("/auth/resend-otp", json={"phone": "9506000006"})
+    assert response.status_code == 200
+    assert len(capture.dispatches) == 1
+    assert capture.last_dispatch["service_key"] == "whatapi-otp"
+
+
+@pytest.mark.asyncio
+async def test_resend_otp_via_email_fails_when_user_has_no_email(async_client, test_db_session):
+    test_db_session.add(User(user_id=9507, age=30, phone="9507000007", status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/auth/resend-otp",
+        json={"phone": "9507000007", "via": "email"},
+    )
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT"
+
+
+@pytest.mark.asyncio
+async def test_resend_otp_returns_404_for_unknown_user(async_client):
+    response = await async_client.post("/auth/resend-otp", json={"phone": "9507999999"})
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "USER_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_resend_otp_replaces_existing_session(async_client, test_db_session):
+    test_db_session.add(
+        User(
+            user_id=9508,
+            age=30,
+            phone="9508000008",
+            status="active",
+            email="user9508@example.com",
+        )
+    )
+    await test_db_session.commit()
+
+    first = await async_client.post("/auth/send-otp", json={"phone": "9508000008"})
+    first_session_id = first.json()["data"]["session_id"]
+
+    second = await async_client.post("/auth/resend-otp", json={"phone": "9508000008"})
+    second_session_id = second.json()["data"]["session_id"]
+    assert second_session_id != first_session_id
+
+    sessions = (
+        await test_db_session.execute(select(AuthOtpSession).where(AuthOtpSession.user_id == 9508))
+    ).scalars().all()
+    assert len(sessions) == 1
+    assert sessions[0].session_id == second_session_id

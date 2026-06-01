@@ -242,6 +242,111 @@ class AuthService:
 
         return created.session_id, delivery
 
+    async def _resolve_user_for_resend(
+        self,
+        db: AsyncSession,
+        *,
+        phone: str | None,
+        email: str | None,
+    ) -> User:
+        has_phone = phone is not None and phone.strip() != ""
+        has_email = email is not None and email.strip() != ""
+
+        user: User | None = None
+        if has_phone:
+            phone_candidates, _ = self._split_send_otp_phone(phone or "")
+            user = await self._resolve_user_for_otp(db, phone_candidates)
+        if user is None and has_email:
+            user = await self._resolve_user_for_otp_by_email(db, email or "")
+
+        if user is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        if has_phone and has_email:
+            normalized_email = (email or "").strip().lower()
+            account_email = (user.email or "").strip().lower()
+            if account_email and account_email != normalized_email:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="Phone and email do not match the same account",
+                )
+
+        return user
+
+    def _build_resend_otp_deliveries(
+        self,
+        *,
+        user: User,
+        via: str | None,
+        otp: str,
+    ) -> list[OtpDelivery]:
+        phone_service_key = settings.OTP_PHONE_SERVICE_KEY
+        email_service_key = settings.OTP_EMAIL_SERVICE_KEY
+
+        if via == "whatsapp":
+            return [OtpDelivery(user_id=user.user_id, otp=otp, service_key=phone_service_key)]
+
+        if via == "email":
+            if not (user.email and user.email.strip()):
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="User does not have an email on file",
+                )
+            return [OtpDelivery(user_id=user.user_id, otp=otp, service_key=email_service_key)]
+
+        deliveries = [OtpDelivery(user_id=user.user_id, otp=otp, service_key=phone_service_key)]
+        if user.email and user.email.strip():
+            deliveries.append(
+                OtpDelivery(user_id=user.user_id, otp=otp, service_key=email_service_key)
+            )
+        return deliveries
+
+    async def resend_otp(
+        self,
+        db: AsyncSession,
+        *,
+        phone: str | None = None,
+        email: str | None = None,
+        via: str | None = None,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> tuple[int, list[OtpDelivery]]:
+        user = await self._resolve_user_for_resend(db, phone=phone, email=email)
+
+        otp = str(secrets.randbelow(1_000_000)).zfill(6)
+        otp_hash = _hash_otp(otp, self._otp_secret())
+
+        now = datetime.now(timezone.utc)
+        expires_at = now + timedelta(minutes=5)
+
+        session = AuthOtpSession(
+            user_id=user.user_id,
+            otp_hash=otp_hash,
+            otp_expires_at=expires_at,
+            created_at=now,
+        )
+
+        await self._repository.delete_expired_otp_sessions(db)
+        await self._repository.delete_all_otp_sessions_for_user(db, user.user_id)
+        created = await self._repository.create_otp_session(db, session)
+
+        deliveries = self._build_resend_otp_deliveries(user=user, via=via, otp=otp)
+
+        await self._audit_service.log_event(
+            db,
+            action="AUTH_RESEND_OTP",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user.user_id,
+            session_id=created.session_id,
+        )
+
+        return created.session_id, deliveries
+
     async def deliver_otp_via_notifications(
         self,
         db: AsyncSession,

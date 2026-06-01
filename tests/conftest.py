@@ -167,6 +167,12 @@ class CapturingNotificationsService:
     def __init__(self):
         self.last_dispatch: dict | None = None
         self.last_otp: str | None = None
+        self.dispatches: list[dict] = []
+
+    def reset_captures(self) -> None:
+        self.last_dispatch = None
+        self.last_otp = None
+        self.dispatches = []
 
     async def dispatch(
         self,
@@ -175,11 +181,13 @@ class CapturingNotificationsService:
         payload,
         triggered_by_user_id: int | None = None,
     ) -> dict:
-        self.last_dispatch = {
+        captured = {
             "service_key": payload.service_key,
             "user_ids": list(payload.user_ids),
             "otp": payload.otp,
         }
+        self.last_dispatch = captured
+        self.dispatches.append(captured)
         self.last_otp = payload.otp
         return {
             "notification_id": 1,
