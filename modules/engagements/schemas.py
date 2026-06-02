@@ -30,6 +30,8 @@ class EngagementCreateRequest(BaseModel):
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
     notification_service_key: str | None = Field(default=None, max_length=200)
+    questionnaire_reminder_1: str | None = Field(default=None, max_length=200)
+    questionnaire_reminder_2: str | None = Field(default=None, max_length=200)
 
 
 class EngagementUpdateRequest(BaseModel):
@@ -51,6 +53,8 @@ class EngagementUpdateRequest(BaseModel):
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
     notification_service_key: str | None = Field(default=None, max_length=200)
+    questionnaire_reminder_1: str | None = Field(default=None, max_length=200)
+    questionnaire_reminder_2: str | None = Field(default=None, max_length=200)
 
 
 class EngagementStatusUpdateRequest(BaseModel):
@@ -78,6 +82,8 @@ class EngagementListItem(BaseModel):
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
     notification_service_key: str
+    questionnaire_reminder_1: str | None = None
+    questionnaire_reminder_2: str | None = None
     readiness: ChecklistReadiness
 
 

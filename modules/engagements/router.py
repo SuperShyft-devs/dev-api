@@ -128,6 +128,8 @@ async def list_engagements(
                 "create_profile_on_metsights": engagement.create_profile_on_metsights,
                 "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
                 "notification_service_key": engagement.notification_service_key,
+                "questionnaire_reminder_1": engagement.questionnaire_reminder_1,
+                "questionnaire_reminder_2": engagement.questionnaire_reminder_2,
                 "readiness": readiness.model_dump(mode="json"),
             }
         )
@@ -169,6 +171,8 @@ async def get_engagement_details(
             "create_profile_on_metsights": engagement.create_profile_on_metsights,
             "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
             "notification_service_key": engagement.notification_service_key,
+            "questionnaire_reminder_1": engagement.questionnaire_reminder_1,
+            "questionnaire_reminder_2": engagement.questionnaire_reminder_2,
         }
     )
 

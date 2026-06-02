@@ -12,7 +12,11 @@ from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
+from modules.engagements.repository import EngagementsRepository
+from modules.assessments.dependencies import get_assessment_package_categories_service
+from modules.metsights.dependencies import get_metsights_service
 from modules.notifications.dependencies import get_notifications_service
+from modules.notifications.questionnaire_reminders import dispatch_questionnaire_reminders
 from modules.notifications.schemas import (
     CallbackRequest,
     DispatchRequest,
@@ -62,6 +66,25 @@ async def dispatch_notification(
     svc: NotificationsService = Depends(get_notifications_service),
 ):
     result = await svc.dispatch(db, payload=payload)
+    await db.commit()
+    return success_response(result)
+
+
+# ── Questionnaire reminders (triggered by external scheduler) ────────────
+
+@router.post("/questionnaire-reminders/dispatch")
+async def dispatch_questionnaire_reminders_endpoint(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    svc: NotificationsService = Depends(get_notifications_service),
+):
+    result = await dispatch_questionnaire_reminders(
+        db,
+        notifications_service=svc,
+        engagements_repository=EngagementsRepository(),
+        metsights_service=get_metsights_service(),
+        categories_service=get_assessment_package_categories_service(),
+    )
     await db.commit()
     return success_response(result)
 

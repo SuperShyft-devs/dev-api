@@ -199,6 +199,13 @@ class EngagementsService:
             raise RuntimeError("Audit service is required")
         return self._audit_service
 
+    async def _validate_optional_notification_service_key(self, db: AsyncSession, raw: str | None) -> str | None:
+        """Return ``None`` when *raw* is empty/None, otherwise validate and return the key."""
+        key = (raw or "").strip()
+        if not key:
+            return None
+        return await self._validate_notification_service_key(db, key)
+
     async def _validate_notification_service_key(self, db: AsyncSession, raw: str | None) -> str:
         service_key = _resolve_notification_service_key(raw)
         svc = await self._notifications_repository.get_service_by_key(db, service_key=service_key)
@@ -306,6 +313,8 @@ class EngagementsService:
         notification_service_key = await self._validate_notification_service_key(
             db, payload.notification_service_key
         )
+        qr1 = await self._validate_optional_notification_service_key(db, payload.questionnaire_reminder_1)
+        qr2 = await self._validate_optional_notification_service_key(db, payload.questionnaire_reminder_2)
 
         engagement = Engagement(
             engagement_name=payload.engagement_name,
@@ -326,6 +335,8 @@ class EngagementsService:
             create_profile_on_metsights=payload.create_profile_on_metsights,
             enroll_for_fitprint_full=payload.enroll_for_fitprint_full,
             notification_service_key=notification_service_key,
+            questionnaire_reminder_1=qr1,
+            questionnaire_reminder_2=qr2,
         )
 
         engagement = await self._repository.create_engagement(db, engagement)
@@ -496,6 +507,12 @@ class EngagementsService:
         engagement.notification_service_key = await self._validate_notification_service_key(
             db, notif_key_raw
         )
+        engagement.questionnaire_reminder_1 = await self._validate_optional_notification_service_key(
+            db, payload.questionnaire_reminder_1
+        )
+        engagement.questionnaire_reminder_2 = await self._validate_optional_notification_service_key(
+            db, payload.questionnaire_reminder_2
+        )
 
         engagement = await self._repository.update_engagement(db, engagement)
 
@@ -631,6 +648,8 @@ class EngagementsService:
             create_profile_on_metsights=create_profile_on_metsights,
             enroll_for_fitprint_full=enroll_for_fitprint_full,
             notification_service_key=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
+            questionnaire_reminder_1=None,
+            questionnaire_reminder_2=None,
         )
         engagement = await self._repository.create_engagement(db, engagement)
 

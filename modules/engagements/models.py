@@ -59,6 +59,16 @@ class Engagement(Base):
         default=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
         server_default="booking-alert-whatsapp",
     )
+    questionnaire_reminder_1 = Column(
+        String,
+        ForeignKey("notification_services.service_key"),
+        nullable=True,
+    )
+    questionnaire_reminder_2 = Column(
+        String,
+        ForeignKey("notification_services.service_key"),
+        nullable=True,
+    )
 
 
 class OnboardingAssistantAssignment(Base):

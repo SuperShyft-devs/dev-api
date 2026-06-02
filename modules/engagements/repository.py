@@ -805,3 +805,34 @@ class EngagementsRepository:
         )
         result = await db.execute(query)
         return [(int(row.user_id), int(row.engagement_id)) for row in result.all()]
+
+    async def list_participants_for_questionnaire_reminder(
+        self,
+        db: AsyncSession,
+        *,
+        target_dates: list[date],
+    ) -> list[tuple[int, int, date, str | None, str | None]]:
+        """Return (user_id, engagement_id, engagement_date, questionnaire_reminder_1, questionnaire_reminder_2)
+        for running engagements with participants whose engagement_date is in *target_dates*."""
+        query = (
+            select(
+                EngagementParticipant.user_id,
+                EngagementParticipant.engagement_id,
+                EngagementParticipant.engagement_date,
+                Engagement.questionnaire_reminder_1,
+                Engagement.questionnaire_reminder_2,
+            )
+            .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
+            .where(self._running_engagement_status_filter())
+            .where(EngagementParticipant.engagement_date.in_(target_dates))
+            .distinct()
+            .order_by(
+                EngagementParticipant.engagement_id.asc(),
+                EngagementParticipant.user_id.asc(),
+            )
+        )
+        result = await db.execute(query)
+        return [
+            (int(row.user_id), int(row.engagement_id), row.engagement_date, row.questionnaire_reminder_1, row.questionnaire_reminder_2)
+            for row in result.all()
+        ]
