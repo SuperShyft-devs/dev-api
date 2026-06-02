@@ -206,6 +206,29 @@ class EngagementsService:
             return None
         return await self._validate_notification_service_key(db, key)
 
+    async def _validate_comma_separated_service_keys(self, db: AsyncSession, raw: str | None) -> str | None:
+        """Validate a comma-separated list of service keys. Returns the cleaned string or None."""
+        if not raw:
+            return None
+        keys = [k.strip() for k in raw.split(",") if k.strip()]
+        if not keys:
+            return None
+        for key in keys:
+            svc = await self._notifications_repository.get_service_by_key(db, service_key=key)
+            if svc is None:
+                raise AppError(
+                    status_code=404,
+                    error_code="NOTIFICATION_SERVICE_NOT_FOUND",
+                    message=f"Notification service '{key}' does not exist",
+                )
+            if not svc.is_active:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message=f"Notification service '{key}' is not active",
+                )
+        return ",".join(keys)
+
     async def _validate_notification_service_key(self, db: AsyncSession, raw: str | None) -> str:
         service_key = _resolve_notification_service_key(raw)
         svc = await self._notifications_repository.get_service_by_key(db, service_key=service_key)
@@ -313,8 +336,10 @@ class EngagementsService:
         notification_service_key = await self._validate_notification_service_key(
             db, payload.notification_service_key
         )
-        qr1 = await self._validate_optional_notification_service_key(db, payload.questionnaire_reminder_1)
-        qr2 = await self._validate_optional_notification_service_key(db, payload.questionnaire_reminder_2)
+        qr1 = await self._validate_comma_separated_service_keys(db, payload.questionnaire_reminder_1)
+        qr2 = await self._validate_comma_separated_service_keys(db, payload.questionnaire_reminder_2)
+        blood_notif = await self._validate_comma_separated_service_keys(db, payload.blood_report_notification)
+        bioai_notif = await self._validate_comma_separated_service_keys(db, payload.bioai_report_notification)
 
         engagement = Engagement(
             engagement_name=payload.engagement_name,
@@ -337,6 +362,8 @@ class EngagementsService:
             notification_service_key=notification_service_key,
             questionnaire_reminder_1=qr1,
             questionnaire_reminder_2=qr2,
+            blood_report_notification=blood_notif,
+            bioai_report_notification=bioai_notif,
         )
 
         engagement = await self._repository.create_engagement(db, engagement)
@@ -507,11 +534,17 @@ class EngagementsService:
         engagement.notification_service_key = await self._validate_notification_service_key(
             db, notif_key_raw
         )
-        engagement.questionnaire_reminder_1 = await self._validate_optional_notification_service_key(
+        engagement.questionnaire_reminder_1 = await self._validate_comma_separated_service_keys(
             db, payload.questionnaire_reminder_1
         )
-        engagement.questionnaire_reminder_2 = await self._validate_optional_notification_service_key(
+        engagement.questionnaire_reminder_2 = await self._validate_comma_separated_service_keys(
             db, payload.questionnaire_reminder_2
+        )
+        engagement.blood_report_notification = await self._validate_comma_separated_service_keys(
+            db, payload.blood_report_notification
+        )
+        engagement.bioai_report_notification = await self._validate_comma_separated_service_keys(
+            db, payload.bioai_report_notification
         )
 
         engagement = await self._repository.update_engagement(db, engagement)
@@ -650,6 +683,8 @@ class EngagementsService:
             notification_service_key=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
             questionnaire_reminder_1=None,
             questionnaire_reminder_2=None,
+            blood_report_notification=None,
+            bioai_report_notification=None,
         )
         engagement = await self._repository.create_engagement(db, engagement)
 

@@ -152,15 +152,16 @@ async def dispatch_questionnaire_reminders(
     if dry_run:
         for user_id, engagement_id, engagement_date, qr1, qr2 in participants:
             reminder_type = "reminder_1" if engagement_date == tomorrow else "reminder_2"
-            service_key = qr1 if engagement_date == tomorrow else qr2
+            raw_key = qr1 if engagement_date == tomorrow else qr2
+            keys = [k.strip() for k in (raw_key or "").split(",") if k.strip()]
             details.append({
                 "user_id": user_id,
                 "engagement_id": engagement_id,
                 "engagement_date": engagement_date.isoformat(),
                 "reminder_type": reminder_type,
-                "service_key": service_key,
+                "service_key": ",".join(keys) if keys else None,
                 "action": "dry_run",
-                "reason": "no service key configured" if not service_key else "would check and dispatch",
+                "reason": "no service key configured" if not keys else "would check and dispatch",
             })
         return {
             "as_of": today.isoformat(),
@@ -178,9 +179,9 @@ async def dispatch_questionnaire_reminders(
         reminder_type = "reminder_1" if engagement_date == tomorrow else "reminder_2"
 
         if engagement_date == tomorrow:
-            service_key = qr1
+            raw_service_keys = qr1
         elif engagement_date == yesterday:
-            service_key = qr2
+            raw_service_keys = qr2
         else:
             skipped += 1
             details.append({
@@ -191,7 +192,8 @@ async def dispatch_questionnaire_reminders(
             })
             continue
 
-        if not service_key:
+        service_keys = [k.strip() for k in (raw_service_keys or "").split(",") if k.strip()]
+        if not service_keys:
             skipped += 1
             details.append({
                 "user_id": user_id, "engagement_id": engagement_id,
@@ -226,7 +228,7 @@ async def dispatch_questionnaire_reminders(
                 details.append({
                     "user_id": user_id, "engagement_id": engagement_id,
                     "engagement_date": engagement_date.isoformat(),
-                    "reminder_type": reminder_type, "service_key": service_key,
+                    "reminder_type": reminder_type, "service_key": ",".join(service_keys),
                     "action": "skipped",
                     "reason": "questionnaire complete on Metsights",
                 })
@@ -244,26 +246,27 @@ async def dispatch_questionnaire_reminders(
                 details.append({
                     "user_id": user_id, "engagement_id": engagement_id,
                     "engagement_date": engagement_date.isoformat(),
-                    "reminder_type": reminder_type, "service_key": service_key,
+                    "reminder_type": reminder_type, "service_key": ",".join(service_keys),
                     "action": "skipped",
                     "reason": "questionnaire complete in internal DB",
                 })
                 continue
 
-            await notifications_service.dispatch(
-                db,
-                payload=DispatchRequest(
-                    service_key=service_key,
-                    user_ids=[user_id],
-                    engagement_id=engagement_id,
-                ),
-                triggered_by_user_id=None,
-            )
+            for sk in service_keys:
+                await notifications_service.dispatch(
+                    db,
+                    payload=DispatchRequest(
+                        service_key=sk,
+                        user_ids=[user_id],
+                        engagement_id=engagement_id,
+                    ),
+                    triggered_by_user_id=None,
+                )
             sent += 1
             details.append({
                 "user_id": user_id, "engagement_id": engagement_id,
                 "engagement_date": engagement_date.isoformat(),
-                "reminder_type": reminder_type, "service_key": service_key,
+                "reminder_type": reminder_type, "service_key": ",".join(service_keys),
                 "action": "sent",
                 "reason": "questionnaire incomplete in both Metsights and internal DB",
             })
@@ -273,7 +276,7 @@ async def dispatch_questionnaire_reminders(
             details.append({
                 "user_id": user_id, "engagement_id": engagement_id,
                 "engagement_date": engagement_date.isoformat(),
-                "reminder_type": reminder_type, "service_key": service_key,
+                "reminder_type": reminder_type, "service_key": ",".join(service_keys),
                 "action": "failed",
                 "reason": str(exc),
             })

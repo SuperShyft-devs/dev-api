@@ -130,6 +130,8 @@ async def list_engagements(
                 "notification_service_key": engagement.notification_service_key,
                 "questionnaire_reminder_1": engagement.questionnaire_reminder_1,
                 "questionnaire_reminder_2": engagement.questionnaire_reminder_2,
+                "blood_report_notification": engagement.blood_report_notification,
+                "bioai_report_notification": engagement.bioai_report_notification,
                 "readiness": readiness.model_dump(mode="json"),
             }
         )
@@ -173,6 +175,8 @@ async def get_engagement_details(
             "notification_service_key": engagement.notification_service_key,
             "questionnaire_reminder_1": engagement.questionnaire_reminder_1,
             "questionnaire_reminder_2": engagement.questionnaire_reminder_2,
+            "blood_report_notification": engagement.blood_report_notification,
+            "bioai_report_notification": engagement.bioai_report_notification,
         }
     )
 
