@@ -129,7 +129,7 @@ def _services():
 
 
 @pytest.mark.asyncio
-async def test_pretest_reminders_early_window(test_db_session, monkeypatch):
+async def test_pretest_reminders_all_participants(test_db_session, monkeypatch):
     await _seed_dependencies(test_db_session)
     await _insert_engagement(
         test_db_session, engagement_id=9601, engagement_code="ENG9601", status="running"
@@ -171,17 +171,16 @@ async def test_pretest_reminders_early_window(test_db_session, monkeypatch):
         notifications_service=notifications_service,
         notifications_repository=notifications_repository,
         engagements_repository=engagements_repository,
-        window="early",
         as_of=as_of,
         dry_run=False,
     )
     await test_db_session.commit()
 
-    assert result["matched"] == 2
-    assert result["whatsapp_sent"] == 2
-    assert result["email_sent"] == 2
+    assert result["matched"] == 3
+    assert result["whatsapp_sent"] == 3
+    assert result["email_sent"] == 3
     assert result["failed"] == 0
-    assert len(webhook_calls) == 4
+    assert len(webhook_calls) == 6
 
     user_ids_per_call = [call["json"]["members"][0] for call in webhook_calls]
     assert all("phone" in m or "email" in m for m in user_ids_per_call)
@@ -189,55 +188,7 @@ async def test_pretest_reminders_early_window(test_db_session, monkeypatch):
     notification_count = (
         await test_db_session.execute(text("SELECT COUNT(*) FROM notifications"))
     ).scalar_one()
-    assert notification_count == 4
-
-
-@pytest.mark.asyncio
-async def test_pretest_reminders_late_window(test_db_session, monkeypatch):
-    await _seed_dependencies(test_db_session)
-    await _insert_engagement(
-        test_db_session, engagement_id=9602, engagement_code="ENG9602", status="running"
-    )
-    collection_date = "2026-06-02"
-    as_of = date(2026, 6, 1)
-    await _insert_participant(
-        test_db_session,
-        engagement_id=9602,
-        user_id=96021,
-        engagement_date=collection_date,
-        slot_start_time="09:00:00",
-    )
-    await _insert_participant(
-        test_db_session,
-        engagement_id=9602,
-        user_id=96022,
-        engagement_date=collection_date,
-        slot_start_time="10:00:00",
-    )
-    await test_db_session.commit()
-
-    webhook_calls: list[dict] = []
-    monkeypatch.setattr(
-        "modules.notifications.service.httpx.AsyncClient",
-        _fake_httpx_client(webhook_calls),
-    )
-
-    notifications_service, notifications_repository, engagements_repository = _services()
-    result = await dispatch_pretest_reminders(
-        test_db_session,
-        notifications_service=notifications_service,
-        notifications_repository=notifications_repository,
-        engagements_repository=engagements_repository,
-        window="late",
-        as_of=as_of,
-        dry_run=False,
-    )
-    await test_db_session.commit()
-
-    assert result["matched"] == 1
-    assert result["whatsapp_sent"] == 1
-    assert result["email_sent"] == 1
-    assert len(webhook_calls) == 2
+    assert notification_count == 6
 
 
 @pytest.mark.asyncio
@@ -269,7 +220,6 @@ async def test_pretest_reminders_excludes_completed_engagements(test_db_session,
         notifications_service=notifications_service,
         notifications_repository=notifications_repository,
         engagements_repository=engagements_repository,
-        window="early",
         as_of=as_of,
         dry_run=False,
     )
@@ -308,7 +258,6 @@ async def test_pretest_reminders_dry_run_does_not_dispatch(test_db_session, monk
         notifications_service=notifications_service,
         notifications_repository=notifications_repository,
         engagements_repository=engagements_repository,
-        window="early",
         as_of=as_of,
         dry_run=True,
     )
@@ -353,7 +302,6 @@ async def test_pretest_reminders_one_user_id_per_dispatch(test_db_session, monke
         notifications_service=notifications_service,
         notifications_repository=notifications_repository,
         engagements_repository=engagements_repository,
-        window="early",
         as_of=as_of,
         dry_run=False,
     )

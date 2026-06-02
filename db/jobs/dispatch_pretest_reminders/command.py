@@ -1,18 +1,15 @@
 """Dispatch pretest blood-collection reminder notifications.
 
-Finds participants in running engagements whose collection date is tomorrow (IST),
-filtered by morning vs afternoon slot window, and dispatches pretest WhatsApp and
-email notifications. Intended to run twice daily via an external scheduler.
+Finds participants in running engagements whose collection date is tomorrow (IST)
+and dispatches pretest WhatsApp and email notifications. Intended to run once daily
+via an external scheduler.
 
 Production example (Linux cron, IST):
 
-    # 6pm IST — early slots (collection tomorrow, slot <= 09:00)
-    0 18 * * * cd /path/to/dev-api && TZ=Asia/Kolkata /path/to/venv/bin/python -m db.jobs.dispatch_pretest_reminders --window early --yes >> /var/log/supershyft/pretest-reminders-early.log 2>&1
+    # 4pm IST — all participants with blood collection tomorrow
+    30 16 * * * cd /path/to/dev-api && TZ=Asia/Kolkata /path/to/venv/bin/python -m db.jobs.dispatch_pretest_reminders --yes >> /var/log/supershyft/pretest-reminders.log 2>&1
 
-    # 9pm IST — late slots (collection tomorrow, slot > 09:00)
-    0 21 * * * cd /path/to/dev-api && TZ=Asia/Kolkata /path/to/venv/bin/python -m db.jobs.dispatch_pretest_reminders --window late --yes >> /var/log/supershyft/pretest-reminders-late.log 2>&1
-
-Entrypoint: ``python -m db.jobs.dispatch_pretest_reminders --window early|late --yes``
+Entrypoint: ``python -m db.jobs.dispatch_pretest_reminders --yes``
 """
 
 from __future__ import annotations
@@ -25,7 +22,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from core.config import settings
 from modules.engagements.repository import EngagementsRepository
-from modules.notifications.pretest_reminders import PretestWindow, dispatch_pretest_reminders
+from modules.notifications.pretest_reminders import dispatch_pretest_reminders
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.service import NotificationsService
 
@@ -34,7 +31,6 @@ async def run_dispatch_pretest_reminders(
     *,
     yes: bool,
     dry_run: bool,
-    window: PretestWindow,
     as_of: date | None,
 ) -> dict:
     settings.validate()
@@ -62,7 +58,6 @@ async def run_dispatch_pretest_reminders(
                 notifications_service=notifications_service,
                 notifications_repository=NotificationsRepository(),
                 engagements_repository=engagements_repository,
-                window=window,
                 as_of=as_of,
                 dry_run=dry_run,
             )
@@ -84,15 +79,6 @@ def _build_parser() -> argparse.ArgumentParser:
             "Dispatch pretest WhatsApp and email reminders for participants with blood collection "
             "tomorrow (IST) in running engagements."
         )
-    )
-    parser.add_argument(
-        "--window",
-        required=True,
-        choices=("early", "late"),
-        help=(
-            "early: collection tomorrow with slot <= 09:00 (6pm cron). "
-            "late: collection tomorrow with slot > 09:00 (9pm cron)."
-        ),
     )
     parser.add_argument(
         "--yes",
@@ -120,13 +106,12 @@ def main(argv: list[str] | None = None) -> int:
         run_dispatch_pretest_reminders(
             yes=args.yes,
             dry_run=args.dry_run,
-            window=args.window,
             as_of=args.as_of,
         )
     )
     mode = "dry-run" if result["dry_run"] else "applied"
     print(
-        f"Dispatch pretest reminders ({mode}): window={result['window']}, "
+        f"Dispatch pretest reminders ({mode}): "
         f"as_of={result['as_of']}, collection_date={result['collection_date']}, "
         f"matched={result['matched']}, whatsapp_sent={result['whatsapp_sent']}, "
         f"email_sent={result['email_sent']}, failed={result['failed']}"

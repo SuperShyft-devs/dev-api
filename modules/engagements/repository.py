@@ -5,8 +5,7 @@ Only database queries live here.
 
 from __future__ import annotations
 
-from datetime import date, time
-from typing import Literal
+from datetime import date
 
 from sqlalchemy import String, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -776,27 +775,18 @@ class EngagementsRepository:
         result = await db.execute(stmt)
         return int(result.rowcount or 0)
 
-    _PRETEST_EARLY_SLOT_CUTOFF = time(9, 0)
-
     async def list_participants_for_pretest_reminder(
         self,
         db: AsyncSession,
         *,
         collection_date: date,
-        window: Literal["early", "late"],
     ) -> list[tuple[int, int]]:
         """Return (user_id, engagement_id) for running engagements with collection on collection_date."""
-        slot_filter = (
-            EngagementParticipant.slot_start_time <= self._PRETEST_EARLY_SLOT_CUTOFF
-            if window == "early"
-            else EngagementParticipant.slot_start_time > self._PRETEST_EARLY_SLOT_CUTOFF
-        )
         query = (
             select(EngagementParticipant.user_id, EngagementParticipant.engagement_id)
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
             .where(self._running_engagement_status_filter())
             .where(EngagementParticipant.engagement_date == collection_date)
-            .where(slot_filter)
             .distinct()
             .order_by(
                 EngagementParticipant.engagement_id.asc(),

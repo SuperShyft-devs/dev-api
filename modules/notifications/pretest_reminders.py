@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import Literal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +19,6 @@ logger = logging.getLogger(__name__)
 PRETEST_WHATSAPP_KEY = "pretest-whatsapp"
 PRETEST_EMAIL_KEY = "pretest-email"
 _IST = ZoneInfo("Asia/Kolkata")
-PretestWindow = Literal["early", "late"]
 
 
 def tomorrow_in_ist(*, as_of: date | None = None) -> date:
@@ -52,7 +50,6 @@ async def dispatch_pretest_reminders(
     notifications_service: NotificationsService,
     notifications_repository: NotificationsRepository,
     engagements_repository: EngagementsRepository,
-    window: PretestWindow,
     as_of: date | None = None,
     dry_run: bool = False,
 ) -> dict[str, int | str | bool]:
@@ -66,7 +63,6 @@ async def dispatch_pretest_reminders(
     participants = await engagements_repository.list_participants_for_pretest_reminder(
         db,
         collection_date=collection_date,
-        window=window,
     )
 
     matched = len(participants)
@@ -76,7 +72,6 @@ async def dispatch_pretest_reminders(
 
     if dry_run:
         return {
-            "window": window,
             "as_of": (as_of or datetime.now(_IST).date()).isoformat(),
             "collection_date": collection_date.isoformat(),
             "matched": matched,
@@ -113,7 +108,6 @@ async def dispatch_pretest_reminders(
                 )
 
     return {
-        "window": window,
         "as_of": (as_of or datetime.now(_IST).date()).isoformat(),
         "collection_date": collection_date.isoformat(),
         "matched": matched,
