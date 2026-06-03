@@ -34,7 +34,12 @@ async def _get_eligible_participants(
     db: AsyncSession,
     today: date,
 ) -> list[tuple]:
-    """Return participants with complete assessments where today >= engagement_date."""
+    """Return participants with complete assessments where today >= engagement_date.
+
+    Includes both MetSights Pro/Basic and FitPrint instances.  The IHR is
+    joined on ``assessment_instance_id`` so each assessment type gets its own
+    report row.
+    """
     query = (
         select(
             EngagementParticipant.user_id,
@@ -56,14 +61,14 @@ async def _get_eligible_participants(
         .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
         .outerjoin(
             IndividualHealthReport,
-            (IndividualHealthReport.user_id == EngagementParticipant.user_id)
-            & (IndividualHealthReport.engagement_id == EngagementParticipant.engagement_id),
+            (IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id),
         )
         .where(Engagement.status.ilike("running"))
         .where(AssessmentInstance.status == "complete")
         .where(EngagementParticipant.engagement_date <= today)
         .where(AssessmentInstance.metsights_record_id.isnot(None))
         .where(AssessmentInstance.metsights_record_id != "")
+        .where(AssessmentPackage.assessment_type_code.in_(_PRO_BASIC_TYPE_CODES | _FITPRINT_TYPE_CODES))
     )
     result = await db.execute(query)
     return result.all()
