@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 _METSIGHTS_PRO_BASIC_TYPE_CODES = {"1", "2"}
 _FITPRINT_TYPE_CODES = {"7"}
 
-_PRIMARY_RESOURCES = ("physical-measurement", "vitals", "diet-lifestyle-parameters")
-_FITNESS_RESOURCE = "fitness-parameters"
+_PRIMARY_SUB_KEYS = ("physical_measurement", "vital_parameter", "diet_lifestyle_parameter")
+_FITNESS_SUB_KEY = "fitness_parameter"
 
 
 async def _get_running_engagement_instances(
@@ -58,23 +58,49 @@ async def _check_any_subresource_complete(
     record_id: str,
     type_code: str,
 ) -> bool:
-    """Return True if any relevant sub-resource on MetSights has is_complete=True."""
+    """Fetch the full record detail from MetSights and check if any relevant
+    embedded sub-resource has ``is_complete=True``.
+
+    Uses ``GET /records/:id/`` (single call) instead of per-resource calls
+    so FitPrint records are handled correctly via the ``fitness_parameter``
+    embedded object.
+    """
     if type_code in _METSIGHTS_PRO_BASIC_TYPE_CODES:
-        resources = _PRIMARY_RESOURCES
+        sub_keys = _PRIMARY_SUB_KEYS
     elif type_code in _FITPRINT_TYPE_CODES:
-        resources = (_FITNESS_RESOURCE,)
+        sub_keys = (_FITNESS_SUB_KEY,)
     else:
+        logger.debug(
+            "Unknown type_code=%r for record=%s, skipping sub-resource check",
+            type_code, record_id,
+        )
         return False
 
-    for resource in resources:
-        try:
-            data = await metsights_service.get_record_subresource_or_none(
-                record_id=record_id, resource=resource
+    try:
+        record_data = await metsights_service.get_record_detail(record_id=record_id)
+    except Exception as exc:
+        logger.warning(
+            "Failed to fetch record detail from MetSights for record=%s: %s",
+            record_id, exc,
+        )
+        return False
+
+    if not isinstance(record_data, dict):
+        logger.warning("MetSights record detail for %s is not a dict: %r", record_id, type(record_data))
+        return False
+
+    for key in sub_keys:
+        sub = record_data.get(key)
+        if isinstance(sub, dict) and sub.get("is_complete", False):
+            logger.debug(
+                "record=%s sub-resource %s is_complete=True", record_id, key,
             )
-            if data is not None and data.get("is_complete", False):
-                return True
-        except Exception:
-            continue
+            return True
+
+    logger.debug(
+        "record=%s type_code=%s — no sub-resource complete (checked: %s)",
+        record_id, type_code, ", ".join(sub_keys),
+    )
     return False
 
 

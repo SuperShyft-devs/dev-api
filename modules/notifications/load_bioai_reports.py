@@ -44,7 +44,7 @@ async def _get_eligible_participants(
             IndividualHealthReport.reports,
             IndividualHealthReport.report_url,
             Engagement.bioai_report_notification,
-            IndividualHealthReport.individual_health_report_id,
+            IndividualHealthReport.report_id,
             AssessmentInstance.assessment_instance_id,
         )
         .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
@@ -140,7 +140,7 @@ async def load_bioai_reports(
                 if ihr_id:
                     ihr_result = await db.execute(
                         select(IndividualHealthReport).where(
-                            IndividualHealthReport.individual_health_report_id == ihr_id
+                            IndividualHealthReport.report_id == ihr_id
                         )
                     )
                     ihr = ihr_result.scalar_one_or_none()
