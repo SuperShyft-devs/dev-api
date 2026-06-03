@@ -185,23 +185,8 @@ async def load_blood_reports(
 
                 access_token = await healthians_client.get_access_token()
 
-                ihr = None
-                if ihr_id:
-                    ihr_result = await db.execute(
-                        select(IndividualHealthReport).where(
-                            IndividualHealthReport.report_id == ihr_id
-                        )
-                    )
-                    ihr = ihr_result.scalar_one_or_none()
-
-                if ihr is None:
-                    ihr = IndividualHealthReport(
-                        user_id=user_id,
-                        engagement_id=engagement_id,
-                        assessment_instance_id=instance_id,
-                    )
-                    db.add(ihr)
-                    await db.flush()
+                fetched_blood = None
+                fetched_diag_url = None
 
                 if needs_blood:
                     try:
@@ -214,7 +199,7 @@ async def load_blood_reports(
                                 data_list, first_name or "", last_name or ""
                             )
                             if matched_entry:
-                                ihr.blood_parameters = matched_entry
+                                fetched_blood = matched_entry
                     except Exception as exc:
                         logger.warning(
                             "Healthians getBookingDigitalValue failed for user=%s booking=%s: %s",
@@ -232,12 +217,43 @@ async def load_blood_reports(
                                 report_list, first_name or "", last_name or ""
                             )
                             if matched_report:
-                                ihr.diagnostic_report_url = matched_report.get("report_url") or matched_report.get("url")
+                                fetched_diag_url = matched_report.get("report_url") or matched_report.get("url")
                     except Exception as exc:
                         logger.warning(
                             "Healthians getBookingReport failed for user=%s booking=%s: %s",
                             user_id, reference_id, exc,
                         )
+
+                if fetched_blood is None and fetched_diag_url is None:
+                    skipped += 1
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped", "reason": "no data returned from Healthians",
+                    })
+                    continue
+
+                ihr = None
+                if ihr_id:
+                    ihr_result = await db.execute(
+                        select(IndividualHealthReport).where(
+                            IndividualHealthReport.report_id == ihr_id
+                        )
+                    )
+                    ihr = ihr_result.scalar_one_or_none()
+
+                if ihr is None:
+                    ihr = IndividualHealthReport(
+                        user_id=user_id,
+                        engagement_id=engagement_id,
+                        assessment_instance_id=instance_id,
+                    )
+                    db.add(ihr)
+
+                if fetched_blood is not None:
+                    ihr.blood_parameters = fetched_blood
+                if fetched_diag_url is not None:
+                    ihr.diagnostic_report_url = fetched_diag_url
+                await db.flush()
 
                 loaded += 1
                 details.append({

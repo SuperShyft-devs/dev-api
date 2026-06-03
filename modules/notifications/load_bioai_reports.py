@@ -136,6 +136,45 @@ async def load_bioai_reports(
             needs_url = existing_report_url is None
 
             if needs_reports or needs_url:
+                fetched_reports = None
+                fetched_url = None
+
+                if needs_reports:
+                    try:
+                        report_data = await metsights_service.get_report(
+                            record_id=record_id, assessment_type_code=type_code,
+                        )
+                        if report_data:
+                            fetched_reports = report_data
+                    except Exception as exc:
+                        logger.warning(
+                            "MetSights get_report failed for record=%s: %s",
+                            record_id, exc,
+                        )
+
+                if needs_url:
+                    try:
+                        pdf_data = await metsights_service.get_report_pdf(
+                            record_id=record_id, assessment_type_code=type_code,
+                        )
+                        if pdf_data:
+                            file_url = pdf_data.get("file") or pdf_data.get("url")
+                            if file_url:
+                                fetched_url = file_url
+                    except Exception as exc:
+                        logger.warning(
+                            "MetSights get_report_pdf failed for record=%s: %s",
+                            record_id, exc,
+                        )
+
+                if fetched_reports is None and fetched_url is None:
+                    skipped += 1
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped", "reason": "no report data returned from MetSights",
+                    })
+                    continue
+
                 ihr = None
                 if ihr_id:
                     ihr_result = await db.execute(
@@ -152,35 +191,12 @@ async def load_bioai_reports(
                         assessment_instance_id=instance_id,
                     )
                     db.add(ihr)
-                    await db.flush()
 
-                if needs_reports:
-                    try:
-                        report_data = await metsights_service.get_report(
-                            record_id=record_id, assessment_type_code=type_code,
-                        )
-                        if report_data:
-                            ihr.reports = report_data
-                    except Exception as exc:
-                        logger.warning(
-                            "MetSights get_report failed for record=%s: %s",
-                            record_id, exc,
-                        )
-
-                if needs_url:
-                    try:
-                        pdf_data = await metsights_service.get_report_pdf(
-                            record_id=record_id, assessment_type_code=type_code,
-                        )
-                        if pdf_data:
-                            file_url = pdf_data.get("file") or pdf_data.get("url")
-                            if file_url:
-                                ihr.report_url = file_url
-                    except Exception as exc:
-                        logger.warning(
-                            "MetSights get_report_pdf failed for record=%s: %s",
-                            record_id, exc,
-                        )
+                if fetched_reports is not None:
+                    ihr.reports = fetched_reports
+                if fetched_url is not None:
+                    ihr.report_url = fetched_url
+                await db.flush()
 
                 loaded += 1
                 details.append({
