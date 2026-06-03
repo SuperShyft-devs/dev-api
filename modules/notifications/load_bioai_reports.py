@@ -149,6 +149,7 @@ async def load_bioai_reports(
                     ihr = IndividualHealthReport(
                         user_id=user_id,
                         engagement_id=engagement_id,
+                        assessment_instance_id=instance_id,
                     )
                     db.add(ihr)
                     await db.flush()
@@ -220,10 +221,11 @@ async def load_bioai_reports(
                     })
 
         except Exception as exc:
+            await db.rollback()
             failed += 1
             details.append({
                 "user_id": user_id, "engagement_id": engagement_id,
-                "action": "failed", "reason": str(exc),
+                "action": "failed", "reason": str(exc)[:200],
             })
             logger.warning(
                 "load_bioai_reports failed: user=%s engagement=%s: %s",

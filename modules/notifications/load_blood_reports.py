@@ -155,7 +155,15 @@ async def load_blood_reports(
             needs_diag = diag_url is None
 
             if needs_blood or needs_diag:
-                collection_data = await metsights_service.get_fetch_collections(record_id=record_id)
+                try:
+                    collection_data = await metsights_service.get_fetch_collections(record_id=record_id)
+                except Exception:
+                    skipped += 1
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped", "reason": "fetch-collections not available for this record",
+                    })
+                    continue
                 reference_id = str(collection_data.get("reference_id") or "").strip()
                 provider = str(collection_data.get("provider") or "").strip().lower()
 
@@ -190,6 +198,7 @@ async def load_blood_reports(
                     ihr = IndividualHealthReport(
                         user_id=user_id,
                         engagement_id=engagement_id,
+                        assessment_instance_id=instance_id,
                     )
                     db.add(ihr)
                     await db.flush()
@@ -266,10 +275,11 @@ async def load_blood_reports(
                     })
 
         except Exception as exc:
+            await db.rollback()
             failed += 1
             details.append({
                 "user_id": user_id, "engagement_id": engagement_id,
-                "action": "failed", "reason": str(exc),
+                "action": "failed", "reason": str(exc)[:200],
             })
             logger.warning(
                 "load_blood_reports failed: user=%s engagement=%s: %s",

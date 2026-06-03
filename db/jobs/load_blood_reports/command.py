@@ -48,14 +48,14 @@ async def run_load(
     notifications_service = NotificationsService(NotificationsRepository())
 
     async with session_factory() as session:
-        async with session.begin():
-            result = await load_blood_reports(
-                session,
-                metsights_service=metsights_service,
-                notifications_service=notifications_service,
-                as_of=as_of,
-                dry_run=dry_run,
-            )
+        result = await load_blood_reports(
+            session,
+            metsights_service=metsights_service,
+            notifications_service=notifications_service,
+            as_of=as_of,
+            dry_run=dry_run,
+        )
+        await session.commit()
 
     await engine.dispose()
     return result
