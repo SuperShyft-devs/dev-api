@@ -47,7 +47,7 @@ class SupportService:
         if user is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
-        for value in (user.email, user.phone):
+        for value in (user.phone, user.email):
             normalized = str(value or "").strip()
             if normalized:
                 return normalized[:255]
