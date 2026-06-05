@@ -11,6 +11,8 @@ from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.support.models import SupportTicket
 from modules.support.repository import SupportRepository
+from modules.support.schemas import SupportTicketCreate
+from modules.users.repository import UsersRepository
 
 
 _ALLOWED_STATUS = {"open", "resolved", "closed"}
@@ -19,9 +21,15 @@ _ALLOWED_STATUS = {"open", "resolved", "closed"}
 class SupportService:
     """Support service layer."""
 
-    def __init__(self, repository: SupportRepository, audit_service: AuditService | None = None):
+    def __init__(
+        self,
+        repository: SupportRepository,
+        audit_service: AuditService | None = None,
+        users_repository: UsersRepository | None = None,
+    ):
         self._repository = repository
         self._audit_service = audit_service
+        self._users_repository = users_repository or UsersRepository()
 
     def _require_audit_service(self) -> AuditService:
         if self._audit_service is None:
@@ -34,19 +42,36 @@ class SupportService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         return normalized
 
+    async def _resolve_contact_input(self, db: AsyncSession, user_id: int) -> str:
+        user = await self._users_repository.get_user_by_id(db, user_id)
+        if user is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        for value in (user.email, user.phone):
+            normalized = str(value or "").strip()
+            if normalized:
+                return normalized[:255]
+
+        return str(user_id)
+
     async def submit_ticket(
         self,
         db: AsyncSession,
         *,
-        data,
-        user_id: int | None = None,
+        data: SupportTicketCreate,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> SupportTicket:
+        user_id = data.user_id
+        contact_input = await self._resolve_contact_input(db, user_id)
+
         ticket = await self._repository.create_ticket(
             db,
-            data=data.model_dump(),
+            data={
+                "query_text": data.query_text,
+                "contact_input": contact_input,
+            },
             user_id=user_id,
         )
 

@@ -45,7 +45,6 @@ async def submit_ticket(
     ticket = await support_service.submit_ticket(
         db,
         data=payload,
-        user_id=None,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
