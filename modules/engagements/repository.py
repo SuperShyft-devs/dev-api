@@ -780,10 +780,14 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         collection_date: date,
-    ) -> list[tuple[int, int]]:
-        """Return (user_id, engagement_id) for running engagements with collection on collection_date."""
+    ) -> list[tuple[int, int, str | None]]:
+        """Return (user_id, engagement_id, pretest_guidelines_notification) for running engagements with collection on collection_date."""
         query = (
-            select(EngagementParticipant.user_id, EngagementParticipant.engagement_id)
+            select(
+                EngagementParticipant.user_id,
+                EngagementParticipant.engagement_id,
+                Engagement.pretest_guidelines_notification,
+            )
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
             .where(self._running_engagement_status_filter())
             .where(EngagementParticipant.engagement_date == collection_date)
@@ -794,7 +798,10 @@ class EngagementsRepository:
             )
         )
         result = await db.execute(query)
-        return [(int(row.user_id), int(row.engagement_id)) for row in result.all()]
+        return [
+            (int(row.user_id), int(row.engagement_id), row.pretest_guidelines_notification)
+            for row in result.all()
+        ]
 
     async def list_participants_for_questionnaire_reminder(
         self,

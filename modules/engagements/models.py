@@ -59,6 +59,7 @@ class Engagement(Base):
         default=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
         server_default="booking-alert-whatsapp",
     )
+    pretest_guidelines_notification = Column(String, nullable=True)
     questionnaire_reminder_1 = Column(String, nullable=True)
     questionnaire_reminder_2 = Column(String, nullable=True)
     blood_report_notification = Column(String, nullable=True)

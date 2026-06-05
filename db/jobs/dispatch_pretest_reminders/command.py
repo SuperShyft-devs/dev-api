@@ -1,8 +1,8 @@
 """Dispatch pretest blood-collection reminder notifications.
 
 Finds participants in running engagements whose collection date is tomorrow (IST)
-and dispatches pretest WhatsApp and email notifications. Intended to run once daily
-via an external scheduler.
+and dispatches notifications using each engagement's pretest_guidelines_notification
+service keys. Intended to run once daily via an external scheduler.
 
 Production example (Linux cron, IST):
 
@@ -56,7 +56,6 @@ async def run_dispatch_pretest_reminders(
             result = await dispatch_pretest_reminders(
                 session,
                 notifications_service=notifications_service,
-                notifications_repository=NotificationsRepository(),
                 engagements_repository=engagements_repository,
                 as_of=as_of,
                 dry_run=dry_run,
@@ -76,8 +75,9 @@ def _parse_as_of(value: str) -> date:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Dispatch pretest WhatsApp and email reminders for participants with blood collection "
-            "tomorrow (IST) in running engagements."
+            "Dispatch pretest guideline reminders for participants with blood collection "
+            "tomorrow (IST) in running engagements, using each engagement's "
+            "pretest_guidelines_notification service keys."
         )
     )
     parser.add_argument(
@@ -113,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"Dispatch pretest reminders ({mode}): "
         f"as_of={result['as_of']}, collection_date={result['collection_date']}, "
-        f"matched={result['matched']}, whatsapp_sent={result['whatsapp_sent']}, "
-        f"email_sent={result['email_sent']}, failed={result['failed']}"
+        f"matched={result['matched']}, sent={result['sent']}, "
+        f"skipped={result['skipped']}, failed={result['failed']}"
     )
     return 0

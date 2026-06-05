@@ -336,6 +336,9 @@ class EngagementsService:
         notification_service_key = await self._validate_notification_service_key(
             db, payload.notification_service_key
         )
+        pretest_notif = await self._validate_comma_separated_service_keys(
+            db, payload.pretest_guidelines_notification
+        )
         qr1 = await self._validate_comma_separated_service_keys(db, payload.questionnaire_reminder_1)
         qr2 = await self._validate_comma_separated_service_keys(db, payload.questionnaire_reminder_2)
         blood_notif = await self._validate_comma_separated_service_keys(db, payload.blood_report_notification)
@@ -360,6 +363,7 @@ class EngagementsService:
             create_profile_on_metsights=payload.create_profile_on_metsights,
             enroll_for_fitprint_full=payload.enroll_for_fitprint_full,
             notification_service_key=notification_service_key,
+            pretest_guidelines_notification=pretest_notif,
             questionnaire_reminder_1=qr1,
             questionnaire_reminder_2=qr2,
             blood_report_notification=blood_notif,
@@ -534,6 +538,9 @@ class EngagementsService:
         engagement.notification_service_key = await self._validate_notification_service_key(
             db, notif_key_raw
         )
+        engagement.pretest_guidelines_notification = await self._validate_comma_separated_service_keys(
+            db, payload.pretest_guidelines_notification
+        )
         engagement.questionnaire_reminder_1 = await self._validate_comma_separated_service_keys(
             db, payload.questionnaire_reminder_1
         )
@@ -681,6 +688,7 @@ class EngagementsService:
             create_profile_on_metsights=create_profile_on_metsights,
             enroll_for_fitprint_full=enroll_for_fitprint_full,
             notification_service_key=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
+            pretest_guidelines_notification=None,
             questionnaire_reminder_1=None,
             questionnaire_reminder_2=None,
             blood_report_notification=None,

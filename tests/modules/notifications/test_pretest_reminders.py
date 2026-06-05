@@ -9,14 +9,14 @@ import pytest
 from sqlalchemy import text
 
 from modules.engagements.repository import EngagementsRepository
-from modules.notifications.pretest_reminders import (
-    PRETEST_EMAIL_KEY,
-    PRETEST_WHATSAPP_KEY,
-    dispatch_pretest_reminders,
-)
+from modules.notifications.pretest_reminders import dispatch_pretest_reminders
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.service import NotificationsService
 from modules.users.models import User
+
+PRETEST_WHATSAPP_KEY = "pretest-whatsapp"
+PRETEST_EMAIL_KEY = "pretest-email"
+DEFAULT_PRETEST_KEYS = f"{PRETEST_WHATSAPP_KEY},{PRETEST_EMAIL_KEY}"
 
 
 async def _seed_dependencies(test_db_session) -> None:
@@ -35,6 +35,7 @@ async def _seed_dependencies(test_db_session) -> None:
     for service_key, channel, webhook_path in (
         (PRETEST_WHATSAPP_KEY, "whatsapp", "pretest-whatsapp"),
         (PRETEST_EMAIL_KEY, "email", "pretest-email"),
+        ("custom-pretest-only", "email", "custom-pretest-only"),
     ):
         await test_db_session.execute(
             text(
@@ -55,15 +56,21 @@ async def _insert_engagement(
     engagement_id: int,
     engagement_code: str,
     status: str,
+    pretest_guidelines_notification: str | None = DEFAULT_PRETEST_KEYS,
 ) -> None:
+    pretest_value = (
+        "NULL"
+        if pretest_guidelines_notification is None
+        else f"'{pretest_guidelines_notification}'"
+    )
     await test_db_session.execute(
         text(
             "INSERT INTO engagements "
             "(engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, "
             "diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count, "
-            "organization_id, notification_service_key) "
+            "organization_id, notification_service_key, pretest_guidelines_notification) "
             f"VALUES ({engagement_id}, 'Camp {engagement_id}', '{engagement_code}', 'bio_ai', 1, 1, 'BLR', 20, "
-            f"'2026-06-01', '2026-06-30', '{status}', 0, NULL, 'pretest-whatsapp')"
+            f"'2026-06-01', '2026-06-30', '{status}', 0, NULL, 'pretest-whatsapp', {pretest_value})"
         )
     )
 
@@ -123,7 +130,6 @@ def _services():
     notifications_repository = NotificationsRepository()
     return (
         NotificationsService(notifications_repository),
-        notifications_repository,
         EngagementsRepository(),
     )
 
@@ -165,11 +171,10 @@ async def test_pretest_reminders_all_participants(test_db_session, monkeypatch):
         _fake_httpx_client(webhook_calls),
     )
 
-    notifications_service, notifications_repository, engagements_repository = _services()
+    notifications_service, engagements_repository = _services()
     result = await dispatch_pretest_reminders(
         test_db_session,
         notifications_service=notifications_service,
-        notifications_repository=notifications_repository,
         engagements_repository=engagements_repository,
         as_of=as_of,
         dry_run=False,
@@ -177,8 +182,8 @@ async def test_pretest_reminders_all_participants(test_db_session, monkeypatch):
     await test_db_session.commit()
 
     assert result["matched"] == 3
-    assert result["whatsapp_sent"] == 3
-    assert result["email_sent"] == 3
+    assert result["sent"] == 3
+    assert result["skipped"] == 0
     assert result["failed"] == 0
     assert len(webhook_calls) == 6
 
@@ -214,11 +219,10 @@ async def test_pretest_reminders_excludes_completed_engagements(test_db_session,
         _fake_httpx_client(webhook_calls),
     )
 
-    notifications_service, notifications_repository, engagements_repository = _services()
+    notifications_service, engagements_repository = _services()
     result = await dispatch_pretest_reminders(
         test_db_session,
         notifications_service=notifications_service,
-        notifications_repository=notifications_repository,
         engagements_repository=engagements_repository,
         as_of=as_of,
         dry_run=False,
@@ -252,11 +256,10 @@ async def test_pretest_reminders_dry_run_does_not_dispatch(test_db_session, monk
         _fake_httpx_client(webhook_calls),
     )
 
-    notifications_service, notifications_repository, engagements_repository = _services()
+    notifications_service, engagements_repository = _services()
     result = await dispatch_pretest_reminders(
         test_db_session,
         notifications_service=notifications_service,
-        notifications_repository=notifications_repository,
         engagements_repository=engagements_repository,
         as_of=as_of,
         dry_run=True,
@@ -296,11 +299,10 @@ async def test_pretest_reminders_one_user_id_per_dispatch(test_db_session, monke
         _fake_httpx_client(webhook_calls),
     )
 
-    notifications_service, notifications_repository, engagements_repository = _services()
+    notifications_service, engagements_repository = _services()
     await dispatch_pretest_reminders(
         test_db_session,
         notifications_service=notifications_service,
-        notifications_repository=notifications_repository,
         engagements_repository=engagements_repository,
         as_of=as_of,
         dry_run=False,
@@ -325,3 +327,99 @@ async def test_pretest_reminders_one_user_id_per_dispatch(test_db_session, monke
         assert row.engagement_id == 9605
     service_keys = {row.service_key for row in rows}
     assert service_keys == {PRETEST_WHATSAPP_KEY, PRETEST_EMAIL_KEY}
+
+
+@pytest.mark.asyncio
+async def test_pretest_reminders_skips_when_no_keys_configured(test_db_session, monkeypatch):
+    await _seed_dependencies(test_db_session)
+    await _insert_engagement(
+        test_db_session,
+        engagement_id=9606,
+        engagement_code="ENG9606",
+        status="running",
+        pretest_guidelines_notification=None,
+    )
+    collection_date = "2026-06-02"
+    as_of = date(2026, 6, 1)
+    await _insert_participant(
+        test_db_session,
+        engagement_id=9606,
+        user_id=96061,
+        engagement_date=collection_date,
+        slot_start_time="08:00:00",
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+    monkeypatch.setattr(
+        "modules.notifications.service.httpx.AsyncClient",
+        _fake_httpx_client(webhook_calls),
+    )
+
+    notifications_service, engagements_repository = _services()
+    result = await dispatch_pretest_reminders(
+        test_db_session,
+        notifications_service=notifications_service,
+        engagements_repository=engagements_repository,
+        as_of=as_of,
+        dry_run=False,
+    )
+    await test_db_session.commit()
+
+    assert result["matched"] == 1
+    assert result["sent"] == 0
+    assert result["skipped"] == 1
+    assert result["failed"] == 0
+    assert len(webhook_calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_pretest_reminders_single_custom_key(test_db_session, monkeypatch):
+    await _seed_dependencies(test_db_session)
+    await _insert_engagement(
+        test_db_session,
+        engagement_id=9607,
+        engagement_code="ENG9607",
+        status="running",
+        pretest_guidelines_notification="custom-pretest-only",
+    )
+    collection_date = "2026-06-02"
+    as_of = date(2026, 6, 1)
+    await _insert_participant(
+        test_db_session,
+        engagement_id=9607,
+        user_id=96071,
+        engagement_date=collection_date,
+        slot_start_time="08:00:00",
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+    monkeypatch.setattr(
+        "modules.notifications.service.httpx.AsyncClient",
+        _fake_httpx_client(webhook_calls),
+    )
+
+    notifications_service, engagements_repository = _services()
+    result = await dispatch_pretest_reminders(
+        test_db_session,
+        notifications_service=notifications_service,
+        engagements_repository=engagements_repository,
+        as_of=as_of,
+        dry_run=False,
+    )
+    await test_db_session.commit()
+
+    assert result["matched"] == 1
+    assert result["sent"] == 1
+    assert result["skipped"] == 0
+    assert result["failed"] == 0
+    assert len(webhook_calls) == 1
+
+    rows = (
+        await test_db_session.execute(
+            text("SELECT service_key FROM notifications ORDER BY notification_id")
+        )
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].service_key == "custom-pretest-only"
