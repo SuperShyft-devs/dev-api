@@ -2,9 +2,10 @@
 
 For participants in running engagements where assessment_instance.status == 'complete'
 and today >= engagement_date:
-1. Check MetSights blood parameters for is_complete.
+1. Check MetSights blood parameters for is_complete (Pro/Basic only).
 2. If individual_health_report.reports or report_url is null, fetch from MetSights.
-3. After loading, send notifications using engagement.bioai_report_notification.
+3. When both reports and report_url are present, send notifications using
+   engagement.bioai_report_notification (skipping services already sent).
 """
 
 from __future__ import annotations
@@ -28,6 +29,10 @@ logger = logging.getLogger(__name__)
 
 _PRO_BASIC_TYPE_CODES = {"1", "2"}
 _FITPRINT_TYPE_CODES = {"7"}
+
+
+def _report_data_complete(reports: Any, report_url: Any) -> bool:
+    return reports is not None and report_url is not None
 
 
 async def _get_eligible_participants(
@@ -74,6 +79,55 @@ async def _get_eligible_participants(
     return result.all()
 
 
+async def _send_report_notifications(
+    db: AsyncSession,
+    *,
+    notifications_service: NotificationsService,
+    service_keys: list[str],
+    user_id: int,
+    engagement_id: int,
+    record_id: str,
+    type_code: str,
+    details: list[dict[str, Any]],
+) -> int:
+    """Dispatch configured notification services that have not already been sent."""
+    dispatch_record_id = record_id if type_code in _PRO_BASIC_TYPE_CODES else None
+    sent_count = 0
+
+    for sk in service_keys:
+        already_sent = await has_notification_been_sent(
+            db, service_key=sk, user_id=user_id, engagement_id=engagement_id,
+        )
+        if already_sent:
+            details.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "action": "skipped",
+                "reason": f"notification '{sk}' already sent",
+            })
+            continue
+
+        await notifications_service.dispatch(
+            db,
+            payload=DispatchRequest(
+                service_key=sk,
+                user_ids=[user_id],
+                engagement_id=engagement_id,
+                record_id=dispatch_record_id,
+            ),
+            triggered_by_user_id=None,
+        )
+        sent_count += 1
+        details.append({
+            "user_id": user_id,
+            "engagement_id": engagement_id,
+            "action": "notified",
+            "reason": f"dispatched '{sk}'",
+        })
+
+    return sent_count
+
+
 async def load_bioai_reports(
     db: AsyncSession,
     *,
@@ -110,15 +164,15 @@ async def load_bioai_reports(
             continue
 
         if dry_run:
+            complete = _report_data_complete(existing_reports, existing_report_url)
             details.append({
                 "user_id": user_id, "engagement_id": engagement_id,
                 "action": "dry_run",
-                "reason": "reports_null" if not existing_reports else "reports_exists",
+                "reason": "reports_complete" if complete else "reports_incomplete",
             })
             continue
 
         try:
-            # Check if blood parameters are complete on MetSights
             if type_code in _PRO_BASIC_TYPE_CODES:
                 try:
                     bp_data = await metsights_service.get_blood_parameters(record_id=record_id)
@@ -137,14 +191,14 @@ async def load_bioai_reports(
                     })
                     continue
 
-            needs_reports = existing_reports is None
-            needs_url = existing_report_url is None
+            reports = existing_reports
+            report_url = existing_report_url
 
-            if needs_reports or needs_url:
+            if not _report_data_complete(reports, report_url):
                 fetched_reports = None
                 fetched_url = None
 
-                if needs_reports:
+                if reports is None:
                     try:
                         report_data = await metsights_service.get_report(
                             record_id=record_id, assessment_type_code=type_code,
@@ -157,7 +211,7 @@ async def load_bioai_reports(
                             record_id, exc,
                         )
 
-                if needs_url:
+                if report_url is None:
                     try:
                         pdf_data = await metsights_service.get_report_pdf(
                             record_id=record_id, assessment_type_code=type_code,
@@ -199,9 +253,20 @@ async def load_bioai_reports(
 
                 if fetched_reports is not None:
                     ihr.reports = fetched_reports
+                    reports = fetched_reports
                 if fetched_url is not None:
                     ihr.report_url = fetched_url
+                    report_url = fetched_url
                 await db.flush()
+
+                if not _report_data_complete(reports, report_url):
+                    skipped += 1
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped",
+                        "reason": "report data incomplete (missing reports or report_url)",
+                    })
+                    continue
 
                 loaded += 1
                 details.append({
@@ -209,37 +274,27 @@ async def load_bioai_reports(
                     "action": "loaded", "reason": "BioAI report data fetched from MetSights",
                 })
 
-            # Send notifications
             service_keys = [
                 k.strip() for k in (bioai_notification or "").split(",") if k.strip()
             ]
-            if service_keys and (ihr_id or loaded):
-                for sk in service_keys:
-                    already_sent = await has_notification_been_sent(
-                        db, service_key=sk, user_id=user_id, engagement_id=engagement_id,
-                    )
-                    if already_sent:
-                        continue
-                    await notifications_service.dispatch(
-                        db,
-                        payload=DispatchRequest(
-                            service_key=sk,
-                            user_ids=[user_id],
-                            engagement_id=engagement_id,
-                        ),
-                        triggered_by_user_id=None,
-                    )
-                    notified += 1
-            elif not service_keys and (existing_reports is not None and existing_report_url is not None):
+            if not service_keys:
                 skipped += 1
-                if not any(
-                    d.get("user_id") == user_id and d.get("engagement_id") == engagement_id
-                    for d in details
-                ):
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "already loaded, no notification keys configured",
-                    })
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "skipped", "reason": "reports ready, no notification keys configured",
+                })
+                continue
+
+            notified += await _send_report_notifications(
+                db,
+                notifications_service=notifications_service,
+                service_keys=service_keys,
+                user_id=user_id,
+                engagement_id=engagement_id,
+                record_id=record_id,
+                type_code=type_code,
+                details=details,
+            )
 
         except Exception as exc:
             await db.rollback()

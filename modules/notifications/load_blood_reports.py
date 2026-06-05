@@ -4,7 +4,8 @@ For participants in running engagements with MetSights Pro/Basic assessments
 where today >= engagement_date:
 1. If individual_health_report.blood_parameters or diagnostic_report_url is null,
    fetch data from Healthians.
-2. After loading, send notifications using engagement.blood_report_notification.
+2. When both fields are present, send notifications using
+   engagement.blood_report_notification (skipping services already sent).
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import logging
 from datetime import date
 from typing import Any
 
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
@@ -29,6 +30,16 @@ from modules.users.models import User
 logger = logging.getLogger(__name__)
 
 _METSIGHTS_PRO_BASIC_TYPE_CODES = {"1", "2"}
+
+
+def _blood_report_data_complete(blood_parameters: Any, diagnostic_report_url: Any) -> bool:
+    return blood_parameters is not None and diagnostic_report_url is not None
+
+
+def _provider_name(provider_field: Any) -> str:
+    if isinstance(provider_field, dict):
+        return str(provider_field.get("name") or "").strip()
+    return str(provider_field or "").strip()
 
 
 def _match_customer_by_name(
@@ -107,6 +118,53 @@ async def _get_eligible_participants(
     return result.all()
 
 
+async def _send_report_notifications(
+    db: AsyncSession,
+    *,
+    notifications_service: NotificationsService,
+    service_keys: list[str],
+    user_id: int,
+    engagement_id: int,
+    record_id: str,
+    details: list[dict[str, Any]],
+) -> int:
+    """Dispatch configured notification services that have not already been sent."""
+    sent_count = 0
+
+    for sk in service_keys:
+        already_sent = await has_notification_been_sent(
+            db, service_key=sk, user_id=user_id, engagement_id=engagement_id,
+        )
+        if already_sent:
+            details.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "action": "skipped",
+                "reason": f"notification '{sk}' already sent",
+            })
+            continue
+
+        await notifications_service.dispatch(
+            db,
+            payload=DispatchRequest(
+                service_key=sk,
+                user_ids=[user_id],
+                engagement_id=engagement_id,
+                record_id=record_id,
+            ),
+            triggered_by_user_id=None,
+        )
+        sent_count += 1
+        details.append({
+            "user_id": user_id,
+            "engagement_id": engagement_id,
+            "action": "notified",
+            "reason": f"dispatched '{sk}'",
+        })
+
+    return sent_count
+
+
 async def load_blood_reports(
     db: AsyncSession,
     *,
@@ -142,18 +200,19 @@ async def load_blood_reports(
             continue
 
         if dry_run:
+            complete = _blood_report_data_complete(blood_params, diag_url)
             details.append({
                 "user_id": user_id, "engagement_id": engagement_id,
                 "action": "dry_run",
-                "reason": "blood_params_null" if not blood_params else "blood_params_exists",
+                "reason": "blood_report_complete" if complete else "blood_report_incomplete",
             })
             continue
 
         try:
-            needs_blood = blood_params is None
-            needs_diag = diag_url is None
+            blood_parameters = blood_params
+            diagnostic_report_url = diag_url
 
-            if needs_blood or needs_diag:
+            if not _blood_report_data_complete(blood_parameters, diagnostic_report_url):
                 try:
                     collection_data = await metsights_service.get_fetch_collections(record_id=record_id)
                 except Exception:
@@ -163,8 +222,9 @@ async def load_blood_reports(
                         "action": "skipped", "reason": "fetch-collections not available for this record",
                     })
                     continue
+
                 reference_id = str(collection_data.get("reference_id") or "").strip()
-                provider = str(collection_data.get("provider") or "").strip().lower()
+                provider_name = _provider_name(collection_data.get("provider"))
 
                 if not reference_id:
                     skipped += 1
@@ -174,11 +234,12 @@ async def load_blood_reports(
                     })
                     continue
 
-                if "healthians" not in provider:
+                if "healthians" not in provider_name.lower():
                     skipped += 1
                     details.append({
                         "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": f"provider is '{provider}', not Healthians",
+                        "action": "skipped",
+                        "reason": f"provider is '{provider_name or 'unknown'}', not Healthians",
                     })
                     continue
 
@@ -187,7 +248,7 @@ async def load_blood_reports(
                 fetched_blood = None
                 fetched_diag_url = None
 
-                if needs_blood:
+                if blood_parameters is None:
                     try:
                         digital_value = await healthians_client.get_booking_digital_value(
                             access_token, reference_id
@@ -205,7 +266,7 @@ async def load_blood_reports(
                             user_id, reference_id, exc,
                         )
 
-                if needs_diag:
+                if diagnostic_report_url is None:
                     try:
                         report_data = await healthians_client.get_booking_report(
                             access_token, reference_id
@@ -216,7 +277,9 @@ async def load_blood_reports(
                                 report_list, first_name or "", last_name or ""
                             )
                             if matched_report:
-                                fetched_diag_url = matched_report.get("report_url") or matched_report.get("url")
+                                fetched_diag_url = (
+                                    matched_report.get("report_url") or matched_report.get("url")
+                                )
                     except Exception as exc:
                         logger.warning(
                             "Healthians getBookingReport failed for user=%s booking=%s: %s",
@@ -250,9 +313,20 @@ async def load_blood_reports(
 
                 if fetched_blood is not None:
                     ihr.blood_parameters = fetched_blood
+                    blood_parameters = fetched_blood
                 if fetched_diag_url is not None:
                     ihr.diagnostic_report_url = fetched_diag_url
+                    diagnostic_report_url = fetched_diag_url
                 await db.flush()
+
+                if not _blood_report_data_complete(blood_parameters, diagnostic_report_url):
+                    skipped += 1
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped",
+                        "reason": "blood report data incomplete (missing blood_parameters or diagnostic_report_url)",
+                    })
+                    continue
 
                 loaded += 1
                 details.append({
@@ -260,34 +334,26 @@ async def load_blood_reports(
                     "action": "loaded", "reason": "blood data fetched from Healthians",
                 })
 
-            # Send notifications (regardless of whether we just loaded or it was already there)
             service_keys = [
                 k.strip() for k in (blood_report_notification or "").split(",") if k.strip()
             ]
-            if service_keys and (ihr_id or loaded):
-                for sk in service_keys:
-                    already_sent = await has_notification_been_sent(
-                        db, service_key=sk, user_id=user_id, engagement_id=engagement_id,
-                    )
-                    if already_sent:
-                        continue
-                    await notifications_service.dispatch(
-                        db,
-                        payload=DispatchRequest(
-                            service_key=sk,
-                            user_ids=[user_id],
-                            engagement_id=engagement_id,
-                        ),
-                        triggered_by_user_id=None,
-                    )
-                    notified += 1
-            elif not service_keys and (blood_params is not None and diag_url is not None):
+            if not service_keys:
                 skipped += 1
-                if not any(d.get("user_id") == user_id and d.get("engagement_id") == engagement_id for d in details):
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "already loaded, no notification keys configured",
-                    })
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "skipped", "reason": "blood reports ready, no notification keys configured",
+                })
+                continue
+
+            notified += await _send_report_notifications(
+                db,
+                notifications_service=notifications_service,
+                service_keys=service_keys,
+                user_id=user_id,
+                engagement_id=engagement_id,
+                record_id=record_id,
+                details=details,
+            )
 
         except Exception as exc:
             await db.rollback()

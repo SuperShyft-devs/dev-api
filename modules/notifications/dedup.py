@@ -16,15 +16,13 @@ async def has_notification_been_sent(
     engagement_id: int,
 ) -> bool:
     """Return True if a notification with the given service_key was already
-    dispatched for this user+engagement (status is 'sent' or 'pending')."""
+    sent for this user+engagement (status is ``sent``)."""
     query = (
         select(func.count())
         .select_from(Notification)
         .where(Notification.service_key == service_key)
         .where(Notification.engagement_id == engagement_id)
-        .where(
-            Notification.status.in_(["pending", "sent"])
-        )
+        .where(Notification.status == "sent")
     )
     # Notification.user is a JSON column storing user info; we need to check
     # if the notification's user list contains this user_id.  Since user is
@@ -42,7 +40,7 @@ async def has_notification_been_sent(
         select(Notification)
         .where(Notification.service_key == service_key)
         .where(Notification.engagement_id == engagement_id)
-        .where(Notification.status.in_(["pending", "sent"]))
+        .where(Notification.status == "sent")
     )
     result = await db.execute(detail_query)
     for notif in result.scalars():
