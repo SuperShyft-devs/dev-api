@@ -58,4 +58,5 @@ class UserPreference(Base):
     store_downloaded_files = Column(Boolean, nullable=False, server_default=text("true"))
     diet_preference = Column(String, nullable=True)
     allergies = Column(JSON, nullable=True, server_default=text("'[]'"))
+    sports_playlists = Column(JSON, nullable=True, server_default=text("'{}'"))
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

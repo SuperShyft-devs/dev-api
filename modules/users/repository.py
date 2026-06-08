@@ -361,7 +361,7 @@ class UsersRepository:
         upsert_data = dict(data)
 
         # Nutrition fields are optional and should only be persisted when explicitly non-null.
-        for field_name in ("diet_preference", "allergies"):
+        for field_name in ("diet_preference", "allergies", "sports_playlists"):
             if upsert_data.get(field_name) is None:
                 upsert_data.pop(field_name, None)
 
