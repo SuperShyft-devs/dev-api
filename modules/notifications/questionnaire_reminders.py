@@ -13,6 +13,7 @@ from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
 from modules.engagements.repository import EngagementsRepository
 from modules.metsights.service import MetsightsService
+from modules.notifications.dedup import should_skip_notification
 from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
 
@@ -252,7 +253,28 @@ async def dispatch_questionnaire_reminders(
                 })
                 continue
 
+            dispatched_any = False
+            skipped_all = True
             for sk in service_keys:
+                skip_reason = await should_skip_notification(
+                    db,
+                    service_key=sk,
+                    user_id=user_id,
+                    engagement_id=engagement_id,
+                )
+                if skip_reason:
+                    details.append({
+                        "user_id": user_id,
+                        "engagement_id": engagement_id,
+                        "engagement_date": engagement_date.isoformat(),
+                        "reminder_type": reminder_type,
+                        "service_key": sk,
+                        "action": "skipped",
+                        "reason": f"notification '{sk}' {skip_reason}",
+                    })
+                    continue
+
+                skipped_all = False
                 await notifications_service.dispatch(
                     db,
                     payload=DispatchRequest(
@@ -262,14 +284,21 @@ async def dispatch_questionnaire_reminders(
                     ),
                     triggered_by_user_id=None,
                 )
-            sent += 1
-            details.append({
-                "user_id": user_id, "engagement_id": engagement_id,
-                "engagement_date": engagement_date.isoformat(),
-                "reminder_type": reminder_type, "service_key": ",".join(service_keys),
-                "action": "sent",
-                "reason": "questionnaire incomplete in both Metsights and internal DB",
-            })
+                dispatched_any = True
+                details.append({
+                    "user_id": user_id,
+                    "engagement_id": engagement_id,
+                    "engagement_date": engagement_date.isoformat(),
+                    "reminder_type": reminder_type,
+                    "service_key": sk,
+                    "action": "sent",
+                    "reason": f"dispatched '{sk}'",
+                })
+
+            if dispatched_any:
+                sent += 1
+            elif skipped_all:
+                skipped += 1
 
         except Exception as exc:
             failed += 1

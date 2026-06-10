@@ -21,7 +21,7 @@ from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.metsights.service import MetsightsService
 from modules.diagnostics.healthians import client as healthians_client
-from modules.notifications.dedup import has_notification_been_sent
+from modules.notifications.dedup import should_skip_notification
 from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
 from modules.reports.models import IndividualHealthReport
@@ -132,15 +132,15 @@ async def _send_report_notifications(
     sent_count = 0
 
     for sk in service_keys:
-        already_sent = await has_notification_been_sent(
+        skip_reason = await should_skip_notification(
             db, service_key=sk, user_id=user_id, engagement_id=engagement_id,
         )
-        if already_sent:
+        if skip_reason:
             details.append({
                 "user_id": user_id,
                 "engagement_id": engagement_id,
                 "action": "skipped",
-                "reason": f"notification '{sk}' already sent",
+                "reason": f"notification '{sk}' {skip_reason}",
             })
             continue
 
