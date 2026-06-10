@@ -2,46 +2,116 @@
   "nodes": [
     {
       "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bio-fetch-err-001",
+              "name": "notification_id",
+              "value": "={{ $('Split Members9').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "bio-fetch-err-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "bio-fetch-err-003",
+              "name": "message",
+              "value": "Report fetch failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        25344,
+        -720
+      ],
+      "id": "74509451-b421-4d95-a6a9-3965ba169cd7",
+      "name": "Bio Fetch Failed"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "blood-fetch-err-001",
+              "name": "notification_id",
+              "value": "={{ $('Split Members9').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "blood-fetch-err-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "blood-fetch-err-003",
+              "name": "message",
+              "value": "Report fetch failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        25888,
+        -864
+      ],
+      "id": "62ea11b2-25ec-4832-b512-030ca4fe9288",
+      "name": "Blood Fetch Failed"
+    },
+    {
+      "parameters": {
         "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || '',\n    record_id: member.record_id || ''\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3360,
-        -176
+        24880,
+        -880
       ],
-      "id": "2c070210-d7ab-4fb7-a013-136032ab4881",
-      "name": "Split Members"
+      "id": "c451a3c2-b19b-46ac-96e2-a8c9ad5bc55a",
+      "name": "Split Members9"
     },
     {
       "parameters": {
         "content": "## Send Email\nIt will send Bio AI and Blood Report to each member.\nEach member has their own record_id.\nExpects: { notification_id, members: [{ first_name, email, record_id }] }",
         "height": 752,
-        "width": 2608
+        "width": 2880
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        2832,
-        -448
+        24352,
+        -1152
       ],
       "typeVersion": 1,
-      "id": "c263f517-816f-48a5-8594-59a037ec3b4c",
-      "name": "Sticky Note3"
+      "id": "85efd145-dfc1-4155-90f7-02b55f0f9cf2",
+      "name": "Sticky Note8"
     },
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "send-reports-email-v2",
+        "path": "send-reports-email-v3",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        2928,
-        -16
+        24448,
+        -720
       ],
-      "id": "25587127-ecee-4dba-a6ea-d2c2a9e146e5",
-      "name": "Send Reports | Email1",
+      "id": "9102ba5a-f05d-4a29-bc17-16049bdfc4c3",
+      "name": "Send Reports | Email2",
       "webhookId": "c13f1ef6-90de-41e0-8f92-551fb211d6ac"
     },
     {
@@ -91,11 +161,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3136,
-        -16
+        24656,
+        -720
       ],
-      "id": "7a305bf5-a4d0-49cf-a07e-b9865d808dd0",
-      "name": "If5"
+      "id": "d0286597-272a-4546-8e33-78bba119a093",
+      "name": "If12"
     },
     {
       "parameters": {
@@ -114,51 +184,16 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        3616,
-        -352
+        25104,
+        -1024
       ],
-      "id": "b0f83941-c5a4-45ff-a7c3-0b6195ed3214",
-      "name": "Fetch BioAI Report2",
+      "id": "417ed38f-17fa-4fcc-b9b4-4a6a87258c9c",
+      "name": "Fetch BioAI Report7",
       "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "bio-fetch-err-001",
-              "name": "notification_id",
-              "value": "={{ $('Split Members').item.json.notification_id }}",
-              "type": "number"
-            },
-            {
-              "id": "bio-fetch-err-002",
-              "name": "status",
-              "value": "failed",
-              "type": "string"
-            },
-            {
-              "id": "bio-fetch-err-003",
-              "name": "message",
-              "value": "Report fetch failed",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        3808,
-        -144
-      ],
-      "id": "d8e9f0a1-b2c3-4567-def0-123456789013",
-      "name": "Bio Fetch Failed"
-    },
-    {
-      "parameters": {
-        "url": "=https://api.metsights.com/records/{{ $json.record_id }}/fetch-collections",
+        "url": "=https://api.metsights.com/records/{{ $json.data.record }}/fetch-collections",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -173,47 +208,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        3616,
-        -176
+        25600,
+        -1056
       ],
-      "id": "4655190b-51b5-4fa6-83b8-d64f08b8df96",
-      "name": "Fetch Blood Report1",
+      "id": "78bc2ea5-34de-4596-bddd-0f621d698478",
+      "name": "Fetch Blood Report4",
       "onError": "continueErrorOutput"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "blood-fetch-err-001",
-              "name": "notification_id",
-              "value": "={{ $('Split Members').item.json.notification_id }}",
-              "type": "number"
-            },
-            {
-              "id": "blood-fetch-err-002",
-              "name": "status",
-              "value": "failed",
-              "type": "string"
-            },
-            {
-              "id": "blood-fetch-err-003",
-              "name": "message",
-              "value": "Report fetch failed",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        3808,
-        32
-      ],
-      "id": "e9f0a1b2-c3d4-5678-ef01-234567890124",
-      "name": "Blood Fetch Failed"
     },
     {
       "parameters": {
@@ -243,11 +243,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3808,
-        -352
+        25344,
+        -1040
       ],
-      "id": "d050aa60-c8a6-4bf5-b253-1c6b9ca87cee",
-      "name": "If6"
+      "id": "bc320cd7-02a2-48ca-87a6-d76a783618a4",
+      "name": "If13"
     },
     {
       "parameters": {
@@ -277,25 +277,25 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3808,
-        -176
+        25888,
+        -1072
       ],
-      "id": "91abb5a5-1820-4767-9084-f9059a2802a6",
-      "name": "If7"
+      "id": "713518eb-debc-4c3b-8bcb-f672fff69322",
+      "name": "If14"
     },
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const bioLink   = $('Fetch BioAI Report2').item.json.data.file;\nconst bloodLink = $('Fetch Blood Report1').item.json.data.file;\nconst member    = $('Split Members').item.json;\n\nconst body = `Hi ${member.first_name},\n\nThank you for completing your blood sample collection and Lifestyle Questionnaire.\n\nYour reports are now ready:\n\n- Blood Test Report: ${bloodLink}\n- Personalized Bio-AI Health Report: ${bioLink}\n\nWarm regards,\nTeam SuperShyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Your Blood and Bio-AI Reports are Ready',\n    body\n  }\n};"
+        "jsCode": "const bioLink   = $('Fetch BioAI Report7').item.json.data.file;\nconst bloodLink = $('Fetch Blood Report4').item.json.data.file;\nconst member    = $('Split Members9').item.json;\n\nconst body = `Hi ${member.first_name},\n\nThank you for completing your blood sample collection and Lifestyle Questionnaire.\n\nYour reports are now ready:\n\n- Blood Test Report: ${bloodLink}\n- Personalized Bio-AI Health Report: ${bioLink}\n\nWarm regards,\nTeam SuperShyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Your Blood and Bio-AI Reports are Ready',\n    body\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4336,
-        -352
+        26176,
+        -1088
       ],
-      "id": "85642d6c-7fb8-43c1-b785-5c9e27794152",
-      "name": "Prepare Email1"
+      "id": "fd125ea2-5485-4648-b183-947da0b810e9",
+      "name": "Prepare Email6"
     },
     {
       "parameters": {
@@ -311,11 +311,11 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        4560,
-        -352
+        26400,
+        -1088
       ],
-      "id": "af388cef-e68d-4924-bc67-fd74aa83c055",
-      "name": "Send an Email1",
+      "id": "7d3f1675-40e9-40ef-8043-71c2412c1649",
+      "name": "Send an Email2",
       "webhookId": "b390d0fb-b402-4675-bf2a-530f3c060c1a",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
@@ -334,7 +334,7 @@
             {
               "id": "142a83ea-738c-4817-8a59-23e1d393f64e",
               "name": "notification_id",
-              "value": "={{ $('Prepare Email1').item.json.notification_id }}",
+              "value": "={{ $('Prepare Email6').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -356,11 +356,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4848,
-        -368
+        26688,
+        -1104
       ],
-      "id": "00cd0bf7-540c-4a06-9701-f30e6753bbb7",
-      "name": "Prepare Response2"
+      "id": "acd7e7c3-2b3c-465e-bdca-f2ccc4bec1e1",
+      "name": "Prepare Response4"
     },
     {
       "parameters": {
@@ -369,7 +369,7 @@
             {
               "id": "345bfda5-bd6c-48f3-b1ce-5f9e18c9127d",
               "name": "notification_id",
-              "value": "={{ $('Prepare Email1').item.json.notification_id }}",
+              "value": "={{ $('Prepare Email6').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -391,11 +391,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4784,
-        -128
+        26688,
+        -896
       ],
-      "id": "97723971-310d-4945-ac6d-c0f9dd62a38a",
-      "name": "Edit Fields6"
+      "id": "89e765cb-f24d-4f1a-b175-79d1c990d639",
+      "name": "Edit Fields17"
     },
     {
       "parameters": {
@@ -404,7 +404,7 @@
             {
               "id": "b1691335-0239-4f89-80b7-e620e85ef3fa",
               "name": "notification_id",
-              "value": "={{ $('Split Members').item.json.notification_id }}",
+              "value": "={{ $('Split Members9').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -426,11 +426,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4288,
-        -144
+        25600,
+        -800
       ],
-      "id": "11830910-f0e1-49a6-a605-dc536cec301d",
-      "name": "Edit Fields7"
+      "id": "412f5d3b-4a05-4b85-8f7c-7455a17cb828",
+      "name": "Edit Fields18"
     },
     {
       "parameters": {
@@ -439,7 +439,7 @@
             {
               "id": "ef347b9f-5ee9-4e15-8e81-f81f0242c110",
               "name": "notification_id",
-              "value": "={{ $('Split Members').item.json.notification_id }}",
+              "value": "={{ $('Split Members9').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -461,11 +461,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4048,
-        -32
+        26176,
+        -912
       ],
-      "id": "f85fd0fa-50df-4553-a616-ebce58cb8643",
-      "name": "Edit Fields8"
+      "id": "2de9b64c-8210-47a5-84a8-065913412bb2",
+      "name": "Edit Fields19"
     },
     {
       "parameters": {
@@ -474,7 +474,7 @@
             {
               "id": "73c4a7c5-095c-4d1f-88de-0a2165f1ac0a",
               "name": "notification_id",
-              "value": "={{ $('Send Reports | Email1').item.json.body.notification_id }}",
+              "value": "={{ $('Send Reports | Email2').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -496,11 +496,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3360,
-        80
+        24880,
+        -624
       ],
-      "id": "3f4c5df3-9a1e-4bea-b076-6632f8b14bc0",
-      "name": "Prepare Response3"
+      "id": "5dea7415-8766-436b-961f-d91e2be028da",
+      "name": "Prepare Response5"
     },
     {
       "parameters": {
@@ -514,62 +514,84 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        5216,
-        96
+        27040,
+        -624
       ],
-      "id": "aa96e0cb-089b-4721-9137-55befe64daf4",
-      "name": "Call Back2",
+      "id": "7e1d5399-65d0-46ac-9a9a-df8c4b2b32d3",
+      "name": "Call Back5",
       "alwaysOutputData": true,
       "retryOnFail": true,
       "onError": "continueRegularOutput"
     }
   ],
   "connections": {
-    "Split Members": {
+    "Bio Fetch Failed": {
       "main": [
         [
           {
-            "node": "Fetch BioAI Report2",
+            "node": "Call Back5",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send Reports | Email1": {
+    "Blood Fetch Failed": {
       "main": [
         [
           {
-            "node": "If5",
+            "node": "Call Back5",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "If5": {
+    "Split Members9": {
       "main": [
         [
           {
-            "node": "Split Members",
+            "node": "Fetch BioAI Report7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reports | Email2": {
+      "main": [
+        [
+          {
+            "node": "If12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If12": {
+      "main": [
+        [
+          {
+            "node": "Split Members9",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Prepare Response3",
+            "node": "Prepare Response5",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch BioAI Report2": {
+    "Fetch BioAI Report7": {
       "main": [
         [
           {
-            "node": "If6",
+            "node": "If13",
             "type": "main",
             "index": 0
           }
@@ -583,22 +605,11 @@
         ]
       ]
     },
-    "Bio Fetch Failed": {
+    "Fetch Blood Report4": {
       "main": [
         [
           {
-            "node": "Call Back2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Blood Report1": {
-      "main": [
-        [
-          {
-            "node": "If7",
+            "node": "If14",
             "type": "main",
             "index": 0
           }
@@ -612,131 +623,120 @@
         ]
       ]
     },
-    "Blood Fetch Failed": {
+    "If13": {
       "main": [
         [
           {
-            "node": "Call Back2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If6": {
-      "main": [
-        [
-          {
-            "node": "Fetch Blood Report1",
+            "node": "Fetch Blood Report4",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Edit Fields7",
+            "node": "Edit Fields18",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "If7": {
+    "If14": {
       "main": [
         [
           {
-            "node": "Prepare Email1",
+            "node": "Prepare Email6",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Edit Fields8",
+            "node": "Edit Fields19",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Email1": {
+    "Prepare Email6": {
       "main": [
         [
           {
-            "node": "Send an Email1",
+            "node": "Send an Email2",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send an Email1": {
+    "Send an Email2": {
       "main": [
         [
           {
-            "node": "Prepare Response2",
+            "node": "Prepare Response4",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Edit Fields6",
+            "node": "Edit Fields17",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Response2": {
+    "Prepare Response4": {
       "main": [
         [
           {
-            "node": "Call Back2",
+            "node": "Call Back5",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Edit Fields6": {
+    "Edit Fields17": {
       "main": [
         [
           {
-            "node": "Call Back2",
+            "node": "Call Back5",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Edit Fields7": {
+    "Edit Fields18": {
       "main": [
         [
           {
-            "node": "Call Back2",
+            "node": "Call Back5",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Edit Fields8": {
+    "Edit Fields19": {
       "main": [
         [
           {
-            "node": "Call Back2",
+            "node": "Call Back5",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Response3": {
+    "Prepare Response5": {
       "main": [
         [
           {
-            "node": "Call Back2",
+            "node": "Call Back5",
             "type": "main",
             "index": 0
           }
