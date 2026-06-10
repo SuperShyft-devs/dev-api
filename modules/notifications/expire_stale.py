@@ -6,8 +6,9 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.config import settings
 from modules.notifications.repository import NotificationsRepository
+
+DEFAULT_PENDING_TIMEOUT_HOURS = 2
 
 _STALE_MESSAGE = "Callback timeout — workflow did not report completion"
 
@@ -21,7 +22,7 @@ async def expire_stale_notifications(
 ) -> dict:
     """Mark pending notifications older than the timeout as failed."""
     repo = repository or NotificationsRepository()
-    hours = timeout_hours if timeout_hours is not None else settings.NOTIFICATION_PENDING_TIMEOUT_HOURS
+    hours = timeout_hours if timeout_hours is not None else DEFAULT_PENDING_TIMEOUT_HOURS
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
     stale_ids = await repo.list_stale_pending_notification_ids(db, dispatched_before=cutoff)

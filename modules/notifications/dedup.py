@@ -8,7 +8,7 @@ from sqlalchemy import cast, select, type_coerce
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.config import settings
+from modules.notifications.expire_stale import DEFAULT_PENDING_TIMEOUT_HOURS
 from modules.notifications.models import Notification
 from modules.notifications.repository import NotificationsRepository
 
@@ -32,7 +32,7 @@ async def should_skip_notification(
     hours = (
         pending_timeout_hours
         if pending_timeout_hours is not None
-        else settings.NOTIFICATION_PENDING_TIMEOUT_HOURS
+        else DEFAULT_PENDING_TIMEOUT_HOURS
     )
     in_flight_cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 

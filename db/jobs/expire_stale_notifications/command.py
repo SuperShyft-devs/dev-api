@@ -11,7 +11,10 @@ import asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from core.config import settings
-from modules.notifications.expire_stale import expire_stale_notifications
+from modules.notifications.expire_stale import (
+    DEFAULT_PENDING_TIMEOUT_HOURS,
+    expire_stale_notifications,
+)
 from modules.notifications.repository import NotificationsRepository
 
 
@@ -66,7 +69,7 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="HOURS",
         help=(
             "Pending age threshold in hours. "
-            f"Defaults to NOTIFICATION_PENDING_TIMEOUT_HOURS ({settings.NOTIFICATION_PENDING_TIMEOUT_HOURS})."
+            f"Defaults to {DEFAULT_PENDING_TIMEOUT_HOURS}."
         ),
     )
     return parser
