@@ -100,7 +100,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const member = $input.item.json;\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) {\n  phone = '91' + phone;\n} else if (phone.length === 12 && phone.startsWith('91')) {\n  // already valid\n} else {\n  throw new Error('Invalid phone number: ' + phone);\n}\n\nconst first_name = (member.first_name || 'Participant').trim();\n\nconst message =\n`camp15,${first_name},Thank you for completing your blood sample collection and the Lifestyle Questionnaire.,Your Blood Test Reports are attached below.,The report includes 88+ biomarker profiles. ,Please visit: app.supershyft.com`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    record_id: member.record_id,\n    first_name,\n    phone,\n    message\n  }\n};"
+        "jsCode": "const member = $input.item.json;\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nlet phone_valid = true;\nif (phone.length === 10) {\n  phone = '91' + phone;\n} else if (phone.length === 12 && phone.startsWith('91')) {\n  // already valid\n} else {\n  phone_valid = false;\n}\n\nconst first_name = (member.first_name || 'Participant').trim();\n\nconst message =\n`camp15,${first_name},Thank you for completing your blood sample collection and the Lifestyle Questionnaire.,Your Blood Test Reports are attached below.,The report includes 88+ biomarker profiles. ,Please visit: app.supershyft.com`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    record_id: member.record_id,\n    first_name,\n    phone,\n    phone_valid,\n    message\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -110,6 +110,75 @@
       ],
       "id": "3b465c1d-9ae8-4987-b91b-4fb5eb14b059",
       "name": "Format Phone and Message1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "phone-valid-001",
+              "leftValue": "={{ $json.phone_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3744,
+        1776
+      ],
+      "id": "c1d2e3f4-a5b6-7890-cdef-123456789abc",
+      "name": "Phone Valid?1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "phone-invalid-001",
+              "name": "notification_id",
+              "value": "={{ $('Format Phone and Message1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "phone-invalid-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "phone-invalid-003",
+              "name": "message",
+              "value": "Invalid phone number",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3968,
+        1984
+      ],
+      "id": "d2e3f4a5-b6c7-8901-defa-234567890bcd",
+      "name": "Set Invalid Phone Status1"
     },
     {
       "parameters": {
@@ -136,7 +205,43 @@
         1776
       ],
       "id": "2508281e-1432-4972-a1bb-6a1c8e5a1f11",
-      "name": "Fetch Blood Report Link1"
+      "name": "Fetch Blood Report Link1",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fetch-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Format Phone and Message1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "fetch-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "fetch-fail-003",
+              "name": "message",
+              "value": "Report fetch failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4064,
+        1984
+      ],
+      "id": "e3f4a5b6-c7d8-9012-efab-345678901cde",
+      "name": "Set Fetch Failed Status1"
     },
     {
       "parameters": {
@@ -205,7 +310,45 @@
         1664
       ],
       "id": "a18e622a-9b71-4bf5-95e4-25d7dc2940d4",
-      "name": "Send Blood Report Whatsapp1"
+      "name": "Send Blood Report Whatsapp1",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "wa-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Format Phone and Message1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "wa-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "wa-fail-003",
+              "name": "message",
+              "value": "WhatsApp sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4512,
+        1856
+      ],
+      "id": "f4a5b6c7-d8e9-0123-fabc-456789012def",
+      "name": "Set WhatsApp Failed Status1"
     },
     {
       "parameters": {
@@ -379,7 +522,36 @@
       "main": [
         [
           {
+            "node": "Phone Valid?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phone Valid?1": {
+      "main": [
+        [
+          {
             "node": "Fetch Blood Report Link1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Invalid Phone Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Invalid Phone Status1": {
+      "main": [
+        [
+          {
+            "node": "Callback1",
             "type": "main",
             "index": 0
           }
@@ -391,6 +563,24 @@
         [
           {
             "node": "File Link Exists?1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Fetch Failed Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fetch Failed Status1": {
+      "main": [
+        [
+          {
+            "node": "Callback1",
             "type": "main",
             "index": 0
           }
@@ -420,6 +610,24 @@
         [
           {
             "node": "Set Success Status1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set WhatsApp Failed Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set WhatsApp Failed Status1": {
+      "main": [
+        [
+          {
+            "node": "Callback1",
             "type": "main",
             "index": 0
           }

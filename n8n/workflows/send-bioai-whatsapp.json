@@ -132,7 +132,43 @@
         944
       ],
       "id": "33b28def-8df8-47fd-9735-b1c9cedd59fa",
-      "name": "Fetch BioAI Report3"
+      "name": "Fetch BioAI Report3",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bio-fetch-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Code in JavaScript1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "bio-fetch-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "bio-fetch-fail-003",
+              "name": "message",
+              "value": "Report fetch failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4080,
+        1120
+      ],
+      "id": "a5b6c7d8-e9f0-1234-abcd-567890123ef0",
+      "name": "Edit Fields12"
     },
     {
       "parameters": {
@@ -197,7 +233,45 @@
         928
       ],
       "id": "908554e0-20fa-450c-a6ee-ddece185ecc7",
-      "name": "Send BioAI Whatsapp1"
+      "name": "Send BioAI Whatsapp1",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bio-wa-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Code in JavaScript1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "bio-wa-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "bio-wa-fail-003",
+              "name": "message",
+              "value": "WhatsApp sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4528,
+        1120
+      ],
+      "id": "b6c7d8e9-f0a1-2345-bcde-678901234f01",
+      "name": "Edit Fields13"
     },
     {
       "parameters": {
@@ -386,6 +460,24 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Edit Fields12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields12": {
+      "main": [
+        [
+          {
+            "node": "Call Back3",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -412,6 +504,24 @@
         [
           {
             "node": "Edit Fields9",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields13": {
+      "main": [
+        [
+          {
+            "node": "Call Back3",
             "type": "main",
             "index": 0
           }

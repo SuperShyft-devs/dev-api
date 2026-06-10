@@ -292,7 +292,43 @@
         2944
       ],
       "id": "0b242c7f-3a79-43ad-8925-61909f4e1506",
-      "name": "Fetch Blood Report2"
+      "name": "Fetch Blood Report2",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-fetchfail-001",
+              "name": "notification_id",
+              "value": "={{ $('Split Members3').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-fetchfail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-fetchfail-003",
+              "name": "message",
+              "value": "Report fetch failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3872,
+        3136
+      ],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Fetch Failed Response"
     },
     {
       "parameters": {
@@ -472,6 +508,24 @@
         [
           {
             "node": "File Link Exists?2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Callback2",
             "type": "main",
             "index": 0
           }

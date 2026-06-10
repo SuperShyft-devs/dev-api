@@ -152,7 +152,43 @@
         3888
       ],
       "id": "2b4b45f5-648d-43fd-843f-5476569c2b3e",
-      "name": "Fetch BioAI Report4"
+      "name": "Fetch BioAI Report4",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-fetchfail-001",
+              "name": "notification_id",
+              "value": "={{ $('Split Members4').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-fetchfail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-fetchfail-003",
+              "name": "message",
+              "value": "Report fetch failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3856,
+        4080
+      ],
+      "id": "c7d8e9f0-a1b2-3456-cdef-789012345012",
+      "name": "Fetch Failed Response1"
     },
     {
       "parameters": {
@@ -428,6 +464,24 @@
         [
           {
             "node": "File Link Exists?3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Failed Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Failed Response1": {
+      "main": [
+        [
+          {
+            "node": "Callback3",
             "type": "main",
             "index": 0
           }

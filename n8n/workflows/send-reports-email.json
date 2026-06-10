@@ -118,7 +118,43 @@
         -352
       ],
       "id": "b0f83941-c5a4-45ff-a7c3-0b6195ed3214",
-      "name": "Fetch BioAI Report2"
+      "name": "Fetch BioAI Report2",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bio-fetch-err-001",
+              "name": "notification_id",
+              "value": "={{ $('Split Members').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "bio-fetch-err-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "bio-fetch-err-003",
+              "name": "message",
+              "value": "Report fetch failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3808,
+        -144
+      ],
+      "id": "d8e9f0a1-b2c3-4567-def0-123456789013",
+      "name": "Bio Fetch Failed"
     },
     {
       "parameters": {
@@ -141,7 +177,43 @@
         -176
       ],
       "id": "4655190b-51b5-4fa6-83b8-d64f08b8df96",
-      "name": "Fetch Blood Report1"
+      "name": "Fetch Blood Report1",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "blood-fetch-err-001",
+              "name": "notification_id",
+              "value": "={{ $('Split Members').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "blood-fetch-err-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "blood-fetch-err-003",
+              "name": "message",
+              "value": "Report fetch failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3808,
+        32
+      ],
+      "id": "e9f0a1b2-c3d4-5678-ef01-234567890124",
+      "name": "Blood Fetch Failed"
     },
     {
       "parameters": {
@@ -210,21 +282,6 @@
       ],
       "id": "91abb5a5-1820-4767-9084-f9059a2802a6",
       "name": "If7"
-    },
-    {
-      "parameters": {
-        "mode": "combine",
-        "combineBy": "combineByPosition",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
-      "position": [
-        4096,
-        -352
-      ],
-      "id": "e8d66bed-ab08-4fd7-846b-1804630c859b",
-      "name": "Merge1"
     },
     {
       "parameters": {
@@ -475,11 +532,6 @@
             "node": "Fetch BioAI Report2",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Fetch Blood Report1",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -521,6 +573,24 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Bio Fetch Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bio Fetch Failed": {
+      "main": [
+        [
+          {
+            "node": "Call Back2",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -532,6 +602,24 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Blood Fetch Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Blood Fetch Failed": {
+      "main": [
+        [
+          {
+            "node": "Call Back2",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -539,7 +627,7 @@
       "main": [
         [
           {
-            "node": "Merge1",
+            "node": "Fetch Blood Report1",
             "type": "main",
             "index": 0
           }
@@ -557,25 +645,14 @@
       "main": [
         [
           {
-            "node": "Merge1",
+            "node": "Prepare Email1",
             "type": "main",
-            "index": 1
+            "index": 0
           }
         ],
         [
           {
             "node": "Edit Fields8",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge1": {
-      "main": [
-        [
-          {
-            "node": "Prepare Email1",
             "type": "main",
             "index": 0
           }

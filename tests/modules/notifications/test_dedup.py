@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import text
@@ -53,6 +53,7 @@ async def _seed_notification(
     user_id: int,
     engagement_id: int,
     status: str,
+    dispatched_at: datetime | None = None,
 ) -> None:
     test_db_session.add(
         Notification(
@@ -62,6 +63,7 @@ async def _seed_notification(
             user={"user_ids": [user_id]},
             engagement_id=engagement_id,
             message="test",
+            dispatched_at=dispatched_at,
         )
     )
     await test_db_session.commit()
@@ -136,7 +138,7 @@ async def test_should_not_skip_when_prior_failed(test_db_session):
 
 
 @pytest.mark.asyncio
-async def test_should_not_skip_when_prior_pending(test_db_session):
+async def test_should_skip_when_prior_pending_in_flight(test_db_session):
     await _seed_service(test_db_session, service_key="dedup-svc-d")
     await _seed_engagement(test_db_session, engagement_id=9704)
     await _seed_notification(
@@ -145,6 +147,7 @@ async def test_should_not_skip_when_prior_pending(test_db_session):
         user_id=42,
         engagement_id=9704,
         status="pending",
+        dispatched_at=datetime.now(timezone.utc) - timedelta(minutes=30),
     )
 
     result = await should_skip_notification(
@@ -152,6 +155,30 @@ async def test_should_not_skip_when_prior_pending(test_db_session):
         service_key="dedup-svc-d",
         user_id=42,
         engagement_id=9704,
+        pending_timeout_hours=2,
+    )
+    assert result == "already in flight"
+
+
+@pytest.mark.asyncio
+async def test_should_not_skip_when_prior_pending_is_stale(test_db_session):
+    await _seed_service(test_db_session, service_key="dedup-svc-d2")
+    await _seed_engagement(test_db_session, engagement_id=97041)
+    await _seed_notification(
+        test_db_session,
+        service_key="dedup-svc-d2",
+        user_id=42,
+        engagement_id=97041,
+        status="pending",
+        dispatched_at=datetime.now(timezone.utc) - timedelta(hours=5),
+    )
+
+    result = await should_skip_notification(
+        test_db_session,
+        service_key="dedup-svc-d2",
+        user_id=42,
+        engagement_id=97041,
+        pending_timeout_hours=2,
     )
     assert result is None
 

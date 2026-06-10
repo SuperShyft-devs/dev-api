@@ -109,6 +109,7 @@ class Settings:
     # Notification service (n8n webhooks)
     NOTIFICATION_SERVICE_BASE_URL: str = os.getenv("NOTIFICATION_SERVICE_BASE_URL", "https://n8n.supershyft.com")
     NOTIFICATION_SERVICE_TIMEOUT_SECONDS: int = int(os.getenv("NOTIFICATION_SERVICE_TIMEOUT_SECONDS", "15"))
+    NOTIFICATION_PENDING_TIMEOUT_HOURS: int = int(os.getenv("NOTIFICATION_PENDING_TIMEOUT_HOURS", "2"))
 
     # Razorpay (server-side secret; never expose RAZORPAY_KEY_SECRET to clients)
     RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")

@@ -110,6 +110,63 @@ class NotificationsRepository:
         )
         await db.flush()
 
+    async def list_stale_pending_notification_ids(
+        self,
+        db: AsyncSession,
+        *,
+        dispatched_before: datetime,
+    ) -> list[int]:
+        result = await db.execute(
+            select(Notification.notification_id)
+            .where(Notification.status == "pending")
+            .where(Notification.dispatched_at.isnot(None))
+            .where(Notification.dispatched_at < dispatched_before)
+            .order_by(Notification.notification_id.asc())
+        )
+        return [row[0] for row in result.all()]
+
+    async def expire_stale_pending_notifications(
+        self,
+        db: AsyncSession,
+        *,
+        dispatched_before: datetime,
+        message: str,
+    ) -> int:
+        result = await db.execute(
+            sql_update(Notification)
+            .where(Notification.status == "pending")
+            .where(Notification.dispatched_at.isnot(None))
+            .where(Notification.dispatched_at < dispatched_before)
+            .values(status="failed", message=message)
+        )
+        await db.flush()
+        return int(result.rowcount or 0)
+
+    async def has_in_flight_pending_notification(
+        self,
+        db: AsyncSession,
+        *,
+        service_key: str,
+        user_id: int,
+        engagement_id: int,
+        dispatched_after: datetime,
+    ) -> bool:
+        result = await db.execute(
+            select(Notification.notification_id)
+            .where(Notification.service_key == service_key)
+            .where(Notification.engagement_id == engagement_id)
+            .where(Notification.status == "pending")
+            .where(Notification.dispatched_at.isnot(None))
+            .where(Notification.dispatched_at >= dispatched_after)
+            .where(
+                cast(Notification.user, JSONB)["user_ids"].contains(
+                    type_coerce([user_id], JSONB)
+                )
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none() is not None
+
     async def delete_notification(self, db: AsyncSession, *, notification_id: int) -> int:
         result = await db.execute(
             delete(Notification).where(Notification.notification_id == notification_id)
