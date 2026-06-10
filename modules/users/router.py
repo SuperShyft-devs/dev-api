@@ -365,6 +365,7 @@ async def get_my_preferences(
             "store_downloaded_files": preference.store_downloaded_files,
             "diet_preference": preference.diet_preference,
             "allergies": preference.allergies,
+            "sports_playlists": preference.sports_playlists,
             "updated_at": preference.updated_at,
         }
     )
@@ -399,6 +400,7 @@ async def update_my_preferences(
             "store_downloaded_files": preference.store_downloaded_files,
             "diet_preference": preference.diet_preference,
             "allergies": preference.allergies,
+            "sports_playlists": preference.sports_playlists,
             "updated_at": preference.updated_at,
         }
     )

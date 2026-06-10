@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 
 class SupportTicketCreate(BaseModel):
-    contact_input: str = Field(min_length=1, max_length=255)
+    user_id: int = Field(gt=0)
     query_text: str = Field(min_length=1)
 
 

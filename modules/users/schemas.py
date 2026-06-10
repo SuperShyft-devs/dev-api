@@ -55,6 +55,12 @@ class UpdateMyProfileRequest(BaseModel):
         return v
 
 
+class SportsPlaylistPayload(BaseModel):
+    sportIds: list[str] = Field(default_factory=list)
+    otherSelected: bool = False
+    otherNote: str = ""
+
+
 class UserPreferencesResponse(BaseModel):
     preference_id: int
     user_id: int
@@ -65,6 +71,7 @@ class UserPreferencesResponse(BaseModel):
     store_downloaded_files: bool
     diet_preference: str | None
     allergies: list[str]
+    sports_playlists: SportsPlaylistPayload | None = None
     updated_at: datetime
 
 
@@ -76,6 +83,7 @@ class UserPreferencesUpdate(BaseModel):
     store_downloaded_files: Optional[bool] = None
     diet_preference: str | None = None
     allergies: list[str] | None = None
+    sports_playlists: SportsPlaylistPayload | None = None
 
     @validator("diet_preference")
     def validate_diet_preference(cls, value):
