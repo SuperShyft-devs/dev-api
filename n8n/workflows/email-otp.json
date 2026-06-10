@@ -1,0 +1,378 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Send OTP Email\nSends OTP verification email to each member.\nExpects: { notification_id, members: [{ first_name, email, otp }] }",
+        "height": 560,
+        "width": 1984
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -416,
+        -32
+      ],
+      "typeVersion": 1,
+      "id": "53ede8b4-c382-4de6-8f66-a1eabe16d812",
+      "name": "Sticky Note OTP Email"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-otp-email-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -288,
+        160
+      ],
+      "id": "0f9f8947-c394-42e6-9c47-a7b85b3a3929",
+      "name": "OTP Email",
+      "webhookId": "g57h5ij0-3456-7890-cdef-otp003email1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "val-001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "val-002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "val-003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -80,
+        160
+      ],
+      "id": "f9b2349d-0a73-4a6c-9db5-d3a9892b4b2f",
+      "name": "Validate Payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    email: member.email || '',\n    otp: member.otp || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        144
+      ],
+      "id": "e11ff3ca-7f7c-40e5-9d83-c3c4ad9729f4",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst otp = member.otp || '------';\n\nconst digits = String(otp).split('');\n// Each digit tile: fluid width using a table-cell approach\n// 6 digits + 5 gaps of 6px each must fit in ~300px min content width\n// So each tile = ~44px max, font 28px — scales on desktop via container\nconst digitSpans = digits.map(d =>\n  `<td style=\"width:44px; height:56px; text-align:center; vertical-align:middle; background:rgba(255,255,255,0.13); border-radius:8px; font-size:28px; font-weight:800; color:#ffffff; font-family:'Courier New',monospace; padding:0 4px;\">${d}</td>`\n).join('<td style=\"width:8px;\"></td>');\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <style>\n    * { margin: 0; padding: 0; box-sizing: border-box; }\n    body { font-family: Arial, sans-serif; background-color: #f0f2f5; color: #333; -webkit-text-size-adjust: 100%; }\n    .wrapper { background-color: #f0f2f5; padding: 24px 12px; }\n    .container { max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.10); width: 100%; }\n\n    .header { background: linear-gradient(135deg, #0a2e2a 0%, #0d4a42 60%, #0f5c52 100%); padding: 32px 24px 26px; text-align: center; }\n    .header-title { color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: 1px; }\n    .header-subtitle { color: #7ecfc4; font-size: 11px; margin-top: 6px; letter-spacing: 2.5px; text-transform: uppercase; }\n\n    .body { padding: 28px 24px; }\n    .greeting { font-size: 17px; font-weight: 700; color: #111; margin-bottom: 12px; }\n    .message { font-size: 14px; color: #555; line-height: 1.75; margin-bottom: 28px; }\n\n    .otp-label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 2px; text-align: center; margin-bottom: 14px; }\n    .otp-box { background: linear-gradient(135deg, #0a2e2a, #0f5c52); border-radius: 14px; padding: 28px 16px; text-align: center; margin-bottom: 28px; }\n    .otp-table { border-collapse: separate; border-spacing: 0; margin: 0 auto; }\n    .otp-validity { font-size: 12px; color: #7ecfc4; margin-top: 16px; letter-spacing: 0.3px; }\n\n    .divider { border: none; border-top: 1px solid #f0f0f0; margin: 0 0 22px; }\n\n    .warning { background-color: #fffbef; border-left: 3px solid #f0a500; padding: 12px 14px; border-radius: 6px; margin-bottom: 24px; }\n    .warning p { font-size: 13px; color: #7a5c00; line-height: 1.65; }\n\n    .help { font-size: 13px; color: #666; line-height: 1.7; }\n    .help a { color: #0d4a42; font-weight: 600; text-decoration: none; }\n\n    .footer { background-color: #f7f8f9; border-top: 1px solid #ececec; padding: 20px 24px; text-align: center; }\n    .footer p { font-size: 11px; color: #bbb; line-height: 1.9; }\n    .footer a { color: #0d4a42; font-weight: 600; text-decoration: none; }\n  </style>\n</head>\n<body>\n  <div class=\"wrapper\">\n    <div class=\"container\">\n\n      <div class=\"header\">\n        <div class=\"header-title\">Supershyft</div>\n        <div class=\"header-subtitle\">Precision Health Solutions</div>\n      </div>\n\n      <div class=\"body\">\n        <p class=\"greeting\">Hi ${name},</p>\n        <p class=\"message\">\n          You requested a one-time password to access your Supershyft account.\n          Use the code below to complete your verification.\n          This code is valid for <strong>10 minutes</strong>.\n        </p>\n\n        <p class=\"otp-label\">Your One-Time Password</p>\n        <div class=\"otp-box\">\n          <table class=\"otp-table\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\">\n            <tr>${digitSpans}</tr>\n          </table>\n          <div class=\"otp-validity\">Valid for 10 minutes &bull; Do not share this code</div>\n        </div>\n\n        <hr class=\"divider\">\n\n        <div class=\"warning\">\n          <p>&#x26a0;&#xfe0f;&nbsp; <strong>Security notice:</strong> Supershyft will never ask for your OTP over call or message. If you did not request this code, please ignore this email or contact our support team immediately.</p>\n        </div>\n\n        <p class=\"help\">Need help? Reach us at <a href=\"mailto:support@supershyft.com\">support@supershyft.com</a></p>\n      </div>\n\n      <div class=\"footer\">\n        <p>Warm regards,<br><strong style=\"color:#444;\">Support Team - Supershyft</strong></p>\n        <p style=\"margin-top:10px;\"><a href=\"https://www.supershyft.com\">www.supershyft.com</a></p>\n        <p style=\"margin-top:10px;\">This is an automated email. Please do not reply directly to this message.</p>\n      </div>\n\n    </div>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: `Your Supershyft verification code`,\n    htmlBody\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        144
+      ],
+      "id": "0d954817-7ae1-48dc-a484-feec5168254a",
+      "name": "Prepare OTP Email"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.htmlBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        592,
+        144
+      ],
+      "id": "871753e9-e060-4555-92f4-81bf9a36e9f2",
+      "name": "Send OTP Email",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "67a42148-3bc1-467f-bb1b-cabd84103ac8",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-sent-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare OTP Email').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-sent-002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "resp-sent-003",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1008,
+        128
+      ],
+      "id": "7211ca4d-104a-4dbd-8426-e328b4c1642c",
+      "name": "Email Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare OTP Email').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-fail-003",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        832,
+        224
+      ],
+      "id": "9511825c-e91a-4d80-adf8-df0e73ed0b56",
+      "name": "Email Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-valfail-001",
+              "name": "notification_id",
+              "value": "={{ $('OTP Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-valfail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-valfail-003",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        144,
+        336
+      ],
+      "id": "c204d1a7-66ce-44eb-8aad-2266e457ba08",
+      "name": "Validation Failed Response"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1312,
+        336
+      ],
+      "id": "30ee59e3-895f-49f6-b6b5-db28cdb1053a",
+      "name": "Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "OTP Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validation Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare OTP Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare OTP Email": {
+      "main": [
+        [
+          {
+            "node": "Send OTP Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send OTP Email": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response": {
+      "main": [
+        [
+          {
+            "node": "Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

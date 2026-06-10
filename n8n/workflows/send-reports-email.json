@@ -1,0 +1,675 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || '',\n    record_id: member.record_id || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        -176
+      ],
+      "id": "2c070210-d7ab-4fb7-a013-136032ab4881",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "content": "## Send Email\nIt will send Bio AI and Blood Report to each member.\nEach member has their own record_id.\nExpects: { notification_id, members: [{ first_name, email, record_id }] }",
+        "height": 752,
+        "width": 2608
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2832,
+        -448
+      ],
+      "typeVersion": 1,
+      "id": "c263f517-816f-48a5-8594-59a037ec3b4c",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-reports-email-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2928,
+        -16
+      ],
+      "id": "25587127-ecee-4dba-a6ea-d2c2a9e146e5",
+      "name": "Send Reports | Email1",
+      "webhookId": "c13f1ef6-90de-41e0-8f92-551fb211d6ac"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ffd9b6a9-91cd-44bc-8d1d-62bc70a4baed",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "9c616895-d218-4d85-9368-b5c42bbc46dc",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "fd24cccd-da53-48d2-96f1-e580846dc058",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3136,
+        -16
+      ],
+      "id": "7a305bf5-a4d0-49cf-a07e-b9865d808dd0",
+      "name": "If5"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.metsights.com/reports/{{ $json.record_id }}/pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "01993398a5aadb4a2798b6e98c2e08ee"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3616,
+        -352
+      ],
+      "id": "b0f83941-c5a4-45ff-a7c3-0b6195ed3214",
+      "name": "Fetch BioAI Report2"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.metsights.com/records/{{ $json.record_id }}/fetch-collections",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "01993398a5aadb4a2798b6e98c2e08ee"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3616,
+        -176
+      ],
+      "id": "4655190b-51b5-4fa6-83b8-d64f08b8df96",
+      "name": "Fetch Blood Report1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0d8c3df4-ba09-4a45-b1a9-ddf01426e52e",
+              "leftValue": "={{ $json.data.file }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3808,
+        -352
+      ],
+      "id": "d050aa60-c8a6-4bf5-b253-1c6b9ca87cee",
+      "name": "If6"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "be2bb721-e410-4f17-a0b9-5413f6bf8fea",
+              "leftValue": "={{ $json.data.file }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3808,
+        -176
+      ],
+      "id": "91abb5a5-1820-4767-9084-f9059a2802a6",
+      "name": "If7"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4096,
+        -352
+      ],
+      "id": "e8d66bed-ab08-4fd7-846b-1804630c859b",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const bioLink   = $('Fetch BioAI Report2').item.json.data.file;\nconst bloodLink = $('Fetch Blood Report1').item.json.data.file;\nconst member    = $('Split Members').item.json;\n\nconst body = `Hi ${member.first_name},\n\nThank you for completing your blood sample collection and Lifestyle Questionnaire.\n\nYour reports are now ready:\n\n- Blood Test Report: ${bloodLink}\n- Personalized Bio-AI Health Report: ${bioLink}\n\nWarm regards,\nTeam SuperShyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Your Blood and Bio-AI Reports are Ready',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4336,
+        -352
+      ],
+      "id": "85642d6c-7fb8-43c1-b785-5c9e27794152",
+      "name": "Prepare Email1"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        4560,
+        -352
+      ],
+      "id": "af388cef-e68d-4924-bc67-fd74aa83c055",
+      "name": "Send an Email1",
+      "webhookId": "b390d0fb-b402-4675-bf2a-530f3c060c1a",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "142a83ea-738c-4817-8a59-23e1d393f64e",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Email1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "98d98822-f125-41af-9d93-13c748585f13",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "de100b0b-ed48-4b83-a749-bee61b5e2054",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4848,
+        -368
+      ],
+      "id": "00cd0bf7-540c-4a06-9701-f30e6753bbb7",
+      "name": "Prepare Response2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "345bfda5-bd6c-48f3-b1ce-5f9e18c9127d",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Email1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "03acbaae-44ac-47dc-a486-356fbe1fdf3c",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "5ff0eaef-cfb1-4bc7-abbd-d3820fe3466f",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4784,
+        -128
+      ],
+      "id": "97723971-310d-4945-ac6d-c0f9dd62a38a",
+      "name": "Edit Fields6"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1691335-0239-4f89-80b7-e620e85ef3fa",
+              "name": "notification_id",
+              "value": "={{ $('Split Members').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "f1f9c74e-aa34-45ab-ab0b-a0dca59578ae",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "5cec76fe-f5ce-4e7a-b8e3-82ab92e6b3f5",
+              "name": "message",
+              "value": "BioAI report file not found",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4288,
+        -144
+      ],
+      "id": "11830910-f0e1-49a6-a605-dc536cec301d",
+      "name": "Edit Fields7"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ef347b9f-5ee9-4e15-8e81-f81f0242c110",
+              "name": "notification_id",
+              "value": "={{ $('Split Members').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "84af5b39-4c8b-475a-974b-baccb7ad5f06",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "3bdca55a-89c8-41ef-a92c-18b1056bc7e4",
+              "name": "message",
+              "value": "Blood report file not found",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4048,
+        -32
+      ],
+      "id": "f85fd0fa-50df-4553-a616-ebce58cb8643",
+      "name": "Edit Fields8"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "73c4a7c5-095c-4d1f-88de-0a2165f1ac0a",
+              "name": "notification_id",
+              "value": "={{ $('Send Reports | Email1').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "8ba0fba9-974a-4ea2-b4e8-e05d9e51fe55",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "b85f18cd-a9ee-4f01-a814-c55a9aaae493",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3360,
+        80
+      ],
+      "id": "3f4c5df3-9a1e-4bea-b076-6632f8b14bc0",
+      "name": "Prepare Response3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5216,
+        96
+      ],
+      "id": "aa96e0cb-089b-4721-9137-55befe64daf4",
+      "name": "Call Back2",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Fetch BioAI Report2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Blood Report1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reports | Email1": {
+      "main": [
+        [
+          {
+            "node": "If5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If5": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Response3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch BioAI Report2": {
+      "main": [
+        [
+          {
+            "node": "If6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Blood Report1": {
+      "main": [
+        [
+          {
+            "node": "If7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If6": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If7": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email1": {
+      "main": [
+        [
+          {
+            "node": "Send an Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an Email1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Response2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Response2": {
+      "main": [
+        [
+          {
+            "node": "Call Back2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields6": {
+      "main": [
+        [
+          {
+            "node": "Call Back2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields7": {
+      "main": [
+        [
+          {
+            "node": "Call Back2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields8": {
+      "main": [
+        [
+          {
+            "node": "Call Back2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Response3": {
+      "main": [
+        [
+          {
+            "node": "Call Back2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

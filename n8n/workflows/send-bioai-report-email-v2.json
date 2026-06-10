@@ -1,0 +1,516 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Send BioAI Report Email\nFetches BioAI report PDF from Metsights and emails it to each member.\nExpects: { notification_id, engagement_id, members: [{ first_name, email, phone, record_id }] }",
+        "height": 672,
+        "width": 2400
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2864,
+        3712
+      ],
+      "typeVersion": 1,
+      "id": "54780ff6-e0de-4c25-a1b5-12206e0b5aaf",
+      "name": "Sticky Note BioAI Email"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-bioai-report-email-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2960,
+        3904
+      ],
+      "id": "a769c77d-16d4-4cae-a365-e75e4ebb4e02",
+      "name": "BioAI Report Email",
+      "webhookId": "f46g4hi9-2345-6789-bcde-bioai002email"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.htmlBody }}",
+        "options": {
+          "appendAttribution": false,
+          "attachments": "={{ $json.fileUrl }}"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        4288,
+        3808
+      ],
+      "id": "582d0379-fd13-4c42-a1f7-ea9f3a5be6ba",
+      "name": "Send BioAI Report Email",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "3abdec11-5662-465a-81f4-a881a87a2505",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "val-001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "val-002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "val-003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3168,
+        3904
+      ],
+      "id": "f6bf7304-2c74-43a3-ac50-bf51641cc245",
+      "name": "Validate Payload3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\nconst engagementId = body.engagement_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    engagement_id: engagementId,\n    first_name: member.first_name || 'Participant',\n    email: member.email || '',\n    phone: member.phone || '',\n    record_id: member.record_id || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3392,
+        3888
+      ],
+      "id": "b9196ee1-dadd-4950-a0dc-3ce59fbc6642",
+      "name": "Split Members4"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.metsights.com/reports/{{ $json.record_id }}/pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "01993398a5aadb4a2798b6e98c2e08ee"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3632,
+        3888
+      ],
+      "id": "2b4b45f5-648d-43fd-843f-5476569c2b3e",
+      "name": "Fetch BioAI Report4"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "file-check-001",
+              "leftValue": "={{ $json.data.file }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3856,
+        3888
+      ],
+      "id": "0a385f2d-8e26-48f3-a2e7-d16ada837826",
+      "name": "File Link Exists?3"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $('Split Members4').item.json;\nconst fileUrl = $('Fetch BioAI Report4').item.json.data.file;\nconst name = (member.first_name || 'Participant').trim();\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<body>\n  <div class=\"container\">\n    <p>Hi ${name},</p>\n    <p>Thank you for completing your Bio-AI health assessment with Supershyft.</p>\n    <p>Please find your personalized Bio-AI Health Report attached to this email. The report combines your blood biomarkers and lifestyle inputs to provide deeper insights into your metabolic health, potential future risk areas, and preventive health recommendations.</p>\n    <p>You can also access and review your reports and insights through:<br>\n    <a href=\"${fileUrl}\">BioAI Report</a></p>\n    <p>Please log in using your registered mobile number and OTP.</p>\n    <p>If you need any assistance accessing your reports or understanding the findings, please feel free to reach out to our support team.</p>\n    <p>Warm regards,<br>\n    Support Team<br>\n    Supershyft<br>\n    <a href=\"https://www.supershyft.com\">www.supershyft.com</a></p>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    engagement_id: member.engagement_id,\n    to: member.email,\n    subject: 'Your Personalized Bio-AI Health Report',\n    htmlBody,\n    fileUrl\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4064,
+        3808
+      ],
+      "id": "96c75b65-b328-4393-bc61-5252bc7d77bb",
+      "name": "Prepare Email3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-sent-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Email3').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-sent-002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "resp-sent-003",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4656,
+        3792
+      ],
+      "id": "a7fe7bcd-b969-450b-bc55-32619c991cf3",
+      "name": "Email Sent Response1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Email3').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-fail-003",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4512,
+        3904
+      ],
+      "id": "fae414aa-7ed1-423a-ab4b-9581d83c70b1",
+      "name": "Email Failed Response1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-nofile-001",
+              "name": "notification_id",
+              "value": "={{ $('Split Members4').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-nofile-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-nofile-003",
+              "name": "message",
+              "value": "BioAI report file not found",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4064,
+        4000
+      ],
+      "id": "5435b5a8-b856-4458-a9ae-069f09a0798a",
+      "name": "File Not Found Response1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-valfail-001",
+              "name": "notification_id",
+              "value": "={{ $('BioAI Report Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-valfail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-valfail-003",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3392,
+        4160
+      ],
+      "id": "dbd803ad-99ea-4bcd-ab82-c890b264297f",
+      "name": "Validation Failed Response1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5056,
+        4160
+      ],
+      "id": "e4fe57f0-0d00-4f9a-b232-2a91eb334e45",
+      "name": "Callback3",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "BioAI Report Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send BioAI Report Email": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload3": {
+      "main": [
+        [
+          {
+            "node": "Split Members4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validation Failed Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members4": {
+      "main": [
+        [
+          {
+            "node": "Fetch BioAI Report4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch BioAI Report4": {
+      "main": [
+        [
+          {
+            "node": "File Link Exists?3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Link Exists?3": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "File Not Found Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email3": {
+      "main": [
+        [
+          {
+            "node": "Send BioAI Report Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response1": {
+      "main": [
+        [
+          {
+            "node": "Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response1": {
+      "main": [
+        [
+          {
+            "node": "Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Not Found Response1": {
+      "main": [
+        [
+          {
+            "node": "Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Failed Response1": {
+      "main": [
+        [
+          {
+            "node": "Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

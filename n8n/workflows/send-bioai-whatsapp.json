@@ -1,0 +1,460 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Sends Bio AI Report on Whatsapp\nExpects: { notification_id, members: [{ first_name, phone, record_id }] }",
+        "height": 672,
+        "width": 2192
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2864,
+        768
+      ],
+      "typeVersion": 1,
+      "id": "a5921488-60ae-445e-a029-52142dc8fc0b",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-bioai-whatsapp-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2960,
+        960
+      ],
+      "id": "7b2f2429-8f4f-43e4-9194-5899a63ccc6a",
+      "name": "BioAI Whatsapp1",
+      "webhookId": "c13f1ef6-90de-41e0-8f92-551fb211d6ac"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c4900e1a-6f0e-4bab-9041-f05ecde58fa9",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "499caaec-2faa-42db-a5a4-4b60f8f6c730",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "9691f373-dbaf-4cc6-a31f-ecbe901cf58a",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3168,
+        960
+      ],
+      "id": "4a1487e4-7396-48c0-af2e-1bc7adb2947d",
+      "name": "If8"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    phone: member.phone || '',\n    record_id: member.record_id || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3392,
+        944
+      ],
+      "id": "98251872-2cdb-4c3b-aa09-1313b871245b",
+      "name": "Split Members2"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message =\n`camp15,${name},\nYour personalized Bio-AI Health Report is attached below.,\nYour report includes personalized metabolic health insights and recommendations.,\nYou can find everything you need below for easy access,\nPlease visit: app.supershyft.com`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    record_id: member.record_id,\n    first_name: name,\n    phone,\n    message\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3632,
+        944
+      ],
+      "id": "67ba8543-e77e-488c-9a21-bbb4af1149da",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.metsights.com/reports/{{ $json.record_id }}/pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "01993398a5aadb4a2798b6e98c2e08ee"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3856,
+        944
+      ],
+      "id": "33b28def-8df8-47fd-9735-b1c9cedd59fa",
+      "name": "Fetch BioAI Report3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "46a16321-428d-4d3e-8162-f06e1575bdff",
+              "leftValue": "={{ $json.data.file }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4080,
+        944
+      ],
+      "id": "947bbe0c-dc63-4762-b780-d8aa6eb86462",
+      "name": "If9"
+    },
+    {
+      "parameters": {
+        "url": "https://webhook.whatapi.in/webhook/69ea095002e28c7ee412c02d",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Code in JavaScript1').item.json.phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $('Code in JavaScript1').item.json.message }}"
+            },
+            {
+              "name": "medialink",
+              "value": "={{ $('Fetch BioAI Report3').item.json.data.file }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4288,
+        928
+      ],
+      "id": "908554e0-20fa-450c-a6ee-ddece185ecc7",
+      "name": "Send BioAI Whatsapp1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "37b41bde-ee96-4a60-a1a9-03f6336aceff",
+              "name": "notification_id",
+              "value": "={{ $('Code in JavaScript1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "c798708a-e137-4725-9ac3-762337ff1fce",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "f0f67fe0-9708-4bba-8d9b-da9aa61a75ba",
+              "name": "message",
+              "value": "Message sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4528,
+        928
+      ],
+      "id": "6c91ce06-4e66-49c0-8346-bd0b70727694",
+      "name": "Edit Fields9"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3133ee24-7c3a-4a3f-b663-9e46f58d046c",
+              "name": "notification_id",
+              "value": "={{ $('Code in JavaScript1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "90cf0b62-9df2-4de5-a43a-d59aa33bbfd0",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "e24088e3-d250-46df-8dcc-aa10cc0985ba",
+              "name": "message",
+              "value": "BioAI report file not found",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4288,
+        1120
+      ],
+      "id": "4b2cf1c3-9a39-4617-b35f-ea0b7c47b4b7",
+      "name": "Edit Fields10"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8741d8fd-bfbf-46ce-bb41-c133fd398608",
+              "name": "notification_id",
+              "value": "={{ $('BioAI Whatsapp1').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "304a6765-ed6a-40cc-8df4-cd92af6dbe17",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "4232dba7-0d7f-4b95-b52d-d95a54d80953",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3392,
+        1248
+      ],
+      "id": "772d7f29-2ca9-4678-9797-695a96f3ecd5",
+      "name": "Edit Fields11"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4816,
+        1264
+      ],
+      "id": "d8aacdbc-34e3-4f15-88d3-aa060c113152",
+      "name": "Call Back3",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "BioAI Whatsapp1": {
+      "main": [
+        [
+          {
+            "node": "If8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If8": {
+      "main": [
+        [
+          {
+            "node": "Split Members2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Fetch BioAI Report3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch BioAI Report3": {
+      "main": [
+        [
+          {
+            "node": "If9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If9": {
+      "main": [
+        [
+          {
+            "node": "Send BioAI Whatsapp1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send BioAI Whatsapp1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields9": {
+      "main": [
+        [
+          {
+            "node": "Call Back3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields10": {
+      "main": [
+        [
+          {
+            "node": "Call Back3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields11": {
+      "main": [
+        [
+          {
+            "node": "Call Back3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

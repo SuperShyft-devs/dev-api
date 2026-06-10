@@ -1,0 +1,379 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Send Pre-test Guidelines Email v2\nSends fasting/pre-test guidelines email to each member before Bio-AI Health Report.\nExpects: { notification_id, members: [{ first_name, last_name, email, phone }] }",
+        "height": 560,
+        "width": 1984
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1936,
+        1856
+      ],
+      "typeVersion": 1,
+      "id": "abafd673-92f7-4afa-afa0-d6e50a69ba46",
+      "name": "Sticky Note Email3"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pretest-email-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2048,
+        2080
+      ],
+      "id": "c480b0c6-e8d9-4b3d-9e3c-2ed3bd5682c8",
+      "name": "Pretest Email1",
+      "webhookId": "3c3c5c03-bd13-617d-d9c6-hbh00d08741d"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f1000001-0000-0000-0000-000000000001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "f1000002-0000-0000-0000-000000000002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "f1000003-0000-0000-0000-000000000003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2288,
+        2080
+      ],
+      "id": "6ab0c493-1a0a-446c-8acf-49afe90fdb29",
+      "name": "Validate Email Payload3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2496,
+        1968
+      ],
+      "id": "b1cbf72f-2d56-45c9-a71f-c0f6ae04e79c",
+      "name": "Split Members3"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nconst body = `Hi ${name},\n\nTo ensure accurate and reliable results for your Bio-AI Health Report, please follow the pre-test guidelines below:\n\nFasting:\nA 10 - 12 hour fasting period is recommended before the test.\n\nIf fasting is not possible, you may have a very light, non-greasy breakfast such as:\n*   Plain idli, plain dosa, upma, or poha\n*   Black tea or black coffee\n*   Tender coconut water\n*   A small fruit such as apple or guava\n*   4 - 5 plain almonds or walnuts\n*   Plenty of water\n\nPlease avoid before the test:\n*   Fried items such as medu vada, parathas, or buttered toast\n*   Sugary beverages or juices\n*   Milk or dairy-based drinks\n*   Bananas, mangoes, or other high-sugar fruits\n\nConsuming high-fat or high-sugar foods before the test can significantly alter lipid profile, blood sugar levels, and other metabolic markers, which may impact the accuracy of your Bio-AI Health Report. Also please complete your Health Assessment before your test, as it is essential for generating your Bio-AI report.\n\nThank you for your cooperation, and we look forward to supporting you on your preventive health journey.\n\nWarm regards,\nTeam SuperShyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Bio-AI Health Report \\u2013 Pre-test guidelines',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        1968
+      ],
+      "id": "a62115bb-330e-4bcd-96a7-2181407b036c",
+      "name": "Prepare Pretest Email1"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2960,
+        1968
+      ],
+      "id": "487fb8ba-37a2-4b4f-a297-d97b5165bcf8",
+      "name": "Send Pretest Email1",
+      "webhookId": "b390d0fb-b402-4675-bf2a-530f3c060c1a",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "g1000001-0000-0000-0000-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Pretest Email1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "g1000002-0000-0000-0000-000000000002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "g1000003-0000-0000-0000-000000000003",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3200,
+        1888
+      ],
+      "id": "993f991f-fcb7-47e1-a67c-eea6c30b77e7",
+      "name": "Email Sent Response3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "g1000011-0000-0000-0000-000000000011",
+              "name": "notification_id",
+              "value": "={{ $json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "g1000012-0000-0000-0000-000000000012",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "g1000013-0000-0000-0000-000000000013",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3200,
+        2064
+      ],
+      "id": "90fd0b0f-9054-4020-8998-b279627af8f2",
+      "name": "Email Failed Response3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "g1000021-0000-0000-0000-000000000021",
+              "name": "notification_id",
+              "value": "={{ $('Pretest Email1').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "g1000022-0000-0000-0000-000000000022",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "g1000023-0000-0000-0000-000000000023",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2496,
+        2208
+      ],
+      "id": "b7abf9a7-0821-471f-b25e-9b5a055b4acb",
+      "name": "Email Validation Failed3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3632,
+        2208
+      ],
+      "id": "b6aee136-d008-48f0-92e1-9bf211e94d97",
+      "name": "Email Callback3",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Pretest Email1": {
+      "main": [
+        [
+          {
+            "node": "Validate Email Payload3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email Payload3": {
+      "main": [
+        [
+          {
+            "node": "Split Members3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Validation Failed3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members3": {
+      "main": [
+        [
+          {
+            "node": "Prepare Pretest Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Pretest Email1": {
+      "main": [
+        [
+          {
+            "node": "Send Pretest Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Pretest Email1": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response3": {
+      "main": [
+        [
+          {
+            "node": "Email Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response3": {
+      "main": [
+        [
+          {
+            "node": "Email Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Validation Failed3": {
+      "main": [
+        [
+          {
+            "node": "Email Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

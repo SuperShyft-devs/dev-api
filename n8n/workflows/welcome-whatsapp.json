@@ -1,0 +1,379 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Send Welcome WhatsApp v2\nSends a welcome WhatsApp message to each member in the payload.\nExpects: { notification_id, members: [{ first_name, last_name, email, phone }] }",
+        "height": 560,
+        "width": 1984
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1904,
+        304
+      ],
+      "typeVersion": 1,
+      "id": "e1cc7e68-170c-43a2-afa0-e18a2211145a",
+      "name": "Sticky Note WhatsApp3"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "welcome-whatsapp-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2000,
+        544
+      ],
+      "id": "8df3b7e4-8dc8-4b66-a4f3-835173cf81f1",
+      "name": "Welcome WhatsApp2",
+      "webhookId": "2b2b4b02-ac02-506c-c8b5-gag99c97630c"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e2000001-0000-0000-0000-000000000001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "e2000002-0000-0000-0000-000000000002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "e2000003-0000-0000-0000-000000000003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2208,
+        544
+      ],
+      "id": "de19bc3f-a050-40a4-9bd3-0b900438de2e",
+      "name": "Validate WhatsApp Payload3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        432
+      ],
+      "id": "685ed2c8-622e-4b6c-9dc8-32ce4ad971e4",
+      "name": "Split Members1"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) {\n  phone = '91' + phone;\n}\n\nconst message =\n`camp13,${name},Thank you so much for trusting us and taking the first step towards prevention.,Your SuperShyft health profile is ready! ,Please take a few minutes to complete your Health Assessment covering lifestyle and daily activity.,Your inputs help build your Bio AI Health Report and better details will lead to more meaningful insights. ,Please visit: app.supershyft.com`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        432
+      ],
+      "id": "c216e4bc-b946-4fca-8a05-9b1c708d95e2",
+      "name": "Prepare WhatsApp Message3"
+    },
+    {
+      "parameters": {
+        "url": "https://webhook.whatapi.in/webhook/69ea095002e28c7ee412c02d",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2912,
+        432
+      ],
+      "id": "a0c43b7e-677c-4d9f-a114-2c22b8181ddd",
+      "name": "Send WhatsApp Message3",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f5000031-0000-0000-0000-000000000031",
+              "name": "notification_id",
+              "value": "={{ $('Welcome WhatsApp2').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "f5000032-0000-0000-0000-000000000032",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "f5000033-0000-0000-0000-000000000033",
+              "name": "message",
+              "value": "Message sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3136,
+        336
+      ],
+      "id": "5a1fc618-c849-47ef-9c14-92594800c7f2",
+      "name": "WhatsApp Sent Response3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f5000041-0000-0000-0000-000000000041",
+              "name": "notification_id",
+              "value": "={{ $('Welcome WhatsApp2').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "f5000042-0000-0000-0000-000000000042",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "f5000043-0000-0000-0000-000000000043",
+              "name": "message",
+              "value": "WhatsApp sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3136,
+        512
+      ],
+      "id": "cef637a6-c2cf-46b1-a136-ed545651789b",
+      "name": "WhatsApp Failed Response3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f5000051-0000-0000-0000-000000000051",
+              "name": "notification_id",
+              "value": "={{ $('Welcome WhatsApp2').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "f5000052-0000-0000-0000-000000000052",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "f5000053-0000-0000-0000-000000000053",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2464,
+        640
+      ],
+      "id": "f324e04a-25ce-46bc-b4a8-b35d41a014fb",
+      "name": "WhatsApp Validation Failed3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3488,
+        640
+      ],
+      "id": "3e849a3d-7ee4-412b-b0a2-0c263f338a97",
+      "name": "WhatsApp Callback3",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Welcome WhatsApp2": {
+      "main": [
+        [
+          {
+            "node": "Validate WhatsApp Payload3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate WhatsApp Payload3": {
+      "main": [
+        [
+          {
+            "node": "Split Members1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Validation Failed3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members1": {
+      "main": [
+        [
+          {
+            "node": "Prepare WhatsApp Message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare WhatsApp Message3": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Message3": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Sent Response3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Failed Response3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Sent Response3": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Failed Response3": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Validation Failed3": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

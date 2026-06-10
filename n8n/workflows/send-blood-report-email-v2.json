@@ -1,0 +1,516 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Send Blood Report Email\nFetches blood report from Metsights and emails it to each member.\nExpects: { notification_id, engagement_id, members: [{ first_name, email, phone, record_id }] }",
+        "height": 672,
+        "width": 2304
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2880,
+        2768
+      ],
+      "typeVersion": 1,
+      "id": "b47f2fec-8bab-4fc3-b9c5-94fab9dcd6a6",
+      "name": "Sticky Note Blood Email"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-blood-report-email-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2976,
+        2960
+      ],
+      "id": "d92c10de-c9aa-4933-a081-7fd596400089",
+      "name": "Blood Report Email",
+      "webhookId": "e35f3gh8-1234-5678-abcd-blood001email"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.htmlBody }}",
+        "options": {
+          "appendAttribution": false,
+          "attachments": "={{ $json.fileUrl }}"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        4304,
+        2864
+      ],
+      "id": "111fc449-4813-414f-ad7d-bc367e52c25e",
+      "name": "Send Blood Report Email",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "938be4d8-9c2f-48a4-8027-36fd4f74118e",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-sent-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Email2').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-sent-002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "resp-sent-003",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4640,
+        2848
+      ],
+      "id": "e4a16531-e320-46f3-bd4b-92eafb9cba36",
+      "name": "Email Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Email2').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-fail-003",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4512,
+        3008
+      ],
+      "id": "8828b2b6-1add-4749-9751-2d37df680dd5",
+      "name": "Email Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-nofile-001",
+              "name": "notification_id",
+              "value": "={{ $('Split Members3').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-nofile-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-nofile-003",
+              "name": "message",
+              "value": "Blood report file not found",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4080,
+        3056
+      ],
+      "id": "e66309e4-9597-49c5-b695-f750672fed89",
+      "name": "File Not Found Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-valFail-001",
+              "name": "notification_id",
+              "value": "={{ $('Blood Report Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-valFail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-valFail-003",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3408,
+        3216
+      ],
+      "id": "df73a0ab-cded-4340-a974-7dcf5d2f2aaa",
+      "name": "Validation Failed Response"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "val-001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "val-002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "val-003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3184,
+        2960
+      ],
+      "id": "d4791b4d-c260-4e5c-92f6-2a97cb2747e2",
+      "name": "Validate Payload2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\nconst engagementId = body.engagement_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    engagement_id: engagementId,\n    first_name: member.first_name || 'Participant',\n    email: member.email || '',\n    phone: member.phone || '',\n    record_id: member.record_id || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3408,
+        2944
+      ],
+      "id": "1e995618-6e01-41f1-870e-519576f50922",
+      "name": "Split Members3"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.metsights.com/records/{{ $json.record_id }}/fetch-collections",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "01993398a5aadb4a2798b6e98c2e08ee"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3648,
+        2944
+      ],
+      "id": "0b242c7f-3a79-43ad-8925-61909f4e1506",
+      "name": "Fetch Blood Report2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "file-check-001",
+              "leftValue": "={{ $json.data.file }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3872,
+        2944
+      ],
+      "id": "bef5f0d6-c518-4957-8d0a-3c86e28b5b9b",
+      "name": "File Link Exists?2"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $('Split Members3').item.json;\nconst fileUrl = $('Fetch Blood Report2').item.json.data.file;\nconst name = (member.first_name || 'Participant').trim();\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<body>\n  <div class=\"container\">\n    <p>Hi ${name},</p>\n    <p>Thank you for completing your blood collection with Supershyft.</p>\n    <p>Please find your blood test report attached to this email for your reference. Please review the report carefully.</p>\n    <p>Your personalized Bio-AI Health Report, which offers a more comprehensive understanding of your health insights and preventive risk analysis, will be shared separately once you complete the health assessment on the Supershyft app.</p>\n    <p>You can also access your reports and health insights through:<br>\n    <a href=\"${fileUrl}\">Blood Report</a></p>\n    <p>Please log in using your registered mobile number and OTP.</p>\n    <p>If you need any assistance or have questions regarding your reports, feel free to reach out to our support team.</p>\n    <p>Warm regards,<br>\n    Support Team<br>\n    Supershyft<br>\n    <a href=\"https://www.supershyft.com\">www.supershyft.com</a></p>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    engagement_id: member.engagement_id,\n    to: member.email,\n    subject: 'Supershyft Blood Report',\n    htmlBody,\n    fileUrl\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4080,
+        2864
+      ],
+      "id": "4007d1d5-1511-492f-96b3-00e9a8b33a8a",
+      "name": "Prepare Email2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4944,
+        3216
+      ],
+      "id": "57c3e781-4996-4524-8221-aa1f296ceb77",
+      "name": "Callback2",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Blood Report Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Blood Report Email": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response": {
+      "main": [
+        [
+          {
+            "node": "Callback2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Callback2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Not Found Response": {
+      "main": [
+        [
+          {
+            "node": "Callback2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Callback2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload2": {
+      "main": [
+        [
+          {
+            "node": "Split Members3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validation Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members3": {
+      "main": [
+        [
+          {
+            "node": "Fetch Blood Report2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Blood Report2": {
+      "main": [
+        [
+          {
+            "node": "File Link Exists?2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Link Exists?2": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "File Not Found Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email2": {
+      "main": [
+        [
+          {
+            "node": "Send Blood Report Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

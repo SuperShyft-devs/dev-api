@@ -1,0 +1,379 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Send Health Assessment Reminder WhatsApp Metsights\nSends camp17 incomplete health assessment reminder to each member.\nExpects: { notification_id, members: [{ first_name, phone }] }",
+        "height": 560,
+        "width": 1984
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1952,
+        3328
+      ],
+      "typeVersion": 1,
+      "id": "51f66a17-38c5-4dfc-a934-d7fc70f9eb73",
+      "name": "Sticky Note HA Reminder"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assessment-reminder-whatsapp-metsights-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2080,
+        3520
+      ],
+      "id": "fd291d5b-1194-4b4d-95fa-a2a2e0db198a",
+      "name": "HA Reminder WhatsApp",
+      "webhookId": "i79j7kl2-5678-9012-efgh-ha005reminder"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "val-001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "val-002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "val-003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2288,
+        3520
+      ],
+      "id": "74f3fc41-d631-4e05-87cd-28997c357c19",
+      "name": "Validate Payload"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message = `camp17,${name},Your Health Assessment is Incomplete,Please complete for SuperShyft Bio-AI Health Report,By answering a few quick questions about your nutrition,sleep and physical activity.Your responses directly shape your Bio-AI Health Report the more accurate your inputs the more useful your report,If you have any query feel free to reach out on 8209512559,Please visit: www.metsights.com`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2768,
+        3504
+      ],
+      "id": "79234142-c60d-412b-a671-846ef52eca5f",
+      "name": "Prepare HA Reminder Message"
+    },
+    {
+      "parameters": {
+        "url": "https://webhook.whatapi.in/webhook/6a057e696f1a8bf9dd523d1f",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2992,
+        3504
+      ],
+      "id": "323a00a3-71c1-4585-bb8e-696c36c6eec4",
+      "name": "Send HA Reminder WhatsApp",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-valfail-001",
+              "name": "notification_id",
+              "value": "={{ $('HA Reminder WhatsApp').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-valfail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-valfail-003",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2512,
+        3696
+      ],
+      "id": "e0de1afe-0598-41f2-904b-68305c1918df",
+      "name": "Validation Failed Response"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3680,
+        3696
+      ],
+      "id": "54be9601-b1db-40cd-a774-397d8406fa9c",
+      "name": "Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    phone: member.phone || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2512,
+        3504
+      ],
+      "id": "5bc7781a-1cb3-4ce9-8c19-4d30026cb3e7",
+      "name": "Split Members5"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-sent-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare HA Reminder Message').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-sent-002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "resp-sent-003",
+              "name": "message",
+              "value": "Message sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3344,
+        3488
+      ],
+      "id": "b69de02d-1a1c-4685-a1ae-10c4edcecd7b",
+      "name": "WhatsApp Sent Response6"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resp-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare HA Reminder Message').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "resp-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "resp-fail-003",
+              "name": "message",
+              "value": "WhatsApp sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3200,
+        3584
+      ],
+      "id": "e4c09b29-293b-4f9d-8f4f-a9f2b34cc9de",
+      "name": "WhatsApp Failed Response6"
+    }
+  ],
+  "connections": {
+    "HA Reminder WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validation Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare HA Reminder Message": {
+      "main": [
+        [
+          {
+            "node": "Send HA Reminder WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send HA Reminder WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Sent Response6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Failed Response6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members5": {
+      "main": [
+        [
+          {
+            "node": "Prepare HA Reminder Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Sent Response6": {
+      "main": [
+        [
+          {
+            "node": "Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Failed Response6": {
+      "main": [
+        [
+          {
+            "node": "Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

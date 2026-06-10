@@ -1,0 +1,468 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Sends Blood Report on WhatsApp\nExpects: { notification_id, members: [{ first_name, phone, record_id }] }",
+        "height": 656,
+        "width": 2240
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2864,
+        1600
+      ],
+      "typeVersion": 1,
+      "id": "d4dfa7a3-c636-4b22-8f0c-c6387806b729",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-blood-report-whatsapp-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2960,
+        1792
+      ],
+      "id": "8a09373e-51ee-4660-bbeb-4e028db4c88b",
+      "name": "Blood Report Whatsapp1",
+      "webhookId": "d24f2ef7-91df-42f1-8a93-662fc322e7bd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a1000001-0001-0001-0001-000000000001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "a1000001-0001-0001-0001-000000000002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "a1000001-0001-0001-0001-000000000003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3168,
+        1792
+      ],
+      "id": "8e72cffa-6ad0-4097-929a-ae0a566f42c7",
+      "name": "Validate Payload1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    phone: member.phone || '',\n    record_id: member.record_id || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3392,
+        1776
+      ],
+      "id": "bb3d6f6a-e975-4922-b974-bd275804d128",
+      "name": "Split Members1"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) {\n  phone = '91' + phone;\n} else if (phone.length === 12 && phone.startsWith('91')) {\n  // already valid\n} else {\n  throw new Error('Invalid phone number: ' + phone);\n}\n\nconst first_name = (member.first_name || 'Participant').trim();\n\nconst message =\n`camp15,${first_name},Thank you for completing your blood sample collection and the Lifestyle Questionnaire.,Your Blood Test Reports are attached below.,The report includes 88+ biomarker profiles. ,Please visit: app.supershyft.com`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    record_id: member.record_id,\n    first_name,\n    phone,\n    message\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3616,
+        1776
+      ],
+      "id": "3b465c1d-9ae8-4987-b91b-4fb5eb14b059",
+      "name": "Format Phone and Message1"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.metsights.com/records/{{ $json.record_id }}/fetch-collections",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "01993398a5aadb4a2798b6e98c2e08ee"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3856,
+        1776
+      ],
+      "id": "2508281e-1432-4972-a1bb-6a1c8e5a1f11",
+      "name": "Fetch Blood Report Link1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a1000002-0002-0002-0002-000000000001",
+              "leftValue": "={{ $json.data.file }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4064,
+        1776
+      ],
+      "id": "1bd870cd-76e1-4afc-8fc7-ae5659cc79ab",
+      "name": "File Link Exists?1"
+    },
+    {
+      "parameters": {
+        "url": "https://webhook.whatapi.in/webhook/69ea095002e28c7ee412c02d",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "phone",
+              "value": "={{ $('Format Phone and Message1').item.json.phone }}"
+            },
+            {
+              "name": "number",
+              "value": "={{ $('Format Phone and Message1').item.json.phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $('Format Phone and Message1').item.json.message }}"
+            },
+            {
+              "name": "medialink",
+              "value": "={{ $('Fetch Blood Report Link1').item.json.data.file }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4288,
+        1664
+      ],
+      "id": "a18e622a-9b71-4bf5-95e4-25d7dc2940d4",
+      "name": "Send Blood Report Whatsapp1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1000003-0003-0003-0003-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Format Phone and Message1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "a1000003-0003-0003-0003-000000000002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "a1000003-0003-0003-0003-000000000003",
+              "name": "message",
+              "value": "Message sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4512,
+        1664
+      ],
+      "id": "83b1b840-bcdb-409e-ae0c-89f886ee6567",
+      "name": "Set Success Status1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1000004-0004-0004-0004-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Format Phone and Message1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "a1000004-0004-0004-0004-000000000002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "a1000004-0004-0004-0004-000000000003",
+              "name": "message",
+              "value": "Blood report file not found",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4288,
+        1856
+      ],
+      "id": "0585281c-b73e-4124-aa62-6db7b093a84b",
+      "name": "Set File Not Found Status1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1000005-0005-0005-0005-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Blood Report Whatsapp1').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "a1000005-0005-0005-0005-000000000002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "a1000005-0005-0005-0005-000000000003",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3392,
+        1984
+      ],
+      "id": "fbe28c49-0f04-49dc-81b6-09cd10d9b379",
+      "name": "Set Validation Failed Status1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4880,
+        1984
+      ],
+      "id": "23ca2f0a-2820-4c52-a8c8-2b0b42ad4729",
+      "name": "Callback1",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Blood Report Whatsapp1": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload1": {
+      "main": [
+        [
+          {
+            "node": "Split Members1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Validation Failed Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members1": {
+      "main": [
+        [
+          {
+            "node": "Format Phone and Message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Phone and Message1": {
+      "main": [
+        [
+          {
+            "node": "Fetch Blood Report Link1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Blood Report Link1": {
+      "main": [
+        [
+          {
+            "node": "File Link Exists?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Link Exists?1": {
+      "main": [
+        [
+          {
+            "node": "Send Blood Report Whatsapp1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set File Not Found Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Blood Report Whatsapp1": {
+      "main": [
+        [
+          {
+            "node": "Set Success Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Success Status1": {
+      "main": [
+        [
+          {
+            "node": "Callback1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set File Not Found Status1": {
+      "main": [
+        [
+          {
+            "node": "Callback1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Validation Failed Status1": {
+      "main": [
+        [
+          {
+            "node": "Callback1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

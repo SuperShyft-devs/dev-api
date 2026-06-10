@@ -1,0 +1,379 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Fan out: one output item per member\nconst body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email,\n    phone: member.phone || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2448,
+        -304
+      ],
+      "id": "d2d5b07d-d29e-498d-b40d-e68415d95d19",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "content": "## Send Welcome Email v2\nSends a welcome email to each member in the payload.\nExpects: { notification_id, members: [{ first_name, last_name, email, phone }] }",
+        "height": 640,
+        "width": 1848
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1904,
+        -464
+      ],
+      "typeVersion": 1,
+      "id": "94dc44cb-76dc-45f7-9d8d-ff74450e37d5",
+      "name": "Sticky Note Email2"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "welcome-email-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2000,
+        -224
+      ],
+      "id": "3461457d-92af-4d73-9f5b-a24137f23a5b",
+      "name": "Welcome Email1",
+      "webhookId": "1a1a3a01-9b01-405b-b7a4-f9f88b86529b"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e1000001-0000-0000-0000-000000000001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "e1000002-0000-0000-0000-000000000002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "e1000003-0000-0000-0000-000000000003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2224,
+        -224
+      ],
+      "id": "49ecb7fb-e202-4d5e-9993-dcf7c4b6f455",
+      "name": "Validate Email Payload2"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nconst body = `Hi ${name},\n\nThank you for trusting us and taking the first step towards preventive health, your profile is now ready !\n\nReady to get started?\nPlease visit: https://app.supershyft.com/\nLog in using your registered mobile number and Verify via OTP for secure access\n\nTo unlock your personalized Bio-AI Health Report, please complete your Health Assessment. These inputs enable us to generate more accurate, personalized, and actionable insights for your Bio-AI report.\n\nIf you need any assistance, please feel free to reach out, we're happy to help. Looking forward to supporting you on your health journey.\n\nWarm regards,\nTeam Supershyft`;\n\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Your Supershyft Profile is Ready',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2656,
+        -304
+      ],
+      "id": "9cf46a4f-73d5-4a9e-bc89-a344edd47aa7",
+      "name": "Prepare Welcome Email1"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2880,
+        -304
+      ],
+      "id": "a5264805-2ea0-4bd5-8af3-9a569388f4f1",
+      "name": "Send Welcome Email1",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "b6dd4cc8-c9de-44dd-9d3f-4cbd38038bf3",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f5000001-0000-0000-0000-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Welcome Email1').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "f5000002-0000-0000-0000-000000000002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "f5000003-0000-0000-0000-000000000003",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3232,
+        -320
+      ],
+      "id": "f0deecf8-2cd3-40ba-87d1-9d4e7629bb7d",
+      "name": "Email Sent Response2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f5000011-0000-0000-0000-000000000011",
+              "name": "notification_id",
+              "value": "={{ $('Welcome Email1').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "f5000012-0000-0000-0000-000000000012",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "f5000013-0000-0000-0000-000000000013",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3088,
+        -192
+      ],
+      "id": "322bec81-f8e2-4c4b-90ac-1f2626d3fcb7",
+      "name": "Email Failed Response2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f5000021-0000-0000-0000-000000000021",
+              "name": "notification_id",
+              "value": "={{ $('Welcome Email1').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "f5000022-0000-0000-0000-000000000022",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "f5000023-0000-0000-0000-000000000023",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2448,
+        -48
+      ],
+      "id": "44877f4a-51c9-4090-8c02-753cbb6d7371",
+      "name": "Email Validation Failed2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3504,
+        -48
+      ],
+      "id": "ed538ed9-7694-4451-9c6b-3bc557bd070f",
+      "name": "Email Callback2",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Welcome Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Welcome Email1": {
+      "main": [
+        [
+          {
+            "node": "Validate Email Payload2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email Payload2": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Validation Failed2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Welcome Email1": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Welcome Email1": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response2": {
+      "main": [
+        [
+          {
+            "node": "Email Callback2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response2": {
+      "main": [
+        [
+          {
+            "node": "Email Callback2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Validation Failed2": {
+      "main": [
+        [
+          {
+            "node": "Email Callback2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

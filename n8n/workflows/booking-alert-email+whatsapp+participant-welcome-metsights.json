@@ -1,0 +1,794 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Send Booking Alert – WhatsApp + Email to Members + Dispatch\nSends booking alert WhatsApp + Email to each member in the list.\nAfter all sends, calls dispatch API with participant_user_id.\nExpects: { notification_id, engagement_id, members[], participant_details{} }",
+        "height": 1168,
+        "width": 3872
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3200,
+        832
+      ],
+      "typeVersion": 1,
+      "id": "8e121585-9b6d-462d-800e-3d1d88a854de",
+      "name": "Sticky Note Booking3"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "booking-alert-email+whatsapp+participant-welcome-metsights",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        3312,
+        1312
+      ],
+      "id": "7b1a8eb1-2ab8-41c9-a6ff-598ee9039823",
+      "name": "Booking Alert WhatsApp3",
+      "webhookId": "5e5e7e05-df35-839f-fbf8-jdj22f20963f"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "h1000001-0000-0000-0000-000000000001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "h1000002-0000-0000-0000-000000000002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "h1000003-0000-0000-0000-000000000003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "h1000004-0000-0000-0000-000000000004",
+              "leftValue": "={{ $json.body.participant_details }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "h1000005-0000-0000-0000-000000000005",
+              "leftValue": "={{ $json.body.engagement_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3552,
+        1312
+      ],
+      "id": "79258cf5-b615-4bc9-ba08-a754aaed10b6",
+      "name": "Validate Booking Payload5"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\nconst engagementId = body.engagement_id;\nconst participantDetails = body.participant_details;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    engagement_id: engagementId,\n    participant_details: participantDetails,\n    first_name: member.first_name || 'Agent',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || '',\n    record_id: member.record_id || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3904,
+        1296
+      ],
+      "id": "4141d516-11b0-4139-963e-45c3c802dfdb",
+      "name": "Split Members1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "h2000021-0000-0000-0000-000000000021",
+              "name": "notification_id",
+              "value": "={{ $('Booking Alert WhatsApp3').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "h2000022-0000-0000-0000-000000000022",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "h2000023-0000-0000-0000-000000000023",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3904,
+        1792
+      ],
+      "id": "6dcf03c4-f081-408c-b63d-4d3757d21e74",
+      "name": "Booking Validation Failed3"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item.json;\nconst agentName = (item.first_name || 'Agent').trim();\n\nlet phone = String(item.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst pd = item.participant_details || {};\nconst detailsName  = pd.name  || 'New Participant';\nconst detailsPhone = pd.phone || '**********';\nconst detailsEmail = pd.email || 'participant@email.com';\nconst bookingDate  = pd.collection_date || 'N/A';\nconst bookingTime  = pd.collection_time || 'N/A';\n\nconst message =\n  `camp16,${agentName},Please initiate the process and proceed with the booking,` +\n  `Details Name: ${detailsName} Phone: ${detailsPhone} Email: ${detailsEmail},` +\n  `Date: ${bookingDate} Time: ${bookingTime},` +\n  `Address in Admin You can check the details below for your convenience. Please visit:https://admin.supershyft.com/`;\n\nreturn {\n  json: {\n    notification_id: item.notification_id,\n    engagement_id: item.engagement_id,\n    participant_details: item.participant_details,\n    email: item.email,\n    phone,\n    message\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4192,
+        1296
+      ],
+      "id": "45ae286a-2ca8-4fee-854f-03428ae951c4",
+      "name": "Prepare Booking Message3"
+    },
+    {
+      "parameters": {
+        "url": "https://webhook.whatapi.in/webhook/6a057e696f1a8bf9dd523d1f",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4480,
+        1152
+      ],
+      "id": "c45b3c48-ab58-4531-928c-f1d1fa0c741c",
+      "name": "Send Booking WhatsApp3",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $('Prepare Booking Message3').item.json;\nconst pd = item.participant_details || {};\n\nconst apptDate = pd.collection_date || 'N/A';\nconst timeSlot = pd.collection_time || '';\nlet formattedTime = timeSlot;\ntry {\n  const [hStr, mStr] = timeSlot.split(':');\n  const h = parseInt(hStr, 10);\n  const m = parseInt(mStr, 10);\n  const ampm = h >= 12 ? 'PM' : 'AM';\n  const h12 = h % 12 || 12;\n  formattedTime = `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;\n} catch (_) {}\n\nconst currentTime = new Date().toISOString().replace('T', ' ').substring(0, 19);\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n    .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }\n    .content { background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; }\n    .field { margin: 10px 0; }\n    .label { font-weight: bold; color: #555; }\n    .value { color: #333; }\n    .footer { background-color: #333; color: white; padding: 15px; text-align: center; border-radius: 0 0 5px 5px; }\n    .highlight { background-color: #e8f5e8; padding: 10px; border-radius: 5px; margin: 15px 0; }\n  </style>\n</head>\n<body>\n  <div class=\\\"container\\\">\n    <div class=\\\"header\\\"><h2>&#127881; New Health Camp Registration</h2><p>SuperShyft Health Camp</p></div>\n    <div class=\\\"content\\\">\n      <div class=\\\"highlight\\\"><strong>&#128197; New registration received at:</strong> ${currentTime}</div>\n      <h3>&#128100; Participant Information</h3>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Name:</span> <span class=\\\"value\\\">${pd.name || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Email:</span> <span class=\\\"value\\\">${pd.email || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Phone:</span> <span class=\\\"value\\\">${pd.phone || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Age:</span> <span class=\\\"value\\\">${pd.age || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Gender:</span> <span class=\\\"value\\\">${pd.gender || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Address:</span> <span class=\\\"value\\\">${pd.address || 'Not provided'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Pincode:</span> <span class=\\\"value\\\">${pd.pincode || 'Not provided'}</span></div>\n      <h3>&#128197; Appointment Details</h3>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Date:</span> <span class=\\\"value\\\">${apptDate}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Time:</span> <span class=\\\"value\\\">${formattedTime}</span></div>\n      <div class=\\\"highlight\\\"><strong>&#128161; Next Steps:</strong><ul><li>Review the registration details</li><li>Confirm the appointment if needed</li><li>Access the admin panel: <a href=\\\"https://admin.supershyft.com/\\\">admin.supershyft.com</a></li></ul></div>\n    </div>\n    <div class=\\\"footer\\\"><p>Automated notification from SuperShyft Health Camp Registration System</p><p>Please do not reply to this email</p></div>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: item.notification_id,\n    engagement_id: item.engagement_id,\n    participant_details: item.participant_details,\n    to: item.email,\n    subject: 'Booking Alert - SuperShyft',\n    htmlBody\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4480,
+        1424
+      ],
+      "id": "35f639eb-a795-4bac-a196-5790609dbd0c",
+      "name": "Prepare Booking Email2"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.htmlBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        4768,
+        1424
+      ],
+      "id": "28d19bc1-155d-4962-b429-7640b7d10660",
+      "name": "Send Booking Email2",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "0950e8c1-2854-487e-9396-2eef74575f75",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "h2000001-0000-0000-0000-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Booking Message3').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "h2000002-0000-0000-0000-000000000002",
+              "name": "engagement_id",
+              "value": "={{ $('Prepare Booking Message3').item.json.engagement_id }}",
+              "type": "number"
+            },
+            {
+              "id": "h2000003-0000-0000-0000-000000000003",
+              "name": "participant_user_id",
+              "value": "={{ $('Prepare Booking Message3').item.json.participant_details.participant_user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "h2000004-0000-0000-0000-000000000004",
+              "name": "channel",
+              "value": "whatsapp",
+              "type": "string"
+            },
+            {
+              "id": "h2000005-0000-0000-0000-000000000005",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4768,
+        928
+      ],
+      "id": "ed778c4f-3f7c-4896-a7a2-eb3bd0abc584",
+      "name": "WhatsApp Sent Response2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "h2000011-0000-0000-0000-000000000011",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Booking Message3').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "h2000012-0000-0000-0000-000000000012",
+              "name": "engagement_id",
+              "value": "={{ $('Prepare Booking Message3').item.json.engagement_id }}",
+              "type": "number"
+            },
+            {
+              "id": "h2000013-0000-0000-0000-000000000013",
+              "name": "participant_user_id",
+              "value": "={{ $('Prepare Booking Message3').item.json.participant_details.participant_user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "h2000014-0000-0000-0000-000000000014",
+              "name": "channel",
+              "value": "whatsapp",
+              "type": "string"
+            },
+            {
+              "id": "h2000015-0000-0000-0000-000000000015",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4768,
+        1168
+      ],
+      "id": "61777c7a-4590-4bac-a3a8-ee27a3ae211f",
+      "name": "WhatsApp Failed Response2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aa000011-0000-0000-0000-000000000011",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Booking Email2').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "aa000012-0000-0000-0000-000000000012",
+              "name": "engagement_id",
+              "value": "={{ $('Prepare Booking Email2').item.json.engagement_id }}",
+              "type": "number"
+            },
+            {
+              "id": "aa000013-0000-0000-0000-000000000013",
+              "name": "participant_user_id",
+              "value": "={{ $('Prepare Booking Email2').item.json.participant_details.participant_user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "aa000014-0000-0000-0000-000000000014",
+              "name": "channel",
+              "value": "email",
+              "type": "string"
+            },
+            {
+              "id": "aa000015-0000-0000-0000-000000000015",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5104,
+        1408
+      ],
+      "id": "5026ef4a-1c1b-4e68-a0bf-52daad14b7c4",
+      "name": "Email Sent Response2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aa000021-0000-0000-0000-000000000021",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Booking Email2').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "aa000022-0000-0000-0000-000000000022",
+              "name": "engagement_id",
+              "value": "={{ $('Prepare Booking Email2').item.json.engagement_id }}",
+              "type": "number"
+            },
+            {
+              "id": "aa000023-0000-0000-0000-000000000023",
+              "name": "participant_user_id",
+              "value": "={{ $('Prepare Booking Email2').item.json.participant_details.participant_user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "aa000024-0000-0000-0000-000000000024",
+              "name": "channel",
+              "value": "email",
+              "type": "string"
+            },
+            {
+              "id": "aa000025-0000-0000-0000-000000000025",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5104,
+        1616
+      ],
+      "id": "0fca2cb6-3112-4fe6-ac90-3634eb5c5a2b",
+      "name": "Email Failed Response2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        5472,
+        1280
+      ],
+      "id": "93b08328-7512-44d2-8556-4dc3a67a95b5",
+      "name": "Merge WhatsApp & Email Results2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\n\nconst notificationId = allItems[0]?.json?.notification_id;\nconst engagementId   = allItems[0]?.json?.engagement_id;\n\nconst userIds = [...new Set(\n  allItems\n    .map(i => i.json.participant_user_id)\n    .filter(Boolean)\n)];\n\nlet overallStatus = 'failed';\nconst sentItems = allItems.filter(i => i.json.status === 'sent');\nif (sentItems.length > 0) overallStatus = 'sent';\n\nconst messages = allItems.map(i => `${i.json.channel}: ${i.json.status}`).join(' | ');\n\nreturn [{\n  json: {\n    notification_id: notificationId,\n    engagement_id:   engagementId,\n    user_ids:        userIds,\n    status:          overallStatus,\n    message:         messages\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5760,
+        1280
+      ],
+      "id": "8011cd1a-4e25-49a1-b3e6-25b14b469670",
+      "name": "Combine Results2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/dispatch",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"service_key\": \"welcome-whatsapp-metsights\",\n  \"user_ids\": {{ JSON.stringify($json.user_ids) }},\n  \"engagement_id\": {{ $json.engagement_id }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6000,
+        1280
+      ],
+      "id": "e90a1ae3-7a48-4bac-9ab3-20df272b8d7b",
+      "name": "Dispatch Notification1",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $('Combine Results2').first().json.notification_id }},\n  \"status\": \"{{ $('Combine Results2').first().json.status }}\",\n  \"message\": \"{{ $('Combine Results2').first().json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6800,
+        1792
+      ],
+      "id": "200eb22d-97a9-445c-a7d9-adf3b08e09c5",
+      "name": "Booking Callback3",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "de8bd379-246a-429f-9ab2-93624739c5a8",
+              "name": "notification_id",
+              "value": "={{ $('Combine Results2').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "a3e84759-a2a3-45cd-a638-82eb186aa5fc",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "14ffc142-b19e-48dd-bbdb-625773a2c516",
+              "name": "message",
+              "value": "={{ $('Combine Results2').item.json.message }} Participant Notification Failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6288,
+        1568
+      ],
+      "id": "32e0fd62-caa7-4b04-a75a-99a0c499fbd4",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4323c66f-1b68-4b23-bf8e-935887baf848",
+              "name": "notification_id",
+              "value": "={{ $('Combine Results2').item.json.notification_id }}",
+              "type": "string"
+            },
+            {
+              "id": "b5b44448-538d-4d9f-823b-abfba38d9b09",
+              "name": "message",
+              "value": "={{ $('Combine Results2').item.json.message }} | Participant Notification sent Successfyllu",
+              "type": "string"
+            },
+            {
+              "id": "e4721d0e-9b01-4a9e-9eeb-805d814651a7",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6288,
+        1264
+      ],
+      "id": "4011dafa-72b0-4516-b3d7-42e3085ba378",
+      "name": "Edit Fields1"
+    }
+  ],
+  "connections": {
+    "Booking Alert WhatsApp3": {
+      "main": [
+        [
+          {
+            "node": "Validate Booking Payload5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Booking Payload5": {
+      "main": [
+        [
+          {
+            "node": "Split Members1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Booking Validation Failed3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Booking Message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Validation Failed3": {
+      "main": [
+        [
+          {
+            "node": "Booking Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Booking Message3": {
+      "main": [
+        [
+          {
+            "node": "Send Booking WhatsApp3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Booking Email2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Booking WhatsApp3": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Sent Response2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Failed Response2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Booking Email2": {
+      "main": [
+        [
+          {
+            "node": "Send Booking Email2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Booking Email2": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Sent Response2": {
+      "main": [
+        [
+          {
+            "node": "Merge WhatsApp & Email Results2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Failed Response2": {
+      "main": [
+        [
+          {
+            "node": "Merge WhatsApp & Email Results2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response2": {
+      "main": [
+        [
+          {
+            "node": "Merge WhatsApp & Email Results2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Email Failed Response2": {
+      "main": [
+        [
+          {
+            "node": "Merge WhatsApp & Email Results2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge WhatsApp & Email Results2": {
+      "main": [
+        [
+          {
+            "node": "Combine Results2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Results2": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Notification1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Notification1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Booking Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Booking Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

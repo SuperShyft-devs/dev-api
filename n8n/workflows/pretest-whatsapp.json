@@ -1,0 +1,379 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Send Pre-test WhatsApp\nSends camp14 WhatsApp template message to each member via webhook gateway.\nExpects: { notification_id, members: [{ first_name, last_name, email, phone }] }",
+        "height": 560,
+        "width": 1888
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1952,
+        2560
+      ],
+      "typeVersion": 1,
+      "id": "d9df329e-5190-4f73-9889-7538b91adb18",
+      "name": "Sticky Note WhatsApp5"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pretest-whatsapp-v2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2048,
+        2784
+      ],
+      "id": "6da94ab8-b904-4638-930c-991b11d60812",
+      "name": "Pretest WhatsApp1",
+      "webhookId": "4d4d6d04-ce24-728e-eae7-ici11e19852e"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f2000001-0000-0000-0000-000000000001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "f2000002-0000-0000-0000-000000000002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "f2000003-0000-0000-0000-000000000003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2272,
+        2784
+      ],
+      "id": "bf1a5232-6961-48bf-bf82-51fcdd710e71",
+      "name": "Validate WhatsApp Payload5"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        2672
+      ],
+      "id": "e9d6b3cf-d6c3-42db-8436-1b837b990504",
+      "name": "Split Members4"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) {\n  phone = '91' + phone;\n}\n\nconst message = `camp14,${name}`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        2672
+      ],
+      "id": "1124368e-0bbc-4c89-a2cd-52914c8bad75",
+      "name": "Prepare WhatsApp Message5"
+    },
+    {
+      "parameters": {
+        "url": "https://webhook.whatapi.in/webhook/69ea095002e28c7ee412c02d",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2928,
+        2672
+      ],
+      "id": "857ea611-ea1c-41ce-8d7b-d41c0ec1a0ee",
+      "name": "Send WhatsApp Message5",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "g2000001-0000-0000-0000-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare WhatsApp Message5').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "g2000002-0000-0000-0000-000000000002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "g2000003-0000-0000-0000-000000000003",
+              "name": "message",
+              "value": "Message sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3152,
+        2592
+      ],
+      "id": "201de654-a478-4730-9b74-16115fd3bc31",
+      "name": "WhatsApp Sent Response5"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "g2000011-0000-0000-0000-000000000011",
+              "name": "notification_id",
+              "value": "={{ $('Prepare WhatsApp Message5').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "g2000012-0000-0000-0000-000000000012",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "g2000013-0000-0000-0000-000000000013",
+              "name": "message",
+              "value": "WhatsApp sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3152,
+        2784
+      ],
+      "id": "5d2af0ce-6321-4969-ae5b-3067f258c564",
+      "name": "WhatsApp Failed Response5"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "g2000021-0000-0000-0000-000000000021",
+              "name": "notification_id",
+              "value": "={{ $('Pretest WhatsApp1').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "g2000022-0000-0000-0000-000000000022",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "g2000023-0000-0000-0000-000000000023",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2480,
+        2896
+      ],
+      "id": "2e72b3d5-8bad-454a-91ac-d1b009ff95d5",
+      "name": "WhatsApp Validation Failed5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3584,
+        2912
+      ],
+      "id": "2b0ec849-f71c-407e-a380-b8fe9836d4ef",
+      "name": "WhatsApp Callback5",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Pretest WhatsApp1": {
+      "main": [
+        [
+          {
+            "node": "Validate WhatsApp Payload5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate WhatsApp Payload5": {
+      "main": [
+        [
+          {
+            "node": "Split Members4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Validation Failed5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members4": {
+      "main": [
+        [
+          {
+            "node": "Prepare WhatsApp Message5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare WhatsApp Message5": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Message5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Message5": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Sent Response5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Failed Response5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Sent Response5": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Failed Response5": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Validation Failed5": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}
