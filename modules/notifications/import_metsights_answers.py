@@ -2,8 +2,8 @@
 
 For participants in running engagements whose assessment_instance.status != 'complete':
 1. Check MetSights record sub-resources for is_complete flags.
-2. If any sub-resource is complete, import answers via MetsightsSyncService.
-3. After import, mark the assessment instance as complete if the API didn't already.
+2. If any sub-resource is complete, import answers per-category via the strategy engine.
+3. After import, mark the assessment instance as complete if all categories are done.
 """
 
 from __future__ import annotations
@@ -16,9 +16,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
+from modules.assessments.repository import AssessmentsRepository
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.metsights.service import MetsightsService
 from modules.metsights.sync_service import MetsightsSyncService
+from modules.questionnaire.repository import QuestionnaireRepository
 
 logger = logging.getLogger(__name__)
 
@@ -109,11 +111,14 @@ async def import_metsights_answers(
     *,
     metsights_service: MetsightsService,
     sync_service: MetsightsSyncService,
+    questionnaire_repository: QuestionnaireRepository | None = None,
     as_of: date | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Check all incomplete assessment instances and import answers from MetSights where sub-resources are complete."""
+    """Check all incomplete assessment instances and import answers per-category from MetSights."""
     today = as_of or date.today()
+    q_repo = questionnaire_repository or QuestionnaireRepository()
+    assessments_repo = AssessmentsRepository()
 
     instances = await _get_running_engagement_instances(db)
     matched = len(instances)
@@ -148,20 +153,51 @@ async def import_metsights_answers(
                 })
                 continue
 
-            if dry_run:
+            metsights_categories = await _get_metsights_categories_for_package(
+                db, assessments_repo=assessments_repo, q_repo=q_repo,
+                package_id=int(instance.package_id),
+            )
+
+            if not metsights_categories:
                 skipped += 1
                 details.append({
                     "assessment_instance_id": ai_id, "user_id": user_id,
-                    "action": "dry_run", "reason": "would import answers",
+                    "action": "skipped", "reason": "no metsights categories assigned to package",
                 })
                 continue
 
-            result = await sync_service.import_questionnaire_answers_for_instance(
-                db,
-                assessment_instance_id=ai_id,
-                current_user_id=user_id,
-                employee_ok=True,
-            )
+            if dry_run:
+                skipped += 1
+                cat_keys = [c.category_key for c in metsights_categories]
+                details.append({
+                    "assessment_instance_id": ai_id, "user_id": user_id,
+                    "action": "dry_run",
+                    "reason": f"would import categories: {', '.join(cat_keys)}",
+                })
+                continue
+
+            total_imported = 0
+            cat_results: list[str] = []
+            for cat in metsights_categories:
+                try:
+                    result = await sync_service.import_category_from_metsights(
+                        db,
+                        assessment_instance_id=ai_id,
+                        user_id=user_id,
+                        category_key=cat.category_key,
+                        category_of="metsights",
+                        reload=0,
+                        employee_ok=True,
+                    )
+                    cat_imported = result.get("responses_imported", 0)
+                    total_imported += cat_imported
+                    cat_results.append(f"{cat.category_key}={cat_imported}")
+                except Exception as cat_exc:
+                    cat_results.append(f"{cat.category_key}=ERR:{cat_exc}")
+                    logger.warning(
+                        "import_metsights_answers category failed: instance=%s category=%s: %s",
+                        ai_id, cat.category_key, cat_exc, exc_info=True,
+                    )
 
             await db.flush()
             await db.refresh(instance)
@@ -173,7 +209,7 @@ async def import_metsights_answers(
             details.append({
                 "assessment_instance_id": ai_id, "user_id": user_id,
                 "action": "imported",
-                "reason": f"upserted {result.get('responses_upserted', 0)} responses",
+                "reason": f"imported {total_imported} responses ({', '.join(cat_results)})",
             })
 
         except Exception as exc:
@@ -196,3 +232,20 @@ async def import_metsights_answers(
         "dry_run": dry_run,
         "details": details,
     }
+
+
+async def _get_metsights_categories_for_package(
+    db: AsyncSession,
+    *,
+    assessments_repo: AssessmentsRepository,
+    q_repo: QuestionnaireRepository,
+    package_id: int,
+) -> list:
+    """Return all questionnaire categories with category_of='metsights' assigned to a package."""
+    links = await assessments_repo.list_package_categories(db, package_id=package_id)
+    metsights_cats = []
+    for link in links:
+        cat = await q_repo.get_category_by_id(db, link.category_id)
+        if cat is not None and getattr(cat, "category_of", "supershyft") == "metsights":
+            metsights_cats.append(cat)
+    return metsights_cats

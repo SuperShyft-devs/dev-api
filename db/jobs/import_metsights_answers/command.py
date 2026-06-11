@@ -64,6 +64,7 @@ async def run_import(
                 session,
                 metsights_service=metsights_service,
                 sync_service=sync_service,
+                questionnaire_repository=QuestionnaireRepository(),
                 as_of=as_of,
                 dry_run=dry_run,
             )
