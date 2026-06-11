@@ -83,6 +83,7 @@ class AssessmentPackageCategoriesService:
                     "category_id": category.category_id,
                     "category_key": category.category_key,
                     "display_name": category.display_name,
+                    "category_of": getattr(category, "category_of", "supershyft") or "supershyft",
                 }
             )
         return categories
@@ -111,6 +112,7 @@ class AssessmentPackageCategoriesService:
                     "category_id": category.category_id,
                     "category_key": category.category_key,
                     "display_name": category.display_name,
+                    "category_of": getattr(category, "category_of", "supershyft") or "supershyft",
                 }
             )
         return categories
@@ -121,6 +123,7 @@ class AssessmentPackageCategoriesService:
         *,
         user_id: int,
         assessment_instance_id: int,
+        category_of: str = "supershyft",
     ) -> list[dict]:
         """Package categories for the instance's package, with per-category complete/incomplete for that instance."""
         assessment_instance_id = _normalize_int(assessment_instance_id)
@@ -142,6 +145,9 @@ class AssessmentPackageCategoriesService:
             category = await self._questionnaire_repository.get_category_by_id(db, link.category_id)
             if category is None:
                 continue
+            cat_of = getattr(category, "category_of", "supershyft") or "supershyft"
+            if category_of != "all" and cat_of != category_of:
+                continue
             progress = await self._repository.get_category_progress(
                 db,
                 assessment_instance_id=int(instance.assessment_instance_id),
@@ -156,6 +162,7 @@ class AssessmentPackageCategoriesService:
                     "category_id": category.category_id,
                     "category_key": category.category_key,
                     "display_name": category.display_name,
+                    "category_of": cat_of,
                     "status": status,
                 }
             )

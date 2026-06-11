@@ -21,6 +21,7 @@ class QuestionnaireQuestionCreateRequest(BaseModel):
     options: Optional[list[dict[str, str | None]]] = Field(default=None)
     visibility_rules: Optional[dict[str, Any]] = Field(default=None)
     prefill_from: Optional[dict[str, Any]] = Field(default=None)
+    metsights_sync: Optional[dict[str, Any]] = Field(default=None)
     status: Optional[str] = Field(default="active", min_length=1, max_length=20)
 
     def normalized_question_key(self) -> str:
@@ -46,6 +47,7 @@ class QuestionnaireQuestionUpdateRequest(BaseModel):
     options: Optional[list[dict[str, str | None]]] = Field(default=None)
     visibility_rules: Optional[dict[str, Any]] = Field(default=None)
     prefill_from: Optional[dict[str, Any]] = Field(default=None)
+    metsights_sync: Optional[dict[str, Any]] = Field(default=None)
 
     def normalized_question_key(self) -> str:
         return _strip(self.question_key).lower()
@@ -55,6 +57,11 @@ class QuestionnaireQuestionUpdateRequest(BaseModel):
 
     def normalized_question_type(self) -> str:
         return _strip(self.question_type).lower()
+
+
+class MetsightsSyncUpdateRequest(BaseModel):
+    """Dedicated schema for updating metsights_sync on a question definition."""
+    metsights_sync: dict[str, Any] = Field(...)
 
 
 class QuestionnaireQuestionStatusUpdateRequest(BaseModel):
@@ -75,6 +82,7 @@ class QuestionnaireQuestionResponse(BaseModel):
     options: Any | None
     visibility_rules: dict[str, Any] | None
     prefill_from: dict[str, Any] | None
+    metsights_sync: dict[str, Any] | None = None
     status: str
     created_at: Any
 
@@ -125,26 +133,37 @@ class QuestionnaireResponsesUpsertRequest(BaseModel):
     responses: list[ResponseItem] = Field(..., min_length=1, max_length=500)
 
 
+_VALID_CATEGORY_OF = {"supershyft", "metsights"}
+
+
 class QuestionnaireCategoryCreateRequest(BaseModel):
     category_key: str = Field(..., min_length=1, max_length=100)
     display_name: str = Field(..., min_length=1, max_length=200)
+    category_of: str = Field(default="supershyft", min_length=1, max_length=20)
 
     def normalized_category_key(self) -> str:
         return _strip(self.category_key).lower()
 
     def normalized_display_name(self) -> str:
         return _strip(self.display_name)
+
+    def normalized_category_of(self) -> str:
+        return _strip(self.category_of).lower()
 
 
 class QuestionnaireCategoryUpdateRequest(BaseModel):
     category_key: str = Field(..., min_length=1, max_length=100)
     display_name: str = Field(..., min_length=1, max_length=200)
+    category_of: str = Field(default="supershyft", min_length=1, max_length=20)
 
     def normalized_category_key(self) -> str:
         return _strip(self.category_key).lower()
 
     def normalized_display_name(self) -> str:
         return _strip(self.display_name)
+
+    def normalized_category_of(self) -> str:
+        return _strip(self.category_of).lower()
 
 
 class QuestionnaireCategoryStatusUpdateRequest(BaseModel):

@@ -20,6 +20,7 @@ from modules.users.repository import UsersRepository
 from modules.questionnaire.schemas import (
     HealthyHabitRuleCreateRequest,
     HealthyHabitRuleUpdateRequest,
+    MetsightsSyncUpdateRequest,
     QuestionnaireCategoryCreateRequest,
     QuestionnaireCategoryQuestionsReorderRequest,
     QuestionnaireCategoryStatusUpdateRequest,
@@ -28,6 +29,8 @@ from modules.questionnaire.schemas import (
     QuestionnaireQuestionStatusUpdateRequest,
     QuestionnaireQuestionUpdateRequest,
 )
+
+_VALID_CATEGORY_OF = {"supershyft", "metsights"}
 
 _ALLOWED_STATUS = {"active", "inactive", "archived"}
 _ALLOWED_STATUS_UPDATE = {"active", "inactive"}
@@ -280,6 +283,7 @@ class QuestionnaireService:
             "options": serialized_options if serialized_options else None,
             "visibility_rules": row.visibility_rules,
             "prefill_from": row.prefill_from,
+            "metsights_sync": row.metsights_sync,
             "status": row.status,
             "created_at": row.created_at,
         }
@@ -593,6 +597,7 @@ class QuestionnaireService:
             help_text=(payload.help_text or "").strip() or None,
             visibility_rules=visibility_rules,
             prefill_from=prefill_from,
+            metsights_sync=payload.metsights_sync,
             status=status_value,
         )
         try:
@@ -717,6 +722,8 @@ class QuestionnaireService:
         row.help_text = (payload.help_text or "").strip() or None
         row.visibility_rules = self._normalize_visibility_rules(payload.visibility_rules)
         row.prefill_from = self._normalize_prefill_from(payload.prefill_from)
+        if payload.metsights_sync is not None:
+            row.metsights_sync = payload.metsights_sync
 
         cleaned_options = _clean_options(payload.options)
         self._validate_options_by_type(question_type=question_type, options=cleaned_options)
@@ -760,12 +767,15 @@ class QuestionnaireService:
         self._ensure_employee_access(employee)
         category_key = payload.normalized_category_key()
         display_name = payload.normalized_display_name()
+        category_of = payload.normalized_category_of()
         if not category_key or not display_name:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        if category_of not in _VALID_CATEGORY_OF:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="category_of must be supershyft or metsights")
         existing = await self._repository.get_category_by_key(db, category_key=category_key)
         if existing is not None:
             raise AppError(status_code=409, error_code="QUESTIONNAIRE_CATEGORY_EXISTS", message="Category already exists")
-        row = QuestionnaireCategory(category_key=category_key, display_name=display_name, status="active")
+        row = QuestionnaireCategory(category_key=category_key, display_name=display_name, category_of=category_of, status="active")
         row = await self._repository.create_category(db, row)
         await self._require_audit_service().log_event(
             db,
@@ -785,10 +795,23 @@ class QuestionnaireService:
         employee: EmployeeContext,
         page: int,
         limit: int,
+        category_of: str | None = None,
+        status: str | None = None,
     ) -> tuple[list[QuestionnaireCategory], int]:
         self._ensure_employee_access(employee)
-        rows = await self._repository.list_categories(db, page=page, limit=limit)
-        total = await self._repository.count_categories(db)
+        filter_category_of: str | None = None
+        if category_of is not None and category_of != "all":
+            if category_of not in _VALID_CATEGORY_OF:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="category_of must be supershyft, metsights, or all")
+            filter_category_of = category_of
+        filter_status: str | None = None
+        if status is not None:
+            normalized = _normalize(status)
+            if normalized not in _ALLOWED_STATUS:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            filter_status = normalized
+        rows = await self._repository.list_categories(db, page=page, limit=limit, category_of=filter_category_of, status=filter_status)
+        total = await self._repository.count_categories(db, category_of=filter_category_of, status=filter_status)
         return rows, total
 
     async def get_category(
@@ -819,11 +842,15 @@ class QuestionnaireService:
         row = await self.get_category(db, employee=employee, category_id=category_id)
         category_key = payload.normalized_category_key()
         display_name = payload.normalized_display_name()
+        category_of = payload.normalized_category_of()
+        if category_of not in _VALID_CATEGORY_OF:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="category_of must be supershyft or metsights")
         existing = await self._repository.get_category_by_key(db, category_key=category_key)
         if existing is not None and existing.category_id != row.category_id:
             raise AppError(status_code=409, error_code="QUESTIONNAIRE_CATEGORY_EXISTS", message="Category already exists")
         row.category_key = category_key
         row.display_name = display_name
+        row.category_of = category_of
         row = await self._repository.update_category(db, row)
         await self._require_audit_service().log_event(
             db,
@@ -989,6 +1016,35 @@ class QuestionnaireService:
             session_id=None,
         )
         return {"category_id": category_id, "question_ids": ordered_ids}
+
+    async def update_metsights_sync(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        question_id: int,
+        payload: MetsightsSyncUpdateRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> QuestionnaireDefinition:
+        self._ensure_employee_access(employee)
+        row = await self._repository.get_definition_by_id(db, question_id)
+        if row is None:
+            raise AppError(status_code=404, error_code="QUESTIONNAIRE_QUESTION_NOT_FOUND", message="Question does not exist")
+        row.metsights_sync = payload.metsights_sync
+        row = await self._repository.update_definition(db, row)
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_UPDATE_QUESTIONNAIRE_METSIGHTS_SYNC",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return row
 
     async def change_question_status(
         self,

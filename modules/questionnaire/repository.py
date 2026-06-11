@@ -159,21 +159,49 @@ class QuestionnaireRepository:
         *,
         page: int,
         limit: int,
+        category_of: str | None = None,
+        status: str | None = None,
     ) -> list[QuestionnaireCategory]:
         offset = (page - 1) * limit
-        result = await db.execute(
-            select(QuestionnaireCategory)
-            .order_by(QuestionnaireCategory.category_id.desc())
-            .offset(offset)
-            .limit(limit)
-        )
+        query = select(QuestionnaireCategory)
+        if category_of is not None:
+            query = query.where(QuestionnaireCategory.category_of == category_of)
+        if status is not None:
+            query = query.where(QuestionnaireCategory.status == status)
+        query = query.order_by(QuestionnaireCategory.category_id.desc()).offset(offset).limit(limit)
+        result = await db.execute(query)
         return list(result.scalars().all())
 
-    async def count_categories(self, db: AsyncSession) -> int:
+    async def count_categories(
+        self,
+        db: AsyncSession,
+        *,
+        category_of: str | None = None,
+        status: str | None = None,
+    ) -> int:
         from sqlalchemy import func
 
-        result = await db.execute(select(func.count()).select_from(QuestionnaireCategory))
+        query = select(func.count()).select_from(QuestionnaireCategory)
+        if category_of is not None:
+            query = query.where(QuestionnaireCategory.category_of == category_of)
+        if status is not None:
+            query = query.where(QuestionnaireCategory.status == status)
+        result = await db.execute(query)
         return int(result.scalar_one())
+
+    async def get_category_by_key_and_category_of(
+        self,
+        db: AsyncSession,
+        *,
+        category_key: str,
+        category_of: str,
+    ) -> QuestionnaireCategory | None:
+        result = await db.execute(
+            select(QuestionnaireCategory)
+            .where(QuestionnaireCategory.category_key == category_key)
+            .where(QuestionnaireCategory.category_of == category_of)
+        )
+        return result.scalar_one_or_none()
 
     async def update_category(self, db: AsyncSession, row: QuestionnaireCategory) -> QuestionnaireCategory:
         db.add(row)

@@ -25,6 +25,7 @@ class QuestionnaireDefinition(Base):
     help_text = Column(Text, nullable=True)
     visibility_rules = Column(JSON, nullable=True)
     prefill_from = Column(JSON, nullable=True)
+    metsights_sync = Column(JSON, nullable=True)
     status = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -49,6 +50,7 @@ class QuestionnaireCategory(Base):
     category_id = Column(Integer, primary_key=True)
     category_key = Column(String, nullable=False)
     display_name = Column(String, nullable=False)
+    category_of = Column(String(20), nullable=False, server_default=text("'supershyft'"))
     status = Column(String, nullable=False, server_default=text("'active'"))
 
 

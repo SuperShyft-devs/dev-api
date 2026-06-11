@@ -22,16 +22,26 @@ from db.seed.questionnaire_field_config import (
     RANDOM_SINGLE_FROM_MULTISELECT_FIELDS,
     SCALE_TO_CHOICE_CONVERTERS,
 )
-from modules.assessments.models import AssessmentInstance
+from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance
+from modules.audit.models import IntegrationSyncLog
+from modules.audit.repository import AuditRepository
 from modules.diagnostics.models import DiagnosticPackage
 from modules.assessments.service import AssessmentsService
 from modules.engagements.models import EngagementKind
 from modules.engagements.service import EngagementsService
 from modules.metsights.service import MetsightsService
+from modules.metsights.strategies import apply_pull_strategy, apply_push_strategy
 from modules.platform_settings.service import PlatformSettingsService
-from modules.questionnaire.models import QuestionnaireResponse
+from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireResponse
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.users.repository import UsersRepository
+
+_CATEGORY_KEY_TO_API_PATH: dict[str, str] = {
+    "physical-measurement": "physical-measurement",
+    "vitals": "vitals",
+    "diet-lifestyle-parameters": "diet-lifestyle-parameters",
+    "fitness-parameters": "fitness-parameters",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -1419,3 +1429,365 @@ class MetsightsSyncService:
             "resources_patched": patched,
             "section_errors": section_errors,
         }
+
+    # ------------------------------------------------------------------
+    # Strategy-based push (category-level submit)
+    # ------------------------------------------------------------------
+
+    async def submit_category_to_metsights(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        user_id: int,
+        category_key: str,
+        category_of: str = "metsights",
+    ) -> dict[str, Any]:
+        """Push answers for a single Metsights category using the strategy engine."""
+        from modules.assessments.repository import AssessmentsRepository
+
+        assessments_repo = AssessmentsRepository()
+        audit_repo = AuditRepository()
+
+        category = await self._questionnaire.get_category_by_key_and_category_of(
+            db, category_key=category_key, category_of=category_of,
+        )
+        if category is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"Category '{category_key}' with category_of='{category_of}' does not exist",
+            )
+
+        instance = await self._assessments.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
+        if instance is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+        if int(instance.user_id) != int(user_id):
+            raise AppError(status_code=403, error_code="FORBIDDEN", message="You do not have permission to perform this action")
+
+        mrid = (instance.metsights_record_id or "").strip()
+        if not mrid:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment has no Metsights record id")
+
+        engagement_id = int(instance.engagement_id) if instance.engagement_id else None
+
+        all_instances = await assessments_repo.list_all_instances_for_engagement(db, engagement_id=engagement_id) if engagement_id else [instance]
+        source_ids = [int(inst.assessment_instance_id) for inst in all_instances if int(inst.user_id) == int(user_id)]
+
+        questions = await self._questionnaire.list_questions_by_category(db, category_id=int(category.category_id))
+        if not questions:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="No questions found for this category")
+
+        not_enabled = []
+        for q in questions:
+            sync_cfg = q.metsights_sync or {}
+            push_cfg = sync_cfg.get("push") or {}
+            if not push_cfg.get("enabled", False):
+                not_enabled.append(q.question_key)
+        if not_enabled:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message=f"Push not enabled for questions: {', '.join(not_enabled)}",
+            )
+
+        question_ids = [int(q.question_id) for q in questions]
+        responses = await self._questionnaire.list_responses_for_instances(db, assessment_instance_ids=source_ids)
+        responses_map: dict[int, Any] = {}
+        for r in responses:
+            if int(r.question_id) in question_ids:
+                responses_map[int(r.question_id)] = r.answer
+
+        api_path = _CATEGORY_KEY_TO_API_PATH.get(category_key)
+        if api_path is None:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message=f"No Metsights API path for category '{category_key}'")
+
+        metsights_payload: dict[str, Any] = {}
+        for q in questions:
+            answer = responses_map.get(int(q.question_id))
+            if answer is None:
+                continue
+            sync_cfg = q.metsights_sync or {}
+            fields = apply_push_strategy(q.question_key, answer, sync_cfg)
+            metsights_payload.update(fields)
+
+        api_url = f"/records/{mrid}/{api_path}/"
+
+        sync_log = await audit_repo.create_sync_log(
+            db,
+            IntegrationSyncLog(
+                engagement_id=engagement_id,
+                user_id=user_id,
+                provider="metsights",
+                api_endpoint_url=api_url,
+                request_payload=metsights_payload,
+                status="pending",
+            ),
+        )
+
+        try:
+            field_meta = await self._fetch_field_metadata_for_resource(mrid, api_path, cache=None)
+            if field_meta:
+                metsights_payload = _validate_payload_against_options(metsights_payload, field_meta)
+            metsights_payload["is_complete"] = True
+            await self._metsights.upsert_record_subresource(record_id=mrid, resource=api_path, body=metsights_payload)
+            await audit_repo.update_sync_log_status(
+                db, sync_log_id=sync_log.sync_log_id, status="success", response_payload={"pushed": True},
+            )
+        except Exception as exc:
+            await audit_repo.update_sync_log_status(
+                db, sync_log_id=sync_log.sync_log_id, status="failed", error_message=str(exc),
+            )
+            raise AppError(
+                status_code=502,
+                error_code="METSIGHTS_PUSH_FAILED",
+                message=f"Failed to push to Metsights: {exc}",
+            ) from exc
+
+        progress = await assessments_repo.get_category_progress(
+            db,
+            assessment_instance_id=assessment_instance_id,
+            category_id=int(category.category_id),
+        )
+        now = datetime.now(timezone.utc)
+        if progress is None:
+            await assessments_repo.create_category_progress(
+                db,
+                AssessmentCategoryProgress(
+                    assessment_instance_id=assessment_instance_id,
+                    category_id=int(category.category_id),
+                    status="complete",
+                    completed_at=now,
+                ),
+            )
+        else:
+            progress.status = "complete"
+            progress.completed_at = now
+            await assessments_repo.update_category_progress(db, progress)
+
+        return {
+            "assessment_instance_id": assessment_instance_id,
+            "category": category_key,
+            "metsights_record_id": mrid,
+            "status": "success",
+            "fields_pushed": list(metsights_payload.keys()),
+        }
+
+    # ------------------------------------------------------------------
+    # Strategy-based pull (category-level import)
+    # ------------------------------------------------------------------
+
+    async def import_category_from_metsights(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        user_id: int,
+        category_key: str,
+        category_of: str = "metsights",
+        reload: int = 0,
+        employee_ok: bool = False,
+    ) -> dict[str, Any]:
+        """Pull answers for a single Metsights category using the strategy engine."""
+        from modules.assessments.repository import AssessmentsRepository
+
+        assessments_repo = AssessmentsRepository()
+        audit_repo = AuditRepository()
+
+        category = await self._questionnaire.get_category_by_key_and_category_of(
+            db, category_key=category_key, category_of=category_of,
+        )
+        if category is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"Category '{category_key}' with category_of='{category_of}' does not exist",
+            )
+
+        instance = await self._assessments.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
+        if instance is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+
+        self._ensure_sync_access(
+            current_user_id=user_id,
+            target_user_id=int(instance.user_id),
+            employee_ok=employee_ok,
+        )
+
+        mrid = (instance.metsights_record_id or "").strip()
+        if not mrid:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment has no Metsights record id")
+
+        engagement_id = int(instance.engagement_id) if instance.engagement_id else None
+        api_path = _CATEGORY_KEY_TO_API_PATH.get(category_key)
+        if api_path is None:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message=f"No Metsights API path for category '{category_key}'")
+
+        if reload == 0:
+            existing_responses = await self._questionnaire.list_responses_for_instance(
+                db, assessment_instance_id=assessment_instance_id, category_id=int(category.category_id),
+            )
+            if existing_responses:
+                return {
+                    "assessment_instance_id": assessment_instance_id,
+                    "category": category_key,
+                    "status": "skipped",
+                    "reason": "responses already exist, use reload=1 to overwrite",
+                }
+
+        api_url = f"/records/{mrid}/{api_path}/"
+        sync_log = await audit_repo.create_sync_log(
+            db,
+            IntegrationSyncLog(
+                engagement_id=engagement_id,
+                user_id=int(instance.user_id),
+                provider="metsights",
+                api_endpoint_url=api_url,
+                status="pending",
+            ),
+        )
+
+        try:
+            metsights_payload = await self._metsights.get_record_subresource_or_none(record_id=mrid, resource=api_path)
+            if not isinstance(metsights_payload, dict):
+                detail = await self._metsights.get_record_detail(record_id=mrid)
+                if isinstance(detail, dict):
+                    nested_key = _RESOURCE_TO_DETAIL_FIELD.get(api_path)
+                    nested = detail.get(nested_key) if nested_key else None
+                    if isinstance(nested, dict):
+                        metsights_payload = nested
+                    else:
+                        metsights_payload = {}
+                else:
+                    metsights_payload = {}
+        except Exception as exc:
+            await audit_repo.update_sync_log_status(
+                db, sync_log_id=sync_log.sync_log_id, status="failed", error_message=str(exc),
+            )
+            raise AppError(
+                status_code=502,
+                error_code="METSIGHTS_PULL_FAILED",
+                message=f"Failed to fetch from Metsights: {exc}",
+            ) from exc
+
+        imported = 0
+        skipped: list[str] = []
+        now = datetime.now(timezone.utc)
+
+        for field_name, raw_val in metsights_payload.items():
+            if field_name in _METADATA_FIELDS or str(field_name).endswith("_unit"):
+                continue
+            if raw_val is None or raw_val == [] or raw_val == "":
+                continue
+
+            qdef = await self._questionnaire.get_definition_by_key(db, question_key=str(field_name))
+            if qdef is None:
+                skipped.append(f"{field_name}:no_definition")
+                continue
+
+            sync_cfg = qdef.metsights_sync or {}
+            pull_cfg = sync_cfg.get("pull") or {}
+            if not pull_cfg.get("enabled", False):
+                skipped.append(f"{field_name}:pull_not_enabled")
+                continue
+
+            answer = apply_pull_strategy(str(field_name), metsights_payload, sync_cfg)
+            if answer is None:
+                skipped.append(f"{field_name}:strategy_returned_none")
+                continue
+
+            existing = await self._questionnaire.get_response_by_instance_and_question_id(
+                db, assessment_instance_id=assessment_instance_id, question_id=int(qdef.question_id),
+            )
+            if existing is not None:
+                existing.answer = answer
+                existing.category_id = int(category.category_id)
+                existing.submitted_at = now
+                await self._questionnaire.update_response(db, existing)
+            else:
+                await self._questionnaire.create_response(
+                    db,
+                    QuestionnaireResponse(
+                        assessment_instance_id=assessment_instance_id,
+                        question_id=int(qdef.question_id),
+                        category_id=int(category.category_id),
+                        answer=answer,
+                        submitted_at=now,
+                    ),
+                )
+            imported += 1
+
+        await audit_repo.update_sync_log_status(
+            db, sync_log_id=sync_log.sync_log_id, status="success",
+            response_payload={"imported": imported, "skipped": skipped},
+        )
+
+        await self._update_all_category_progress_for_instance(
+            db, assessments_repo=assessments_repo, instance=instance,
+        )
+
+        return {
+            "assessment_instance_id": assessment_instance_id,
+            "category": category_key,
+            "metsights_record_id": mrid,
+            "responses_imported": imported,
+            "skipped": skipped,
+        }
+
+    async def _update_all_category_progress_for_instance(
+        self,
+        db: AsyncSession,
+        *,
+        assessments_repo: "AssessmentsRepository",
+        instance: AssessmentInstance,
+    ) -> None:
+        """Check all categories for an instance and update progress status."""
+        package_categories = await assessments_repo.list_package_categories(
+            db, package_id=int(instance.package_id),
+        )
+        now = datetime.now(timezone.utc)
+
+        for link in package_categories:
+            cat = await self._questionnaire.get_category_by_id(db, link.category_id)
+            if cat is None:
+                continue
+
+            questions = await self._questionnaire.list_questions_by_category(db, category_id=int(cat.category_id))
+            active_questions = [q for q in questions if (q.status or "").lower() == "active"]
+            required_questions = [q for q in active_questions if q.is_required]
+
+            if not required_questions:
+                continue
+
+            responses = await self._questionnaire.list_responses_for_instance(
+                db, assessment_instance_id=int(instance.assessment_instance_id), category_id=int(cat.category_id),
+            )
+            answered_qids = {int(r.question_id) for r in responses if r.answer is not None}
+            all_required_answered = all(int(q.question_id) in answered_qids for q in required_questions)
+
+            progress = await assessments_repo.get_category_progress(
+                db,
+                assessment_instance_id=int(instance.assessment_instance_id),
+                category_id=int(cat.category_id),
+            )
+
+            if all_required_answered:
+                if progress is None:
+                    await assessments_repo.create_category_progress(
+                        db,
+                        AssessmentCategoryProgress(
+                            assessment_instance_id=int(instance.assessment_instance_id),
+                            category_id=int(cat.category_id),
+                            status="complete",
+                            completed_at=now,
+                        ),
+                    )
+                elif (progress.status or "").strip().lower() != "complete":
+                    progress.status = "complete"
+                    progress.completed_at = now
+                    await assessments_repo.update_category_progress(db, progress)
+            else:
+                if progress is not None and (progress.status or "").strip().lower() == "complete":
+                    progress.status = "incomplete"
+                    progress.completed_at = None
+                    await assessments_repo.update_category_progress(db, progress)

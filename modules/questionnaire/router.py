@@ -22,6 +22,7 @@ from modules.questionnaire.dependencies import (
 from modules.questionnaire.schemas import (
     HealthyHabitRuleCreateRequest,
     HealthyHabitRuleUpdateRequest,
+    MetsightsSyncUpdateRequest,
     QuestionnaireCategoryCreateRequest,
     QuestionnaireCategoryQuestionsAssignRequest,
     QuestionnaireCategoryQuestionsReorderRequest,
@@ -155,6 +156,28 @@ async def update_question_status(
     return success_response({"question_id": updated.question_id, "status": updated.status})
 
 
+@management_router.put("/questions/{question_id}/metsights-sync")
+async def update_metsights_sync(
+    question_id: int,
+    payload: MetsightsSyncUpdateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    updated = await service.update_metsights_sync(
+        db,
+        employee=employee,
+        question_id=question_id,
+        payload=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(await service.serialize_question_definition(db, updated))
+
+
 @management_router.get("/questions/{question_id}/healthy-habit-rules")
 async def list_healthy_habit_rules(
     question_id: int,
@@ -259,18 +282,23 @@ async def create_category(
 async def list_categories(
     page: int = 1,
     limit: int = 20,
+    category_of: str | None = None,
+    status: str | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     service: QuestionnaireService = Depends(get_questionnaire_management_service),
 ):
     if page < 1 or limit < 1 or limit > 100:
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-    rows, total = await service.list_categories(db, employee=employee, page=page, limit=limit)
+    rows, total = await service.list_categories(
+        db, employee=employee, page=page, limit=limit, category_of=category_of, status=status,
+    )
     data = [
         {
             "category_id": row.category_id,
             "category_key": row.category_key,
             "display_name": row.display_name,
+            "category_of": row.category_of,
             "status": row.status,
         }
         for row in rows
@@ -291,6 +319,7 @@ async def get_category(
             "category_id": row.category_id,
             "category_key": row.category_key,
             "display_name": row.display_name,
+            "category_of": row.category_of,
             "status": row.status,
         }
     )

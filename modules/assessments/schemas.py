@@ -47,6 +47,12 @@ class MetsightsRecordIdUpdate(BaseModel):
 
 
 class AssessmentSubmitRequest(BaseModel):
+    category: str = Field(..., min_length=1, max_length=100)
+    category_of: str = Field(default="metsights", min_length=1, max_length=20)
+
+
+class AssessmentSubmitLegacyRequest(BaseModel):
+    """Legacy submit payload (kept for backward compatibility)."""
     source_assessment_instance_ids: list[int] | None = Field(
         default=None,
         alias="source_assessment_instance_ids",
@@ -61,6 +67,12 @@ class AssessmentSubmitRequest(BaseModel):
     @property
     def effective_source_ids(self) -> list[int] | None:
         return self.source_assessment_instance_ids or self.source_assessment_instance_id
+
+
+class MetsightsImportRequest(BaseModel):
+    category: str = Field(..., min_length=1, max_length=100)
+    category_of: str = Field(default="metsights", min_length=1, max_length=20)
+    reload: int = Field(default=0)
 
 
 class AssessmentPackageCreateRequest(BaseModel):

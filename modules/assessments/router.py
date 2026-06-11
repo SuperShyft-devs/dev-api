@@ -14,7 +14,13 @@ from modules.assessments.dependencies import (
     get_assessments_service,
 )
 from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
-from modules.assessments.schemas import AssessmentStatusUpdateRequest, AssessmentSubmitRequest, MetsightsRecordIdUpdate
+from modules.assessments.schemas import (
+    AssessmentStatusUpdateRequest,
+    AssessmentSubmitLegacyRequest,
+    AssessmentSubmitRequest,
+    MetsightsImportRequest,
+    MetsightsRecordIdUpdate,
+)
 from modules.assessments.service import AssessmentsService
 from modules.employee.dependencies import get_current_employee, get_optional_employee
 from modules.metsights.dependencies import get_metsights_sync_service
@@ -106,13 +112,35 @@ async def get_assessment_details(
 async def submit_assessment(
     assessment_instance_id: int,
     request: Request,
-    body: AssessmentSubmitRequest | None = None,
+    body: AssessmentSubmitRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
+):
+    """Push answers for a specific Metsights category using the strategy engine."""
+
+    data = await sync_service.submit_category_to_metsights(
+        db,
+        assessment_instance_id=assessment_instance_id,
+        user_id=user.user_id,
+        category_key=body.category,
+        category_of=body.category_of,
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.post("/{assessment_instance_id}/submit-legacy")
+async def submit_assessment_legacy(
+    assessment_instance_id: int,
+    request: Request,
+    body: AssessmentSubmitLegacyRequest | None = None,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
     assessments_service: AssessmentsService = Depends(get_assessments_service),
     sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
 ):
-    """Finalize questionnaire: push answers to Metsights (when applicable), mark responses and assessment completed."""
+    """Legacy submit: push all answers to Metsights and mark assessment completed."""
 
     source_ids = body.effective_source_ids if body else None
 
@@ -133,12 +161,36 @@ async def submit_assessment(
 @router.post("/{assessment_instance_id}/metsights/import-answers")
 async def import_metsights_questionnaire_answers(
     assessment_instance_id: int,
+    body: MetsightsImportRequest,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
     employee=Depends(get_optional_employee),
     sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
 ):
-    """Pull Metsights per-type questionnaire resources (GET + OPTIONS) and upsert responses (field keys + choice/unit codes match seed)."""
+    """Pull answers for a specific Metsights category using the strategy engine."""
+
+    result = await sync_service.import_category_from_metsights(
+        db,
+        assessment_instance_id=assessment_instance_id,
+        user_id=current_user.user_id,
+        category_key=body.category,
+        category_of=body.category_of,
+        reload=body.reload,
+        employee_ok=employee is not None,
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.post("/{assessment_instance_id}/metsights/import-answers-legacy")
+async def import_metsights_questionnaire_answers_legacy(
+    assessment_instance_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    employee=Depends(get_optional_employee),
+    sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
+):
+    """Legacy import: pull all Metsights questionnaire resources for the instance."""
 
     result = await sync_service.import_questionnaire_answers_for_instance(
         db,
@@ -153,6 +205,7 @@ async def import_metsights_questionnaire_answers(
 @router.get("/{assessment_instance_id}/status")
 async def get_assessment_categories_status(
     assessment_instance_id: int,
+    category_of: str = "supershyft",
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
     categories_service: AssessmentPackageCategoriesService = Depends(get_assessment_package_categories_service),
@@ -162,6 +215,7 @@ async def get_assessment_categories_status(
         db,
         user_id=user.user_id,
         assessment_instance_id=assessment_instance_id,
+        category_of=category_of,
     )
     return success_response(data)
 
