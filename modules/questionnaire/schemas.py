@@ -64,6 +64,32 @@ class MetsightsSyncUpdateRequest(BaseModel):
     metsights_sync: dict[str, Any] = Field(...)
 
 
+class MetsightsSyncGapsCategoryRef(BaseModel):
+    category_id: int
+    category_key: str | None = None
+    display_name: str | None = None
+
+
+class MetsightsSyncGapsItem(BaseModel):
+    question_id: int
+    question_key: str | None = None
+    question_text: str | None = None
+    metsights_categories: list[MetsightsSyncGapsCategoryRef]
+    sync_gaps: dict[str, bool]
+
+
+class MetsightsSyncGapsSummary(BaseModel):
+    not_configured: int
+    pull_disabled: int
+    push_disabled: int
+
+
+class MetsightsSyncGapsResponse(BaseModel):
+    count: int
+    summary: MetsightsSyncGapsSummary
+    questions: list[MetsightsSyncGapsItem]
+
+
 class QuestionnaireQuestionStatusUpdateRequest(BaseModel):
     status: str = Field(..., min_length=1, max_length=20)
 

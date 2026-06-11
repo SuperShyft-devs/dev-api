@@ -6,6 +6,7 @@ import logging
 import math
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -662,6 +663,67 @@ class QuestionnaireService:
         )
         total = await self._repository.count_definitions(db, status=status_value, question_type=type_value)
         return rows, total
+
+    async def list_metsights_sync_gaps(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+    ) -> dict[str, Any]:
+        """Questions in metsights categories with incomplete metsights_sync configuration."""
+        self._ensure_employee_access(employee)
+
+        rows = await self._repository.list_question_category_assignments_for_metsights(db)
+        by_question: dict[int, dict[str, Any]] = {}
+
+        for definition, category in rows:
+            qid = int(definition.question_id)
+            if qid not in by_question:
+                ms = definition.metsights_sync
+                pull = (ms or {}).get("pull") or {}
+                push = (ms or {}).get("push") or {}
+                not_configured = ms is None
+                pull_disabled = not_configured or not pull.get("enabled", False)
+                push_disabled = not_configured or not push.get("enabled", False)
+                by_question[qid] = {
+                    "question_id": qid,
+                    "question_key": definition.question_key,
+                    "question_text": definition.question_text,
+                    "metsights_categories": [],
+                    "sync_gaps": {
+                        "not_configured": not_configured,
+                        "pull_disabled": pull_disabled,
+                        "push_disabled": push_disabled,
+                    },
+                }
+            by_question[qid]["metsights_categories"].append(
+                {
+                    "category_id": int(category.category_id),
+                    "category_key": category.category_key,
+                    "display_name": category.display_name,
+                }
+            )
+
+        gaps = [
+            item
+            for item in by_question.values()
+            if item["sync_gaps"]["not_configured"]
+            or item["sync_gaps"]["pull_disabled"]
+            or item["sync_gaps"]["push_disabled"]
+        ]
+        gaps.sort(key=lambda x: (x.get("question_key") or "", x["question_id"]))
+
+        summary = {
+            "not_configured": sum(1 for g in gaps if g["sync_gaps"]["not_configured"]),
+            "pull_disabled": sum(1 for g in gaps if g["sync_gaps"]["pull_disabled"]),
+            "push_disabled": sum(1 for g in gaps if g["sync_gaps"]["push_disabled"]),
+        }
+
+        return {
+            "count": len(gaps),
+            "summary": summary,
+            "questions": gaps,
+        }
 
     async def get_question_definition(
         self,

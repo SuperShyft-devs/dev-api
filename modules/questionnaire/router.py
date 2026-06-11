@@ -100,6 +100,16 @@ async def list_questions(
     return success_response(data, meta={"page": page, "limit": limit, "total": total})
 
 
+@management_router.get("/questions/metsights-sync-gaps")
+async def list_metsights_sync_gaps(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    data = await service.list_metsights_sync_gaps(db, employee=employee)
+    return success_response(data)
+
+
 @management_router.get("/questions/{question_id}")
 async def get_question(
     question_id: int,

@@ -208,6 +208,26 @@ class QuestionnaireRepository:
         await db.flush()
         return row
 
+    async def list_question_category_assignments_for_metsights(
+        self,
+        db: AsyncSession,
+    ) -> list[tuple[QuestionnaireDefinition, QuestionnaireCategory]]:
+        """All question-to-category links where the category has category_of=metsights."""
+        result = await db.execute(
+            select(QuestionnaireDefinition, QuestionnaireCategory)
+            .join(
+                QuestionnaireCategoryQuestion,
+                QuestionnaireCategoryQuestion.question_id == QuestionnaireDefinition.question_id,
+            )
+            .join(
+                QuestionnaireCategory,
+                QuestionnaireCategory.category_id == QuestionnaireCategoryQuestion.category_id,
+            )
+            .where(QuestionnaireCategory.category_of == "metsights")
+            .order_by(QuestionnaireDefinition.question_id.asc(), QuestionnaireCategory.category_id.asc())
+        )
+        return list(result.all())
+
     async def list_questions_by_category(
         self,
         db: AsyncSession,
