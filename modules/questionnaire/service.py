@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
+from db.seed.metsights_sync_operations import reset_metsights_sync as run_reset_metsights_sync
 from db.seed.questionnaire_field_config import QUESTION_TYPE_OVERRIDES
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
@@ -725,6 +726,30 @@ class QuestionnaireService:
             "questions": gaps,
         }
 
+    async def reset_metsights_sync(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict[str, Any]:
+        """Upsert Metsights sync categories, question links, and metsights_sync configs."""
+        self._ensure_employee_access(employee)
+        stats = await run_reset_metsights_sync(db)
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_RESET_METSIGHTS_SYNC",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return stats
+
     async def get_question_definition(
         self,
         db: AsyncSession,
@@ -834,7 +859,11 @@ class QuestionnaireService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         if category_of not in _VALID_CATEGORY_OF:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="category_of must be supershyft or metsights")
-        existing = await self._repository.get_category_by_key(db, category_key=category_key)
+        existing = await self._repository.get_category_by_key_and_category_of(
+            db,
+            category_key=category_key,
+            category_of=category_of,
+        )
         if existing is not None:
             raise AppError(status_code=409, error_code="QUESTIONNAIRE_CATEGORY_EXISTS", message="Category already exists")
         row = QuestionnaireCategory(category_key=category_key, display_name=display_name, category_of=category_of, status="active")
@@ -907,7 +936,11 @@ class QuestionnaireService:
         category_of = payload.normalized_category_of()
         if category_of not in _VALID_CATEGORY_OF:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="category_of must be supershyft or metsights")
-        existing = await self._repository.get_category_by_key(db, category_key=category_key)
+        existing = await self._repository.get_category_by_key_and_category_of(
+            db,
+            category_key=category_key,
+            category_of=category_of,
+        )
         if existing is not None and existing.category_id != row.category_id:
             raise AppError(status_code=409, error_code="QUESTIONNAIRE_CATEGORY_EXISTS", message="Category already exists")
         row.category_key = category_key

@@ -110,6 +110,25 @@ async def list_metsights_sync_gaps(
     return success_response(data)
 
 
+@management_router.post("/metsights-sync/reset")
+async def reset_metsights_sync(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    """Create or update Metsights sync categories, assignments, and metsights_sync configs."""
+    data = await service.reset_metsights_sync(
+        db,
+        employee=employee,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
 @management_router.get("/questions/{question_id}")
 async def get_question(
     question_id: int,
