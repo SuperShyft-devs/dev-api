@@ -1365,37 +1365,39 @@ class ReportsService:
     @staticmethod
     def _extract_fitprint_parameter(
         params_list: Any,
-        parameter_name: str,
+        parameter_name: str | tuple[str, ...],
     ) -> FitPrintParameter | None:
         """Extract a full parameter object from a FitPrint report parameters list."""
         if not isinstance(params_list, list):
             return None
-        for p in params_list:
-            if not isinstance(p, dict):
-                continue
-            if p.get("parameter") != parameter_name:
-                continue
-            raw_val = p.get("value")
-            value = float(raw_val) if isinstance(raw_val, (int, float)) else None
-            healthy_range_str = p.get("healthy_range")
-            healthy_range: FitPrintParameterRange | None = None
-            if isinstance(healthy_range_str, str) and "–" in healthy_range_str:
-                parts = healthy_range_str.split("–")
-                try:
-                    healthy_range = FitPrintParameterRange(
-                        min=float(parts[0].strip()),
-                        max=float(parts[1].strip()),
-                    )
-                except (ValueError, IndexError):
-                    pass
-            return FitPrintParameter(
-                parameter=p.get("parameter"),
-                code=p.get("code"),
-                value=value,
-                unit=p.get("unit"),
-                healthy_range=healthy_range,
-                status=p.get("status"),
-            )
+        names = (parameter_name,) if isinstance(parameter_name, str) else parameter_name
+        for name in names:
+            for p in params_list:
+                if not isinstance(p, dict):
+                    continue
+                if p.get("parameter") != name:
+                    continue
+                raw_val = p.get("value")
+                value = float(raw_val) if isinstance(raw_val, (int, float)) else None
+                healthy_range_str = p.get("healthy_range")
+                healthy_range: FitPrintParameterRange | None = None
+                if isinstance(healthy_range_str, str) and "–" in healthy_range_str:
+                    parts = healthy_range_str.split("–")
+                    try:
+                        healthy_range = FitPrintParameterRange(
+                            min=float(parts[0].strip()),
+                            max=float(parts[1].strip()),
+                        )
+                    except (ValueError, IndexError):
+                        pass
+                return FitPrintParameter(
+                    parameter=p.get("parameter"),
+                    code=p.get("code"),
+                    value=value,
+                    unit=p.get("unit"),
+                    healthy_range=healthy_range,
+                    status=p.get("status"),
+                )
         return None
 
     async def get_health_span_index(
@@ -1513,7 +1515,9 @@ class ReportsService:
         bmr_param = self._extract_fitprint_parameter(activity_params, "Basal Metabolic Rate")
 
         fitness_params = fitness_spec.get("parameters") if isinstance(fitness_spec, dict) else None
-        body_fat_param = self._extract_fitprint_parameter(fitness_params, "Estimated Body Fat")
+        body_fat_param = self._extract_fitprint_parameter(
+            fitness_params, ("Estimated Body Fat", "Body Fat")
+        )
 
         def _ideal_range(key: str) -> IdealRangeDetail | None:
             raw = nutrition_response.get(key)
