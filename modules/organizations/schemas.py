@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class OrganizationCreateRequest(BaseModel):
@@ -19,9 +19,7 @@ class OrganizationCreateRequest(BaseModel):
     state: Optional[str] = Field(default=None, max_length=100)
     country: Optional[str] = Field(default=None, max_length=100)
 
-    contact_name: Optional[str] = Field(default=None, max_length=200)
-    contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = Field(default=None, max_length=30)
+    contact_person: Optional[int] = Field(default=None, gt=0)
     contact_designation: Optional[str] = Field(default=None, max_length=100)
 
     bd_employee_id: Optional[int] = Field(default=None, gt=0)
@@ -38,9 +36,7 @@ class OrganizationUpdateRequest(BaseModel):
     state: Optional[str] = Field(default=None, max_length=100)
     country: Optional[str] = Field(default=None, max_length=100)
 
-    contact_name: Optional[str] = Field(default=None, max_length=200)
-    contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = Field(default=None, max_length=30)
+    contact_person: Optional[int] = Field(default=None, gt=0)
     contact_designation: Optional[str] = Field(default=None, max_length=100)
 
     bd_employee_id: Optional[int] = Field(default=None, gt=0)
@@ -74,9 +70,7 @@ class OrganizationDetailsResponse(BaseModel):
     state: Optional[str] = None
     country: Optional[str] = None
 
-    contact_name: Optional[str] = None
-    contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = None
+    contact_person: Optional[int] = None
     contact_designation: Optional[str] = None
 
     bd_employee_id: Optional[int] = None

@@ -37,9 +37,9 @@ class OrganizationHealthReport(Base):
     __tablename__ = "organization_health_report"
 
     report_id = Column(Integer, primary_key=True)
-    metsights_output = Column(JSON)
+    camp_report = Column(JSON)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    engagement_id = Column(Integer, ForeignKey("engagements.engagement_id"), nullable=False)
+    camp_no = Column(Integer, nullable=False)
     organization_id = Column(Integer, ForeignKey("organizations.organization_id"), nullable=False)
 
 

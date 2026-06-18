@@ -6,6 +6,8 @@ from db.session import AsyncSessionLocal
 from modules.assessments.repository import AssessmentsRepository
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
+from modules.engagements.repository import EngagementsRepository
+from modules.organizations.repository import OrganizationsRepository
 from modules.diagnostics.dependencies import get_diagnostics_service
 from modules.diagnostics.healthians.client import (
     get_access_token as healthians_get_access_token,
@@ -31,4 +33,6 @@ def get_reports_service() -> ReportsService:
         questionnaire_repository=questionnaire_repository,
         healthians_get_access_token=healthians_get_access_token,
         healthians_get_booking_digital_value=healthians_get_booking_digital_value,
+        engagements_repository=EngagementsRepository(),
+        organizations_repository=OrganizationsRepository(),
     )

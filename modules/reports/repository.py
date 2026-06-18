@@ -5,11 +5,15 @@ Only database queries belong here.
 
 from __future__ import annotations
 
+from datetime import date
+
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
-from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
+from modules.engagements.models import EngagementParticipant
+from modules.reports.models import IndividualHealthReport, OrganizationHealthReport, ReportsUserSyncState
+from modules.users.models import User
 
 # MetSights Basic / Pro (excludes FitPrint and other types).
 _METSIGHTS_PRO_BASIC_TYPE_CODES = ("1", "2")
@@ -168,3 +172,229 @@ class ReportsRepository:
             .order_by(AssessmentInstance.assessment_instance_id.asc())
         )
         return list(result.scalars().all())
+
+    async def list_participants_for_engagements(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_ids: list[int],
+    ) -> list[EngagementParticipant]:
+        if not engagement_ids:
+            return []
+        result = await db.execute(
+            select(EngagementParticipant)
+            .where(EngagementParticipant.engagement_id.in_(engagement_ids))
+            .order_by(EngagementParticipant.engagement_participant_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_individual_reports_for_engagements(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_ids: list[int],
+    ) -> list[IndividualHealthReport]:
+        if not engagement_ids:
+            return []
+        result = await db.execute(
+            select(IndividualHealthReport)
+            .where(IndividualHealthReport.engagement_id.in_(engagement_ids))
+            .order_by(IndividualHealthReport.report_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def map_user_date_of_birth(
+        self,
+        db: AsyncSession,
+        *,
+        user_ids: list[int],
+    ) -> dict[int, date | None]:
+        if not user_ids:
+            return {}
+
+        result = await db.execute(
+            select(User.user_id, User.date_of_birth).where(User.user_id.in_(user_ids))
+        )
+        mapped: dict[int, date | None] = {}
+        for user_id, dob in result.all():
+            mapped[int(user_id)] = dob
+        return mapped
+
+    async def get_camp_report(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+    ) -> OrganizationHealthReport | None:
+        result = await db.execute(
+            select(OrganizationHealthReport)
+            .where(OrganizationHealthReport.camp_no == camp_no)
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def upsert_organization_camp_report(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: int,
+        camp_no: int,
+        camp_report: dict,
+    ) -> OrganizationHealthReport:
+        existing = await self.get_camp_report(
+            db,
+            camp_no=camp_no,
+        )
+        if existing is None:
+            row = OrganizationHealthReport(
+                organization_id=organization_id,
+                camp_no=camp_no,
+                camp_report=camp_report,
+            )
+            db.add(row)
+            await db.flush()
+            return row
+
+        existing.camp_report = camp_report
+        db.add(existing)
+        await db.flush()
+        return existing
+
+    async def map_user_gender_by_id(
+        self,
+        db: AsyncSession,
+        *,
+        user_ids: list[int],
+    ) -> dict[int, str | None]:
+        """Return a {user_id: gender} mapping for the given user IDs."""
+        if not user_ids:
+            return {}
+        result = await db.execute(
+            select(User.user_id, User.gender).where(User.user_id.in_(user_ids))
+        )
+        return {int(uid): gender for uid, gender in result.all()}
+
+    async def list_questionnaire_answers_for_participants(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_ids: list[int],
+        question_ids: list[int],
+    ) -> dict[tuple[int, int], str]:
+        """Return {(user_id, question_id): option_display_name} for the given engagements and questions.
+
+        Fetches the latest questionnaire responses per user and translates option IDs
+        to human-readable labels using questionnaire_options — all without any
+        JSON-to-integer casts, which are fragile across different JSON storage formats.
+        """
+        from sqlalchemy import and_
+        from modules.assessments.models import AssessmentInstance
+        from modules.questionnaire.models import QuestionnaireOption, QuestionnaireResponse
+
+        if not engagement_ids or not question_ids:
+            return {}
+
+        # Step 1: Find the latest assessment_instance_id per user per engagement.
+        latest_ai = (
+            select(
+                AssessmentInstance.user_id,
+                func.max(AssessmentInstance.assessment_instance_id).label("latest_ai_id"),
+            )
+            .where(AssessmentInstance.engagement_id.in_(engagement_ids))
+            .group_by(AssessmentInstance.user_id)
+            .subquery()
+        )
+
+        # Step 2: Fetch raw responses for those assessment instances and questions.
+        resp_result = await db.execute(
+            select(
+                latest_ai.c.user_id,
+                QuestionnaireResponse.question_id,
+                QuestionnaireResponse.answer,
+            )
+            .join(
+                QuestionnaireResponse,
+                and_(
+                    QuestionnaireResponse.assessment_instance_id == latest_ai.c.latest_ai_id,
+                    QuestionnaireResponse.question_id.in_(question_ids),
+                ),
+            )
+        )
+        raw_responses = resp_result.all()
+        if not raw_responses:
+            return {}
+
+        # Step 3: Collect all unique option_ids seen in the responses (handle both int and str JSON values).
+        option_ids_needed: set[int] = set()
+        for _, _, answer in raw_responses:
+            try:
+                option_ids_needed.add(int(str(answer).strip('"')))
+            except (TypeError, ValueError):
+                pass
+
+        if not option_ids_needed:
+            return {}
+
+        # Step 4: Fetch matching option display names in one query.
+        opt_result = await db.execute(
+            select(
+                QuestionnaireOption.question_id,
+                QuestionnaireOption.option_id,
+                QuestionnaireOption.display_name,
+            )
+            .where(
+                QuestionnaireOption.question_id.in_(question_ids),
+                QuestionnaireOption.option_id.in_(list(option_ids_needed)),
+            )
+        )
+        # Build a lookup: {(question_id, option_id): display_name}
+        option_lookup: dict[tuple[int, int], str] = {
+            (int(qid), int(oid)): name
+            for qid, oid, name in opt_result.all()
+        }
+
+        # Step 5: Combine into the final {(user_id, question_id): display_name} map.
+        answers: dict[tuple[int, int], str] = {}
+        for user_id, question_id, answer in raw_responses:
+            try:
+                option_id = int(str(answer).strip('"'))
+            except (TypeError, ValueError):
+                continue
+            display = option_lookup.get((int(question_id), option_id))
+            if display:
+                answers[(int(user_id), int(question_id))] = display
+        return answers
+
+    async def list_health_parameters_with_ranges(
+        self,
+        db: AsyncSession,
+    ) -> dict[str, dict]:
+        """Return {parameter_key: {low_male, high_male, low_female, high_female}} for all active health parameters."""
+        from modules.diagnostics.models import HealthParameter
+
+        result = await db.execute(
+            select(
+                HealthParameter.parameter_key,
+                HealthParameter.test_name,
+                HealthParameter.low_risk_lower_range_male,
+                HealthParameter.low_risk_higher_range_male,
+                HealthParameter.low_risk_lower_range_female,
+                HealthParameter.low_risk_higher_range_female,
+            )
+            .where(HealthParameter.parameter_key.isnot(None))
+            .where(HealthParameter.is_available.is_(True))
+        )
+
+        params: dict[str, dict] = {}
+        for row in result.all():
+            key = str(row.parameter_key or "").strip()
+            if not key:
+                continue
+            params[key] = {
+                "test_name": row.test_name,
+                "low_male": float(row.low_risk_lower_range_male) if row.low_risk_lower_range_male is not None else None,
+                "high_male": float(row.low_risk_higher_range_male) if row.low_risk_higher_range_male is not None else None,
+                "low_female": float(row.low_risk_lower_range_female) if row.low_risk_lower_range_female is not None else None,
+                "high_female": float(row.low_risk_higher_range_female) if row.low_risk_higher_range_female is not None else None,
+            }
+        return params

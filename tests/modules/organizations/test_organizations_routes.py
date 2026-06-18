@@ -51,7 +51,7 @@ async def test_create_organization_creates_row(async_client, test_db_session):
         "name": "Acme",
         "organization_type": "corporate",
         "website_url": "https://example.com",
-        "contact_email": "ops@example.com",
+        "contact_person": 7102,
         "bd_employee_id": 21,
     }
 
@@ -112,7 +112,7 @@ async def test_get_organization_details_returns_details(async_client, test_db_se
             name="DetailOrg",
             organization_type="corporate",
             website_url="https://detail.example.com",
-            contact_email="c@example.com",
+            contact_person=7104,
             status="active",
         )
     )
@@ -141,9 +141,7 @@ async def test_update_organization_updates_fields(async_client, test_db_session)
         "city": None,
         "state": None,
         "country": None,
-        "contact_name": None,
-        "contact_email": None,
-        "contact_phone": None,
+        "contact_person": None,
         "contact_designation": None,
         "bd_employee_id": None,
     }

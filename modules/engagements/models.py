@@ -64,6 +64,9 @@ class Engagement(Base):
     questionnaire_reminder_2 = Column(String, nullable=True)
     blood_report_notification = Column(String, nullable=True)
     bioai_report_notification = Column(String, nullable=True)
+    # Globally unique per organization: multiple engagements in one org may share a camp_no,
+    # but the same camp_no cannot appear on engagements belonging to different organizations.
+    camp_no = Column(Integer, nullable=True)
 
 
 class OnboardingAssistantAssignment(Base):

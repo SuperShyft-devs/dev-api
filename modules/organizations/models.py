@@ -28,9 +28,7 @@ class Organization(Base):
     state = Column(String)
     country = Column(String)
 
-    contact_name = Column(String)
-    contact_email = Column(String)
-    contact_phone = Column(String)
+    contact_person = Column(Integer, ForeignKey("users.user_id"))
     contact_designation = Column(String)
 
     bd_employee_id = Column(Integer, ForeignKey("employee.employee_id"))

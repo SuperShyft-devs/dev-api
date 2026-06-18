@@ -6,6 +6,7 @@ import asyncio
 import logging
 from collections.abc import Callable, Coroutine
 from datetime import date, datetime, timezone
+from statistics import mean
 from typing import Any
 
 import httpx
@@ -18,6 +19,10 @@ from db.session import AsyncSessionLocal
 from modules.assessments.models import AssessmentInstance
 from modules.assessments.repository import AssessmentsRepository
 from modules.audit.service import AuditService
+from modules.engagements.repository import EngagementsRepository
+from modules.organizations.repository import OrganizationsRepository
+from modules.organizations.service import ensure_organization_camp_access
+from modules.employee.service import EmployeeContext
 from modules.diagnostics.service import DiagnosticsService
 from modules.metsights.service import MetsightsService
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
@@ -59,6 +64,63 @@ _OVERVIEW_METABOLIC_AGE_OVERRIDES: dict[int, float] = {
     1169: 52.0,
 }
 
+_CAMP_AGE_BRACKETS: tuple[tuple[str, int, int | None], ...] = (
+    ("20-30", 20, 30),
+    ("30-40", 30, 40),
+    ("40-50", 40, 50),
+    ("50+", 50, None),
+)
+
+_CAMP_SUPPORTED_CHARTS = frozenset(
+    {
+        "metrics",
+        "age_wise",
+        "departments_summary",
+        "gender_breakdown",
+        "blood_groups",
+        "physical_activity",
+        "sleep",
+        "oxidative_stress",
+        "top_diseases",
+        "disease_deep_dive",
+        "blood_and_lab_intelligence",
+        "positive_wins",
+    }
+)
+
+_CAMP_METRICS_CHART_KEYS = frozenset(
+    {
+        "participation",
+        "total_blood_tests",
+        "doctor_consultation",
+        "high_risk_group",
+        "high_risk_pct",
+        "avg_metabolic_score",
+    }
+)
+
+# Question IDs used for questionnaire chart calculations.
+_CAMP_QUESTION_ID_SLEEP = 18
+_CAMP_QUESTION_ID_ACTIVITY = 14
+
+# Healthy habit rules: if >= threshold_pct of participants answered a "healthy" option,
+# the habit_label is included in positive_wins.healthy_habits.
+# healthy_display_names must match the display_name values in questionnaire_options.
+_CAMP_HEALTHY_HABIT_RULES: tuple[dict, ...] = (
+    {
+        "question_id": _CAMP_QUESTION_ID_ACTIVITY,
+        "healthy_display_names": frozenset({"30-60 minutes a day", "More than 60 minutes a day"}),
+        "habit_label": "Regular physical activity",
+        "threshold_pct": 50.0,
+    },
+    {
+        "question_id": _CAMP_QUESTION_ID_SLEEP,
+        "healthy_display_names": frozenset({"Between 7 to 9 hours"}),
+        "habit_label": "Adequate sleep (7\u20139 hrs)",
+        "threshold_pct": 50.0,
+    },
+)
+
 _BIO_AI_METSIGHTS_REPORT_URL_OVERRIDES: dict[str, str] = {
     "https://storages.metsights.com/reports/D6E1178CCA4F488C_Deepa_Gupta_MHR.pdf": (
         "https://api.supershyft.com/media/bio-ai/141a9b846e254200995dcbdcc1596ea5.pdf"
@@ -93,6 +155,8 @@ class ReportsService:
         questionnaire_repository: QuestionnaireRepository | None = None,
         healthians_get_access_token: Callable[[], Coroutine[Any, Any, str]] | None = None,
         healthians_get_booking_digital_value: Callable[[str, str], Coroutine[Any, Any, dict]] | None = None,
+        engagements_repository: EngagementsRepository | None = None,
+        organizations_repository: OrganizationsRepository | None = None,
     ):
         self._repository = repository
         self._assessments_repository = assessments_repository
@@ -104,6 +168,8 @@ class ReportsService:
         self._questionnaire_repository = questionnaire_repository
         self._healthians_get_access_token = healthians_get_access_token
         self._healthians_get_booking_digital_value = healthians_get_booking_digital_value
+        self._engagements_repository = engagements_repository or EngagementsRepository()
+        self._organizations_repository = organizations_repository or OrganizationsRepository()
 
     def _require_audit_service(self) -> AuditService:
         if self._audit_service is None:
@@ -1908,3 +1974,569 @@ class ReportsService:
             user_id=user_id,
             disease_key=disease_key,
         )
+
+    @staticmethod
+    def _camp_age_bracket_from_dob(dob: date | None, *, today: date | None = None) -> str | None:
+        if dob is None:
+            return None
+        ref = today or date.today()
+        age = ref.year - dob.year - ((ref.month, ref.day) < (dob.month, dob.day))
+        for label, lower, upper in _CAMP_AGE_BRACKETS:
+            if upper is None:
+                if age >= lower:
+                    return label
+            elif lower <= age < upper:
+                return label
+        return None
+
+    @staticmethod
+    def _camp_extract_metabolic_score(report_dict: dict[str, Any] | None) -> float | None:
+        """Extract the metabolic score from the real BioAI JSON report."""
+        if not isinstance(report_dict, dict):
+            return None
+        # Real data key is "metabolic_score"; fall back to legacy "fitprint_score".
+        for key in ("metabolic_score", "fitprint_score"):
+            value = report_dict.get(key)
+            if isinstance(value, (int, float)):
+                return float(value)
+        return None
+
+    @staticmethod
+    def _camp_is_high_risk_user(report_dict: dict[str, Any] | None) -> bool:
+        """Return True if any disease in the report has a risk_status that is not healthy/low."""
+        if not isinstance(report_dict, dict):
+            return False
+        diseases = report_dict.get("diseases")
+        if not isinstance(diseases, list):
+            return False
+        for disease in diseases:
+            if not isinstance(disease, dict):
+                continue
+            risk_status = str(disease.get("risk_status") or "").strip().lower()
+            if risk_status and risk_status not in {"healthy", "low"}:
+                return True
+        return False
+
+    @staticmethod
+    def _camp_build_disease_stats(
+        *,
+        user_ids_in_group: set[int],
+        reports_by_user_id: dict[int, list[dict[str, Any] | None]],
+    ) -> dict[str, Any]:
+        """Compute disease-level risk counts across a group of users.
+
+        Returns:
+            {
+                "disease_counts": {disease_name: high_risk_count},
+                "oxidative_stress": {"low": N, "moderate": N, "high": N, "very_high": N, "elevated_pct": pct},
+                "positive_wins": [disease_names with 90%+ healthy],
+            }
+        """
+        total = len(user_ids_in_group)
+        disease_counts: dict[str, int] = {}
+        ox_stress_buckets: dict[str, int] = {"low": 0, "moderate": 0, "high": 0, "very_high": 0}
+
+        for uid in user_ids_in_group:
+            user_reports = reports_by_user_id.get(uid, [])
+            primary = next((r for r in user_reports if isinstance(r, dict)), None)
+            if primary is None:
+                continue
+            diseases = primary.get("diseases")
+            if not isinstance(diseases, list):
+                continue
+            for disease in diseases:
+                if not isinstance(disease, dict):
+                    continue
+                name = str(disease.get("name") or "").strip()
+                code = str(disease.get("code") or "").strip().lower()
+                risk_status_raw = str(disease.get("risk_status") or "").strip().lower()
+                if not name:
+                    continue
+
+                # Count elevated risk for disease deep dive / top diseases.
+                if risk_status_raw not in {"healthy", "low", ""}:
+                    disease_counts[name] = disease_counts.get(name, 0) + 1
+
+                # Oxidative stress breakdown.
+                if code == "oxidative_stress":
+                    if risk_status_raw in {"high", "very high", "very_high"}:
+                        bucket = "very_high" if "very" in risk_status_raw else "high"
+                        ox_stress_buckets[bucket] = ox_stress_buckets.get(bucket, 0) + 1
+                    elif risk_status_raw == "moderate":
+                        ox_stress_buckets["moderate"] += 1
+                    else:
+                        ox_stress_buckets["low"] += 1
+
+        elevated = ox_stress_buckets["high"] + ox_stress_buckets["very_high"]
+        elevated_pct = round((elevated / total) * 100, 1) if total else 0.0
+
+        # Positive wins: diseases where <10% of the group is elevated.
+        positive_wins: list[str] = []
+        for disease_name, high_count in disease_counts.items():
+            if total and (high_count / total) < 0.10:
+                positive_wins.append(disease_name)
+
+        return {
+            "disease_counts": disease_counts,
+            "oxidative_stress": {
+                **ox_stress_buckets,
+                "elevated_pct": elevated_pct,
+                "elevated_count": elevated,
+            },
+            "positive_wins": positive_wins,
+        }
+
+    @staticmethod
+    def _camp_build_blood_lab_stats(
+        *,
+        user_ids_in_group: set[int],
+        reports_by_user_id: dict[int, list[dict[str, Any] | None]],
+        gender_by_id: dict[int, str | None],
+        health_parameters: dict[str, dict],
+    ) -> dict[str, Any]:
+        """Calculate blood & lab intelligence: percentage out-of-range per test parameter.
+
+        Returns:
+            {
+                "out_of_range": {test_name: out_of_range_pct},
+                "positive_blood_profiles": [test_names where 90%+ are in range],
+            }
+        """
+        # {parameter_key: {"tested": N, "out_of_range": N, "test_name": str}}
+        param_stats: dict[str, dict] = {}
+
+        for uid in user_ids_in_group:
+            user_reports = reports_by_user_id.get(uid, [])
+            primary = next((r for r in user_reports if isinstance(r, dict)), None)
+            if primary is None:
+                continue
+            blood = primary.get("blood_parameters") if isinstance(primary.get("blood_parameters"), dict) else {}
+            gender = str(gender_by_id.get(uid) or "").strip().lower()
+
+            for param_key, param_meta in health_parameters.items():
+                raw_value = blood.get(param_key)
+                # Skip unit keys and None values.
+                if raw_value is None or not isinstance(raw_value, (int, float)):
+                    continue
+
+                test_name = param_meta.get("test_name") or param_key
+                if param_key not in param_stats:
+                    param_stats[param_key] = {"tested": 0, "out_of_range": 0, "test_name": test_name}
+                param_stats[param_key]["tested"] += 1
+
+                low = param_meta.get("low_female") if gender == "female" else param_meta.get("low_male")
+                high = param_meta.get("high_female") if gender == "female" else param_meta.get("high_male")
+
+                if low is not None and high is not None:
+                    if not (low <= float(raw_value) <= high):
+                        param_stats[param_key]["out_of_range"] += 1
+
+        out_of_range: dict[str, float] = {}
+        positive_blood_profiles: list[str] = []
+
+        for param_key, stats in param_stats.items():
+            tested = stats["tested"]
+            if tested == 0:
+                continue
+            oor_pct = round((stats["out_of_range"] / tested) * 100, 1)
+            out_of_range[stats["test_name"]] = oor_pct
+            if oor_pct <= 10.0:
+                positive_blood_profiles.append(stats["test_name"])
+
+        return {
+            "out_of_range": out_of_range,
+            "positive_blood_profiles": positive_blood_profiles,
+        }
+
+    @classmethod
+    def _camp_aggregate_participant_metrics(
+        cls,
+        *,
+        participants: list[Any],
+        reports_by_user_id: dict[int, list[dict[str, Any] | None]],
+        blood_test_user_ids: set[int],
+        user_dob_by_id: dict[int, date | None],
+        gender_by_id: dict[int, str | None] | None = None,
+        questionnaire_answers: dict[tuple[int, int], str] | None = None,
+        health_parameters: dict[str, dict] | None = None,
+    ) -> dict[str, Any]:
+        """Aggregate all dashboard metrics for a list of participants (company-wide or per-department)."""
+        gender_by_id = gender_by_id or {}
+        questionnaire_answers = questionnaire_answers or {}
+        health_parameters = health_parameters or {}
+
+        participation = len(participants)
+        doctor_consultation = sum(
+            1 for row in participants if bool(getattr(row, "want_doctor_consultation", False))
+        )
+
+        metabolic_scores: list[float] = []
+        blood_test_count = 0
+        high_risk_count = 0
+        user_dobs: list[date | None] = []
+        gender_counts: dict[str, int] = {}
+        blood_group_counts: dict[str, int] = {}
+        activity_counts: dict[str, int] = {}
+        sleep_counts: dict[str, int] = {}
+
+        seen_users: set[int] = set()
+        for participant in participants:
+            uid = int(participant.user_id)
+            user_dobs.append(user_dob_by_id.get(uid))
+
+            # Blood group.
+            bg = str(getattr(participant, "participant_blood_group", None) or "").strip()
+            if bg:
+                blood_group_counts[bg] = blood_group_counts.get(bg, 0) + 1
+
+            if uid in seen_users:
+                continue
+            seen_users.add(uid)
+
+            # Gender.
+            g = str(gender_by_id.get(uid) or "").strip().lower() or "unknown"
+            gender_counts[g] = gender_counts.get(g, 0) + 1
+
+            if uid in blood_test_user_ids:
+                blood_test_count += 1
+
+            user_reports = reports_by_user_id.get(uid, [])
+            primary_report = next((r for r in user_reports if isinstance(r, dict)), None)
+            score = cls._camp_extract_metabolic_score(primary_report)
+            if score is not None:
+                metabolic_scores.append(score)
+
+            if cls._camp_is_high_risk_user(primary_report):
+                high_risk_count += 1
+
+            # Questionnaire answers (activity, sleep).
+            act_label = questionnaire_answers.get((uid, _CAMP_QUESTION_ID_ACTIVITY))
+            if act_label:
+                activity_counts[act_label] = activity_counts.get(act_label, 0) + 1
+
+            sleep_label = questionnaire_answers.get((uid, _CAMP_QUESTION_ID_SLEEP))
+            if sleep_label:
+                sleep_counts[sleep_label] = sleep_counts.get(sleep_label, 0) + 1
+
+        high_risk_pct = round((high_risk_count / participation) * 100, 1) if participation else 0.0
+        age_wise = {label: 0 for label, _, _ in _CAMP_AGE_BRACKETS}
+        for dob in user_dobs:
+            bracket = cls._camp_age_bracket_from_dob(dob)
+            if bracket is not None:
+                age_wise[bracket] += 1
+
+        avg_metabolic = round(mean(metabolic_scores), 1) if metabolic_scores else None
+
+        # Disease & oxidative stress stats.
+        disease_stats = cls._camp_build_disease_stats(
+            user_ids_in_group=seen_users,
+            reports_by_user_id=reports_by_user_id,
+        )
+        disease_counts = disease_stats["disease_counts"]
+        sorted_diseases = sorted(disease_counts.items(), key=lambda x: x[1], reverse=True)
+
+        # Blood & lab intelligence.
+        blood_lab = cls._camp_build_blood_lab_stats(
+            user_ids_in_group=seen_users,
+            reports_by_user_id=reports_by_user_id,
+            gender_by_id=gender_by_id,
+            health_parameters=health_parameters,
+        )
+
+        # Healthy habits: for each habit rule, check if >= threshold_pct of participants
+        # answered one of the "healthy" options for that question.
+        healthy_habits: list[str] = []
+        unique_count = len(seen_users)
+        for rule in _CAMP_HEALTHY_HABIT_RULES:
+            q_id = rule["question_id"]
+            healthy_names: frozenset[str] = rule["healthy_display_names"]
+            threshold: float = rule["threshold_pct"]
+            healthy_count = sum(
+                1
+                for uid in seen_users
+                if questionnaire_answers.get((uid, q_id)) in healthy_names
+            )
+            if unique_count > 0 and (healthy_count / unique_count * 100) >= threshold:
+                healthy_habits.append(rule["habit_label"])
+
+        return {
+            "metrics": {
+                "participation": participation,
+                "total_blood_tests": blood_test_count,
+                "doctor_consultation": doctor_consultation,
+                "high_risk_group": high_risk_count,
+                "high_risk_pct": high_risk_pct,
+                "avg_metabolic_score": avg_metabolic,
+            },
+            "age_wise": age_wise,
+            "gender_breakdown": gender_counts,
+            "blood_groups": blood_group_counts,
+            "physical_activity": activity_counts,
+            "sleep": sleep_counts,
+            "oxidative_stress": disease_stats["oxidative_stress"],
+            "top_diseases": [
+                {"name": name, "high_risk_count": count, "high_risk_pct": round((count / participation) * 100, 1) if participation else 0.0}
+                for name, count in sorted_diseases[:5]
+            ],
+            "disease_deep_dive": [
+                {"name": name, "high_risk_count": count, "high_risk_pct": round((count / participation) * 100, 1) if participation else 0.0}
+                for name, count in sorted_diseases
+            ],
+            "blood_and_lab_intelligence": blood_lab["out_of_range"],
+            "positive_wins": {
+                "healthy_diseases": disease_stats["positive_wins"],
+                "healthy_habits": healthy_habits,
+                "healthy_blood_profiles": blood_lab["positive_blood_profiles"],
+            },
+        }
+
+    @classmethod
+    def _camp_build_department_section(
+        cls,
+        *,
+        participants: list[Any],
+        reports_by_user_id: dict[int, list[dict[str, Any] | None]],
+        blood_test_user_ids: set[int],
+        user_dob_by_id: dict[int, date | None],
+        gender_by_id: dict[int, str | None] | None = None,
+        questionnaire_answers: dict[tuple[int, int], str] | None = None,
+        health_parameters: dict[str, dict] | None = None,
+    ) -> dict[str, Any]:
+        """Build the full section dict for a department (or overall) using the same aggregate logic."""
+        return cls._camp_aggregate_participant_metrics(
+            participants=participants,
+            reports_by_user_id=reports_by_user_id,
+            blood_test_user_ids=blood_test_user_ids,
+            user_dob_by_id=user_dob_by_id,
+            gender_by_id=gender_by_id,
+            questionnaire_answers=questionnaire_answers,
+            health_parameters=health_parameters,
+        )
+
+    @staticmethod
+    def _camp_build_departments_summary(departments: dict[str, Any]) -> list[dict[str, Any]]:
+        summary: list[dict[str, Any]] = []
+        for name in sorted(departments):
+            section = departments.get(name) or {}
+            metrics = section.get("metrics") if isinstance(section, dict) else {}
+            if not isinstance(metrics, dict):
+                metrics = {}
+            gender = section.get("gender_breakdown") if isinstance(section, dict) else {}
+            if not isinstance(gender, dict):
+                gender = {}
+            summary.append(
+                {
+                    "name": name,
+                    "employees": metrics.get("participation", 0),
+                    "male_count": gender.get("male", 0),
+                    "female_count": gender.get("female", 0),
+                    "high_risk_group": metrics.get("high_risk_group", 0),
+                    "high_risk_pct": metrics.get("high_risk_pct", 0.0),
+                    "avg_metabolic_score": metrics.get("avg_metabolic_score"),
+                    "total_blood_tests": metrics.get("total_blood_tests", 0),
+                    "doctor_consultation": metrics.get("doctor_consultation", 0),
+                }
+            )
+        return summary
+
+    async def _resolve_camp_from_engagements(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+    ) -> tuple[int, list[Any]]:
+        engagements = await self._engagements_repository.list_engagements_for_camp(db, camp_no=camp_no)
+        if not engagements:
+            raise AppError(status_code=404, error_code="CAMP_NOT_FOUND", message="Camp does not exist")
+
+        organization_ids = {int(row.organization_id) for row in engagements}
+        if len(organization_ids) > 1:
+            raise AppError(
+                status_code=409,
+                error_code="CAMP_NO_ORG_CONFLICT",
+                message=(
+                    "Camp number is used by multiple organizations. "
+                    "Reassign camp_no on engagements so each camp number belongs to one organization."
+                ),
+            )
+
+        organization_id = next(iter(organization_ids))
+        organization = await self._organizations_repository.get_by_id(db, organization_id)
+        if organization is None:
+            raise AppError(status_code=404, error_code="ORGANIZATION_NOT_FOUND", message="Organization does not exist")
+
+        return organization_id, engagements
+
+    async def calculate_camp_report(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        user_id: int,
+        employee: EmployeeContext | None,
+    ) -> dict[str, Any]:
+        organization_id, engagements = await self._resolve_camp_from_engagements(db, camp_no=camp_no)
+        organization = await self._organizations_repository.get_by_id(db, organization_id)
+        if organization is None:
+            raise AppError(status_code=404, error_code="ORGANIZATION_NOT_FOUND", message="Organization does not exist")
+        ensure_organization_camp_access(user_id=user_id, employee=employee, organization=organization)
+
+        engagement_ids = [int(row.engagement_id) for row in engagements]
+        participants = await self._repository.list_participants_for_engagements(db, engagement_ids=engagement_ids)
+        user_ids = sorted({int(row.user_id) for row in participants})
+
+        # Fetch supporting lookup tables in parallel.
+        user_dob_by_id, gender_by_id, questionnaire_answers, health_parameters = await asyncio.gather(
+            self._repository.map_user_date_of_birth(db, user_ids=user_ids),
+            self._repository.map_user_gender_by_id(db, user_ids=user_ids),
+            self._repository.list_questionnaire_answers_for_participants(
+                db,
+                engagement_ids=engagement_ids,
+                question_ids=[_CAMP_QUESTION_ID_ACTIVITY, _CAMP_QUESTION_ID_SLEEP],
+            ),
+            self._repository.list_health_parameters_with_ranges(db),
+        )
+
+        reports_by_user_id: dict[int, list[dict[str, Any] | None]] = {uid: [] for uid in user_ids}
+        blood_test_user_ids: set[int] = set()
+        health_reports = await self._repository.list_individual_reports_for_engagements(
+            db,
+            engagement_ids=engagement_ids,
+        )
+        for report in health_reports:
+            uid = int(report.user_id)
+            if isinstance(report.blood_parameters, dict) and report.blood_parameters:
+                blood_test_user_ids.add(uid)
+            # Store blood_parameters inside the reports dict so helpers can access it.
+            payload: dict[str, Any] | None = None
+            if isinstance(report.reports, dict):
+                payload = dict(report.reports)
+                if isinstance(report.blood_parameters, dict):
+                    payload["blood_parameters"] = report.blood_parameters
+            reports_by_user_id.setdefault(uid, []).append(payload)
+
+        # Build per-department sections.
+        departments: dict[str, Any] = {}
+        participants_by_department: dict[str, list[Any]] = {}
+        for participant in participants:
+            department_name = (getattr(participant, "participant_department", None) or "").strip()
+            if not department_name:
+                continue
+            participants_by_department.setdefault(department_name, []).append(participant)
+
+        for department_name, dept_participants in participants_by_department.items():
+            departments[department_name] = self._camp_build_department_section(
+                participants=dept_participants,
+                reports_by_user_id=reports_by_user_id,
+                blood_test_user_ids=blood_test_user_ids,
+                user_dob_by_id=user_dob_by_id,
+                gender_by_id=gender_by_id,
+                questionnaire_answers=questionnaire_answers,
+                health_parameters=health_parameters,
+            )
+
+        # Build the overall section (all participants combined).
+        overall = self._camp_aggregate_participant_metrics(
+            participants=participants,
+            reports_by_user_id=reports_by_user_id,
+            blood_test_user_ids=blood_test_user_ids,
+            user_dob_by_id=user_dob_by_id,
+            gender_by_id=gender_by_id,
+            questionnaire_answers=questionnaire_answers,
+            health_parameters=health_parameters,
+        )
+        overall["departments_summary"] = self._camp_build_departments_summary(departments)
+
+        camp_report = {
+            "overall": overall,
+            "departments": departments,
+        }
+        await self._repository.upsert_organization_camp_report(
+            db,
+            organization_id=organization_id,
+            camp_no=camp_no,
+            camp_report=camp_report,
+        )
+        return camp_report
+
+    async def get_camp_chart_data(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        chart: str,
+        department: str | None = None,
+        user_id: int,
+        employee: EmployeeContext | None,
+    ) -> dict[str, Any]:
+        chart_key = (chart or "").strip()
+        if chart_key not in _CAMP_SUPPORTED_CHARTS:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid chart parameter")
+
+        organization_id, _ = await self._resolve_camp_from_engagements(db, camp_no=camp_no)
+        organization = await self._organizations_repository.get_by_id(db, organization_id)
+        if organization is None:
+            raise AppError(status_code=404, error_code="ORGANIZATION_NOT_FOUND", message="Organization does not exist")
+        ensure_organization_camp_access(user_id=user_id, employee=employee, organization=organization)
+
+        row = await self._repository.get_camp_report(
+            db,
+            camp_no=camp_no,
+        )
+        if row is None or not isinstance(row.camp_report, dict):
+            raise AppError(
+                status_code=404,
+                error_code="CAMP_REPORT_NOT_FOUND",
+                message="Camp report has not been calculated yet",
+            )
+
+        # departments_summary is always from overall, never filterable by department.
+        if chart_key == "departments_summary":
+            if department is not None and department.strip():
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="Department filter is not supported for departments_summary",
+                )
+            overall = row.camp_report.get("overall") or {}
+            summary = overall.get("departments_summary")
+            return summary if isinstance(summary, list) else []
+
+        # Resolve the correct section (overall or a specific department).
+        section = row.camp_report.get("overall") or {}
+        if department is not None and department.strip():
+            departments_map = row.camp_report.get("departments") or {}
+            if not isinstance(departments_map, dict):
+                raise AppError(status_code=404, error_code="DEPARTMENT_NOT_FOUND", message="Department not found")
+            section = departments_map.get(department.strip())
+            if not isinstance(section, dict):
+                raise AppError(status_code=404, error_code="DEPARTMENT_NOT_FOUND", message="Department not found")
+
+        if chart_key == "metrics":
+            metrics = section.get("metrics") or {}
+            if not isinstance(metrics, dict):
+                metrics = {}
+            return {key: metrics.get(key) for key in _CAMP_METRICS_CHART_KEYS if key in metrics}
+
+        # Simple section-key charts — just return the pre-computed value.
+        _simple_charts = {
+            "age_wise",
+            "gender_breakdown",
+            "blood_groups",
+            "physical_activity",
+            "sleep",
+            "oxidative_stress",
+            "top_diseases",
+            "disease_deep_dive",
+            "blood_and_lab_intelligence",
+            "positive_wins",
+        }
+        if chart_key in _simple_charts:
+            value = section.get(chart_key)
+            if isinstance(value, dict):
+                return value
+            if isinstance(value, list):
+                return value  # type: ignore[return-value]
+            return {}
+
+        return {}

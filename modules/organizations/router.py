@@ -9,9 +9,10 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
+from core.dependencies import get_current_user
 from core.exceptions import AppError
 from db.session import get_db
-from modules.employee.dependencies import get_current_employee
+from modules.employee.dependencies import get_current_employee, get_optional_employee
 from modules.employee.service import EmployeeContext
 from modules.organizations.dependencies import get_organizations_service
 from modules.organizations.schemas import (
@@ -145,9 +146,7 @@ async def get_organization_details(
             "city": organization.city,
             "state": organization.state,
             "country": organization.country,
-            "contact_name": organization.contact_name,
-            "contact_email": organization.contact_email,
-            "contact_phone": organization.contact_phone,
+            "contact_person": organization.contact_person,
             "contact_designation": organization.contact_designation,
             "bd_employee_id": organization.bd_employee_id,
             "status": organization.status,
@@ -203,6 +202,23 @@ async def update_organization_status(
     await db.commit()
 
     return success_response({"organization_id": updated.organization_id, "status": updated.status})
+
+
+@router.get("/{organization_id}/camps")
+async def list_organization_camps(
+    organization_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    employee: EmployeeContext | None = Depends(get_optional_employee),
+    organizations_service: OrganizationsService = Depends(get_organizations_service),
+):
+    payload = await organizations_service.list_camps_for_organization(
+        db,
+        user_id=current_user.user_id,
+        employee=employee,
+        organization_id=organization_id,
+    )
+    return success_response(payload)
 
 
 @router.get("/{organization_id}/participants")

@@ -15,11 +15,32 @@ from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
 from modules.organizations.models import Organization
+from modules.engagements.repository import EngagementsRepository
 from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.schemas import OrganizationCreateRequest, OrganizationUpdateRequest
+from modules.users.repository import UsersRepository
 
 
 _ALLOWED_ORGANIZATION_STATUS = {"active", "inactive", "archived"}
+
+
+def ensure_organization_camp_access(
+    *,
+    user_id: int,
+    employee: EmployeeContext | None,
+    organization: Organization,
+) -> None:
+    """Allow camp report APIs for organization admins and the assigned contact person."""
+
+    if employee is not None and (employee.role or "").strip().lower() == "admin":
+        return
+    if organization.contact_person is not None and organization.contact_person == user_id:
+        return
+    raise AppError(
+        status_code=403,
+        error_code="FORBIDDEN",
+        message="You do not have permission to perform this action",
+    )
 
 
 def _normalize_status(value: str | None) -> str:
@@ -31,9 +52,13 @@ class OrganizationsService:
         self,
         repository: OrganizationsRepository,
         audit_service: AuditService | None = None,
+        engagements_repository: EngagementsRepository | None = None,
+        users_repository: UsersRepository | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
+        self._engagements_repository = engagements_repository or EngagementsRepository()
+        self._users_repository = users_repository or UsersRepository()
 
     def _ensure_employee_access(self, employee: EmployeeContext | None) -> None:
         if employee is None:
@@ -47,6 +72,17 @@ class OrganizationsService:
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
         return self._audit_service
+
+    async def _validate_contact_person(self, db, contact_person: int | None) -> None:
+        if contact_person is None:
+            return
+        user = await self._users_repository.get_user_by_id(db, contact_person)
+        if user is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Invalid contact person",
+            )
 
     async def create_organization_for_employee(
         self,
@@ -68,6 +104,8 @@ class OrganizationsService:
         if existing is not None:
             raise AppError(status_code=409, error_code="ORGANIZATION_ALREADY_EXISTS", message="Organization already exists")
 
+        await self._validate_contact_person(db, payload.contact_person)
+
         organization = Organization(
             name=name,
             organization_type=payload.organization_type,
@@ -78,9 +116,7 @@ class OrganizationsService:
             city=payload.city,
             state=payload.state,
             country=payload.country,
-            contact_name=payload.contact_name,
-            contact_email=str(payload.contact_email) if payload.contact_email is not None else None,
-            contact_phone=payload.contact_phone,
+            contact_person=payload.contact_person,
             contact_designation=payload.contact_designation,
             bd_employee_id=payload.bd_employee_id,
             status="active",
@@ -219,9 +255,9 @@ class OrganizationsService:
         organization.city = payload.city
         organization.state = payload.state
         organization.country = payload.country
-        organization.contact_name = payload.contact_name
-        organization.contact_email = str(payload.contact_email) if payload.contact_email is not None else None
-        organization.contact_phone = payload.contact_phone
+        await self._validate_contact_person(db, payload.contact_person)
+
+        organization.contact_person = payload.contact_person
         organization.contact_designation = payload.contact_designation
         organization.bd_employee_id = payload.bd_employee_id
         organization.updated_employee_id = employee.employee_id
@@ -349,3 +385,31 @@ class OrganizationsService:
             })
 
         return result, total
+
+    async def list_camps_for_organization(
+        self,
+        db,
+        *,
+        user_id: int,
+        employee: EmployeeContext | None,
+        organization_id: int,
+    ) -> dict[str, list[int]]:
+        organization = await self._repository.get_by_id(db, organization_id)
+        if organization is None:
+            raise AppError(
+                status_code=404,
+                error_code="ORGANIZATION_NOT_FOUND",
+                message="Organization does not exist",
+            )
+
+        ensure_organization_camp_access(
+            user_id=user_id,
+            employee=employee,
+            organization=organization,
+        )
+
+        camp_numbers = await self._engagements_repository.list_distinct_camp_numbers_for_organization(
+            db,
+            organization_id=organization_id,
+        )
+        return {"camp_no": camp_numbers}

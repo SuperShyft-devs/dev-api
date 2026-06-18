@@ -833,3 +833,95 @@ class EngagementsRepository:
             (int(row.user_id), int(row.engagement_id), row.engagement_date, row.questionnaire_reminder_1, row.questionnaire_reminder_2)
             for row in result.all()
         ]
+
+    async def camp_no_used_by_other_organization(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        organization_id: int,
+        exclude_engagement_id: int | None = None,
+    ) -> bool:
+        """Return True if camp_no is already used by a different organization."""
+        query = (
+            select(Engagement.engagement_id)
+            .where(Engagement.camp_no == camp_no)
+            .where(Engagement.organization_id.isnot(None))
+            .where(Engagement.organization_id != organization_id)
+        )
+        if exclude_engagement_id is not None:
+            query = query.where(Engagement.engagement_id != exclude_engagement_id)
+        result = await db.execute(query.limit(1))
+        return result.scalar_one_or_none() is not None
+
+    async def list_distinct_camp_numbers_for_organization(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: int,
+    ) -> list[int]:
+        result = await db.execute(
+            select(func.distinct(Engagement.camp_no))
+            .where(Engagement.organization_id == organization_id)
+            .where(Engagement.camp_no.isnot(None))
+            .order_by(Engagement.camp_no.desc())
+        )
+        return [int(v) for v in result.scalars().all() if v is not None]
+
+    async def list_engagements_for_camp(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+    ) -> list[Engagement]:
+        result = await db.execute(
+            select(Engagement)
+            .where(Engagement.camp_no == camp_no)
+            .where(Engagement.organization_id.isnot(None))
+            .order_by(Engagement.engagement_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_engagements_for_organization_camp(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: int,
+        camp_no: int,
+    ) -> list[Engagement]:
+        result = await db.execute(
+            select(Engagement)
+            .where(Engagement.organization_id == organization_id)
+            .where(Engagement.camp_no == camp_no)
+            .order_by(Engagement.engagement_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def count_engagements_for_camp(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+    ) -> int:
+        result = await db.execute(
+            select(func.count())
+            .select_from(Engagement)
+            .where(Engagement.camp_no == camp_no)
+            .where(Engagement.organization_id.isnot(None))
+        )
+        return int(result.scalar_one() or 0)
+
+    async def count_engagements_for_organization_camp(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: int,
+        camp_no: int,
+    ) -> int:
+        result = await db.execute(
+            select(func.count())
+            .select_from(Engagement)
+            .where(Engagement.organization_id == organization_id)
+            .where(Engagement.camp_no == camp_no)
+        )
+        return int(result.scalar_one() or 0)

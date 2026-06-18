@@ -621,10 +621,16 @@ class UsersRepository:
                         delete(AssessmentInstance).where(AssessmentInstance.assessment_instance_id.in_(orphan_assessment_ids))
                     )
 
-                await db.execute(
-                    delete(OrganizationHealthReport).where(
-                        OrganizationHealthReport.engagement_id.in_(orphan_engagement_ids)
+                orphan_camp_pairs = list(
+                    (
+                        await db.execute(
+                            select(Engagement.organization_id, Engagement.camp_no)
+                            .where(Engagement.engagement_id.in_(orphan_engagement_ids))
+                            .where(Engagement.organization_id.isnot(None))
+                            .where(Engagement.camp_no.isnot(None))
+                        )
                     )
+                    .all()
                 )
                 await db.execute(
                     delete(OnboardingAssistantAssignment).where(
@@ -632,6 +638,22 @@ class UsersRepository:
                     )
                 )
                 await db.execute(delete(Engagement).where(Engagement.engagement_id.in_(orphan_engagement_ids)))
+
+                for org_id, camp_no in orphan_camp_pairs:
+                    remaining = (
+                        await db.execute(
+                            select(func.count())
+                            .select_from(Engagement)
+                            .where(Engagement.organization_id == int(org_id))
+                            .where(Engagement.camp_no == int(camp_no))
+                        )
+                    ).scalar_one()
+                    if int(remaining or 0) == 0:
+                        await db.execute(
+                            delete(OrganizationHealthReport).where(
+                                OrganizationHealthReport.camp_no == int(camp_no),
+                            )
+                        )
 
         # Employee rows reference users; organizations and onboarding assignments reference employee.
         employee_ids_subq = select(Employee.employee_id).where(Employee.user_id.in_(user_ids))

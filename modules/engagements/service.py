@@ -54,6 +54,39 @@ def _normalize_status(value: str | None) -> str:
     return (value or "").strip().lower()
 
 
+async def _resolve_camp_no_for_engagement(
+    repository: EngagementsRepository,
+    db: AsyncSession,
+    *,
+    organization_id: int | None,
+    camp_no: int | None,
+    exclude_engagement_id: int | None = None,
+) -> int | None:
+    if camp_no is None:
+        return None
+
+    if organization_id is None:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message="Camp number requires an organization",
+        )
+
+    if await repository.camp_no_used_by_other_organization(
+        db,
+        camp_no=camp_no,
+        organization_id=organization_id,
+        exclude_engagement_id=exclude_engagement_id,
+    ):
+        raise AppError(
+            status_code=409,
+            error_code="CAMP_NO_ORG_CONFLICT",
+            message="Camp number is already assigned to a different organization",
+        )
+
+    return camp_no
+
+
 def _resolve_notification_service_key(raw: str | None) -> str:
     key = (raw or "").strip()
     return key or DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
@@ -343,11 +376,18 @@ class EngagementsService:
         qr2 = await self._validate_comma_separated_service_keys(db, payload.questionnaire_reminder_2)
         blood_notif = await self._validate_comma_separated_service_keys(db, payload.blood_report_notification)
         bioai_notif = await self._validate_comma_separated_service_keys(db, payload.bioai_report_notification)
+        camp_no = await _resolve_camp_no_for_engagement(
+            self._repository,
+            db,
+            organization_id=payload.organization_id,
+            camp_no=payload.camp_no,
+        )
 
         engagement = Engagement(
             engagement_name=payload.engagement_name,
             metsights_engagement_id=payload.metsights_engagement_id,
             organization_id=payload.organization_id,
+            camp_no=camp_no,
             engagement_code=code,
             engagement_type=payload.engagement_type,
             assessment_package_id=payload.assessment_package_id,
@@ -552,6 +592,13 @@ class EngagementsService:
         )
         engagement.bioai_report_notification = await self._validate_comma_separated_service_keys(
             db, payload.bioai_report_notification
+        )
+        engagement.camp_no = await _resolve_camp_no_for_engagement(
+            self._repository,
+            db,
+            organization_id=payload.organization_id,
+            camp_no=payload.camp_no,
+            exclude_engagement_id=int(engagement.engagement_id),
         )
 
         engagement = await self._repository.update_engagement(db, engagement)
@@ -1071,10 +1118,27 @@ class EngagementsService:
             engagement_id=engagement_id,
         )
 
-        org_report_result = await db.execute(
-            delete(OrganizationHealthReport).where(OrganizationHealthReport.engagement_id == engagement_id)
-        )
-        totals["deleted_organization_health_reports"] = int(org_report_result.rowcount or 0)
+        engagement_row = await self._repository.get_engagement_by_id(db, engagement_id)
+        if (
+            engagement_row is not None
+            and engagement_row.organization_id is not None
+            and engagement_row.camp_no is not None
+        ):
+            remaining = await self._repository.count_engagements_for_camp(
+                db,
+                camp_no=int(engagement_row.camp_no),
+            )
+            if remaining <= 1:
+                org_report_result = await db.execute(
+                    delete(OrganizationHealthReport).where(
+                        OrganizationHealthReport.camp_no == int(engagement_row.camp_no),
+                    )
+                )
+                totals["deleted_organization_health_reports"] = int(org_report_result.rowcount or 0)
+            else:
+                totals["deleted_organization_health_reports"] = 0
+        else:
+            totals["deleted_organization_health_reports"] = 0
 
         totals["deleted_onboarding_assistant_assignments"] = (
             await self._repository.delete_all_onboarding_assignments_for_engagement(

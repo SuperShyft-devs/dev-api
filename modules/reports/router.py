@@ -9,6 +9,8 @@ from common.responses import success_response
 from core.dependencies import get_current_user
 from core.exceptions import AppError
 from db.session import get_db
+from modules.employee.dependencies import get_optional_employee
+from modules.employee.service import EmployeeContext
 from modules.reports.dependencies import get_reports_service
 from modules.reports.schemas import BloodParameterTrendResponse, HealthSpanIndexRequest
 from modules.reports.service import ReportsService
@@ -24,6 +26,45 @@ def _client_ip(request: Request) -> str:
     if request.client is None:
         return "unknown"
     return request.client.host
+
+
+@router.post("/camp/{camp_no}/calculate")
+async def calculate_camp_report(
+    camp_no: int,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    employee: EmployeeContext | None = Depends(get_optional_employee),
+    reports_service: ReportsService = Depends(get_reports_service),
+):
+    payload = await reports_service.calculate_camp_report(
+        db,
+        camp_no=camp_no,
+        user_id=user.user_id,
+        employee=employee,
+    )
+    await db.commit()
+    return success_response(payload)
+
+
+@router.get("/camp/{camp_no}")
+async def get_camp_chart(
+    camp_no: int,
+    chart: str = Query(..., min_length=1),
+    department: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    employee: EmployeeContext | None = Depends(get_optional_employee),
+    reports_service: ReportsService = Depends(get_reports_service),
+):
+    data = await reports_service.get_camp_chart_data(
+        db,
+        camp_no=camp_no,
+        chart=chart,
+        department=department,
+        user_id=user.user_id,
+        employee=employee,
+    )
+    return {"message": "success", "data": data}
 
 
 @router.get("/{assessment_id}/overview")
