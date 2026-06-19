@@ -451,3 +451,118 @@ async def test_dispatch_omits_otp_in_members_when_not_required(async_client, tes
     assert response.status_code == 201, response.text
     member = webhook_calls[0]["json"]["members"][0]
     assert "otp" not in member
+
+
+async def _seed_simple_dispatch_service(
+    test_db_session, *, user_id: int, service_key: str, webhook_path: str = "test-webhook"
+):
+    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}0000000", status="active"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'Sync Log Test', 'email', :wp, true, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, webhook_path = EXCLUDED.webhook_path"
+        ),
+        {"sk": service_key, "wp": webhook_path},
+    )
+    await test_db_session.commit()
+
+
+def _fake_httpx_client(*, succeed: bool = True):
+    class _FakeResponse:
+        status_code = 200
+        text = "ok"
+
+        def raise_for_status(self):
+            if not succeed:
+                raise RuntimeError("webhook failed")
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            return _FakeResponse()
+
+    return _FakeClient
+
+
+@pytest.mark.asyncio
+async def test_dispatch_creates_n8n_sync_log_on_success(async_client, test_db_session, monkeypatch):
+    service_key = "sync_log_success_test"
+    await _seed_simple_dispatch_service(
+        test_db_session, user_id=9601, service_key=service_key, webhook_path="welcome-whatsapp"
+    )
+
+    monkeypatch.setattr(
+        "modules.notifications.service.httpx.AsyncClient",
+        _fake_httpx_client(succeed=True),
+    )
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        json={"service_key": service_key, "user_ids": [9601]},
+    )
+    assert response.status_code == 201, response.text
+    notification_id = response.json()["data"]["notification_id"]
+
+    result = await test_db_session.execute(
+        text(
+            "SELECT provider, engagement_id, user_id, api_endpoint_url, request_payload, "
+            "response_payload, status, error_message "
+            "FROM integration_sync_logs WHERE provider = 'n8n' "
+            "ORDER BY sync_log_id DESC LIMIT 1"
+        )
+    )
+    row = result.mappings().one()
+    assert row["provider"] == "n8n"
+    assert row["engagement_id"] is None
+    assert row["user_id"] is None
+    assert row["api_endpoint_url"].endswith("/welcome-whatsapp")
+    assert row["request_payload"]["notification_id"] == notification_id
+    assert row["request_payload"]["members"]
+    assert row["status"] == "success"
+    assert row["response_payload"] == {"message": "ok"}
+    assert row["error_message"] is None
+
+
+@pytest.mark.asyncio
+async def test_dispatch_creates_n8n_sync_log_on_failure(async_client, test_db_session, monkeypatch):
+    service_key = "sync_log_failure_test"
+    await _seed_simple_dispatch_service(
+        test_db_session, user_id=9602, service_key=service_key, webhook_path="failed-webhook"
+    )
+
+    monkeypatch.setattr(
+        "modules.notifications.service.httpx.AsyncClient",
+        _fake_httpx_client(succeed=False),
+    )
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        json={"service_key": service_key, "user_ids": [9602]},
+    )
+    assert response.status_code == 201, response.text
+    assert "Webhook call failed" in response.json()["data"]["message"]
+
+    result = await test_db_session.execute(
+        text(
+            "SELECT status, error_message, response_payload "
+            "FROM integration_sync_logs WHERE provider = 'n8n' "
+            "ORDER BY sync_log_id DESC LIMIT 1"
+        )
+    )
+    row = result.mappings().one()
+    assert row["status"] == "failed"
+    assert "webhook failed" in row["error_message"]
+    assert row["response_payload"] is None

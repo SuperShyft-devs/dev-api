@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from core.exceptions import AppError
+from modules.audit.models import IntegrationSyncLog
+from modules.audit.repository import AuditRepository
 from modules.notifications.models import Notification, NotificationService
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.schemas import (
@@ -162,15 +164,47 @@ class NotificationsService:
         if payload.participant_details:
             webhook_payload["participant_details"] = payload.participant_details
 
+        audit_repo = AuditRepository()
+        sync_log = await audit_repo.create_sync_log(
+            db,
+            IntegrationSyncLog(
+                engagement_id=None,
+                user_id=None,
+                provider="n8n",
+                api_endpoint_url=webhook_url,
+                request_payload=webhook_payload,
+                status="pending",
+            ),
+        )
+
         try:
             async with httpx.AsyncClient(timeout=settings.NOTIFICATION_SERVICE_TIMEOUT_SECONDS) as client:
                 resp = await client.post(webhook_url, json=webhook_payload)
                 resp.raise_for_status()
-                resp_data = resp.json()
-                webhook_message = resp_data.get("message", "Webhook called successfully")
+                try:
+                    resp_data = resp.json()
+                except Exception:
+                    resp_data = {"status_code": resp.status_code, "body": resp.text}
+                webhook_message = (
+                    resp_data.get("message", "Webhook called successfully")
+                    if isinstance(resp_data, dict)
+                    else "Webhook called successfully"
+                )
+                await audit_repo.update_sync_log_status(
+                    db,
+                    sync_log_id=sync_log.sync_log_id,
+                    status="success",
+                    response_payload=resp_data if isinstance(resp_data, dict) else {"body": resp_data},
+                )
         except Exception as exc:
             logger.error("Notification webhook call failed: %s", exc)
             webhook_message = f"Webhook call failed: {exc}"
+            await audit_repo.update_sync_log_status(
+                db,
+                sync_log_id=sync_log.sync_log_id,
+                status="failed",
+                error_message=str(exc),
+            )
 
         await self._repo.update_notification(
             db,
