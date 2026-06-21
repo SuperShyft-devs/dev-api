@@ -258,6 +258,7 @@ async def load_bioai_reports(
                     ihr.report_url = fetched_url
                     report_url = fetched_url
                 await db.flush()
+                await db.commit()
 
                 if not _report_data_complete(reports, report_url):
                     skipped += 1
@@ -295,6 +296,7 @@ async def load_bioai_reports(
                 type_code=type_code,
                 details=details,
             )
+            await db.commit()
 
         except Exception as exc:
             await db.rollback()

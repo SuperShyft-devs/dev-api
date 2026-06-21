@@ -318,6 +318,7 @@ async def load_blood_reports(
                     ihr.diagnostic_report_url = fetched_diag_url
                     diagnostic_report_url = fetched_diag_url
                 await db.flush()
+                await db.commit()
 
                 if not _blood_report_data_complete(blood_parameters, diagnostic_report_url):
                     skipped += 1
@@ -354,6 +355,7 @@ async def load_blood_reports(
                 record_id=record_id,
                 details=details,
             )
+            await db.commit()
 
         except Exception as exc:
             await db.rollback()
