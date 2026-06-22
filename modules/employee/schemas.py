@@ -7,16 +7,18 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from modules.employee.models import EmployeeRole
+
 
 class EmployeeCreateRequest(BaseModel):
     user_id: int = Field(gt=0)
-    role: str = Field(min_length=1, max_length=50)
+    role: EmployeeRole
     status: Optional[str] = Field(default="active", max_length=30)
 
 
 class EmployeeUpdateRequest(BaseModel):
     user_id: int = Field(gt=0)
-    role: str = Field(min_length=1, max_length=50)
+    role: EmployeeRole
 
 
 class EmployeeStatusUpdateRequest(BaseModel):
@@ -26,7 +28,7 @@ class EmployeeStatusUpdateRequest(BaseModel):
 class EmployeeListItem(BaseModel):
     employee_id: int
     user_id: int
-    role: Optional[str] = None
+    role: Optional[EmployeeRole] = None
     status: Optional[str] = None
 
 

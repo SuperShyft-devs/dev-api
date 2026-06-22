@@ -438,8 +438,8 @@ class EngagementsRepository:
         *,
         engagement_id: int,
     ) -> list[int]:
-        """Return user_ids for all onboarding assistants assigned to an engagement."""
-        from modules.employee.models import Employee
+        """Return user_ids for admin-role onboarding assistants assigned to an engagement."""
+        from modules.employee.models import Employee, EmployeeRole
 
         query = (
             select(Employee.user_id)
@@ -448,6 +448,7 @@ class EngagementsRepository:
                 OnboardingAssistantAssignment.employee_id == Employee.employee_id,
             )
             .where(OnboardingAssistantAssignment.engagement_id == engagement_id)
+            .where(Employee.role == EmployeeRole.admin)
         )
         result = await db.execute(query)
         return [int(uid) for uid in result.scalars().all()]

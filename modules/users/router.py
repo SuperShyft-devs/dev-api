@@ -85,30 +85,35 @@ async def onboard_user_for_engagement(
 @router.get("/me")
 async def get_me(
     current_user=Depends(get_current_user),
+    employee: EmployeeContext | None = Depends(get_optional_employee),
 ):
-    return success_response(
-        {
-            "user_id": current_user.user_id,
-            "first_name": current_user.first_name,
-            "last_name": current_user.last_name,
-            "age": current_user.age,
-            "phone": current_user.phone,
-            "email": current_user.email,
-            "profile_photo": current_user.profile_photo,
-            "date_of_birth": current_user.date_of_birth,
-            "gender": current_user.gender,
-            "address": current_user.address,
-            "pin_code": current_user.pin_code,
-            "city": current_user.city,
-            "state": current_user.state,
-            "country": current_user.country,
-            "referred_by": current_user.referred_by,
-            "is_participant": current_user.is_participant,
-            "status": current_user.status,
-            "created_at": current_user.created_at,
-            "updated_at": current_user.updated_at,
+    data = {
+        "user_id": current_user.user_id,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
+        "age": current_user.age,
+        "phone": current_user.phone,
+        "email": current_user.email,
+        "profile_photo": current_user.profile_photo,
+        "date_of_birth": current_user.date_of_birth,
+        "gender": current_user.gender,
+        "address": current_user.address,
+        "pin_code": current_user.pin_code,
+        "city": current_user.city,
+        "state": current_user.state,
+        "country": current_user.country,
+        "referred_by": current_user.referred_by,
+        "is_participant": current_user.is_participant,
+        "status": current_user.status,
+        "created_at": current_user.created_at,
+        "updated_at": current_user.updated_at,
+    }
+    if employee is not None:
+        data["employee"] = {
+            "employee_id": employee.employee_id,
+            "role": employee.role,
         }
-    )
+    return success_response(data)
 
 
 @router.get("/me/upcoming-slot")

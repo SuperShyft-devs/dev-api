@@ -22,6 +22,7 @@ from modules.assessments.repository import AssessmentsRepository
 from modules.assessments.service import AssessmentsService
 from modules.audit.service import AuditService
 from modules.checklists.schemas import ChecklistReadiness
+from modules.employee.models import EmployeeRole
 from modules.employee.service import EmployeeContext
 from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
 from modules.engagements.models import Engagement, EngagementKind, EngagementParticipant, OnboardingAssistantAssignment
@@ -193,6 +194,28 @@ class EngagementsService:
                 error_code="FORBIDDEN",
                 message="You do not have permission to perform this action",
             )
+
+    async def _ensure_employee_or_assigned_assistant(
+        self,
+        db: AsyncSession,
+        employee: EmployeeContext | None,
+        engagement_id: int,
+    ) -> None:
+        """Allow admins unconditionally; allow onboarding_assistant only if assigned to the engagement."""
+        self._ensure_employee_access(employee)
+        if employee.role == EmployeeRole.admin:
+            return
+        if employee.role == EmployeeRole.onboarding_assistant:
+            assignment = await self._repository.get_onboarding_assistant_assignment(
+                db, engagement_id=engagement_id, employee_id=employee.employee_id
+            )
+            if assignment is not None:
+                return
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
 
     def _require_audit_service(self) -> AuditService:
         if self._audit_service is None:
@@ -460,7 +483,7 @@ class EngagementsService:
         employee: EmployeeContext,
         engagement_id: int,
     ) -> Engagement:
-        self._ensure_employee_access(employee)
+        await self._ensure_employee_or_assigned_assistant(db, employee, engagement_id)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -874,7 +897,7 @@ class EngagementsService:
     ) -> tuple[list[dict], int]:
         """Fetch participant enrollment rows for a specific engagement by id."""
 
-        self._ensure_employee_access(employee)
+        await self._ensure_employee_or_assigned_assistant(db, employee, engagement_id)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:

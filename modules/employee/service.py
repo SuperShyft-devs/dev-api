@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
-from modules.employee.models import Employee
+from modules.employee.models import Employee, EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.schemas import EmployeeCreateRequest, EmployeeUpdateRequest
 
@@ -22,7 +22,7 @@ class EmployeeContext:
 
     employee_id: int
     user_id: int
-    role: str
+    role: EmployeeRole
 
 
 _ALLOWED_EMPLOYEE_STATUS = {"active", "inactive", "archived"}
@@ -51,7 +51,7 @@ class EmployeeService:
 
     def _ensure_admin(self, employee: EmployeeContext | None) -> None:
         self._ensure_employee_access(employee)
-        if (employee.role or "").strip().lower() != "admin":
+        if employee.role != EmployeeRole.admin:
             raise AppError(
                 status_code=403,
                 error_code="FORBIDDEN",
