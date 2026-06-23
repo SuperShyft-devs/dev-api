@@ -12,6 +12,7 @@ Business rules:
 from __future__ import annotations
 
 from core.exceptions import AppError
+from common.slug import slugify_department
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
 from modules.organizations.models import Organization
@@ -24,6 +25,84 @@ _ALLOWED_ORGANIZATION_STATUS = {"active", "inactive", "archived"}
 
 def _normalize_status(value: str | None) -> str:
     return (value or "").strip().lower()
+
+
+def _normalize_departments(
+    inputs: list | None,
+) -> list[dict[str, str]] | None:
+    if inputs is None:
+        return None
+    if not inputs:
+        return None
+
+    seen_names: set[str] = set()
+    seen_slugs: set[str] = set()
+    normalized: list[dict[str, str]] = []
+
+    for item in inputs:
+        name = (getattr(item, "department", None) or "").strip()
+        if not name:
+            continue
+        name_key = name.casefold()
+        if name_key in seen_names:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        slug = slugify_department(name)
+        if not slug:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        if slug in seen_slugs:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        seen_names.add(name_key)
+        seen_slugs.add(slug)
+        normalized.append({"department": name, "slug": slug})
+
+    return normalized or None
+
+
+def get_department_slugs(organization: Organization) -> set[str]:
+    departments = organization.departments or []
+    if not isinstance(departments, list):
+        return set()
+    slugs: set[str] = set()
+    for item in departments:
+        if isinstance(item, dict):
+            slug = (item.get("slug") or "").strip()
+            if slug:
+                slugs.add(slug)
+    return slugs
+
+
+def resolve_department_label(organization: Organization, slug: str | None) -> str | None:
+    value = (slug or "").strip()
+    if not value:
+        return None
+    departments = organization.departments or []
+    if not isinstance(departments, list):
+        return None
+    for item in departments:
+        if isinstance(item, dict) and (item.get("slug") or "").strip() == value:
+            label = (item.get("department") or "").strip()
+            return label or value
+    return None
+
+
+def validate_participant_department_for_organization(
+    organization: Organization | None,
+    participant_department: str | None,
+) -> str | None:
+    """Validate and return normalized slug, or None if department not provided."""
+    value = (participant_department or "").strip()
+    if not value:
+        return None
+    if organization is None:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message="Department requires an organization engagement",
+        )
+    allowed = get_department_slugs(organization)
+    if value not in allowed:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid department")
+    return value
 
 
 class OrganizationsService:
@@ -83,6 +162,7 @@ class OrganizationsService:
             contact_phone=payload.contact_phone,
             contact_designation=payload.contact_designation,
             bd_employee_id=payload.bd_employee_id,
+            departments=_normalize_departments(payload.departments),
             status="active",
             created_employee_id=employee.employee_id,
             updated_employee_id=employee.employee_id,
@@ -224,6 +304,7 @@ class OrganizationsService:
         organization.contact_phone = payload.contact_phone
         organization.contact_designation = payload.contact_designation
         organization.bd_employee_id = payload.bd_employee_id
+        organization.departments = _normalize_departments(payload.departments)
         organization.updated_employee_id = employee.employee_id
 
         organization = await self._repository.update(db, organization)

@@ -7,7 +7,7 @@ Schema must match `instructions/db-schema.txt`.
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text, func
 
 from db.base import Base
 
@@ -34,6 +34,7 @@ class Organization(Base):
     contact_designation = Column(String)
 
     bd_employee_id = Column(Integer, ForeignKey("employee.employee_id"))
+    departments = Column(JSON, nullable=True)
     status = Column(String)
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

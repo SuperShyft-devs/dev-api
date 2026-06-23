@@ -897,3 +897,78 @@ async def test_delete_participant_clears_notification_refs_before_instance_delet
         )
     ).scalar_one()
     assert notif_assessment_id is None
+
+
+@pytest.mark.asyncio
+async def test_patch_participant_department_updates_slug(async_client, test_db_session):
+    from datetime import time
+
+    from modules.engagements.models import Engagement, EngagementParticipant
+    from modules.organizations.models import Organization
+
+    await _seed_employee(test_db_session, user_id=7030, employee_id=31)
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    test_db_session.add(
+        Organization(
+            organization_id=8701,
+            name="Patch Dept Org",
+            status="active",
+            departments=[
+                {"department": "Sales", "slug": "sales"},
+                {"department": "Marketing", "slug": "marketing"},
+            ],
+        )
+    )
+    test_db_session.add(User(user_id=1030, age=30, phone="1030000000", status="active"))
+    await test_db_session.flush()
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=8701,
+            engagement_name="Patch Dept Engagement",
+            organization_id=8701,
+            engagement_code="PD8701",
+            engagement_type="bio_ai",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 1),
+            status="running",
+            participant_count=1,
+        )
+    )
+    await test_db_session.flush()
+
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=87001,
+            engagement_id=8701,
+            user_id=1030,
+            engagement_date=date(2026, 2, 1),
+            slot_start_time=time(10, 0),
+            participant_department=None,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/engagements/8701/participants/1030",
+        headers=_auth_header(7030),
+        json={"participant_department": "marketing"},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["participant_department"] == "marketing"
+
+    row = (
+        await test_db_session.execute(
+            text(
+                "SELECT participant_department FROM engagement_participants "
+                "WHERE engagement_id = 8701 AND user_id = 1030"
+            )
+        )
+    ).first()
+    assert row.participant_department == "marketing"

@@ -195,8 +195,15 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
     # Prepare an existing engagement with participant_count=0
     await test_db_session.execute(
         text(
-            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3001, 'Camp', 'ENG12345', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
+            "INSERT INTO organizations (organization_id, name, status, departments) "
+            "VALUES (8001, 'Camp Org', 'active', "
+            "'[{\"department\": \"HR\", \"slug\": \"hr\"}]'::json)"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
+            "VALUES (3001, 'Camp', 'ENG12345', 8001, 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
         )
     )
     await test_db_session.commit()
@@ -210,7 +217,7 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
         "city": "BLR",
         "blood_collection_date": "2026-02-01",
         "blood_collection_time_slot": "11:00",
-        "participant_department": "HR",
+        "participant_department": "hr",
         "participant_blood_group": "B+",
     }
 
@@ -229,7 +236,7 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
             {"pid": data["engagement_participant_id"]},
         )
     ).first()
-    assert slot_row.participant_department == "HR"
+    assert slot_row.participant_department == "hr"
     assert slot_row.participant_blood_group == "B+"
     assert slot_row.is_profile_created_on_metsights is False
 
@@ -238,7 +245,7 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
             text("SELECT participant_count FROM engagements WHERE engagement_id = 3001")
         )
     ).first()
-    assert engagement_row.participant_count == 0
+    assert engagement_row.participant_count == 1
 
     instance_row = (
         await test_db_session.execute(
@@ -454,3 +461,82 @@ async def test_public_onboard_fails_when_fallback_packages_inactive(async_client
     response = await async_client.post("/users/public/onboard", json=payload)
     assert response.status_code == 422
     assert response.json()["error_code"] == "INVALID_B2C_ASSESSMENT_PACKAGE"
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_rejects_invalid_department_slug(async_client, test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO organizations (organization_id, name, status, departments) "
+            "VALUES (8101, 'Dept Org', 'active', "
+            "'[{\"department\": \"Sales\", \"slug\": \"sales\"}]'::json)"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
+            "VALUES (3101, 'Dept Camp', 'DEPT01', 8101, 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "Bad",
+        "phone": "5555555555",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "11:00",
+        "participant_department": "marketing",
+    }
+
+    response = await async_client.post("/users/code/DEPT01/onboard", json=payload)
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT"
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_rejects_department_without_organization(async_client, test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
+            "VALUES (3102, 'B2C Camp', 'B2CDEPT', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "NoOrg",
+        "phone": "5555555556",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "11:00",
+        "participant_department": "sales",
+    }
+
+    response = await async_client.post("/users/code/B2CDEPT/onboard", json=payload)
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT"

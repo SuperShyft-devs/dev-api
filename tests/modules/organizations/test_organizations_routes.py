@@ -174,3 +174,74 @@ async def test_update_organization_status_sets_inactive(async_client, test_db_se
     updated = await test_db_session.get(Organization, 9301)
     assert updated is not None
     assert (updated.status or "").lower() == "inactive"
+
+
+@pytest.mark.asyncio
+async def test_create_organization_with_departments_generates_slugs(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7107, employee_id=26)
+
+    payload = {
+        "name": "DeptOrg",
+        "departments": [
+            {"department": "Sales"},
+            {"department": "Marketing"},
+        ],
+    }
+
+    response = await async_client.post("/organizations", headers=_auth_header(7107), json=payload)
+    assert response.status_code == 201
+
+    organization_id = response.json()["data"]["organization_id"]
+    created = await test_db_session.get(Organization, organization_id)
+    assert created is not None
+    assert created.departments == [
+        {"department": "Sales", "slug": "sales"},
+        {"department": "Marketing", "slug": "marketing"},
+    ]
+
+    details = await async_client.get(f"/organizations/{organization_id}", headers=_auth_header(7107))
+    assert details.status_code == 200
+    assert details.json()["data"]["departments"] == created.departments
+
+
+@pytest.mark.asyncio
+async def test_create_organization_rejects_duplicate_department_names(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7108, employee_id=27)
+
+    payload = {
+        "name": "DupDeptOrg",
+        "departments": [
+            {"department": "Sales"},
+            {"department": "sales"},
+        ],
+    }
+
+    response = await async_client.post("/organizations", headers=_auth_header(7108), json=payload)
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_update_organization_replaces_departments(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7109, employee_id=28)
+
+    test_db_session.add(
+        Organization(
+            organization_id=9401,
+            name="ReplaceDeptOrg",
+            status="active",
+            departments=[{"department": "Sales", "slug": "sales"}],
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "name": "ReplaceDeptOrg",
+        "departments": [{"department": "Engineering"}],
+    }
+
+    response = await async_client.put("/organizations/9401", headers=_auth_header(7109), json=payload)
+    assert response.status_code == 200
+
+    updated = await test_db_session.get(Organization, 9401)
+    assert updated is not None
+    assert updated.departments == [{"department": "Engineering", "slug": "engineering"}]

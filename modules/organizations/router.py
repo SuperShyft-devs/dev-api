@@ -150,6 +150,7 @@ async def get_organization_details(
             "contact_phone": organization.contact_phone,
             "contact_designation": organization.contact_designation,
             "bd_employee_id": organization.bd_employee_id,
+            "departments": organization.departments,
             "status": organization.status,
             "created_at": organization.created_at,
             "created_employee_id": organization.created_employee_id,

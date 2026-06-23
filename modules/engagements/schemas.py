@@ -164,3 +164,7 @@ class CreateMetsightsProfilesRequest(BaseModel):
         pattern=r"^(enrol_force|enrol|profile)$",
         description="enrol_force: register all via engagement; enrol: register new only via engagement; profile: create standalone profiles for new only",
     )
+
+
+class EngagementParticipantDepartmentUpdateRequest(BaseModel):
+    participant_department: Optional[str] = Field(default=None, max_length=100)

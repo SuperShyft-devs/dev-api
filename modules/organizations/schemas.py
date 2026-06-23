@@ -8,6 +8,15 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 
 
+class OrganizationDepartment(BaseModel):
+    department: str
+    slug: str
+
+
+class OrganizationDepartmentInput(BaseModel):
+    department: str = Field(min_length=1, max_length=100)
+
+
 class OrganizationCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     organization_type: Optional[str] = Field(default=None, max_length=50)
@@ -25,6 +34,7 @@ class OrganizationCreateRequest(BaseModel):
     contact_designation: Optional[str] = Field(default=None, max_length=100)
 
     bd_employee_id: Optional[int] = Field(default=None, gt=0)
+    departments: Optional[list[OrganizationDepartmentInput]] = None
 
 
 class OrganizationUpdateRequest(BaseModel):
@@ -44,6 +54,7 @@ class OrganizationUpdateRequest(BaseModel):
     contact_designation: Optional[str] = Field(default=None, max_length=100)
 
     bd_employee_id: Optional[int] = Field(default=None, gt=0)
+    departments: Optional[list[OrganizationDepartmentInput]] = None
 
 
 class OrganizationStatusUpdateRequest(BaseModel):
@@ -80,6 +91,7 @@ class OrganizationDetailsResponse(BaseModel):
     contact_designation: Optional[str] = None
 
     bd_employee_id: Optional[int] = None
+    departments: Optional[list[OrganizationDepartment]] = None
     status: Optional[str] = None
 
     created_at: Optional[datetime] = None

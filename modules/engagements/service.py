@@ -30,6 +30,7 @@ from modules.engagements.repository import EngagementsRepository
 from modules.engagements.schemas import EngagementCreateRequest, EngagementUpdateRequest
 from modules.notifications.repository import NotificationsRepository
 from modules.organizations.repository import OrganizationsRepository
+from modules.organizations.service import validate_participant_department_for_organization
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.repository import ReportsRepository
 from modules.users.models import User
@@ -838,6 +839,83 @@ class EngagementsService:
         created = await self._repository.create_participant(db, participant)
         await self._refresh_participant_count(db, engagement)
         return created
+
+    async def resolve_participant_department_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement: Engagement,
+        participant_department: str | None,
+    ) -> str | None:
+        value = (participant_department or "").strip()
+        if not value:
+            return None
+        if engagement.organization_id is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Department requires an organization engagement",
+            )
+        if self._organizations_repository is None:
+            raise RuntimeError("Organizations repository is required")
+        organization = await self._organizations_repository.get_by_id(db, engagement.organization_id)
+        return validate_participant_department_for_organization(organization, value)
+
+    async def update_participant_department_for_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        participant_department: str | None,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        self._ensure_employee_access(employee)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        participant = await self._repository.get_participant_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant does not exist")
+
+        normalized: str | None
+        if participant_department is None:
+            normalized = None
+        else:
+            normalized = await self.resolve_participant_department_for_engagement(
+                db,
+                engagement=engagement,
+                participant_department=participant_department,
+            )
+
+        participant.participant_department = normalized
+        await self._repository.update_participant(db, participant)
+
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_UPDATE_PARTICIPANT_DEPARTMENT",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return {
+            "engagement_id": engagement_id,
+            "user_id": user_id,
+            "participant_department": normalized,
+        }
 
     async def update_participant_sync_flags(
         self,

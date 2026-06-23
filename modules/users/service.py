@@ -1925,6 +1925,11 @@ class UsersService:
         )
 
         slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
+        validated_department = await self._engagements_service.resolve_participant_department_for_engagement(
+            db,
+            engagement=engagement,
+            participant_department=payload.participant_department,
+        )
         time_slot = await self._engagements_service.enroll_user_in_engagement(
             db,
             engagement=engagement,
@@ -1933,7 +1938,7 @@ class UsersService:
             slot_start_time=slot_start,
             increment_participant_count=False,
             participants_employee_id=payload.participants_employee_id,
-            participant_department=payload.participant_department,
+            participant_department=validated_department,
             participant_blood_group=payload.participant_blood_group,
             want_doctor_consultation=payload.want_doctor_consultation,
             want_nutritionist_consultation=payload.want_nutritionist_consultation,
