@@ -538,6 +538,13 @@ class EngagementAssessmentPackagesService:
                 inst_id = int(inst.assessment_instance_id)
                 mrid = (inst.metsights_record_id or "").strip()
                 if not mrid:
+                    await sync_service.log_skipped_push(
+                        db,
+                        engagement_id=engagement_id,
+                        user_id=int(user_id),
+                        reason="no_metsights_record_id",
+                        assessment_instance_id=inst_id,
+                    )
                     skipped += 1
                     continue
 

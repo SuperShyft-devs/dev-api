@@ -681,6 +681,101 @@ class MetsightsSyncService:
             message="You do not have permission to perform this action",
         )
 
+    @staticmethod
+    def _push_placeholder_url(*, record_id: str | None = None, resource: str = "push") -> str:
+        mrid = (record_id or "unknown").strip() or "unknown"
+        return f"/records/{mrid}/{resource}/"
+
+    async def _create_pending_sync_log(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int | None,
+        user_id: int | None,
+        api_url: str,
+        request_payload: dict | None = None,
+    ) -> IntegrationSyncLog:
+        audit_repo = AuditRepository()
+        return await audit_repo.create_sync_log(
+            db,
+            IntegrationSyncLog(
+                engagement_id=engagement_id,
+                user_id=user_id,
+                provider="metsights",
+                api_endpoint_url=api_url,
+                request_payload=request_payload,
+                status="pending",
+            ),
+        )
+
+    async def _finalize_sync_log(
+        self,
+        db: AsyncSession,
+        *,
+        sync_log_id: int,
+        status: str,
+        response_payload: dict | None = None,
+        error_message: str | None = None,
+    ) -> None:
+        audit_repo = AuditRepository()
+        await audit_repo.update_sync_log_status(
+            db,
+            sync_log_id=sync_log_id,
+            status=status,
+            response_payload=response_payload,
+            error_message=error_message,
+        )
+
+    async def _log_skipped_metsights_sync(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int | None,
+        user_id: int | None,
+        api_url: str,
+        reason: str,
+        request_payload: dict | None = None,
+    ) -> None:
+        audit_repo = AuditRepository()
+        await audit_repo.create_sync_log(
+            db,
+            IntegrationSyncLog(
+                engagement_id=engagement_id,
+                user_id=user_id,
+                provider="metsights",
+                api_endpoint_url=api_url,
+                request_payload=request_payload,
+                response_payload={"skipped": True, "reason": reason},
+                status="skipped",
+            ),
+        )
+
+    async def log_skipped_push(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        user_id: int,
+        reason: str,
+        assessment_instance_id: int | None = None,
+    ) -> None:
+        """Log a skipped bulk/employee push attempt (no Metsights API call)."""
+        response_payload: dict[str, Any] = {"skipped": True, "reason": reason}
+        if assessment_instance_id is not None:
+            response_payload["assessment_instance_id"] = assessment_instance_id
+        audit_repo = AuditRepository()
+        await audit_repo.create_sync_log(
+            db,
+            IntegrationSyncLog(
+                engagement_id=engagement_id,
+                user_id=user_id,
+                provider="metsights",
+                api_endpoint_url=self._push_placeholder_url(),
+                response_payload=response_payload,
+                status="skipped",
+            ),
+        )
+
     async def sync_completed_metsights_records(
         self,
         db: AsyncSession,
@@ -890,6 +985,9 @@ class MetsightsSyncService:
                 message=f"No Metsights questionnaire resources mapped for assessment type {type_code!r}",
             )
 
+        engagement_id = int(instance.engagement_id) if instance.engagement_id else None
+        participant_user_id = int(instance.user_id)
+
         imported = 0
         skipped_questions: list[str] = []
         record_detail_cache: dict[str, Any] | None = None
@@ -912,8 +1010,9 @@ class MetsightsSyncService:
             resource: str,
             payload: dict[str, Any],
             choice_maps: dict[str, dict[str, str]],
-        ) -> None:
+        ) -> int:
             nonlocal imported
+            resource_imported = 0
             for field_name, raw_val in payload.items():
                 if field_name in _METADATA_FIELDS:
                     continue
@@ -1023,6 +1122,8 @@ class MetsightsSyncService:
                         ),
                     )
                 imported += 1
+                resource_imported += 1
+            return resource_imported
 
         def _payload_has_answer(payload: dict[str, Any]) -> bool:
             for fn, rv in payload.items():
@@ -1034,29 +1135,60 @@ class MetsightsSyncService:
             return False
 
         for resource in resources:
-            payload = await self._metsights.get_record_subresource_or_none(record_id=mrid, resource=resource)
-            source = resource
+            api_url = f"/records/{mrid}/{resource}/"
+            sync_log = await self._create_pending_sync_log(
+                db,
+                engagement_id=engagement_id,
+                user_id=participant_user_id,
+                api_url=api_url,
+            )
 
-            # Fallback: Metsights returns 405 for GET on some sub-resources
-            # (e.g. ``/fitness-parameters/`` and ``/vitals/``). Read the same data
-            # from the record detail envelope in that case, or when the sub-resource
-            # simply has no usable answers yet (e.g. FitPrint records always go here
-            # because their fitness parameters are only exposed via record detail).
-            if not isinstance(payload, dict) or not _payload_has_answer(payload):
-                detail = await _get_record_detail_cached()
-                if isinstance(detail, dict):
-                    nested_key = _RESOURCE_TO_DETAIL_FIELD.get(resource)
-                    nested = detail.get(nested_key) if nested_key else None
-                    if isinstance(nested, dict) and _payload_has_answer(nested):
-                        payload = nested
-                        source = f"record_detail.{nested_key}"
+            try:
+                payload = await self._metsights.get_record_subresource_or_none(record_id=mrid, resource=resource)
+                source = resource
 
-            if not isinstance(payload, dict):
-                continue
+                # Fallback: Metsights returns 405 for GET on some sub-resources
+                # (e.g. ``/fitness-parameters/`` and ``/vitals/``). Read the same data
+                # from the record detail envelope in that case, or when the sub-resource
+                # simply has no usable answers yet (e.g. FitPrint records always go here
+                # because their fitness parameters are only exposed via record detail).
+                if not isinstance(payload, dict) or not _payload_has_answer(payload):
+                    detail = await _get_record_detail_cached()
+                    if isinstance(detail, dict):
+                        nested_key = _RESOURCE_TO_DETAIL_FIELD.get(resource)
+                        nested = detail.get(nested_key) if nested_key else None
+                        if isinstance(nested, dict) and _payload_has_answer(nested):
+                            payload = nested
+                            source = f"record_detail.{nested_key}"
 
-            opt_env = await self._metsights.options_record_subresource(record_id=mrid, resource=resource)
-            choice_maps = _build_field_choice_maps(opt_env if isinstance(opt_env, dict) else {})
-            await _ingest_payload(source, payload, choice_maps)
+                if not isinstance(payload, dict) or not _payload_has_answer(payload):
+                    await self._finalize_sync_log(
+                        db,
+                        sync_log_id=sync_log.sync_log_id,
+                        status="skipped",
+                        response_payload={"skipped": True, "reason": "no_ingestable_data"},
+                    )
+                    continue
+
+                skipped_before = len(skipped_questions)
+                opt_env = await self._metsights.options_record_subresource(record_id=mrid, resource=resource)
+                choice_maps = _build_field_choice_maps(opt_env if isinstance(opt_env, dict) else {})
+                resource_imported = await _ingest_payload(source, payload, choice_maps)
+                resource_skipped = skipped_questions[skipped_before:]
+                await self._finalize_sync_log(
+                    db,
+                    sync_log_id=sync_log.sync_log_id,
+                    status="success",
+                    response_payload={"imported": resource_imported, "skipped": resource_skipped},
+                )
+            except Exception as exc:
+                await self._finalize_sync_log(
+                    db,
+                    sync_log_id=sync_log.sync_log_id,
+                    status="failed",
+                    error_message=str(exc),
+                )
+                raise
 
         return {
             "assessment_instance_id": assessment_instance_id,
@@ -1089,6 +1221,9 @@ class MetsightsSyncService:
     async def _patch_metsights_sections(
         self,
         *,
+        db: AsyncSession,
+        engagement_id: int | None,
+        user_id: int | None,
         record_id: str,
         type_code: str,
         merged: dict[str, Any],
@@ -1105,6 +1240,7 @@ class MetsightsSyncService:
             return
 
         async def _patch_section(resource: str, body: dict[str, Any]) -> None:
+            api_url = f"/records/{mrid}/{resource}/"
             payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
             if not payload:
                 logger.info(
@@ -1113,6 +1249,13 @@ class MetsightsSyncService:
                     mrid,
                 )
                 skipped_sections.append(resource)
+                await self._log_skipped_metsights_sync(
+                    db,
+                    engagement_id=engagement_id,
+                    user_id=user_id,
+                    api_url=api_url,
+                    reason="empty_payload",
+                )
                 return
             field_meta = await self._fetch_field_metadata_for_resource(mrid, resource, cache=options_cache)
             if field_meta:
@@ -1126,14 +1269,41 @@ class MetsightsSyncService:
                     skipped_sections.append(resource)
                     if section_errors is not None:
                         section_errors.append(resource)
+                    await self._log_skipped_metsights_sync(
+                        db,
+                        engagement_id=engagement_id,
+                        user_id=user_id,
+                        api_url=api_url,
+                        reason="all_fields_invalid",
+                    )
                     return
             if mark_complete and resource in _METSIGHTS_QUESTIONNAIRE_RESOURCES:
                 payload["is_complete"] = True
             logger.info("Pushing to Metsights %s for record %s: %s", resource, mrid, payload)
+
+            sync_log = await self._create_pending_sync_log(
+                db,
+                engagement_id=engagement_id,
+                user_id=user_id,
+                api_url=api_url,
+                request_payload=dict(payload),
+            )
             try:
                 await self._metsights.upsert_record_subresource(record_id=mrid, resource=resource, body=payload)
                 patched.append(resource)
+                await self._finalize_sync_log(
+                    db,
+                    sync_log_id=sync_log.sync_log_id,
+                    status="success",
+                    response_payload={"pushed": True},
+                )
             except Exception as exc:
+                await self._finalize_sync_log(
+                    db,
+                    sync_log_id=sync_log.sync_log_id,
+                    status="failed",
+                    error_message=str(exc),
+                )
                 logger.warning(
                     "Metsights push %s for record %s failed: %s — payload was: %s",
                     resource,
@@ -1276,7 +1446,13 @@ class MetsightsSyncService:
         patched: list[str] = []
         skipped_sections: list[str] = []
 
+        engagement_id = int(instance.engagement_id) if instance.engagement_id else None
+        participant_user_id = int(current_user_id)
+
         await self._patch_metsights_sections(
+            db=db,
+            engagement_id=engagement_id,
+            user_id=participant_user_id,
             record_id=mrid,
             type_code=type_code,
             merged=merged,
@@ -1296,6 +1472,9 @@ class MetsightsSyncService:
                 fp_rid = (fitprint_inst.metsights_record_id or "").strip()
                 if fp_rid:
                     await self._patch_metsights_sections(
+                        db=db,
+                        engagement_id=engagement_id,
+                        user_id=participant_user_id,
                         record_id=fp_rid,
                         type_code="7",
                         merged=merged,
@@ -1343,8 +1522,18 @@ class MetsightsSyncService:
         if instance is None:
             return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "instance_not_found"}
 
+        engagement_id = int(instance.engagement_id) if instance.engagement_id else None
+        participant_user_id = int(instance.user_id)
+
         mrid = (instance.metsights_record_id or "").strip()
         if not mrid:
+            await self._log_skipped_metsights_sync(
+                db,
+                engagement_id=engagement_id,
+                user_id=participant_user_id,
+                api_url=self._push_placeholder_url(),
+                reason="no_metsights_record_id",
+            )
             return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "no_metsights_record_id"}
 
         package = await self._assessments.get_package_by_id(db, int(instance.package_id))
@@ -1366,6 +1555,13 @@ class MetsightsSyncService:
             assessment_instance_ids=effective_source_ids,
         )
         if not responses:
+            await self._log_skipped_metsights_sync(
+                db,
+                engagement_id=engagement_id,
+                user_id=participant_user_id,
+                api_url=self._push_placeholder_url(record_id=mrid),
+                reason="no_responses",
+            )
             return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "no_responses"}
 
         source_order = {sid: idx for idx, sid in enumerate(effective_source_ids)}
@@ -1385,6 +1581,13 @@ class MetsightsSyncService:
             merged.update(_answer_to_metsights_fields(key, str(qdef.question_type or ""), resp.answer))
 
         if not merged:
+            await self._log_skipped_metsights_sync(
+                db,
+                engagement_id=engagement_id,
+                user_id=participant_user_id,
+                api_url=self._push_placeholder_url(record_id=mrid),
+                reason="no_mappable_answers",
+            )
             return {"assessment_instance_id": assessment_instance_id, "pushed": False, "reason": "no_mappable_answers"}
 
         patched: list[str] = []
@@ -1392,6 +1595,9 @@ class MetsightsSyncService:
         section_errors: list[str] = []
 
         await self._patch_metsights_sections(
+            db=db,
+            engagement_id=engagement_id,
+            user_id=participant_user_id,
             record_id=mrid,
             type_code=type_code,
             merged=merged,
@@ -1412,6 +1618,9 @@ class MetsightsSyncService:
                 fp_rid = (fitprint_inst.metsights_record_id or "").strip()
                 if fp_rid:
                     await self._patch_metsights_sections(
+                        db=db,
+                        engagement_id=engagement_id,
+                        user_id=participant_user_id,
                         record_id=fp_rid,
                         type_code="7",
                         merged=merged,
@@ -1628,6 +1837,14 @@ class MetsightsSyncService:
                 db, assessment_instance_id=assessment_instance_id, category_id=int(category.category_id),
             )
             if existing_responses:
+                api_url = f"/records/{mrid}/{api_path}/"
+                await self._log_skipped_metsights_sync(
+                    db,
+                    engagement_id=engagement_id,
+                    user_id=int(instance.user_id),
+                    api_url=api_url,
+                    reason="responses already exist, use reload=1 to overwrite",
+                )
                 return {
                     "assessment_instance_id": assessment_instance_id,
                     "category": category_key,
