@@ -235,7 +235,7 @@ async def test_get_questionnaire_returns_empty_questions_when_no_package_questio
     assert data["assessment_status"] == "active"
     assert data["assessment_package"] == "Empty Package"
     assert data["category"] == "Category 7002"
-    assert data["category_status"] == "active"
+    assert data["category_status"] == "incomplete"
     assert data["questions"] == []
 
 
@@ -300,7 +300,7 @@ async def test_get_questionnaire_returns_questions_without_answers(async_client,
     assert data["assessment_status"] == "active"
     assert data["assessment_package"] == "Test Package"
     assert data["category"] == "Category 7003"
-    assert data["category_status"] == "active"
+    assert data["category_status"] == "incomplete"
     assert len(data["questions"]) == 2
 
     # Check first question
@@ -1048,27 +1048,27 @@ async def test_upsert_responses_updates_existing_responses(async_client, test_db
     assert updated.submitted_at is None
 
 
-# ==================== POST /assessments/{assessment_instance_id}/submit Tests ====================
+# ==================== POST /assessments/{assessment_instance_id}/submit-legacy Tests ====================
 
 
 @pytest.mark.asyncio
-async def test_submit_questionnaire_requires_auth(async_client):
+async def test_submit_legacy_requires_auth(async_client):
     """Test that authentication is required."""
-    response = await async_client.post("/assessments/1/submit")
+    response = await async_client.post("/assessments/1/submit-legacy")
     assert response.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_submit_questionnaire_returns_404_when_assessment_not_found(async_client, test_db_session):
+async def test_submit_legacy_returns_404_when_assessment_not_found(async_client, test_db_session):
     """Test 404 when assessment instance does not exist."""
     await _seed_user(test_db_session, user_id=5017)
 
-    response = await async_client.post("/assessments/99999/submit", headers=_auth_header(5017))
+    response = await async_client.post("/assessments/99999/submit-legacy", headers=_auth_header(5017))
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_submit_questionnaire_returns_403_when_not_owner(async_client, test_db_session):
+async def test_submit_legacy_returns_403_when_not_owner(async_client, test_db_session):
     """Test 403 when user tries to submit another user's assessment."""
     await _seed_user(test_db_session, user_id=5018)
     await _seed_user(test_db_session, user_id=5019)
@@ -1086,12 +1086,12 @@ async def test_submit_questionnaire_returns_403_when_not_owner(async_client, tes
     test_db_session.add(instance)
     await test_db_session.commit()
 
-    response = await async_client.post("/assessments/2012/submit", headers=_auth_header(5018))
+    response = await async_client.post("/assessments/2012/submit-legacy", headers=_auth_header(5018))
     assert response.status_code == 403
 
 
 @pytest.mark.asyncio
-async def test_submit_questionnaire_returns_422_when_already_completed(async_client, test_db_session):
+async def test_submit_legacy_returns_422_when_already_completed(async_client, test_db_session):
     """Test 422 when assessment is already completed."""
     await _seed_user(test_db_session, user_id=5020)
     await _ensure_test_engagement(test_db_session)
@@ -1108,13 +1108,13 @@ async def test_submit_questionnaire_returns_422_when_already_completed(async_cli
     test_db_session.add(instance)
     await test_db_session.commit()
 
-    response = await async_client.post("/assessments/2013/submit", headers=_auth_header(5020))
+    response = await async_client.post("/assessments/2013/submit-legacy", headers=_auth_header(5020))
     assert response.status_code == 422
     assert "already completed" in response.json()["message"]
 
 
 @pytest.mark.asyncio
-async def test_submit_questionnaire_returns_422_when_not_active(async_client, test_db_session):
+async def test_submit_legacy_returns_422_when_not_active(async_client, test_db_session):
     """Test 422 when assessment is not active."""
     await _seed_user(test_db_session, user_id=5021)
     await _ensure_test_engagement(test_db_session)
@@ -1131,14 +1131,14 @@ async def test_submit_questionnaire_returns_422_when_not_active(async_client, te
     test_db_session.add(instance)
     await test_db_session.commit()
 
-    response = await async_client.post("/assessments/2014/submit", headers=_auth_header(5021))
+    response = await async_client.post("/assessments/2014/submit-legacy", headers=_auth_header(5021))
     assert response.status_code == 422
     assert "not active" in response.json()["message"]
 
 
 @pytest.mark.asyncio
-async def test_submit_questionnaire_marks_assessment_completed(async_client, test_db_session):
-    """Test successful submission marks assessment as completed."""
+async def test_submit_legacy_marks_assessment_completed(async_client, test_db_session):
+    """Test successful legacy submission marks assessment as completed."""
     await _seed_user(test_db_session, user_id=5022)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1015, package_code="PKG015", display_name="Test Package", status="active")
@@ -1168,7 +1168,6 @@ async def test_submit_questionnaire_marks_assessment_completed(async_client, tes
     )
     test_db_session.add(instance)
 
-    # Add a response
     response_row = QuestionnaireResponse(
         assessment_instance_id=2015,
         question_id=3010,
@@ -1179,23 +1178,21 @@ async def test_submit_questionnaire_marks_assessment_completed(async_client, tes
     test_db_session.add(response_row)
     await test_db_session.commit()
 
-    response = await async_client.post("/assessments/2015/submit", headers=_auth_header(5022))
+    response = await async_client.post("/assessments/2015/submit-legacy", headers=_auth_header(5022))
     assert response.status_code == 200
     assert "submitted successfully" in response.json()["data"]["message"].lower()
 
-    # Verify assessment is completed
     await test_db_session.refresh(instance)
     assert instance.status == "completed"
     assert instance.completed_at is not None
 
-    # Verify response has submission timestamp
     await test_db_session.refresh(response_row)
     assert response_row.submitted_at is not None
 
 
 @pytest.mark.asyncio
-async def test_submit_questionnaire_with_no_responses(async_client, test_db_session):
-    """Test submission is allowed even with no responses."""
+async def test_submit_legacy_with_no_responses(async_client, test_db_session):
+    """Test legacy submission is allowed even with no responses."""
     await _seed_user(test_db_session, user_id=5023)
     await _ensure_test_engagement(test_db_session)
     package = AssessmentPackage(package_id=1016, package_code="PKG016", display_name="Test Package", status="active")
@@ -1211,10 +1208,9 @@ async def test_submit_questionnaire_with_no_responses(async_client, test_db_sess
     test_db_session.add(instance)
     await test_db_session.commit()
 
-    response = await async_client.post("/assessments/2016/submit", headers=_auth_header(5023))
+    response = await async_client.post("/assessments/2016/submit-legacy", headers=_auth_header(5023))
     assert response.status_code == 200
 
-    # Verify assessment is completed
     await test_db_session.refresh(instance)
     assert instance.status == "completed"
 
@@ -1346,3 +1342,184 @@ async def test_upsert_responses_keeps_category_incomplete_until_all_required_ans
 
     status_response2 = await async_client.get("/assessments/9031/status", headers=_auth_header(5041))
     assert status_response2.json()["data"][0]["status"] == "complete"
+
+
+# ==================== is_read_only enforcement Tests ====================
+
+
+@pytest.mark.asyncio
+async def test_upsert_responses_rejects_read_only_question(async_client, test_db_session):
+    """Saving answers for a read-only question should be rejected."""
+    await _seed_user(test_db_session, user_id=5080)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=9050, package_code="PKG9050", display_name="ReadOnly Pkg", status="active")
+    category = QuestionnaireCategory(category_id=8050, category_key="cat_8050", display_name="Cat 8050", status="active")
+    test_db_session.add_all([package, category])
+    await test_db_session.commit()
+    q_ro = QuestionnaireDefinition(
+        question_id=4050,
+        question_key="q4050_ro",
+        question_text="Read-only field",
+        question_type="text",
+        is_read_only=True,
+        status="active",
+    )
+    test_db_session.add(q_ro)
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=8950, category_id=8050, question_id=4050)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=9050, category_id=8050))
+    test_db_session.add(AssessmentInstance(
+        assessment_instance_id=9050, user_id=5080, package_id=9050, engagement_id=1, status="active",
+    ))
+    await test_db_session.commit()
+
+    payload = {"responses": [{"question_id": 4050, "answer": "attempt to write"}]}
+    response = await async_client.put(
+        "/questionnaire/9050/category/8050/responses", headers=_auth_header(5080), json=payload,
+    )
+    assert response.status_code == 422
+    assert "read-only" in response.json()["message"].lower()
+
+
+# ==================== Answer validation Tests ====================
+
+
+@pytest.mark.asyncio
+async def test_upsert_single_choice_rejects_invalid_option(async_client, test_db_session):
+    """Single choice answer must match one of the defined option values."""
+    await _seed_user(test_db_session, user_id=5081)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=9051, package_code="PKG9051", display_name="Choice Pkg", status="active")
+    category = QuestionnaireCategory(category_id=8051, category_key="cat_8051", display_name="Cat 8051", status="active")
+    q_sc = QuestionnaireDefinition(
+        question_id=4051, question_key="q4051_sc", question_text="Pick one",
+        question_type="single_choice", status="active",
+    )
+    test_db_session.add_all([package, category, q_sc])
+    await test_db_session.commit()
+    test_db_session.add_all([
+        QuestionnaireOption(question_id=4051, option_value="red", display_name="Red"),
+        QuestionnaireOption(question_id=4051, option_value="blue", display_name="Blue"),
+    ])
+    await _map_question_to_category(test_db_session, mapping_id=8951, category_id=8051, question_id=4051)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=9051, category_id=8051))
+    test_db_session.add(AssessmentInstance(
+        assessment_instance_id=9051, user_id=5081, package_id=9051, engagement_id=1, status="active",
+    ))
+    await test_db_session.commit()
+
+    bad = {"responses": [{"question_id": 4051, "answer": "green"}]}
+    resp = await async_client.put("/questionnaire/9051/category/8051/responses", headers=_auth_header(5081), json=bad)
+    assert resp.status_code == 422
+    assert "not a valid option" in resp.json()["message"].lower()
+
+    good = {"responses": [{"question_id": 4051, "answer": "red"}]}
+    resp = await async_client.put("/questionnaire/9051/category/8051/responses", headers=_auth_header(5081), json=good)
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_upsert_multiple_choice_rejects_invalid_option(async_client, test_db_session):
+    """Multiple choice answers must all match defined option values."""
+    await _seed_user(test_db_session, user_id=5082)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=9052, package_code="PKG9052", display_name="MC Pkg", status="active")
+    category = QuestionnaireCategory(category_id=8052, category_key="cat_8052", display_name="Cat 8052", status="active")
+    q_mc = QuestionnaireDefinition(
+        question_id=4052, question_key="q4052_mc", question_text="Pick many",
+        question_type="multiple_choice", status="active",
+    )
+    test_db_session.add_all([package, category, q_mc])
+    await test_db_session.commit()
+    test_db_session.add_all([
+        QuestionnaireOption(question_id=4052, option_value="a", display_name="A"),
+        QuestionnaireOption(question_id=4052, option_value="b", display_name="B"),
+    ])
+    await _map_question_to_category(test_db_session, mapping_id=8952, category_id=8052, question_id=4052)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=9052, category_id=8052))
+    test_db_session.add(AssessmentInstance(
+        assessment_instance_id=9052, user_id=5082, package_id=9052, engagement_id=1, status="active",
+    ))
+    await test_db_session.commit()
+
+    bad = {"responses": [{"question_id": 4052, "answer": ["a", "c"]}]}
+    resp = await async_client.put("/questionnaire/9052/category/8052/responses", headers=_auth_header(5082), json=bad)
+    assert resp.status_code == 422
+    assert "invalid option" in resp.json()["message"].lower()
+
+    good = {"responses": [{"question_id": 4052, "answer": ["a", "b"]}]}
+    resp = await async_client.put("/questionnaire/9052/category/8052/responses", headers=_auth_header(5082), json=good)
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_upsert_text_rejects_non_string(async_client, test_db_session):
+    """Text answers must be strings."""
+    await _seed_user(test_db_session, user_id=5083)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=9053, package_code="PKG9053", display_name="Text Pkg", status="active")
+    category = QuestionnaireCategory(category_id=8053, category_key="cat_8053", display_name="Cat 8053", status="active")
+    q_txt = QuestionnaireDefinition(
+        question_id=4053, question_key="q4053_txt", question_text="Say something",
+        question_type="text", status="active",
+    )
+    test_db_session.add_all([package, category, q_txt])
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=8953, category_id=8053, question_id=4053)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=9053, category_id=8053))
+    test_db_session.add(AssessmentInstance(
+        assessment_instance_id=9053, user_id=5083, package_id=9053, engagement_id=1, status="active",
+    ))
+    await test_db_session.commit()
+
+    bad = {"responses": [{"question_id": 4053, "answer": 12345}]}
+    resp = await async_client.put("/questionnaire/9053/category/8053/responses", headers=_auth_header(5083), json=bad)
+    assert resp.status_code == 422
+    assert "string" in resp.json()["message"].lower()
+
+    good = {"responses": [{"question_id": 4053, "answer": "hello"}]}
+    resp = await async_client.put("/questionnaire/9053/category/8053/responses", headers=_auth_header(5083), json=good)
+    assert resp.status_code == 200
+
+
+# ==================== category_status consistency Tests ====================
+
+
+@pytest.mark.asyncio
+async def test_category_status_consistent_between_get_questionnaire_and_status_endpoint(async_client, test_db_session):
+    """GET questionnaire category_status should match GET /assessments/{id}/status."""
+    await _seed_user(test_db_session, user_id=5084)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=9054, package_code="PKG9054", display_name="Consistency Pkg", status="active")
+    category = QuestionnaireCategory(
+        category_id=8054, category_key="cat_8054", display_name="Cat 8054", status="active",
+    )
+    test_db_session.add_all([package, category])
+    await test_db_session.commit()
+    q = QuestionnaireDefinition(
+        question_id=4054, question_key="q4054", question_text="Q",
+        question_type="text", is_required=True, status="active",
+    )
+    test_db_session.add(q)
+    await test_db_session.commit()
+    await _map_question_to_category(test_db_session, mapping_id=8954, category_id=8054, question_id=4054)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=9054, category_id=8054))
+    test_db_session.add(AssessmentInstance(
+        assessment_instance_id=9054, user_id=5084, package_id=9054, engagement_id=1, status="active",
+    ))
+    await test_db_session.commit()
+
+    get_q = await async_client.get("/questionnaire/9054/category/8054", headers=_auth_header(5084))
+    assert get_q.status_code == 200
+    q_status = get_q.json()["data"]["category_status"]
+
+    get_s = await async_client.get("/assessments/9054/status", headers=_auth_header(5084))
+    assert get_s.status_code == 200
+    s_status = get_s.json()["data"][0]["status"]
+
+    assert q_status == s_status

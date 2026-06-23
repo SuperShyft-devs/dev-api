@@ -1,6 +1,6 @@
 """Load BioAI reports from MetSights and send notifications.
 
-For participants in running engagements where assessment_instance.status == 'complete'
+For participants in running engagements where assessment_instance.status == 'completed'
 and today >= engagement_date:
 1. Check MetSights blood parameters for is_complete (Pro/Basic only).
 2. If individual_health_report.reports or report_url is null, fetch from MetSights.
@@ -69,7 +69,7 @@ async def _get_eligible_participants(
             (IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id),
         )
         .where(Engagement.status.ilike("running"))
-        .where(AssessmentInstance.status == "complete")
+        .where(AssessmentInstance.status == "completed")
         .where(EngagementParticipant.engagement_date <= today)
         .where(AssessmentInstance.metsights_record_id.isnot(None))
         .where(AssessmentInstance.metsights_record_id != "")

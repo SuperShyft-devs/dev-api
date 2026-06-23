@@ -1,9 +1,9 @@
 """Auto-import questionnaire answers from MetSights for incomplete assessment instances.
 
-For participants in running engagements whose assessment_instance.status != 'complete':
+For participants in running engagements whose assessment_instance.status != 'completed':
 1. Check MetSights record sub-resources for is_complete flags.
 2. If any sub-resource is complete, import answers per-category via the strategy engine.
-3. After import, mark the assessment instance as complete if all categories are done.
+3. After import, mark the assessment instance as completed if all categories are done.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ async def _get_running_engagement_instances(
         )
         .join(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
         .where(Engagement.status.ilike("running"))
-        .where(AssessmentInstance.status != "complete")
+        .where(AssessmentInstance.status != "completed")
         .where(AssessmentInstance.metsights_record_id.isnot(None))
         .where(AssessmentInstance.metsights_record_id != "")
         .order_by(AssessmentInstance.engagement_id.asc(), AssessmentInstance.user_id.asc())
@@ -201,8 +201,21 @@ async def import_metsights_answers(
 
             await db.flush()
             await db.refresh(instance)
-            if (instance.status or "").strip().lower() != "complete":
-                instance.status = "complete"
+
+            package_categories = await assessments_repo.list_package_categories(
+                db, package_id=int(instance.package_id),
+            )
+            all_categories_complete = True
+            for link in package_categories:
+                progress = await assessments_repo.get_category_progress(
+                    db, assessment_instance_id=ai_id, category_id=link.category_id,
+                )
+                if progress is None or (progress.status or "").strip().lower() != "complete":
+                    all_categories_complete = False
+                    break
+
+            if all_categories_complete and (instance.status or "").strip().lower() != "completed":
+                instance.status = "completed"
                 instance.completed_at = datetime.now(timezone.utc)
 
             imported += 1

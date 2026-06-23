@@ -1631,6 +1631,13 @@ class MetsightsSyncService:
                         section_errors=section_errors,
                     )
 
+        if patched:
+            now = datetime.now(timezone.utc)
+            for resp in responses:
+                if resp.submitted_at is None:
+                    resp.submitted_at = now
+                    await self._questionnaire.update_response(db, resp)
+
         return {
             "assessment_instance_id": assessment_instance_id,
             "metsights_record_id": mrid,
@@ -1753,26 +1760,55 @@ class MetsightsSyncService:
                 message=f"Failed to push to Metsights: {exc}",
             ) from exc
 
+        now = datetime.now(timezone.utc)
+
+        category_responses = await self._questionnaire.list_responses_for_instance(
+            db, assessment_instance_id=assessment_instance_id,
+            category_id=int(category.category_id),
+        )
+        for resp in category_responses:
+            if resp.submitted_at is None:
+                resp.submitted_at = now
+                await self._questionnaire.update_response(db, resp)
+
+        from modules.questionnaire.service import QuestionnaireService
+
+        q_service = QuestionnaireService(
+            repository=self._questionnaire,
+            users_repository=self._users,
+        )
+        is_complete = await q_service.is_category_complete(
+            db,
+            assessment_instance_id=assessment_instance_id,
+            category_id=int(category.category_id),
+            user_id=user_id,
+        )
+
         progress = await assessments_repo.get_category_progress(
             db,
             assessment_instance_id=assessment_instance_id,
             category_id=int(category.category_id),
         )
-        now = datetime.now(timezone.utc)
-        if progress is None:
-            await assessments_repo.create_category_progress(
-                db,
-                AssessmentCategoryProgress(
-                    assessment_instance_id=assessment_instance_id,
-                    category_id=int(category.category_id),
-                    status="complete",
-                    completed_at=now,
-                ),
-            )
+        if is_complete:
+            if progress is None:
+                await assessments_repo.create_category_progress(
+                    db,
+                    AssessmentCategoryProgress(
+                        assessment_instance_id=assessment_instance_id,
+                        category_id=int(category.category_id),
+                        status="complete",
+                        completed_at=now,
+                    ),
+                )
+            elif (progress.status or "").strip().lower() != "complete":
+                progress.status = "complete"
+                progress.completed_at = now
+                await assessments_repo.update_category_progress(db, progress)
         else:
-            progress.status = "complete"
-            progress.completed_at = now
-            await assessments_repo.update_category_progress(db, progress)
+            if progress is not None and (progress.status or "").strip().lower() == "complete":
+                progress.status = "incomplete"
+                progress.completed_at = None
+                await assessments_repo.update_category_progress(db, progress)
 
         return {
             "assessment_instance_id": assessment_instance_id,
@@ -1837,6 +1873,9 @@ class MetsightsSyncService:
                 db, assessment_instance_id=assessment_instance_id, category_id=int(category.category_id),
             )
             if existing_responses:
+                await self._update_all_category_progress_for_instance(
+                    db, assessments_repo=assessments_repo, instance=instance,
+                )
                 api_url = f"/records/{mrid}/{api_path}/"
                 await self._log_skipped_metsights_sync(
                     db,
@@ -1958,7 +1997,19 @@ class MetsightsSyncService:
         assessments_repo: "AssessmentsRepository",
         instance: AssessmentInstance,
     ) -> None:
-        """Check all categories for an instance and update progress status."""
+        """Check all categories for an instance and update progress status.
+
+        Delegates to QuestionnaireService.is_category_complete so that
+        visibility rules, prefill, and full answer validation are applied
+        consistently with the user-facing upsert path.
+        """
+        from modules.questionnaire.service import QuestionnaireService
+
+        q_service = QuestionnaireService(
+            repository=self._questionnaire,
+            users_repository=self._users,
+        )
+
         package_categories = await assessments_repo.list_package_categories(
             db, package_id=int(instance.package_id),
         )
@@ -1969,18 +2020,12 @@ class MetsightsSyncService:
             if cat is None:
                 continue
 
-            questions = await self._questionnaire.list_questions_by_category(db, category_id=int(cat.category_id))
-            active_questions = [q for q in questions if (q.status or "").lower() == "active"]
-            required_questions = [q for q in active_questions if q.is_required]
-
-            if not required_questions:
-                continue
-
-            responses = await self._questionnaire.list_responses_for_instance(
-                db, assessment_instance_id=int(instance.assessment_instance_id), category_id=int(cat.category_id),
+            all_required_answered = await q_service.is_category_complete(
+                db,
+                assessment_instance_id=int(instance.assessment_instance_id),
+                category_id=int(cat.category_id),
+                user_id=int(instance.user_id),
             )
-            answered_qids = {int(r.question_id) for r in responses if r.answer is not None}
-            all_required_answered = all(int(q.question_id) in answered_qids for q in required_questions)
 
             progress = await assessments_repo.get_category_progress(
                 db,

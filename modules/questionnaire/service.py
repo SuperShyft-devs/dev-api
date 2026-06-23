@@ -405,23 +405,56 @@ class QuestionnaireService:
 
     def _validate_answer_by_type(self, *, question: dict, answer: object) -> None:
         question_type = _normalize_question_type(question.get("question_type"))
-        if question_type != _SCALE_TYPE:
+
+        if question_type == _SCALE_TYPE:
+            if not isinstance(answer, dict):
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must be an object")
+            value = answer.get("value")
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must include a valid number")
+            unit = _normalize_text(answer.get("unit"))
+            if not unit:
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must include a unit")
+            allowed_units = {
+                _normalize_text(option.get("option_value"))
+                for option in (question.get("options") or [])
+                if isinstance(option, dict)
+            }
+            if unit not in allowed_units:
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer unit is not allowed")
             return
-        if not isinstance(answer, dict):
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must be an object")
-        value = answer.get("value")
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must include a valid number")
-        unit = _normalize_text(answer.get("unit"))
-        if not unit:
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must include a unit")
-        allowed_units = {
-            _normalize_text(option.get("option_value"))
-            for option in (question.get("options") or [])
-            if isinstance(option, dict)
-        }
-        if unit not in allowed_units:
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer unit is not allowed")
+
+        if question_type == "single_choice":
+            if not isinstance(answer, str):
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Single choice answer must be a string")
+            allowed_values = {
+                _normalize_text(option.get("option_value"))
+                for option in (question.get("options") or [])
+                if isinstance(option, dict)
+            }
+            if allowed_values and _normalize_text(answer) not in allowed_values:
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Single choice answer is not a valid option")
+            return
+
+        if question_type == "multiple_choice":
+            if not isinstance(answer, list):
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Multiple choice answer must be a list")
+            allowed_values = {
+                _normalize_text(option.get("option_value"))
+                for option in (question.get("options") or [])
+                if isinstance(option, dict)
+            }
+            if allowed_values:
+                for item in answer:
+                    if not isinstance(item, str):
+                        raise AppError(status_code=422, error_code="INVALID_STATE", message="Multiple choice answer items must be strings")
+                    if _normalize_text(item) not in allowed_values:
+                        raise AppError(status_code=422, error_code="INVALID_STATE", message="Multiple choice answer contains an invalid option")
+            return
+
+        if question_type == "text":
+            if not isinstance(answer, str):
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Text answer must be a string")
 
     @staticmethod
     def _is_answer_provided(*, question: dict, answer: object) -> bool:
@@ -444,25 +477,25 @@ class QuestionnaireService:
             return len(answer) > 0
         return True
 
-    async def _sync_category_progress_after_responses(
+    async def is_category_complete(
         self,
         db: AsyncSession,
         *,
-        instance,
+        assessment_instance_id: int,
         category_id: int,
         user_id: int,
-    ) -> None:
-        """Update assessment_category_progress when all visible required questions are answered."""
-        from modules.assessments.models import AssessmentCategoryProgress
-        from modules.assessments.repository import AssessmentsRepository
+    ) -> bool:
+        """Check whether all visible required questions in a category are answered.
 
+        Uses visibility rules, prefill, and full answer validation --
+        the single source of truth for category completion.
+        """
         category_questions = await self._list_active_questions_for_category(db, category_id=category_id)
         if not category_questions:
-            return
+            return True
 
         all_responses = await self._repository.list_responses_for_instance(
-            db,
-            assessment_instance_id=instance.assessment_instance_id,
+            db, assessment_instance_id=assessment_instance_id,
         )
         all_qids = [int(r.question_id) for r in all_responses]
         all_qdefs_map = (
@@ -492,7 +525,6 @@ class QuestionnaireService:
             extra_answers_by_key=full_answers_by_key,
         )
 
-        all_required_answered = True
         for question in category_questions:
             question_id = int(question["question_id"])
             if not bool(question.get("is_required")):
@@ -506,8 +538,27 @@ class QuestionnaireService:
                     preferences=preferences,
                 )
             if not self._is_answer_provided(question=question, answer=answer):
-                all_required_answered = False
-                break
+                return False
+        return True
+
+    async def _sync_category_progress_after_responses(
+        self,
+        db: AsyncSession,
+        *,
+        instance,
+        category_id: int,
+        user_id: int,
+    ) -> None:
+        """Update assessment_category_progress when all visible required questions are answered."""
+        from modules.assessments.models import AssessmentCategoryProgress
+        from modules.assessments.repository import AssessmentsRepository
+
+        all_required_answered = await self.is_category_complete(
+            db,
+            assessment_instance_id=int(instance.assessment_instance_id),
+            category_id=category_id,
+            user_id=user_id,
+        )
 
         assessments_repo = AssessmentsRepository()
         progress = await assessments_repo.get_category_progress(
@@ -1031,7 +1082,27 @@ class QuestionnaireService:
         normalized = [qid for qid in question_ids if isinstance(qid, int) and qid > 0]
         if len(normalized) != len(question_ids):
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-        await self._repository.assign_questions_to_category(db, category_id=category_id, question_ids=normalized)
+
+        seen: set[int] = set()
+        duplicates: list[int] = []
+        unique_ids: list[int] = []
+        for qid in normalized:
+            if qid in seen:
+                duplicates.append(qid)
+            else:
+                seen.add(qid)
+                unique_ids.append(qid)
+
+        existing_defs = await self._repository.get_definitions_by_ids(db, question_ids=unique_ids)
+        invalid_ids = [qid for qid in unique_ids if qid not in existing_defs]
+        if invalid_ids:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"Question IDs do not exist: {invalid_ids}",
+            )
+
+        await self._repository.assign_questions_to_category(db, category_id=category_id, question_ids=unique_ids)
         await self._require_audit_service().log_event(
             db,
             action="EMPLOYEE_ASSIGN_QUESTIONNAIRE_CATEGORY_QUESTIONS",
@@ -1041,7 +1112,11 @@ class QuestionnaireService:
             user_id=employee.user_id,
             session_id=None,
         )
-        return {"category_id": category_id, "question_ids": normalized}
+
+        result: dict[str, Any] = {"category_id": category_id, "question_ids": unique_ids}
+        if duplicates:
+            result["duplicate_question_ids"] = duplicates
+        return result
 
     async def remove_category_question(
         self,
@@ -1207,7 +1282,7 @@ class QuestionnaireService:
             assessment_instance_id=int(instance.assessment_instance_id),
             category_id=category_id,
         )
-        category_status = (progress.status or "active") if progress is not None else "active"
+        category_status = (progress.status or "incomplete") if progress is not None else "incomplete"
 
         assessment_status = instance.status or "active"
         meta_top = {
@@ -1456,6 +1531,12 @@ class QuestionnaireService:
                     error_code="INVALID_STATE",
                     message="Question is not available",
                 )
+            if question_def.get("is_read_only"):
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Question is read-only and cannot be modified",
+                )
             self._validate_answer_by_type(
                 question=question_def,
                 answer=response_item["answer"],
@@ -1501,21 +1582,12 @@ class QuestionnaireService:
             session_id=None,
         )
 
-        try:
-            await self._sync_category_progress_after_responses(
-                db,
-                instance=instance,
-                category_id=category_id,
-                user_id=user_id,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logging.getLogger(__name__).warning(
-                "Failed to sync category progress after responses for instance %s / category %s: %s",
-                getattr(instance, "assessment_instance_id", None),
-                category_id,
-                exc,
-                exc_info=True,
-            )
+        await self._sync_category_progress_after_responses(
+            db,
+            instance=instance,
+            category_id=category_id,
+            user_id=user_id,
+        )
 
     def _serialize_healthy_habit_rule(self, row: QuestionnaireHealthyHabitRule) -> dict:
         scale_min = row.scale_min
