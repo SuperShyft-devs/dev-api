@@ -195,27 +195,40 @@ class EngagementsService:
                 message="You do not have permission to perform this action",
             )
 
-    async def _ensure_employee_or_assigned_assistant(
+    def _ensure_admin(self, employee: EmployeeContext | None) -> None:
+        self._ensure_employee_access(employee)
+        if employee.role != EmployeeRole.admin:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+    async def _ensure_assigned_onboarding_assistant(
         self,
         db: AsyncSession,
         employee: EmployeeContext | None,
         engagement_id: int,
     ) -> None:
-        """Allow admins unconditionally; allow onboarding_assistant only if assigned to the engagement."""
+        """Require a row in onboarding_assistant_assignment; role is not checked."""
         self._ensure_employee_access(employee)
-        if employee.role == EmployeeRole.admin:
-            return
-        if employee.role == EmployeeRole.onboarding_assistant:
-            assignment = await self._repository.get_onboarding_assistant_assignment(
-                db, engagement_id=engagement_id, employee_id=employee.employee_id
-            )
-            if assignment is not None:
-                return
-        raise AppError(
-            status_code=403,
-            error_code="FORBIDDEN",
-            message="You do not have permission to perform this action",
+        assignment = await self._repository.get_onboarding_assistant_assignment(
+            db, engagement_id=engagement_id, employee_id=employee.employee_id
         )
+        if assignment is None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+    def _ensure_engagement_running(self, engagement: Engagement) -> None:
+        if (engagement.status or "").lower() != "running":
+            raise AppError(
+                status_code=422,
+                error_code="ENGAGEMENT_NOT_RUNNING",
+                message="This engagement is not running",
+            )
 
     def _require_audit_service(self) -> AuditService:
         if self._audit_service is None:
@@ -483,7 +496,7 @@ class EngagementsService:
         employee: EmployeeContext,
         engagement_id: int,
     ) -> Engagement:
-        await self._ensure_employee_or_assigned_assistant(db, employee, engagement_id)
+        self._ensure_admin(employee)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -897,7 +910,7 @@ class EngagementsService:
     ) -> tuple[list[dict], int]:
         """Fetch participant enrollment rows for a specific engagement by id."""
 
-        await self._ensure_employee_or_assigned_assistant(db, employee, engagement_id)
+        self._ensure_admin(employee)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -906,6 +919,81 @@ class EngagementsService:
                 error_code="ENGAGEMENT_NOT_FOUND",
                 message="Engagement does not exist",
             )
+
+        participants = await self._repository.list_participants_by_engagement_id(
+            db,
+            engagement_id=engagement_id,
+            page=page,
+            limit=limit,
+        )
+        total = await self._repository.count_distinct_participants_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+
+        result = [_participant_enrollment_to_dict(row) for row in participants]
+        return result, total
+
+    @staticmethod
+    def _engagement_to_console_dict(engagement: Engagement) -> dict:
+        return {
+            "engagement_id": engagement.engagement_id,
+            "engagement_name": engagement.engagement_name,
+            "engagement_code": engagement.engagement_code,
+            "start_date": engagement.start_date,
+            "end_date": engagement.end_date,
+            "status": engagement.status,
+            "participant_count": engagement.participant_count,
+        }
+
+    async def list_console_engagements(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+    ) -> list[dict]:
+        self._ensure_employee_access(employee)
+        engagements = await self._repository.list_running_engagements_for_assigned_employee(
+            db, employee_id=employee.employee_id
+        )
+        return [self._engagement_to_console_dict(e) for e in engagements]
+
+    async def get_engagement_for_console(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+    ) -> dict:
+        await self._ensure_assigned_onboarding_assistant(db, employee, engagement_id)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        self._ensure_engagement_running(engagement)
+        return self._engagement_to_console_dict(engagement)
+
+    async def list_participants_for_console(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        page: int,
+        limit: int,
+    ) -> tuple[list[dict], int]:
+        await self._ensure_assigned_onboarding_assistant(db, employee, engagement_id)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+
+        self._ensure_engagement_running(engagement)
 
         participants = await self._repository.list_participants_by_engagement_id(
             db,

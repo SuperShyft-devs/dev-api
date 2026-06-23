@@ -417,6 +417,28 @@ class EngagementsRepository:
         result = await db.execute(query)
         return result.scalar_one_or_none()
 
+    async def list_running_engagements_for_assigned_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee_id: int,
+    ) -> list[Engagement]:
+        """List running engagements where the employee is assigned as onboarding assistant."""
+        query = (
+            select(Engagement)
+            .join(
+                OnboardingAssistantAssignment,
+                OnboardingAssistantAssignment.engagement_id == Engagement.engagement_id,
+            )
+            .where(
+                OnboardingAssistantAssignment.employee_id == employee_id,
+                Engagement.status == "running",
+            )
+            .order_by(Engagement.start_date.desc(), Engagement.engagement_id.desc())
+        )
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
     async def list_onboarding_assistant_assignments(
         self,
         db: AsyncSession,
