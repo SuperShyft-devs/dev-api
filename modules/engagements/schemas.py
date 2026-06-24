@@ -17,6 +17,7 @@ class EngagementCreateRequest(BaseModel):
     engagement_name: Optional[str] = Field(default=None, max_length=200)
     metsights_engagement_id: Optional[str] = Field(default=None, max_length=200)
     organization_id: int = Field(gt=0)
+    camp_no: Optional[int] = None
     engagement_type: EngagementKind
     engagement_code: Optional[str] = Field(default=None, max_length=50)
     assessment_package_id: Optional[int] = Field(default=None, gt=0)
@@ -43,6 +44,7 @@ class EngagementUpdateRequest(BaseModel):
     engagement_name: Optional[str] = Field(default=None, max_length=200)
     engagement_code: str = Field(min_length=1, max_length=50)
     organization_id: Optional[int] = Field(default=None, gt=0)
+    camp_no: Optional[int] = None
     engagement_type: EngagementKind
     assessment_package_id: Optional[int] = Field(default=None, gt=0)
     diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
@@ -73,6 +75,7 @@ class EngagementListItem(BaseModel):
     engagement_id: int
     engagement_name: Optional[str] = None
     organization_id: Optional[int] = None
+    camp_no: Optional[int] = None
     engagement_code: str
     engagement_type: Optional[str] = None
     assessment_package_id: Optional[int] = None

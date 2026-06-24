@@ -18,6 +18,7 @@ from core.config import settings
 from modules.assessments.models import AssessmentPackage, AssessmentPackageCategory
 from modules.diagnostics.models import DiagnosticPackage
 from modules.employee.models import Employee
+from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.models import Engagement, EngagementParticipant, OnboardingAssistantAssignment
 from modules.organizations.models import Organization
 from modules.questionnaire.models import (
@@ -385,6 +386,7 @@ async def _upsert_engagements(session: AsyncSession, engagements: Iterable[SeedE
         row.engagement_name = seed.engagement_name
         row.metsights_engagement_id = seed.metsights_engagement_id
         row.organization_id = seed.organization_id
+        row.camp_no = compute_camp_no(seed.organization_id, seed.start_date)
         row.engagement_code = seed.engagement_code
         row.engagement_type = seed.engagement_type
         row.assessment_package_id = seed.assessment_package_id

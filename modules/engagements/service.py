@@ -24,6 +24,7 @@ from modules.audit.service import AuditService
 from modules.checklists.schemas import ChecklistReadiness
 from modules.employee.models import EmployeeRole
 from modules.employee.service import EmployeeContext
+from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
 from modules.engagements.models import Engagement, EngagementKind, EngagementParticipant, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
@@ -385,6 +386,7 @@ class EngagementsService:
             engagement_name=payload.engagement_name,
             metsights_engagement_id=payload.metsights_engagement_id,
             organization_id=payload.organization_id,
+            camp_no=compute_camp_no(payload.organization_id, payload.start_date),
             engagement_code=code,
             engagement_type=payload.engagement_type,
             assessment_package_id=payload.assessment_package_id,
@@ -566,6 +568,7 @@ class EngagementsService:
         engagement.slot_duration = payload.slot_duration
         engagement.start_date = payload.start_date
         engagement.end_date = payload.end_date
+        engagement.camp_no = compute_camp_no(payload.organization_id, payload.start_date)
         engagement.metsights_engagement_id = payload.metsights_engagement_id
         engagement.create_profile_on_metsights = payload.create_profile_on_metsights
         engagement.enroll_for_fitprint_full = payload.enroll_for_fitprint_full
@@ -710,6 +713,7 @@ class EngagementsService:
             engagement_name=engagement_name,
             metsights_engagement_id=None,
             organization_id=None,
+            camp_no=None,
             engagement_code=_generate_engagement_code(),
             engagement_type=engagement_type,
             assessment_package_id=assessment_package_id,

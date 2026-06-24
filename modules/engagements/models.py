@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import Boolean, Column, Date, Enum as SAEnum, ForeignKey, Integer, String, Time, UniqueConstraint, Index
+from sqlalchemy import BigInteger, Boolean, Column, Date, Enum as SAEnum, ForeignKey, Integer, String, Time, UniqueConstraint, Index
 
 from db.base import Base
 from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
@@ -38,6 +38,7 @@ class Engagement(Base):
     engagement_name = Column(String)
     metsights_engagement_id = Column(String, nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.organization_id"), nullable=True)
+    camp_no = Column(BigInteger, nullable=True)
     engagement_code = Column(String, nullable=False)
     engagement_type = Column(_engagement_kind, nullable=True)
     assessment_package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=True)

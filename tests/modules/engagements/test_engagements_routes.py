@@ -159,6 +159,84 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
     body = details.json()
     detail_data = body.get("data", body)
     assert detail_data["notification_service_key"] == "booking-alert-whatsapp"
+    assert detail_data["camp_no"] == 1010226
+
+
+@pytest.mark.asyncio
+async def test_create_engagement_sets_camp_no_for_org_8(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7010, employee_id=16)
+    await _seed_organization(test_db_session, organization_id=8, name="Org Eight")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    payload = {
+        "engagement_name": "June Camp",
+        "organization_id": 8,
+        "engagement_type": "bio_ai",
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "city": "BLR",
+        "slot_duration": 20,
+        "start_date": "2026-06-23",
+        "end_date": "2026-06-24",
+    }
+
+    response = await async_client.post("/engagements", headers=_auth_header(7010), json=payload)
+    assert response.status_code == 201
+
+    engagement_id = response.json()["data"]["engagement_id"]
+    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7010))
+    detail_data = details.json()["data"]
+    assert detail_data["camp_no"] == 8230626
+
+
+@pytest.mark.asyncio
+async def test_update_engagement_recalculates_camp_no(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7011, employee_id=17)
+    await _seed_organization(test_db_session, organization_id=8, name="Org Eight")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    from modules.engagements.models import Engagement
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=8110,
+            engagement_name="Camp",
+            organization_id=8,
+            camp_no=8230626,
+            engagement_code="UPD8",
+            engagement_type="bio_ai",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 6, 23),
+            end_date=date(2026, 6, 24),
+            status="running",
+            participant_count=0,
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "engagement_name": "Camp",
+        "engagement_code": "UPD8",
+        "organization_id": 8,
+        "engagement_type": "bio_ai",
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "city": "BLR",
+        "slot_duration": 20,
+        "start_date": "2026-07-01",
+        "end_date": "2026-07-02",
+    }
+
+    response = await async_client.put("/engagements/8110", headers=_auth_header(7011), json=payload)
+    assert response.status_code == 200
+
+    details = await async_client.get("/engagements/8110", headers=_auth_header(7011))
+    assert details.json()["data"]["camp_no"] == 8010726
 
 
 @pytest.mark.asyncio

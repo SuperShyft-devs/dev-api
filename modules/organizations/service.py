@@ -15,6 +15,7 @@ from core.exceptions import AppError
 from common.slug import slugify_department
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
+from modules.engagements.camp_no import format_camp_name
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.schemas import OrganizationCreateRequest, OrganizationUpdateRequest
@@ -428,5 +429,44 @@ class OrganizationsService:
                 "country": country,
                 "status": status,
             })
+
+        return result, total
+
+    async def list_camps_for_employee(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        page: int,
+        limit: int,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> tuple[list[dict], int]:
+        self._ensure_employee_access(employee)
+
+        total = await self._repository.count_camps(db, search=search)
+        rows = await self._repository.list_camps(
+            db,
+            page=page,
+            limit=limit,
+            search=search,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+
+        result = []
+        for camp_no, organization_id, organization_name, start_date, engagement_count in rows:
+            org_name = organization_name or ""
+            result.append(
+                {
+                    "camp_no": int(camp_no),
+                    "camp_name": format_camp_name(org_name, start_date),
+                    "organization_id": int(organization_id),
+                    "organization_name": org_name,
+                    "start_date": start_date,
+                    "engagement_count": int(engagement_count),
+                }
+            )
 
         return result, total

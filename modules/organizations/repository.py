@@ -11,6 +11,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
+from modules.engagements.models import Engagement
 from modules.organizations.models import Organization
 
 
@@ -215,5 +216,60 @@ class OrganizationsRepository:
             .limit(limit)
         )
 
+        result = await db.execute(query)
+        return list(result.all())
+
+    def _camps_grouped_query(self, *, search: str | None = None):
+        query = (
+            select(
+                Engagement.camp_no,
+                Engagement.organization_id,
+                Organization.name.label("organization_name"),
+                func.min(Engagement.start_date).label("start_date"),
+                func.count().label("engagement_count"),
+            )
+            .select_from(Engagement)
+            .join(Organization, Organization.organization_id == Engagement.organization_id)
+            .where(Engagement.camp_no.isnot(None))
+            .group_by(Engagement.camp_no, Engagement.organization_id, Organization.name)
+        )
+        if search is not None and search.strip():
+            pattern = ilike_pattern(search)
+            conditions = [Organization.name.ilike(pattern)]
+            stripped = search.strip()
+            if stripped.isdigit():
+                conditions.append(Engagement.camp_no == int(stripped))
+            query = query.where(or_(*conditions))
+        return query
+
+    async def count_camps(self, db: AsyncSession, *, search: str | None = None) -> int:
+        subq = self._camps_grouped_query(search=search).subquery()
+        result = await db.execute(select(func.count()).select_from(subq))
+        return int(result.scalar_one())
+
+    async def list_camps(
+        self,
+        db: AsyncSession,
+        *,
+        page: int,
+        limit: int,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> list[tuple]:
+        query = self._camps_grouped_query(search=search)
+        normalized_sort = (sort_by or "camp_no").strip().lower()
+        descending = (sort_dir or "desc").strip().lower() == "desc"
+
+        if normalized_sort == "engagement_count":
+            order_col = func.count()
+        elif normalized_sort == "camp_name":
+            order_col = Organization.name
+        else:
+            order_col = Engagement.camp_no
+
+        query = query.order_by(order_col.desc() if descending else order_col.asc())
+        offset = (page - 1) * limit
+        query = query.offset(offset).limit(limit)
         result = await db.execute(query)
         return list(result.all())

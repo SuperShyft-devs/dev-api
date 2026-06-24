@@ -120,6 +120,32 @@ async def list_organizations(
     return success_response(data, meta={"page": page, "limit": limit, "total": total})
 
 
+@router.get("/camps")
+async def list_camps(
+    page: int = 1,
+    limit: int = 20,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    organizations_service: OrganizationsService = Depends(get_organizations_service),
+):
+    if page < 1 or limit < 1 or limit > 100:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    camps, total = await organizations_service.list_camps_for_employee(
+        db,
+        employee=employee,
+        page=page,
+        limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+    )
+    return success_response(camps, meta={"page": page, "limit": limit, "total": total})
+
+
 @router.get("/{organization_id}")
 async def get_organization_details(
     organization_id: int,

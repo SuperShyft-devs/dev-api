@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
@@ -110,3 +110,12 @@ class OrganizationParticipantItem(BaseModel):
     email: Optional[str] = None
     city: Optional[str] = None
     status: Optional[str] = None
+
+
+class CampListItem(BaseModel):
+    camp_no: int
+    camp_name: str
+    organization_id: int
+    organization_name: str
+    start_date: date
+    engagement_count: int
