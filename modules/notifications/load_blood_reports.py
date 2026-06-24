@@ -36,10 +36,10 @@ def _blood_report_data_complete(blood_parameters: Any, diagnostic_report_url: An
     return blood_parameters is not None and diagnostic_report_url is not None
 
 
-def _provider_name(provider_field: Any) -> str:
+def _provider_code(provider_field: Any) -> str:
     if isinstance(provider_field, dict):
-        return str(provider_field.get("name") or "").strip()
-    return str(provider_field or "").strip()
+        return str(provider_field.get("code") or "").strip()
+    return ""
 
 
 def _match_customer_by_name(
@@ -224,7 +224,7 @@ async def load_blood_reports(
                     continue
 
                 reference_id = str(collection_data.get("reference_id") or "").strip()
-                provider_name = _provider_name(collection_data.get("provider"))
+                provider_code = _provider_code(collection_data.get("provider"))
 
                 if not reference_id:
                     skipped += 1
@@ -234,12 +234,12 @@ async def load_blood_reports(
                     })
                     continue
 
-                if "healthians" not in provider_name.lower():
+                if provider_code.lower() != "healthians":
                     skipped += 1
                     details.append({
                         "user_id": user_id, "engagement_id": engagement_id,
                         "action": "skipped",
-                        "reason": f"provider is '{provider_name or 'unknown'}', not Healthians",
+                        "reason": f"provider code is '{provider_code or 'unknown'}', not Healthians",
                     })
                     continue
 
