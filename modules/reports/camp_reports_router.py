@@ -11,6 +11,7 @@ from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
 from modules.reports.camp_reports_service import CampReportsService
 from modules.reports.dependencies import get_camp_reports_service
+from modules.reports.schemas import CampReportRefreshRequest
 
 router = APIRouter(prefix="/reports/camps", tags=["reports"])
 
@@ -22,6 +23,63 @@ def _client_ip(request: Request) -> str:
     if request.client is None:
         return "unknown"
     return request.client.host
+
+
+@router.get("/{camp_no}")
+async def list_camp_reports(
+    camp_no: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    rows = await service.list_camp_reports(db, employee=employee, camp_no=camp_no)
+    return success_response(rows)
+
+
+@router.put("/{camp_no}/refresh")
+async def refresh_camp_report(
+    camp_no: int,
+    payload: CampReportRefreshRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.refresh_camp_report_section(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.put("/{camp_no}/department/{slug}/refresh")
+async def refresh_department_camp_report(
+    camp_no: int,
+    slug: str,
+    payload: CampReportRefreshRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.refresh_camp_report_section(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
+        department=slug,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
 
 
 @router.post("/{camp_no}/init", status_code=201)
