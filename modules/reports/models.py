@@ -43,6 +43,17 @@ class OrganizationHealthReport(Base):
     organization_id = Column(Integer, ForeignKey("organizations.organization_id"), nullable=False)
 
 
+class CampReportSection(Base):
+    """SQLAlchemy model for `camp_report_sections` reference table."""
+
+    __tablename__ = "camp_report_sections"
+
+    report_sections = Column(Integer, primary_key=True)
+    section = Column(String, nullable=False)
+    section_key = Column(String, nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+
+
 class ReportsUserSyncState(Base):
     """Tracks user-level reports sync state for non-blocking refresh."""
 

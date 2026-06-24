@@ -326,6 +326,71 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
 
 
 @pytest.mark.asyncio
+async def test_list_engagements_filters_by_camp_no(async_client, test_db_session):
+    from modules.engagements.camp_no import compute_camp_no
+    from modules.engagements.models import Engagement
+
+    await _seed_employee(test_db_session, user_id=7005, employee_id=13)
+    await _seed_organization(test_db_session, organization_id=1, name="Org 1")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    start_a = date(2026, 2, 1)
+    start_b = date(2026, 3, 1)
+    camp_a = compute_camp_no(1, start_a)
+    camp_b = compute_camp_no(1, start_b)
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=8111,
+            engagement_name="Camp A Eng",
+            organization_id=1,
+            camp_no=camp_a,
+            engagement_code="CAMPA1",
+            engagement_type="bio_ai",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=start_a,
+            end_date=start_a,
+            status="running",
+            participant_count=0,
+        )
+    )
+    test_db_session.add(
+        Engagement(
+            engagement_id=8112,
+            engagement_name="Camp B Eng",
+            organization_id=1,
+            camp_no=camp_b,
+            engagement_code="CAMPB1",
+            engagement_type="bio_ai",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=start_b,
+            end_date=start_b,
+            status="running",
+            participant_count=0,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        f"/engagements?page=1&limit=10&camp_no={camp_a}",
+        headers=_auth_header(7005),
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["meta"]["total"] == 1
+    assert len(body["data"]) == 1
+    assert body["data"][0]["engagement_id"] == 8111
+    assert body["data"][0]["camp_no"] == camp_a
+
+
+@pytest.mark.asyncio
 async def test_get_engagement_details_returns_row(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7004, employee_id=12)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization")

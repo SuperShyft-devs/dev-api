@@ -33,6 +33,7 @@ class EngagementsRepository:
         query,
         *,
         organization_id: int | None = None,
+        camp_no: int | None = None,
         status: str | None = None,
         city: str | None = None,
         on_date=None,
@@ -41,6 +42,8 @@ class EngagementsRepository:
     ):
         if organization_id is not None:
             query = query.where(Engagement.organization_id == organization_id)
+        if camp_no is not None:
+            query = query.where(Engagement.camp_no == camp_no)
         if status is not None:
             query = query.where(Engagement.status == status)
         if city is not None and city.strip():
@@ -110,6 +113,7 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         organization_id: int | None = None,
+        camp_no: int | None = None,
         status: str | None = None,
         city: str | None = None,
         on_date=None,
@@ -120,6 +124,7 @@ class EngagementsRepository:
         query = self._apply_engagement_list_filters(
             query,
             organization_id=organization_id,
+            camp_no=camp_no,
             status=status,
             city=city,
             on_date=on_date,
@@ -137,6 +142,7 @@ class EngagementsRepository:
         page: int,
         limit: int,
         organization_id: int | None = None,
+        camp_no: int | None = None,
         status: str | None = None,
         city: str | None = None,
         on_date=None,
@@ -150,6 +156,7 @@ class EngagementsRepository:
         query = self._apply_engagement_list_filters(
             query,
             organization_id=organization_id,
+            camp_no=camp_no,
             status=status,
             city=city,
             on_date=on_date,

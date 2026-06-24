@@ -432,6 +432,7 @@ class EngagementsService:
         page: int,
         limit: int,
         organization_id: int | None,
+        camp_no: int | None,
         status: str | None,
         city: str | None,
         on_date,
@@ -454,6 +455,7 @@ class EngagementsService:
             page=page,
             limit=limit,
             organization_id=organization_id,
+            camp_no=camp_no,
             status=status_value,
             city=city,
             on_date=on_date,
@@ -466,6 +468,7 @@ class EngagementsService:
         total = await self._repository.count_engagements(
             db,
             organization_id=organization_id,
+            camp_no=camp_no,
             status=status_value,
             city=city,
             on_date=on_date,

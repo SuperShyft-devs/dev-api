@@ -195,3 +195,15 @@ class HealthSpanIndexResponse(BaseModel):
     fitness: HealthSpanFitnessDetail | None = None
     nutrition: HealthSpanNutritionDetail | None = None
     lifestyle: HealthSpanLifestyleDetail | None = None
+
+
+class CampReportSectionCreateRequest(BaseModel):
+    section: str = Field(min_length=1, max_length=500)
+    section_key: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+
+
+class CampReportSectionUpdateRequest(BaseModel):
+    section: str | None = Field(default=None, min_length=1, max_length=500)
+    section_key: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None

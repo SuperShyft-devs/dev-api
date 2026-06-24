@@ -16,6 +16,8 @@ from modules.questionnaire.healthy_habits_service import HealthyHabitsService
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.repository import ReportsRepository
 from modules.reports.service import ReportsService
+from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
+from modules.reports.camp_report_sections_service import CampReportSectionsService
 
 
 def get_reports_service() -> ReportsService:
@@ -31,4 +33,11 @@ def get_reports_service() -> ReportsService:
         questionnaire_repository=questionnaire_repository,
         healthians_get_access_token=healthians_get_access_token,
         healthians_get_booking_digital_value=healthians_get_booking_digital_value,
+    )
+
+
+def get_camp_report_sections_service() -> CampReportSectionsService:
+    return CampReportSectionsService(
+        repository=CampReportSectionsRepository(),
+        audit_service=AuditService(AuditRepository()),
     )
