@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
-from modules.employee.access_control import ensure_camp_access, ensure_internal_employee
+from modules.employee.access_control import (
+    ensure_camp_access,
+    ensure_camp_access_admin_or_org_manager,
+    ensure_internal_employee,
+)
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import format_camp_name, format_department_camp_name
 from modules.organizations.models import Organization
@@ -391,6 +395,37 @@ class CampReportsService:
         row = await self._get_camp_report_row(db, camp_no=camp_no, department=department)
         report = row.report or {}
         return dict(report.get("meta") or {})
+
+    async def list_camp_report_section_keys(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        department: str | None = None,
+    ) -> list[str]:
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access_admin_or_org_manager(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=context["organization_id"],
+                slug=normalized_department,
+            )
+            department = normalized_department
+
+        row = await self._get_camp_report_row(db, camp_no=camp_no, department=department)
+        report = row.report or {}
+        return list(report.keys())
 
     async def get_camp_report_dashboard(
         self,

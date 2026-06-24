@@ -53,6 +53,34 @@ async def get_department_camp_report_meta(
     return success_response(result)
 
 
+@router.get("/{camp_no}/sections")
+async def list_camp_report_sections(
+    camp_no: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.list_camp_report_section_keys(db, employee=employee, camp_no=camp_no)
+    return success_response(result)
+
+
+@router.get("/{camp_no}/department/{slug}/sections")
+async def list_department_camp_report_sections(
+    camp_no: int,
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.list_camp_report_section_keys(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        department=slug,
+    )
+    return success_response(result)
+
+
 @router.get("/{camp_no}/dashboard")
 async def get_camp_report_dashboard(
     camp_no: int,

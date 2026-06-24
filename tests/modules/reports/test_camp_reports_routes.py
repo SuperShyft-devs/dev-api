@@ -671,3 +671,94 @@ async def test_organization_manager_cannot_access_other_camp_meta(async_client, 
         headers=_auth_header(7607),
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_list_camp_report_sections_returns_keys(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7610, employee_id=80)
+    await _seed_participation_section(test_db_session, report_sections=31)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9310,
+        engagement_id=9310,
+    )
+    headers = _auth_header(7610)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+
+    refresh = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert refresh.status_code == 200
+
+    response = await async_client.get(f"/reports/camps/{camp_no}/sections", headers=headers)
+    assert response.status_code == 200
+    keys = response.json()["data"]
+    assert keys == ["meta", "participation_by_age"]
+
+
+@pytest.mark.asyncio
+async def test_list_department_camp_report_sections(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7611, employee_id=81)
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=9311, engagement_id=9311)
+    headers = _auth_header(7611)
+
+    init = await async_client.post(
+        f"/reports/camps/{camp_no}/department/sales/init",
+        headers=headers,
+    )
+    assert init.status_code == 201
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/department/sales/sections",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["data"] == ["meta"]
+
+
+@pytest.mark.asyncio
+async def test_list_camp_report_sections_onboarding_assistant_403(async_client, test_db_session):
+    test_db_session.add(User(user_id=7612, age=30, phone="7612000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(
+        Employee(employee_id=82, user_id=7612, role="onboarding_assistant", status="active")
+    )
+    await test_db_session.commit()
+
+    await _seed_employee(test_db_session, user_id=7613, employee_id=83)
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=9312, engagement_id=9312)
+    admin_headers = _auth_header(7613)
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=admin_headers)
+    assert init.status_code == 201
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/sections",
+        headers=_auth_header(7612),
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_organization_manager_can_list_own_camp_sections(async_client, test_db_session):
+    camp_no, _ = await _seed_organization_manager_for_camp(
+        test_db_session,
+        manager_user_id=7614,
+        employee_id=84,
+        organization_id=9313,
+        engagement_id=9313,
+    )
+    await _seed_employee(test_db_session, user_id=7615, employee_id=85)
+    admin_headers = _auth_header(7615)
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=admin_headers)
+    assert init.status_code == 201
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/sections",
+        headers=_auth_header(7614),
+    )
+    assert response.status_code == 200
+    assert response.json()["data"] == ["meta"]
