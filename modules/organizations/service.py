@@ -456,7 +456,15 @@ class OrganizationsService:
         )
 
         result = []
-        for camp_no, organization_id, organization_name, start_date, engagement_count, department_count in rows:
+        for (
+            camp_no,
+            organization_id,
+            organization_name,
+            start_date,
+            engagement_count,
+            department_count,
+            report_count,
+        ) in rows:
             org_name = organization_name or ""
             result.append(
                 {
@@ -467,6 +475,7 @@ class OrganizationsService:
                     "start_date": start_date,
                     "engagement_count": int(engagement_count),
                     "department_count": int(department_count or 0),
+                    "report_count": int(report_count or 0),
                 }
             )
 

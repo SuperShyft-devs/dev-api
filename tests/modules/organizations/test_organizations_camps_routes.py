@@ -105,3 +105,4 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
     assert matching[0]["camp_name"] == "Camp Org 23 June 2026"
     assert matching[0]["organization_id"] == 8001
     assert matching[0]["department_count"] == 2
+    assert matching[0]["report_count"] == 0

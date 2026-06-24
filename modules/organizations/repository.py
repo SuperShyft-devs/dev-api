@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common.listing import apply_sort, ilike_pattern
 from modules.engagements.models import Engagement
 from modules.organizations.models import Organization
+from modules.reports.models import CampReport
 
 
 class OrganizationsRepository:
@@ -223,7 +224,18 @@ class OrganizationsRepository:
     def _department_count_expr(self):
         return func.coalesce(func.jsonb_array_length(cast(Organization.departments, JSONB)), 0)
 
+    def _camp_report_counts_subquery(self):
+        return (
+            select(
+                CampReport.camp_no,
+                func.count().label("report_count"),
+            )
+            .group_by(CampReport.camp_no)
+            .subquery()
+        )
+
     def _camps_grouped_query(self, *, search: str | None = None):
+        report_counts = self._camp_report_counts_subquery()
         query = (
             select(
                 Engagement.camp_no,
@@ -232,9 +244,11 @@ class OrganizationsRepository:
                 func.min(Engagement.start_date).label("start_date"),
                 func.count().label("engagement_count"),
                 func.max(self._department_count_expr()).label("department_count"),
+                func.max(func.coalesce(report_counts.c.report_count, 0)).label("report_count"),
             )
             .select_from(Engagement)
             .join(Organization, Organization.organization_id == Engagement.organization_id)
+            .outerjoin(report_counts, report_counts.c.camp_no == Engagement.camp_no)
             .where(Engagement.camp_no.isnot(None))
             .group_by(Engagement.camp_no, Engagement.organization_id, Organization.name)
         )
