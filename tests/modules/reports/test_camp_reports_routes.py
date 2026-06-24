@@ -484,3 +484,190 @@ async def test_refresh_camp_report_replaces_existing_section(async_client, test_
     ).scalar_one()
     assert row.report["meta"]["camp_name"] == "Camp Reports Org 23 June 2026"
     assert row.report["participation_by_age"]["total_enrolled"] == 3
+
+
+async def _seed_organization_manager_for_camp(
+    test_db_session,
+    *,
+    manager_user_id: int = 7601,
+    employee_id: int = 71,
+    organization_id: int = 9301,
+    engagement_id: int = 9301,
+):
+    test_db_session.add(
+        User(user_id=manager_user_id, age=30, phone=f"{manager_user_id}000000000", status="active")
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        Employee(
+            employee_id=employee_id,
+            user_id=manager_user_id,
+            role="organization_manager",
+            status="active",
+        )
+    )
+    test_db_session.add(
+        Organization(
+            organization_id=organization_id,
+            name="Managed Camp Org",
+            organization_type="corporate",
+            status="active",
+            contact_person_user_id=manager_user_id,
+            departments=[
+                {"department": "Sales", "slug": "sales"},
+                {"department": "Engineering", "slug": "engineering"},
+            ],
+        )
+    )
+    await test_db_session.commit()
+
+    start = date(2026, 6, 23)
+    end = date(2026, 6, 25)
+    camp_no = compute_camp_no(organization_id, start)
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id,
+            engagement_name="Managed Camp Engagement",
+            organization_id=organization_id,
+            camp_no=camp_no,
+            engagement_code="MGDCAMP1",
+            engagement_type="bio_ai",
+            assessment_package_id=None,
+            diagnostic_package_id=None,
+            city="BLR",
+            slot_duration=20,
+            start_date=start,
+            end_date=end,
+            status="running",
+            participant_count=0,
+        )
+    )
+    await test_db_session.commit()
+    return camp_no, organization_id
+
+
+@pytest.mark.asyncio
+async def test_get_camp_report_meta(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7602, employee_id=72)
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=9302, engagement_id=9302)
+    headers = _auth_header(7602)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+
+    response = await async_client.get(f"/reports/camps/{camp_no}/meta", headers=headers)
+    assert response.status_code == 200
+    meta = response.json()["data"]
+    assert meta["camp_name"] == "Camp Reports Org 23 June 2026"
+    assert meta["summary_available"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_camp_report_dashboard_after_refresh(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7603, employee_id=73)
+    await _seed_participation_section(test_db_session, report_sections=21)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9303,
+        engagement_id=9303,
+    )
+    headers = _auth_header(7603)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+
+    refresh = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert refresh.status_code == 200
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/dashboard",
+        headers=headers,
+        params={"section": "participation_by_age"},
+    )
+    assert response.status_code == 200
+    section = response.json()["data"]
+    assert section["total_enrolled"] == 3
+    assert section["name"] == "Participation by Age"
+
+
+@pytest.mark.asyncio
+async def test_get_camp_report_dashboard_section_not_found(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7604, employee_id=74)
+    await _seed_participation_section(test_db_session, report_sections=22)
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=9304, engagement_id=9304)
+    headers = _auth_header(7604)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/dashboard",
+        headers=headers,
+        params={"section": "participation_by_age"},
+    )
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "SECTION_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_get_department_camp_report_meta(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7605, employee_id=75)
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=9305, engagement_id=9305)
+    headers = _auth_header(7605)
+
+    init = await async_client.post(
+        f"/reports/camps/{camp_no}/department/sales/init",
+        headers=headers,
+    )
+    assert init.status_code == 201
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/department/sales/meta",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["camp_name"] == "Camp Reports Org sales 23 June 2026"
+
+
+@pytest.mark.asyncio
+async def test_organization_manager_can_access_own_camp_meta(async_client, test_db_session):
+    camp_no, _ = await _seed_organization_manager_for_camp(test_db_session)
+    headers = _auth_header(7601)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 403
+
+    await _seed_employee(test_db_session, user_id=7606, employee_id=76)
+    admin_headers = _auth_header(7606)
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=admin_headers)
+    assert init.status_code == 201
+
+    response = await async_client.get(f"/reports/camps/{camp_no}/meta", headers=headers)
+    assert response.status_code == 200
+    assert "camp_name" in response.json()["data"]
+
+
+@pytest.mark.asyncio
+async def test_organization_manager_cannot_access_other_camp_meta(async_client, test_db_session):
+    await _seed_organization_manager_for_camp(
+        test_db_session,
+        manager_user_id=7607,
+        employee_id=77,
+        organization_id=9306,
+        engagement_id=9306,
+    )
+    await _seed_employee(test_db_session, user_id=7608, employee_id=78)
+    other_camp_no, _ = await _seed_camp(test_db_session, organization_id=9307, engagement_id=9307)
+    admin_headers = _auth_header(7608)
+    init = await async_client.post(f"/reports/camps/{other_camp_no}/init", headers=admin_headers)
+    assert init.status_code == 201
+
+    response = await async_client.get(
+        f"/reports/camps/{other_camp_no}/meta",
+        headers=_auth_header(7607),
+    )
+    assert response.status_code == 403

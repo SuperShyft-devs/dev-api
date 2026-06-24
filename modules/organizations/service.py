@@ -14,11 +14,15 @@ from __future__ import annotations
 from core.exceptions import AppError
 from common.slug import slugify_department
 from modules.audit.service import AuditService
+from modules.employee.access_control import ensure_internal_employee, ensure_org_access, is_internal_employee
+from modules.employee.models import Employee, EmployeeRole
+from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import format_camp_name
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.schemas import OrganizationCreateRequest, OrganizationUpdateRequest
+from modules.users.repository import UsersRepository
 
 
 _ALLOWED_ORGANIZATION_STATUS = {"active", "inactive", "archived"}
@@ -110,23 +114,43 @@ class OrganizationsService:
     def __init__(
         self,
         repository: OrganizationsRepository,
+        employee_repository: EmployeeRepository | None = None,
+        users_repository: UsersRepository | None = None,
         audit_service: AuditService | None = None,
     ):
         self._repository = repository
+        self._employee_repository = employee_repository or EmployeeRepository()
+        self._users_repository = users_repository or UsersRepository()
         self._audit_service = audit_service
-
-    def _ensure_employee_access(self, employee: EmployeeContext | None) -> None:
-        if employee is None:
-            raise AppError(
-                status_code=403,
-                error_code="FORBIDDEN",
-                message="You do not have permission to perform this action",
-            )
 
     def _require_audit_service(self) -> AuditService:
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
         return self._audit_service
+
+    async def _validate_contact_person_user_id(self, db, user_id: int | None) -> int | None:
+        if user_id is None:
+            return None
+
+        user = await self._users_repository.get_user_by_id(db, user_id)
+        if user is None or (user.status or "").lower() != "active":
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        return user_id
+
+    async def _ensure_contact_person_employee(self, db, user_id: int) -> None:
+        existing = await self._employee_repository.get_by_user_id(db, user_id)
+        if existing is None:
+            row = Employee(
+                user_id=user_id,
+                role=EmployeeRole.organization_manager,
+                status="active",
+            )
+            await self._employee_repository.create(db, row)
+            return
+
+        if (existing.status or "").lower() != "active":
+            existing.status = "active"
+            await self._employee_repository.update(db, existing)
 
     async def create_organization_for_employee(
         self,
@@ -138,7 +162,7 @@ class OrganizationsService:
         user_agent: str,
         endpoint: str,
     ) -> Organization:
-        self._ensure_employee_access(employee)
+        ensure_internal_employee(employee)
 
         name = payload.name.strip()
         if not name:
@@ -147,6 +171,11 @@ class OrganizationsService:
         existing = await self._repository.get_by_name(db, name)
         if existing is not None:
             raise AppError(status_code=409, error_code="ORGANIZATION_ALREADY_EXISTS", message="Organization already exists")
+
+        contact_person_user_id = await self._validate_contact_person_user_id(
+            db,
+            payload.contact_person_user_id,
+        )
 
         organization = Organization(
             name=name,
@@ -158,10 +187,7 @@ class OrganizationsService:
             city=payload.city,
             state=payload.state,
             country=payload.country,
-            contact_name=payload.contact_name,
-            contact_email=str(payload.contact_email) if payload.contact_email is not None else None,
-            contact_phone=payload.contact_phone,
-            contact_designation=payload.contact_designation,
+            contact_person_user_id=contact_person_user_id,
             bd_employee_id=payload.bd_employee_id,
             departments=_normalize_departments(payload.departments),
             status="active",
@@ -170,6 +196,9 @@ class OrganizationsService:
         )
 
         organization = await self._repository.create(db, organization)
+
+        if contact_person_user_id is not None:
+            await self._ensure_contact_person_employee(db, contact_person_user_id)
 
         audit = self._require_audit_service()
         await audit.log_event(
@@ -200,7 +229,7 @@ class OrganizationsService:
         sort_by: str | None = None,
         sort_dir: str | None = None,
     ) -> tuple[list[Organization], int]:
-        self._ensure_employee_access(employee)
+        ensure_internal_employee(employee)
 
         status_value = None
         if status is not None:
@@ -234,7 +263,7 @@ class OrganizationsService:
         return organizations, total
 
     async def get_organization_filter_options_for_employee(self, db, *, employee: EmployeeContext) -> dict:
-        self._ensure_employee_access(employee)
+        ensure_internal_employee(employee)
         cities, countries = await self._repository.list_distinct_cities_and_countries(db)
         return {"cities": cities, "countries": countries}
 
@@ -245,8 +274,6 @@ class OrganizationsService:
         employee: EmployeeContext,
         organization_id: int,
     ) -> Organization:
-        self._ensure_employee_access(employee)
-
         organization = await self._repository.get_by_id(db, organization_id)
         if organization is None:
             raise AppError(
@@ -254,6 +281,13 @@ class OrganizationsService:
                 error_code="ORGANIZATION_NOT_FOUND",
                 message="Organization does not exist",
             )
+
+        await ensure_org_access(
+            db,
+            employee,
+            organization_id,
+            repository=self._repository,
+        )
 
         return organization
 
@@ -268,8 +302,6 @@ class OrganizationsService:
         user_agent: str,
         endpoint: str,
     ) -> Organization:
-        self._ensure_employee_access(employee)
-
         organization = await self._repository.get_by_id(db, organization_id)
         if organization is None:
             raise AppError(
@@ -277,6 +309,13 @@ class OrganizationsService:
                 error_code="ORGANIZATION_NOT_FOUND",
                 message="Organization does not exist",
             )
+
+        await ensure_org_access(
+            db,
+            employee,
+            organization_id,
+            repository=self._repository,
+        )
 
         name = payload.name.strip()
         if not name:
@@ -300,10 +339,14 @@ class OrganizationsService:
         organization.city = payload.city
         organization.state = payload.state
         organization.country = payload.country
-        organization.contact_name = payload.contact_name
-        organization.contact_email = str(payload.contact_email) if payload.contact_email is not None else None
-        organization.contact_phone = payload.contact_phone
-        organization.contact_designation = payload.contact_designation
+        if is_internal_employee(employee.role):
+            contact_person_user_id = await self._validate_contact_person_user_id(
+                db,
+                payload.contact_person_user_id,
+            )
+            organization.contact_person_user_id = contact_person_user_id
+            if contact_person_user_id is not None:
+                await self._ensure_contact_person_employee(db, contact_person_user_id)
         organization.bd_employee_id = payload.bd_employee_id
         organization.departments = _normalize_departments(payload.departments)
         organization.updated_employee_id = employee.employee_id
@@ -334,7 +377,7 @@ class OrganizationsService:
         user_agent: str,
         endpoint: str,
     ) -> Organization:
-        self._ensure_employee_access(employee)
+        ensure_internal_employee(employee)
 
         organization = await self._repository.get_by_id(db, organization_id)
         if organization is None:
@@ -375,7 +418,7 @@ class OrganizationsService:
         limit: int,
     ) -> tuple[list[dict], int]:
         """Fetch all distinct users enrolled across all engagements for an organization."""
-        self._ensure_employee_access(employee)
+        ensure_internal_employee(employee)
 
         # Validate organization exists
         organization = await self._repository.get_by_id(db, organization_id)
@@ -443,7 +486,7 @@ class OrganizationsService:
         sort_by: str | None = None,
         sort_dir: str | None = None,
     ) -> tuple[list[dict], int]:
-        self._ensure_employee_access(employee)
+        ensure_internal_employee(employee)
 
         total = await self._repository.count_camps(db, search=search)
         rows = await self._repository.list_camps(

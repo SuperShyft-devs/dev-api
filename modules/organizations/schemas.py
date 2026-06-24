@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class OrganizationDepartment(BaseModel):
@@ -28,11 +28,7 @@ class OrganizationCreateRequest(BaseModel):
     state: Optional[str] = Field(default=None, max_length=100)
     country: Optional[str] = Field(default=None, max_length=100)
 
-    contact_name: Optional[str] = Field(default=None, max_length=200)
-    contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = Field(default=None, max_length=30)
-    contact_designation: Optional[str] = Field(default=None, max_length=100)
-
+    contact_person_user_id: Optional[int] = Field(default=None, gt=0)
     bd_employee_id: Optional[int] = Field(default=None, gt=0)
     departments: Optional[list[OrganizationDepartmentInput]] = None
 
@@ -48,11 +44,7 @@ class OrganizationUpdateRequest(BaseModel):
     state: Optional[str] = Field(default=None, max_length=100)
     country: Optional[str] = Field(default=None, max_length=100)
 
-    contact_name: Optional[str] = Field(default=None, max_length=200)
-    contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = Field(default=None, max_length=30)
-    contact_designation: Optional[str] = Field(default=None, max_length=100)
-
+    contact_person_user_id: Optional[int] = Field(default=None, gt=0)
     bd_employee_id: Optional[int] = Field(default=None, gt=0)
     departments: Optional[list[OrganizationDepartmentInput]] = None
 
@@ -85,10 +77,7 @@ class OrganizationDetailsResponse(BaseModel):
     state: Optional[str] = None
     country: Optional[str] = None
 
-    contact_name: Optional[str] = None
-    contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = None
-    contact_designation: Optional[str] = None
+    contact_person_user_id: Optional[int] = None
 
     bd_employee_id: Optional[int] = None
     departments: Optional[list[OrganizationDepartment]] = None

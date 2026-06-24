@@ -51,7 +51,6 @@ async def test_create_organization_creates_row(async_client, test_db_session):
         "name": "Acme",
         "organization_type": "corporate",
         "website_url": "https://example.com",
-        "contact_email": "ops@example.com",
         "bd_employee_id": 21,
     }
 
@@ -112,7 +111,6 @@ async def test_get_organization_details_returns_details(async_client, test_db_se
             name="DetailOrg",
             organization_type="corporate",
             website_url="https://detail.example.com",
-            contact_email="c@example.com",
             status="active",
         )
     )
@@ -141,10 +139,7 @@ async def test_update_organization_updates_fields(async_client, test_db_session)
         "city": None,
         "state": None,
         "country": None,
-        "contact_name": None,
-        "contact_email": None,
-        "contact_phone": None,
-        "contact_designation": None,
+        "contact_person_user_id": None,
         "bd_employee_id": None,
     }
 
@@ -245,3 +240,97 @@ async def test_update_organization_replaces_departments(async_client, test_db_se
     updated = await test_db_session.get(Organization, 9401)
     assert updated is not None
     assert updated.departments == [{"department": "Engineering", "slug": "engineering"}]
+
+
+@pytest.mark.asyncio
+async def test_create_organization_with_contact_person_creates_organization_manager(
+    async_client,
+    test_db_session,
+):
+    await _seed_employee(test_db_session, user_id=7110, employee_id=29)
+
+    contact_user = User(user_id=7111, age=35, phone="7111000000", status="active")
+    test_db_session.add(contact_user)
+    await test_db_session.commit()
+
+    payload = {
+        "name": "ContactPersonOrg",
+        "contact_person_user_id": 7111,
+    }
+
+    response = await async_client.post("/organizations", headers=_auth_header(7110), json=payload)
+    assert response.status_code == 201
+
+    organization_id = response.json()["data"]["organization_id"]
+    created = await test_db_session.get(Organization, organization_id)
+    assert created is not None
+    assert created.contact_person_user_id == 7111
+
+    from sqlalchemy import select
+
+    employee_row = (
+        await test_db_session.execute(select(Employee).where(Employee.user_id == 7111))
+    ).scalar_one_or_none()
+    assert employee_row is not None
+    assert employee_row.role == "organization_manager"
+    assert (employee_row.status or "").lower() == "active"
+
+
+@pytest.mark.asyncio
+async def test_organization_manager_can_get_own_organization(async_client, test_db_session):
+    manager_user = User(user_id=7120, age=30, phone="7120000000", status="active")
+    test_db_session.add(manager_user)
+    await test_db_session.flush()
+    test_db_session.add(
+        Employee(employee_id=120, user_id=7120, role="organization_manager", status="active")
+    )
+    test_db_session.add(
+        Organization(
+            organization_id=9501,
+            name="ManagedOrg",
+            status="active",
+            contact_person_user_id=7120,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get("/organizations/9501", headers=_auth_header(7120))
+    assert response.status_code == 200
+    assert response.json()["data"]["contact_person_user_id"] == 7120
+
+
+@pytest.mark.asyncio
+async def test_organization_manager_cannot_get_other_organization(async_client, test_db_session):
+    manager_user = User(user_id=7121, age=30, phone="7121000000", status="active")
+    other_contact_user = User(user_id=7123, age=30, phone="7123000000", status="active")
+    test_db_session.add_all([manager_user, other_contact_user])
+    await test_db_session.flush()
+    test_db_session.add(
+        Employee(employee_id=121, user_id=7121, role="organization_manager", status="active")
+    )
+    test_db_session.add(
+        Organization(
+            organization_id=9502,
+            name="OtherOrg",
+            status="active",
+            contact_person_user_id=7123,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get("/organizations/9502", headers=_auth_header(7121))
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_organization_manager_cannot_list_organizations(async_client, test_db_session):
+    manager_user = User(user_id=7122, age=30, phone="7122000000", status="active")
+    test_db_session.add(manager_user)
+    await test_db_session.flush()
+    test_db_session.add(
+        Employee(employee_id=122, user_id=7122, role="organization_manager", status="active")
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get("/organizations", headers=_auth_header(7122))
+    assert response.status_code == 403

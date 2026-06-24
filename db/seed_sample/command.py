@@ -69,10 +69,7 @@ class SeedOrganization:
     city: str
     state: str
     country: str
-    contact_name: str
-    contact_email: str
-    contact_phone: str
-    contact_designation: str
+    contact_person_user_id: int | None
     bd_employee_id: int | None
     status: str
     created_employee_id: int | None
@@ -202,10 +199,10 @@ SAMPLE_EMPLOYEES: tuple[SeedEmployee, ...] = (
 )
 
 SAMPLE_ORGANIZATIONS: tuple[SeedOrganization, ...] = (
-    SeedOrganization(301, "Zenith Corp", "enterprise", "https://zenith.example.com", "BKC, Bandra East", "400051", "Mumbai", "Maharashtra", "India", "Anita Menon", "anita.menon@zenith.example.com", "9876501001", "HR Director", 202, "active", 201, 201),
-    SeedOrganization(302, "Apex Retail", "retail", "https://apex.example.com", "Hitech City", "500081", "Hyderabad", "Telangana", "India", "Pranav Reddy", "pranav.reddy@apex.example.com", "9876501002", "People Ops Lead", 202, "active", 201, 202),
-    SeedOrganization(303, "Nimbus Logistics", "logistics", "https://nimbus.example.com", "Electronic City", "560100", "Bengaluru", "Karnataka", "India", "Kritika Jain", "kritika.jain@nimbus.example.com", "9876501003", "Admin Head", 205, "inactive", 205, 205),
-    SeedOrganization(304, "Legacy Foods", "manufacturing", "https://legacy.example.com", "Sector V", "700091", "Kolkata", "West Bengal", "India", "Ravi Sinha", "ravi.sinha@legacy.example.com", "9876501004", "HR Manager", 205, "archived", 205, 205),
+    SeedOrganization(301, "Zenith Corp", "enterprise", "https://zenith.example.com", "BKC, Bandra East", "400051", "Mumbai", "Maharashtra", "India", None, 202, "active", 201, 201),
+    SeedOrganization(302, "Apex Retail", "retail", "https://apex.example.com", "Hitech City", "500081", "Hyderabad", "Telangana", "India", None, 202, "active", 201, 202),
+    SeedOrganization(303, "Nimbus Logistics", "logistics", "https://nimbus.example.com", "Electronic City", "560100", "Bengaluru", "Karnataka", "India", None, 205, "inactive", 205, 205),
+    SeedOrganization(304, "Legacy Foods", "manufacturing", "https://legacy.example.com", "Sector V", "700091", "Kolkata", "West Bengal", "India", None, 205, "archived", 205, 205),
 )
 
 SAMPLE_ASSESSMENT_PACKAGES: tuple[SeedAssessmentPackage, ...] = (
@@ -340,10 +337,7 @@ async def _upsert_organizations(session: AsyncSession, organizations: Iterable[S
         row.city = seed.city
         row.state = seed.state
         row.country = seed.country
-        row.contact_name = seed.contact_name
-        row.contact_email = seed.contact_email
-        row.contact_phone = seed.contact_phone
-        row.contact_designation = seed.contact_designation
+        row.contact_person_user_id = seed.contact_person_user_id
         row.bd_employee_id = seed.bd_employee_id
         row.status = seed.status
         row.created_employee_id = seed.created_employee_id

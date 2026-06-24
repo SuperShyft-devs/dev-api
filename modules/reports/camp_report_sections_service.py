@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
+from modules.employee.access_control import ensure_internal_employee
 from modules.employee.service import EmployeeContext
 from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
 from modules.reports.models import CampReportSection
@@ -26,8 +27,7 @@ class CampReportSectionsService:
         self._audit_service = audit_service
 
     def _ensure_employee_access(self, employee: EmployeeContext | None) -> None:
-        if employee is None:
-            raise AppError(status_code=401, error_code="UNAUTHORIZED", message="Authentication required")
+        ensure_internal_employee(employee)
 
     @staticmethod
     def _normalize_text(value: str | None) -> str | None:

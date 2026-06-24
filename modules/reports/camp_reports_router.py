@@ -25,6 +25,70 @@ def _client_ip(request: Request) -> str:
     return request.client.host
 
 
+@router.get("/{camp_no}/meta")
+async def get_camp_report_meta(
+    camp_no: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.get_camp_report_meta(db, employee=employee, camp_no=camp_no)
+    return success_response(result)
+
+
+@router.get("/{camp_no}/department/{slug}/meta")
+async def get_department_camp_report_meta(
+    camp_no: int,
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.get_camp_report_meta(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        department=slug,
+    )
+    return success_response(result)
+
+
+@router.get("/{camp_no}/dashboard")
+async def get_camp_report_dashboard(
+    camp_no: int,
+    section: str,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.get_camp_report_dashboard(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=section,
+    )
+    return success_response(result)
+
+
+@router.get("/{camp_no}/department/{slug}/dashboard")
+async def get_department_camp_report_dashboard(
+    camp_no: int,
+    slug: str,
+    section: str,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.get_camp_report_dashboard(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=section,
+        department=slug,
+    )
+    return success_response(result)
+
+
 @router.get("/{camp_no}")
 async def list_camp_reports(
     camp_no: int,

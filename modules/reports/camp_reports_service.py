@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
+from modules.employee.access_control import ensure_camp_access, ensure_internal_employee
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import format_camp_name, format_department_camp_name
 from modules.organizations.models import Organization
+from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.service import get_department_slugs
 from modules.reports.camp_report_section_builders import SECTION_BUILDERS
 from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
@@ -27,15 +29,13 @@ class CampReportsService:
         *,
         repository: CampReportsRepository,
         sections_repository: CampReportSectionsRepository,
+        organizations_repository: OrganizationsRepository | None = None,
         audit_service: AuditService,
     ) -> None:
         self._repository = repository
         self._sections_repository = sections_repository
+        self._organizations_repository = organizations_repository or OrganizationsRepository()
         self._audit_service = audit_service
-
-    def _ensure_employee_access(self, employee: EmployeeContext | None) -> None:
-        if employee is None:
-            raise AppError(status_code=401, error_code="UNAUTHORIZED", message="Authentication required")
 
     async def _resolve_camp_context(self, db: AsyncSession, *, camp_no: int) -> dict:
         row = await self._repository.get_camp_context(db, camp_no=camp_no)
@@ -110,7 +110,7 @@ class CampReportsService:
         user_agent: str,
         endpoint: str,
     ) -> CampReport:
-        self._ensure_employee_access(employee)
+        ensure_internal_employee(employee)
 
         context = await self._resolve_camp_context(db, camp_no=camp_no)
         existing = await self._repository.get_overall_by_camp_no(db, camp_no=camp_no)
@@ -165,7 +165,7 @@ class CampReportsService:
         user_agent: str,
         endpoint: str,
     ) -> CampReport:
-        self._ensure_employee_access(employee)
+        ensure_internal_employee(employee)
 
         normalized_slug = slug.strip()
         if not normalized_slug:
@@ -237,7 +237,7 @@ class CampReportsService:
         user_agent: str,
         endpoint: str,
     ) -> None:
-        self._ensure_employee_access(employee)
+        ensure_internal_employee(employee)
 
         deleted = await self._repository.delete_overall(db, camp_no=camp_no)
         if deleted == 0:
@@ -268,7 +268,7 @@ class CampReportsService:
         user_agent: str,
         endpoint: str,
     ) -> None:
-        self._ensure_employee_access(employee)
+        ensure_internal_employee(employee)
 
         normalized_slug = slug.strip()
         if not normalized_slug:
@@ -329,10 +329,121 @@ class CampReportsService:
         employee: EmployeeContext,
         camp_no: int,
     ) -> list[dict]:
-        self._ensure_employee_access(employee)
+        ensure_internal_employee(employee)
         await self._resolve_camp_context(db, camp_no=camp_no)
         rows = await self._repository.list_by_camp_no(db, camp_no=camp_no)
         return [self._serialize_camp_report(row) for row in rows]
+
+    async def _get_camp_report_row(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+    ) -> CampReport:
+        if department is None:
+            row = await self._repository.get_overall_by_camp_no(db, camp_no=camp_no)
+        else:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            row = await self._repository.get_by_camp_no_and_department(
+                db,
+                camp_no=camp_no,
+                department=normalized_department,
+            )
+
+        if row is None:
+            raise AppError(
+                status_code=404,
+                error_code="CAMP_REPORT_NOT_FOUND",
+                message="Camp report does not exist",
+            )
+        return row
+
+    async def get_camp_report_meta(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        department: str | None = None,
+    ) -> dict:
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=context["organization_id"],
+                slug=normalized_department,
+            )
+            department = normalized_department
+
+        row = await self._get_camp_report_row(db, camp_no=camp_no, department=department)
+        report = row.report or {}
+        return dict(report.get("meta") or {})
+
+    async def get_camp_report_dashboard(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        section: str,
+        department: str | None = None,
+    ) -> dict:
+        normalized_section = section.strip()
+        if not normalized_section:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=context["organization_id"],
+                slug=normalized_department,
+            )
+            department = normalized_department
+
+        section_row = await self._sections_repository.get_by_section_key(
+            db,
+            section_key=normalized_section,
+        )
+        if section_row is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_SECTION",
+                message="Invalid report section",
+            )
+
+        row = await self._get_camp_report_row(db, camp_no=camp_no, department=department)
+        report = row.report or {}
+        if normalized_section not in report:
+            raise AppError(
+                status_code=404,
+                error_code="SECTION_NOT_FOUND",
+                message="Report section has not been refreshed",
+            )
+        return dict(report[normalized_section])
 
     async def refresh_camp_report_section(
         self,
@@ -346,13 +457,17 @@ class CampReportsService:
         user_agent: str,
         endpoint: str,
     ) -> dict:
-        self._ensure_employee_access(employee)
-
         normalized_section = section.strip()
         if not normalized_section:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
         context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
         reference_date = context["camp_start_date"] or date.today()
 
         if department is None:
