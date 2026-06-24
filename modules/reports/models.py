@@ -5,7 +5,7 @@ Schema must match `instructions/db-schema.txt`.
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.types import JSON
 
 from db.base import Base
@@ -31,16 +31,23 @@ class IndividualHealthReport(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
-class OrganizationHealthReport(Base):
-    """SQLAlchemy model for `organization_health_report` table."""
+class CampReport(Base):
+    """SQLAlchemy model for `camp_reports` table."""
 
-    __tablename__ = "organization_health_report"
+    __tablename__ = "camp_reports"
 
     report_id = Column(Integer, primary_key=True)
-    metsights_output = Column(JSON)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    engagement_id = Column(Integer, ForeignKey("engagements.engagement_id"), nullable=False)
+    report = Column(JSON)
+    camp_no = Column(BigInteger, nullable=False, index=True)
+    department = Column(String, nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.organization_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
 
 class CampReportSection(Base):

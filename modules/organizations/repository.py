@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import cast, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
@@ -219,6 +220,9 @@ class OrganizationsRepository:
         result = await db.execute(query)
         return list(result.all())
 
+    def _department_count_expr(self):
+        return func.coalesce(func.jsonb_array_length(cast(Organization.departments, JSONB)), 0)
+
     def _camps_grouped_query(self, *, search: str | None = None):
         query = (
             select(
@@ -227,6 +231,7 @@ class OrganizationsRepository:
                 Organization.name.label("organization_name"),
                 func.min(Engagement.start_date).label("start_date"),
                 func.count().label("engagement_count"),
+                func.max(self._department_count_expr()).label("department_count"),
             )
             .select_from(Engagement)
             .join(Organization, Organization.organization_id == Engagement.organization_id)
@@ -265,6 +270,8 @@ class OrganizationsRepository:
             order_col = func.count()
         elif normalized_sort == "camp_name":
             order_col = Organization.name
+        elif normalized_sort == "department_count":
+            order_col = func.max(self._department_count_expr())
         else:
             order_col = Engagement.camp_no
 

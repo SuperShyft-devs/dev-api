@@ -76,6 +76,7 @@ from modules.assessments.packages_router import router as assessment_packages_ro
 from modules.questionnaire.router import router as questionnaire_router
 from modules.reports.router import router as reports_router
 from modules.reports.camp_report_sections_router import router as camp_report_sections_router
+from modules.reports.camp_reports_router import router as camp_reports_router
 from modules.platform_settings.router import router as platform_settings_router
 from modules.bookings.router import router as bookings_router
 from modules.experts.router import router as experts_router
@@ -296,6 +297,7 @@ async def fastapi_app(
     app.include_router(assessments_router)
     app.include_router(assessment_packages_router)
     app.include_router(questionnaire_router)
+    app.include_router(camp_reports_router)
     app.include_router(reports_router)
     app.include_router(camp_report_sections_router)
     app.include_router(platform_settings_router)
@@ -347,7 +349,7 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     await test_db_session.execute(text("DELETE FROM questionnaire_healthy_habit_rules"))
     await test_db_session.execute(text("DELETE FROM assessment_category_progress"))
     await test_db_session.execute(text("DELETE FROM individual_health_report"))
-    await test_db_session.execute(text("DELETE FROM organization_health_report"))
+    await test_db_session.execute(text("DELETE FROM camp_reports"))
     await test_db_session.execute(text("DELETE FROM reports_user_sync_state"))
     await test_db_session.execute(text("DELETE FROM engagement_participants"))
     await test_db_session.execute(text("DELETE FROM notifications"))

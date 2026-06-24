@@ -21,3 +21,11 @@ def format_camp_name(organization_name: str, start_date: date) -> str:
     name = (organization_name or "").strip() or "Organization"
     month_word = calendar.month_name[start_date.month]
     return f"{name} {start_date.day} {month_word} {start_date.year}"
+
+
+def format_department_camp_name(organization_name: str, department_slug: str, start_date: date) -> str:
+    """Human-readable department camp label, e.g. 'Acme Corp sales 23 June 2026'."""
+    name = (organization_name or "").strip() or "Organization"
+    slug = (department_slug or "").strip()
+    month_word = calendar.month_name[start_date.month]
+    return f"{name} {slug} {start_date.day} {month_word} {start_date.year}"

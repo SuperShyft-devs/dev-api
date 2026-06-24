@@ -25,7 +25,7 @@ from modules.employee.models import Employee
 from modules.engagements.models import OnboardingAssistantAssignment
 from modules.questionnaire.models import QuestionnaireResponse
 from modules.payments.models import Booking, Order, OrderBooking, Payment
-from modules.reports.models import IndividualHealthReport, OrganizationHealthReport, ReportsUserSyncState
+from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.support.models import SupportTicket
 
 
@@ -590,6 +590,19 @@ class UsersRepository:
             )
 
             if orphan_engagement_ids:
+                orphan_camp_nos = list(
+                    (
+                        await db.execute(
+                            select(Engagement.camp_no).where(
+                                Engagement.engagement_id.in_(orphan_engagement_ids),
+                                Engagement.camp_no.isnot(None),
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+
                 orphan_assessment_ids = list(
                     (
                         await db.execute(
@@ -622,16 +635,20 @@ class UsersRepository:
                     )
 
                 await db.execute(
-                    delete(OrganizationHealthReport).where(
-                        OrganizationHealthReport.engagement_id.in_(orphan_engagement_ids)
-                    )
-                )
-                await db.execute(
                     delete(OnboardingAssistantAssignment).where(
                         OnboardingAssistantAssignment.engagement_id.in_(orphan_engagement_ids)
                     )
                 )
                 await db.execute(delete(Engagement).where(Engagement.engagement_id.in_(orphan_engagement_ids)))
+
+                if orphan_camp_nos:
+                    from modules.reports.camp_reports_repository import CampReportsRepository
+
+                    camp_reports_repo = CampReportsRepository()
+                    for camp_no in set(orphan_camp_nos):
+                        remaining = await camp_reports_repo.count_engagements_for_camp_no(db, camp_no=int(camp_no))
+                        if remaining == 0:
+                            await camp_reports_repo.delete_all_for_camp_no(db, camp_no=int(camp_no))
 
         # Employee rows reference users; organizations and onboarding assignments reference employee.
         employee_ids_subq = select(Employee.employee_id).where(Employee.user_id.in_(user_ids))

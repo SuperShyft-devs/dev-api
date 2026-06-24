@@ -1226,7 +1226,6 @@ class EngagementsService:
 
         from modules.checklists.models import EngagementChecklist
         from modules.notifications.models import Notification
-        from modules.reports.models import OrganizationHealthReport
 
         instances = await self._assessments_repository.list_all_instances_for_engagement(
             db,
@@ -1247,7 +1246,6 @@ class EngagementsService:
             "deleted_questionnaire_responses": 0,
             "deleted_reports": 0,
             "deleted_category_progress_rows": 0,
-            "deleted_organization_health_reports": 0,
             "deleted_onboarding_assistant_assignments": 0,
             "deleted_engagement_checklists": 0,
         }
@@ -1266,11 +1264,6 @@ class EngagementsService:
             db,
             engagement_id=engagement_id,
         )
-
-        org_report_result = await db.execute(
-            delete(OrganizationHealthReport).where(OrganizationHealthReport.engagement_id == engagement_id)
-        )
-        totals["deleted_organization_health_reports"] = int(org_report_result.rowcount or 0)
 
         totals["deleted_onboarding_assistant_assignments"] = (
             await self._repository.delete_all_onboarding_assignments_for_engagement(
@@ -1304,11 +1297,22 @@ class EngagementsService:
         if engagement is None:
             raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
 
+        camp_no = engagement.camp_no
+
         purge = await self._purge_engagement_scoped_data(db, engagement_id=engagement_id)
 
         deleted = await self._repository.delete_engagement_by_id(db, engagement_id=engagement_id)
         if not deleted:
             raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        from modules.reports.camp_reports_repository import CampReportsRepository
+
+        camp_reports_repo = CampReportsRepository()
+        deleted_camp_reports = 0
+        if camp_no is not None:
+            remaining = await camp_reports_repo.count_engagements_for_camp_no(db, camp_no=camp_no)
+            if remaining == 0:
+                deleted_camp_reports = await camp_reports_repo.delete_all_for_camp_no(db, camp_no=camp_no)
 
         audit = self._require_audit_service()
         await audit.log_event(
@@ -1325,6 +1329,7 @@ class EngagementsService:
             "engagement_id": engagement_id,
             "engagement_code": engagement.engagement_code,
             "engagement_name": engagement.engagement_name,
+            "deleted_camp_reports": deleted_camp_reports,
             **purge,
         }
 
