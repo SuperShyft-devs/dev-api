@@ -19,7 +19,11 @@ from modules.engagements.camp_no import format_camp_name, format_department_camp
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.service import get_department_slugs
-from modules.reports.camp_report_section_builders import SECTION_BUILDERS
+from modules.reports.camp_report_section_builders import (
+    SECTION_BUILDERS,
+    build_kpis,
+    build_participation_by_age,
+)
 from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
 from modules.reports.camp_reports_repository import CampReportsRepository
 from modules.reports.models import CampReport
@@ -503,7 +507,6 @@ class CampReportsService:
             context["organization_id"],
             repository=self._organizations_repository,
         )
-        reference_date = context["camp_start_date"] or date.today()
 
         if department is None:
             row = await self._repository.get_overall_by_camp_no(db, camp_no=camp_no)
@@ -551,12 +554,14 @@ class CampReportsService:
                 message="Report section is not implemented",
             )
 
-        users = await self._repository.list_distinct_enrolled_users(
+        built_payload = await self._build_section_payload(
             db,
+            section_key=normalized_section,
             camp_no=camp_no,
             department=department,
+            camp_start_date=context["camp_start_date"],
+            camp_end_date=context["camp_end_date"],
         )
-        built_payload = builder(users, reference_date=reference_date)
 
         report = dict(row.report or {})
         meta = dict(report.get("meta") or {})
@@ -587,3 +592,39 @@ class CampReportsService:
             "report_id": row.report_id,
             "section": section_payload,
         }
+
+    async def _build_section_payload(
+        self,
+        db: AsyncSession,
+        *,
+        section_key: str,
+        camp_no: int,
+        department: str | None,
+        camp_start_date: date | None,
+        camp_end_date: date | None,
+    ) -> dict:
+        participation_reference = camp_start_date or date.today()
+        age_reference = camp_end_date or date.today()
+
+        if section_key == "participation_by_age":
+            users = await self._repository.list_distinct_enrolled_users(
+                db,
+                camp_no=camp_no,
+                department=department,
+            )
+            return build_participation_by_age(users, reference_date=participation_reference)
+
+        if section_key == "kpis":
+            metrics = await self._repository.compute_kpi_metrics(
+                db,
+                camp_no=camp_no,
+                department=department,
+                age_reference_date=age_reference,
+            )
+            return build_kpis(metrics)
+
+        raise AppError(
+            status_code=400,
+            error_code="SECTION_NOT_IMPLEMENTED",
+            message="Report section is not implemented",
+        )

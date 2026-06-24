@@ -3,18 +3,65 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.organizations.models import Organization
-from modules.reports.models import CampReport
+from modules.reports.camp_report_section_builders import extract_metabolic_age, is_high_metabolic_risk, resolve_user_age
+from modules.reports.models import CampReport, IndividualHealthReport
 from modules.users.models import User
+
+_MALE_GENDERS = ("male", "m", "1")
+_FEMALE_GENDERS = ("female", "f", "2")
 
 
 class CampReportsRepository:
     """CRUD queries for camp_reports."""
+
+    @staticmethod
+    def _enrolled_users_ranked_subquery(*, camp_no: int, department: str | None = None):
+        """Distinct enrolled users per camp (latest participant row per user_id)."""
+        ranked_rows = (
+            select(
+                User.user_id,
+                User.date_of_birth,
+                User.age,
+                User.gender,
+                Engagement.engagement_id,
+                func.row_number()
+                .over(
+                    partition_by=EngagementParticipant.user_id,
+                    order_by=EngagementParticipant.engagement_participant_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(Engagement)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_id == Engagement.engagement_id,
+            )
+            .join(User, User.user_id == EngagementParticipant.user_id)
+            .where(Engagement.camp_no == camp_no)
+        )
+        if department is not None:
+            ranked_rows = ranked_rows.where(EngagementParticipant.participant_department == department)
+
+        ranked = ranked_rows.subquery()
+        return (
+            select(
+                ranked.c.user_id,
+                ranked.c.date_of_birth,
+                ranked.c.age,
+                ranked.c.gender,
+                ranked.c.engagement_id,
+            )
+            .where(ranked.c.rn == 1)
+            .subquery()
+        )
 
     async def get_camp_context(self, db: AsyncSession, *, camp_no: int) -> tuple | None:
         """Return (organization_id, organization_name, start_date, end_date) for a camp."""
@@ -83,38 +130,143 @@ class CampReportsRepository:
         department: str | None = None,
     ) -> list[tuple[int, date | None, int]]:
         """Return distinct (user_id, date_of_birth, age) enrolled in a camp."""
-        ranked_rows = (
-            select(
-                User.user_id,
-                User.date_of_birth,
-                User.age,
-                func.row_number()
-                .over(
-                    partition_by=EngagementParticipant.user_id,
-                    order_by=EngagementParticipant.engagement_participant_id.desc(),
-                )
-                .label("rn"),
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        query = select(
+            enrolled.c.user_id,
+            enrolled.c.date_of_birth,
+            enrolled.c.age,
+        )
+        result = await db.execute(query)
+        return [(int(r[0]), r[1], int(r[2])) for r in result.all()]
+
+    async def compute_kpi_metrics(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+        age_reference_date: date,
+    ) -> dict[str, int]:
+        """Aggregate KPI counts for a camp (optionally scoped to a department)."""
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+
+        employees_result = await db.execute(
+            select(func.count()).select_from(enrolled)
+        )
+        employees_enrolled = int(employees_result.scalar_one())
+
+        male_result = await db.execute(
+            select(func.count())
+            .select_from(enrolled)
+            .where(func.lower(func.trim(enrolled.c.gender)).in_(_MALE_GENDERS))
+        )
+        male_enrolled = int(male_result.scalar_one())
+
+        female_result = await db.execute(
+            select(func.count())
+            .select_from(enrolled)
+            .where(func.lower(func.trim(enrolled.c.gender)).in_(_FEMALE_GENDERS))
+        )
+        female_enrolled = int(female_result.scalar_one())
+
+        blood_result = await db.execute(
+            select(func.count(func.distinct(enrolled.c.user_id)))
+            .select_from(enrolled)
+            .join(
+                AssessmentInstance,
+                and_(
+                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
+                    AssessmentInstance.user_id == enrolled.c.user_id,
+                ),
             )
+            .join(
+                IndividualHealthReport,
+                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+            )
+            .where(IndividualHealthReport.blood_parameters.isnot(None))
+        )
+        total_blood_test = int(blood_result.scalar_one())
+
+        doctor_query = (
+            select(func.count(func.distinct(EngagementParticipant.user_id)))
             .select_from(Engagement)
             .join(
                 EngagementParticipant,
                 EngagementParticipant.engagement_id == Engagement.engagement_id,
             )
-            .join(User, User.user_id == EngagementParticipant.user_id)
             .where(Engagement.camp_no == camp_no)
+            .where(
+                or_(
+                    EngagementParticipant.want_doctor_consultation.is_(True),
+                    EngagementParticipant.want_doctor_and_nutritionist_consultation.is_(True),
+                )
+            )
         )
         if department is not None:
-            ranked_rows = ranked_rows.where(EngagementParticipant.participant_department == department)
+            doctor_query = doctor_query.where(EngagementParticipant.participant_department == department)
+        doctor_result = await db.execute(doctor_query)
+        doctor_consultation = int(doctor_result.scalar_one())
 
-        ranked_rows = ranked_rows.subquery()
-        query = select(
-            ranked_rows.c.user_id,
-            ranked_rows.c.date_of_birth,
-            ranked_rows.c.age,
-        ).where(ranked_rows.c.rn == 1)
+        ranked_reports = (
+            select(
+                enrolled.c.user_id,
+                enrolled.c.date_of_birth,
+                enrolled.c.age,
+                IndividualHealthReport.reports,
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=IndividualHealthReport.report_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(
+                AssessmentInstance,
+                and_(
+                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
+                    AssessmentInstance.user_id == enrolled.c.user_id,
+                ),
+            )
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .join(
+                IndividualHealthReport,
+                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+            )
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        ).subquery()
 
-        result = await db.execute(query)
-        return [(int(r[0]), r[1], int(r[2])) for r in result.all()]
+        reports_result = await db.execute(
+            select(
+                ranked_reports.c.user_id,
+                ranked_reports.c.date_of_birth,
+                ranked_reports.c.age,
+                ranked_reports.c.reports,
+            ).where(ranked_reports.c.rn == 1)
+        )
+        high_risk_group = 0
+        for _user_id, dob, stored_age, reports in reports_result.all():
+            reports_dict: dict[str, Any] = reports if isinstance(reports, dict) else {}
+            metabolic_age = extract_metabolic_age(reports_dict)
+            chronological_age = resolve_user_age(
+                date_of_birth=dob,
+                stored_age=int(stored_age),
+                reference_date=age_reference_date,
+            )
+            if is_high_metabolic_risk(
+                metabolic_age=metabolic_age,
+                chronological_age=chronological_age,
+            ):
+                high_risk_group += 1
+
+        return {
+            "employees_enrolled": employees_enrolled,
+            "male_enrolled": male_enrolled,
+            "female_enrolled": female_enrolled,
+            "total_blood_test": total_blood_test,
+            "doctor_consultation": doctor_consultation,
+            "high_risk_group": high_risk_group,
+        }
 
     async def delete_overall(self, db: AsyncSession, *, camp_no: int) -> int:
         result = await db.execute(

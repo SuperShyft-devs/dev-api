@@ -409,7 +409,7 @@ async def test_refresh_camp_report_participation_by_age(async_client, test_db_se
     section = payload["section"]
     assert section["name"] == "Participation by Age"
     assert section["description"] == "Enrollment distribution across age groups"
-    assert section["total_enrolled"] == 3
+    assert section["data"]["total_enrolled"] == 3
     assert section["data"]["age_group"] == ["18–25", "26–35", "36–45", "46–55", "55+"]
     assert section["data"]["enrolled"] == [1, 0, 1, 0, 1]
     assert section["data"]["percent"] == [33.3, 0.0, 33.3, 0.0, 33.3]
@@ -419,7 +419,7 @@ async def test_refresh_camp_report_participation_by_age(async_client, test_db_se
     ).scalar_one()
     assert row.report["meta"]["summary_available"] is True
     assert row.report["meta"]["refreshed_at"] is not None
-    assert row.report["participation_by_age"]["total_enrolled"] == 3
+    assert row.report["participation_by_age"]["data"]["total_enrolled"] == 3
 
 
 @pytest.mark.asyncio
@@ -446,7 +446,7 @@ async def test_refresh_department_camp_report_participation_by_age(async_client,
     )
     assert response.status_code == 200
     section = response.json()["data"]["section"]
-    assert section["total_enrolled"] == 2
+    assert section["data"]["total_enrolled"] == 2
     assert section["data"]["enrolled"] == [1, 0, 1, 0, 0]
 
 
@@ -483,7 +483,7 @@ async def test_refresh_camp_report_replaces_existing_section(async_client, test_
         await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
     ).scalar_one()
     assert row.report["meta"]["camp_name"] == "Camp Reports Org 23 June 2026"
-    assert row.report["participation_by_age"]["total_enrolled"] == 3
+    assert row.report["participation_by_age"]["data"]["total_enrolled"] == 3
 
 
 async def _seed_organization_manager_for_camp(
@@ -590,7 +590,7 @@ async def test_get_camp_report_dashboard_after_refresh(async_client, test_db_ses
     )
     assert response.status_code == 200
     section = response.json()["data"]
-    assert section["total_enrolled"] == 3
+    assert section["data"]["total_enrolled"] == 3
     assert section["name"] == "Participation by Age"
 
 
@@ -762,3 +762,309 @@ async def test_organization_manager_can_list_own_camp_sections(async_client, tes
     )
     assert response.status_code == 200
     assert response.json()["data"] == ["meta"]
+
+
+async def _seed_kpis_section(test_db_session, *, report_sections: int = 100):
+    existing = (
+        await test_db_session.execute(
+            select(CampReportSection).where(CampReportSection.section_key == "kpis")
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    row = CampReportSection(
+        report_sections=report_sections,
+        section="KPIs",
+        section_key="kpis",
+        description="Camp enrollment and health KPI summary",
+    )
+    test_db_session.add(row)
+    await test_db_session.commit()
+    return row
+
+
+async def _seed_kpis_camp_data(
+    test_db_session,
+    *,
+    organization_id: int = 9401,
+    engagement_id: int = 9401,
+):
+    from modules.assessments.models import AssessmentInstance, AssessmentPackage
+    from modules.reports.models import IndividualHealthReport
+
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=organization_id, engagement_id=engagement_id)
+    start = date(2026, 6, 23)
+
+    test_db_session.add_all(
+        [
+            AssessmentPackage(
+                package_id=9401,
+                package_code="KPIPKG1",
+                display_name="Bio AI Package",
+                assessment_type_code="1",
+                status="active",
+            ),
+            AssessmentPackage(
+                package_id=9402,
+                package_code="KPIPKG2",
+                display_name="Bio AI Package 2",
+                assessment_type_code="2",
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            User(
+                user_id=94001,
+                age=30,
+                gender="Male",
+                phone="940010000000",
+                status="active",
+            ),
+            User(
+                user_id=94002,
+                age=40,
+                gender="Female",
+                phone="940020000000",
+                status="active",
+            ),
+            User(
+                user_id=94003,
+                age=50,
+                gender="male",
+                phone="940030000000",
+                status="active",
+            ),
+            User(
+                user_id=94004,
+                age=50,
+                gender="Female",
+                phone="940040000000",
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            EngagementParticipant(
+                engagement_participant_id=94001,
+                engagement_id=engagement_id,
+                user_id=94001,
+                engagement_date=start,
+                slot_start_time=time(10, 0),
+                participant_department="sales",
+                want_doctor_consultation=True,
+            ),
+            EngagementParticipant(
+                engagement_participant_id=94002,
+                engagement_id=engagement_id,
+                user_id=94002,
+                engagement_date=start,
+                slot_start_time=time(10, 20),
+                participant_department="sales",
+                want_doctor_consultation=False,
+            ),
+            EngagementParticipant(
+                engagement_participant_id=94003,
+                engagement_id=engagement_id,
+                user_id=94003,
+                engagement_date=start,
+                slot_start_time=time(11, 0),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=94004,
+                engagement_id=engagement_id,
+                user_id=94004,
+                engagement_date=start,
+                slot_start_time=time(11, 20),
+                participant_department="engineering",
+                want_doctor_and_nutritionist_consultation=True,
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            AssessmentInstance(
+                assessment_instance_id=94001,
+                user_id=94001,
+                engagement_id=engagement_id,
+                package_id=9401,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=94002,
+                user_id=94002,
+                engagement_id=engagement_id,
+                package_id=9402,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=94003,
+                user_id=94003,
+                engagement_id=engagement_id,
+                package_id=9401,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=94004,
+                user_id=94004,
+                engagement_id=engagement_id,
+                package_id=9401,
+                status="completed",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            IndividualHealthReport(
+                report_id=94001,
+                user_id=94001,
+                assessment_instance_id=94001,
+                engagement_id=engagement_id,
+                reports={"metabolic_age": 34.0},
+                blood_parameters={"value": 1},
+            ),
+            IndividualHealthReport(
+                report_id=94002,
+                user_id=94002,
+                assessment_instance_id=94002,
+                engagement_id=engagement_id,
+                reports={"metabolic_age": 41.0},
+                blood_parameters={"value": 1},
+            ),
+            IndividualHealthReport(
+                report_id=94004,
+                user_id=94004,
+                assessment_instance_id=94004,
+                engagement_id=engagement_id,
+                reports={"data": {"metabolic_age": 53.0}},
+                blood_parameters={"value": 1},
+            ),
+        ]
+    )
+    await test_db_session.commit()
+    return camp_no
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_report_kpis(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7701, employee_id=91)
+    await _seed_kpis_section(test_db_session, report_sections=101)
+    camp_no = await _seed_kpis_camp_data(test_db_session, organization_id=9401, engagement_id=9401)
+    headers = _auth_header(7701)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "kpis"},
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["report_id"] == report_id
+    section = payload["section"]
+    assert section["name"] == "KPIs"
+    assert section["description"] == "Camp enrollment and health KPI summary"
+    data = section["data"]
+    assert data["employees_enrolled"] == 4
+    assert data["male_enrolled"] == 2
+    assert data["female_enrolled"] == 2
+    assert data["total_blood_test"] == 3
+    assert data["blood_test_percent"] == 75
+    assert data["doctor_consultation"] == 2
+    assert data["high_risk_group"] == 2
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.report["kpis"]["data"]["employees_enrolled"] == 4
+
+
+@pytest.mark.asyncio
+async def test_refresh_department_camp_report_kpis(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7702, employee_id=92)
+    await _seed_kpis_section(test_db_session, report_sections=102)
+    camp_no = await _seed_kpis_camp_data(test_db_session, organization_id=9402, engagement_id=9402)
+    headers = _auth_header(7702)
+
+    init = await async_client.post(
+        f"/reports/camps/{camp_no}/department/sales/init",
+        headers=headers,
+    )
+    assert init.status_code == 201
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/department/sales/refresh",
+        headers=headers,
+        json={"section": "kpis"},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]["section"]["data"]
+    assert data["employees_enrolled"] == 2
+    assert data["male_enrolled"] == 1
+    assert data["female_enrolled"] == 1
+    assert data["total_blood_test"] == 2
+    assert data["blood_test_percent"] == 100
+    assert data["doctor_consultation"] == 1
+    assert data["high_risk_group"] == 1
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_report_kpis_replaces_without_touching_other_sections(
+    async_client,
+    test_db_session,
+):
+    await _seed_employee(test_db_session, user_id=7703, employee_id=93)
+    await _seed_participation_section(test_db_session, report_sections=103)
+    await _seed_kpis_section(test_db_session, report_sections=104)
+    camp_no = await _seed_kpis_camp_data(test_db_session, organization_id=9403, engagement_id=9403)
+    headers = _auth_header(7703)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    participation = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert participation.status_code == 200
+
+    kpis = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "kpis"},
+    )
+    assert kpis.status_code == 200
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert "participation_by_age" in row.report
+    assert "kpis" in row.report
+    assert row.report["participation_by_age"]["data"]["total_enrolled"] == 4
+    assert row.report["kpis"]["data"]["employees_enrolled"] == 4
+
+    kpis_again = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "kpis"},
+    )
+    assert kpis_again.status_code == 200
+    assert kpis_again.json()["data"]["section"]["data"]["employees_enrolled"] == 4
+    assert row.report["participation_by_age"]["data"]["total_enrolled"] == 4

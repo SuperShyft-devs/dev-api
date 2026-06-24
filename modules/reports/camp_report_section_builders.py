@@ -43,6 +43,43 @@ def _percent(part: int, total: int) -> float:
     return round((part / total) * 1000) / 10
 
 
+def extract_metabolic_age(reports: dict) -> float | None:
+    """Read metabolic_age from Metsights report JSON (top-level or nested data)."""
+    ma = reports.get("metabolic_age")
+    if isinstance(ma, (int, float)):
+        return float(ma)
+    data = reports.get("data")
+    if isinstance(data, dict):
+        nested = data.get("metabolic_age")
+        if isinstance(nested, (int, float)):
+            return float(nested)
+    return None
+
+
+def is_high_metabolic_risk(*, metabolic_age: float | None, chronological_age: int) -> bool:
+    """True when metabolic age gap is at least 3 years."""
+    effective_metabolic = metabolic_age if metabolic_age is not None else float(chronological_age)
+    gap_years = effective_metabolic - chronological_age
+    return gap_years >= 3
+
+
+def build_kpis(metrics: dict) -> dict:
+    """Build kpis section payload from aggregated metrics."""
+    enrolled = int(metrics["employees_enrolled"])
+    blood = int(metrics["total_blood_test"])
+    return {
+        "data": {
+            "employees_enrolled": enrolled,
+            "male_enrolled": int(metrics["male_enrolled"]),
+            "female_enrolled": int(metrics["female_enrolled"]),
+            "total_blood_test": blood,
+            "blood_test_percent": round(blood / enrolled * 100) if enrolled else 0,
+            "doctor_consultation": int(metrics["doctor_consultation"]),
+            "high_risk_group": int(metrics["high_risk_group"]),
+        },
+    }
+
+
 def build_participation_by_age(
     users: list[tuple[int, date | None, int]],
     *,
@@ -64,11 +101,12 @@ def build_participation_by_age(
             "age_group": list(AGE_GROUPS),
             "enrolled": enrolled,
             "percent": percent,
+            "total_enrolled": total,
         },
-        "total_enrolled": total,
     }
 
 
 SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "participation_by_age": build_participation_by_age,
+    "kpis": build_kpis,
 }
