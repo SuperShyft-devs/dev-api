@@ -19,6 +19,18 @@ _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET: dict[str, str] = {
     "3": "more_than_60_mins",
     "5": "rarely_or_never",
 }
+SLEEPING_HOURS_BUCKETS: tuple[str, ...] = (
+    "less_than_5hrs",
+    "between_5_7_hrs",
+    "between_7_9_hrs",
+    "more_than_9hrs",
+)
+_OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET: dict[str, str] = {
+    "0": "less_than_5hrs",
+    "1": "between_5_7_hrs",
+    "2": "between_7_9_hrs",
+    "3": "more_than_9hrs",
+}
 
 
 def resolve_user_age(
@@ -161,12 +173,12 @@ def physical_activity_answer_to_bucket(answer: object | None) -> str | None:
     return _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET.get(str(answer).strip())
 
 
-def _build_gender_distribution(counts: dict[str, int]) -> dict:
-    total = sum(counts[bucket] for bucket in PHYSICAL_ACTIVITY_BUCKETS)
-    count = [counts[bucket] for bucket in PHYSICAL_ACTIVITY_BUCKETS]
+def _build_gender_distribution(counts: dict[str, int], buckets: tuple[str, ...]) -> dict:
+    total = sum(counts[bucket] for bucket in buckets)
+    count = [counts[bucket] for bucket in buckets]
     percent = [_percent(c, total) for c in count]
     return {
-        "group": list(PHYSICAL_ACTIVITY_BUCKETS),
+        "group": list(buckets),
         "count": count,
         "percent": percent,
     }
@@ -191,8 +203,40 @@ def build_distribution_by_physical_activity_frequency(
 
     return {
         "data": {
-            "male": _build_gender_distribution(male_counts),
-            "female": _build_gender_distribution(female_counts),
+            "male": _build_gender_distribution(male_counts, PHYSICAL_ACTIVITY_BUCKETS),
+            "female": _build_gender_distribution(female_counts, PHYSICAL_ACTIVITY_BUCKETS),
+        },
+    }
+
+
+def sleeping_hours_answer_to_bucket(answer: object | None) -> str | None:
+    """Map questionnaire option_value to a sleeping hours bucket key."""
+    if answer is None:
+        return None
+    return _OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET.get(str(answer).strip())
+
+
+def build_distribution_by_sleeping_hours(
+    rows: list[tuple[str | None, object | None]],
+) -> dict:
+    """Build distribution_by_sleeping_hours from (gender, answer) rows."""
+    male_counts = {bucket: 0 for bucket in SLEEPING_HOURS_BUCKETS}
+    female_counts = {bucket: 0 for bucket in SLEEPING_HOURS_BUCKETS}
+
+    for gender_raw, answer in rows:
+        gender = normalize_camp_gender(gender_raw)
+        bucket = sleeping_hours_answer_to_bucket(answer)
+        if gender is None or bucket is None:
+            continue
+        if gender == "male":
+            male_counts[bucket] += 1
+        else:
+            female_counts[bucket] += 1
+
+    return {
+        "data": {
+            "male": _build_gender_distribution(male_counts, SLEEPING_HOURS_BUCKETS),
+            "female": _build_gender_distribution(female_counts, SLEEPING_HOURS_BUCKETS),
         },
     }
 
@@ -224,4 +268,5 @@ SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "kpis": build_kpis,
     "overall_risk_score": build_overall_risk_score,
     "distribution_by_physical_activity_frequency": build_distribution_by_physical_activity_frequency,
+    "distribution_by_sleeping_hours": build_distribution_by_sleeping_hours,
 }
