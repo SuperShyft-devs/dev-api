@@ -1325,7 +1325,7 @@ async def test_refresh_camp_report_overall_risk_score(async_client, test_db_sess
     assert data["count"] == [1, 1, 1, 1]
     assert data["percent"] == [25.0, 25.0, 25.0, 25.0]
     assert data["total_employees"] == 4
-    assert data["avg_metabolic_score"] == 42.5
+    assert data["elevated_metabolic_score"] == 50.0
 
     row = (
         await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
@@ -1357,7 +1357,7 @@ async def test_refresh_department_camp_report_overall_risk_score(async_client, t
     data = response.json()["data"]["section"]["data"]
     assert data["count"] == [1, 1, 0, 0]
     assert data["total_employees"] == 2
-    assert data["avg_metabolic_score"] == 27.5
+    assert data["elevated_metabolic_score"] == 0.0
 
 
 @pytest.mark.asyncio

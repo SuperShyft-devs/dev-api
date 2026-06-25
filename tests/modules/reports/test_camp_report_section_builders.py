@@ -101,7 +101,7 @@ def test_build_overall_risk_score():
     assert data["count"] == [1, 1, 1, 1]
     assert data["percent"] == [25.0, 25.0, 25.0, 25.0]
     assert data["total_employees"] == 4
-    assert data["avg_metabolic_score"] == 42.5
+    assert data["elevated_metabolic_score"] == 50.0
 
 
 def test_build_overall_risk_score_empty():
@@ -110,7 +110,7 @@ def test_build_overall_risk_score_empty():
     assert data["count"] == [0, 0, 0, 0]
     assert data["percent"] == [0.0, 0.0, 0.0, 0.0]
     assert data["total_employees"] == 0
-    assert data["avg_metabolic_score"] == 0.0
+    assert data["elevated_metabolic_score"] == 0.0
 
 
 def test_normalize_camp_gender():

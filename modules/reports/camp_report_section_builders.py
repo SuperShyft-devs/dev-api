@@ -250,7 +250,7 @@ def build_overall_risk_score(scores: list[float]) -> dict:
     total = len(scores)
     count = [counts[band] for band in METABOLIC_SCORE_BANDS]
     percent = [_percent(c, total) for c in count]
-    avg = round(sum(scores) / total, 1) if total else 0.0
+    elevated = _percent(counts["increased_risk"] + counts["high_risk"], total)
 
     return {
         "data": {
@@ -258,7 +258,7 @@ def build_overall_risk_score(scores: list[float]) -> dict:
             "count": count,
             "percent": percent,
             "total_employees": total,
-            "avg_metabolic_score": avg,
+            "elevated_metabolic_score": elevated,
         },
     }
 
