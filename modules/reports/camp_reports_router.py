@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
+from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
@@ -115,6 +116,28 @@ async def get_department_camp_report_dashboard(
         department=slug,
     )
     return success_response(result)
+
+
+@router.get("/{camp_no}/participants")
+async def list_camp_participants(
+    camp_no: int,
+    page: int = 1,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    if page < 1 or limit < 1 or limit > 100:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    participants, total = await service.list_camp_participants(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        page=page,
+        limit=limit,
+    )
+    return success_response(participants, meta={"page": page, "limit": limit, "total": total})
 
 
 @router.get("/{camp_no}")

@@ -211,3 +211,15 @@ class CampReportSectionUpdateRequest(BaseModel):
 
 class CampReportRefreshRequest(BaseModel):
     section: str = Field(min_length=1, max_length=200)
+
+
+class CampParticipantResponse(BaseModel):
+    engagement_participant_id: int
+    engagement_id: int
+    user_id: int
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    gender: str | None = None
+    participant_blood_group: str | None = None
+    participant_department: str | None = None

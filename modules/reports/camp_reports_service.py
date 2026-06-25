@@ -343,6 +343,57 @@ class CampReportsService:
         rows = await self._repository.list_by_camp_no(db, camp_no=camp_no)
         return [self._serialize_camp_report(row) for row in rows]
 
+    @staticmethod
+    def _camp_participant_to_dict(row: tuple) -> dict:
+        (
+            engagement_participant_id,
+            engagement_id,
+            user_id,
+            first_name,
+            last_name,
+            phone,
+            gender,
+            participant_blood_group,
+            participant_department,
+        ) = row
+        return {
+            "engagement_participant_id": engagement_participant_id,
+            "engagement_id": engagement_id,
+            "user_id": user_id,
+            "first_name": first_name,
+            "last_name": last_name,
+            "phone": phone,
+            "gender": gender,
+            "participant_blood_group": participant_blood_group,
+            "participant_department": participant_department,
+        }
+
+    async def list_camp_participants(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        page: int,
+        limit: int,
+    ) -> tuple[list[dict], int]:
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        rows = await self._repository.list_participants_by_camp_no(
+            db,
+            camp_no=camp_no,
+            page=page,
+            limit=limit,
+        )
+        total = await self._repository.count_participants_by_camp_no(db, camp_no=camp_no)
+        return [self._camp_participant_to_dict(row) for row in rows], total
+
     async def _get_camp_report_row(
         self,
         db: AsyncSession,

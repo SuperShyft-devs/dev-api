@@ -346,3 +346,54 @@ class CampReportsRepository:
             .where(Engagement.camp_no == camp_no)
         )
         return int(result.scalar_one())
+
+    async def list_participants_by_camp_no(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        page: int,
+        limit: int,
+    ) -> list[tuple]:
+        """Fetch all engagement participant enrollment rows for a camp."""
+        offset = (page - 1) * limit
+
+        query = (
+            select(
+                EngagementParticipant.engagement_participant_id,
+                EngagementParticipant.engagement_id,
+                User.user_id,
+                User.first_name,
+                User.last_name,
+                User.phone,
+                User.gender,
+                EngagementParticipant.participant_blood_group,
+                EngagementParticipant.participant_department,
+            )
+            .select_from(Engagement)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_id == Engagement.engagement_id,
+            )
+            .join(User, User.user_id == EngagementParticipant.user_id)
+            .where(Engagement.camp_no == camp_no)
+            .order_by(EngagementParticipant.engagement_participant_id.asc())
+            .offset(offset)
+            .limit(limit)
+        )
+
+        result = await db.execute(query)
+        return list(result.all())
+
+    async def count_participants_by_camp_no(self, db: AsyncSession, *, camp_no: int) -> int:
+        """Count all engagement participant enrollment rows for a camp."""
+        result = await db.execute(
+            select(func.count())
+            .select_from(Engagement)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_id == Engagement.engagement_id,
+            )
+            .where(Engagement.camp_no == camp_no)
+        )
+        return int(result.scalar_one())
