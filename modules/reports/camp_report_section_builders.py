@@ -6,6 +6,7 @@ from collections.abc import Callable
 from datetime import date
 
 AGE_GROUPS: tuple[str, ...] = ("18–25", "26–35", "36–45", "46–55", "55+")
+METABOLIC_SCORE_BANDS: tuple[str, ...] = ("optimal", "low_risk", "increased_risk", "high_risk")
 
 
 def resolve_user_age(
@@ -54,6 +55,29 @@ def extract_metabolic_age(reports: dict) -> float | None:
         if isinstance(nested, (int, float)):
             return float(nested)
     return None
+
+
+def extract_metabolic_score(reports: dict) -> float | None:
+    """Read metabolic_score from Metsights report JSON (top-level or nested data)."""
+    ms = reports.get("metabolic_score")
+    if isinstance(ms, (int, float)):
+        return float(ms)
+    data = reports.get("data")
+    if isinstance(data, dict):
+        nested = data.get("metabolic_score")
+        if isinstance(nested, (int, float)):
+            return float(nested)
+    return None
+
+
+def metabolic_score_to_band(score: float) -> str:
+    if score <= 25:
+        return "optimal"
+    if score <= 42:
+        return "low_risk"
+    if score <= 58:
+        return "increased_risk"
+    return "high_risk"
 
 
 def is_high_metabolic_risk(*, metabolic_age: float | None, chronological_age: int) -> bool:
@@ -106,7 +130,30 @@ def build_participation_by_age(
     }
 
 
+def build_overall_risk_score(scores: list[float]) -> dict:
+    """Build overall_risk_score section payload from metabolic scores."""
+    counts = {band: 0 for band in METABOLIC_SCORE_BANDS}
+    for score in scores:
+        counts[metabolic_score_to_band(score)] += 1
+
+    total = len(scores)
+    count = [counts[band] for band in METABOLIC_SCORE_BANDS]
+    percent = [_percent(c, total) for c in count]
+    avg = round(sum(scores) / total, 1) if total else 0.0
+
+    return {
+        "data": {
+            "group": list(METABOLIC_SCORE_BANDS),
+            "count": count,
+            "percent": percent,
+            "total_employees": total,
+            "avg_metabolic_score": avg,
+        },
+    }
+
+
 SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "participation_by_age": build_participation_by_age,
     "kpis": build_kpis,
+    "overall_risk_score": build_overall_risk_score,
 }

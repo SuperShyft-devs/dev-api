@@ -6,9 +6,12 @@ from datetime import date
 
 from modules.reports.camp_report_section_builders import (
     build_kpis,
+    build_overall_risk_score,
     build_participation_by_age,
     extract_metabolic_age,
+    extract_metabolic_score,
     is_high_metabolic_risk,
+    metabolic_score_to_band,
 )
 
 
@@ -65,3 +68,43 @@ def test_build_participation_by_age_total_inside_data():
     )
     assert "total_enrolled" not in payload
     assert payload["data"]["total_enrolled"] == 1
+
+
+def test_extract_metabolic_score_top_level():
+    assert extract_metabolic_score({"metabolic_score": 20.0}) == 20.0
+
+
+def test_extract_metabolic_score_nested_data():
+    assert extract_metabolic_score({"data": {"metabolic_score": 35.5}}) == 35.5
+
+
+def test_extract_metabolic_score_missing():
+    assert extract_metabolic_score({}) is None
+
+
+def test_metabolic_score_to_band_boundaries():
+    assert metabolic_score_to_band(25) == "optimal"
+    assert metabolic_score_to_band(26) == "low_risk"
+    assert metabolic_score_to_band(42) == "low_risk"
+    assert metabolic_score_to_band(43) == "increased_risk"
+    assert metabolic_score_to_band(58) == "increased_risk"
+    assert metabolic_score_to_band(59) == "high_risk"
+
+
+def test_build_overall_risk_score():
+    payload = build_overall_risk_score([20.0, 30.0, 50.0, 70.0])
+    data = payload["data"]
+    assert data["group"] == ["optimal", "low_risk", "increased_risk", "high_risk"]
+    assert data["count"] == [1, 1, 1, 1]
+    assert data["percent"] == [25.0, 25.0, 25.0, 25.0]
+    assert data["total_employees"] == 4
+    assert data["avg_metabolic_score"] == 42.5
+
+
+def test_build_overall_risk_score_empty():
+    payload = build_overall_risk_score([])
+    data = payload["data"]
+    assert data["count"] == [0, 0, 0, 0]
+    assert data["percent"] == [0.0, 0.0, 0.0, 0.0]
+    assert data["total_employees"] == 0
+    assert data["avg_metabolic_score"] == 0.0

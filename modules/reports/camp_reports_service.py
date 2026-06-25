@@ -22,6 +22,7 @@ from modules.organizations.service import get_department_slugs
 from modules.reports.camp_report_section_builders import (
     SECTION_BUILDERS,
     build_kpis,
+    build_overall_risk_score,
     build_participation_by_age,
 )
 from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
@@ -622,6 +623,14 @@ class CampReportsService:
                 age_reference_date=age_reference,
             )
             return build_kpis(metrics)
+
+        if section_key == "overall_risk_score":
+            scores = await self._repository.list_metabolic_scores(
+                db,
+                camp_no=camp_no,
+                department=department,
+            )
+            return build_overall_risk_score(scores)
 
         raise AppError(
             status_code=400,

@@ -1068,3 +1068,338 @@ async def test_refresh_camp_report_kpis_replaces_without_touching_other_sections
     assert kpis_again.status_code == 200
     assert kpis_again.json()["data"]["section"]["data"]["employees_enrolled"] == 4
     assert row.report["participation_by_age"]["data"]["total_enrolled"] == 4
+
+
+async def _seed_overall_risk_score_section(test_db_session, *, report_sections: int = 200):
+    existing = (
+        await test_db_session.execute(
+            select(CampReportSection).where(CampReportSection.section_key == "overall_risk_score")
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        existing.section = "Overall Risk Score"
+        existing.description = "Metabolic score distribution across risk bands"
+        await test_db_session.commit()
+        return existing
+
+    row = CampReportSection(
+        report_sections=report_sections,
+        section="Overall Risk Score",
+        section_key="overall_risk_score",
+        description="Metabolic score distribution across risk bands",
+    )
+    test_db_session.add(row)
+    await test_db_session.commit()
+    return row
+
+
+async def _seed_overall_risk_score_camp_data(
+    test_db_session,
+    *,
+    organization_id: int = 9501,
+    engagement_id: int = 9501,
+):
+    from modules.assessments.models import AssessmentInstance, AssessmentPackage
+    from modules.reports.models import IndividualHealthReport
+
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=organization_id, engagement_id=engagement_id)
+    start = date(2026, 6, 23)
+
+    test_db_session.add_all(
+        [
+            AssessmentPackage(
+                package_id=9501,
+                package_code="ORSPKG1",
+                display_name="Bio AI Package",
+                assessment_type_code="1",
+                status="active",
+            ),
+            AssessmentPackage(
+                package_id=9502,
+                package_code="ORSPKG2",
+                display_name="Bio AI Package 2",
+                assessment_type_code="2",
+                status="active",
+            ),
+            AssessmentPackage(
+                package_id=9503,
+                package_code="ORSPKG7",
+                display_name="FitPrint Package",
+                assessment_type_code="7",
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            User(user_id=95001, age=30, phone="950010000000", status="active"),
+            User(user_id=95002, age=35, phone="950020000000", status="active"),
+            User(user_id=95003, age=40, phone="950030000000", status="active"),
+            User(user_id=95004, age=45, phone="950040000000", status="active"),
+            User(user_id=95005, age=50, phone="950050000000", status="active"),
+            User(user_id=95006, age=28, phone="950060000000", status="active"),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            EngagementParticipant(
+                engagement_participant_id=95001,
+                engagement_id=engagement_id,
+                user_id=95001,
+                engagement_date=start,
+                slot_start_time=time(10, 0),
+                participant_department="sales",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=95002,
+                engagement_id=engagement_id,
+                user_id=95002,
+                engagement_date=start,
+                slot_start_time=time(10, 20),
+                participant_department="sales",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=95003,
+                engagement_id=engagement_id,
+                user_id=95003,
+                engagement_date=start,
+                slot_start_time=time(11, 0),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=95004,
+                engagement_id=engagement_id,
+                user_id=95004,
+                engagement_date=start,
+                slot_start_time=time(11, 20),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=95005,
+                engagement_id=engagement_id,
+                user_id=95005,
+                engagement_date=start,
+                slot_start_time=time(12, 0),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=95006,
+                engagement_id=engagement_id,
+                user_id=95006,
+                engagement_date=start,
+                slot_start_time=time(12, 20),
+                participant_department="sales",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            AssessmentInstance(
+                assessment_instance_id=95001,
+                user_id=95001,
+                engagement_id=engagement_id,
+                package_id=9501,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=95002,
+                user_id=95002,
+                engagement_id=engagement_id,
+                package_id=9502,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=95003,
+                user_id=95003,
+                engagement_id=engagement_id,
+                package_id=9501,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=95004,
+                user_id=95004,
+                engagement_id=engagement_id,
+                package_id=9502,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=95005,
+                user_id=95005,
+                engagement_id=engagement_id,
+                package_id=9501,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=95006,
+                user_id=95006,
+                engagement_id=engagement_id,
+                package_id=9503,
+                status="completed",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            IndividualHealthReport(
+                report_id=95001,
+                user_id=95001,
+                assessment_instance_id=95001,
+                engagement_id=engagement_id,
+                reports={"metabolic_score": 20.0},
+            ),
+            IndividualHealthReport(
+                report_id=95002,
+                user_id=95002,
+                assessment_instance_id=95002,
+                engagement_id=engagement_id,
+                reports={"data": {"metabolic_score": 35.0}},
+            ),
+            IndividualHealthReport(
+                report_id=95003,
+                user_id=95003,
+                assessment_instance_id=95003,
+                engagement_id=engagement_id,
+                reports={"metabolic_score": 50.0},
+            ),
+            IndividualHealthReport(
+                report_id=95004,
+                user_id=95004,
+                assessment_instance_id=95004,
+                engagement_id=engagement_id,
+                reports={"metabolic_score": 65.0},
+            ),
+            IndividualHealthReport(
+                report_id=95005,
+                user_id=95005,
+                assessment_instance_id=95005,
+                engagement_id=engagement_id,
+                reports={"metabolic_age": 45.0},
+            ),
+            IndividualHealthReport(
+                report_id=95006,
+                user_id=95006,
+                assessment_instance_id=95006,
+                engagement_id=engagement_id,
+                reports={"metabolic_score": 10.0},
+            ),
+        ]
+    )
+    await test_db_session.commit()
+    return camp_no
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_report_overall_risk_score(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7801, employee_id=201)
+    await _seed_overall_risk_score_section(test_db_session, report_sections=201)
+    camp_no = await _seed_overall_risk_score_camp_data(
+        test_db_session, organization_id=9501, engagement_id=9501
+    )
+    headers = _auth_header(7801)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "overall_risk_score"},
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["report_id"] == report_id
+    section = payload["section"]
+    assert section["name"] == "Overall Risk Score"
+    assert section["description"] == "Metabolic score distribution across risk bands"
+    data = section["data"]
+    assert data["group"] == ["optimal", "low_risk", "increased_risk", "high_risk"]
+    assert data["count"] == [1, 1, 1, 1]
+    assert data["percent"] == [25.0, 25.0, 25.0, 25.0]
+    assert data["total_employees"] == 4
+    assert data["avg_metabolic_score"] == 42.5
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.report["overall_risk_score"]["data"]["total_employees"] == 4
+
+
+@pytest.mark.asyncio
+async def test_refresh_department_camp_report_overall_risk_score(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7802, employee_id=202)
+    await _seed_overall_risk_score_section(test_db_session, report_sections=202)
+    camp_no = await _seed_overall_risk_score_camp_data(
+        test_db_session, organization_id=9502, engagement_id=9502
+    )
+    headers = _auth_header(7802)
+
+    init = await async_client.post(
+        f"/reports/camps/{camp_no}/department/sales/init",
+        headers=headers,
+    )
+    assert init.status_code == 201
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/department/sales/refresh",
+        headers=headers,
+        json={"section": "overall_risk_score"},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]["section"]["data"]
+    assert data["count"] == [1, 1, 0, 0]
+    assert data["total_employees"] == 2
+    assert data["avg_metabolic_score"] == 27.5
+
+
+@pytest.mark.asyncio
+async def test_refresh_overall_risk_score_updates_existing(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7803, employee_id=203)
+    await _seed_participation_section(test_db_session, report_sections=203)
+    await _seed_overall_risk_score_section(test_db_session, report_sections=204)
+    camp_no = await _seed_overall_risk_score_camp_data(
+        test_db_session, organization_id=9503, engagement_id=9503
+    )
+    headers = _auth_header(7803)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    participation = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert participation.status_code == 200
+
+    overall = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "overall_risk_score"},
+    )
+    assert overall.status_code == 200
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert "participation_by_age" in row.report
+    assert "overall_risk_score" in row.report
+    assert row.report["overall_risk_score"]["data"]["total_employees"] == 4
+
+    overall_again = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "overall_risk_score"},
+    )
+    assert overall_again.status_code == 200
+    assert overall_again.json()["data"]["section"]["data"]["total_employees"] == 4
+    assert row.report["participation_by_age"]["data"]["total_enrolled"] == 6
