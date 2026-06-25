@@ -7,6 +7,18 @@ from datetime import date
 
 AGE_GROUPS: tuple[str, ...] = ("18–25", "26–35", "36–45", "46–55", "55+")
 METABOLIC_SCORE_BANDS: tuple[str, ...] = ("optimal", "low_risk", "increased_risk", "high_risk")
+PHYSICAL_ACTIVITY_BUCKETS: tuple[str, ...] = (
+    "less_than_30mins",
+    "30_60_mins",
+    "more_than_60_mins",
+    "rarely_or_never",
+)
+_OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET: dict[str, str] = {
+    "1": "less_than_30mins",
+    "2": "30_60_mins",
+    "3": "more_than_60_mins",
+    "5": "rarely_or_never",
+}
 
 
 def resolve_user_age(
@@ -130,6 +142,61 @@ def build_participation_by_age(
     }
 
 
+def normalize_camp_gender(value: object | None) -> str | None:
+    """Map user gender to male/female using the same values as camp KPI aggregation."""
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    if normalized in {"m", "male", "1"}:
+        return "male"
+    if normalized in {"f", "female", "2"}:
+        return "female"
+    return None
+
+
+def physical_activity_answer_to_bucket(answer: object | None) -> str | None:
+    """Map questionnaire option_value to a physical activity bucket key."""
+    if answer is None:
+        return None
+    return _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET.get(str(answer).strip())
+
+
+def _build_gender_distribution(counts: dict[str, int]) -> dict:
+    total = sum(counts[bucket] for bucket in PHYSICAL_ACTIVITY_BUCKETS)
+    count = [counts[bucket] for bucket in PHYSICAL_ACTIVITY_BUCKETS]
+    percent = [_percent(c, total) for c in count]
+    return {
+        "group": list(PHYSICAL_ACTIVITY_BUCKETS),
+        "count": count,
+        "percent": percent,
+    }
+
+
+def build_distribution_by_physical_activity_frequency(
+    rows: list[tuple[str | None, object | None]],
+) -> dict:
+    """Build distribution_by_physical_activity_frequency from (gender, answer) rows."""
+    male_counts = {bucket: 0 for bucket in PHYSICAL_ACTIVITY_BUCKETS}
+    female_counts = {bucket: 0 for bucket in PHYSICAL_ACTIVITY_BUCKETS}
+
+    for gender_raw, answer in rows:
+        gender = normalize_camp_gender(gender_raw)
+        bucket = physical_activity_answer_to_bucket(answer)
+        if gender is None or bucket is None:
+            continue
+        if gender == "male":
+            male_counts[bucket] += 1
+        else:
+            female_counts[bucket] += 1
+
+    return {
+        "data": {
+            "male": _build_gender_distribution(male_counts),
+            "female": _build_gender_distribution(female_counts),
+        },
+    }
+
+
 def build_overall_risk_score(scores: list[float]) -> dict:
     """Build overall_risk_score section payload from metabolic scores."""
     counts = {band: 0 for band in METABOLIC_SCORE_BANDS}
@@ -156,4 +223,5 @@ SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "participation_by_age": build_participation_by_age,
     "kpis": build_kpis,
     "overall_risk_score": build_overall_risk_score,
+    "distribution_by_physical_activity_frequency": build_distribution_by_physical_activity_frequency,
 }

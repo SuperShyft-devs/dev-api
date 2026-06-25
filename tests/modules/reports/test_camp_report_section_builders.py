@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from modules.reports.camp_report_section_builders import (
+    build_distribution_by_physical_activity_frequency,
     build_kpis,
     build_overall_risk_score,
     build_participation_by_age,
@@ -12,6 +13,8 @@ from modules.reports.camp_report_section_builders import (
     extract_metabolic_score,
     is_high_metabolic_risk,
     metabolic_score_to_band,
+    normalize_camp_gender,
+    physical_activity_answer_to_bucket,
 )
 
 
@@ -108,3 +111,54 @@ def test_build_overall_risk_score_empty():
     assert data["percent"] == [0.0, 0.0, 0.0, 0.0]
     assert data["total_employees"] == 0
     assert data["avg_metabolic_score"] == 0.0
+
+
+def test_normalize_camp_gender():
+    assert normalize_camp_gender("Male") == "male"
+    assert normalize_camp_gender("f") == "female"
+    assert normalize_camp_gender("1") == "male"
+    assert normalize_camp_gender("2") == "female"
+    assert normalize_camp_gender("other") is None
+    assert normalize_camp_gender(None) is None
+
+
+def test_physical_activity_answer_to_bucket():
+    assert physical_activity_answer_to_bucket("1") == "less_than_30mins"
+    assert physical_activity_answer_to_bucket("2") == "30_60_mins"
+    assert physical_activity_answer_to_bucket("3") == "more_than_60_mins"
+    assert physical_activity_answer_to_bucket("5") == "rarely_or_never"
+    assert physical_activity_answer_to_bucket("4") is None
+    assert physical_activity_answer_to_bucket(None) is None
+
+
+def test_build_distribution_by_physical_activity_frequency():
+    rows = [
+        ("male", "1"),
+        ("Male", "2"),
+        ("female", "3"),
+        ("F", "5"),
+        ("other", "1"),
+        ("male", "4"),
+        (None, "1"),
+    ]
+    payload = build_distribution_by_physical_activity_frequency(rows)
+    male = payload["data"]["male"]
+    female = payload["data"]["female"]
+    assert male["group"] == [
+        "less_than_30mins",
+        "30_60_mins",
+        "more_than_60_mins",
+        "rarely_or_never",
+    ]
+    assert male["count"] == [1, 1, 0, 0]
+    assert male["percent"] == [50.0, 50.0, 0.0, 0.0]
+    assert female["count"] == [0, 0, 1, 1]
+    assert female["percent"] == [0.0, 0.0, 50.0, 50.0]
+
+
+def test_build_distribution_by_physical_activity_frequency_empty():
+    payload = build_distribution_by_physical_activity_frequency([])
+    for gender in ("male", "female"):
+        data = payload["data"][gender]
+        assert data["count"] == [0, 0, 0, 0]
+        assert data["percent"] == [0.0, 0.0, 0.0, 0.0]

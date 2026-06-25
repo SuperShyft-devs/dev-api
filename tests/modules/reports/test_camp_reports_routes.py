@@ -1595,3 +1595,299 @@ async def test_list_camp_participants_camp_not_found(async_client, test_db_sessi
     )
     assert response.status_code == 404
     assert response.json()["error_code"] == "CAMP_NOT_FOUND"
+
+
+async def _seed_physical_activity_section(test_db_session, *, report_sections: int = 300):
+    existing = (
+        await test_db_session.execute(
+            select(CampReportSection).where(
+                CampReportSection.section_key == "distribution_by_physical_activity_frequency"
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        existing.section = "Physical Activity Distribution"
+        existing.description = "Distribution of daily physical activity frequency by gender"
+        await test_db_session.commit()
+        return existing
+
+    row = CampReportSection(
+        report_sections=report_sections,
+        section="Physical Activity Distribution",
+        section_key="distribution_by_physical_activity_frequency",
+        description="Distribution of daily physical activity frequency by gender",
+    )
+    test_db_session.add(row)
+    await test_db_session.commit()
+    return row
+
+
+async def _seed_physical_activity_camp_data(
+    test_db_session,
+    *,
+    organization_id: int = 9701,
+    engagement_id: int = 9701,
+):
+    from modules.assessments.models import AssessmentInstance, AssessmentPackage
+    from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireResponse
+
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=organization_id, engagement_id=engagement_id)
+    start = date(2026, 6, 23)
+    pkg_id = engagement_id
+    q_id = engagement_id
+    cat_id = engagement_id
+    user_base = engagement_id * 10
+
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pkg_id,
+            package_code=f"PAPKG{engagement_id}",
+            display_name="Bio AI Package",
+            assessment_type_code="1",
+            status="active",
+        )
+    )
+    await test_db_session.flush()
+
+    test_db_session.add(
+        QuestionnaireCategory(
+            category_id=cat_id,
+            category_key=f"pa_cat_{engagement_id}",
+            display_name="Lifestyle",
+            status="active",
+        )
+    )
+    test_db_session.add(
+        QuestionnaireDefinition(
+            question_id=q_id,
+            question_key="physical_activity_frequency",
+            question_text="How much time do you spend engaging in physical activity or exercise daily?",
+            question_type="single_choice",
+            status="active",
+        )
+    )
+    await test_db_session.flush()
+
+    user_ids = [user_base + offset for offset in range(1, 7)]
+    test_db_session.add_all(
+        [
+            User(user_id=user_ids[0], age=30, gender="male", phone=f"{user_ids[0]}000000000", status="active"),
+            User(user_id=user_ids[1], age=35, gender="Male", phone=f"{user_ids[1]}000000000", status="active"),
+            User(user_id=user_ids[2], age=40, gender="female", phone=f"{user_ids[2]}000000000", status="active"),
+            User(user_id=user_ids[3], age=45, gender="F", phone=f"{user_ids[3]}000000000", status="active"),
+            User(user_id=user_ids[4], age=50, gender="m", phone=f"{user_ids[4]}000000000", status="active"),
+            User(user_id=user_ids[5], age=28, gender="female", phone=f"{user_ids[5]}000000000", status="active"),
+        ]
+    )
+    await test_db_session.flush()
+
+    participant_ids = [user_base + offset for offset in range(1, 7)]
+    test_db_session.add_all(
+        [
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[0],
+                engagement_id=engagement_id,
+                user_id=user_ids[0],
+                engagement_date=start,
+                slot_start_time=time(10, 0),
+                participant_department="sales",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[1],
+                engagement_id=engagement_id,
+                user_id=user_ids[1],
+                engagement_date=start,
+                slot_start_time=time(10, 20),
+                participant_department="sales",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[2],
+                engagement_id=engagement_id,
+                user_id=user_ids[2],
+                engagement_date=start,
+                slot_start_time=time(11, 0),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[3],
+                engagement_id=engagement_id,
+                user_id=user_ids[3],
+                engagement_date=start,
+                slot_start_time=time(11, 20),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[4],
+                engagement_id=engagement_id,
+                user_id=user_ids[4],
+                engagement_date=start,
+                slot_start_time=time(12, 0),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[5],
+                engagement_id=engagement_id,
+                user_id=user_ids[5],
+                engagement_date=start,
+                slot_start_time=time(12, 20),
+                participant_department="sales",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    instance_specs = [
+        (user_base + 1, user_ids[0], "1"),
+        (user_base + 2, user_ids[1], "2"),
+        (user_base + 3, user_ids[2], "3"),
+        (user_base + 4, user_ids[3], "5"),
+        (user_base + 5, user_ids[4], "3"),
+        (user_base + 6, user_ids[5], "1"),
+    ]
+    test_db_session.add_all(
+        [
+            AssessmentInstance(
+                assessment_instance_id=instance_id,
+                user_id=user_id,
+                engagement_id=engagement_id,
+                package_id=pkg_id,
+                status="completed",
+            )
+            for instance_id, user_id, _answer in instance_specs
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            QuestionnaireResponse(
+                response_id=engagement_id * 100 + instance_id,
+                assessment_instance_id=instance_id,
+                question_id=q_id,
+                category_id=cat_id,
+                answer=answer,
+            )
+            for instance_id, _user_id, answer in instance_specs
+        ]
+    )
+    await test_db_session.commit()
+    return camp_no
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_report_physical_activity_distribution(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8001, employee_id=301)
+    await _seed_physical_activity_section(test_db_session, report_sections=301)
+    camp_no = await _seed_physical_activity_camp_data(
+        test_db_session, organization_id=9701, engagement_id=9701
+    )
+    headers = _auth_header(8001)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "distribution_by_physical_activity_frequency"},
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["report_id"] == report_id
+    section = payload["section"]
+    assert section["name"] == "Physical Activity Distribution"
+    assert section["description"] == "Distribution of daily physical activity frequency by gender"
+    male = section["data"]["male"]
+    female = section["data"]["female"]
+    assert male["group"] == [
+        "less_than_30mins",
+        "30_60_mins",
+        "more_than_60_mins",
+        "rarely_or_never",
+    ]
+    assert male["count"] == [1, 1, 1, 0]
+    assert male["percent"] == [33.3, 33.3, 33.3, 0.0]
+    assert female["count"] == [1, 0, 1, 1]
+    assert female["percent"] == [33.3, 0.0, 33.3, 33.3]
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.report["distribution_by_physical_activity_frequency"]["data"]["male"]["count"] == [1, 1, 1, 0]
+
+
+@pytest.mark.asyncio
+async def test_refresh_department_camp_report_physical_activity_distribution(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8002, employee_id=302)
+    await _seed_physical_activity_section(test_db_session, report_sections=302)
+    camp_no = await _seed_physical_activity_camp_data(
+        test_db_session, organization_id=9702, engagement_id=9702
+    )
+    headers = _auth_header(8002)
+
+    init = await async_client.post(
+        f"/reports/camps/{camp_no}/department/sales/init",
+        headers=headers,
+    )
+    assert init.status_code == 201
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/department/sales/refresh",
+        headers=headers,
+        json={"section": "distribution_by_physical_activity_frequency"},
+    )
+    assert response.status_code == 200
+    male = response.json()["data"]["section"]["data"]["male"]
+    female = response.json()["data"]["section"]["data"]["female"]
+    assert male["count"] == [1, 1, 0, 0]
+    assert male["percent"] == [50.0, 50.0, 0.0, 0.0]
+    assert female["count"] == [1, 0, 0, 0]
+    assert female["percent"] == [100.0, 0.0, 0.0, 0.0]
+
+
+@pytest.mark.asyncio
+async def test_refresh_physical_activity_distribution_updates_existing(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8003, employee_id=303)
+    await _seed_participation_section(test_db_session, report_sections=303)
+    await _seed_physical_activity_section(test_db_session, report_sections=304)
+    camp_no = await _seed_physical_activity_camp_data(
+        test_db_session, organization_id=9703, engagement_id=9703
+    )
+    headers = _auth_header(8003)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    participation = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert participation.status_code == 200
+
+    physical = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "distribution_by_physical_activity_frequency"},
+    )
+    assert physical.status_code == 200
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert "participation_by_age" in row.report
+    assert "distribution_by_physical_activity_frequency" in row.report
+    assert row.report["distribution_by_physical_activity_frequency"]["data"]["male"]["count"] == [1, 1, 1, 0]
+
+    physical_again = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "distribution_by_physical_activity_frequency"},
+    )
+    assert physical_again.status_code == 200
+    assert (
+        physical_again.json()["data"]["section"]["data"]["female"]["count"] == [1, 0, 1, 1]
+    )
+    assert row.report["participation_by_age"]["data"]["total_enrolled"] == 6

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.organizations.models import Organization
+from modules.questionnaire.models import QuestionnaireDefinition, QuestionnaireResponse
 from modules.reports.camp_report_section_builders import extract_metabolic_age, extract_metabolic_score, is_high_metabolic_risk, resolve_user_age
 from modules.reports.models import CampReport, IndividualHealthReport
 from modules.users.models import User
@@ -316,6 +317,52 @@ class CampReportsRepository:
             if score is not None:
                 scores.append(score)
         return scores
+
+    async def list_physical_activity_frequency_by_gender(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+    ) -> list[tuple[str | None, object | None]]:
+        """Return (gender, answer) for enrolled users with physical_activity_frequency responses."""
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+
+        ranked_instances = (
+            select(
+                enrolled.c.user_id,
+                enrolled.c.gender,
+                QuestionnaireResponse.answer,
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=AssessmentInstance.assessment_instance_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(
+                AssessmentInstance,
+                and_(
+                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
+                    AssessmentInstance.user_id == enrolled.c.user_id,
+                ),
+            )
+            .join(
+                QuestionnaireResponse,
+                QuestionnaireResponse.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+            )
+            .join(
+                QuestionnaireDefinition,
+                QuestionnaireDefinition.question_id == QuestionnaireResponse.question_id,
+            )
+            .where(QuestionnaireDefinition.question_key == "physical_activity_frequency")
+        ).subquery()
+
+        result = await db.execute(
+            select(ranked_instances.c.gender, ranked_instances.c.answer).where(ranked_instances.c.rn == 1)
+        )
+        return [(row[0], row[1]) for row in result.all()]
 
     async def delete_overall(self, db: AsyncSession, *, camp_no: int) -> int:
         result = await db.execute(

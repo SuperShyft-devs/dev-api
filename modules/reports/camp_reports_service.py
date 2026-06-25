@@ -21,6 +21,7 @@ from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.service import get_department_slugs
 from modules.reports.camp_report_section_builders import (
     SECTION_BUILDERS,
+    build_distribution_by_physical_activity_frequency,
     build_kpis,
     build_overall_risk_score,
     build_participation_by_age,
@@ -682,6 +683,14 @@ class CampReportsService:
                 department=department,
             )
             return build_overall_risk_score(scores)
+
+        if section_key == "distribution_by_physical_activity_frequency":
+            rows = await self._repository.list_physical_activity_frequency_by_gender(
+                db,
+                camp_no=camp_no,
+                department=department,
+            )
+            return build_distribution_by_physical_activity_frequency(rows)
 
         raise AppError(
             status_code=400,
