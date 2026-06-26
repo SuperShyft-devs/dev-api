@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fastapi import Depends
+
 from db.session import AsyncSessionLocal
 from modules.assessments.repository import AssessmentsRepository
 from modules.audit.repository import AuditRepository
@@ -46,10 +48,13 @@ def get_camp_report_sections_service() -> CampReportSectionsService:
     )
 
 
-def get_camp_reports_service() -> CampReportsService:
+def get_camp_reports_service(
+    reports_service: ReportsService = Depends(get_reports_service),
+) -> CampReportsService:
     return CampReportsService(
         repository=CampReportsRepository(),
         sections_repository=CampReportSectionsRepository(),
         organizations_repository=OrganizationsRepository(),
         audit_service=AuditService(AuditRepository()),
+        reports_service=reports_service,
     )

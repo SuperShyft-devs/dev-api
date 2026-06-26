@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
@@ -18,6 +19,17 @@ from modules.users.models import User
 
 _MALE_GENDERS = ("male", "m", "1")
 _FEMALE_GENDERS = ("female", "f", "2")
+
+
+@dataclass
+class EnrolledAssessmentContext:
+    """Latest assessment context for one enrolled camp participant."""
+
+    assessment_instance: AssessmentInstance
+    package: AssessmentPackage
+    engagement: Engagement
+    individual_report: IndividualHealthReport | None
+    user_gender: str | None
 
 
 class CampReportsRepository:
@@ -573,6 +585,71 @@ class CampReportsRepository:
 
         result = await db.execute(query)
         return list(result.all())
+
+    async def list_enrolled_assessment_contexts(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+    ) -> list[EnrolledAssessmentContext]:
+        """Latest assessment + report context per enrolled user in a camp."""
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+
+        ranked = (
+            select(
+                AssessmentInstance.assessment_instance_id.label("assessment_instance_id"),
+                enrolled.c.gender.label("user_gender"),
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=AssessmentInstance.assessment_instance_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(
+                AssessmentInstance,
+                and_(
+                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
+                    AssessmentInstance.user_id == enrolled.c.user_id,
+                ),
+            )
+        ).subquery()
+
+        query = (
+            select(
+                AssessmentInstance,
+                AssessmentPackage,
+                Engagement,
+                IndividualHealthReport,
+                ranked.c.user_gender,
+            )
+            .select_from(ranked)
+            .join(
+                AssessmentInstance,
+                AssessmentInstance.assessment_instance_id == ranked.c.assessment_instance_id,
+            )
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .join(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
+            .outerjoin(
+                IndividualHealthReport,
+                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+            )
+            .where(ranked.c.rn == 1)
+        )
+
+        result = await db.execute(query)
+        return [
+            EnrolledAssessmentContext(
+                assessment_instance=ai,
+                package=pkg,
+                engagement=eng,
+                individual_report=ihr,
+                user_gender=gender,
+            )
+            for ai, pkg, eng, ihr, gender in result.all()
+        ]
 
     async def count_participants_by_camp_no(self, db: AsyncSession, *, camp_no: int) -> int:
         """Count all engagement participant enrollment rows for a camp."""

@@ -21,6 +21,8 @@ from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.service import get_department_slugs
 from modules.reports.camp_report_section_builders import (
     SECTION_BUILDERS,
+    aggregate_top_healthy_habits,
+    aggregate_top_healthy_profiles,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
     build_distribution_by_physical_activity_frequency,
@@ -28,10 +30,12 @@ from modules.reports.camp_report_section_builders import (
     build_kpis,
     build_overall_risk_score,
     build_participation_by_age,
+    build_positive_wins,
 )
 from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
 from modules.reports.camp_reports_repository import CampReportsRepository
 from modules.reports.models import CampReport
+from modules.reports.service import ReportsService
 
 
 class CampReportsService:
@@ -44,11 +48,13 @@ class CampReportsService:
         sections_repository: CampReportSectionsRepository,
         organizations_repository: OrganizationsRepository | None = None,
         audit_service: AuditService,
+        reports_service: ReportsService,
     ) -> None:
         self._repository = repository
         self._sections_repository = sections_repository
         self._organizations_repository = organizations_repository or OrganizationsRepository()
         self._audit_service = audit_service
+        self._reports_service = reports_service
 
     async def _resolve_camp_context(self, db: AsyncSession, *, camp_no: int) -> dict:
         row = await self._repository.get_camp_context(db, camp_no=camp_no)
@@ -649,6 +655,39 @@ class CampReportsService:
             "section": section_payload,
         }
 
+    async def _compute_positive_wins_payload(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+    ) -> dict:
+        contexts = await self._repository.list_enrolled_assessment_contexts(
+            db,
+            camp_no=camp_no,
+            department=department,
+        )
+        participant_habits: list[list[dict[str, str | None]]] = []
+        participant_profiles: list[list[str]] = []
+        for ctx in contexts:
+            habits, profiles = await self._reports_service.compute_healthy_habits_and_profiles_for_instance(
+                db,
+                assessment_instance=ctx.assessment_instance,
+                package=ctx.package,
+                engagement=ctx.engagement,
+                individual_report=ctx.individual_report,
+                user_gender=ctx.user_gender,
+            )
+            participant_habits.append(
+                [{"habit_key": h.habit_key, "habit_label": h.habit_label} for h in habits]
+            )
+            participant_profiles.append(profiles)
+
+        return build_positive_wins(
+            healthy_habits=aggregate_top_healthy_habits(participant_habits),
+            healthy_profiles=aggregate_top_healthy_profiles(participant_profiles),
+        )
+
     async def _build_section_payload(
         self,
         db: AsyncSession,
@@ -718,6 +757,13 @@ class CampReportsService:
                 department=department,
             )
             return build_distribution_by_gender_by_metabolic_syndrome(rows)
+
+        if section_key == "positive_wins":
+            return await self._compute_positive_wins_payload(
+                db,
+                camp_no=camp_no,
+                department=department,
+            )
 
         raise AppError(
             status_code=400,

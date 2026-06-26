@@ -437,6 +437,60 @@ def build_distribution_by_oxidative_stress(scores: list[float]) -> dict:
     }
 
 
+def aggregate_top_healthy_habits(
+    participant_habits: list[list[dict[str, Any]]],
+    *,
+    limit: int = 3,
+) -> list[dict[str, Any]]:
+    """Top habits by how many participants have each habit_label."""
+    counts: dict[str, int] = {}
+    keys_by_label: dict[str, str | None] = {}
+    for habits in participant_habits:
+        for habit in habits:
+            label = str(habit.get("habit_label") or "").strip()
+            if not label:
+                continue
+            counts[label] = counts.get(label, 0) + 1
+            if label not in keys_by_label:
+                keys_by_label[label] = habit.get("habit_key")
+    ranked = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+    return [
+        {"habit_key": keys_by_label[label], "habit_label": label}
+        for label, _ in ranked[:limit]
+    ]
+
+
+def aggregate_top_healthy_profiles(
+    participant_profiles: list[list[str]],
+    *,
+    limit: int = 3,
+) -> list[str]:
+    """Top profile group names by how many participants have each."""
+    counts: dict[str, int] = {}
+    for profiles in participant_profiles:
+        for name in profiles:
+            label = str(name or "").strip()
+            if not label:
+                continue
+            counts[label] = counts.get(label, 0) + 1
+    ranked = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+    return [name for name, _ in ranked[:limit]]
+
+
+def build_positive_wins(
+    *,
+    healthy_habits: list[dict[str, Any]],
+    healthy_profiles: list[str],
+) -> dict:
+    """Build positive_wins camp report section payload."""
+    return {
+        "data": {
+            "healthy_habits": healthy_habits,
+            "healthy_profiles": healthy_profiles,
+        },
+    }
+
+
 SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "participation_by_age": build_participation_by_age,
     "kpis": build_kpis,
@@ -445,4 +499,5 @@ SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "distribution_by_sleeping_hours": build_distribution_by_sleeping_hours,
     "distribution_by_oxidative_stress": build_distribution_by_oxidative_stress,
     "distribution_by_gender_by_metabolic_syndrome": build_distribution_by_gender_by_metabolic_syndrome,
+    "positive_wins": build_positive_wins,
 }

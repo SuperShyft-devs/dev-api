@@ -15,7 +15,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from core.config import settings
 from core.exceptions import AppError
 from db.session import AsyncSessionLocal
-from modules.assessments.models import AssessmentInstance
+from modules.assessments.models import AssessmentInstance, AssessmentPackage
+from modules.engagements.models import Engagement
 from modules.assessments.repository import AssessmentsRepository
 from modules.audit.service import AuditService
 from modules.diagnostics.service import DiagnosticsService
@@ -547,6 +548,55 @@ class ReportsService:
         await self._repository.update_individual_report(db, individual_report)
         return blood_parameters if isinstance(blood_parameters, dict) else {}
 
+    async def compute_healthy_habits_and_profiles_for_instance(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance: AssessmentInstance,
+        package: AssessmentPackage | None,
+        engagement: Engagement | None,
+        individual_report: IndividualHealthReport | None,
+        user_gender: str | None,
+    ) -> tuple[list[HealthyHabitItem], list[str]]:
+        """Healthy habits and profiles for one assessment (overview positive_wins subset)."""
+        healthy_profiles: list[str] = []
+        if (
+            engagement is not None
+            and engagement.diagnostic_package_id is not None
+            and individual_report is not None
+        ):
+            normalized_gender = (user_gender or "").strip().lower() or None
+            if normalized_gender not in {"male", "female"}:
+                normalized_gender = None
+            blood_raw = await self._resolve_blood_parameters_for_overview(
+                db,
+                assessment_instance=assessment_instance,
+                individual_report=individual_report,
+            )
+            detected_source = self._detect_blood_parameters_source(blood_raw)
+            groups = await self._build_blood_parameter_groups_report(
+                db=db,
+                blood_parameters=blood_raw,
+                diagnostic_package_id=int(engagement.diagnostic_package_id),
+                user_gender=normalized_gender,
+                source=detected_source,
+            )
+            healthy_profiles = self._top_healthy_profile_group_names(groups)
+
+        healthy_habits: list[HealthyHabitItem] = []
+        if self._healthy_habits_service is not None and package is not None:
+            computed = await self._healthy_habits_service.top_habits_for_assessment(
+                db,
+                assessment_instance_id=int(assessment_instance.assessment_instance_id),
+                package_id=int(assessment_instance.package_id),
+                limit=3,
+            )
+            healthy_habits = [
+                HealthyHabitItem(habit_key=h.habit_key, habit_label=h.habit_label) for h in computed
+            ]
+
+        return healthy_habits, healthy_profiles
+
     async def get_overview_for_user(
         self,
         db: AsyncSession,
@@ -672,41 +722,14 @@ class ReportsService:
         risk_analysis_list.sort(key=lambda x: (-x.risk_score_scaled, x.code))
         risk_analysis_list = risk_analysis_list[:3]
 
-        healthy_profiles: list[str] = []
-        if (
-            engagement is not None
-            and engagement.diagnostic_package_id is not None
-            and individual_report is not None
-        ):
-            normalized_gender = (user_gender or "").strip().lower() or None
-            if normalized_gender not in {"male", "female"}:
-                normalized_gender = None
-            blood_raw = await self._resolve_blood_parameters_for_overview(
-                db,
-                assessment_instance=assessment_instance,
-                individual_report=individual_report,
-            )
-            detected_source = self._detect_blood_parameters_source(blood_raw)
-            groups = await self._build_blood_parameter_groups_report(
-                db=db,
-                blood_parameters=blood_raw,
-                diagnostic_package_id=int(engagement.diagnostic_package_id),
-                user_gender=normalized_gender,
-                source=detected_source,
-            )
-            healthy_profiles = self._top_healthy_profile_group_names(groups)
-
-        healthy_habits: list[HealthyHabitItem] = []
-        if self._healthy_habits_service is not None:
-            computed = await self._healthy_habits_service.top_habits_for_assessment(
-                db,
-                assessment_instance_id=assessment_id,
-                package_id=int(assessment_instance.package_id),
-                limit=3,
-            )
-            healthy_habits = [
-                HealthyHabitItem(habit_key=h.habit_key, habit_label=h.habit_label) for h in computed
-            ]
+        healthy_habits, healthy_profiles = await self.compute_healthy_habits_and_profiles_for_instance(
+            db,
+            assessment_instance=assessment_instance,
+            package=package,
+            engagement=engagement,
+            individual_report=individual_report,
+            user_gender=user_gender,
+        )
 
         await self._require_audit_service().log_event(
             db,

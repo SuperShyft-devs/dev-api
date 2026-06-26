@@ -2636,3 +2636,524 @@ async def test_refresh_gender_metabolic_syndrome_updates_existing(async_client, 
         gender_again.json()["data"]["section"]["data"]["diseases"][1]["male"]["count"] == [1, 0, 1, 0]
     )
     assert row.report["participation_by_age"]["data"]["total_enrolled"] == 6
+
+
+async def _seed_positive_wins_section(test_db_session, *, report_sections: int = 100):
+    existing = (
+        await test_db_session.execute(
+            select(CampReportSection).where(CampReportSection.section_key == "positive_wins")
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    row = CampReportSection(
+        report_sections=report_sections,
+        section="Positive Wins",
+        section_key="positive_wins",
+        description="Top healthy habits and profiles across the camp",
+    )
+    test_db_session.add(row)
+    await test_db_session.commit()
+    return row
+
+
+async def _seed_positive_wins_camp_with_assessments(test_db_session, *, organization_id: int = 9301):
+    from datetime import datetime, timezone
+
+    from sqlalchemy import text
+
+    from modules.assessments.models import AssessmentInstance, AssessmentPackage, AssessmentPackageCategory
+    from modules.engagements.models import Engagement
+    from modules.questionnaire.models import (
+        QuestionnaireCategory,
+        QuestionnaireCategoryQuestion,
+        QuestionnaireDefinition,
+        QuestionnaireHealthyHabitRule,
+        QuestionnaireOption,
+        QuestionnaireResponse,
+    )
+    from modules.reports.models import IndividualHealthReport
+
+    camp_no, _ = await _seed_camp(
+        test_db_session,
+        organization_id=organization_id,
+        engagement_id=organization_id,
+    )
+    start = date(2026, 6, 23)
+    pkg_id = organization_id % 1000
+    cat_id = organization_id + 100
+    q_alcohol_id = organization_id + 200
+    q_walk_id = organization_id + 201
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'REF1', 'Diag Package 1', 'test_provider', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    engagement = (
+        await test_db_session.execute(
+            select(Engagement).where(Engagement.engagement_id == organization_id)
+        )
+    ).scalar_one()
+    engagement.assessment_package_id = pkg_id
+    engagement.diagnostic_package_id = 1
+
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pkg_id,
+            package_code=f"PKG{organization_id}",
+            display_name=f"Package {organization_id}",
+            assessment_type_code="2",
+            status="active",
+        )
+    )
+    await test_db_session.flush()
+
+    users = [
+        (organization_id + 1, "male", "sales"),
+        (organization_id + 2, "female", "sales"),
+        (organization_id + 3, "male", "engineering"),
+    ]
+    for user_id, gender, _dept in users:
+        test_db_session.add(
+            User(
+                user_id=user_id,
+                age=30,
+                phone=f"{user_id}000000000",
+                gender=gender,
+                status="active",
+            )
+        )
+    await test_db_session.flush()
+
+    for idx, (user_id, _gender, dept) in enumerate(users):
+        test_db_session.add(
+            EngagementParticipant(
+                engagement_participant_id=organization_id * 10 + idx + 1,
+                engagement_id=organization_id,
+                user_id=user_id,
+                engagement_date=start,
+                slot_start_time=time(10, idx * 20),
+                participant_department=dept,
+            )
+        )
+    await test_db_session.flush()
+
+    test_db_session.add(
+        QuestionnaireCategory(
+            category_id=cat_id,
+            category_key=f"hab_cat_{organization_id}",
+            display_name="Habits",
+            status="active",
+        )
+    )
+    test_db_session.add_all(
+        [
+            QuestionnaireDefinition(
+                question_id=q_alcohol_id,
+                question_key="alcohol_consumption",
+                question_text="Weekly alcohol?",
+                question_type="single_choice",
+                status="active",
+            ),
+            QuestionnaireDefinition(
+                question_id=q_walk_id,
+                question_key="daily_walk",
+                question_text="Daily walk?",
+                question_type="single_choice",
+                status="active",
+            ),
+        ]
+    )
+    test_db_session.add_all(
+        [
+            QuestionnaireOption(question_id=q_alcohol_id, option_value="no_alcohol", display_name="None"),
+            QuestionnaireOption(question_id=q_walk_id, option_value="yes_walk", display_name="Yes"),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            QuestionnaireCategoryQuestion(
+                id=organization_id + 300,
+                category_id=cat_id,
+                question_id=q_alcohol_id,
+                display_order=1,
+            ),
+            QuestionnaireCategoryQuestion(
+                id=organization_id + 301,
+                category_id=cat_id,
+                question_id=q_walk_id,
+                display_order=2,
+            ),
+            AssessmentPackageCategory(
+                id=organization_id + 302,
+                package_id=pkg_id,
+                category_id=cat_id,
+                display_order=1,
+            ),
+            QuestionnaireHealthyHabitRule(
+                question_id=q_alcohol_id,
+                habit_key="no_alcohol",
+                habit_label="No Alcohol",
+                display_order=1,
+                condition_type="option_match",
+                matched_option_values=["no_alcohol"],
+                status="active",
+            ),
+            QuestionnaireHealthyHabitRule(
+                question_id=q_walk_id,
+                habit_key="daily_walk",
+                habit_label="Daily Walk",
+                display_order=2,
+                condition_type="option_match",
+                matched_option_values=["yes_walk"],
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    for idx, (user_id, _gender, _dept) in enumerate(users):
+        assessment_id = organization_id + 400 + idx
+        test_db_session.add(
+            AssessmentInstance(
+                assessment_instance_id=assessment_id,
+                user_id=user_id,
+                package_id=pkg_id,
+                engagement_id=organization_id,
+                status="completed",
+                metsights_record_id=f"REC{assessment_id}",
+                assigned_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(timezone.utc),
+            )
+        )
+        if idx < 2:
+            test_db_session.add(
+                QuestionnaireResponse(
+                    response_id=organization_id + 500 + idx,
+                    assessment_instance_id=assessment_id,
+                    question_id=q_alcohol_id,
+                    category_id=cat_id,
+                    answer="no_alcohol",
+                )
+            )
+        else:
+            test_db_session.add(
+                QuestionnaireResponse(
+                    response_id=organization_id + 500 + idx,
+                    assessment_instance_id=assessment_id,
+                    question_id=q_walk_id,
+                    category_id=cat_id,
+                    answer="yes_walk",
+                )
+            )
+        test_db_session.add(
+            IndividualHealthReport(
+                report_id=organization_id + 600 + idx,
+                user_id=user_id,
+                engagement_id=organization_id,
+                assessment_instance_id=assessment_id,
+                reports={"metabolic_age": 30.0, "diseases": []},
+                blood_parameters={
+                    "b1": 5.0,
+                    "b2": 5.0,
+                    "b3": 5.0,
+                    "a1": 5.0,
+                    "a2": 5.0,
+                    "g1": 5.0,
+                },
+            )
+        )
+
+    await test_db_session.commit()
+    return camp_no
+
+
+def _diag_multi_group_factory():
+    from modules.diagnostics.schemas import (
+        HealthParameterResponse,
+        PackageTestsResponse,
+        ParameterType,
+        TestGroupResponse as DiagnosticTestGroupResponse,
+    )
+
+    def _hp(tid: int, tname: str, pkey: str) -> HealthParameterResponse:
+        return HealthParameterResponse(
+            test_id=tid,
+            parameter_type=ParameterType.TEST,
+            test_name=tname,
+            parameter_key=pkey,
+            unit="u",
+            meaning=None,
+            low_risk_lower_range_male=1.0,
+            low_risk_higher_range_male=10.0,
+            low_risk_lower_range_female=1.0,
+            low_risk_higher_range_female=10.0,
+            causes_when_high=None,
+            causes_when_low=None,
+            effects_when_high=None,
+            effects_when_low=None,
+            what_to_do_when_low=None,
+            what_to_do_when_high=None,
+            is_available=True,
+            display_order=tid,
+        )
+
+    class _DiagMultiGroup:
+        async def get_package_tests(self, db, *, package_id: int) -> PackageTestsResponse:
+            return PackageTestsResponse(
+                diagnostic_package_id=1,
+                groups=[
+                    DiagnosticTestGroupResponse(
+                        group_id=1,
+                        group_name="Beta",
+                        test_count=3,
+                        display_order=2,
+                        tests=[_hp(1, "b1", "b1"), _hp(2, "b2", "b2"), _hp(3, "b3", "b3")],
+                    ),
+                    DiagnosticTestGroupResponse(
+                        group_id=2,
+                        group_name="Alpha",
+                        test_count=2,
+                        display_order=1,
+                        tests=[_hp(4, "a1", "a1"), _hp(5, "a2", "a2")],
+                    ),
+                    DiagnosticTestGroupResponse(
+                        group_id=3,
+                        group_name="Gamma",
+                        test_count=1,
+                        display_order=3,
+                        tests=[_hp(6, "g1", "g1")],
+                    ),
+                ],
+            )
+
+        async def get_health_parameter_by_parameter_key(self, db, *, parameter_key: str):
+            return None
+
+    return _DiagMultiGroup()
+
+
+def _reports_service_for_positive_wins(*, diagnostics_service):
+    from modules.assessments.repository import AssessmentsRepository
+    from modules.audit.repository import AuditRepository
+    from modules.audit.service import AuditService
+    from modules.questionnaire.healthy_habits_service import HealthyHabitsService
+    from modules.questionnaire.repository import QuestionnaireRepository
+    from modules.reports.repository import ReportsRepository
+    from modules.reports.service import ReportsService
+    from tests.modules.reports.test_reports_routes import _FakeMetsightsService
+
+    return ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=_FakeMetsightsService(payload={}, should_fail=True),
+        diagnostics_service=diagnostics_service,
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_report_positive_wins(async_client, fastapi_app, test_db_session):
+    from modules.reports.dependencies import get_reports_service
+
+    await _seed_employee(test_db_session, user_id=7601, employee_id=701)
+    await _seed_positive_wins_section(test_db_session, report_sections=101)
+    camp_no = await _seed_positive_wins_camp_with_assessments(test_db_session, organization_id=9301)
+    headers = _auth_header(7601)
+
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_positive_wins(
+        diagnostics_service=_diag_multi_group_factory(),
+    )
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "positive_wins"},
+    )
+    assert response.status_code == 200
+    section = response.json()["data"]["section"]
+    assert section["name"] == "Positive Wins"
+    assert section["description"] == "Top healthy habits and profiles across the camp"
+    assert section["data"]["healthy_habits"][0] == {
+        "habit_key": "no_alcohol",
+        "habit_label": "No Alcohol",
+    }
+    assert section["data"]["healthy_habits"][1] == {
+        "habit_key": "daily_walk",
+        "habit_label": "Daily Walk",
+    }
+    assert section["data"]["healthy_profiles"] == ["Alpha", "Beta", "Gamma"]
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.report["positive_wins"]["name"] == "Positive Wins"
+    assert row.report["positive_wins"]["data"]["healthy_habits"][0]["habit_label"] == "No Alcohol"
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_refresh_department_camp_report_positive_wins(async_client, fastapi_app, test_db_session):
+    from modules.reports.dependencies import get_reports_service
+
+    class _DiagSalesOnly:
+        async def get_package_tests(self, db, *, package_id: int):
+            from modules.diagnostics.schemas import (
+                HealthParameterResponse,
+                PackageTestsResponse,
+                ParameterType,
+                TestGroupResponse as DiagnosticTestGroupResponse,
+            )
+
+            return PackageTestsResponse(
+                diagnostic_package_id=1,
+                groups=[
+                    DiagnosticTestGroupResponse(
+                        group_id=1,
+                        group_name="Beta",
+                        test_count=3,
+                        display_order=1,
+                        tests=[
+                            HealthParameterResponse(
+                                test_id=1,
+                                parameter_type=ParameterType.TEST,
+                                test_name="b1",
+                                parameter_key="b1",
+                                unit="u",
+                                meaning=None,
+                                low_risk_lower_range_male=1.0,
+                                low_risk_higher_range_male=10.0,
+                                low_risk_lower_range_female=1.0,
+                                low_risk_higher_range_female=10.0,
+                                causes_when_high=None,
+                                causes_when_low=None,
+                                effects_when_high=None,
+                                effects_when_low=None,
+                                what_to_do_when_low=None,
+                                what_to_do_when_high=None,
+                                is_available=True,
+                                display_order=1,
+                            ),
+                        ],
+                    ),
+                ],
+            )
+
+        async def get_health_parameter_by_parameter_key(self, db, *, parameter_key: str):
+            return None
+
+    await _seed_employee(test_db_session, user_id=7602, employee_id=702)
+    await _seed_positive_wins_section(test_db_session, report_sections=102)
+    camp_no = await _seed_positive_wins_camp_with_assessments(test_db_session, organization_id=9302)
+    headers = _auth_header(7602)
+
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_positive_wins(
+        diagnostics_service=_DiagSalesOnly(),
+    )
+
+    init = await async_client.post(
+        f"/reports/camps/{camp_no}/department/sales/init",
+        headers=headers,
+    )
+    assert init.status_code == 201
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/department/sales/refresh",
+        headers=headers,
+        json={"section": "positive_wins"},
+    )
+    assert response.status_code == 200
+    section = response.json()["data"]["section"]
+    assert len(section["data"]["healthy_habits"]) == 1
+    assert section["data"]["healthy_habits"][0]["habit_label"] == "No Alcohol"
+    assert section["data"]["healthy_profiles"] == ["Beta"]
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_report_positive_wins_empty_camp(async_client, fastapi_app, test_db_session):
+    from modules.reports.dependencies import get_reports_service
+    from tests.modules.reports.test_reports_routes import _FakeDiagnosticsService
+
+    await _seed_employee(test_db_session, user_id=7603, employee_id=703)
+    await _seed_positive_wins_section(test_db_session, report_sections=103)
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=9303, engagement_id=9303)
+    headers = _auth_header(7603)
+
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_positive_wins(
+        diagnostics_service=_FakeDiagnosticsService(),
+    )
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "positive_wins"},
+    )
+    assert response.status_code == 200
+    section = response.json()["data"]["section"]
+    assert section["data"]["healthy_habits"] == []
+    assert section["data"]["healthy_profiles"] == []
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_report_positive_wins_preserves_other_sections(
+    async_client, fastapi_app, test_db_session
+):
+    from modules.reports.dependencies import get_reports_service
+    from tests.modules.reports.test_reports_routes import _FakeDiagnosticsService
+
+    await _seed_employee(test_db_session, user_id=7604, employee_id=704)
+    await _seed_participation_section(test_db_session, report_sections=104)
+    await _seed_positive_wins_section(test_db_session, report_sections=105)
+    camp_no = await _seed_positive_wins_camp_with_assessments(test_db_session, organization_id=9304)
+    headers = _auth_header(7604)
+
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_positive_wins(
+        diagnostics_service=_FakeDiagnosticsService(),
+    )
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    participation = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert participation.status_code == 200
+
+    positive = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "positive_wins"},
+    )
+    assert positive.status_code == 200
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert "participation_by_age" in row.report
+    assert "positive_wins" in row.report
+    assert row.report["participation_by_age"]["data"]["total_enrolled"] == 3
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
