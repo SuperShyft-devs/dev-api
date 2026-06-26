@@ -57,6 +57,14 @@ _SYNC_IDLE = "idle"
 _SYNC_IN_PROGRESS = "in_progress"
 _SYNC_FAILED = "failed"
 
+# Blood fetch failures that should yield empty profiles, not abort camp/overview aggregation.
+BLOOD_DATA_UNAVAILABLE_ERROR_CODES = frozenset({
+    "BLOOD_PARAMETERS_NOT_FOUND",
+    "BLOOD_SAMPLE_NOT_COLLECTED",
+    "INVALID_STATE",
+    "EXTERNAL_SERVICE_UNAVAILABLE",
+})
+
 _OVERVIEW_METABOLIC_AGE_OVERRIDES: dict[int, float] = {
     1169: 52.0,
 }
@@ -560,11 +568,7 @@ class ReportsService:
                 await self._repository.update_individual_report(db, individual_report)
                 return blood_parameters
             except AppError as exc:
-                if exc.error_code not in {
-                    "BLOOD_PARAMETERS_NOT_FOUND",
-                    "INVALID_STATE",
-                    "EXTERNAL_SERVICE_UNAVAILABLE",
-                }:
+                if exc.error_code not in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
                     raise
                 logger.debug(
                     "Provider blood parameters unavailable for record %s: %s",
@@ -575,8 +579,12 @@ class ReportsService:
         try:
             blood_parameters = await self._metsights_service.get_blood_parameters(record_id=record_id)
         except AppError as exc:
-            if exc.error_code == "BLOOD_PARAMETERS_NOT_FOUND":
-                logger.debug("Metsights blood parameters not found for record %s", record_id)
+            if exc.error_code in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
+                logger.debug(
+                    "Metsights blood parameters unavailable for record %s: %s",
+                    record_id,
+                    exc.error_code,
+                )
                 return {}
             raise
 
@@ -601,32 +609,41 @@ class ReportsService:
             and engagement.diagnostic_package_id is not None
             and individual_report is not None
         ):
-            normalized_gender = (user_gender or "").strip().lower() or None
-            if normalized_gender not in {"male", "female"}:
-                normalized_gender = None
-            user_first_name = ""
-            user_last_name = ""
-            if individual_report.blood_parameters is None:
-                user_row = await db.get(User, assessment_instance.user_id)
-                if user_row is not None:
-                    user_first_name = user_row.first_name or ""
-                    user_last_name = user_row.last_name or ""
-            blood_raw = await self._resolve_blood_parameters_for_overview(
-                db,
-                assessment_instance=assessment_instance,
-                individual_report=individual_report,
-                user_first_name=user_first_name,
-                user_last_name=user_last_name,
-            )
-            detected_source = self._detect_blood_parameters_source(blood_raw)
-            groups = await self._build_blood_parameter_groups_report(
-                db=db,
-                blood_parameters=blood_raw,
-                diagnostic_package_id=int(engagement.diagnostic_package_id),
-                user_gender=normalized_gender,
-                source=detected_source,
-            )
-            healthy_profiles = self._top_healthy_profile_group_names(groups)
+            try:
+                normalized_gender = (user_gender or "").strip().lower() or None
+                if normalized_gender not in {"male", "female"}:
+                    normalized_gender = None
+                user_first_name = ""
+                user_last_name = ""
+                if individual_report.blood_parameters is None:
+                    user_row = await db.get(User, assessment_instance.user_id)
+                    if user_row is not None:
+                        user_first_name = user_row.first_name or ""
+                        user_last_name = user_row.last_name or ""
+                blood_raw = await self._resolve_blood_parameters_for_overview(
+                    db,
+                    assessment_instance=assessment_instance,
+                    individual_report=individual_report,
+                    user_first_name=user_first_name,
+                    user_last_name=user_last_name,
+                )
+                detected_source = self._detect_blood_parameters_source(blood_raw)
+                groups = await self._build_blood_parameter_groups_report(
+                    db=db,
+                    blood_parameters=blood_raw,
+                    diagnostic_package_id=int(engagement.diagnostic_package_id),
+                    user_gender=normalized_gender,
+                    source=detected_source,
+                )
+                healthy_profiles = self._top_healthy_profile_group_names(groups)
+            except AppError as exc:
+                if exc.error_code not in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
+                    raise
+                logger.debug(
+                    "Skipping healthy profiles for assessment %s: %s",
+                    assessment_instance.assessment_instance_id,
+                    exc.error_code,
+                )
 
         healthy_habits: list[HealthyHabitItem] = []
         if self._healthy_habits_service is not None and package is not None:

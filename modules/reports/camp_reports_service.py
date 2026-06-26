@@ -35,7 +35,7 @@ from modules.reports.camp_report_section_builders import (
 from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
 from modules.reports.camp_reports_repository import CampReportsRepository
 from modules.reports.models import CampReport
-from modules.reports.service import ReportsService
+from modules.reports.service import BLOOD_DATA_UNAVAILABLE_ERROR_CODES, ReportsService
 
 
 class CampReportsService:
@@ -680,10 +680,9 @@ class CampReportsService:
                     user_gender=ctx.user_gender,
                 )
             except AppError as exc:
-                if exc.error_code == "BLOOD_PARAMETERS_NOT_FOUND":
-                    habits, profiles = [], []
-                else:
+                if exc.error_code not in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
                     raise
+                habits, profiles = [], []
             participant_habits.append(
                 [{"habit_key": h.habit_key, "habit_label": h.habit_label} for h in habits]
             )
