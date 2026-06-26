@@ -1405,6 +1405,365 @@ async def test_refresh_overall_risk_score_updates_existing(async_client, test_db
     assert row.report["participation_by_age"]["data"]["total_enrolled"] == 6
 
 
+async def _seed_oxidative_stress_section(test_db_session, *, report_sections: int = 210):
+    existing = (
+        await test_db_session.execute(
+            select(CampReportSection).where(
+                CampReportSection.section_key == "distribution_by_oxidative_stress"
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        existing.section = "Oxidative Stress Distribution"
+        existing.description = "Distribution of oxidative stress risk bands across assessed employees"
+        await test_db_session.commit()
+        return existing
+
+    row = CampReportSection(
+        report_sections=report_sections,
+        section="Oxidative Stress Distribution",
+        section_key="distribution_by_oxidative_stress",
+        description="Distribution of oxidative stress risk bands across assessed employees",
+    )
+    test_db_session.add(row)
+    await test_db_session.commit()
+    return row
+
+
+async def _seed_oxidative_stress_camp_data(
+    test_db_session,
+    *,
+    organization_id: int = 9601,
+    engagement_id: int = 9601,
+):
+    from modules.assessments.models import AssessmentInstance, AssessmentPackage
+    from modules.reports.models import IndividualHealthReport
+
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=organization_id, engagement_id=engagement_id)
+    start = date(2026, 6, 23)
+
+    test_db_session.add_all(
+        [
+            AssessmentPackage(
+                package_id=9601,
+                package_code="OXSPKG1",
+                display_name="Bio AI Package",
+                assessment_type_code="1",
+                status="active",
+            ),
+            AssessmentPackage(
+                package_id=9602,
+                package_code="OXSPKG2",
+                display_name="Bio AI Package 2",
+                assessment_type_code="2",
+                status="active",
+            ),
+            AssessmentPackage(
+                package_id=9603,
+                package_code="OXSPKG7",
+                display_name="FitPrint Package",
+                assessment_type_code="7",
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            User(user_id=96001, age=30, phone="960010000000", status="active"),
+            User(user_id=96002, age=35, phone="960020000000", status="active"),
+            User(user_id=96003, age=40, phone="960030000000", status="active"),
+            User(user_id=96004, age=45, phone="960040000000", status="active"),
+            User(user_id=96005, age=50, phone="960050000000", status="active"),
+            User(user_id=96006, age=28, phone="960060000000", status="active"),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            EngagementParticipant(
+                engagement_participant_id=96001,
+                engagement_id=engagement_id,
+                user_id=96001,
+                engagement_date=start,
+                slot_start_time=time(10, 0),
+                participant_department="sales",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=96002,
+                engagement_id=engagement_id,
+                user_id=96002,
+                engagement_date=start,
+                slot_start_time=time(10, 20),
+                participant_department="sales",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=96003,
+                engagement_id=engagement_id,
+                user_id=96003,
+                engagement_date=start,
+                slot_start_time=time(11, 0),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=96004,
+                engagement_id=engagement_id,
+                user_id=96004,
+                engagement_date=start,
+                slot_start_time=time(11, 20),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=96005,
+                engagement_id=engagement_id,
+                user_id=96005,
+                engagement_date=start,
+                slot_start_time=time(12, 0),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=96006,
+                engagement_id=engagement_id,
+                user_id=96006,
+                engagement_date=start,
+                slot_start_time=time(12, 20),
+                participant_department="sales",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            AssessmentInstance(
+                assessment_instance_id=96001,
+                user_id=96001,
+                engagement_id=engagement_id,
+                package_id=9601,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=96002,
+                user_id=96002,
+                engagement_id=engagement_id,
+                package_id=9602,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=96003,
+                user_id=96003,
+                engagement_id=engagement_id,
+                package_id=9601,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=96004,
+                user_id=96004,
+                engagement_id=engagement_id,
+                package_id=9602,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=96005,
+                user_id=96005,
+                engagement_id=engagement_id,
+                package_id=9601,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=96006,
+                user_id=96006,
+                engagement_id=engagement_id,
+                package_id=9603,
+                status="completed",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            IndividualHealthReport(
+                report_id=96001,
+                user_id=96001,
+                assessment_instance_id=96001,
+                engagement_id=engagement_id,
+                reports={
+                    "diseases": [
+                        {"code": "oxidative_stress", "name": "Oxidative stress", "risk_score_scaled": 20},
+                    ]
+                },
+            ),
+            IndividualHealthReport(
+                report_id=96002,
+                user_id=96002,
+                assessment_instance_id=96002,
+                engagement_id=engagement_id,
+                reports={
+                    "data": {
+                        "diseases": [
+                            {"code": "oxidative_stress", "name": "Oxidative stress", "risk_score_scaled": 35},
+                        ]
+                    }
+                },
+            ),
+            IndividualHealthReport(
+                report_id=96003,
+                user_id=96003,
+                assessment_instance_id=96003,
+                engagement_id=engagement_id,
+                reports={
+                    "diseases": [
+                        {"code": "oxidative_stress", "name": "Oxidative stress", "risk_score_scaled": 50},
+                    ]
+                },
+            ),
+            IndividualHealthReport(
+                report_id=96004,
+                user_id=96004,
+                assessment_instance_id=96004,
+                engagement_id=engagement_id,
+                reports={
+                    "diseases": [
+                        {"code": "oxidative_stress", "name": "Oxidative stress", "risk_score_scaled": 65},
+                    ]
+                },
+            ),
+            IndividualHealthReport(
+                report_id=96005,
+                user_id=96005,
+                assessment_instance_id=96005,
+                engagement_id=engagement_id,
+                reports={"metabolic_age": 45.0},
+            ),
+            IndividualHealthReport(
+                report_id=96006,
+                user_id=96006,
+                assessment_instance_id=96006,
+                engagement_id=engagement_id,
+                reports={
+                    "diseases": [
+                        {"code": "oxidative_stress", "name": "Oxidative stress", "risk_score_scaled": 10},
+                    ]
+                },
+            ),
+        ]
+    )
+    await test_db_session.commit()
+    return camp_no
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_report_distribution_by_oxidative_stress(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7901, employee_id=211)
+    await _seed_oxidative_stress_section(test_db_session, report_sections=211)
+    camp_no = await _seed_oxidative_stress_camp_data(
+        test_db_session, organization_id=9601, engagement_id=9601
+    )
+    headers = _auth_header(7901)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "distribution_by_oxidative_stress"},
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["report_id"] == report_id
+    section = payload["section"]
+    assert section["name"] == "Oxidative Stress Distribution"
+    assert section["description"] == "Distribution of oxidative stress risk bands across assessed employees"
+    data = section["data"]
+    assert data["group"] == ["low", "moderate", "high", "very_high"]
+    assert data["count"] == [1, 1, 1, 1]
+    assert data["percent"] == [25.0, 25.0, 25.0, 25.0]
+    assert data["total_employees"] == 4
+    assert data["elevated_oxidative_stress_percent"] == 50.0
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.report["distribution_by_oxidative_stress"]["data"]["total_employees"] == 4
+
+
+@pytest.mark.asyncio
+async def test_refresh_department_camp_report_distribution_by_oxidative_stress(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7902, employee_id=212)
+    await _seed_oxidative_stress_section(test_db_session, report_sections=212)
+    camp_no = await _seed_oxidative_stress_camp_data(
+        test_db_session, organization_id=9602, engagement_id=9602
+    )
+    headers = _auth_header(7902)
+
+    init = await async_client.post(
+        f"/reports/camps/{camp_no}/department/sales/init",
+        headers=headers,
+    )
+    assert init.status_code == 201
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/department/sales/refresh",
+        headers=headers,
+        json={"section": "distribution_by_oxidative_stress"},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]["section"]["data"]
+    assert data["count"] == [1, 1, 0, 0]
+    assert data["total_employees"] == 2
+    assert data["elevated_oxidative_stress_percent"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_refresh_oxidative_stress_updates_existing(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7903, employee_id=213)
+    await _seed_participation_section(test_db_session, report_sections=213)
+    await _seed_oxidative_stress_section(test_db_session, report_sections=214)
+    camp_no = await _seed_oxidative_stress_camp_data(
+        test_db_session, organization_id=9603, engagement_id=9603
+    )
+    headers = _auth_header(7903)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    participation = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert participation.status_code == 200
+
+    oxidative = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "distribution_by_oxidative_stress"},
+    )
+    assert oxidative.status_code == 200
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert "participation_by_age" in row.report
+    assert "distribution_by_oxidative_stress" in row.report
+    assert row.report["distribution_by_oxidative_stress"]["data"]["total_employees"] == 4
+
+    oxidative_again = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "distribution_by_oxidative_stress"},
+    )
+    assert oxidative_again.status_code == 200
+    assert oxidative_again.json()["data"]["section"]["data"]["total_employees"] == 4
+    assert row.report["participation_by_age"]["data"]["total_enrolled"] == 6
+
+
 async def _seed_camp_participants_with_profile_fields(
     test_db_session,
     *,

@@ -5,15 +5,18 @@ from __future__ import annotations
 from datetime import date
 
 from modules.reports.camp_report_section_builders import (
+    build_distribution_by_oxidative_stress,
     build_distribution_by_physical_activity_frequency,
     build_kpis,
     build_overall_risk_score,
     build_participation_by_age,
     extract_metabolic_age,
     extract_metabolic_score,
+    extract_oxidative_stress_score,
     is_high_metabolic_risk,
     metabolic_score_to_band,
     normalize_camp_gender,
+    oxidative_stress_to_band,
     physical_activity_answer_to_bucket,
 )
 
@@ -111,6 +114,63 @@ def test_build_overall_risk_score_empty():
     assert data["percent"] == [0.0, 0.0, 0.0, 0.0]
     assert data["total_employees"] == 0
     assert data["elevated_metabolic_score"] == 0.0
+
+
+def test_extract_oxidative_stress_score_top_level():
+    reports = {
+        "diseases": [
+            {"code": "diabetes", "risk_score_scaled": 10},
+            {"code": "oxidative_stress", "risk_score_scaled": 40},
+        ]
+    }
+    assert extract_oxidative_stress_score(reports) == 40.0
+
+
+def test_extract_oxidative_stress_score_nested_data():
+    reports = {
+        "data": {
+            "diseases": [
+                {"code": "oxidative_stress", "risk_score_scaled": 35.5},
+            ]
+        }
+    }
+    assert extract_oxidative_stress_score(reports) == 35.5
+
+
+def test_extract_oxidative_stress_score_missing():
+    assert extract_oxidative_stress_score({}) is None
+    assert extract_oxidative_stress_score({"diseases": [{"code": "diabetes"}]}) is None
+    assert extract_oxidative_stress_score(
+        {"diseases": [{"code": "oxidative_stress", "risk_score_scaled": "high"}]}
+    ) is None
+
+
+def test_oxidative_stress_to_band_boundaries():
+    assert oxidative_stress_to_band(25) == "low"
+    assert oxidative_stress_to_band(26) == "moderate"
+    assert oxidative_stress_to_band(42) == "moderate"
+    assert oxidative_stress_to_band(43) == "high"
+    assert oxidative_stress_to_band(58) == "high"
+    assert oxidative_stress_to_band(59) == "very_high"
+
+
+def test_build_distribution_by_oxidative_stress():
+    payload = build_distribution_by_oxidative_stress([20.0, 35.0, 50.0, 65.0])
+    data = payload["data"]
+    assert data["group"] == ["low", "moderate", "high", "very_high"]
+    assert data["count"] == [1, 1, 1, 1]
+    assert data["percent"] == [25.0, 25.0, 25.0, 25.0]
+    assert data["total_employees"] == 4
+    assert data["elevated_oxidative_stress_percent"] == 50.0
+
+
+def test_build_distribution_by_oxidative_stress_empty():
+    payload = build_distribution_by_oxidative_stress([])
+    data = payload["data"]
+    assert data["count"] == [0, 0, 0, 0]
+    assert data["percent"] == [0.0, 0.0, 0.0, 0.0]
+    assert data["total_employees"] == 0
+    assert data["elevated_oxidative_stress_percent"] == 0.0
 
 
 def test_normalize_camp_gender():

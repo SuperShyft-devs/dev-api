@@ -21,6 +21,7 @@ from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.service import get_department_slugs
 from modules.reports.camp_report_section_builders import (
     SECTION_BUILDERS,
+    build_distribution_by_oxidative_stress,
     build_distribution_by_physical_activity_frequency,
     build_distribution_by_sleeping_hours,
     build_kpis,
@@ -684,6 +685,14 @@ class CampReportsService:
                 department=department,
             )
             return build_overall_risk_score(scores)
+
+        if section_key == "distribution_by_oxidative_stress":
+            scores = await self._repository.list_oxidative_stress_scores(
+                db,
+                camp_no=camp_no,
+                department=department,
+            )
+            return build_distribution_by_oxidative_stress(scores)
 
         if section_key == "distribution_by_physical_activity_frequency":
             rows = await self._repository.list_physical_activity_frequency_by_gender(

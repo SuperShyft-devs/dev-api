@@ -12,7 +12,7 @@ from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.organizations.models import Organization
 from modules.questionnaire.models import QuestionnaireDefinition, QuestionnaireResponse
-from modules.reports.camp_report_section_builders import extract_metabolic_age, extract_metabolic_score, is_high_metabolic_risk, resolve_user_age
+from modules.reports.camp_report_section_builders import extract_metabolic_age, extract_metabolic_score, extract_oxidative_stress_score, is_high_metabolic_risk, resolve_user_age
 from modules.reports.models import CampReport, IndividualHealthReport
 from modules.users.models import User
 
@@ -314,6 +314,55 @@ class CampReportsRepository:
         for (reports,) in reports_result.all():
             reports_dict: dict[str, Any] = reports if isinstance(reports, dict) else {}
             score = extract_metabolic_score(reports_dict)
+            if score is not None:
+                scores.append(score)
+        return scores
+
+    async def list_oxidative_stress_scores(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+    ) -> list[float]:
+        """Return oxidative stress scores for enrolled users with Pro/Basic health reports."""
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+
+        ranked_reports = (
+            select(
+                enrolled.c.user_id,
+                IndividualHealthReport.reports,
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=IndividualHealthReport.report_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(
+                AssessmentInstance,
+                and_(
+                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
+                    AssessmentInstance.user_id == enrolled.c.user_id,
+                ),
+            )
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .join(
+                IndividualHealthReport,
+                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+            )
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        ).subquery()
+
+        reports_result = await db.execute(
+            select(ranked_reports.c.reports).where(ranked_reports.c.rn == 1)
+        )
+
+        scores: list[float] = []
+        for (reports,) in reports_result.all():
+            reports_dict: dict[str, Any] = reports if isinstance(reports, dict) else {}
+            score = extract_oxidative_stress_score(reports_dict)
             if score is not None:
                 scores.append(score)
         return scores
