@@ -36,6 +36,16 @@ def ensure_internal_employee(employee: EmployeeContext | None) -> None:
         )
 
 
+def ensure_admin(employee: EmployeeContext | None) -> None:
+    ensure_employee_present(employee)
+    if employee.role != EmployeeRole.admin:
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+
 async def ensure_org_access(
     db: AsyncSession,
     employee: EmployeeContext | None,

@@ -229,6 +229,34 @@ async def update_organization_status(
     return success_response({"organization_id": updated.organization_id, "status": updated.status})
 
 
+@router.get("/{organization_id}/camps")
+async def list_organization_camps(
+    organization_id: int,
+    page: int = 1,
+    limit: int = 20,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    organizations_service: OrganizationsService = Depends(get_organizations_service),
+):
+    if page < 1 or limit < 1 or limit > 100:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    camps, total = await organizations_service.list_camps_for_organization_for_employee(
+        db,
+        employee=employee,
+        organization_id=organization_id,
+        page=page,
+        limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+    )
+    return success_response(camps, meta={"page": page, "limit": limit, "total": total})
+
+
 @router.get("/{organization_id}/participants")
 async def get_organization_participants(
     organization_id: int,

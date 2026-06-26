@@ -14,7 +14,13 @@ from __future__ import annotations
 from core.exceptions import AppError
 from common.slug import slugify_department
 from modules.audit.service import AuditService
-from modules.employee.access_control import ensure_internal_employee, ensure_org_access, is_internal_employee
+from modules.employee.access_control import (
+    ensure_admin,
+    ensure_camp_access_admin_or_org_manager,
+    ensure_internal_employee,
+    ensure_org_access,
+    is_internal_employee,
+)
 from modules.employee.models import Employee, EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
@@ -475,29 +481,8 @@ class OrganizationsService:
 
         return result, total
 
-    async def list_camps_for_employee(
-        self,
-        db,
-        *,
-        employee: EmployeeContext,
-        page: int,
-        limit: int,
-        search: str | None = None,
-        sort_by: str | None = None,
-        sort_dir: str | None = None,
-    ) -> tuple[list[dict], int]:
-        ensure_internal_employee(employee)
-
-        total = await self._repository.count_camps(db, search=search)
-        rows = await self._repository.list_camps(
-            db,
-            page=page,
-            limit=limit,
-            search=search,
-            sort_by=sort_by,
-            sort_dir=sort_dir,
-        )
-
+    @staticmethod
+    def _camp_rows_to_dicts(rows: list[tuple]) -> list[dict]:
         result = []
         for (
             camp_no,
@@ -521,5 +506,65 @@ class OrganizationsService:
                     "report_count": int(report_count or 0),
                 }
             )
+        return result
 
-        return result, total
+    async def list_camps_for_employee(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        page: int,
+        limit: int,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> tuple[list[dict], int]:
+        ensure_admin(employee)
+
+        total = await self._repository.count_camps(db, search=search)
+        rows = await self._repository.list_camps(
+            db,
+            page=page,
+            limit=limit,
+            search=search,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+
+        return self._camp_rows_to_dicts(rows), total
+
+    async def list_camps_for_organization_for_employee(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        organization_id: int,
+        page: int,
+        limit: int,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> tuple[list[dict], int]:
+        await ensure_camp_access_admin_or_org_manager(
+            db,
+            employee,
+            organization_id,
+            repository=self._repository,
+        )
+
+        total = await self._repository.count_camps(
+            db,
+            search=search,
+            organization_id=organization_id,
+        )
+        rows = await self._repository.list_camps(
+            db,
+            page=page,
+            limit=limit,
+            search=search,
+            organization_id=organization_id,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+
+        return self._camp_rows_to_dicts(rows), total

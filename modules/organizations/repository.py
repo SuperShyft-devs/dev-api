@@ -234,7 +234,12 @@ class OrganizationsRepository:
             .subquery()
         )
 
-    def _camps_grouped_query(self, *, search: str | None = None):
+    def _camps_grouped_query(
+        self,
+        *,
+        search: str | None = None,
+        organization_id: int | None = None,
+    ):
         report_counts = self._camp_report_counts_subquery()
         query = (
             select(
@@ -252,6 +257,8 @@ class OrganizationsRepository:
             .where(Engagement.camp_no.isnot(None))
             .group_by(Engagement.camp_no, Engagement.organization_id, Organization.name)
         )
+        if organization_id is not None:
+            query = query.where(Engagement.organization_id == organization_id)
         if search is not None and search.strip():
             pattern = ilike_pattern(search)
             conditions = [Organization.name.ilike(pattern)]
@@ -261,8 +268,14 @@ class OrganizationsRepository:
             query = query.where(or_(*conditions))
         return query
 
-    async def count_camps(self, db: AsyncSession, *, search: str | None = None) -> int:
-        subq = self._camps_grouped_query(search=search).subquery()
+    async def count_camps(
+        self,
+        db: AsyncSession,
+        *,
+        search: str | None = None,
+        organization_id: int | None = None,
+    ) -> int:
+        subq = self._camps_grouped_query(search=search, organization_id=organization_id).subquery()
         result = await db.execute(select(func.count()).select_from(subq))
         return int(result.scalar_one())
 
@@ -273,10 +286,11 @@ class OrganizationsRepository:
         page: int,
         limit: int,
         search: str | None = None,
+        organization_id: int | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
     ) -> list[tuple]:
-        query = self._camps_grouped_query(search=search)
+        query = self._camps_grouped_query(search=search, organization_id=organization_id)
         normalized_sort = (sort_by or "camp_no").strip().lower()
         descending = (sort_dir or "desc").strip().lower() == "desc"
 

@@ -34,6 +34,17 @@ async def test_list_camps_requires_auth(async_client):
 
 
 @pytest.mark.asyncio
+async def test_list_camps_onboarding_assistant_403(async_client, test_db_session):
+    test_db_session.add(User(user_id=7202, age=30, phone="7202000000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=32, user_id=7202, role="onboarding_assistant", status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.get("/organizations/camps", headers=_auth_header(7202))
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_list_camps_aggregates_engagements(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7201, employee_id=31)
 
