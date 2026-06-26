@@ -146,6 +146,32 @@ async def list_camps(
     return success_response(camps, meta={"page": page, "limit": limit, "total": total})
 
 
+@router.get("/we")
+async def list_my_organizations(
+    page: int = 1,
+    limit: int = 20,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    organizations_service: OrganizationsService = Depends(get_organizations_service),
+):
+    if page < 1 or limit < 1 or limit > 100:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    organizations, total = await organizations_service.list_my_organizations_for_employee(
+        db,
+        employee=employee,
+        page=page,
+        limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+    )
+    return success_response(organizations, meta={"page": page, "limit": limit, "total": total})
+
+
 @router.get("/{organization_id}")
 async def get_organization_details(
     organization_id: int,
@@ -160,26 +186,7 @@ async def get_organization_details(
     )
 
     return success_response(
-        {
-            "organization_id": organization.organization_id,
-            "name": organization.name,
-            "organization_type": organization.organization_type,
-            "logo": organization.logo,
-            "website_url": organization.website_url,
-            "address": organization.address,
-            "pin_code": organization.pin_code,
-            "city": organization.city,
-            "state": organization.state,
-            "country": organization.country,
-            "contact_person_user_id": organization.contact_person_user_id,
-            "bd_employee_id": organization.bd_employee_id,
-            "departments": organization.departments,
-            "status": organization.status,
-            "created_at": organization.created_at,
-            "created_employee_id": organization.created_employee_id,
-            "updated_at": organization.updated_at,
-            "updated_employee_id": organization.updated_employee_id,
-        }
+        organizations_service.organization_to_details_dict(organization)
     )
 
 

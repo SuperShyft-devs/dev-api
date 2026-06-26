@@ -17,6 +17,7 @@ from modules.audit.service import AuditService
 from modules.employee.access_control import (
     ensure_admin,
     ensure_camp_access_admin_or_org_manager,
+    ensure_employee_present,
     ensure_internal_employee,
     ensure_org_access,
     is_internal_employee,
@@ -219,6 +220,29 @@ class OrganizationsService:
 
         return organization
 
+    @staticmethod
+    def organization_to_details_dict(organization: Organization) -> dict:
+        return {
+            "organization_id": organization.organization_id,
+            "name": organization.name,
+            "organization_type": organization.organization_type,
+            "logo": organization.logo,
+            "website_url": organization.website_url,
+            "address": organization.address,
+            "pin_code": organization.pin_code,
+            "city": organization.city,
+            "state": organization.state,
+            "country": organization.country,
+            "contact_person_user_id": organization.contact_person_user_id,
+            "bd_employee_id": organization.bd_employee_id,
+            "departments": organization.departments,
+            "status": organization.status,
+            "created_at": organization.created_at,
+            "created_employee_id": organization.created_employee_id,
+            "updated_at": organization.updated_at,
+            "updated_employee_id": organization.updated_employee_id,
+        }
+
     async def list_organizations_for_employee(
         self,
         db,
@@ -267,6 +291,47 @@ class OrganizationsService:
             country=country,
         )
         return organizations, total
+
+    async def list_my_organizations_for_employee(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        page: int,
+        limit: int,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> tuple[list[dict], int]:
+        ensure_employee_present(employee)
+
+        contact_person_user_id = None
+        if employee.role == EmployeeRole.admin:
+            pass
+        elif employee.role == EmployeeRole.organization_manager:
+            contact_person_user_id = employee.user_id
+        else:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        organizations = await self._repository.list_organizations(
+            db,
+            page=page,
+            limit=limit,
+            contact_person_user_id=contact_person_user_id,
+            search=search,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+        total = await self._repository.count_organizations(
+            db,
+            contact_person_user_id=contact_person_user_id,
+            search=search,
+        )
+        return [self.organization_to_details_dict(org) for org in organizations], total
 
     async def get_organization_filter_options_for_employee(self, db, *, employee: EmployeeContext) -> dict:
         ensure_internal_employee(employee)

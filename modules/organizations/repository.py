@@ -36,6 +36,7 @@ class OrganizationsRepository:
         status: str | None = None,
         organization_type: str | None = None,
         bd_employee_id: int | None = None,
+        contact_person_user_id: int | None = None,
         search: str | None = None,
         city: str | None = None,
         country: str | None = None,
@@ -46,6 +47,8 @@ class OrganizationsRepository:
             query = query.where(Organization.organization_type == organization_type)
         if bd_employee_id is not None:
             query = query.where(Organization.bd_employee_id == bd_employee_id)
+        if contact_person_user_id is not None:
+            query = query.where(Organization.contact_person_user_id == contact_person_user_id)
         if city is not None and city.strip():
             query = query.where(func.lower(func.trim(Organization.city)) == city.strip().lower())
         if country is not None and country.strip():
@@ -76,6 +79,7 @@ class OrganizationsRepository:
         status: str | None = None,
         organization_type: str | None = None,
         bd_employee_id: int | None = None,
+        contact_person_user_id: int | None = None,
         search: str | None = None,
         city: str | None = None,
         country: str | None = None,
@@ -86,6 +90,7 @@ class OrganizationsRepository:
             status=status,
             organization_type=organization_type,
             bd_employee_id=bd_employee_id,
+            contact_person_user_id=contact_person_user_id,
             search=search,
             city=city,
             country=country,
@@ -103,6 +108,7 @@ class OrganizationsRepository:
         status: str | None = None,
         organization_type: str | None = None,
         bd_employee_id: int | None = None,
+        contact_person_user_id: int | None = None,
         search: str | None = None,
         city: str | None = None,
         country: str | None = None,
@@ -116,6 +122,7 @@ class OrganizationsRepository:
             status=status,
             organization_type=organization_type,
             bd_employee_id=bd_employee_id,
+            contact_person_user_id=contact_person_user_id,
             search=search,
             city=city,
             country=country,
