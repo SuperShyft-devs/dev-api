@@ -2852,13 +2852,43 @@ async def _seed_positive_wins_camp_with_assessments(test_db_session, *, organiza
                     answer="yes_walk",
                 )
             )
+        if idx < 2:
+            diseases = [
+                {
+                    "code": "low_a",
+                    "name": "Low A",
+                    "risk_status": "Healthy",
+                    "risk_score_scaled": 12,
+                    "healthy_percentile": 50,
+                },
+            ]
+            if idx == 0:
+                diseases.append(
+                    {
+                        "code": "low_b",
+                        "name": "Low B",
+                        "risk_status": "Healthy",
+                        "risk_score_scaled": 15,
+                        "healthy_percentile": 50,
+                    }
+                )
+        else:
+            diseases = [
+                {
+                    "code": "low_c",
+                    "name": "Low C",
+                    "risk_status": "Healthy",
+                    "risk_score_scaled": 10,
+                    "healthy_percentile": 50,
+                },
+            ]
         test_db_session.add(
             IndividualHealthReport(
                 report_id=organization_id + 600 + idx,
                 user_id=user_id,
                 engagement_id=organization_id,
                 assessment_instance_id=assessment_id,
-                reports={"metabolic_age": 30.0, "diseases": []},
+                reports={"metabolic_age": 30.0, "diseases": diseases},
                 blood_parameters={
                     "b1": 5.0,
                     "b2": 5.0,
@@ -2985,6 +3015,7 @@ async def test_refresh_camp_report_positive_wins(async_client, fastapi_app, test
     section = response.json()["data"]["section"]
     assert section["name"] == "Positive Wins"
     assert section["description"] == "Top healthy habits and profiles across the camp"
+    assert [item["code"] for item in section["data"]["low_risk"]] == ["low_a", "low_b", "low_c"]
     assert section["data"]["healthy_habits"][0] == {
         "habit_key": "no_alcohol",
         "habit_label": "No Alcohol",
@@ -3109,6 +3140,7 @@ async def test_refresh_camp_report_positive_wins_empty_camp(async_client, fastap
     section = response.json()["data"]["section"]
     assert section["data"]["healthy_habits"] == []
     assert section["data"]["healthy_profiles"] == []
+    assert section["data"]["low_risk"] == []
 
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 

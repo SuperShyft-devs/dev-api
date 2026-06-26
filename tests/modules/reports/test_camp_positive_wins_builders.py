@@ -5,6 +5,7 @@ from __future__ import annotations
 from modules.reports.camp_report_section_builders import (
     aggregate_top_healthy_habits,
     aggregate_top_healthy_profiles,
+    aggregate_top_low_risk,
     build_positive_wins,
 )
 
@@ -48,13 +49,33 @@ def test_aggregate_top_healthy_profiles_frequency_and_limit():
     ]
 
 
+def test_aggregate_top_low_risk_frequency_and_tie_break():
+    participant_low_risk = [
+        [
+            {"code": "low_a", "name": "Low A", "risk_status": "Healthy", "risk_score_scaled": 12},
+            {"code": "low_b", "name": "Low B", "risk_status": "Healthy", "risk_score_scaled": 15},
+        ],
+        [
+            {"code": "low_a", "name": "Low A", "risk_status": "Healthy", "risk_score_scaled": 12},
+        ],
+        [
+            {"code": "low_c", "name": "Low C", "risk_status": "Healthy", "risk_score_scaled": 10},
+        ],
+    ]
+    result = aggregate_top_low_risk(participant_low_risk, limit=3)
+    assert [item["code"] for item in result] == ["low_a", "low_b", "low_c"]
+    assert result[0]["risk_status"] == "Healthy"
+
+
 def test_build_positive_wins_shape():
     payload = build_positive_wins(
+        low_risk=[{"code": "a", "name": "A", "risk_status": "Healthy", "risk_score_scaled": 10}],
         healthy_habits=[{"habit_key": "k", "habit_label": "Label"}],
         healthy_profiles=["Group A"],
     )
     assert payload == {
         "data": {
+            "low_risk": [{"code": "a", "name": "A", "risk_status": "Healthy", "risk_score_scaled": 10}],
             "healthy_habits": [{"habit_key": "k", "habit_label": "Label"}],
             "healthy_profiles": ["Group A"],
         },

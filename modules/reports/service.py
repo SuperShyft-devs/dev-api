@@ -537,6 +537,110 @@ class ReportsService:
         scored.sort(key=lambda x: (-x[0], x[1]))
         return [name for _, name in scored[:limit]]
 
+    @staticmethod
+    def _top_low_risk_from_report_dict(
+        report_dict: dict[str, Any],
+        *,
+        limit: int = 3,
+    ) -> list[DiseaseOverview]:
+        """Healthy diseases from a Metsights report, lowest risk_score_scaled first."""
+        dis = report_dict.get("diseases", [])
+        diseases_raw: list[Any] = dis if isinstance(dis, list) else []
+        positive_wins_list: list[DiseaseOverview] = []
+        for d in diseases_raw:
+            if not isinstance(d, dict):
+                continue
+            code = str(d.get("code") or "")
+            name = str(d.get("name") or "")
+            rs = d.get("risk_status")
+            risk_status = str(rs) if rs is not None else ""
+            rsc = d.get("risk_score_scaled")
+            try:
+                risk_score_scaled = int(rsc) if rsc is not None else 0
+            except (TypeError, ValueError):
+                risk_score_scaled = 0
+            if risk_status == "Healthy":
+                positive_wins_list.append(
+                    DiseaseOverview(
+                        code=code,
+                        name=name,
+                        risk_status=risk_status,
+                        risk_score_scaled=risk_score_scaled,
+                    )
+                )
+        positive_wins_list.sort(key=lambda x: (x.risk_score_scaled, x.code))
+        return positive_wins_list[:limit]
+
+    async def _resolve_report_dict_for_instance(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance: AssessmentInstance,
+        package: AssessmentPackage,
+        individual_report: IndividualHealthReport | None,
+        cache_on_fetch: bool = True,
+    ) -> dict[str, Any]:
+        """Return Metsights report JSON for an assessment, optionally persisting a fetch."""
+        if individual_report is not None and individual_report.reports is not None:
+            report_data = individual_report.reports
+            return report_data if isinstance(report_data, dict) else {}
+
+        record_id = (assessment_instance.metsights_record_id or "").strip()
+        if not record_id:
+            return {}
+
+        report_data = await self._metsights_service.get_report(
+            record_id=record_id,
+            assessment_type_code=package.assessment_type_code,
+        )
+        report_dict = report_data if isinstance(report_data, dict) else {}
+
+        if cache_on_fetch:
+            if individual_report is None:
+                individual_report = IndividualHealthReport(
+                    user_id=assessment_instance.user_id,
+                    engagement_id=assessment_instance.engagement_id,
+                    assessment_instance_id=assessment_instance.assessment_instance_id,
+                    reports=report_data,
+                    blood_parameters=None,
+                )
+                await self._repository.create_individual_report(db, individual_report)
+            else:
+                individual_report.reports = report_data
+                await self._repository.update_individual_report(db, individual_report)
+
+        return report_dict
+
+    async def compute_low_risk_for_instance(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance: AssessmentInstance,
+        package: AssessmentPackage | None,
+        individual_report: IndividualHealthReport | None,
+    ) -> list[DiseaseOverview]:
+        """Overview-style low_risk diseases for one assessment; empty when unavailable."""
+        if package is None:
+            return []
+        if (package.assessment_type_code or "").strip() == "7":
+            return []
+        try:
+            report_dict = await self._resolve_report_dict_for_instance(
+                db,
+                assessment_instance=assessment_instance,
+                package=package,
+                individual_report=individual_report,
+                cache_on_fetch=True,
+            )
+        except AppError as exc:
+            logger.debug(
+                "Skipping low_risk for assessment %s: %s",
+                assessment_instance.assessment_instance_id,
+                exc.error_code,
+            )
+            return []
+        return self._top_low_risk_from_report_dict(report_dict)
+
     async def _resolve_blood_parameters_for_overview(
         self,
         db: AsyncSession,
@@ -699,10 +803,8 @@ class ReportsService:
             assessment_instance_id=assessment_id,
         )
 
-        if individual_report is not None and individual_report.reports is not None:
-            report_data: Any = individual_report.reports
-        else:
-            record_id = (assessment_instance.metsights_record_id or "").strip()
+        record_id = (assessment_instance.metsights_record_id or "").strip()
+        if individual_report is None or individual_report.reports is None:
             if not record_id:
                 raise AppError(
                     status_code=422,
@@ -710,25 +812,18 @@ class ReportsService:
                     message="Metsights record id is missing for this assessment",
                 )
 
-            report_data = await self._metsights_service.get_report(
-                record_id=record_id,
-                assessment_type_code=package.assessment_type_code,
+        report_dict = await self._resolve_report_dict_for_instance(
+            db,
+            assessment_instance=assessment_instance,
+            package=package,
+            individual_report=individual_report,
+            cache_on_fetch=True,
+        )
+        if individual_report is None:
+            individual_report = await self._repository.get_individual_report_by_assessment(
+                db,
+                assessment_instance_id=assessment_id,
             )
-
-            if individual_report is None:
-                individual_report = IndividualHealthReport(
-                    user_id=assessment_instance.user_id,
-                    engagement_id=assessment_instance.engagement_id,
-                    assessment_instance_id=assessment_instance.assessment_instance_id,
-                    reports=report_data,
-                    blood_parameters=None,
-                )
-                await self._repository.create_individual_report(db, individual_report)
-            else:
-                individual_report.reports = report_data
-                await self._repository.update_individual_report(db, individual_report)
-
-        report_dict = report_data if isinstance(report_data, dict) else {}
 
         ma = report_dict.get("metabolic_age")
         if isinstance(ma, (int, float)):
@@ -740,7 +835,7 @@ class ReportsService:
         dis = report_dict.get("diseases", [])
         diseases_raw: list[Any] = dis if isinstance(dis, list) else []
 
-        positive_wins_list: list[DiseaseOverview] = []
+        positive_wins_list = self._top_low_risk_from_report_dict(report_dict)
         risk_analysis_list: list[RiskAnalysisItem] = []
         for d in diseases_raw:
             if not isinstance(d, dict):
@@ -754,15 +849,6 @@ class ReportsService:
                 risk_score_scaled = int(rsc) if rsc is not None else 0
             except (TypeError, ValueError):
                 risk_score_scaled = 0
-            if risk_status == "Healthy":
-                positive_wins_list.append(
-                    DiseaseOverview(
-                        code=code,
-                        name=name,
-                        risk_status=risk_status,
-                        risk_score_scaled=risk_score_scaled,
-                    )
-                )
             hp = d.get("healthy_percentile")
             try:
                 healthy_percentile = int(hp) if hp is not None else 0
@@ -777,9 +863,6 @@ class ReportsService:
                     healthy_percentile=healthy_percentile,
                 )
             )
-
-        positive_wins_list.sort(key=lambda x: (x.risk_score_scaled, x.code))
-        positive_wins_list = positive_wins_list[:3]
 
         risk_analysis_list.sort(key=lambda x: (-x.risk_score_scaled, x.code))
         risk_analysis_list = risk_analysis_list[:3]

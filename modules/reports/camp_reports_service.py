@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,7 @@ from modules.reports.camp_report_section_builders import (
     SECTION_BUILDERS,
     aggregate_top_healthy_habits,
     aggregate_top_healthy_profiles,
+    aggregate_top_low_risk,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
     build_distribution_by_physical_activity_frequency,
@@ -669,7 +671,25 @@ class CampReportsService:
         )
         participant_habits: list[list[dict[str, str | None]]] = []
         participant_profiles: list[list[str]] = []
+        participant_low_risk: list[list[dict[str, Any]]] = []
         for ctx in contexts:
+            low_risk_items = await self._reports_service.compute_low_risk_for_instance(
+                db,
+                assessment_instance=ctx.assessment_instance,
+                package=ctx.package,
+                individual_report=ctx.individual_report,
+            )
+            participant_low_risk.append(
+                [
+                    {
+                        "code": item.code,
+                        "name": item.name,
+                        "risk_status": item.risk_status,
+                        "risk_score_scaled": item.risk_score_scaled,
+                    }
+                    for item in low_risk_items
+                ]
+            )
             try:
                 habits, profiles = await self._reports_service.compute_healthy_habits_and_profiles_for_instance(
                     db,
@@ -689,6 +709,7 @@ class CampReportsService:
             participant_profiles.append(profiles)
 
         return build_positive_wins(
+            low_risk=aggregate_top_low_risk(participant_low_risk),
             healthy_habits=aggregate_top_healthy_habits(participant_habits),
             healthy_profiles=aggregate_top_healthy_profiles(participant_profiles),
         )

@@ -477,14 +477,36 @@ def aggregate_top_healthy_profiles(
     return [name for name, _ in ranked[:limit]]
 
 
+def aggregate_top_low_risk(
+    participant_low_risk: list[list[dict[str, Any]]],
+    *,
+    limit: int = 3,
+) -> list[dict[str, Any]]:
+    """Top disease codes by how many participants have each in their low_risk list."""
+    counts: dict[str, int] = {}
+    meta_by_code: dict[str, dict[str, Any]] = {}
+    for low_risk_items in participant_low_risk:
+        for item in low_risk_items:
+            code = str(item.get("code") or "").strip()
+            if not code:
+                continue
+            counts[code] = counts.get(code, 0) + 1
+            if code not in meta_by_code:
+                meta_by_code[code] = item
+    ranked = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+    return [meta_by_code[code] for code, _ in ranked[:limit]]
+
+
 def build_positive_wins(
     *,
+    low_risk: list[dict[str, Any]],
     healthy_habits: list[dict[str, Any]],
     healthy_profiles: list[str],
 ) -> dict:
     """Build positive_wins camp report section payload."""
     return {
         "data": {
+            "low_risk": low_risk,
             "healthy_habits": healthy_habits,
             "healthy_profiles": healthy_profiles,
         },
