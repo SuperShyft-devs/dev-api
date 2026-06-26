@@ -301,6 +301,120 @@ def build_overall_risk_score(scores: list[float]) -> dict:
     }
 
 
+DISEASE_RISK_BANDS: tuple[str, ...] = ("healthy", "increased", "high", "very_high")
+
+CAMP_REPORT_DISEASE_CODES: tuple[str, ...] = (
+    "type_2_diabetes",
+    "hypertension",
+    "obesity",
+    "pcos_pcod",
+    "nafld",
+    "cardiac_health",
+    "thyroid_health",
+    "dyslipidemia",
+)
+
+_DASHBOARD_DISEASE_ALIASES: dict[str, tuple[str, ...]] = {
+    "type_2_diabetes": ("type_2_diabetes", "diabetes"),
+    "pcos_pcod": ("pcos_pcod", "pcos", "pcos/pcod"),
+}
+
+
+def _matches_disease_code(*, requested: str, report_code: str) -> bool:
+    req = (requested or "").strip().lower()
+    code = (report_code or "").strip().lower()
+    if not req or not code:
+        return False
+    if code == req:
+        return True
+    if code.startswith(f"{req}/") or req.startswith(f"{code}/"):
+        return True
+    return False
+
+
+def match_dashboard_disease_code(report_code: str) -> str | None:
+    """Map a report diseases[].code value to a dashboard disease code, if recognized."""
+    for dashboard_code in CAMP_REPORT_DISEASE_CODES:
+        aliases = _DASHBOARD_DISEASE_ALIASES.get(dashboard_code, (dashboard_code,))
+        for alias in aliases:
+            if _matches_disease_code(requested=alias, report_code=report_code):
+                return dashboard_code
+    return None
+
+
+def risk_score_scaled_to_band(score: float) -> str:
+    if score <= 25:
+        return "healthy"
+    if score <= 42:
+        return "increased"
+    if score <= 58:
+        return "high"
+    return "very_high"
+
+
+def extract_disease_risk_scores(reports: dict) -> dict[str, float]:
+    """Return {dashboard_disease_code: risk_score_scaled} for diseases present in a report."""
+    scores: dict[str, float] = {}
+    for entry in extract_diseases(reports):
+        if not isinstance(entry, dict):
+            continue
+        code = entry.get("code")
+        if not isinstance(code, str):
+            continue
+        dashboard_code = match_dashboard_disease_code(code)
+        if dashboard_code is None:
+            continue
+        risk_score = entry.get("risk_score_scaled")
+        if not isinstance(risk_score, (int, float)):
+            continue
+        scores[dashboard_code] = float(risk_score)
+    return scores
+
+
+def _build_gender_risk_distribution(counts: dict[str, int], buckets: tuple[str, ...]) -> dict:
+    distribution = _build_gender_distribution(counts, buckets)
+    percent = distribution["percent"]
+    distribution["elevated_percent"] = round(percent[2] + percent[3], 1)
+    return distribution
+
+
+def build_distribution_by_gender_by_metabolic_syndrome(
+    rows: list[tuple[str | None, dict]],
+) -> dict:
+    """Build distribution_by_gender_by_metabolic_syndrome from (gender, reports) rows."""
+    disease_counts: dict[str, dict[str, dict[str, int]]] = {
+        code: {
+            "male": {band: 0 for band in DISEASE_RISK_BANDS},
+            "female": {band: 0 for band in DISEASE_RISK_BANDS},
+        }
+        for code in CAMP_REPORT_DISEASE_CODES
+    }
+
+    for gender_raw, reports in rows:
+        gender = normalize_camp_gender(gender_raw)
+        if gender is None:
+            continue
+        for dashboard_code, risk_score in extract_disease_risk_scores(reports).items():
+            band = risk_score_scaled_to_band(risk_score)
+            disease_counts[dashboard_code][gender][band] += 1
+
+    diseases: list[dict[str, Any]] = []
+    for code in CAMP_REPORT_DISEASE_CODES:
+        male_total = sum(disease_counts[code]["male"].values())
+        female_total = sum(disease_counts[code]["female"].values())
+        if male_total + female_total == 0:
+            continue
+        diseases.append(
+            {
+                "code": code,
+                "male": _build_gender_risk_distribution(disease_counts[code]["male"], DISEASE_RISK_BANDS),
+                "female": _build_gender_risk_distribution(disease_counts[code]["female"], DISEASE_RISK_BANDS),
+            }
+        )
+
+    return {"data": {"diseases": diseases}}
+
+
 def build_distribution_by_oxidative_stress(scores: list[float]) -> dict:
     """Build distribution_by_oxidative_stress section payload from oxidative stress scores."""
     counts = {band: 0 for band in OXIDATIVE_STRESS_BANDS}
@@ -330,4 +444,5 @@ SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "distribution_by_physical_activity_frequency": build_distribution_by_physical_activity_frequency,
     "distribution_by_sleeping_hours": build_distribution_by_sleeping_hours,
     "distribution_by_oxidative_stress": build_distribution_by_oxidative_stress,
+    "distribution_by_gender_by_metabolic_syndrome": build_distribution_by_gender_by_metabolic_syndrome,
 }

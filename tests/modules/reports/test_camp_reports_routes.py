@@ -2250,3 +2250,389 @@ async def test_refresh_physical_activity_distribution_updates_existing(async_cli
         physical_again.json()["data"]["section"]["data"]["female"]["count"] == [1, 0, 1, 1]
     )
     assert row.report["participation_by_age"]["data"]["total_enrolled"] == 6
+
+
+async def _seed_gender_metabolic_syndrome_section(test_db_session, *, report_sections: int = 400):
+    existing = (
+        await test_db_session.execute(
+            select(CampReportSection).where(
+                CampReportSection.section_key == "distribution_by_gender_by_metabolic_syndrome"
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        existing.section = "Disease Risk by Gender"
+        existing.description = "Distribution of metabolic disease risk bands by gender"
+        await test_db_session.commit()
+        return existing
+
+    row = CampReportSection(
+        report_sections=report_sections,
+        section="Disease Risk by Gender",
+        section_key="distribution_by_gender_by_metabolic_syndrome",
+        description="Distribution of metabolic disease risk bands by gender",
+    )
+    test_db_session.add(row)
+    await test_db_session.commit()
+    return row
+
+
+async def _seed_gender_metabolic_syndrome_camp_data(
+    test_db_session,
+    *,
+    organization_id: int = 9801,
+    engagement_id: int = 9801,
+):
+    from modules.assessments.models import AssessmentInstance, AssessmentPackage
+    from modules.reports.models import IndividualHealthReport
+
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=organization_id, engagement_id=engagement_id)
+    start = date(2026, 6, 23)
+    pkg_basic = engagement_id * 10 + 1
+    pkg_pro = engagement_id * 10 + 2
+    pkg_fitprint = engagement_id * 10 + 3
+    user_base = engagement_id * 100
+    participant_base = engagement_id * 100
+    instance_base = engagement_id * 100
+    report_base = engagement_id * 100
+
+    test_db_session.add_all(
+        [
+            AssessmentPackage(
+                package_id=pkg_basic,
+                package_code=f"GMSPKG{engagement_id}1",
+                display_name="Bio AI Package",
+                assessment_type_code="1",
+                status="active",
+            ),
+            AssessmentPackage(
+                package_id=pkg_pro,
+                package_code=f"GMSPKG{engagement_id}2",
+                display_name="Bio AI Package 2",
+                assessment_type_code="2",
+                status="active",
+            ),
+            AssessmentPackage(
+                package_id=pkg_fitprint,
+                package_code=f"GMSPKG{engagement_id}7",
+                display_name="FitPrint Package",
+                assessment_type_code="7",
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    user_ids = [user_base + offset for offset in range(1, 7)]
+    test_db_session.add_all(
+        [
+            User(user_id=user_ids[0], age=30, gender="male", phone=f"{user_ids[0]}000000000", status="active"),
+            User(user_id=user_ids[1], age=35, gender="male", phone=f"{user_ids[1]}000000000", status="active"),
+            User(user_id=user_ids[2], age=40, gender="female", phone=f"{user_ids[2]}000000000", status="active"),
+            User(user_id=user_ids[3], age=45, gender="female", phone=f"{user_ids[3]}000000000", status="active"),
+            User(user_id=user_ids[4], age=50, gender="female", phone=f"{user_ids[4]}000000000", status="active"),
+            User(user_id=user_ids[5], age=28, gender="male", phone=f"{user_ids[5]}000000000", status="active"),
+        ]
+    )
+    await test_db_session.flush()
+
+    participant_ids = [participant_base + offset for offset in range(1, 7)]
+    test_db_session.add_all(
+        [
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[0],
+                engagement_id=engagement_id,
+                user_id=user_ids[0],
+                engagement_date=start,
+                slot_start_time=time(10, 0),
+                participant_department="sales",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[1],
+                engagement_id=engagement_id,
+                user_id=user_ids[1],
+                engagement_date=start,
+                slot_start_time=time(10, 20),
+                participant_department="sales",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[2],
+                engagement_id=engagement_id,
+                user_id=user_ids[2],
+                engagement_date=start,
+                slot_start_time=time(11, 0),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[3],
+                engagement_id=engagement_id,
+                user_id=user_ids[3],
+                engagement_date=start,
+                slot_start_time=time(11, 20),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[4],
+                engagement_id=engagement_id,
+                user_id=user_ids[4],
+                engagement_date=start,
+                slot_start_time=time(12, 0),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=participant_ids[5],
+                engagement_id=engagement_id,
+                user_id=user_ids[5],
+                engagement_date=start,
+                slot_start_time=time(12, 20),
+                participant_department="sales",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    instance_ids = [instance_base + offset for offset in range(1, 7)]
+    test_db_session.add_all(
+        [
+            AssessmentInstance(
+                assessment_instance_id=instance_ids[0],
+                user_id=user_ids[0],
+                engagement_id=engagement_id,
+                package_id=pkg_basic,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=instance_ids[1],
+                user_id=user_ids[1],
+                engagement_id=engagement_id,
+                package_id=pkg_pro,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=instance_ids[2],
+                user_id=user_ids[2],
+                engagement_id=engagement_id,
+                package_id=pkg_basic,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=instance_ids[3],
+                user_id=user_ids[3],
+                engagement_id=engagement_id,
+                package_id=pkg_pro,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=instance_ids[4],
+                user_id=user_ids[4],
+                engagement_id=engagement_id,
+                package_id=pkg_basic,
+                status="completed",
+            ),
+            AssessmentInstance(
+                assessment_instance_id=instance_ids[5],
+                user_id=user_ids[5],
+                engagement_id=engagement_id,
+                package_id=pkg_fitprint,
+                status="completed",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    report_ids = [report_base + offset for offset in range(1, 7)]
+    test_db_session.add_all(
+        [
+            IndividualHealthReport(
+                report_id=report_ids[0],
+                user_id=user_ids[0],
+                assessment_instance_id=instance_ids[0],
+                engagement_id=engagement_id,
+                reports={
+                    "diseases": [
+                        {"code": "hypertension", "risk_score_scaled": 20},
+                    ]
+                },
+            ),
+            IndividualHealthReport(
+                report_id=report_ids[1],
+                user_id=user_ids[1],
+                assessment_instance_id=instance_ids[1],
+                engagement_id=engagement_id,
+                reports={
+                    "diseases": [
+                        {"code": "hypertension", "risk_score_scaled": 50},
+                    ]
+                },
+            ),
+            IndividualHealthReport(
+                report_id=report_ids[2],
+                user_id=user_ids[2],
+                assessment_instance_id=instance_ids[2],
+                engagement_id=engagement_id,
+                reports={
+                    "diseases": [
+                        {"code": "hypertension", "risk_score_scaled": 35},
+                    ]
+                },
+            ),
+            IndividualHealthReport(
+                report_id=report_ids[3],
+                user_id=user_ids[3],
+                assessment_instance_id=instance_ids[3],
+                engagement_id=engagement_id,
+                reports={
+                    "diseases": [
+                        {"code": "diabetes", "risk_score_scaled": 10},
+                    ]
+                },
+            ),
+            IndividualHealthReport(
+                report_id=report_ids[4],
+                user_id=user_ids[4],
+                assessment_instance_id=instance_ids[4],
+                engagement_id=engagement_id,
+                reports={
+                    "diseases": [
+                        {"code": "oxidative_stress", "risk_score_scaled": 70},
+                    ]
+                },
+            ),
+            IndividualHealthReport(
+                report_id=report_ids[5],
+                user_id=user_ids[5],
+                assessment_instance_id=instance_ids[5],
+                engagement_id=engagement_id,
+                reports={
+                    "diseases": [
+                        {"code": "hypertension", "risk_score_scaled": 60},
+                    ]
+                },
+            ),
+        ]
+    )
+    await test_db_session.commit()
+    return camp_no
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_report_distribution_by_gender_by_metabolic_syndrome(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8101, employee_id=401)
+    await _seed_gender_metabolic_syndrome_section(test_db_session, report_sections=401)
+    camp_no = await _seed_gender_metabolic_syndrome_camp_data(
+        test_db_session, organization_id=9801, engagement_id=9801
+    )
+    headers = _auth_header(8101)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "distribution_by_gender_by_metabolic_syndrome"},
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["report_id"] == report_id
+    section = payload["section"]
+    assert section["name"] == "Disease Risk by Gender"
+    assert section["description"] == "Distribution of metabolic disease risk bands by gender"
+
+    diseases = section["data"]["diseases"]
+    codes = [d["code"] for d in diseases]
+    assert codes == ["type_2_diabetes", "hypertension"]
+
+    hypertension = next(d for d in diseases if d["code"] == "hypertension")
+    assert hypertension["male"]["group"] == ["healthy", "increased", "high", "very_high"]
+    assert hypertension["male"]["count"] == [1, 0, 1, 0]
+    assert hypertension["male"]["percent"] == [50.0, 0.0, 50.0, 0.0]
+    assert hypertension["male"]["elevated_percent"] == 50.0
+    assert hypertension["female"]["count"] == [0, 1, 0, 0]
+    assert hypertension["female"]["elevated_percent"] == 0.0
+
+    diabetes = next(d for d in diseases if d["code"] == "type_2_diabetes")
+    assert diabetes["female"]["count"] == [1, 0, 0, 0]
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.report["distribution_by_gender_by_metabolic_syndrome"]["data"]["diseases"][1]["code"] == "hypertension"
+
+
+@pytest.mark.asyncio
+async def test_refresh_department_camp_report_distribution_by_gender_by_metabolic_syndrome(
+    async_client, test_db_session
+):
+    await _seed_employee(test_db_session, user_id=8102, employee_id=402)
+    await _seed_gender_metabolic_syndrome_section(test_db_session, report_sections=402)
+    camp_no = await _seed_gender_metabolic_syndrome_camp_data(
+        test_db_session, organization_id=9802, engagement_id=9802
+    )
+    headers = _auth_header(8102)
+
+    init = await async_client.post(
+        f"/reports/camps/{camp_no}/department/sales/init",
+        headers=headers,
+    )
+    assert init.status_code == 201
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/department/sales/refresh",
+        headers=headers,
+        json={"section": "distribution_by_gender_by_metabolic_syndrome"},
+    )
+    assert response.status_code == 200
+    diseases = response.json()["data"]["section"]["data"]["diseases"]
+    assert len(diseases) == 1
+    assert diseases[0]["code"] == "hypertension"
+    assert diseases[0]["male"]["count"] == [1, 0, 1, 0]
+    assert diseases[0]["female"]["count"] == [0, 0, 0, 0]
+
+
+@pytest.mark.asyncio
+async def test_refresh_gender_metabolic_syndrome_updates_existing(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8103, employee_id=403)
+    await _seed_participation_section(test_db_session, report_sections=403)
+    await _seed_gender_metabolic_syndrome_section(test_db_session, report_sections=404)
+    camp_no = await _seed_gender_metabolic_syndrome_camp_data(
+        test_db_session, organization_id=9803, engagement_id=9803
+    )
+    headers = _auth_header(8103)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    participation = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert participation.status_code == 200
+
+    gender_section = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "distribution_by_gender_by_metabolic_syndrome"},
+    )
+    assert gender_section.status_code == 200
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert "participation_by_age" in row.report
+    assert "distribution_by_gender_by_metabolic_syndrome" in row.report
+    assert len(row.report["distribution_by_gender_by_metabolic_syndrome"]["data"]["diseases"]) == 2
+
+    gender_again = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "distribution_by_gender_by_metabolic_syndrome"},
+    )
+    assert gender_again.status_code == 200
+    assert (
+        gender_again.json()["data"]["section"]["data"]["diseases"][1]["male"]["count"] == [1, 0, 1, 0]
+    )
+    assert row.report["participation_by_age"]["data"]["total_enrolled"] == 6

@@ -5,19 +5,23 @@ from __future__ import annotations
 from datetime import date
 
 from modules.reports.camp_report_section_builders import (
+    build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
     build_distribution_by_physical_activity_frequency,
     build_kpis,
     build_overall_risk_score,
     build_participation_by_age,
+    extract_disease_risk_scores,
     extract_metabolic_age,
     extract_metabolic_score,
     extract_oxidative_stress_score,
     is_high_metabolic_risk,
+    match_dashboard_disease_code,
     metabolic_score_to_band,
     normalize_camp_gender,
     oxidative_stress_to_band,
     physical_activity_answer_to_bucket,
+    risk_score_scaled_to_band,
 )
 
 
@@ -222,3 +226,68 @@ def test_build_distribution_by_physical_activity_frequency_empty():
         data = payload["data"][gender]
         assert data["count"] == [0, 0, 0, 0]
         assert data["percent"] == [0.0, 0.0, 0.0, 0.0]
+
+
+def test_risk_score_scaled_to_band_boundaries():
+    assert risk_score_scaled_to_band(25) == "healthy"
+    assert risk_score_scaled_to_band(26) == "increased"
+    assert risk_score_scaled_to_band(42) == "increased"
+    assert risk_score_scaled_to_band(43) == "high"
+    assert risk_score_scaled_to_band(58) == "high"
+    assert risk_score_scaled_to_band(59) == "very_high"
+
+
+def test_match_dashboard_disease_code_aliases():
+    assert match_dashboard_disease_code("diabetes") == "type_2_diabetes"
+    assert match_dashboard_disease_code("type_2_diabetes") == "type_2_diabetes"
+    assert match_dashboard_disease_code("pcos/pcod") == "pcos_pcod"
+    assert match_dashboard_disease_code("pcos") == "pcos_pcod"
+    assert match_dashboard_disease_code("hypertension") == "hypertension"
+    assert match_dashboard_disease_code("oxidative_stress") is None
+    assert match_dashboard_disease_code("unknown") is None
+
+
+def test_extract_disease_risk_scores():
+    reports = {
+        "data": {
+            "diseases": [
+                {"code": "diabetes", "risk_score_scaled": 15},
+                {"code": "hypertension", "risk_score_scaled": 40},
+                {"code": "oxidative_stress", "risk_score_scaled": 67},
+                {"code": "nafld", "risk_score_scaled": "invalid"},
+            ]
+        }
+    }
+    scores = extract_disease_risk_scores(reports)
+    assert scores == {"type_2_diabetes": 15.0, "hypertension": 40.0}
+
+
+def test_build_distribution_by_gender_by_metabolic_syndrome():
+    rows = [
+        ("male", {"diseases": [{"code": "hypertension", "risk_score_scaled": 20}]}),
+        ("male", {"diseases": [{"code": "hypertension", "risk_score_scaled": 50}]}),
+        ("female", {"diseases": [{"code": "hypertension", "risk_score_scaled": 35}]}),
+        ("female", {"diseases": [{"code": "diabetes", "risk_score_scaled": 10}]}),
+        ("other", {"diseases": [{"code": "hypertension", "risk_score_scaled": 60}]}),
+        ("male", {"diseases": [{"code": "oxidative_stress", "risk_score_scaled": 70}]}),
+    ]
+    payload = build_distribution_by_gender_by_metabolic_syndrome(rows)
+    diseases = payload["data"]["diseases"]
+    codes = [d["code"] for d in diseases]
+    assert codes == ["type_2_diabetes", "hypertension"]
+
+    hypertension = next(d for d in diseases if d["code"] == "hypertension")
+    assert hypertension["male"]["count"] == [1, 0, 1, 0]
+    assert hypertension["male"]["percent"] == [50.0, 0.0, 50.0, 0.0]
+    assert hypertension["male"]["elevated_percent"] == 50.0
+    assert hypertension["female"]["count"] == [0, 1, 0, 0]
+    assert hypertension["female"]["elevated_percent"] == 0.0
+
+    diabetes = next(d for d in diseases if d["code"] == "type_2_diabetes")
+    assert diabetes["male"]["count"] == [0, 0, 0, 0]
+    assert diabetes["female"]["count"] == [1, 0, 0, 0]
+
+
+def test_build_distribution_by_gender_by_metabolic_syndrome_empty():
+    payload = build_distribution_by_gender_by_metabolic_syndrome([])
+    assert payload["data"]["diseases"] == []

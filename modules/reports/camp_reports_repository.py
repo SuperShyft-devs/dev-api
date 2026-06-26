@@ -367,6 +367,53 @@ class CampReportsRepository:
                 scores.append(score)
         return scores
 
+    async def list_health_reports_by_gender(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+    ) -> list[tuple[str | None, dict[str, Any]]]:
+        """Return (gender, reports) for enrolled users with latest Pro/Basic health reports."""
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+
+        ranked_reports = (
+            select(
+                enrolled.c.gender,
+                IndividualHealthReport.reports,
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=IndividualHealthReport.report_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(
+                AssessmentInstance,
+                and_(
+                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
+                    AssessmentInstance.user_id == enrolled.c.user_id,
+                ),
+            )
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .join(
+                IndividualHealthReport,
+                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+            )
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        ).subquery()
+
+        reports_result = await db.execute(
+            select(ranked_reports.c.gender, ranked_reports.c.reports).where(ranked_reports.c.rn == 1)
+        )
+
+        rows: list[tuple[str | None, dict[str, Any]]] = []
+        for gender, reports in reports_result.all():
+            reports_dict: dict[str, Any] = reports if isinstance(reports, dict) else {}
+            rows.append((gender, reports_dict))
+        return rows
+
     async def list_physical_activity_frequency_by_gender(
         self,
         db: AsyncSession,

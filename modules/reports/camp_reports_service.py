@@ -21,6 +21,7 @@ from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.service import get_department_slugs
 from modules.reports.camp_report_section_builders import (
     SECTION_BUILDERS,
+    build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
     build_distribution_by_physical_activity_frequency,
     build_distribution_by_sleeping_hours,
@@ -709,6 +710,14 @@ class CampReportsService:
                 department=department,
             )
             return build_distribution_by_sleeping_hours(rows)
+
+        if section_key == "distribution_by_gender_by_metabolic_syndrome":
+            rows = await self._repository.list_health_reports_by_gender(
+                db,
+                camp_no=camp_no,
+                department=department,
+            )
+            return build_distribution_by_gender_by_metabolic_syndrome(rows)
 
         raise AppError(
             status_code=400,
