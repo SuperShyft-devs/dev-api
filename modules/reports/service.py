@@ -23,6 +23,7 @@ from modules.diagnostics.service import DiagnosticsService
 from modules.metsights.service import MetsightsService
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.reports.repository import ReportsRepository
+from modules.users.models import User
 from modules.questionnaire.healthy_habits_service import HealthyHabitsService
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.schemas import (
@@ -534,6 +535,8 @@ class ReportsService:
         *,
         assessment_instance: AssessmentInstance,
         individual_report: IndividualHealthReport,
+        user_first_name: str = "",
+        user_last_name: str = "",
     ) -> dict[str, Any]:
         if individual_report.blood_parameters is not None:
             raw = individual_report.blood_parameters
@@ -543,7 +546,40 @@ class ReportsService:
         if not record_id:
             return {}
 
-        blood_parameters = await self._metsights_service.get_blood_parameters(record_id=record_id)
+        if (
+            self._healthians_get_access_token is not None
+            and self._healthians_get_booking_digital_value is not None
+        ):
+            try:
+                blood_parameters = await self._fetch_blood_parameters_from_provider(
+                    record_id=record_id,
+                    user_first_name=user_first_name,
+                    user_last_name=user_last_name,
+                )
+                individual_report.blood_parameters = blood_parameters
+                await self._repository.update_individual_report(db, individual_report)
+                return blood_parameters
+            except AppError as exc:
+                if exc.error_code not in {
+                    "BLOOD_PARAMETERS_NOT_FOUND",
+                    "INVALID_STATE",
+                    "EXTERNAL_SERVICE_UNAVAILABLE",
+                }:
+                    raise
+                logger.debug(
+                    "Provider blood parameters unavailable for record %s: %s",
+                    record_id,
+                    exc.error_code,
+                )
+
+        try:
+            blood_parameters = await self._metsights_service.get_blood_parameters(record_id=record_id)
+        except AppError as exc:
+            if exc.error_code == "BLOOD_PARAMETERS_NOT_FOUND":
+                logger.debug("Metsights blood parameters not found for record %s", record_id)
+                return {}
+            raise
+
         individual_report.blood_parameters = blood_parameters
         await self._repository.update_individual_report(db, individual_report)
         return blood_parameters if isinstance(blood_parameters, dict) else {}
@@ -568,10 +604,19 @@ class ReportsService:
             normalized_gender = (user_gender or "").strip().lower() or None
             if normalized_gender not in {"male", "female"}:
                 normalized_gender = None
+            user_first_name = ""
+            user_last_name = ""
+            if individual_report.blood_parameters is None:
+                user_row = await db.get(User, assessment_instance.user_id)
+                if user_row is not None:
+                    user_first_name = user_row.first_name or ""
+                    user_last_name = user_row.last_name or ""
             blood_raw = await self._resolve_blood_parameters_for_overview(
                 db,
                 assessment_instance=assessment_instance,
                 individual_report=individual_report,
+                user_first_name=user_first_name,
+                user_last_name=user_last_name,
             )
             detected_source = self._detect_blood_parameters_source(blood_raw)
             groups = await self._build_blood_parameter_groups_report(

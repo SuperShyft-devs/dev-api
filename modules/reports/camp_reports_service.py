@@ -670,14 +670,20 @@ class CampReportsService:
         participant_habits: list[list[dict[str, str | None]]] = []
         participant_profiles: list[list[str]] = []
         for ctx in contexts:
-            habits, profiles = await self._reports_service.compute_healthy_habits_and_profiles_for_instance(
-                db,
-                assessment_instance=ctx.assessment_instance,
-                package=ctx.package,
-                engagement=ctx.engagement,
-                individual_report=ctx.individual_report,
-                user_gender=ctx.user_gender,
-            )
+            try:
+                habits, profiles = await self._reports_service.compute_healthy_habits_and_profiles_for_instance(
+                    db,
+                    assessment_instance=ctx.assessment_instance,
+                    package=ctx.package,
+                    engagement=ctx.engagement,
+                    individual_report=ctx.individual_report,
+                    user_gender=ctx.user_gender,
+                )
+            except AppError as exc:
+                if exc.error_code == "BLOOD_PARAMETERS_NOT_FOUND":
+                    habits, profiles = [], []
+                else:
+                    raise
             participant_habits.append(
                 [{"habit_key": h.habit_key, "habit_label": h.habit_label} for h in habits]
             )
