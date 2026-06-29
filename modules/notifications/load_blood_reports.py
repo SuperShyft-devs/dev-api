@@ -2,9 +2,9 @@
 
 For participants in running engagements with MetSights Pro/Basic assessments
 where today >= engagement_date:
-1. If individual_health_report.blood_parameters or diagnostic_report_url is null,
-   fetch data from Healthians.
-2. When both fields are present, send notifications using
+1. Always refresh individual_health_report.diagnostic_report_url from Healthians.
+2. Fetch blood_parameters from Healthians only when that field is null.
+3. When both fields are present, send notifications using
    engagement.blood_report_notification (skipping services already sent).
 """
 
@@ -201,10 +201,16 @@ async def load_blood_reports(
 
         if dry_run:
             complete = _blood_report_data_complete(blood_params, diag_url)
+            dry_run_reasons = ["would_refresh_diagnostic_report_url"]
+            if blood_params is None:
+                dry_run_reasons.append("would_fetch_blood_parameters")
+            dry_run_reasons.append(
+                "blood_report_complete" if complete else "blood_report_incomplete"
+            )
             details.append({
                 "user_id": user_id, "engagement_id": engagement_id,
                 "action": "dry_run",
-                "reason": "blood_report_complete" if complete else "blood_report_incomplete",
+                "reason": ", ".join(dry_run_reasons),
             })
             continue
 
@@ -212,88 +218,79 @@ async def load_blood_reports(
             blood_parameters = blood_params
             diagnostic_report_url = diag_url
 
-            if not _blood_report_data_complete(blood_parameters, diagnostic_report_url):
+            try:
+                collection_data = await metsights_service.get_fetch_collections(record_id=record_id)
+            except Exception:
+                skipped += 1
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "skipped", "reason": "fetch-collections not available for this record",
+                })
+                continue
+
+            reference_id = str(collection_data.get("reference_id") or "").strip()
+            provider_code = _provider_code(collection_data.get("provider"))
+
+            if not reference_id:
+                skipped += 1
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "skipped", "reason": "no reference_id from MetSights collections",
+                })
+                continue
+
+            if provider_code.lower() != "healthians":
+                skipped += 1
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "skipped",
+                    "reason": f"provider code is '{provider_code or 'unknown'}', not Healthians",
+                })
+                continue
+
+            access_token = await healthians_client.get_access_token()
+
+            fetched_blood = None
+            fetched_diag_url = None
+
+            if blood_parameters is None:
                 try:
-                    collection_data = await metsights_service.get_fetch_collections(record_id=record_id)
-                except Exception:
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "fetch-collections not available for this record",
-                    })
-                    continue
-
-                reference_id = str(collection_data.get("reference_id") or "").strip()
-                provider_code = _provider_code(collection_data.get("provider"))
-
-                if not reference_id:
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "no reference_id from MetSights collections",
-                    })
-                    continue
-
-                if provider_code.lower() != "healthians":
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped",
-                        "reason": f"provider code is '{provider_code or 'unknown'}', not Healthians",
-                    })
-                    continue
-
-                access_token = await healthians_client.get_access_token()
-
-                fetched_blood = None
-                fetched_diag_url = None
-
-                if blood_parameters is None:
-                    try:
-                        digital_value = await healthians_client.get_booking_digital_value(
-                            access_token, reference_id
+                    digital_value = await healthians_client.get_booking_digital_value(
+                        access_token, reference_id
+                    )
+                    data_list = digital_value.get("data")
+                    if isinstance(data_list, list) and data_list:
+                        matched_entry = _match_customer_by_name(
+                            data_list, first_name or "", last_name or ""
                         )
-                        data_list = digital_value.get("data")
-                        if isinstance(data_list, list) and data_list:
-                            matched_entry = _match_customer_by_name(
-                                data_list, first_name or "", last_name or ""
-                            )
-                            if matched_entry:
-                                fetched_blood = matched_entry
-                    except Exception as exc:
-                        logger.warning(
-                            "Healthians getBookingDigitalValue failed for user=%s booking=%s: %s",
-                            user_id, reference_id, exc,
-                        )
+                        if matched_entry:
+                            fetched_blood = matched_entry
+                except Exception as exc:
+                    logger.warning(
+                        "Healthians getBookingDigitalValue failed for user=%s booking=%s: %s",
+                        user_id, reference_id, exc,
+                    )
 
-                if diagnostic_report_url is None:
-                    try:
-                        report_data = await healthians_client.get_booking_report(
-                            access_token, reference_id
+            try:
+                report_data = await healthians_client.get_booking_report(
+                    access_token, reference_id
+                )
+                report_list = report_data.get("data")
+                if isinstance(report_list, list) and report_list:
+                    matched_report = _match_customer_by_name(
+                        report_list, first_name or "", last_name or ""
+                    )
+                    if matched_report:
+                        fetched_diag_url = (
+                            matched_report.get("report_url") or matched_report.get("url")
                         )
-                        report_list = report_data.get("data")
-                        if isinstance(report_list, list) and report_list:
-                            matched_report = _match_customer_by_name(
-                                report_list, first_name or "", last_name or ""
-                            )
-                            if matched_report:
-                                fetched_diag_url = (
-                                    matched_report.get("report_url") or matched_report.get("url")
-                                )
-                    except Exception as exc:
-                        logger.warning(
-                            "Healthians getBookingReport failed for user=%s booking=%s: %s",
-                            user_id, reference_id, exc,
-                        )
+            except Exception as exc:
+                logger.warning(
+                    "Healthians getBookingReport failed for user=%s booking=%s: %s",
+                    user_id, reference_id, exc,
+                )
 
-                if fetched_blood is None and fetched_diag_url is None:
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "no data returned from Healthians",
-                    })
-                    continue
-
+            if fetched_blood is not None or fetched_diag_url is not None:
                 ihr = None
                 if ihr_id:
                     ihr_result = await db.execute(
@@ -320,20 +317,33 @@ async def load_blood_reports(
                 await db.flush()
                 await db.commit()
 
-                if not _blood_report_data_complete(blood_parameters, diagnostic_report_url):
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped",
-                        "reason": "blood report data incomplete (missing blood_parameters or diagnostic_report_url)",
-                    })
-                    continue
-
                 loaded += 1
+                if fetched_blood is not None and fetched_diag_url is not None:
+                    load_reason = "blood data and diagnostic_report_url fetched from Healthians"
+                elif fetched_blood is not None:
+                    load_reason = "blood data fetched from Healthians"
+                else:
+                    load_reason = "diagnostic_report_url refreshed from Healthians"
                 details.append({
                     "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "loaded", "reason": "blood data fetched from Healthians",
+                    "action": "loaded", "reason": load_reason,
                 })
+
+            if not _blood_report_data_complete(blood_parameters, diagnostic_report_url):
+                skipped += 1
+                if fetched_blood is None and fetched_diag_url is None:
+                    incomplete_reason = "no data returned from Healthians"
+                else:
+                    incomplete_reason = (
+                        "blood report data incomplete "
+                        "(missing blood_parameters or diagnostic_report_url)"
+                    )
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "skipped",
+                    "reason": incomplete_reason,
+                })
+                continue
 
             service_keys = [
                 k.strip() for k in (blood_report_notification or "").split(",") if k.strip()
