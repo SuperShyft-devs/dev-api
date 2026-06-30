@@ -3189,3 +3189,241 @@ async def test_refresh_camp_report_positive_wins_preserves_other_sections(
 
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
+
+async def _seed_company_average_scores_section(test_db_session, *, report_sections: int = 200):
+    existing = (
+        await test_db_session.execute(
+            select(CampReportSection).where(CampReportSection.section_key == "company_average_scores")
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    row = CampReportSection(
+        report_sections=report_sections,
+        section="Company Average Scores",
+        section_key="company_average_scores",
+        description="Average nutrition, fitness, and lifestyle scores across participants",
+    )
+    test_db_session.add(row)
+    await test_db_session.commit()
+    return row
+
+
+async def _seed_company_average_scores_camp(test_db_session, *, organization_id: int = 9401):
+    from datetime import datetime, timezone
+
+    from modules.assessments.models import AssessmentInstance, AssessmentPackage
+    from modules.engagements.models import Engagement
+    from modules.reports.models import IndividualHealthReport
+
+    camp_no, _ = await _seed_camp(
+        test_db_session,
+        organization_id=organization_id,
+        engagement_id=organization_id,
+    )
+    start = date(2026, 6, 23)
+    pkg_id = organization_id + 700
+
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pkg_id,
+            package_code=f"FITPRINT{organization_id}",
+            display_name=f"FitPrint Package {organization_id}",
+            assessment_type_code="7",
+            status="active",
+        )
+    )
+    await test_db_session.flush()
+
+    users = [
+        (organization_id + 1, "male", "sales"),
+        (organization_id + 2, "female", "sales"),
+        (organization_id + 3, "male", "engineering"),
+    ]
+    for user_id, gender, _dept in users:
+        test_db_session.add(
+            User(
+                user_id=user_id,
+                age=30,
+                phone=f"{user_id}000000000",
+                gender=gender,
+                status="active",
+            )
+        )
+    await test_db_session.flush()
+
+    for idx, (user_id, _gender, dept) in enumerate(users):
+        test_db_session.add(
+            EngagementParticipant(
+                engagement_participant_id=organization_id * 10 + idx + 1,
+                engagement_id=organization_id,
+                user_id=user_id,
+                engagement_date=start,
+                slot_start_time=time(10, idx * 20),
+                participant_department=dept,
+            )
+        )
+    await test_db_session.flush()
+
+    fitprint_reports = [
+        {"fitness_specification": {"score": 60.0}, "activity_specification": {"score": 50.0}},
+        {"fitness_specification": {"score": 70.0}, "activity_specification": {"score": 60.0}},
+        {"fitness_specification": {"score": 65.0}, "activity_specification": {"score": 55.0}},
+    ]
+
+    for idx, (user_id, _gender, _dept) in enumerate(users):
+        ai_id = organization_id * 100 + idx + 1
+        test_db_session.add(
+            AssessmentInstance(
+                assessment_instance_id=ai_id,
+                user_id=user_id,
+                package_id=pkg_id,
+                engagement_id=organization_id,
+                status="completed",
+                metsights_record_id=f"REC{ai_id}",
+                assigned_at=datetime(2026, 6, 23, tzinfo=timezone.utc),
+                completed_at=datetime(2026, 6, 24, tzinfo=timezone.utc),
+            )
+        )
+        await test_db_session.flush()
+        test_db_session.add(
+            IndividualHealthReport(
+                user_id=user_id,
+                engagement_id=organization_id,
+                assessment_instance_id=ai_id,
+                reports=fitprint_reports[idx],
+                blood_parameters=None,
+            )
+        )
+    await test_db_session.commit()
+    return camp_no
+
+
+def _reports_service_for_company_average_scores(*, nutrition_score: float = 64.0):
+    from modules.assessments.repository import AssessmentsRepository
+    from modules.audit.repository import AuditRepository
+    from modules.audit.service import AuditService
+    from modules.questionnaire.healthy_habits_service import HealthyHabitsService
+    from modules.questionnaire.repository import QuestionnaireRepository
+    from modules.reports.repository import ReportsRepository
+    from modules.reports.service import ReportsService
+    from tests.modules.reports.test_reports_routes import _FakeMetsightsService
+
+    svc = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=_FakeMetsightsService(payload={}, should_fail=True),
+        diagnostics_service=None,
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+        questionnaire_repository=QuestionnaireRepository(),
+    )
+
+    async def _mock_call_nutrition_api(payload):
+        return {"nutrition_score": nutrition_score}
+
+    svc._call_nutrition_api = _mock_call_nutrition_api
+    return svc
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_report_company_average_scores(async_client, fastapi_app, test_db_session):
+    from modules.reports.dependencies import get_reports_service
+
+    await _seed_employee(test_db_session, user_id=7801, employee_id=801)
+    await _seed_company_average_scores_section(test_db_session, report_sections=200)
+    camp_no = await _seed_company_average_scores_camp(test_db_session, organization_id=9401)
+    headers = _auth_header(7801)
+
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_company_average_scores(
+        nutrition_score=64.0,
+    )
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "company_average_scores"},
+    )
+    assert response.status_code == 200
+    section = response.json()["data"]["section"]
+    assert section["name"] == "Company Average Scores"
+    assert section["description"] == "Average nutrition, fitness, and lifestyle scores across participants"
+    assert section["data"]["nutrition"]["score"] == 64
+    assert section["data"]["fitness"]["score"] == 55
+    assert section["data"]["lifestyle"]["score"] == 65
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert "company_average_scores" in row.report
+    assert row.report["company_average_scores"]["name"] == "Company Average Scores"
+    assert row.report["company_average_scores"]["data"]["nutrition"]["score"] == 64
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_refresh_department_camp_report_company_average_scores(async_client, fastapi_app, test_db_session):
+    from modules.reports.dependencies import get_reports_service
+
+    await _seed_employee(test_db_session, user_id=7802, employee_id=802)
+    await _seed_company_average_scores_section(test_db_session, report_sections=201)
+    camp_no = await _seed_company_average_scores_camp(test_db_session, organization_id=9402)
+    headers = _auth_header(7802)
+
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_company_average_scores(
+        nutrition_score=70.0,
+    )
+
+    init = await async_client.post(
+        f"/reports/camps/{camp_no}/department/sales/init",
+        headers=headers,
+    )
+    assert init.status_code == 201
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/department/sales/refresh",
+        headers=headers,
+        json={"section": "company_average_scores"},
+    )
+    assert response.status_code == 200
+    section = response.json()["data"]["section"]
+    assert section["data"]["nutrition"]["score"] == 70
+    assert section["data"]["lifestyle"]["score"] == 65
+    assert section["data"]["fitness"]["score"] == 55
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_report_company_average_scores_empty_camp(async_client, fastapi_app, test_db_session):
+    from modules.reports.dependencies import get_reports_service
+
+    await _seed_employee(test_db_session, user_id=7803, employee_id=803)
+    await _seed_company_average_scores_section(test_db_session, report_sections=202)
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=9403, engagement_id=9403)
+    headers = _auth_header(7803)
+
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_company_average_scores()
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "company_average_scores"},
+    )
+    assert response.status_code == 200
+    section = response.json()["data"]["section"]
+    assert section["data"]["nutrition"]["score"] == 0
+    assert section["data"]["fitness"]["score"] == 0
+    assert section["data"]["lifestyle"]["score"] == 0
+
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+

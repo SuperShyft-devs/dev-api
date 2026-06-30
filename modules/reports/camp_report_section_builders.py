@@ -513,6 +513,30 @@ def build_positive_wins(
     }
 
 
+def build_company_average_scores(scores: list[dict[str, float | None]]) -> dict:
+    """Build company_average_scores section payload from per-participant score dicts.
+
+    Each entry in *scores* has keys "nutrition", "fitness", "lifestyle" with float or None.
+    Averages each category across participants that have a valid (non-None) value.
+    """
+    totals: dict[str, float] = {"nutrition": 0.0, "fitness": 0.0, "lifestyle": 0.0}
+    counts: dict[str, int] = {"nutrition": 0, "fitness": 0, "lifestyle": 0}
+
+    for entry in scores:
+        for key in ("nutrition", "fitness", "lifestyle"):
+            val = entry.get(key)
+            if val is not None:
+                totals[key] += val
+                counts[key] += 1
+
+    data: dict[str, dict[str, int]] = {}
+    for key in ("nutrition", "fitness", "lifestyle"):
+        avg = round(totals[key] / counts[key]) if counts[key] > 0 else 0
+        data[key] = {"score": avg}
+
+    return {"data": data}
+
+
 SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "participation_by_age": build_participation_by_age,
     "kpis": build_kpis,
@@ -522,4 +546,5 @@ SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "distribution_by_oxidative_stress": build_distribution_by_oxidative_stress,
     "distribution_by_gender_by_metabolic_syndrome": build_distribution_by_gender_by_metabolic_syndrome,
     "positive_wins": build_positive_wins,
+    "company_average_scores": build_company_average_scores,
 }

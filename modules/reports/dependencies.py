@@ -57,4 +57,5 @@ def get_camp_reports_service(
         organizations_repository=OrganizationsRepository(),
         audit_service=AuditService(AuditRepository()),
         reports_service=reports_service,
+        assessments_repository=AssessmentsRepository(),
     )

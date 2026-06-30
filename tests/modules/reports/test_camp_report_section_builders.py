@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from modules.reports.camp_report_section_builders import (
+    build_company_average_scores,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
     build_distribution_by_physical_activity_frequency,
@@ -291,3 +292,64 @@ def test_build_distribution_by_gender_by_metabolic_syndrome():
 def test_build_distribution_by_gender_by_metabolic_syndrome_empty():
     payload = build_distribution_by_gender_by_metabolic_syndrome([])
     assert payload["data"]["diseases"] == []
+
+
+def test_build_company_average_scores_basic():
+    scores = [
+        {"nutrition": 60.0, "fitness": 50.0, "lifestyle": 70.0},
+        {"nutrition": 80.0, "fitness": 70.0, "lifestyle": 60.0},
+    ]
+    payload = build_company_average_scores(scores)
+    assert payload == {
+        "data": {
+            "nutrition": {"score": 70},
+            "fitness": {"score": 60},
+            "lifestyle": {"score": 65},
+        },
+    }
+
+
+def test_build_company_average_scores_with_none_values():
+    scores = [
+        {"nutrition": 64.0, "fitness": None, "lifestyle": 63.0},
+        {"nutrition": None, "fitness": 58.0, "lifestyle": 63.0},
+        {"nutrition": 64.0, "fitness": 58.0, "lifestyle": None},
+    ]
+    payload = build_company_average_scores(scores)
+    assert payload["data"]["nutrition"]["score"] == 64
+    assert payload["data"]["fitness"]["score"] == 58
+    assert payload["data"]["lifestyle"]["score"] == 63
+
+
+def test_build_company_average_scores_empty():
+    payload = build_company_average_scores([])
+    assert payload == {
+        "data": {
+            "nutrition": {"score": 0},
+            "fitness": {"score": 0},
+            "lifestyle": {"score": 0},
+        },
+    }
+
+
+def test_build_company_average_scores_all_none():
+    scores = [
+        {"nutrition": None, "fitness": None, "lifestyle": None},
+        {"nutrition": None, "fitness": None, "lifestyle": None},
+    ]
+    payload = build_company_average_scores(scores)
+    assert payload["data"]["nutrition"]["score"] == 0
+    assert payload["data"]["fitness"]["score"] == 0
+    assert payload["data"]["lifestyle"]["score"] == 0
+
+
+def test_build_company_average_scores_rounds():
+    scores = [
+        {"nutrition": 10.0, "fitness": 10.0, "lifestyle": 10.0},
+        {"nutrition": 11.0, "fitness": 11.0, "lifestyle": 11.0},
+        {"nutrition": 12.0, "fitness": 12.0, "lifestyle": 12.0},
+    ]
+    payload = build_company_average_scores(scores)
+    assert payload["data"]["nutrition"]["score"] == 11
+    assert payload["data"]["fitness"]["score"] == 11
+    assert payload["data"]["lifestyle"]["score"] == 11

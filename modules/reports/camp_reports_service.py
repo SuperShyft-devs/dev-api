@@ -25,6 +25,7 @@ from modules.reports.camp_report_section_builders import (
     aggregate_top_healthy_habits,
     aggregate_top_healthy_profiles,
     aggregate_top_low_risk,
+    build_company_average_scores,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
     build_distribution_by_physical_activity_frequency,
@@ -34,6 +35,7 @@ from modules.reports.camp_report_section_builders import (
     build_participation_by_age,
     build_positive_wins,
 )
+from modules.assessments.repository import AssessmentsRepository
 from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
 from modules.reports.camp_reports_repository import CampReportsRepository
 from modules.reports.models import CampReport
@@ -51,12 +53,14 @@ class CampReportsService:
         organizations_repository: OrganizationsRepository | None = None,
         audit_service: AuditService,
         reports_service: ReportsService,
+        assessments_repository: AssessmentsRepository | None = None,
     ) -> None:
         self._repository = repository
         self._sections_repository = sections_repository
         self._organizations_repository = organizations_repository or OrganizationsRepository()
         self._audit_service = audit_service
         self._reports_service = reports_service
+        self._assessments_repository = assessments_repository or AssessmentsRepository()
 
     async def _resolve_camp_context(self, db: AsyncSession, *, camp_no: int) -> dict:
         row = await self._repository.get_camp_context(db, camp_no=camp_no)
@@ -714,6 +718,70 @@ class CampReportsService:
             healthy_profiles=aggregate_top_healthy_profiles(participant_profiles),
         )
 
+    async def _compute_company_average_scores_payload(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+    ) -> dict:
+        contexts = await self._repository.list_fitprint_assessment_contexts(
+            db,
+            camp_no=camp_no,
+            department=department,
+        )
+
+        participant_scores: list[dict[str, float | None]] = []
+
+        for ctx in contexts:
+            report_dict = await self._reports_service._resolve_report_dict_for_instance(
+                db,
+                assessment_instance=ctx.assessment_instance,
+                package=ctx.package,
+                individual_report=ctx.individual_report,
+            )
+
+            fitness_spec = report_dict.get("fitness_specification") or {}
+            activity_spec = report_dict.get("activity_specification") or {}
+
+            raw_lifestyle = fitness_spec.get("score") if isinstance(fitness_spec, dict) else None
+            lifestyle_score = float(raw_lifestyle) if isinstance(raw_lifestyle, (int, float)) else None
+
+            raw_fitness = activity_spec.get("score") if isinstance(activity_spec, dict) else None
+            fitness_score = float(raw_fitness) if isinstance(raw_fitness, (int, float)) else None
+
+            # Get all assessment instances for this user in the engagement for nutrition lookup
+            all_instances = await self._assessments_repository.list_instances_for_user_engagement(
+                db,
+                user_id=ctx.assessment_instance.user_id,
+                engagement_id=ctx.assessment_instance.engagement_id,
+            )
+            source_ids = [inst.assessment_instance_id for inst in all_instances]
+
+            nutrition_score: float | None = None
+            if source_ids:
+                try:
+                    lookup, _ = await self._reports_service._build_questionnaire_lookup(
+                        db,
+                        source_assessment_instance_ids=source_ids,
+                    )
+                    nutrition_payload = self._reports_service._build_nutrition_api_payload(
+                        lookup, user_gender=ctx.user_gender
+                    )
+                    nutrition_response = await self._reports_service._call_nutrition_api(nutrition_payload)
+                    raw_nutrition = nutrition_response.get("nutrition_score")
+                    nutrition_score = float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
+                except Exception:
+                    nutrition_score = None
+
+            participant_scores.append({
+                "nutrition": nutrition_score,
+                "fitness": fitness_score,
+                "lifestyle": lifestyle_score,
+            })
+
+        return build_company_average_scores(participant_scores)
+
     async def _build_section_payload(
         self,
         db: AsyncSession,
@@ -786,6 +854,13 @@ class CampReportsService:
 
         if section_key == "positive_wins":
             return await self._compute_positive_wins_payload(
+                db,
+                camp_no=camp_no,
+                department=department,
+            )
+
+        if section_key == "company_average_scores":
+            return await self._compute_company_average_scores_payload(
                 db,
                 camp_no=camp_no,
                 department=department,
