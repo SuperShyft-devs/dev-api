@@ -795,6 +795,11 @@ class CampReportsService:
         "inflammatory",
     )
 
+    _BLOOD_INTELLIGENCE_COMBINED_KEYS: dict[str, list[str]] = {
+        "lipid_profile": ["cholesterol_total", "triglycerides", "ldl_cholestrol"],
+        "inflammatory": ["homocysteine", "hs-crp", "esr"],
+    }
+
     async def _compute_blood_and_lab_intelligence_payload(
         self,
         db: AsyncSession,
@@ -815,6 +820,10 @@ class CampReportsService:
                 continue
             tests = await self._diagnostics_repository.get_parameters_for_group(db, group_id=group.group_id)
             group_tests.append((group_key, tests))
+
+        tests_by_group: dict[str, dict[str, object]] = {}
+        for group_key, tests in group_tests:
+            tests_by_group[group_key] = {t.parameter_key: t for t in tests if t.parameter_key}
 
         group_stats: dict[str, dict[str, dict[str, int]]] = {}
         for group_key, tests in group_tests:
@@ -837,6 +846,37 @@ class CampReportsService:
                         in_range_count += 1
 
                 test_stats[param_key] = {"in_range": in_range_count, "total": total_valid}
+
+            combined_params = self._BLOOD_INTELLIGENCE_COMBINED_KEYS.get(group_key)
+            if combined_params:
+                combined_key = "__".join(combined_params)
+                group_test_map = tests_by_group.get(group_key, {})
+                combined_tests = [group_test_map[k] for k in combined_params if k in group_test_map]
+
+                if combined_tests:
+                    combined_in_range = 0
+                    combined_total = 0
+
+                    for gender, blood_params in participants:
+                        all_valid = True
+                        all_in_range = True
+                        for ct in combined_tests:
+                            value, lower_range, higher_range = self._extract_test_value_and_range(
+                                blood_params, ct, gender
+                            )
+                            if value is None or lower_range is None or higher_range is None:
+                                all_valid = False
+                                break
+                            if not (lower_range <= value <= higher_range):
+                                all_in_range = False
+                        if not all_valid:
+                            continue
+                        combined_total += 1
+                        if all_in_range:
+                            combined_in_range += 1
+
+                    test_stats[combined_key] = {"in_range": combined_in_range, "total": combined_total}
+
             group_stats[group_key] = test_stats
 
         return build_blood_and_lab_intelligence(group_stats)
