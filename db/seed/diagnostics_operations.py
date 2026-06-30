@@ -204,6 +204,7 @@ class SeedDiagTag:
 class SeedDiagGroup:
     group_id: int
     group_name: str
+    group_key: str
     display_order: int | None
 
 
@@ -266,6 +267,7 @@ async def upsert_diagnostic_groups(session: AsyncSession, rows: Iterable[SeedDia
             row = DiagnosticTestGroup(group_id=seed.group_id)
             session.add(row)
         row.group_name = seed.group_name
+        row.group_key = seed.group_key
         row.display_order = seed.display_order
 
 
@@ -351,6 +353,9 @@ async def upsert_diagnostic_groups_from_csv(session: AsyncSession, csv_path: Pat
                 row = DiagnosticTestGroup(group_id=gid)
                 session.add(row)
             row.group_name = (raw.get("group_name") or "").strip() or row.group_name
+            group_key = (raw.get("group_key") or "").strip()
+            if group_key:
+                row.group_key = group_key
             row.display_order = _int(raw.get("display_order"))
             row.price = _dec(raw.get("price"))
             row.original_price = _dec(raw.get("original_price"))

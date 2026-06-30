@@ -266,6 +266,7 @@ class HealthParameterResponse(BaseModel):
 
 class TestGroupCreate(BaseModel):
     group_name: str = Field(min_length=1)
+    group_key: str = Field(min_length=1)
     display_order: Optional[int] = None
     price: Optional[float] = None
     original_price: Optional[float] = None
@@ -276,6 +277,7 @@ class TestGroupCreate(BaseModel):
 
 class TestGroupUpdate(BaseModel):
     group_name: Optional[str] = None
+    group_key: Optional[str] = Field(default=None, min_length=1)
     display_order: Optional[int] = None
     price: Optional[float] = None
     original_price: Optional[float] = None
@@ -287,6 +289,7 @@ class TestGroupUpdate(BaseModel):
 class TestGroupResponse(BaseModel):
     group_id: int
     group_name: str
+    group_key: str
     test_count: int
     display_order: Optional[int] = None
     price: Optional[float] = None

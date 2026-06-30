@@ -543,6 +543,12 @@ class DiagnosticsRepository:
         result = await db.execute(select(DiagnosticTestGroup).where(DiagnosticTestGroup.group_id == group_id))
         return result.scalar_one_or_none()
 
+    async def get_group_by_group_key(self, db: AsyncSession, *, group_key: str) -> DiagnosticTestGroup | None:
+        result = await db.execute(
+            select(DiagnosticTestGroup).where(DiagnosticTestGroup.group_key == group_key)
+        )
+        return result.scalar_one_or_none()
+
     async def get_group_filter_chip_links(
         self,
         db: AsyncSession,

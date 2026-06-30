@@ -8,6 +8,8 @@ Business rules:
 
 from __future__ import annotations
 
+import re
+
 from sqlalchemy.exc import IntegrityError
 
 from core.exceptions import AppError
@@ -114,6 +116,14 @@ class DiagnosticsService:
     def _normalize_lower(self, value: str | None) -> str | None:
         normalized = self._normalize(value)
         return normalized.lower() if normalized else None
+
+    def _slugify_group_key(self, value: str | None) -> str | None:
+        normalized = self._normalize(value)
+        if normalized is None:
+            return None
+        slug = re.sub(r"[^a-zA-Z0-9]+", "_", normalized.lower())
+        slug = re.sub(r"_+", "_", slug).strip("_")
+        return slug if slug else None
 
     def _orm_parameter_type(self, value: ParameterType | ORMParameterType | str | None) -> ORMParameterType:
         if value is None:
@@ -295,6 +305,7 @@ class DiagnosticsService:
         return TestGroupResponse(
             group_id=row.group_id,
             group_name=row.group_name,
+            group_key=row.group_key,
             display_order=row.display_order,
             test_count=resolved_count,
             price=price,
@@ -778,11 +789,21 @@ class DiagnosticsService:
         if group_name is None:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         payload["group_name"] = group_name
+        group_key = self._slugify_group_key(payload.get("group_key"))
+        if group_key is None:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        payload["group_key"] = group_key
+        dup = await self._repository.get_group_by_group_key(db, group_key=group_key)
+        if dup is not None:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Group key already exists")
         self._validate_optional_gender_field(payload)
         self._validate_package_for_field(payload)
         payload.setdefault("package_for", "public")
 
-        created = await self._repository.create_group(db, DiagnosticTestGroup(**payload))
+        try:
+            created = await self._repository.create_group(db, DiagnosticTestGroup(**payload))
+        except IntegrityError:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request") from None
         await self._require_audit_service().log_event(
             db,
             action="EMPLOYEE_CREATE_DIAGNOSTIC_TEST_GROUP",
@@ -816,10 +837,21 @@ class DiagnosticsService:
             if group_name is None:
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
             payload["group_name"] = group_name
+        if "group_key" in payload:
+            group_key = self._slugify_group_key(payload.get("group_key"))
+            if group_key is None:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            payload["group_key"] = group_key
+            other = await self._repository.get_group_by_group_key(db, group_key=group_key)
+            if other is not None and other.group_id != group_id:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Group key already exists")
         self._validate_optional_gender_field(payload)
         self._validate_package_for_field(payload)
 
-        updated = await self._repository.update_group(db, group_id=group_id, data=payload)
+        try:
+            updated = await self._repository.update_group(db, group_id=group_id, data=payload)
+        except IntegrityError:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request") from None
         if updated is None:
             raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
         tests = await self._repository.get_parameters_for_group(db, group_id=group_id)

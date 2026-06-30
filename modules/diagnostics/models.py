@@ -168,6 +168,7 @@ class DiagnosticTestGroup(Base):
 
     group_id = Column(Integer, primary_key=True)
     group_name = Column(String, nullable=False)
+    group_key = Column(String, nullable=False, unique=True)
     display_order = Column(Integer)
     price = Column(Numeric(10, 2))
     original_price = Column(Numeric(10, 2))

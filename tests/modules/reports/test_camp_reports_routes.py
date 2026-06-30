@@ -2942,6 +2942,7 @@ def _diag_multi_group_factory():
                     DiagnosticTestGroupResponse(
                         group_id=1,
                         group_name="Beta",
+                        group_key="beta",
                         test_count=3,
                         display_order=2,
                         tests=[_hp(1, "b1", "b1"), _hp(2, "b2", "b2"), _hp(3, "b3", "b3")],
@@ -2949,6 +2950,7 @@ def _diag_multi_group_factory():
                     DiagnosticTestGroupResponse(
                         group_id=2,
                         group_name="Alpha",
+                        group_key="alpha",
                         test_count=2,
                         display_order=1,
                         tests=[_hp(4, "a1", "a1"), _hp(5, "a2", "a2")],
@@ -2956,6 +2958,7 @@ def _diag_multi_group_factory():
                     DiagnosticTestGroupResponse(
                         group_id=3,
                         group_name="Gamma",
+                        group_key="gamma",
                         test_count=1,
                         display_order=3,
                         tests=[_hp(6, "g1", "g1")],
@@ -3054,6 +3057,7 @@ async def test_refresh_department_camp_report_positive_wins(async_client, fastap
                     DiagnosticTestGroupResponse(
                         group_id=1,
                         group_name="Beta",
+                        group_key="beta",
                         test_count=3,
                         display_order=1,
                         tests=[

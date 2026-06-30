@@ -1,40 +1,40 @@
-group_id,group_name,display_order,price,original_price,is_most_popular,gender_suitability
-80,Kidney Function Profile,,,,FALSE,both
-81,Hormones Male,,,,FALSE,male
-82,Hormones Female,,,,FALSE,female
-83,Heart Health C-Suite,,,,FALSE,
-84,Vitamins C-Suite,,,,FALSE,
-35,Diabetes Profile Pro,,499,800,FALSE,
-85,Hormones C-suite Female,,,,FALSE,
-86,Cancer Female C-suite,,,,FALSE,
-87,Allergy Profile,,,,FALSE,
-88,Hormones C-suite Male,,,,FALSE,
-89,Cancer Male C-suite,,,,FALSE,
-25,Liver Profile,,799,1000,FALSE,
-28,Kidney Function with K,,699,800,FALSE,
-29,Thyroid Profile,,599,800,FALSE,
-31,Iron Studies with Ferritin,,699,800,FALSE,
-30,Iron Studies,,599,700,FALSE,
-32,Lipid Profile,,499,600,FALSE,
-33,Complete Hemogram,,499,700,FALSE,
-45,Insulin fasting,,499,,FALSE,
-46,HOMA Index with Beta cells,,999,,FALSE,
-50,Urine Routine and Microscopy,,299,400,FALSE,
-48,"Cortisol ,Serum",,499,799,FALSE,
-34,Vitamin Profile,,799,1000,FALSE,
-38,Pancreatic Cancer,,499,700,FALSE,
-39,Stomach Cancer,,1499,2500,FALSE,
-40,Ovarian Cancer,,499,700,FALSE,
-41,Breast Cancer,,499,900,FALSE,
-42,Colorectal Cancer,,499,800,FALSE,
-43,Prostate Cancer,,399,800,FALSE,
-44,AFP,,399,700,FALSE,
-37,Hormones Peak Female,,1499,2000,FALSE,female
-73,Kidney Progressive,,,,FALSE,
-74,Sleep,,,,FALSE,both
-75,Inflammatory,,,,FALSE,both
-76,Hormones Hair,,,,FALSE,
-77,Hormones Genz male,,,,FALSE,male
-78,Hormones Genz female,,,,FALSE,
-79,Hormones Menstrual Health,,,,FALSE,female
-36,Diabetes Profile,,399,,FALSE,
+group_id,group_name,group_key,display_order,price,original_price,is_most_popular,gender_suitability
+80,Kidney Function Profile,kidney_function_profile,,,,FALSE,both
+81,Hormones Male,hormones_male,,,,FALSE,male
+82,Hormones Female,hormones_female,,,,FALSE,female
+83,Heart Health C-Suite,heart_health_c_suite,,,,FALSE,
+84,Vitamins C-Suite,vitamins_c_suite,,,,FALSE,
+35,Diabetes Profile Pro,diabetes_profile_pro,,499,800,FALSE,
+85,Hormones C-suite Female,hormones_c_suite_female,,,,FALSE,
+86,Cancer Female C-suite,cancer_female_c_suite,,,,FALSE,
+87,Allergy Profile,allergy_profile,,,,FALSE,
+88,Hormones C-suite Male,hormones_c_suite_male,,,,FALSE,
+89,Cancer Male C-suite,cancer_male_c_suite,,,,FALSE,
+25,Liver Profile,liver_profile,,799,1000,FALSE,
+28,Kidney Function with K,kidney_function_with_k,,699,800,FALSE,
+29,Thyroid Profile,thyroid_profile,,599,800,FALSE,
+31,Iron Studies with Ferritin,iron_studies_with_ferritin,,699,800,FALSE,
+30,Iron Studies,iron_studies,,599,700,FALSE,
+32,Lipid Profile,lipid_profile,,499,600,FALSE,
+33,Complete Hemogram,complete_hemogram,,499,700,FALSE,
+45,Insulin fasting,insulin_fasting,,499,,FALSE,
+46,HOMA Index with Beta cells,homa_index_with_beta_cells,,999,,FALSE,
+50,Urine Routine and Microscopy,urine_routine_and_microscopy,,299,400,FALSE,
+48,"Cortisol ,Serum",cortisol_serum,,499,799,FALSE,
+34,Vitamin Profile,vitamin_profile,,799,1000,FALSE,
+38,Pancreatic Cancer,pancreatic_cancer,,499,700,FALSE,
+39,Stomach Cancer,stomach_cancer,,1499,2500,FALSE,
+40,Ovarian Cancer,ovarian_cancer,,499,700,FALSE,
+41,Breast Cancer,breast_cancer,,499,900,FALSE,
+42,Colorectal Cancer,colorectal_cancer,,499,800,FALSE,
+43,Prostate Cancer,prostate_cancer,,399,800,FALSE,
+44,AFP,afp,,399,700,FALSE,
+37,Hormones Peak Female,hormones_peak_female,,1499,2000,FALSE,female
+73,Kidney Progressive,kidney_progressive,,,,FALSE,
+74,Sleep,sleep,,,,FALSE,both
+75,Inflammatory,inflammatory,,,,FALSE,both
+76,Hormones Hair,hormones_hair,,,,FALSE,
+77,Hormones Genz male,hormones_genz_male,,,,FALSE,male
+78,Hormones Genz female,hormones_genz_female,,,,FALSE,
+79,Hormones Menstrual Health,hormones_menstrual_health,,,,FALSE,female
+36,Diabetes Profile,diabetes_profile,,399,,FALSE,
