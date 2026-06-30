@@ -25,6 +25,7 @@ from modules.reports.camp_report_section_builders import (
     aggregate_top_healthy_habits,
     aggregate_top_healthy_profiles,
     aggregate_top_low_risk,
+    build_blood_and_lab_intelligence,
     build_company_average_scores,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
@@ -36,6 +37,7 @@ from modules.reports.camp_report_section_builders import (
     build_positive_wins,
 )
 from modules.assessments.repository import AssessmentsRepository
+from modules.diagnostics.repository import DiagnosticsRepository
 from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
 from modules.reports.camp_reports_repository import CampReportsRepository
 from modules.reports.models import CampReport
@@ -54,6 +56,7 @@ class CampReportsService:
         audit_service: AuditService,
         reports_service: ReportsService,
         assessments_repository: AssessmentsRepository | None = None,
+        diagnostics_repository: DiagnosticsRepository | None = None,
     ) -> None:
         self._repository = repository
         self._sections_repository = sections_repository
@@ -61,6 +64,7 @@ class CampReportsService:
         self._audit_service = audit_service
         self._reports_service = reports_service
         self._assessments_repository = assessments_repository or AssessmentsRepository()
+        self._diagnostics_repository = diagnostics_repository or DiagnosticsRepository()
 
     async def _resolve_camp_context(self, db: AsyncSession, *, camp_no: int) -> dict:
         row = await self._repository.get_camp_context(db, camp_no=camp_no)
@@ -784,6 +788,122 @@ class CampReportsService:
 
         return build_company_average_scores(participant_scores)
 
+    _BLOOD_INTELLIGENCE_GROUP_KEYS = (
+        "vitamin_profile",
+        "diabetes_profile",
+        "lipid_profile",
+        "inflammatory",
+    )
+
+    async def _compute_blood_and_lab_intelligence_payload(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+    ) -> dict:
+        participants = await self._repository.list_blood_parameters_by_gender(
+            db,
+            camp_no=camp_no,
+            department=department,
+        )
+
+        group_tests: list[tuple[str, list]] = []
+        for group_key in self._BLOOD_INTELLIGENCE_GROUP_KEYS:
+            group = await self._diagnostics_repository.get_group_by_group_key(db, group_key=group_key)
+            if group is None:
+                continue
+            tests = await self._diagnostics_repository.get_parameters_for_group(db, group_id=group.group_id)
+            group_tests.append((group_key, tests))
+
+        group_stats: dict[str, dict[str, dict[str, int]]] = {}
+        for group_key, tests in group_tests:
+            test_stats: dict[str, dict[str, int]] = {}
+            for test in tests:
+                param_key = test.parameter_key
+                if not param_key:
+                    continue
+                in_range_count = 0
+                total_valid = 0
+
+                for gender, blood_params in participants:
+                    value, lower_range, higher_range = self._extract_test_value_and_range(
+                        blood_params, test, gender
+                    )
+                    if value is None or lower_range is None or higher_range is None:
+                        continue
+                    total_valid += 1
+                    if lower_range <= value <= higher_range:
+                        in_range_count += 1
+
+                test_stats[param_key] = {"in_range": in_range_count, "total": total_valid}
+            group_stats[group_key] = test_stats
+
+        return build_blood_and_lab_intelligence(group_stats)
+
+    @staticmethod
+    def _extract_test_value_and_range(
+        blood_params: dict[str, Any],
+        test,
+        gender: str | None,
+    ) -> tuple[float | None, float | None, float | None]:
+        """Extract value and range for a single test from a participant's blood_parameters."""
+        is_provider = isinstance(blood_params.get("digital_data"), list)
+
+        value: float | None = None
+        lower_range: float | None = None
+        higher_range: float | None = None
+
+        if is_provider:
+            healthians_pid = test.healthians_parameter_id
+            if healthians_pid is None:
+                return None, None, None
+            for entry in blood_params["digital_data"]:
+                entry_pid = entry.get("parameter_id")
+                if entry_pid is not None and str(entry_pid) == str(healthians_pid):
+                    raw_val = entry.get("value")
+                    if raw_val is not None:
+                        try:
+                            value = float(raw_val)
+                        except (TypeError, ValueError):
+                            pass
+                    raw_min = entry.get("min_range")
+                    if raw_min is not None:
+                        try:
+                            lower_range = float(raw_min)
+                        except (TypeError, ValueError):
+                            pass
+                    raw_max = entry.get("max_range")
+                    if raw_max is not None:
+                        try:
+                            higher_range = float(raw_max)
+                        except (TypeError, ValueError):
+                            pass
+                    break
+        else:
+            param_key = test.parameter_key
+            if not param_key:
+                return None, None, None
+            raw_val = blood_params.get(param_key)
+            if raw_val is not None:
+                try:
+                    value = float(raw_val)
+                except (TypeError, ValueError):
+                    pass
+            normalized_gender = (gender or "").strip().lower()
+            if normalized_gender in ("male", "m", "1"):
+                if test.low_risk_lower_range_male is not None:
+                    lower_range = float(test.low_risk_lower_range_male)
+                if test.low_risk_higher_range_male is not None:
+                    higher_range = float(test.low_risk_higher_range_male)
+            elif normalized_gender in ("female", "f", "2"):
+                if test.low_risk_lower_range_female is not None:
+                    lower_range = float(test.low_risk_lower_range_female)
+                if test.low_risk_higher_range_female is not None:
+                    higher_range = float(test.low_risk_higher_range_female)
+
+        return value, lower_range, higher_range
+
     async def _build_section_payload(
         self,
         db: AsyncSession,
@@ -863,6 +983,13 @@ class CampReportsService:
 
         if section_key == "company_average_scores":
             return await self._compute_company_average_scores_payload(
+                db,
+                camp_no=camp_no,
+                department=department,
+            )
+
+        if section_key == "blood_and_lab_intelligence":
+            return await self._compute_blood_and_lab_intelligence_payload(
                 db,
                 camp_no=camp_no,
                 department=department,

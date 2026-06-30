@@ -426,6 +426,53 @@ class CampReportsRepository:
             rows.append((gender, reports_dict))
         return rows
 
+    async def list_blood_parameters_by_gender(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+    ) -> list[tuple[str | None, dict[str, Any]]]:
+        """Return (gender, blood_parameters) for enrolled users with blood data."""
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+
+        ranked_reports = (
+            select(
+                enrolled.c.gender,
+                IndividualHealthReport.blood_parameters,
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=IndividualHealthReport.report_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(
+                AssessmentInstance,
+                and_(
+                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
+                    AssessmentInstance.user_id == enrolled.c.user_id,
+                ),
+            )
+            .join(
+                IndividualHealthReport,
+                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+            )
+            .where(IndividualHealthReport.blood_parameters.isnot(None))
+        ).subquery()
+
+        result = await db.execute(
+            select(ranked_reports.c.gender, ranked_reports.c.blood_parameters).where(ranked_reports.c.rn == 1)
+        )
+
+        rows: list[tuple[str | None, dict[str, Any]]] = []
+        for gender, blood_params in result.all():
+            bp: dict[str, Any] = blood_params if isinstance(blood_params, dict) else {}
+            if bp:
+                rows.append((gender, bp))
+        return rows
+
     async def list_physical_activity_frequency_by_gender(
         self,
         db: AsyncSession,

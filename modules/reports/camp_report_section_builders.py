@@ -537,6 +537,25 @@ def build_company_average_scores(scores: list[dict[str, float | None]]) -> dict:
     return {"data": data}
 
 
+def build_blood_and_lab_intelligence(group_stats: dict[str, dict[str, dict[str, int]]]) -> dict:
+    """Build blood_and_lab_intelligence section from pre-computed in-range stats.
+
+    ``group_stats`` maps group_key -> {parameter_key: {"in_range": N, "total": N}}.
+    """
+    data: dict[str, dict[str, Any]] = {}
+    for group_key, tests in group_stats.items():
+        group_data: dict[str, Any] = {}
+        for param_key, counts in tests.items():
+            total = counts.get("total", 0)
+            in_range = counts.get("in_range", 0)
+            if total > 0:
+                group_data[param_key] = {"in_range_percent": round(in_range / total * 100)}
+            else:
+                group_data[param_key] = {"in_range_percent": 0}
+        data[group_key] = group_data
+    return {"data": data}
+
+
 SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "participation_by_age": build_participation_by_age,
     "kpis": build_kpis,
@@ -547,4 +566,5 @@ SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "distribution_by_gender_by_metabolic_syndrome": build_distribution_by_gender_by_metabolic_syndrome,
     "positive_wins": build_positive_wins,
     "company_average_scores": build_company_average_scores,
+    "blood_and_lab_intelligence": build_blood_and_lab_intelligence,
 }

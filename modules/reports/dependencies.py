@@ -21,6 +21,7 @@ from modules.reports.service import ReportsService
 from modules.organizations.repository import OrganizationsRepository
 from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
 from modules.reports.camp_report_sections_service import CampReportSectionsService
+from modules.diagnostics.repository import DiagnosticsRepository
 from modules.reports.camp_reports_repository import CampReportsRepository
 from modules.reports.camp_reports_service import CampReportsService
 
@@ -58,4 +59,5 @@ def get_camp_reports_service(
         audit_service=AuditService(AuditRepository()),
         reports_service=reports_service,
         assessments_repository=AssessmentsRepository(),
+        diagnostics_repository=DiagnosticsRepository(),
     )
