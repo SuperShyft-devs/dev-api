@@ -734,12 +734,15 @@ class CampReportsService:
         participant_scores: list[dict[str, float | None]] = []
 
         for ctx in contexts:
-            report_dict = await self._reports_service._resolve_report_dict_for_instance(
-                db,
-                assessment_instance=ctx.assessment_instance,
-                package=ctx.package,
-                individual_report=ctx.individual_report,
-            )
+            try:
+                report_dict = await self._reports_service._resolve_report_dict_for_instance(
+                    db,
+                    assessment_instance=ctx.assessment_instance,
+                    package=ctx.package,
+                    individual_report=ctx.individual_report,
+                )
+            except Exception:
+                continue
 
             fitness_spec = report_dict.get("fitness_specification") or {}
             activity_spec = report_dict.get("activity_specification") or {}
@@ -750,7 +753,6 @@ class CampReportsService:
             raw_fitness = activity_spec.get("score") if isinstance(activity_spec, dict) else None
             fitness_score = float(raw_fitness) if isinstance(raw_fitness, (int, float)) else None
 
-            # Get all assessment instances for this user in the engagement for nutrition lookup
             all_instances = await self._assessments_repository.list_instances_for_user_engagement(
                 db,
                 user_id=ctx.assessment_instance.user_id,
