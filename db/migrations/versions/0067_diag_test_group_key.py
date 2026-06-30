@@ -1,6 +1,6 @@
 """Add group_key column to diagnostic_test_groups.
 
-Revision ID: 0067_diagnostic_test_groups_group_key
+Revision ID: 0067_diag_test_group_key
 Revises: 0066_org_contact_person
 """
 
@@ -13,7 +13,7 @@ from alembic import op
 from sqlalchemy import inspect, text
 
 
-revision = "0067_diagnostic_test_groups_group_key"
+revision = "0067_diag_test_group_key"
 down_revision = "0066_org_contact_person"
 branch_labels = None
 depends_on = None
