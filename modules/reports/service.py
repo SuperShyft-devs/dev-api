@@ -1993,13 +1993,10 @@ class ReportsService:
         date_value: str,
         engagement_id: int,
     ) -> dict[str, Any]:
-        point: dict[str, Any] = {
+        return {
             "date": date_value,
-            "engagement_id": engagement_id,
+            "risk_score_scaled": ReportsService._serialize_disease_trend_field(entry.get("risk_score_scaled")),
         }
-        for key, raw in entry.items():
-            point[key] = ReportsService._serialize_disease_trend_field(raw)
-        return point
 
     async def _build_disease_trend_payload(
         self,
