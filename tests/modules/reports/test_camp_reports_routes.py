@@ -3324,7 +3324,7 @@ def _reports_service_for_company_average_scores(*, nutrition_score: float = 64.0
         questionnaire_repository=QuestionnaireRepository(),
     )
 
-    async def _mock_call_nutrition_api(payload):
+    async def _mock_call_nutrition_api(db, payload, **kwargs):
         return {"nutrition_score": nutrition_score}
 
     svc._call_nutrition_api = _mock_call_nutrition_api

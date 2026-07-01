@@ -776,7 +776,12 @@ class CampReportsService:
                     nutrition_payload = self._reports_service._build_nutrition_api_payload(
                         lookup, user_gender=ctx.user_gender
                     )
-                    nutrition_response = await self._reports_service._call_nutrition_api(nutrition_payload)
+                    nutrition_response = await self._reports_service._call_nutrition_api(
+                        db,
+                        nutrition_payload,
+                        user_id=ctx.assessment_instance.user_id,
+                        engagement_id=ctx.assessment_instance.engagement_id,
+                    )
                     raw_nutrition = nutrition_response.get("nutrition_score")
                     nutrition_score = float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
                 except Exception:
@@ -973,7 +978,12 @@ class CampReportsService:
                         nutrition_payload = self._reports_service._build_nutrition_api_payload(
                             lookup, user_gender=ctx.user_gender
                         )
-                        nutrition_response = await self._reports_service._call_nutrition_api(nutrition_payload)
+                        nutrition_response = await self._reports_service._call_nutrition_api(
+                            db,
+                            nutrition_payload,
+                            user_id=ctx.assessment_instance.user_id,
+                            engagement_id=ctx.assessment_instance.engagement_id,
+                        )
                         raw_nutrition = nutrition_response.get("nutrition_score")
                         nutrition_score = float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
 

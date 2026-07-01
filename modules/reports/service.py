@@ -18,6 +18,8 @@ from db.session import AsyncSessionLocal
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.engagements.models import Engagement
 from modules.assessments.repository import AssessmentsRepository
+from modules.audit.models import IntegrationSyncLog
+from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
 from modules.diagnostics.service import DiagnosticsService
 from modules.metsights.service import MetsightsService
@@ -1350,7 +1352,27 @@ class ReportsService:
         "sickness_frequency",
     ]
 
-    async def _call_nutrition_api(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _call_nutrition_api(
+        self,
+        db: AsyncSession,
+        payload: dict[str, Any],
+        *,
+        user_id: int | None = None,
+        engagement_id: int | None = None,
+    ) -> dict[str, Any]:
+        audit_repo = AuditRepository()
+        sync_log = await audit_repo.create_sync_log(
+            db,
+            IntegrationSyncLog(
+                engagement_id=engagement_id,
+                user_id=user_id,
+                provider="nutrition_api",
+                api_endpoint_url=settings.NUTRITION_API_URL,
+                request_payload=payload,
+                status="pending",
+            ),
+        )
+
         try:
             async with httpx.AsyncClient(timeout=settings.NUTRITION_API_TIMEOUT_SECONDS) as client:
                 response = await client.post(
@@ -1360,9 +1382,17 @@ class ReportsService:
                 )
                 response.raise_for_status()
                 data = response.json()
-                return data if isinstance(data, dict) else {}
+                response_payload = data if isinstance(data, dict) else {}
+                await audit_repo.update_sync_log_status(
+                    db,
+                    sync_log_id=sync_log.sync_log_id,
+                    status="success",
+                    response_payload=response_payload,
+                )
+                return response_payload
         except httpx.HTTPStatusError as exc:
             status = exc.response.status_code
+            error_message = f"HTTP {status}"
             if 400 <= status < 500:
                 detail: str | None = None
                 try:
@@ -1376,17 +1406,36 @@ class ReportsService:
                             detail = str(raw_detail)[:500]
                 except Exception:
                     detail = None
+                error_message = detail or "Nutrition API rejected request payload"
+                await audit_repo.update_sync_log_status(
+                    db,
+                    sync_log_id=sync_log.sync_log_id,
+                    status="failed",
+                    error_message=error_message,
+                )
                 raise AppError(
                     status_code=400,
                     error_code="INVALID_INPUT",
-                    message=detail or "Nutrition API rejected request payload",
+                    message=error_message,
                 ) from exc
+            await audit_repo.update_sync_log_status(
+                db,
+                sync_log_id=sync_log.sync_log_id,
+                status="failed",
+                error_message=error_message,
+            )
             raise AppError(
                 status_code=503,
                 error_code="EXTERNAL_SERVICE_UNAVAILABLE",
                 message="Nutrition API request failed",
             ) from exc
         except httpx.HTTPError as exc:
+            await audit_repo.update_sync_log_status(
+                db,
+                sync_log_id=sync_log.sync_log_id,
+                status="failed",
+                error_message=str(exc),
+            )
             raise AppError(
                 status_code=503,
                 error_code="EXTERNAL_SERVICE_UNAVAILABLE",
@@ -1662,7 +1711,12 @@ class ReportsService:
 
         # Step 5: Call the nutrition API
         nutrition_payload = self._build_nutrition_api_payload(lookup, user_gender=user_gender)
-        nutrition_response = await self._call_nutrition_api(nutrition_payload)
+        nutrition_response = await self._call_nutrition_api(
+            db,
+            nutrition_payload,
+            user_id=user_id,
+            engagement_id=assessment_instance.engagement_id,
+        )
         nutrition_score_raw = nutrition_response.get("nutrition_score")
         nutrition_score = float(nutrition_score_raw) if isinstance(nutrition_score_raw, (int, float)) else None
 
