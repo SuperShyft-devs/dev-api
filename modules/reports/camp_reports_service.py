@@ -769,12 +769,13 @@ class CampReportsService:
             nutrition_score: float | None = None
             if source_ids:
                 try:
-                    lookup, _ = await self._reports_service._build_questionnaire_lookup(
+                    lookup, key_to_qid = await self._reports_service._build_questionnaire_lookup(
                         db,
                         source_assessment_instance_ids=source_ids,
                     )
+                    option_reverse_map = await self._reports_service._build_option_reverse_map(db, key_to_qid)
                     nutrition_payload = self._reports_service._build_nutrition_api_payload(
-                        lookup, user_gender=ctx.user_gender
+                        lookup, user_gender=ctx.user_gender, option_reverse_map=option_reverse_map,
                     )
                     nutrition_response = await self._reports_service._call_nutrition_api(
                         db,
@@ -959,7 +960,7 @@ class CampReportsService:
                 })
             else:
                 try:
-                    lookup, _ = await self._reports_service._build_questionnaire_lookup(
+                    lookup, key_to_qid = await self._reports_service._build_questionnaire_lookup(
                         db,
                         source_assessment_instance_ids=source_ids,
                     )
@@ -975,8 +976,9 @@ class CampReportsService:
                             "missing_questions": missing_keys,
                         })
                     else:
+                        option_reverse_map = await self._reports_service._build_option_reverse_map(db, key_to_qid)
                         nutrition_payload = self._reports_service._build_nutrition_api_payload(
-                            lookup, user_gender=ctx.user_gender
+                            lookup, user_gender=ctx.user_gender, option_reverse_map=option_reverse_map,
                         )
                         nutrition_response = await self._reports_service._call_nutrition_api(
                             db,

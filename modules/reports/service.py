@@ -1520,16 +1520,41 @@ class ReportsService:
             return "ft/in"
         return value.strip() or None
 
-    def _build_nutrition_api_payload(self, lookup: dict[str, Any], *, user_gender: str | None = None) -> dict[str, Any]:
+    async def _build_option_reverse_map(
+        self,
+        db: AsyncSession,
+        key_to_question_id: dict[str, int],
+    ) -> dict[str, dict[str, str]]:
+        """Build {question_key: {display_name: option_value}} for answer resolution."""
+        if self._questionnaire_repository is None or not key_to_question_id:
+            return {}
+
+        qid_to_key: dict[int, str] = {qid: qkey for qkey, qid in key_to_question_id.items()}
+        all_options = await self._questionnaire_repository.list_options_for_question_ids(
+            db, question_ids=list(qid_to_key.keys()),
+        )
+
+        reverse_map: dict[str, dict[str, str]] = {}
+        for opt in all_options:
+            qkey = qid_to_key.get(int(opt.question_id))
+            if qkey is None:
+                continue
+            if qkey not in reverse_map:
+                reverse_map[qkey] = {}
+            reverse_map[qkey][opt.display_name] = opt.option_value
+        return reverse_map
+
+    def _build_nutrition_api_payload(self, lookup: dict[str, Any], *, user_gender: str | None = None, option_reverse_map: dict[str, dict[str, str]] | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {}
         for key in self._NUTRITION_API_QUESTION_KEYS:
             val = lookup.get(key)
             if val is None:
                 continue
+            key_map = (option_reverse_map or {}).get(key, {})
             if isinstance(val, list):
-                payload[key] = [str(v) for v in val]
+                payload[key] = [key_map.get(str(v), str(v)) for v in val]
             else:
-                payload[key] = str(val)
+                payload[key] = key_map.get(str(val), str(val))
 
         # New nutrition API contract requires these identity/anthropometry fields.
         resolved_gender = self._normalize_gender(lookup.get("gender")) or self._normalize_gender(user_gender)
@@ -1710,7 +1735,8 @@ class ReportsService:
         )
 
         # Step 5: Call the nutrition API
-        nutrition_payload = self._build_nutrition_api_payload(lookup, user_gender=user_gender)
+        option_reverse_map = await self._build_option_reverse_map(db, key_to_question_id)
+        nutrition_payload = self._build_nutrition_api_payload(lookup, user_gender=user_gender, option_reverse_map=option_reverse_map)
         nutrition_response = await self._call_nutrition_api(
             db,
             nutrition_payload,
