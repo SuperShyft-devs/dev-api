@@ -768,6 +768,46 @@ class CampReportsRepository:
             for ai, pkg, eng, ihr, gender in result.all()
         ]
 
+    async def list_enrolled_users_without_fitprint(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+    ) -> list[tuple[int, str | None, str | None]]:
+        """Enrolled camp users who have NO FitPrint (type_code '7') assessment.
+
+        Returns list of (user_id, first_name, last_name).
+        """
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+
+        fitprint_users = (
+            select(AssessmentInstance.user_id)
+            .select_from(enrolled)
+            .join(
+                AssessmentInstance,
+                and_(
+                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
+                    AssessmentInstance.user_id == enrolled.c.user_id,
+                ),
+            )
+            .join(
+                AssessmentPackage,
+                AssessmentPackage.package_id == AssessmentInstance.package_id,
+            )
+            .where(AssessmentPackage.assessment_type_code == "7")
+        ).subquery()
+
+        query = (
+            select(enrolled.c.user_id, User.first_name, User.last_name)
+            .select_from(enrolled)
+            .join(User, User.user_id == enrolled.c.user_id)
+            .where(enrolled.c.user_id.notin_(select(fitprint_users.c.user_id)))
+        )
+
+        result = await db.execute(query)
+        return [(int(r[0]), r[1], r[2]) for r in result.all()]
+
     async def count_participants_by_camp_no(self, db: AsyncSession, *, camp_no: int) -> int:
         """Count all engagement participant enrollment rows for a camp."""
         result = await db.execute(

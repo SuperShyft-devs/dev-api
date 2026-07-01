@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections import Counter
 from datetime import date, datetime, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +43,7 @@ from modules.reports.camp_report_sections_repository import CampReportSectionsRe
 from modules.reports.camp_reports_repository import CampReportsRepository
 from modules.reports.models import CampReport
 from modules.reports.service import BLOOD_DATA_UNAVAILABLE_ERROR_CODES, ReportsService
+from modules.users.models import User
 
 
 class CampReportsService:
@@ -822,12 +823,37 @@ class CampReportsService:
             department=department,
         )
 
+        no_fitprint_rows = await self._repository.list_enrolled_users_without_fitprint(
+            db,
+            camp_no=camp_no,
+            department=department,
+        )
+
+        user_ids = [ctx.assessment_instance.user_id for ctx in contexts]
+        user_names: dict[int, str] = {}
+        if user_ids:
+            rows = await db.execute(
+                select(User.user_id, User.first_name, User.last_name).where(
+                    User.user_id.in_(user_ids)
+                )
+            )
+            for uid, first, last in rows.all():
+                parts = [p for p in (first, last) if p]
+                user_names[int(uid)] = " ".join(parts) if parts else f"User {uid}"
+
+        nutrition_question_keys = self._reports_service._NUTRITION_API_QUESTION_KEYS
+
         total_participants = len(contexts)
         valid_counts: dict[str, int] = {"nutrition": 0, "fitness": 0, "lifestyle": 0}
         totals: dict[str, float] = {"nutrition": 0.0, "fitness": 0.0, "lifestyle": 0.0}
-        failure_reasons: dict[str, list[str]] = {"nutrition": [], "fitness": [], "lifestyle": []}
+        participants_detail: dict[str, list[dict[str, Any]]] = {
+            "nutrition": [], "fitness": [], "lifestyle": [],
+        }
 
         for ctx in contexts:
+            uid = ctx.assessment_instance.user_id
+            name = user_names.get(uid, f"User {uid}")
+
             try:
                 report_dict = await self._reports_service._resolve_report_dict_for_instance(
                     db,
@@ -836,9 +862,11 @@ class CampReportsService:
                     individual_report=ctx.individual_report,
                 )
             except Exception:
-                failure_reasons["fitness"].append("FitPrint report not available")
-                failure_reasons["lifestyle"].append("FitPrint report not available")
-                failure_reasons["nutrition"].append("FitPrint report not available")
+                for key in ("nutrition", "fitness", "lifestyle"):
+                    participants_detail[key].append({
+                        "user_id": uid, "name": name,
+                        "score": None, "reason": "FitPrint report not available",
+                    })
                 continue
 
             fitness_spec = report_dict.get("fitness_specification") or {}
@@ -849,67 +877,105 @@ class CampReportsService:
             if lifestyle_score is not None:
                 valid_counts["lifestyle"] += 1
                 totals["lifestyle"] += lifestyle_score
+                participants_detail["lifestyle"].append({
+                    "user_id": uid, "name": name,
+                    "score": lifestyle_score, "reason": None,
+                })
             else:
-                failure_reasons["lifestyle"].append("Fitness specification score missing in FitPrint report")
+                participants_detail["lifestyle"].append({
+                    "user_id": uid, "name": name,
+                    "score": None, "reason": "Fitness specification score missing in FitPrint report",
+                })
 
             raw_fitness = activity_spec.get("score") if isinstance(activity_spec, dict) else None
             fitness_score = float(raw_fitness) if isinstance(raw_fitness, (int, float)) else None
             if fitness_score is not None:
                 valid_counts["fitness"] += 1
                 totals["fitness"] += fitness_score
+                participants_detail["fitness"].append({
+                    "user_id": uid, "name": name,
+                    "score": fitness_score, "reason": None,
+                })
             else:
-                failure_reasons["fitness"].append("Activity specification score missing in FitPrint report")
+                participants_detail["fitness"].append({
+                    "user_id": uid, "name": name,
+                    "score": None, "reason": "Activity specification score missing in FitPrint report",
+                })
 
             all_instances = await self._assessments_repository.list_instances_for_user_engagement(
                 db,
-                user_id=ctx.assessment_instance.user_id,
+                user_id=uid,
                 engagement_id=ctx.assessment_instance.engagement_id,
             )
             source_ids = [inst.assessment_instance_id for inst in all_instances]
 
             nutrition_score: float | None = None
+            nutrition_detail: dict[str, Any] = {"user_id": uid, "name": name}
+
             if not source_ids:
-                failure_reasons["nutrition"].append("No assessment instances found for nutrition questionnaire")
+                nutrition_detail.update({"score": None, "reason": "No assessment instances found"})
             else:
                 try:
                     lookup, _ = await self._reports_service._build_questionnaire_lookup(
                         db,
                         source_assessment_instance_ids=source_ids,
                     )
-                    nutrition_payload = self._reports_service._build_nutrition_api_payload(
-                        lookup, user_gender=ctx.user_gender
-                    )
-                    nutrition_response = await self._reports_service._call_nutrition_api(nutrition_payload)
-                    raw_nutrition = nutrition_response.get("nutrition_score")
-                    nutrition_score = float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
-                    if nutrition_score is None:
-                        failure_reasons["nutrition"].append("Nutrition API returned no score")
+
+                    answered_keys = [k for k in nutrition_question_keys if lookup.get(k) is not None]
+                    missing_keys = [k for k in nutrition_question_keys if lookup.get(k) is None]
+
+                    if not answered_keys:
+                        nutrition_detail.update({
+                            "score": None,
+                            "reason": "Nutrition questionnaire not filled",
+                            "missing_questions": missing_keys,
+                        })
+                    else:
+                        nutrition_payload = self._reports_service._build_nutrition_api_payload(
+                            lookup, user_gender=ctx.user_gender
+                        )
+                        nutrition_response = await self._reports_service._call_nutrition_api(nutrition_payload)
+                        raw_nutrition = nutrition_response.get("nutrition_score")
+                        nutrition_score = float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
+
+                        if nutrition_score is not None:
+                            nutrition_detail.update({"score": nutrition_score, "reason": None})
+                            if missing_keys:
+                                nutrition_detail["missing_questions"] = missing_keys
+                        else:
+                            nutrition_detail.update({
+                                "score": None,
+                                "reason": "Nutrition API returned no score",
+                            })
+                            if missing_keys:
+                                nutrition_detail["missing_questions"] = missing_keys
                 except Exception:
-                    failure_reasons["nutrition"].append("Nutrition API call failed")
+                    nutrition_detail.update({"score": None, "reason": "Nutrition API call failed"})
 
             if nutrition_score is not None:
                 valid_counts["nutrition"] += 1
                 totals["nutrition"] += nutrition_score
 
+            participants_detail["nutrition"].append(nutrition_detail)
+
         result: dict[str, Any] = {}
         for key in ("nutrition", "fitness", "lifestyle"):
             vc = valid_counts[key]
             avg = round(totals[key] / vc) if vc > 0 else 0
-            reason: str | None = None
-            if total_participants == 0:
-                reason = "No FitPrint participants found in this camp"
-            elif vc == 0:
-                reasons_list = failure_reasons[key]
-                if reasons_list:
-                    reason = Counter(reasons_list).most_common(1)[0][0]
-                else:
-                    reason = f"No valid {key} scores available"
             result[key] = {
                 "score": avg,
                 "valid_count": vc,
                 "total_participants": total_participants,
-                "reason": reason,
+                "participants": participants_detail[key],
             }
+
+        result["no_fitprint_assigned"] = [
+            {
+                "user_id": uid,
+                "name": " ".join(p for p in (first, last) if p) or f"User {uid}",
+            }
+            for uid, first, last in no_fitprint_rows
+        ]
 
         return result
 
