@@ -150,6 +150,38 @@ async def validate_department_company_average_scores(
     return success_response(result)
 
 
+@router.get("/{camp_no}/validate/positive-wins")
+async def validate_positive_wins(
+    camp_no: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.validate_positive_wins(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+    )
+    return success_response(result)
+
+
+@router.get("/{camp_no}/department/{slug}/validate/positive-wins")
+async def validate_department_positive_wins(
+    camp_no: int,
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.validate_positive_wins(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        department=slug,
+    )
+    return success_response(result)
+
+
 @router.get("/{camp_no}/participants")
 async def list_camp_participants(
     camp_no: int,

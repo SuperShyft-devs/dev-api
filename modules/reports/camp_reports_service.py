@@ -1055,6 +1055,193 @@ class CampReportsService:
 
         return result
 
+    async def validate_positive_wins(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        department: str | None = None,
+    ) -> dict:
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=context["organization_id"],
+                slug=normalized_department,
+            )
+            department = normalized_department
+
+        contexts = await self._repository.list_enrolled_assessment_contexts(
+            db,
+            camp_no=camp_no,
+            department=department,
+        )
+
+        user_ids = [ctx.assessment_instance.user_id for ctx in contexts]
+        user_names: dict[int, str] = {}
+        if user_ids:
+            rows = await db.execute(
+                select(User.user_id, User.first_name, User.last_name).where(
+                    User.user_id.in_(user_ids)
+                )
+            )
+            for uid, first, last in rows.all():
+                parts = [p for p in (first, last) if p]
+                user_names[int(uid)] = " ".join(parts) if parts else f"User {uid}"
+
+        participants_low_risk: list[dict[str, Any]] = []
+        participants_habits: list[dict[str, Any]] = []
+        participants_profiles: list[dict[str, Any]] = []
+
+        agg_low_risk: list[list[dict[str, Any]]] = []
+        agg_habits: list[list[dict[str, str | None]]] = []
+        agg_profiles: list[list[str]] = []
+
+        for ctx in contexts:
+            uid = ctx.assessment_instance.user_id
+            name = user_names.get(uid, f"User {uid}")
+
+            # --- low_risk ---
+            lr_entry: dict[str, Any] = {"user_id": uid, "name": name}
+            if ctx.package is None:
+                lr_entry.update({"items": None, "reason": "No assessment package", "detail": None})
+                agg_low_risk.append([])
+            elif (ctx.package.assessment_type_code or "").strip() == "7":
+                lr_entry.update({"items": None, "reason": "FitPrint assessment (not applicable for disease risk)", "detail": None})
+                agg_low_risk.append([])
+            else:
+                try:
+                    report_dict = await self._reports_service._resolve_report_dict_for_instance(
+                        db,
+                        assessment_instance=ctx.assessment_instance,
+                        package=ctx.package,
+                        individual_report=ctx.individual_report,
+                    )
+                except AppError as exc:
+                    lr_entry.update({"items": None, "reason": "Metsights report unavailable", "detail": exc.message})
+                    agg_low_risk.append([])
+                    participants_low_risk.append(lr_entry)
+
+                    # habits & profiles also fail when metsights is down for this participant
+                    participants_habits.append({"user_id": uid, "name": name, "items": None, "reason": "Metsights report unavailable", "detail": exc.message})
+                    agg_habits.append([])
+                    participants_profiles.append({"user_id": uid, "name": name, "items": None, "reason": "Metsights report unavailable", "detail": exc.message})
+                    agg_profiles.append([])
+                    continue
+                except Exception as exc:
+                    detail = str(exc) or "Unexpected error resolving report"
+                    lr_entry.update({"items": None, "reason": "Report resolution failed", "detail": detail})
+                    agg_low_risk.append([])
+                    participants_low_risk.append(lr_entry)
+
+                    participants_habits.append({"user_id": uid, "name": name, "items": None, "reason": "Report resolution failed", "detail": detail})
+                    agg_habits.append([])
+                    participants_profiles.append({"user_id": uid, "name": name, "items": None, "reason": "Report resolution failed", "detail": detail})
+                    agg_profiles.append([])
+                    continue
+                else:
+                    low_risk_items = self._reports_service._top_low_risk_from_report_dict(report_dict)
+                    if low_risk_items:
+                        items_dicts = [{"code": i.code, "name": i.name, "risk_status": i.risk_status, "risk_score_scaled": i.risk_score_scaled} for i in low_risk_items]
+                        lr_entry.update({"items": [i.name for i in low_risk_items], "reason": None, "detail": None})
+                        agg_low_risk.append(items_dicts)
+                    else:
+                        lr_entry.update({"items": None, "reason": "No low-risk diseases found in report", "detail": None})
+                        agg_low_risk.append([])
+            participants_low_risk.append(lr_entry)
+
+            # --- healthy_habits ---
+            hh_entry: dict[str, Any] = {"user_id": uid, "name": name}
+            if self._reports_service._healthy_habits_service is None:
+                hh_entry.update({"items": None, "reason": "Healthy habits service not configured", "detail": None})
+                agg_habits.append([])
+            elif ctx.package is None:
+                hh_entry.update({"items": None, "reason": "No assessment package", "detail": None})
+                agg_habits.append([])
+            else:
+                try:
+                    computed = await self._reports_service._healthy_habits_service.top_habits_for_assessment(
+                        db,
+                        assessment_instance_id=int(ctx.assessment_instance.assessment_instance_id),
+                        package_id=int(ctx.assessment_instance.package_id),
+                        limit=3,
+                    )
+                except Exception as exc:
+                    hh_entry.update({"items": None, "reason": "Healthy habits computation failed", "detail": str(exc) or "Unexpected error"})
+                    agg_habits.append([])
+                else:
+                    if computed:
+                        habit_dicts = [{"habit_key": h.habit_key, "habit_label": h.habit_label} for h in computed]
+                        hh_entry.update({"items": [h.habit_label for h in computed], "reason": None, "detail": None})
+                        agg_habits.append(habit_dicts)
+                    else:
+                        hh_entry.update({"items": None, "reason": "No habit rules matched participant answers", "detail": None})
+                        agg_habits.append([])
+            participants_habits.append(hh_entry)
+
+            # --- healthy_profiles ---
+            hp_entry: dict[str, Any] = {"user_id": uid, "name": name}
+            if ctx.engagement is None or ctx.engagement.diagnostic_package_id is None:
+                hp_entry.update({"items": None, "reason": "No diagnostic package assigned", "detail": None})
+                agg_profiles.append([])
+            elif ctx.individual_report is None:
+                hp_entry.update({"items": None, "reason": "No individual health report", "detail": None})
+                agg_profiles.append([])
+            else:
+                try:
+                    _, profiles = await self._reports_service.compute_healthy_habits_and_profiles_for_instance(
+                        db,
+                        assessment_instance=ctx.assessment_instance,
+                        package=ctx.package,
+                        engagement=ctx.engagement,
+                        individual_report=ctx.individual_report,
+                        user_gender=ctx.user_gender,
+                    )
+                except AppError as exc:
+                    if exc.error_code in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
+                        hp_entry.update({"items": None, "reason": "Blood data unavailable", "detail": exc.error_code})
+                    else:
+                        hp_entry.update({"items": None, "reason": "Blood data fetch failed", "detail": exc.message})
+                    agg_profiles.append([])
+                except Exception as exc:
+                    hp_entry.update({"items": None, "reason": "Healthy profiles computation failed", "detail": str(exc) or "Unexpected error"})
+                    agg_profiles.append([])
+                else:
+                    if profiles:
+                        hp_entry.update({"items": profiles, "reason": None, "detail": None})
+                        agg_profiles.append(profiles)
+                    else:
+                        hp_entry.update({"items": None, "reason": "No test groups with in-range parameters", "detail": None})
+                        agg_profiles.append([])
+            participants_profiles.append(hp_entry)
+
+        return {
+            "total_participants": len(contexts),
+            "low_risk": {
+                "aggregated": aggregate_top_low_risk(agg_low_risk),
+                "participants": participants_low_risk,
+            },
+            "healthy_habits": {
+                "aggregated": aggregate_top_healthy_habits(agg_habits),
+                "participants": participants_habits,
+            },
+            "healthy_profiles": {
+                "aggregated": aggregate_top_healthy_profiles(agg_profiles),
+                "participants": participants_profiles,
+            },
+        }
+
     _BLOOD_INTELLIGENCE_GROUP_KEYS = (
         "vitamin_profile",
         "diabetes_profile",
