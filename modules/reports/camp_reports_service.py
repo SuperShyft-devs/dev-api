@@ -861,11 +861,43 @@ class CampReportsService:
                     package=ctx.package,
                     individual_report=ctx.individual_report,
                 )
-            except Exception:
+            except AppError as exc:
+                detail = f"Metsights service returned: {exc.message}"
                 for key in ("nutrition", "fitness", "lifestyle"):
                     participants_detail[key].append({
                         "user_id": uid, "name": name,
                         "score": None, "reason": "FitPrint report not available",
+                        "detail": detail,
+                    })
+                continue
+            except Exception as exc:
+                detail = str(exc) or "An unexpected error occurred while resolving the FitPrint report"
+                for key in ("nutrition", "fitness", "lifestyle"):
+                    participants_detail[key].append({
+                        "user_id": uid, "name": name,
+                        "score": None, "reason": "FitPrint report not available",
+                        "detail": detail,
+                    })
+                continue
+
+            record_id = (ctx.assessment_instance.metsights_record_id or "").strip()
+            report_empty = not report_dict
+
+            if report_empty and not record_id:
+                for key in ("nutrition", "fitness", "lifestyle"):
+                    participants_detail[key].append({
+                        "user_id": uid, "name": name,
+                        "score": None, "reason": "FitPrint report not available",
+                        "detail": "FitPrint assessment not completed yet (no Metsights record ID)",
+                    })
+                continue
+
+            if report_empty:
+                for key in ("nutrition", "fitness", "lifestyle"):
+                    participants_detail[key].append({
+                        "user_id": uid, "name": name,
+                        "score": None, "reason": "FitPrint report not available",
+                        "detail": "Metsights returned an empty report for this participant",
                     })
                 continue
 
@@ -879,12 +911,13 @@ class CampReportsService:
                 totals["lifestyle"] += lifestyle_score
                 participants_detail["lifestyle"].append({
                     "user_id": uid, "name": name,
-                    "score": lifestyle_score, "reason": None,
+                    "score": lifestyle_score, "reason": None, "detail": None,
                 })
             else:
                 participants_detail["lifestyle"].append({
                     "user_id": uid, "name": name,
-                    "score": None, "reason": "Fitness specification score missing in FitPrint report",
+                    "score": None, "reason": "Lifestyle score missing in FitPrint report",
+                    "detail": "The Metsights FitPrint report was retrieved but does not contain a fitness_specification score. The participant may not have completed the fitness assessment.",
                 })
 
             raw_fitness = activity_spec.get("score") if isinstance(activity_spec, dict) else None
@@ -894,12 +927,13 @@ class CampReportsService:
                 totals["fitness"] += fitness_score
                 participants_detail["fitness"].append({
                     "user_id": uid, "name": name,
-                    "score": fitness_score, "reason": None,
+                    "score": fitness_score, "reason": None, "detail": None,
                 })
             else:
                 participants_detail["fitness"].append({
                     "user_id": uid, "name": name,
-                    "score": None, "reason": "Activity specification score missing in FitPrint report",
+                    "score": None, "reason": "Fitness score missing in FitPrint report",
+                    "detail": "The Metsights FitPrint report was retrieved but does not contain an activity_specification score. The participant may not have completed the fitness assessment.",
                 })
 
             all_instances = await self._assessments_repository.list_instances_for_user_engagement(
@@ -913,7 +947,11 @@ class CampReportsService:
             nutrition_detail: dict[str, Any] = {"user_id": uid, "name": name}
 
             if not source_ids:
-                nutrition_detail.update({"score": None, "reason": "No assessment instances found"})
+                nutrition_detail.update({
+                    "score": None,
+                    "reason": "No assessment instances found",
+                    "detail": "No assessments (questionnaire or other) found for this participant's engagement — nutrition questions cannot be loaded",
+                })
             else:
                 try:
                     lookup, _ = await self._reports_service._build_questionnaire_lookup(
@@ -928,6 +966,7 @@ class CampReportsService:
                         nutrition_detail.update({
                             "score": None,
                             "reason": "Nutrition questionnaire not filled",
+                            "detail": f"Participant has not answered any of the {len(nutrition_question_keys)} nutrition-related questions required for score calculation",
                             "missing_questions": missing_keys,
                         })
                     else:
@@ -939,18 +978,38 @@ class CampReportsService:
                         nutrition_score = float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
 
                         if nutrition_score is not None:
-                            nutrition_detail.update({"score": nutrition_score, "reason": None})
+                            nutrition_detail.update({"score": nutrition_score, "reason": None, "detail": None})
                             if missing_keys:
                                 nutrition_detail["missing_questions"] = missing_keys
                         else:
+                            detail_parts = ["The nutrition API processed the request but did not return a numeric score"]
+                            if missing_keys:
+                                detail_parts.append(f"{len(missing_keys)} of {len(nutrition_question_keys)} questions were not answered, which may have affected the result")
                             nutrition_detail.update({
                                 "score": None,
                                 "reason": "Nutrition API returned no score",
+                                "detail": ". ".join(detail_parts),
                             })
                             if missing_keys:
                                 nutrition_detail["missing_questions"] = missing_keys
-                except Exception:
-                    nutrition_detail.update({"score": None, "reason": "Nutrition API call failed"})
+                except AppError as exc:
+                    if exc.error_code == "INVALID_INPUT":
+                        detail = exc.message or "The nutrition API rejected the request payload"
+                    elif exc.error_code == "EXTERNAL_SERVICE_UNAVAILABLE":
+                        detail = "The nutrition scoring service is currently unavailable"
+                    else:
+                        detail = exc.message or str(exc)
+                    nutrition_detail.update({
+                        "score": None,
+                        "reason": "Nutrition API call failed",
+                        "detail": detail,
+                    })
+                except Exception as exc:
+                    nutrition_detail.update({
+                        "score": None,
+                        "reason": "Nutrition API call failed",
+                        "detail": str(exc) or "An unexpected error occurred while calling the nutrition API",
+                    })
 
             if nutrition_score is not None:
                 valid_counts["nutrition"] += 1
