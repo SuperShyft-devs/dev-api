@@ -768,6 +768,76 @@ class CampReportsRepository:
             for ai, pkg, eng, ihr, gender in result.all()
         ]
 
+    async def list_health_assessment_contexts(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+    ) -> list[EnrolledAssessmentContext]:
+        """Latest health (type_code '1' or '2') assessment context per enrolled user."""
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+
+        ranked = (
+            select(
+                AssessmentInstance.assessment_instance_id.label("assessment_instance_id"),
+                enrolled.c.gender.label("user_gender"),
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=AssessmentInstance.assessment_instance_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(
+                AssessmentInstance,
+                and_(
+                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
+                    AssessmentInstance.user_id == enrolled.c.user_id,
+                ),
+            )
+            .join(
+                AssessmentPackage,
+                AssessmentPackage.package_id == AssessmentInstance.package_id,
+            )
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        ).subquery()
+
+        query = (
+            select(
+                AssessmentInstance,
+                AssessmentPackage,
+                Engagement,
+                IndividualHealthReport,
+                ranked.c.user_gender,
+            )
+            .select_from(ranked)
+            .join(
+                AssessmentInstance,
+                AssessmentInstance.assessment_instance_id == ranked.c.assessment_instance_id,
+            )
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .join(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
+            .outerjoin(
+                IndividualHealthReport,
+                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+            )
+            .where(ranked.c.rn == 1)
+        )
+
+        result = await db.execute(query)
+        return [
+            EnrolledAssessmentContext(
+                assessment_instance=ai,
+                package=pkg,
+                engagement=eng,
+                individual_report=ihr,
+                user_gender=gender,
+            )
+            for ai, pkg, eng, ihr, gender in result.all()
+        ]
+
     async def list_enrolled_users_without_fitprint(
         self,
         db: AsyncSession,

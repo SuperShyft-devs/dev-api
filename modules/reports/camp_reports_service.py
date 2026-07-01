@@ -674,7 +674,7 @@ class CampReportsService:
         camp_no: int,
         department: str | None,
     ) -> dict:
-        contexts = await self._repository.list_enrolled_assessment_contexts(
+        contexts = await self._repository.list_health_assessment_contexts(
             db,
             camp_no=camp_no,
             department=department,
@@ -1082,7 +1082,7 @@ class CampReportsService:
             )
             department = normalized_department
 
-        contexts = await self._repository.list_enrolled_assessment_contexts(
+        contexts = await self._repository.list_health_assessment_contexts(
             db,
             camp_no=camp_no,
             department=department,
@@ -1116,9 +1116,6 @@ class CampReportsService:
             lr_entry: dict[str, Any] = {"user_id": uid, "name": name}
             if ctx.package is None:
                 lr_entry.update({"items": None, "reason": "No assessment package", "detail": None})
-                agg_low_risk.append([])
-            elif (ctx.package.assessment_type_code or "").strip() == "7":
-                lr_entry.update({"items": None, "reason": "FitPrint assessment (not applicable for disease risk)", "detail": None})
                 agg_low_risk.append([])
             else:
                 try:
