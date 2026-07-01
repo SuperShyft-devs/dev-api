@@ -995,6 +995,11 @@ class CampReportsService:
                 except AppError as exc:
                     if exc.error_code == "INVALID_INPUT":
                         detail = exc.message or "The nutrition API rejected the request payload"
+                        for qkey, qval in nutrition_payload.items():
+                            val_str = str(qval) if not isinstance(qval, list) else str(qval)
+                            if val_str in detail:
+                                detail = f"[{qkey}] {detail}"
+                                break
                     elif exc.error_code == "EXTERNAL_SERVICE_UNAVAILABLE":
                         detail = "The nutrition scoring service is currently unavailable"
                     else:
