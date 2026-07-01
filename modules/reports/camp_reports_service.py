@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -787,6 +788,130 @@ class CampReportsService:
             })
 
         return build_company_average_scores(participant_scores)
+
+    async def validate_company_average_scores(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        department: str | None = None,
+    ) -> dict:
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=context["organization_id"],
+                slug=normalized_department,
+            )
+            department = normalized_department
+
+        contexts = await self._repository.list_fitprint_assessment_contexts(
+            db,
+            camp_no=camp_no,
+            department=department,
+        )
+
+        total_participants = len(contexts)
+        valid_counts: dict[str, int] = {"nutrition": 0, "fitness": 0, "lifestyle": 0}
+        totals: dict[str, float] = {"nutrition": 0.0, "fitness": 0.0, "lifestyle": 0.0}
+        failure_reasons: dict[str, list[str]] = {"nutrition": [], "fitness": [], "lifestyle": []}
+
+        for ctx in contexts:
+            try:
+                report_dict = await self._reports_service._resolve_report_dict_for_instance(
+                    db,
+                    assessment_instance=ctx.assessment_instance,
+                    package=ctx.package,
+                    individual_report=ctx.individual_report,
+                )
+            except Exception:
+                failure_reasons["fitness"].append("FitPrint report not available")
+                failure_reasons["lifestyle"].append("FitPrint report not available")
+                failure_reasons["nutrition"].append("FitPrint report not available")
+                continue
+
+            fitness_spec = report_dict.get("fitness_specification") or {}
+            activity_spec = report_dict.get("activity_specification") or {}
+
+            raw_lifestyle = fitness_spec.get("score") if isinstance(fitness_spec, dict) else None
+            lifestyle_score = float(raw_lifestyle) if isinstance(raw_lifestyle, (int, float)) else None
+            if lifestyle_score is not None:
+                valid_counts["lifestyle"] += 1
+                totals["lifestyle"] += lifestyle_score
+            else:
+                failure_reasons["lifestyle"].append("Fitness specification score missing in FitPrint report")
+
+            raw_fitness = activity_spec.get("score") if isinstance(activity_spec, dict) else None
+            fitness_score = float(raw_fitness) if isinstance(raw_fitness, (int, float)) else None
+            if fitness_score is not None:
+                valid_counts["fitness"] += 1
+                totals["fitness"] += fitness_score
+            else:
+                failure_reasons["fitness"].append("Activity specification score missing in FitPrint report")
+
+            all_instances = await self._assessments_repository.list_instances_for_user_engagement(
+                db,
+                user_id=ctx.assessment_instance.user_id,
+                engagement_id=ctx.assessment_instance.engagement_id,
+            )
+            source_ids = [inst.assessment_instance_id for inst in all_instances]
+
+            nutrition_score: float | None = None
+            if not source_ids:
+                failure_reasons["nutrition"].append("No assessment instances found for nutrition questionnaire")
+            else:
+                try:
+                    lookup, _ = await self._reports_service._build_questionnaire_lookup(
+                        db,
+                        source_assessment_instance_ids=source_ids,
+                    )
+                    nutrition_payload = self._reports_service._build_nutrition_api_payload(
+                        lookup, user_gender=ctx.user_gender
+                    )
+                    nutrition_response = await self._reports_service._call_nutrition_api(nutrition_payload)
+                    raw_nutrition = nutrition_response.get("nutrition_score")
+                    nutrition_score = float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
+                    if nutrition_score is None:
+                        failure_reasons["nutrition"].append("Nutrition API returned no score")
+                except Exception:
+                    failure_reasons["nutrition"].append("Nutrition API call failed")
+
+            if nutrition_score is not None:
+                valid_counts["nutrition"] += 1
+                totals["nutrition"] += nutrition_score
+
+        result: dict[str, Any] = {}
+        for key in ("nutrition", "fitness", "lifestyle"):
+            vc = valid_counts[key]
+            avg = round(totals[key] / vc) if vc > 0 else 0
+            reason: str | None = None
+            if total_participants == 0:
+                reason = "No FitPrint participants found in this camp"
+            elif vc == 0:
+                reasons_list = failure_reasons[key]
+                if reasons_list:
+                    reason = Counter(reasons_list).most_common(1)[0][0]
+                else:
+                    reason = f"No valid {key} scores available"
+            result[key] = {
+                "score": avg,
+                "valid_count": vc,
+                "total_participants": total_participants,
+                "reason": reason,
+            }
+
+        return result
 
     _BLOOD_INTELLIGENCE_GROUP_KEYS = (
         "vitamin_profile",
