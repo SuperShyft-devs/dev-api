@@ -12,6 +12,7 @@ from modules.assessments.models import AssessmentPackage
 from modules.employee.models import Employee
 from modules.engagements.models import Engagement, OnboardingAssistantAssignment
 from modules.diagnostics.models import DiagnosticPackage
+from modules.organizations.models import Organization
 from modules.users.models import User
 
 
@@ -538,13 +539,24 @@ async def test_onboarding_assistant_routes_require_admin(async_client, test_db_s
 
 
 @pytest.mark.asyncio
-async def test_add_onboarding_assistants_rejects_organization_manager(async_client, test_db_session):
+async def test_add_onboarding_assistants_accepts_organization_manager_when_contact_person(
+    async_client, test_db_session
+):
     await _seed_employee(test_db_session, user_id=9032, employee_id=122, role="admin")
     await _seed_employee(
         test_db_session, user_id=9033, employee_id=123, role="organization_manager"
     )
     await _ensure_assessment_package(test_db_session)
 
+    test_db_session.add(
+        Organization(
+            organization_id=9501,
+            name="Assignable Org",
+            organization_type="corporate",
+            status="active",
+            contact_person_user_id=9033,
+        )
+    )
     test_db_session.add(
         Engagement(
             engagement_id=5011,
@@ -553,6 +565,7 @@ async def test_add_onboarding_assistants_rejects_organization_manager(async_clie
             engagement_type="doctor",
             assessment_package_id=1,
             diagnostic_package_id=1,
+            organization_id=9501,
             status="running",
             participant_count=0,
             start_date=date.today(),
@@ -565,6 +578,55 @@ async def test_add_onboarding_assistants_rejects_organization_manager(async_clie
         "/engagements/5011/onboarding-assistants",
         headers=_auth_header(9032),
         json={"employee_ids": [123]},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["added_employee_ids"] == [123]
+
+
+@pytest.mark.asyncio
+async def test_add_onboarding_assistants_rejects_organization_manager_wrong_org(
+    async_client, test_db_session
+):
+    await _seed_employee(test_db_session, user_id=9034, employee_id=124, role="admin")
+    await _seed_employee(
+        test_db_session, user_id=9035, employee_id=125, role="organization_manager"
+    )
+    await _ensure_assessment_package(test_db_session)
+
+    test_db_session.add(
+        User(user_id=9999, age=30, phone="999900000000", status="active")
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        Organization(
+            organization_id=9502,
+            name="Other Org",
+            organization_type="corporate",
+            status="active",
+            contact_person_user_id=9999,
+        )
+    )
+    test_db_session.add(
+        Engagement(
+            engagement_id=5012,
+            engagement_name="Test Engagement 2",
+            engagement_code="ENG012",
+            engagement_type="doctor",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            organization_id=9502,
+            status="running",
+            participant_count=0,
+            start_date=date.today(),
+            end_date=date.today(),
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/engagements/5012/onboarding-assistants",
+        headers=_auth_header(9034),
+        json={"employee_ids": [125]},
     )
     assert response.status_code == 400
     assert response.json()["error_code"] == "INVALID_INPUT"

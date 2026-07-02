@@ -42,6 +42,12 @@ class ConsoleService:
             engagements = await self._repository.list_running_engagements_for_assigned_employee(
                 db, employee_id=employee.employee_id
             )
+        elif employee.role == EmployeeRole.organization_manager:
+            engagements = await self._repository.list_engagements_for_assigned_org_contact_person(
+                db,
+                employee_id=employee.employee_id,
+                user_id=employee.user_id,
+            )
         else:
             raise AppError(
                 status_code=403,

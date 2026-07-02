@@ -12,6 +12,7 @@ from modules.assessments.models import AssessmentPackage
 from modules.diagnostics.models import DiagnosticPackage
 from modules.employee.models import Employee
 from modules.engagements.models import Engagement, OnboardingAssistantAssignment
+from modules.organizations.models import Organization
 from modules.users.models import User
 
 
@@ -94,6 +95,49 @@ async def _assign_assistant(
         )
     )
     await test_db_session.commit()
+
+
+async def _seed_org_manager_with_engagement(
+    test_db_session,
+    *,
+    manager_user_id: int,
+    employee_id: int,
+    organization_id: int,
+    engagement_id: int,
+    status: str = "running",
+    contact_person_user_id: int | None = None,
+) -> Engagement:
+    await _ensure_assessment_package(test_db_session)
+    test_db_session.add(
+        User(user_id=manager_user_id, age=30, phone=f"{manager_user_id}000000000", status="active")
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        Employee(
+            employee_id=employee_id,
+            user_id=manager_user_id,
+            role="organization_manager",
+            status="active",
+        )
+    )
+    test_db_session.add(
+        Organization(
+            organization_id=organization_id,
+            name=f"Org {organization_id}",
+            organization_type="corporate",
+            status="active",
+            contact_person_user_id=contact_person_user_id if contact_person_user_id is not None else manager_user_id,
+        )
+    )
+    engagement = await _seed_engagement(
+        test_db_session,
+        engagement_id=engagement_id,
+        status=status,
+        engagement_code=f"ORG{engagement_id}",
+    )
+    engagement.organization_id = organization_id
+    await test_db_session.flush()
+    return engagement
 
 
 # ============================================================================
@@ -314,17 +358,111 @@ async def test_console_participants_includes_age(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
-async def test_console_routes_org_manager_assigned_403(async_client, test_db_session):
-    await _seed_employee(
-        test_db_session, user_id=9112, employee_id=212, role="organization_manager"
+async def test_console_routes_org_manager_assigned_contact_person_running(async_client, test_db_session):
+    await _seed_org_manager_with_engagement(
+        test_db_session,
+        manager_user_id=9112,
+        employee_id=212,
+        organization_id=9401,
+        engagement_id=6016,
+        status="running",
     )
-    await _seed_engagement(test_db_session, engagement_id=6016, status="running")
     await _assign_assistant(test_db_session, assignment_id=7, employee_id=212, engagement_id=6016)
 
     headers = _auth_header(9112)
 
-    assert (await async_client.get("/engagements/6016/console", headers=headers)).status_code == 403
+    list_res = await async_client.get("/engagements/console/engagements", headers=headers)
+    assert list_res.status_code == 200
+    assert len(list_res.json()["data"]) == 1
+    assert list_res.json()["data"][0]["engagement_id"] == 6016
+
+    assert (await async_client.get("/engagements/6016/console", headers=headers)).status_code == 200
     assert (
         await async_client.get("/engagements/6016/console/participants", headers=headers)
+    ).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_console_routes_org_manager_assigned_contact_person_completed(async_client, test_db_session):
+    await _seed_org_manager_with_engagement(
+        test_db_session,
+        manager_user_id=9113,
+        employee_id=213,
+        organization_id=9402,
+        engagement_id=6017,
+        status="completed",
+    )
+    await _assign_assistant(test_db_session, assignment_id=8, employee_id=213, engagement_id=6017)
+
+    headers = _auth_header(9113)
+
+    list_res = await async_client.get("/engagements/console/engagements", headers=headers)
+    assert list_res.status_code == 200
+    assert {row["engagement_id"] for row in list_res.json()["data"]} == {6017}
+
+    assert (await async_client.get("/engagements/6017/console", headers=headers)).status_code == 200
+    assert (
+        await async_client.get("/engagements/6017/console/participants", headers=headers)
+    ).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_console_routes_org_manager_assigned_wrong_org(async_client, test_db_session):
+    other_contact_user_id = 9199
+    test_db_session.add(
+        User(user_id=other_contact_user_id, age=30, phone="919900000000", status="active")
+    )
+    await test_db_session.flush()
+    await _seed_org_manager_with_engagement(
+        test_db_session,
+        manager_user_id=9114,
+        employee_id=214,
+        organization_id=9403,
+        engagement_id=6018,
+        status="running",
+        contact_person_user_id=other_contact_user_id,
+    )
+    await _assign_assistant(test_db_session, assignment_id=9, employee_id=214, engagement_id=6018)
+
+    headers = _auth_header(9114)
+
+    assert (await async_client.get("/engagements/6018/console", headers=headers)).status_code == 403
+    assert (
+        await async_client.get("/engagements/6018/console/participants", headers=headers)
     ).status_code == 403
-    assert (await async_client.get("/engagements/console/engagements", headers=headers)).status_code == 403
+    assert (await async_client.get("/engagements/console/engagements", headers=headers)).status_code == 200
+    assert (await async_client.get("/engagements/console/engagements", headers=headers)).json()["data"] == []
+
+
+@pytest.mark.asyncio
+async def test_console_routes_org_manager_contact_person_not_assigned(async_client, test_db_session):
+    await _seed_org_manager_with_engagement(
+        test_db_session,
+        manager_user_id=9115,
+        employee_id=215,
+        organization_id=9404,
+        engagement_id=6019,
+        status="running",
+    )
+
+    headers = _auth_header(9115)
+
+    assert (await async_client.get("/engagements/6019/console", headers=headers)).status_code == 403
+    assert (
+        await async_client.get("/engagements/6019/console/participants", headers=headers)
+    ).status_code == 403
+    assert (await async_client.get("/engagements/console/engagements", headers=headers)).json()["data"] == []
+
+
+@pytest.mark.asyncio
+async def test_console_routes_org_manager_assigned_no_organization_id(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9116, employee_id=216, role="organization_manager")
+    await _seed_engagement(test_db_session, engagement_id=6020, status="running")
+    await _assign_assistant(test_db_session, assignment_id=10, employee_id=216, engagement_id=6020)
+
+    headers = _auth_header(9116)
+
+    assert (await async_client.get("/engagements/6020/console", headers=headers)).status_code == 403
+    assert (
+        await async_client.get("/engagements/6020/console/participants", headers=headers)
+    ).status_code == 403

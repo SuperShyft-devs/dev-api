@@ -6,7 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
-from modules.employee.access_control import ensure_admin, ensure_valid_onboarding_assistant_assignee_role
+from modules.employee.access_control import (
+    ensure_admin,
+    ensure_org_manager_assignable_to_engagement,
+    ensure_valid_onboarding_assistant_assignee_role,
+)
 from modules.employee.service import EmployeeContext, EmployeeService
 from modules.engagements.models import OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
@@ -140,6 +144,13 @@ class OnboardingAssistantsService:
                 employee_id=emp_id,
             )
             ensure_valid_onboarding_assistant_assignee_role(emp.role)
+            await ensure_org_manager_assignable_to_engagement(
+                db,
+                assignee_user_id=emp.user_id,
+                assignee_role=emp.role,
+                engagement_id=engagement_id,
+                repository=self._repository,
+            )
 
             # Check if already assigned
             existing = await self._repository.get_onboarding_assistant_assignment(

@@ -456,6 +456,35 @@ class EngagementsRepository:
         result = await db.execute(query)
         return list(result.scalars().all())
 
+    async def list_engagements_for_assigned_org_contact_person(
+        self,
+        db: AsyncSession,
+        *,
+        employee_id: int,
+        user_id: int,
+    ) -> list[Engagement]:
+        """List engagements assigned to employee where user is org contact person (any status)."""
+        from modules.organizations.models import Organization
+
+        query = (
+            select(Engagement)
+            .join(
+                OnboardingAssistantAssignment,
+                OnboardingAssistantAssignment.engagement_id == Engagement.engagement_id,
+            )
+            .join(
+                Organization,
+                Organization.organization_id == Engagement.organization_id,
+            )
+            .where(
+                OnboardingAssistantAssignment.employee_id == employee_id,
+                Organization.contact_person_user_id == user_id,
+            )
+            .order_by(Engagement.start_date.desc(), Engagement.engagement_id.desc())
+        )
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
     async def list_onboarding_assistant_assignments(
         self,
         db: AsyncSession,

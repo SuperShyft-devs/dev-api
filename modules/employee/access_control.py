@@ -14,7 +14,7 @@ from modules.organizations.repository import OrganizationsRepository
 INTERNAL_ROLES = frozenset({EmployeeRole.admin, EmployeeRole.onboarding_assistant})
 
 ONBOARDING_ASSISTANT_ASSIGNEE_ROLES = frozenset(
-    {EmployeeRole.admin, EmployeeRole.onboarding_assistant}
+    {EmployeeRole.admin, EmployeeRole.onboarding_assistant, EmployeeRole.organization_manager}
 )
 
 
@@ -52,7 +52,7 @@ def ensure_admin(employee: EmployeeContext | None) -> None:
 
 
 def ensure_valid_onboarding_assistant_assignee_role(role: EmployeeRole) -> None:
-    """Only admin and onboarding_assistant employees may be assigned to engagements."""
+    """Only admin, onboarding_assistant, and organization_manager may be assigned."""
     if role not in ONBOARDING_ASSISTANT_ASSIGNEE_ROLES:
         raise AppError(
             status_code=400,
@@ -77,10 +77,38 @@ async def ensure_console_access(
     *,
     repository: EngagementsRepository,
 ) -> None:
-    """Admins: any engagement. Onboarding assistants: assigned + running only."""
+    """Admins: any engagement. Org managers: assigned + org contact person. OAs: assigned + running."""
     ensure_employee_present(employee)
     if employee.role == EmployeeRole.admin:
         return
+
+    if employee.role == EmployeeRole.organization_manager:
+        assignment = await repository.get_onboarding_assistant_assignment(
+            db, engagement_id=engagement_id, employee_id=employee.employee_id
+        )
+        if assignment is None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        engagement = await repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+        if engagement.organization_id is None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+        await ensure_org_access(db, employee, engagement.organization_id)
+        return
+
     if employee.role != EmployeeRole.onboarding_assistant:
         raise AppError(
             status_code=403,
@@ -106,6 +134,52 @@ async def ensure_console_access(
             message="Engagement does not exist",
         )
     ensure_engagement_running(engagement)
+
+
+async def ensure_org_manager_assignable_to_engagement(
+    db: AsyncSession,
+    *,
+    assignee_user_id: int,
+    assignee_role: EmployeeRole,
+    engagement_id: int,
+    repository: EngagementsRepository,
+    organizations_repository: OrganizationsRepository | None = None,
+) -> None:
+    """Organization managers may only be assigned to engagements for orgs they manage."""
+    if assignee_role != EmployeeRole.organization_manager:
+        return
+
+    engagement = await repository.get_engagement_by_id(db, engagement_id)
+    if engagement is None:
+        raise AppError(
+            status_code=404,
+            error_code="ENGAGEMENT_NOT_FOUND",
+            message="Engagement does not exist",
+        )
+    if engagement.organization_id is None:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message="Organization manager can only be assigned to organization engagements",
+        )
+
+    organization = await _load_organization(
+        db,
+        engagement.organization_id,
+        repository=organizations_repository,
+    )
+    if organization is None:
+        raise AppError(
+            status_code=404,
+            error_code="ORGANIZATION_NOT_FOUND",
+            message="Organization does not exist",
+        )
+    if organization.contact_person_user_id != assignee_user_id:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message="Organization manager must be the contact person for the engagement organization",
+        )
 
 
 async def ensure_org_access(
