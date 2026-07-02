@@ -47,7 +47,7 @@ class QuestionnaireCategory(Base):
 
     __tablename__ = "questionnaire_categories"
     __table_args__ = (
-        UniqueConstraint("category_key", "category_of", name="uq_questionnaire_categories_key_category_of"),
+        UniqueConstraint("category_key", name="uq_questionnaire_categories_key"),
     )
 
     category_id = Column(Integer, primary_key=True)

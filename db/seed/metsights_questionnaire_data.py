@@ -16,7 +16,7 @@ METSIGHTS_CATEGORIES: tuple[SeedCategory, ...] = (
     SeedCategory(2, "family_history", "Family History", "active"),
     SeedCategory(3, "lifestyle_habits", "Lifestyle & Habits", "active"),
     SeedCategory(4, "nutrition_log", "Nutrition Log", "active"),
-    SeedCategory(5, "vitals", "Vitals", "active"),
+    SeedCategory(5, "health_vitals", "Vitals", "active"),
 )
 
 METSIGHTS_QUESTIONS: tuple[SeedQuestion, ...] = (

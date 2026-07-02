@@ -21,29 +21,47 @@ from modules.questionnaire.models import QuestionnaireCategory
 from modules.questionnaire.repository import QuestionnaireRepository
 
 
-async def _ensure_category_composite_unique_constraint(db: AsyncSession) -> bool:
-    """Ensure (category_key, category_of) uniqueness so Metsights keys can coexist with UX keys.
+async def _ensure_category_key_unique_constraint(db: AsyncSession) -> bool:
+    """Ensure global category_key uniqueness (rename supershyft vitals collision first).
 
     Returns True when the schema was upgraded in-place.
     """
-    has_composite = (
+    upgraded = False
+
+    rename_result = await db.execute(
+        text(
+            """
+            UPDATE questionnaire_categories
+            SET category_key = 'health_vitals'
+            WHERE category_key = 'vitals' AND category_of = 'supershyft'
+            """
+        )
+    )
+    if rename_result.rowcount and rename_result.rowcount > 0:
+        upgraded = True
+
+    has_global = (
         await db.execute(
-            text(
-                "SELECT 1 FROM pg_constraint WHERE conname = 'uq_questionnaire_categories_key_category_of'"
-            )
+            text("SELECT 1 FROM pg_constraint WHERE conname = 'uq_questionnaire_categories_key'")
         )
     ).scalar_one_or_none()
-    if has_composite is not None:
-        return False
+    if has_global is not None:
+        await db.flush()
+        return upgraded
 
+    await db.execute(
+        text(
+            "ALTER TABLE questionnaire_categories "
+            "DROP CONSTRAINT IF EXISTS uq_questionnaire_categories_key_category_of"
+        )
+    )
     await db.execute(
         text("ALTER TABLE questionnaire_categories DROP CONSTRAINT IF EXISTS uq_questionnaire_categories_key")
     )
     await db.execute(
         text(
             "ALTER TABLE questionnaire_categories "
-            "ADD CONSTRAINT uq_questionnaire_categories_key_category_of "
-            "UNIQUE (category_key, category_of)"
+            "ADD CONSTRAINT uq_questionnaire_categories_key UNIQUE (category_key)"
         )
     )
     await db.flush()
@@ -73,7 +91,7 @@ async def reset_metsights_sync(db: AsyncSession) -> dict[str, Any]:
         "missing_package_codes": [],
     }
 
-    stats["schema_upgraded"] = await _ensure_category_composite_unique_constraint(db)
+    stats["schema_upgraded"] = await _ensure_category_key_unique_constraint(db)
 
     category_id_by_key: dict[str, int] = {}
 
