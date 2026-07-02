@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
+from modules.employee.access_control import ensure_admin, ensure_valid_onboarding_assistant_assignee_role
 from modules.employee.service import EmployeeContext, EmployeeService
 from modules.engagements.models import OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
@@ -31,15 +32,6 @@ class OnboardingAssistantsService:
         self._employee_service = employee_service
         self._audit_service = audit_service
 
-    def _ensure_employee_access(self, employee: EmployeeContext | None) -> None:
-        """Verify that the current user is an employee."""
-        if employee is None:
-            raise AppError(
-                status_code=403,
-                error_code="FORBIDDEN",
-                message="You do not have permission to perform this action",
-            )
-
     def _require_audit_service(self) -> AuditService:
         """Ensure audit service is available."""
         if self._audit_service is None:
@@ -54,7 +46,7 @@ class OnboardingAssistantsService:
         engagement_id: int,
     ) -> list[dict]:
         """List all employees assigned as onboarding assistants to an engagement."""
-        self._ensure_employee_access(employee)
+        ensure_admin(employee)
 
         engagement_id = _normalize_int(engagement_id)
 
@@ -112,7 +104,7 @@ class OnboardingAssistantsService:
         endpoint: str,
     ) -> dict:
         """Assign one or more employees as onboarding assistants to an engagement."""
-        self._ensure_employee_access(employee)
+        ensure_admin(employee)
 
         engagement_id = _normalize_int(engagement_id)
 
@@ -142,12 +134,12 @@ class OnboardingAssistantsService:
         skipped: list[int] = []
 
         for emp_id in normalized_ids:
-            # Validate employee exists via employee service
-            await self._employee_service.get_employee_details(
+            emp, _first_name, _last_name = await self._employee_service.get_employee_details(
                 db,
                 employee=employee,
                 employee_id=emp_id,
             )
+            ensure_valid_onboarding_assistant_assignee_role(emp.role)
 
             # Check if already assigned
             existing = await self._repository.get_onboarding_assistant_assignment(
@@ -194,7 +186,7 @@ class OnboardingAssistantsService:
         endpoint: str,
     ) -> dict:
         """Remove an employee's assignment from an engagement."""
-        self._ensure_employee_access(employee)
+        ensure_admin(employee)
 
         engagement_id = _normalize_int(engagement_id)
         employee_id = _normalize_int(employee_id)

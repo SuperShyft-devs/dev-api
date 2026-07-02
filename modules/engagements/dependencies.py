@@ -11,6 +11,7 @@ from modules.employee.service import EmployeeService
 from modules.engagements.assessment_packages_service import (
     EngagementAssessmentPackagesService,
 )
+from modules.engagements.console.service import ConsoleService
 from modules.engagements.onboarding_assistants_service import OnboardingAssistantsService
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService
@@ -47,6 +48,10 @@ def get_onboarding_assistants_service() -> OnboardingAssistantsService:
         employee_service=employee_service,
         audit_service=audit_service,
     )
+
+
+def get_console_service() -> ConsoleService:
+    return ConsoleService(repository=EngagementsRepository())
 
 
 def get_engagement_assessment_packages_service() -> EngagementAssessmentPackagesService:

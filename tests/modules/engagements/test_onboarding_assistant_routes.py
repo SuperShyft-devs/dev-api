@@ -496,3 +496,75 @@ async def test_remove_onboarding_assistant_returns_404_when_engagement_missing(a
     assert response.status_code == 404
     assert response.json() == {"error_code": "ENGAGEMENT_NOT_FOUND", "message": "Engagement does not exist"}
 
+
+@pytest.mark.asyncio
+async def test_onboarding_assistant_routes_require_admin(async_client, test_db_session):
+    """Onboarding assistant employees cannot manage onboarding assistant assignments."""
+    await _seed_employee(test_db_session, user_id=9030, employee_id=120, role="admin")
+    await _seed_employee(test_db_session, user_id=9031, employee_id=121, role="onboarding_assistant")
+    await _ensure_assessment_package(test_db_session)
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=5010,
+            engagement_name="Test Engagement",
+            engagement_code="ENG010",
+            engagement_type="doctor",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            status="running",
+            participant_count=0,
+            start_date=date.today(),
+            end_date=date.today(),
+        )
+    )
+    await test_db_session.commit()
+
+    headers = _auth_header(9031)
+
+    assert (
+        await async_client.get("/engagements/5010/onboarding-assistants", headers=headers)
+    ).status_code == 403
+    assert (
+        await async_client.post(
+            "/engagements/5010/onboarding-assistants",
+            headers=headers,
+            json={"employee_ids": [120]},
+        )
+    ).status_code == 403
+    assert (
+        await async_client.delete("/engagements/5010/onboarding-assistants/120", headers=headers)
+    ).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_add_onboarding_assistants_rejects_organization_manager(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9032, employee_id=122, role="admin")
+    await _seed_employee(
+        test_db_session, user_id=9033, employee_id=123, role="organization_manager"
+    )
+    await _ensure_assessment_package(test_db_session)
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=5011,
+            engagement_name="Test Engagement",
+            engagement_code="ENG011",
+            engagement_type="doctor",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            status="running",
+            participant_count=0,
+            start_date=date.today(),
+            end_date=date.today(),
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/engagements/5011/onboarding-assistants",
+        headers=_auth_header(9032),
+        json={"employee_ids": [123]},
+    )
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT"

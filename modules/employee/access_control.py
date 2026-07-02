@@ -7,10 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.employee.models import EmployeeRole
 from modules.employee.service import EmployeeContext
+from modules.engagements.repository import EngagementsRepository
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
 
 INTERNAL_ROLES = frozenset({EmployeeRole.admin, EmployeeRole.onboarding_assistant})
+
+ONBOARDING_ASSISTANT_ASSIGNEE_ROLES = frozenset(
+    {EmployeeRole.admin, EmployeeRole.onboarding_assistant}
+)
 
 
 def is_internal_employee(role: EmployeeRole) -> bool:
@@ -44,6 +49,63 @@ def ensure_admin(employee: EmployeeContext | None) -> None:
             error_code="FORBIDDEN",
             message="You do not have permission to perform this action",
         )
+
+
+def ensure_valid_onboarding_assistant_assignee_role(role: EmployeeRole) -> None:
+    """Only admin and onboarding_assistant employees may be assigned to engagements."""
+    if role not in ONBOARDING_ASSISTANT_ASSIGNEE_ROLES:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message="Employee role cannot be assigned as an onboarding assistant",
+        )
+
+
+def ensure_engagement_running(engagement) -> None:
+    if (getattr(engagement, "status", None) or "").lower() != "running":
+        raise AppError(
+            status_code=422,
+            error_code="ENGAGEMENT_NOT_RUNNING",
+            message="This engagement is not running",
+        )
+
+
+async def ensure_console_access(
+    db: AsyncSession,
+    employee: EmployeeContext | None,
+    engagement_id: int,
+    *,
+    repository: EngagementsRepository,
+) -> None:
+    """Admins: any engagement. Onboarding assistants: assigned + running only."""
+    ensure_employee_present(employee)
+    if employee.role == EmployeeRole.admin:
+        return
+    if employee.role != EmployeeRole.onboarding_assistant:
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+    assignment = await repository.get_onboarding_assistant_assignment(
+        db, engagement_id=engagement_id, employee_id=employee.employee_id
+    )
+    if assignment is None:
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+    engagement = await repository.get_engagement_by_id(db, engagement_id)
+    if engagement is None:
+        raise AppError(
+            status_code=404,
+            error_code="ENGAGEMENT_NOT_FOUND",
+            message="Engagement does not exist",
+        )
+    ensure_engagement_running(engagement)
 
 
 async def ensure_org_access(

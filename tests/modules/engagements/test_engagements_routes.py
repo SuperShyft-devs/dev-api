@@ -18,10 +18,10 @@ def _auth_header(user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
+async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1, role: str = "admin"):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role=role, status="active"))
     await test_db_session.commit()
 
 
@@ -1115,3 +1115,63 @@ async def test_patch_participant_department_updates_slug(async_client, test_db_s
         )
     ).first()
     assert row.participant_department == "marketing"
+
+
+@pytest.mark.asyncio
+async def test_list_engagements_onboarding_assistant_403(async_client, test_db_session):
+    await _seed_employee(
+        test_db_session, user_id=7040, employee_id=40, role="onboarding_assistant"
+    )
+    response = await async_client.get("/engagements", headers=_auth_header(7040))
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_update_engagement_onboarding_assistant_403(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7041, employee_id=41, role="admin")
+    await _seed_employee(
+        test_db_session, user_id=7042, employee_id=42, role="onboarding_assistant"
+    )
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    from modules.engagements.models import Engagement
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=8801,
+            engagement_name="OA Blocked Update",
+            organization_id=1,
+            engagement_code="OABLOCK1",
+            engagement_type="bio_ai",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 1),
+            status="running",
+            participant_count=0,
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "engagement_name": "Hacked",
+        "engagement_code": "OABLOCK1",
+        "organization_id": 1,
+        "engagement_type": "bio_ai",
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "city": "BLR",
+        "slot_duration": 20,
+        "start_date": "2026-02-01",
+        "end_date": "2026-02-01",
+    }
+    response = await async_client.put(
+        "/engagements/8801",
+        headers=_auth_header(7042),
+        json=payload,
+    )
+    assert response.status_code == 403

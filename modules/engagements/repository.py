@@ -424,6 +424,16 @@ class EngagementsRepository:
         result = await db.execute(query)
         return result.scalar_one_or_none()
 
+    async def list_running_engagements(self, db: AsyncSession) -> list[Engagement]:
+        """List all running engagements."""
+        query = (
+            select(Engagement)
+            .where(Engagement.status == "running")
+            .order_by(Engagement.start_date.desc(), Engagement.engagement_id.desc())
+        )
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
     async def list_running_engagements_for_assigned_employee(
         self,
         db: AsyncSession,
@@ -546,6 +556,7 @@ class EngagementsRepository:
                 User.last_name,
                 User.phone,
                 User.email,
+                User.age,
                 User.address,
                 User.pin_code,
                 User.city,
@@ -584,6 +595,7 @@ class EngagementsRepository:
                 ranked_rows.c.last_name,
                 ranked_rows.c.phone,
                 ranked_rows.c.email,
+                ranked_rows.c.age,
                 ranked_rows.c.address,
                 ranked_rows.c.pin_code,
                 ranked_rows.c.city,
@@ -671,6 +683,7 @@ class EngagementsRepository:
                 User.last_name,
                 User.phone,
                 User.email,
+                User.age,
                 User.address,
                 User.pin_code,
                 User.city,
@@ -710,6 +723,7 @@ class EngagementsRepository:
                 ranked_rows.c.last_name,
                 ranked_rows.c.phone,
                 ranked_rows.c.email,
+                ranked_rows.c.age,
                 ranked_rows.c.address,
                 ranked_rows.c.pin_code,
                 ranked_rows.c.city,

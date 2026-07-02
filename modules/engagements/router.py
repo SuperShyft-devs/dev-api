@@ -144,16 +144,6 @@ async def list_engagements(
     return success_response(data, meta={"page": page, "limit": limit, "total": total})
 
 
-@router.get("/console/engagements")
-async def list_console_engagements(
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    engagements_service: EngagementsService = Depends(get_engagements_service),
-):
-    data = await engagements_service.list_console_engagements(db, employee=employee)
-    return success_response(data)
-
-
 @router.get("/{engagement_id}")
 async def get_engagement_details(
     engagement_id: int,
@@ -196,44 +186,6 @@ async def get_engagement_details(
             "bioai_report_notification": engagement.bioai_report_notification,
         }
     )
-
-
-@router.get("/{engagement_id}/console")
-async def get_engagement_for_console(
-    engagement_id: int,
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    engagements_service: EngagementsService = Depends(get_engagements_service),
-):
-    data = await engagements_service.get_engagement_for_console(
-        db,
-        employee=employee,
-        engagement_id=engagement_id,
-    )
-    return success_response(data)
-
-
-@router.get("/{engagement_id}/console/participants")
-async def get_console_participants(
-    engagement_id: int,
-    page: int = 1,
-    limit: int = 20,
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    engagements_service: EngagementsService = Depends(get_engagements_service),
-):
-    if page < 1 or limit < 1 or limit > 100:
-        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-
-    participants, total = await engagements_service.list_participants_for_console(
-        db,
-        employee=employee,
-        engagement_id=engagement_id,
-        page=page,
-        limit=limit,
-    )
-
-    return success_response(participants, meta={"page": page, "limit": limit, "total": total})
 
 
 @router.put("/{engagement_id}")
