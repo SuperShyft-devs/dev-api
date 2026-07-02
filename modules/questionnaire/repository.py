@@ -118,6 +118,41 @@ class QuestionnaireRepository:
         )
         return list(result.scalars().all())
 
+    async def delete_responses_for_question_ids(
+        self,
+        db: AsyncSession,
+        question_ids: list[int],
+    ) -> int:
+        if not question_ids:
+            return 0
+        result = await db.execute(
+            delete(QuestionnaireResponse).where(QuestionnaireResponse.question_id.in_(question_ids))
+        )
+        await db.flush()
+        return int(result.rowcount or 0)
+
+    async def delete_definition_cascade(self, db: AsyncSession, question_id: int) -> None:
+        await db.execute(
+            delete(QuestionnaireResponse).where(QuestionnaireResponse.question_id == question_id)
+        )
+        await db.execute(
+            delete(QuestionnaireOption).where(QuestionnaireOption.question_id == question_id)
+        )
+        await db.execute(
+            delete(QuestionnaireCategoryQuestion).where(
+                QuestionnaireCategoryQuestion.question_id == question_id
+            )
+        )
+        await db.execute(
+            delete(QuestionnaireHealthyHabitRule).where(
+                QuestionnaireHealthyHabitRule.question_id == question_id
+            )
+        )
+        await db.execute(
+            delete(QuestionnaireDefinition).where(QuestionnaireDefinition.question_id == question_id)
+        )
+        await db.flush()
+
     async def replace_options_for_question(
         self,
         db: AsyncSession,

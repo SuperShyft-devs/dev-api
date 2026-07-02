@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from db.seed.metsights_sync_operations import reset_metsights_sync as run_reset_metsights_sync
+from db.seed.blood_parameters_operations import reload_blood_parameters_questions as run_reload_blood_parameters_questions
 from db.seed.questionnaire_field_config import QUESTION_TYPE_OVERRIDES
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
@@ -793,6 +794,30 @@ class QuestionnaireService:
         await audit.log_event(
             db,
             action="EMPLOYEE_RESET_METSIGHTS_SYNC",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return stats
+
+    async def reload_blood_parameters_questions(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict[str, Any]:
+        """Delete and recreate blood parameter questions from the Metsights OPTIONS registry."""
+        self._ensure_employee_access(employee)
+        stats = await run_reload_blood_parameters_questions(db)
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_RELOAD_BLOOD_PARAMETERS_QUESTIONS",
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,

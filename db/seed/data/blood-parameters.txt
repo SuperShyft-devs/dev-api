@@ -1,0 +1,1268 @@
+{
+    "name": "Blood Parameter Record",
+    "description": "",
+    "renders": [
+        "application/json"
+    ],
+    "parses": [
+        "application/json",
+        "application/x-www-form-urlencoded",
+        "multipart/form-data"
+    ],
+    "actions": {
+        "POST": {
+            "id": {
+                "type": "string",
+                "required": false,
+                "read_only": true,
+                "label": "Id"
+            },
+            "haemoglobin": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Haemoglobin"
+            },
+            "haemoglobin_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Haemoglobin unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "g/dL"
+                    }
+                ]
+            },
+            "rbc_count": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Erythrocyte (RBC) count"
+            },
+            "rbc_count_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Rbc count unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "10³/mm³"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "cell count/cu.m.m"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "cell count/μl"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "10³/μl"
+                    },
+                    {
+                        "value": "5",
+                        "display_name": "10⁶/μl"
+                    }
+                ]
+            },
+            "wbc_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Total WBC",
+                "help_text": "Value must be between 1 and 20 10³/μl"
+            },
+            "wbc_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Wbc value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "10³/mm³"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "cell count/cu.m.m"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "cell count/μl"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "10³/μl"
+                    },
+                    {
+                        "value": "5",
+                        "display_name": "10⁶/μl"
+                    }
+                ]
+            },
+            "neutrophils": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Neutrophils"
+            },
+            "neutrophils_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Neutrophils unit",
+                "choices": [
+                    {
+                        "value": "4",
+                        "display_name": "%"
+                    },
+                    {
+                        "value": "0",
+                        "display_name": "10³/mm³"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "cell count/cu.m.m"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "cell count/μl"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "10³/μl"
+                    },
+                    {
+                        "value": "5",
+                        "display_name": "10⁶/μl"
+                    }
+                ]
+            },
+            "lymphocytes": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Lymphocytes"
+            },
+            "lymphocytes_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Lymphocytes unit",
+                "choices": [
+                    {
+                        "value": "4",
+                        "display_name": "%"
+                    },
+                    {
+                        "value": "0",
+                        "display_name": "10³/mm³"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "cell count/cu.m.m"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "cell count/μl"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "10³/μl"
+                    },
+                    {
+                        "value": "5",
+                        "display_name": "10⁶/μl"
+                    }
+                ]
+            },
+            "monocytes": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Monocytes",
+                "help_text": "Value must be between 0 and 25%"
+            },
+            "monocytes_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Monocytes unit",
+                "choices": [
+                    {
+                        "value": "4",
+                        "display_name": "%"
+                    },
+                    {
+                        "value": "0",
+                        "display_name": "10³/mm³"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "cell count/cu.m.m"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "cell count/μl"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "10³/μl"
+                    },
+                    {
+                        "value": "5",
+                        "display_name": "10⁶/μl"
+                    }
+                ]
+            },
+            "eosinophils": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Eosinophils"
+            },
+            "eosinophils_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Eosinophils unit",
+                "choices": [
+                    {
+                        "value": "4",
+                        "display_name": "%"
+                    },
+                    {
+                        "value": "0",
+                        "display_name": "10³/mm³"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "cell count/cu.m.m"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "cell count/μl"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "10³/μl"
+                    },
+                    {
+                        "value": "5",
+                        "display_name": "10⁶/μl"
+                    }
+                ]
+            },
+            "basophils": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Basophils"
+            },
+            "basophils_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Basophils unit",
+                "choices": [
+                    {
+                        "value": "4",
+                        "display_name": "%"
+                    },
+                    {
+                        "value": "0",
+                        "display_name": "10³/mm³"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "cell count/cu.m.m"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "cell count/μl"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "10³/μl"
+                    },
+                    {
+                        "value": "5",
+                        "display_name": "10⁶/μl"
+                    }
+                ]
+            },
+            "platelets": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Platelets",
+                "help_text": "Value must be between 10 and 800 10³/μl"
+            },
+            "platelets_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Platelets unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "10³/mm³"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "cell count/cu.m.m"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "cell count/μl"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "10³/μl"
+                    },
+                    {
+                        "value": "5",
+                        "display_name": "10⁶/μl"
+                    }
+                ]
+            },
+            "mpv_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Mean Platelet Volume (MPV)"
+            },
+            "mpv_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Mpv value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "fL"
+                    }
+                ]
+            },
+            "pct_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Platelet crit (PCT)"
+            },
+            "pct_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Pct value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "%"
+                    }
+                ]
+            },
+            "pdw_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Platelet Distribution Width (PDW)"
+            },
+            "pdw_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Pdw value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "%"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "fL"
+                    }
+                ]
+            },
+            "total_bilirubin": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Bilirubin (Total)"
+            },
+            "total_bilirubin_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Total bilirubin unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/dL"
+                    }
+                ]
+            },
+            "direct_bilirubin": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Bilirubin (Direct)"
+            },
+            "direct_bilirubin_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Direct bilirubin unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/dL"
+                    }
+                ]
+            },
+            "ast_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "SGOT (AST)",
+                "help_text": "Value must be between 5 and 300 IU/L"
+            },
+            "ast_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Ast value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "U/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mlU/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "ulU/ml"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "IU/L"
+                    }
+                ]
+            },
+            "alt_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "SGPT (ALT)",
+                "help_text": "Value must be between 5 and 300 IU/L"
+            },
+            "alt_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Alt value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "U/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mlU/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "ulU/ml"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "IU/L"
+                    }
+                ]
+            },
+            "alkaline_phosphatase": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Alkaline Phosphatase"
+            },
+            "alkaline_phosphatase_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Alkaline phosphatase unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "U/L"
+                    }
+                ]
+            },
+            "total_protein": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Total Protein",
+                "help_text": "Value must be between 1 and 15 g/dL"
+            },
+            "total_protein_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Total protein unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "g/dL"
+                    }
+                ]
+            },
+            "albumin": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Albumin"
+            },
+            "albumin_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Albumin unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "g/dL"
+                    }
+                ]
+            },
+            "globulin": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Globulin"
+            },
+            "globulin_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Globulin unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "g/dL"
+                    }
+                ]
+            },
+            "ggt_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "GGTP (Gamma GT)",
+                "help_text": "Value must be between 5 and 300 IU/L"
+            },
+            "ggt_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Ggt value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "U/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mlU/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "ulU/ml"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "IU/L"
+                    }
+                ]
+            },
+            "glucose_fasting": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Fasting glucose",
+                "help_text": "Value must be in between 50 and 500 mg/dL"
+            },
+            "glucose_fasting_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Glucose fasting unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/dL"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mmol/L"
+                    }
+                ]
+            },
+            "glucose_random": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Random glucose",
+                "help_text": "Value must be in between 50 and 500 mg/dL"
+            },
+            "glucose_random_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Glucose random unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/dL"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mmol/L"
+                    }
+                ]
+            },
+            "creatinine": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Serum Creatinine"
+            },
+            "creatinine_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Creatinine unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/dL"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "µmol/L"
+                    }
+                ]
+            },
+            "bun_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Blood Urea Nitrogen (BUN)"
+            },
+            "bun_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Bun value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/dL"
+                    }
+                ]
+            },
+            "uric_acid": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Uric acid",
+                "help_text": "Value must be between 1.5 and 12 mg/dL"
+            },
+            "uric_acid_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Uric acid unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/dL"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "umol/L"
+                    }
+                ]
+            },
+            "calcium": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Serum Calcium"
+            },
+            "calcium_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Calcium unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mmol/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mg/dL"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "mEq/L"
+                    }
+                ]
+            },
+            "egfr_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "EGFR"
+            },
+            "egfr_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Egfr value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "ml/min/1.73 m²"
+                    }
+                ]
+            },
+            "total_cholesterol": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Total cholesterol",
+                "help_text": "Value must be between 70 and 650 mg/dL"
+            },
+            "total_cholesterol_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Total cholesterol unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/dL"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mmol/L"
+                    }
+                ]
+            },
+            "triglycerides": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Triglycerides",
+                "help_text": "Value must be between 30 and 500 mg/dL"
+            },
+            "triglycerides_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Triglycerides unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/dL"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mmol/L"
+                    }
+                ]
+            },
+            "hdlc_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "HDL cholesterol",
+                "help_text": "Value must be between 20 and 120 mg/dL"
+            },
+            "hdlc_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Hdlc value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/dL"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mmol/L"
+                    }
+                ]
+            },
+            "ldlc_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "LDL cholesterol",
+                "help_text": "Value must be between 20 and 400 mg/dL"
+            },
+            "ldlc_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Ldlc value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/dL"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mmol/L"
+                    }
+                ]
+            },
+            "triiodothyronine": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Tri-iodothyronine (T3)"
+            },
+            "triiodothyronine_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Triiodothyronine unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "ng/dL"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "ng/mL"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "ng/UL"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "nmol/L"
+                    },
+                    {
+                        "value": "4",
+                        "display_name": "pmol/L"
+                    }
+                ]
+            },
+            "thyroxine": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Thyroxine (T4)"
+            },
+            "thyroxine_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Thyroxine unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "pg/mL"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "μg/dL"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "nmol/L"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "pmol/L"
+                    }
+                ]
+            },
+            "tsh_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Thyroid stimulating hormone (TSH)",
+                "help_text": "Value must be greater than 0 uIU/mL"
+            },
+            "tsh_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Tsh value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mIU/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "IU/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "μIU/mL"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "mIU/mL"
+                    }
+                ]
+            },
+            "insulin": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Insulin",
+                "help_text": "Value must be between 0.3 and 100 IU/L"
+            },
+            "insulin_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Insulin unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "uIU/mL"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mIU/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "IU/L"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "pmol/L"
+                    }
+                ]
+            },
+            "esr_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Erythrocyte Sedimentation Rate (ESR)"
+            },
+            "esr_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Esr value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mm/hr"
+                    }
+                ]
+            },
+            "glycated_haemoglobin": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "HbA1c",
+                "help_text": "Value must be between 3 and 20 %"
+            },
+            "glycated_haemoglobin_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Glycated haemoglobin unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "%"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mmol/mol"
+                    }
+                ]
+            },
+            "prothrombin_time": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Prothrombin Time"
+            },
+            "prothrombin_time_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Prothrombin time unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "s"
+                    }
+                ]
+            },
+            "ptinr_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "PT(INR) Value",
+                "help_text": "Value must be within 0.7 and 30"
+            },
+            "ldh_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Lactate Dehydrogenase (LDH)"
+            },
+            "ldh_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Ldh value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "U/L"
+                    }
+                ]
+            },
+            "crp_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "C Reactive Protein (CRP)"
+            },
+            "crp_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Crp value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mg/dL"
+                    }
+                ]
+            },
+            "hscrp_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "High Sensitivity CRP (HsCRP)"
+            },
+            "hscrp_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Hscrp value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mg/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "mg/dL"
+                    }
+                ]
+            },
+            "cpk_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Creatine Phosphokinase level (CPK)"
+            },
+            "cpk_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Cpk value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "U/L"
+                    }
+                ]
+            },
+            "vitamin_d": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Total Vitamin D (25-Hydroxy Vitamin D)"
+            },
+            "vitamin_d_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Vitamin d unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "ng/ml"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "nmol/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "pg/mL"
+                    }
+                ]
+            },
+            "vitamin_b12": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Vitamin B12"
+            },
+            "vitamin_b12_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Vitamin b12 unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "ng/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "pg/mL"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "pmol/L"
+                    }
+                ]
+            },
+            "lh_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Lh value"
+            },
+            "lh_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Lh value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mIU/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "IU/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "μIU/mL"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "mIU/mL"
+                    }
+                ]
+            },
+            "fsh_value": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Fsh value"
+            },
+            "fsh_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Fsh value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mIU/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "IU/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "μIU/mL"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "mIU/mL"
+                    }
+                ]
+            },
+            "testosterone": {
+                "type": "float",
+                "required": false,
+                "read_only": false,
+                "label": "Testosterone"
+            },
+            "testosterone_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Testosterone unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "ng/dl"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "nmol/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "ng/mL"
+                    }
+                ]
+            },
+            "is_complete": {
+                "type": "boolean",
+                "required": false,
+                "read_only": true,
+                "label": "Is complete"
+            },
+            "created_at": {
+                "type": "datetime",
+                "required": false,
+                "read_only": true,
+                "label": "Created at"
+            },
+            "updated_at": {
+                "type": "datetime",
+                "required": false,
+                "read_only": true,
+                "label": "Updated at"
+            }
+        }
+    }
+}

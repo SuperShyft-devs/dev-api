@@ -31,6 +31,20 @@ def push_scale_emit(key: str, answer: Any, params: dict) -> dict[str, Any]:
     return {key: val, f"{key}_unit": str(unit_raw).strip()}
 
 
+def push_scale_emit_unitless(key: str, answer: Any, params: dict) -> dict[str, Any]:
+    """Scale answer ``{value, unit}`` -> ``{key: value}`` (no ``*_unit`` field)."""
+    if not isinstance(answer, dict):
+        return {}
+    raw_val = answer.get("value")
+    if raw_val is None:
+        return {}
+    try:
+        val = float(raw_val)
+    except (TypeError, ValueError):
+        return {}
+    return {key: val}
+
+
 def push_passthrough(key: str, answer: Any, params: dict) -> dict[str, Any]:
     """Pass the answer as-is with the question_key as the Metsights field."""
     if answer is None:
@@ -169,6 +183,20 @@ def pull_scale_ingest(key: str, payload: dict[str, Any], params: dict) -> Any:
     return {"value": val, "unit": str(unit_raw).strip()}
 
 
+def pull_scale_ingest_unitless(key: str, payload: dict[str, Any], params: dict) -> Any:
+    """Metsights ``{key: float}`` -> ``{value, unit: "0"}`` for unitless scale fields."""
+    raw_val = payload.get(key)
+    if raw_val is None:
+        return None
+    if isinstance(raw_val, bool):
+        return None
+    try:
+        val = float(raw_val)
+    except (TypeError, ValueError):
+        return None
+    return {"value": val, "unit": "0"}
+
+
 def pull_passthrough(key: str, payload: dict[str, Any], params: dict) -> Any:
     """Return the value as-is from the Metsights response."""
     val = payload.get(key)
@@ -261,6 +289,7 @@ def pull_list_to_single(key: str, payload: dict[str, Any], params: dict) -> Any:
 
 PUSH_STRATEGIES: dict[str, Any] = {
     "scale_emit": push_scale_emit,
+    "scale_emit_unitless": push_scale_emit_unitless,
     "passthrough": push_passthrough,
     "choice_remap": push_choice_remap,
     "bucket_to_scale": push_bucket_to_scale,
@@ -272,6 +301,7 @@ PUSH_STRATEGIES: dict[str, Any] = {
 
 PULL_STRATEGIES: dict[str, Any] = {
     "scale_ingest": pull_scale_ingest,
+    "scale_ingest_unitless": pull_scale_ingest_unitless,
     "passthrough": pull_passthrough,
     "choice_ingest": pull_choice_ingest,
     "scale_to_bucket": pull_scale_to_bucket,

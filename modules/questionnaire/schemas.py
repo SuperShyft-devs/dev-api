@@ -90,6 +90,19 @@ class MetsightsSyncGapsResponse(BaseModel):
     questions: list[MetsightsSyncGapsItem]
 
 
+class BloodParametersReloadResponse(BaseModel):
+    questions_deleted: int
+    responses_deleted: int
+    questions_created: int
+    categories_created: int
+    categories_updated: int
+    question_links_total: int
+    links_added: int
+    package_links_added: int
+    package_links_total: int
+    missing_package_codes: list[str]
+
+
 class QuestionnaireQuestionStatusUpdateRequest(BaseModel):
     status: str = Field(..., min_length=1, max_length=20)
 

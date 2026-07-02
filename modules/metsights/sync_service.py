@@ -12,6 +12,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
+from db.seed.blood_parameters_registry import (
+    ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
+    ADVANCED_BLOOD_PARAMETER_DETAIL_FIELD,
+    ADVANCED_BLOOD_PARAMETER_QUESTION_ORDER,
+    BLOOD_PARAMETER_CATEGORY_KEY,
+    BLOOD_PARAMETER_DETAIL_FIELD,
+    BLOOD_PARAMETER_QUESTION_ORDER,
+)
 from db.seed.questionnaire_field_config import (
     CHOICE_TO_METSIGHTS_VALUE,
     DAILY_ACTIVE_DURATION_PUSH_MAP,
@@ -41,6 +49,8 @@ _CATEGORY_KEY_TO_API_PATH: dict[str, str] = {
     "vitals": "vitals",
     "diet-lifestyle-parameters": "diet-lifestyle-parameters",
     "fitness-parameters": "fitness-parameters",
+    BLOOD_PARAMETER_CATEGORY_KEY: BLOOD_PARAMETER_CATEGORY_KEY,
+    ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY: ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
 }
 
 logger = logging.getLogger(__name__)
@@ -152,6 +162,8 @@ _METSIGHTS_SUBMIT_FITNESS_ONLY_KEYS = frozenset(
         "weight_loss_goal",
     }
 )
+_METSIGHTS_SUBMIT_BLOOD_KEYS = frozenset(BLOOD_PARAMETER_QUESTION_ORDER)
+_METSIGHTS_SUBMIT_ADVANCED_BLOOD_KEYS = frozenset(ADVANCED_BLOOD_PARAMETER_QUESTION_ORDER)
 
 # Questionnaire sub-resources that should be marked complete when pushing (Metsights UI sections).
 _METSIGHTS_QUESTIONNAIRE_RESOURCES = frozenset({
@@ -634,7 +646,13 @@ def _scale_answer_mapped(
 def _resources_for_assessment_type(type_code: str) -> list[str]:
     tc = (type_code or "").strip()
     if tc in ("1", "2"):
-        return ["diet-lifestyle-parameters", "physical-measurement", "vitals"]
+        return [
+            "diet-lifestyle-parameters",
+            "physical-measurement",
+            "vitals",
+            BLOOD_PARAMETER_CATEGORY_KEY,
+            ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
+        ]
     if tc == "7":
         return ["fitness-parameters"]
     return []
@@ -649,6 +667,8 @@ _RESOURCE_TO_DETAIL_FIELD: dict[str, str] = {
     "vitals": "vital_parameter",
     "diet-lifestyle-parameters": "diet_lifestyle_parameter",
     "fitness-parameters": "fitness_parameter",
+    BLOOD_PARAMETER_CATEGORY_KEY: BLOOD_PARAMETER_DETAIL_FIELD,
+    ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY: ADVANCED_BLOOD_PARAMETER_DETAIL_FIELD,
 }
 
 
@@ -1321,9 +1341,13 @@ class MetsightsSyncService:
             phys = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_PHYSICAL_KEYS)
             vit = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_VITALS_KEYS)
             diet = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_DIET_LIFESTYLE_KEYS)
+            blood = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_BLOOD_KEYS)
+            advanced_blood = _pick_metsights_payload_for_bases(merged, _METSIGHTS_SUBMIT_ADVANCED_BLOOD_KEYS)
             await _patch_section("physical-measurement", phys)
             await _patch_section("vitals", vit)
             await _patch_section("diet-lifestyle-parameters", diet)
+            await _patch_section(BLOOD_PARAMETER_CATEGORY_KEY, blood)
+            await _patch_section(ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY, advanced_blood)
         elif tc == "7":
             bases = (
                 _METSIGHTS_SUBMIT_PHYSICAL_KEYS

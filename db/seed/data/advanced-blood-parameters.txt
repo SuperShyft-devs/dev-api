@@ -1,0 +1,123 @@
+{
+    "name": "Advanced Blood Parameter Record",
+    "description": "",
+    "renders": [
+        "application/json"
+    ],
+    "parses": [
+        "application/json",
+        "application/x-www-form-urlencoded",
+        "multipart/form-data"
+    ],
+    "actions": {
+        "POST": {
+            "lh_value": {
+                "type": "float",
+                "required": true,
+                "read_only": false,
+                "label": "Luteinizing hormone",
+                "help_text": "Value must be below 100 mIU/mL"
+            },
+            "lh_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Lh value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mIU/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "IU/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "μIU/mL"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "mIU/mL"
+                    }
+                ]
+            },
+            "fsh_value": {
+                "type": "float",
+                "required": true,
+                "read_only": false,
+                "label": "Follicle stimulating hormone",
+                "help_text": "Value must be below 150 mIU/mL"
+            },
+            "fsh_value_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Fsh value unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "mIU/L"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "IU/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "μIU/mL"
+                    },
+                    {
+                        "value": "3",
+                        "display_name": "mIU/mL"
+                    }
+                ]
+            },
+            "testosterone": {
+                "type": "float",
+                "required": true,
+                "read_only": false,
+                "label": "Testosterone",
+                "help_text": "Value must be above 0 ng/L"
+            },
+            "testosterone_unit": {
+                "type": "choice",
+                "required": false,
+                "read_only": false,
+                "label": "Testosterone unit",
+                "choices": [
+                    {
+                        "value": "0",
+                        "display_name": "ng/dl"
+                    },
+                    {
+                        "value": "1",
+                        "display_name": "nmol/L"
+                    },
+                    {
+                        "value": "2",
+                        "display_name": "ng/mL"
+                    }
+                ]
+            },
+            "is_complete": {
+                "type": "boolean",
+                "required": false,
+                "read_only": false,
+                "label": "Completed status"
+            },
+            "created_at": {
+                "type": "datetime",
+                "required": false,
+                "read_only": true,
+                "label": "Created at"
+            },
+            "updated_at": {
+                "type": "datetime",
+                "required": false,
+                "read_only": true,
+                "label": "Updated at"
+            }
+        }
+    }
+}

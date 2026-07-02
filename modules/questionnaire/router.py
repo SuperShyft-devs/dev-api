@@ -129,6 +129,25 @@ async def reset_metsights_sync(
     return success_response(data)
 
 
+@management_router.post("/blood-parameters/reload")
+async def reload_blood_parameters_questions(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: QuestionnaireService = Depends(get_questionnaire_management_service),
+):
+    """Delete and recreate blood parameter questions from the Metsights OPTIONS registry."""
+    data = await service.reload_blood_parameters_questions(
+        db,
+        employee=employee,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
 @management_router.get("/questions/{question_id}")
 async def get_question(
     question_id: int,

@@ -8,6 +8,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from db.seed.blood_parameters_registry import (
+    ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
+    ADVANCED_BLOOD_PARAMETER_QUESTION_ORDER,
+    ALL_BLOOD_PARAMETER_KEYS,
+    BLOOD_PARAMETER_CATEGORY_KEY,
+    BLOOD_PARAMETER_QUESTION_ORDER,
+    build_blood_parameter_metsights_sync,
+)
 from db.seed.questionnaire_field_config import (
     CHOICE_TO_METSIGHTS_VALUE,
     DAILY_ACTIVE_DURATION_PUSH_MAP,
@@ -21,6 +29,8 @@ METSIGHTS_SYNC_CATEGORIES: tuple[tuple[str, str], ...] = (
     ("vitals", "Vitals"),
     ("diet-lifestyle-parameters", "Diet & Lifestyle"),
     ("fitness-parameters", "Fitness Parameters"),
+    (BLOOD_PARAMETER_CATEGORY_KEY, "Blood Parameters"),
+    (ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY, "Advanced Blood Parameters"),
 )
 
 _PHYSICAL_MEASUREMENT_KEYS: tuple[str, ...] = (
@@ -84,6 +94,7 @@ _SCALE_KEYS: frozenset[str] = frozenset({
     "systolic_blood_pressure",
     "diastolic_blood_pressure",
     "weight_loss_goal",
+    *ALL_BLOOD_PARAMETER_KEYS,
 })
 
 _SKIP_IF_ONLY_KEYS: frozenset[str] = frozenset({
@@ -134,6 +145,12 @@ def _build_question_category_assignments() -> dict[str, list[str]]:
     for key in _FITNESS_ONLY_KEYS:
         _add(key, "fitness-parameters")
 
+    for key in BLOOD_PARAMETER_QUESTION_ORDER:
+        _add(key, BLOOD_PARAMETER_CATEGORY_KEY)
+
+    for key in ADVANCED_BLOOD_PARAMETER_QUESTION_ORDER:
+        _add(key, ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY)
+
     return assignments
 
 
@@ -146,11 +163,25 @@ CATEGORY_QUESTION_ORDER: dict[str, list[str]] = {
     "fitness-parameters": list(_PHYSICAL_MEASUREMENT_KEYS)
     + list(_DIET_LIFESTYLE_KEYS)
     + list(_FITNESS_ONLY_KEYS),
+    BLOOD_PARAMETER_CATEGORY_KEY: list(BLOOD_PARAMETER_QUESTION_ORDER),
+    ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY: list(ADVANCED_BLOOD_PARAMETER_QUESTION_ORDER),
 }
 
 PACKAGE_METSIGHTS_CATEGORY_LINKS: dict[str, list[str]] = {
-    "METSIGHTS_BASIC": ["physical-measurement", "vitals", "diet-lifestyle-parameters"],
-    "METSIGHTS_PRO": ["physical-measurement", "vitals", "diet-lifestyle-parameters"],
+    "METSIGHTS_BASIC": [
+        "physical-measurement",
+        "vitals",
+        "diet-lifestyle-parameters",
+        BLOOD_PARAMETER_CATEGORY_KEY,
+        ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
+    ],
+    "METSIGHTS_PRO": [
+        "physical-measurement",
+        "vitals",
+        "diet-lifestyle-parameters",
+        BLOOD_PARAMETER_CATEGORY_KEY,
+        ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
+    ],
     "MY_FITNESS_PRINT": ["fitness-parameters"],
 }
 
@@ -173,6 +204,9 @@ def _scale_sync() -> dict[str, Any]:
 
 def build_metsights_sync(question_key: str) -> dict[str, Any]:
     """Return the canonical metsights_sync JSON for a question_key."""
+    if question_key in ALL_BLOOD_PARAMETER_KEYS:
+        return build_blood_parameter_metsights_sync(question_key)
+
     if question_key in _SCALE_KEYS:
         return _scale_sync()
 
