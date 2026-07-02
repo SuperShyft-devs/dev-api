@@ -173,7 +173,6 @@ PACKAGE_METSIGHTS_CATEGORY_LINKS: dict[str, list[str]] = {
         "vitals",
         "diet-lifestyle-parameters",
         BLOOD_PARAMETER_CATEGORY_KEY,
-        ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
     ],
     "METSIGHTS_PRO": [
         "physical-measurement",

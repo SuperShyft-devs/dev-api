@@ -30,6 +30,11 @@ from modules.questionnaire.repository import QuestionnaireRepository
 
 _BLOOD_PACKAGE_CODES = ("METSIGHTS_BASIC", "METSIGHTS_PRO")
 
+_PACKAGE_BLOOD_CATEGORY_KEYS: dict[str, tuple[str, ...]] = {
+    "METSIGHTS_BASIC": (BLOOD_PARAMETER_CATEGORY_KEY,),
+    "METSIGHTS_PRO": (BLOOD_PARAMETER_CATEGORY_KEY, ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY),
+}
+
 
 async def reload_blood_parameters_questions(db: AsyncSession) -> dict[str, Any]:
     """Delete and recreate blood parameter question definitions and Metsights wiring.
@@ -158,17 +163,26 @@ async def reload_blood_parameters_questions(db: AsyncSession) -> dict[str, Any]:
         stats["question_links_total"] += len(links_after)
         stats["links_added"] += len(links_after - links_before)
 
-    blood_category_keys = (BLOOD_PARAMETER_CATEGORY_KEY, ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY)
     for package_code in _BLOOD_PACKAGE_CODES:
         package = await assessments_repo.get_package_by_code(db, package_code=package_code)
         if package is None:
             stats["missing_package_codes"].append(package_code)
             continue
 
+        package_blood_keys = _PACKAGE_BLOOD_CATEGORY_KEYS.get(package_code, ())
         base_categories = list(PACKAGE_METSIGHTS_CATEGORY_LINKS.get(package_code, []))
-        for category_key in blood_category_keys:
+        for category_key in package_blood_keys:
             if category_key not in base_categories:
                 base_categories.append(category_key)
+
+        if package_code == "METSIGHTS_BASIC":
+            advanced_category_id = category_id_by_key.get(ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY)
+            if advanced_category_id is not None:
+                await assessments_repo.delete_package_category_link(
+                    db,
+                    package_id=int(package.package_id),
+                    category_id=advanced_category_id,
+                )
 
         for index, category_key in enumerate(base_categories, start=1):
             category_id = category_id_by_key.get(category_key)
