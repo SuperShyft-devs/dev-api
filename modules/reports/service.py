@@ -27,7 +27,10 @@ from modules.metsights.sync_service import MetsightsSyncService
 from modules.reports.blood_parameters_normalizer import normalize_from_healthians
 from modules.reports.blood_parameters_read_service import BloodParametersReadService
 from modules.reports.blood_parameters_questionnaire_reader import BloodParametersQuestionnaireReader
-from modules.reports.blood_parameters_schemas import is_canonical_blood_parameters, is_legacy_healthians_format
+from modules.reports.blood_parameters_schemas import (
+    has_usable_provider_blood_parameters,
+    provider_code_from_field,
+)
 from db.seed.blood_parameters_registry import (
     ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
     BLOOD_PARAMETER_CATEGORY_KEY,
@@ -149,6 +152,11 @@ class ReportsService:
     ) -> IndividualHealthReport:
         catalog = await self._load_health_parameters_catalog(db)
         canonical, raw = normalize_from_healthians(raw_customer, catalog=catalog)
+        if not has_usable_provider_blood_parameters(canonical):
+            logger.warning(
+                "Healthians normalize produced empty parameters for assessment_instance_id=%s",
+                assessment_instance.assessment_instance_id,
+            )
         if individual_report is None:
             individual_report = IndividualHealthReport(
                 user_id=assessment_instance.user_id,
@@ -240,6 +248,17 @@ class ReportsService:
             )
 
         collection_data = await self._metsights_service.get_fetch_collections(record_id=record_id)
+        provider_code = provider_code_from_field(collection_data.get("provider"))
+        if provider_code.lower() != "healthians":
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message=(
+                    f"Blood report provider is '{provider_code or 'unknown'}', "
+                    "only Healthians is supported for provider load"
+                ),
+            )
+
         reference_id = str(collection_data.get("reference_id") or "").strip()
         if not reference_id:
             raise AppError(
@@ -316,7 +335,13 @@ class ReportsService:
                 message="Assessment is missing engagement context",
             )
 
-        diagnostic_package_id = engagement.diagnostic_package_id
+        if engagement.diagnostic_package_id is None:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Engagement has no diagnostic package",
+            )
+        diagnostic_package_id = int(engagement.diagnostic_package_id)
         normalized_gender = (user_gender or "").strip().lower() or None
         if normalized_gender not in {"male", "female"}:
             normalized_gender = None
@@ -356,7 +381,7 @@ class ReportsService:
         use_cache = (
             reload != 1
             and existing_report is not None
-            and existing_report.blood_parameters is not None
+            and has_usable_provider_blood_parameters(existing_report.blood_parameters)
         )
         if use_cache:
             return await self._blood_read_service.build_from_canonical_or_legacy_provider(
@@ -366,24 +391,48 @@ class ReportsService:
                 user_gender=normalized_gender,
             )
 
-        if not record_id:
-            raise AppError(
-                status_code=422,
-                error_code="INVALID_STATE",
-                message="Metsights record id is missing for this assessment",
-            )
-
-        raw_customer = await self._fetch_blood_parameters_from_provider(
-            record_id=record_id,
-            user_first_name=user_first_name,
-            user_last_name=user_last_name,
-        )
-        await self._persist_provider_blood_data(
-            db,
-            individual_report=existing_report,
-            assessment_instance=assessment_instance,
-            raw_customer=raw_customer,
-        )
+        if record_id:
+            try:
+                raw_customer = await self._fetch_blood_parameters_from_provider(
+                    record_id=record_id,
+                    user_first_name=user_first_name,
+                    user_last_name=user_last_name,
+                )
+                await self._persist_provider_blood_data(
+                    db,
+                    individual_report=existing_report,
+                    assessment_instance=assessment_instance,
+                    raw_customer=raw_customer,
+                )
+                await self._require_audit_service().log_event(
+                    db,
+                    action="USER_FETCH_BLOOD_PARAMETERS_REPORT",
+                    endpoint=endpoint,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    user_id=user_id,
+                    session_id=None,
+                )
+                refreshed = await self._repository.get_individual_report_by_assessment(
+                    db,
+                    assessment_instance_id=assessment_id,
+                )
+                cached = refreshed.blood_parameters if refreshed is not None else None
+                if has_usable_provider_blood_parameters(cached):
+                    return await self._blood_read_service.build_from_canonical_or_legacy_provider(
+                        db=db,
+                        blood_parameters=cached,
+                        diagnostic_package_id=diagnostic_package_id,
+                        user_gender=normalized_gender,
+                    )
+            except AppError as exc:
+                if exc.error_code not in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
+                    raise
+                logger.debug(
+                    "Provider blood parameters unavailable for assessment %s: %s",
+                    assessment_id,
+                    exc.error_code,
+                )
 
         await self._require_audit_service().log_event(
             db,
@@ -394,16 +443,11 @@ class ReportsService:
             user_id=user_id,
             session_id=None,
         )
-
-        refreshed = await self._repository.get_individual_report_by_assessment(
-            db,
-            assessment_instance_id=assessment_id,
-        )
-        cached = refreshed.blood_parameters if refreshed is not None else None
-        return await self._blood_read_service.build_from_canonical_or_legacy_provider(
+        return await self._blood_read_service.build_from_questionnaire_responses(
             db=db,
-            blood_parameters=cached,
+            assessment_instance_id=assessment_instance.assessment_instance_id,
             diagnostic_package_id=diagnostic_package_id,
+            user_gender=normalized_gender,
         )
 
     async def get_diagnostic_pdf_for_user(
@@ -716,20 +760,13 @@ class ReportsService:
         user_gender: str | None = None,
         diagnostic_package_id: int,
     ) -> list[BloodParameterGroupInReportResponse]:
-        if individual_report.blood_parameters is not None:
-            from modules.reports.blood_parameters_schemas import is_legacy_metsights_flat_format
-
-            if (
-                is_canonical_blood_parameters(individual_report.blood_parameters)
-                or is_legacy_healthians_format(individual_report.blood_parameters)
-                or is_legacy_metsights_flat_format(individual_report.blood_parameters)
-            ):
-                return await self._blood_read_service.build_from_canonical_or_legacy_provider(
-                    db=db,
-                    blood_parameters=individual_report.blood_parameters,
-                    diagnostic_package_id=diagnostic_package_id,
-                    user_gender=user_gender,
-                )
+        if has_usable_provider_blood_parameters(individual_report.blood_parameters):
+            return await self._blood_read_service.build_from_canonical_or_legacy_provider(
+                db=db,
+                blood_parameters=individual_report.blood_parameters,
+                diagnostic_package_id=diagnostic_package_id,
+                user_gender=user_gender,
+            )
 
         record_id = (assessment_instance.metsights_record_id or "").strip()
         if record_id and (
@@ -752,11 +789,14 @@ class ReportsService:
                     db,
                     assessment_instance_id=assessment_instance.assessment_instance_id,
                 )
-                if refreshed is not None and refreshed.blood_parameters is not None:
+                if refreshed is not None and has_usable_provider_blood_parameters(
+                    refreshed.blood_parameters
+                ):
                     return await self._blood_read_service.build_from_canonical_or_legacy_provider(
                         db=db,
                         blood_parameters=refreshed.blood_parameters,
                         diagnostic_package_id=diagnostic_package_id,
+                        user_gender=user_gender,
                     )
             except AppError as exc:
                 if exc.error_code not in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
@@ -797,7 +837,7 @@ class ReportsService:
                     normalized_gender = None
                 user_first_name = ""
                 user_last_name = ""
-                if individual_report.blood_parameters is None:
+                if not has_usable_provider_blood_parameters(individual_report.blood_parameters):
                     user_row = await db.get(User, assessment_instance.user_id)
                     if user_row is not None:
                         user_first_name = user_row.first_name or ""
@@ -1860,12 +1900,14 @@ class ReportsService:
                     record_id = (assessment.metsights_record_id or "").strip()
                     if not record_id:
                         continue
+                    if self._metsights_sync_service is None:
+                        break
+
+                    any_ok = False
                     for category_key in (
                         BLOOD_PARAMETER_CATEGORY_KEY,
                         ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
                     ):
-                        if self._metsights_sync_service is None:
-                            continue
                         try:
                             await self._metsights_sync_service.import_category_from_metsights(
                                 db,
@@ -1873,14 +1915,19 @@ class ReportsService:
                                 user_id=user_id,
                                 category_key=category_key,
                                 category_of="metsights",
-                                reload=0,
+                                reload=1,
                             )
+                            any_ok = True
                         except AppError as exc:
                             logger.debug(
                                 "Questionnaire blood import failed for assessment %s: %s",
                                 assessment.assessment_instance_id,
                                 exc.error_code,
                             )
+
+                    if not any_ok:
+                        # Do not advance past a failed assessment so the next run retries it.
+                        break
                     latest_synced_id = max(latest_synced_id, int(assessment.assessment_instance_id))
 
                 state.last_synced_assessment_instance_id = latest_synced_id if latest_synced_id > 0 else None

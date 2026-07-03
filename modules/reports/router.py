@@ -89,8 +89,6 @@ async def get_blood_parameters_report(
     user=Depends(get_current_user),
     reports_service: ReportsService = Depends(get_reports_service),
 ):
-    effective_reload = 0 if load_from == "metsights" else reload
-
     blood_parameter_groups = await reports_service.get_blood_parameters_for_user(
         db,
         assessment_id=assessment_id,
@@ -99,7 +97,7 @@ async def get_blood_parameters_report(
         user_first_name=getattr(user, "first_name", "") or "",
         user_last_name=getattr(user, "last_name", "") or "",
         load_from=load_from,
-        reload=effective_reload,
+        reload=reload,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),

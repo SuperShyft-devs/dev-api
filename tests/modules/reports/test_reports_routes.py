@@ -9,6 +9,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from core.config import settings
+from core.exceptions import AppError
 from core.security import create_jwt_token
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.assessments.repository import AssessmentsRepository
@@ -93,6 +94,24 @@ class _FakeMetsightsService:
 class _FailingMetsightsSyncService:
     async def import_category_from_metsights(self, *args, **kwargs):
         raise RuntimeError("simulated metsights sync failure")
+
+
+class _OkMetsightsSyncService:
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    async def import_category_from_metsights(self, *args, **kwargs):
+        self.calls.append(kwargs)
+        return {"status": "ok"}
+
+
+class _AppErrorMetsightsSyncService:
+    async def import_category_from_metsights(self, *args, **kwargs):
+        raise AppError(
+            status_code=422,
+            error_code="INVALID_STATE",
+            message="simulated metsights category missing",
+        )
 
 
 class _FailingMetsightsService:
@@ -395,8 +414,9 @@ async def test_get_blood_parameters_fetches_and_caches_on_miss(
 
 
 @pytest.mark.asyncio
-async def test_get_blood_parameters_requires_metsights_record_id(
+async def test_get_blood_parameters_provider_falls_back_to_questionnaire_without_record_id(
     async_client,
+    fastapi_app,
     test_db_session,
 ):
     await _seed_assessment(
@@ -406,13 +426,33 @@ async def test_get_blood_parameters_requires_metsights_record_id(
         engagement_id=4803,
         record_id=None,
     )
+    await _seed_glucose_questionnaire_response(
+        test_db_session,
+        assessment_instance_id=98003,
+        category_id=88003,
+        question_id=88003,
+        option_id=88003,
+        response_id=88003,
+    )
+    await test_db_session.commit()
+
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=_FakeMetsightsService(payload={}, should_fail=True),
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+        questionnaire_repository=QuestionnaireRepository(),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
     response = await async_client.get("/reports/98003/blood-parameters", headers=_auth_header(3803))
-    assert response.status_code == 422
-    assert response.json() == {
-        "error_code": "INVALID_STATE",
-        "message": "Metsights record id is missing for this assessment",
-    }
+    assert response.status_code == 200
+    body = response.json()["data"]
+    glucose_test = next(t for g in body for t in g["tests"] if t["parameter_key"] == "glucose_fasting")
+    assert glucose_test["value"] == 91
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
 
 @pytest.mark.asyncio
@@ -1278,6 +1318,7 @@ async def test_refresh_user_blood_parameters_success_advances_cursor(test_db_ses
     await test_db_session.commit()
 
     session_factory = async_sessionmaker(bind=test_db_session.bind, expire_on_commit=False)
+    sync_service = _OkMetsightsSyncService()
     service = ReportsService(
         repository=ReportsRepository(),
         assessments_repository=AssessmentsRepository(),
@@ -1286,6 +1327,7 @@ async def test_refresh_user_blood_parameters_success_advances_cursor(test_db_ses
         audit_service=AuditService(AuditRepository()),
         session_factory=session_factory,
         healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+        metsights_sync_service=sync_service,
     )
     await service._refresh_user_blood_parameters(user_id=3841)
 
@@ -1295,10 +1337,11 @@ async def test_refresh_user_blood_parameters_success_advances_cursor(test_db_ses
     assert state_row.sync_status == "idle"
     assert state_row.last_synced_assessment_instance_id == 98042
     assert state_row.last_sync_error is None
+    assert all(call.get("reload") == 1 for call in sync_service.calls)
 
 
 @pytest.mark.asyncio
-async def test_refresh_user_blood_parameters_failure_sets_failed(test_db_session):
+async def test_refresh_user_blood_parameters_app_error_does_not_advance_cursor(test_db_session):
     await _seed_assessment(
         test_db_session,
         assessment_id=98051,
@@ -1324,12 +1367,51 @@ async def test_refresh_user_blood_parameters_failure_sets_failed(test_db_session
         audit_service=AuditService(AuditRepository()),
         session_factory=session_factory,
         healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
-        metsights_sync_service=_FailingMetsightsSyncService(),
+        metsights_sync_service=_AppErrorMetsightsSyncService(),
     )
     await service._refresh_user_blood_parameters(user_id=3851)
 
     state_row = (
         await test_db_session.execute(select(ReportsUserSyncState).where(ReportsUserSyncState.user_id == 3851))
+    ).scalar_one()
+    assert state_row.sync_status == "idle"
+    assert state_row.last_synced_assessment_instance_id == 98050
+    assert state_row.last_sync_error is None
+
+
+@pytest.mark.asyncio
+async def test_refresh_user_blood_parameters_failure_sets_failed(test_db_session):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=98052,
+        user_id=3852,
+        engagement_id=4852,
+        record_id="REC_FAIL_HARD",
+    )
+    test_db_session.add(
+        ReportsUserSyncState(
+            user_id=3852,
+            last_synced_assessment_instance_id=98050,
+            sync_status="in_progress",
+        )
+    )
+    await test_db_session.commit()
+
+    session_factory = async_sessionmaker(bind=test_db_session.bind, expire_on_commit=False)
+    service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=_FailingMetsightsService(),
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        session_factory=session_factory,
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+        metsights_sync_service=_FailingMetsightsSyncService(),
+    )
+    await service._refresh_user_blood_parameters(user_id=3852)
+
+    state_row = (
+        await test_db_session.execute(select(ReportsUserSyncState).where(ReportsUserSyncState.user_id == 3852))
     ).scalar_one()
     assert state_row.sync_status == "failed"
     assert state_row.last_sync_error is not None

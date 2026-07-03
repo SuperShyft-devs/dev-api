@@ -68,6 +68,30 @@ def is_empty_blood_parameters(blob: Any) -> bool:
     return False
 
 
+def has_usable_provider_blood_parameters(blob: Any) -> bool:
+    """Return True when ``blob`` has provider/lab values worth serving from cache."""
+    if is_empty_blood_parameters(blob) or is_metsights_metadata_only(blob):
+        return False
+    if is_canonical_blood_parameters(blob):
+        params = blob.get("parameters")
+        return isinstance(params, dict) and len(params) > 0
+    if is_legacy_healthians_format(blob):
+        digital_data = blob.get("digital_data")
+        return isinstance(digital_data, list) and len(digital_data) > 0
+    if is_legacy_metsights_flat_format(blob):
+        return True
+    return False
+
+
+def provider_code_from_field(provider_field: Any) -> str:
+    """Extract provider code from Metsights fetch-collections ``provider`` field."""
+    if isinstance(provider_field, dict):
+        return str(provider_field.get("code") or "").strip()
+    if provider_field is None:
+        return ""
+    return str(provider_field).strip()
+
+
 def is_metsights_metadata_only(blob: Any) -> bool:
     """Metsights API wrapper with only record metadata and no parameter values."""
     if not isinstance(blob, dict) or not blob:

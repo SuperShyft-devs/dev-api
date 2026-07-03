@@ -26,6 +26,10 @@ from modules.notifications.dedup import should_skip_notification
 from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
 from modules.reports.blood_parameters_normalizer import normalize_from_healthians
+from modules.reports.blood_parameters_schemas import (
+    has_usable_provider_blood_parameters,
+    provider_code_from_field,
+)
 from modules.reports.models import IndividualHealthReport
 from modules.users.models import User
 
@@ -35,7 +39,10 @@ _METSIGHTS_PRO_BASIC_TYPE_CODES = {"1", "2"}
 
 
 def _blood_report_data_complete(blood_parameters: Any, diagnostic_report_url: Any) -> bool:
-    return blood_parameters is not None and diagnostic_report_url is not None
+    return (
+        has_usable_provider_blood_parameters(blood_parameters)
+        and diagnostic_report_url is not None
+    )
 
 
 async def _canonicalize_provider_blood(
@@ -47,9 +54,7 @@ async def _canonicalize_provider_blood(
 
 
 def _provider_code(provider_field: Any) -> str:
-    if isinstance(provider_field, dict):
-        return str(provider_field.get("code") or "").strip()
-    return ""
+    return provider_code_from_field(provider_field)
 
 
 def _match_customer_by_name(
@@ -212,7 +217,7 @@ async def load_blood_reports(
         if dry_run:
             complete = _blood_report_data_complete(blood_params, diag_url)
             dry_run_reasons = ["would_refresh_diagnostic_report_url"]
-            if blood_params is None:
+            if not has_usable_provider_blood_parameters(blood_params):
                 dry_run_reasons.append("would_fetch_blood_parameters")
             dry_run_reasons.append(
                 "blood_report_complete" if complete else "blood_report_incomplete"
@@ -263,7 +268,7 @@ async def load_blood_reports(
             fetched_blood = None
             fetched_diag_url = None
 
-            if blood_parameters is None:
+            if not has_usable_provider_blood_parameters(blood_parameters):
                 try:
                     digital_value = await healthians_client.get_booking_digital_value(
                         access_token, reference_id
