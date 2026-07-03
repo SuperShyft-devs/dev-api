@@ -25,9 +25,13 @@ from modules.questionnaire.models import (
 )
 from modules.reports.blood_parameters_normalizer import normalize_from_healthians
 from modules.reports.blood_parameters_schemas import (
+    describe_blood_parameters_blob,
+    extract_healthians_customer_blob,
     is_canonical_blood_parameters,
+    is_empty_blood_parameters,
     is_legacy_healthians_format,
     is_legacy_metsights_flat_format,
+    is_metsights_metadata_only,
 )
 from modules.reports.models import IndividualHealthReport
 
@@ -44,17 +48,19 @@ async def migrate_blood_parameters(
 ) -> dict[str, Any]:
     catalog = await DiagnosticsRepository().get_all_parameters(db)
     question_map = await _load_blood_question_map(db)
-    category_ids = await _blood_category_ids(db)
 
-    stats = {
+    stats: dict[str, Any] = {
         "dry_run": dry_run,
         "scanned": 0,
         "skipped_canonical": 0,
         "migrated_healthians": 0,
         "migrated_metsights": 0,
+        "cleared_empty": 0,
+        "skipped_metsights_pending_questionnaire": 0,
         "failed": 0,
         "unmapped_metsights_keys": [],
         "errors": [],
+        "questionnaire_definitions_loaded": len(question_map),
     }
 
     offset = 0
@@ -79,23 +85,65 @@ async def migrate_blood_parameters(
                     stats["skipped_canonical"] += 1
                     continue
 
+                if is_empty_blood_parameters(blob) or is_metsights_metadata_only(blob):
+                    if not dry_run:
+                        row.blood_parameters = None
+                        row.blood_report_raw = None
+                        db.add(row)
+                    stats["cleared_empty"] += 1
+                    continue
+
+                healthians_customer = extract_healthians_customer_blob(blob)
+                if healthians_customer is not None:
+                    canonical, raw = normalize_from_healthians(healthians_customer, catalog=catalog)
+                    if not dry_run:
+                        row.blood_parameters = canonical
+                        row.blood_report_raw = raw
+                        db.add(row)
+                    stats["migrated_healthians"] += 1
+                    continue
+
                 if is_legacy_healthians_format(blob):
                     canonical, raw = normalize_from_healthians(blob, catalog=catalog)
                     if not dry_run:
                         row.blood_parameters = canonical
                         row.blood_report_raw = raw
+                        db.add(row)
                     stats["migrated_healthians"] += 1
                     continue
 
                 if is_legacy_metsights_flat_format(blob):
-                    unmapped = await _migrate_metsights_flat_to_questionnaire(
+                    if not question_map:
+                        stats["skipped_metsights_pending_questionnaire"] += 1
+                        stats["errors"].append(
+                            {
+                                "report_id": row.report_id,
+                                "reason": (
+                                    "metsights flat blood_parameters present but no blood "
+                                    "questionnaire definitions — run POST "
+                                    "/questionnaire/blood-parameters/reload before --yes"
+                                ),
+                            }
+                        )
+                        continue
+
+                    unmapped, migrated_count = await _migrate_metsights_flat_to_questionnaire(
                         db,
                         row=row,
                         flat=blob,
                         question_map=question_map,
-                        category_ids=category_ids,
                         dry_run=dry_run,
                     )
+                    if migrated_count == 0 and not dry_run:
+                        stats["skipped_metsights_pending_questionnaire"] += 1
+                        stats["errors"].append(
+                            {
+                                "report_id": row.report_id,
+                                "reason": "no metsights flat keys could be mapped to questionnaire",
+                            }
+                        )
+                        continue
+
                     stats["migrated_metsights"] += 1
                     if unmapped:
                         stats["unmapped_metsights_keys"].extend(unmapped)
@@ -103,7 +151,10 @@ async def migrate_blood_parameters(
 
                 stats["failed"] += 1
                 stats["errors"].append(
-                    {"report_id": row.report_id, "reason": "unknown blood_parameters shape"},
+                    {
+                        "report_id": row.report_id,
+                        "reason": f"unknown blood_parameters shape: {describe_blood_parameters_blob(blob)}",
+                    }
                 )
             except Exception as exc:
                 stats["failed"] += 1
@@ -115,16 +166,6 @@ async def migrate_blood_parameters(
     if not dry_run:
         await db.flush()
     return stats
-
-
-async def _blood_category_ids(db: AsyncSession) -> set[int]:
-    result = await db.execute(
-        select(QuestionnaireCategory.category_id).where(
-            QuestionnaireCategory.category_key.in_(_BLOOD_CATEGORY_KEYS),
-            QuestionnaireCategory.category_of == "metsights",
-        )
-    )
-    return {int(row[0]) for row in result.all()}
 
 
 async def _load_blood_question_map(
@@ -158,10 +199,11 @@ async def _migrate_metsights_flat_to_questionnaire(
     row: IndividualHealthReport,
     flat: dict[str, Any],
     question_map: dict[str, tuple[QuestionnaireDefinition, int]],
-    category_ids: set[int],
     dry_run: bool,
-) -> list[str]:
+) -> tuple[list[str], int]:
+    """Return ``(unmapped_keys, migrated_response_count)``."""
     unmapped: list[str] = []
+    migrated_count = 0
     now = datetime.now(timezone.utc)
 
     for question_key in ALL_BLOOD_PARAMETER_KEYS:
@@ -194,6 +236,7 @@ async def _migrate_metsights_flat_to_questionnaire(
                     unit_display=str(raw_unit).strip(),
                 ) or str(raw_unit).strip()
 
+        migrated_count += 1
         if dry_run:
             continue
 
@@ -221,12 +264,12 @@ async def _migrate_metsights_flat_to_questionnaire(
             response.submitted_at = now
             db.add(response)
 
-    if not dry_run:
+    if migrated_count > 0 and not dry_run:
         row.blood_parameters = None
         row.blood_report_raw = None
         db.add(row)
 
-    return unmapped
+    return unmapped, migrated_count
 
 
 async def _resolve_unit_option_code(

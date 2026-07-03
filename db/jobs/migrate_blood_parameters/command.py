@@ -51,7 +51,10 @@ def main(argv: list[str] | None = None) -> int:
         "skipped_canonical",
         "migrated_healthians",
         "migrated_metsights",
+        "cleared_empty",
+        "skipped_metsights_pending_questionnaire",
         "failed",
+        "questionnaire_definitions_loaded",
     ):
         print(f"  {key}={result.get(key)}")
     unmapped = result.get("unmapped_metsights_keys") or []

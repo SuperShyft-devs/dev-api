@@ -50,3 +50,60 @@ def is_legacy_metsights_flat_format(blob: Any) -> bool:
     if is_canonical_blood_parameters(blob) or is_legacy_healthians_format(blob):
         return False
     return bool(blob)
+
+
+_METSIGHTS_METADATA_KEYS = frozenset({"id", "is_complete", "created_at", "updated_at"})
+
+
+def is_empty_blood_parameters(blob: Any) -> bool:
+    """Return True when ``blob`` is null-like or carries no usable blood data."""
+    if blob is None:
+        return True
+    if isinstance(blob, dict):
+        return len(blob) == 0
+    if isinstance(blob, list):
+        return len(blob) == 0
+    if isinstance(blob, str):
+        return not blob.strip()
+    return False
+
+
+def is_metsights_metadata_only(blob: Any) -> bool:
+    """Metsights API wrapper with only record metadata and no parameter values."""
+    if not isinstance(blob, dict) or not blob:
+        return False
+    value_keys = {
+        key
+        for key in blob
+        if key not in _METSIGHTS_METADATA_KEYS and not str(key).endswith("_unit")
+    }
+    return not value_keys
+
+
+def extract_healthians_customer_blob(blob: Any) -> dict[str, Any] | None:
+    """Return a Healthians customer object from raw or API-envelope JSON."""
+    if not isinstance(blob, dict):
+        return None
+    if is_legacy_healthians_format(blob):
+        return blob
+    data = blob.get("data")
+    if not isinstance(data, list):
+        return None
+    for entry in data:
+        if isinstance(entry, dict) and is_legacy_healthians_format(entry):
+            return entry
+    return None
+
+
+def describe_blood_parameters_blob(blob: Any) -> str:
+    """Short description for migration error reporting."""
+    if blob is None:
+        return "null"
+    if isinstance(blob, dict):
+        keys = sorted(str(k) for k in blob.keys())
+        preview = ", ".join(keys[:8])
+        if len(keys) > 8:
+            preview += ", ..."
+        return f"dict(keys=[{preview}])"
+    return type(blob).__name__
+
