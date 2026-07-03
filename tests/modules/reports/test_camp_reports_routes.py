@@ -986,6 +986,8 @@ async def test_refresh_camp_report_kpis(async_client, test_db_session):
     assert data["total_blood_test"] == 3
     assert data["blood_test_percent"] == 75
     assert data["doctor_consultation"] == 2
+    assert data["nutritionist_consultation"] == 1
+    assert data["doctor_and_nutritionist_consultation"] == 1
     assert data["high_risk_group"] == 2
 
     row = (
@@ -1020,6 +1022,8 @@ async def test_refresh_department_camp_report_kpis(async_client, test_db_session
     assert data["total_blood_test"] == 2
     assert data["blood_test_percent"] == 100
     assert data["doctor_consultation"] == 1
+    assert data["nutritionist_consultation"] == 0
+    assert data["doctor_and_nutritionist_consultation"] == 0
     assert data["high_risk_group"] == 1
 
 

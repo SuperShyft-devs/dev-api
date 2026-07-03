@@ -161,6 +161,10 @@ def build_kpis(metrics: dict) -> dict:
             "total_blood_test": blood,
             "blood_test_percent": round(blood / enrolled * 100) if enrolled else 0,
             "doctor_consultation": int(metrics["doctor_consultation"]),
+            "nutritionist_consultation": int(metrics["nutritionist_consultation"]),
+            "doctor_and_nutritionist_consultation": int(
+                metrics["doctor_and_nutritionist_consultation"]
+            ),
             "high_risk_group": int(metrics["high_risk_group"]),
         },
     }

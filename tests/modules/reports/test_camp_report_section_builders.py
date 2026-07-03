@@ -52,6 +52,8 @@ def test_build_kpis_percent():
             "female_enrolled": 2,
             "total_blood_test": 3,
             "doctor_consultation": 2,
+            "nutritionist_consultation": 1,
+            "doctor_and_nutritionist_consultation": 1,
             "high_risk_group": 1,
         }
     )
@@ -66,6 +68,8 @@ def test_build_kpis_percent_zero_enrolled():
             "female_enrolled": 0,
             "total_blood_test": 0,
             "doctor_consultation": 0,
+            "nutritionist_consultation": 0,
+            "doctor_and_nutritionist_consultation": 0,
             "high_risk_group": 0,
         }
     )

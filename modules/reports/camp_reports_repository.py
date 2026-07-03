@@ -220,6 +220,43 @@ class CampReportsRepository:
         doctor_result = await db.execute(doctor_query)
         doctor_consultation = int(doctor_result.scalar_one())
 
+        nutritionist_query = (
+            select(func.count(func.distinct(EngagementParticipant.user_id)))
+            .select_from(Engagement)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_id == Engagement.engagement_id,
+            )
+            .where(Engagement.camp_no == camp_no)
+            .where(
+                or_(
+                    EngagementParticipant.want_nutritionist_consultation.is_(True),
+                    EngagementParticipant.want_doctor_and_nutritionist_consultation.is_(True),
+                )
+            )
+        )
+        if department is not None:
+            nutritionist_query = nutritionist_query.where(
+                EngagementParticipant.participant_department == department
+            )
+        nutritionist_result = await db.execute(nutritionist_query)
+        nutritionist_consultation = int(nutritionist_result.scalar_one())
+
+        both_query = (
+            select(func.count(func.distinct(EngagementParticipant.user_id)))
+            .select_from(Engagement)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_id == Engagement.engagement_id,
+            )
+            .where(Engagement.camp_no == camp_no)
+            .where(EngagementParticipant.want_doctor_and_nutritionist_consultation.is_(True))
+        )
+        if department is not None:
+            both_query = both_query.where(EngagementParticipant.participant_department == department)
+        both_result = await db.execute(both_query)
+        doctor_and_nutritionist_consultation = int(both_result.scalar_one())
+
         ranked_reports = (
             select(
                 enrolled.c.user_id,
@@ -278,6 +315,8 @@ class CampReportsRepository:
             "female_enrolled": female_enrolled,
             "total_blood_test": total_blood_test,
             "doctor_consultation": doctor_consultation,
+            "nutritionist_consultation": nutritionist_consultation,
+            "doctor_and_nutritionist_consultation": doctor_and_nutritionist_consultation,
             "high_risk_group": high_risk_group,
         }
 
