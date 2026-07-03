@@ -537,9 +537,13 @@ class CampReportsRepository:
             .select_from(enrolled)
             .join(
                 AssessmentInstance,
+                AssessmentInstance.user_id == enrolled.c.user_id,
+            )
+            .join(
+                Engagement,
                 and_(
-                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
-                    AssessmentInstance.user_id == enrolled.c.user_id,
+                    Engagement.engagement_id == AssessmentInstance.engagement_id,
+                    Engagement.camp_no == camp_no,
                 ),
             )
             .join(
@@ -583,9 +587,13 @@ class CampReportsRepository:
             .select_from(enrolled)
             .join(
                 AssessmentInstance,
+                AssessmentInstance.user_id == enrolled.c.user_id,
+            )
+            .join(
+                Engagement,
                 and_(
-                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
-                    AssessmentInstance.user_id == enrolled.c.user_id,
+                    Engagement.engagement_id == AssessmentInstance.engagement_id,
+                    Engagement.camp_no == camp_no,
                 ),
             )
             .join(
