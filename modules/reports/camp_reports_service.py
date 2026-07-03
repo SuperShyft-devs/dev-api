@@ -36,6 +36,9 @@ from modules.reports.camp_report_section_builders import (
     build_overall_risk_score,
     build_participation_by_age,
     build_positive_wins,
+    normalize_camp_gender,
+    physical_activity_answer_to_bucket,
+    sleeping_hours_answer_to_bucket,
 )
 from modules.assessments.repository import AssessmentsRepository
 from modules.diagnostics.repository import DiagnosticsRepository
@@ -1237,6 +1240,121 @@ class CampReportsService:
                 "aggregated": aggregate_top_healthy_profiles(agg_profiles),
                 "participants": participants_profiles,
             },
+        }
+
+    _QUESTIONNAIRE_SECTION_CONFIG: dict[str, dict[str, Any]] = {
+        "physical_activity_frequency": {
+            "question_key": "physical_activity_frequency",
+            "bucket_fn": staticmethod(physical_activity_answer_to_bucket),
+        },
+        "sleeping_hours": {
+            "question_key": "sleeping_hours",
+            "bucket_fn": staticmethod(sleeping_hours_answer_to_bucket),
+        },
+    }
+
+    async def validate_questionnaire_distribution(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        question_key: str,
+        department: str | None = None,
+    ) -> dict:
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=context["organization_id"],
+                slug=normalized_department,
+            )
+            department = normalized_department
+
+        config = self._QUESTIONNAIRE_SECTION_CONFIG.get(question_key)
+        if config is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"Unsupported question_key: {question_key}",
+            )
+        bucket_fn = config["bucket_fn"]
+
+        rows = await self._repository.list_enrolled_users_with_questionnaire_answer(
+            db,
+            camp_no=camp_no,
+            question_key=question_key,
+            department=department,
+        )
+
+        summary: dict[str, dict[str, int]] = {
+            "male": {"enrolled": 0, "responded": 0, "not_responded": 0},
+            "female": {"enrolled": 0, "responded": 0, "not_responded": 0},
+        }
+        participants: list[dict[str, Any]] = []
+
+        for user_id, first_name, last_name, gender_raw, answer in rows:
+            parts = [p for p in (first_name, last_name) if p]
+            name = " ".join(parts) if parts else f"User {user_id}"
+            gender = normalize_camp_gender(gender_raw)
+
+            if gender is not None:
+                summary[gender]["enrolled"] += 1
+
+            if answer is None:
+                if gender is not None:
+                    summary[gender]["not_responded"] += 1
+                participants.append({
+                    "user_id": user_id,
+                    "name": name,
+                    "gender": gender,
+                    "answer": None,
+                    "bucket": None,
+                    "reason": "No questionnaire response found for this question",
+                })
+            else:
+                answer_str = str(answer).strip()
+                bucket = bucket_fn(answer_str)
+                if bucket is not None:
+                    if gender is not None:
+                        summary[gender]["responded"] += 1
+                    participants.append({
+                        "user_id": user_id,
+                        "name": name,
+                        "gender": gender,
+                        "answer": answer_str,
+                        "bucket": bucket,
+                        "reason": None,
+                    })
+                else:
+                    if gender is not None:
+                        summary[gender]["not_responded"] += 1
+                    participants.append({
+                        "user_id": user_id,
+                        "name": name,
+                        "gender": gender,
+                        "answer": answer_str,
+                        "bucket": None,
+                        "reason": f"Answer value '{answer_str}' does not map to a known bucket",
+                    })
+
+        total_enrolled = len(rows)
+
+        return {
+            "question_key": question_key,
+            "total_enrolled": total_enrolled,
+            "summary": summary,
+            "participants": participants,
         }
 
     _BLOOD_INTELLIGENCE_GROUP_KEYS = (

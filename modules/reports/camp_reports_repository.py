@@ -612,6 +612,79 @@ class CampReportsRepository:
         )
         return [(row[0], row[1]) for row in result.all()]
 
+    async def list_enrolled_users_with_questionnaire_answer(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        question_key: str,
+        department: str | None = None,
+    ) -> list[tuple[int, str | None, str | None, str | None, object | None]]:
+        """Return (user_id, first_name, last_name, gender, answer) for ALL enrolled users.
+
+        Uses LEFT JOIN so users without a questionnaire response for the given
+        question_key still appear with answer=NULL.
+        """
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+
+        qr_subquery = (
+            select(
+                AssessmentInstance.user_id.label("qr_user_id"),
+                QuestionnaireResponse.answer.label("qr_answer"),
+                func.row_number()
+                .over(
+                    partition_by=AssessmentInstance.user_id,
+                    order_by=AssessmentInstance.assessment_instance_id.desc(),
+                )
+                .label("qr_rn"),
+            )
+            .select_from(Engagement)
+            .join(
+                AssessmentInstance,
+                AssessmentInstance.engagement_id == Engagement.engagement_id,
+            )
+            .join(
+                QuestionnaireResponse,
+                QuestionnaireResponse.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+            )
+            .join(
+                QuestionnaireDefinition,
+                QuestionnaireDefinition.question_id == QuestionnaireResponse.question_id,
+            )
+            .where(
+                Engagement.camp_no == camp_no,
+                QuestionnaireDefinition.question_key == question_key,
+            )
+        ).subquery()
+
+        latest_answer = (
+            select(qr_subquery.c.qr_user_id, qr_subquery.c.qr_answer)
+            .where(qr_subquery.c.qr_rn == 1)
+            .subquery()
+        )
+
+        query = (
+            select(
+                enrolled.c.user_id,
+                User.first_name,
+                User.last_name,
+                enrolled.c.gender,
+                latest_answer.c.qr_answer,
+            )
+            .select_from(enrolled)
+            .join(User, User.user_id == enrolled.c.user_id)
+            .outerjoin(
+                latest_answer,
+                latest_answer.c.qr_user_id == enrolled.c.user_id,
+            )
+        )
+
+        result = await db.execute(query)
+        return [
+            (int(row[0]), row[1], row[2], row[3], row[4])
+            for row in result.all()
+        ]
+
     async def delete_overall(self, db: AsyncSession, *, camp_no: int) -> int:
         result = await db.execute(
             delete(CampReport).where(

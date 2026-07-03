@@ -182,6 +182,74 @@ async def validate_department_positive_wins(
     return success_response(result)
 
 
+@router.get("/{camp_no}/validate/physical-activity-frequency")
+async def validate_physical_activity_frequency(
+    camp_no: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.validate_questionnaire_distribution(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        question_key="physical_activity_frequency",
+    )
+    return success_response(result)
+
+
+@router.get("/{camp_no}/department/{slug}/validate/physical-activity-frequency")
+async def validate_department_physical_activity_frequency(
+    camp_no: int,
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.validate_questionnaire_distribution(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        question_key="physical_activity_frequency",
+        department=slug,
+    )
+    return success_response(result)
+
+
+@router.get("/{camp_no}/validate/sleeping-hours")
+async def validate_sleeping_hours(
+    camp_no: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.validate_questionnaire_distribution(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        question_key="sleeping_hours",
+    )
+    return success_response(result)
+
+
+@router.get("/{camp_no}/department/{slug}/validate/sleeping-hours")
+async def validate_department_sleeping_hours(
+    camp_no: int,
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.validate_questionnaire_distribution(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        question_key="sleeping_hours",
+        department=slug,
+    )
+    return success_response(result)
+
+
 @router.get("/{camp_no}/participants")
 async def list_camp_participants(
     camp_no: int,
