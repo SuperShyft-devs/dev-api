@@ -19,11 +19,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.engagements.models import Engagement, EngagementParticipant
+from modules.diagnostics.repository import DiagnosticsRepository
 from modules.metsights.service import MetsightsService
 from modules.diagnostics.healthians import client as healthians_client
 from modules.notifications.dedup import should_skip_notification
 from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
+from modules.reports.blood_parameters_normalizer import normalize_from_healthians
 from modules.reports.models import IndividualHealthReport
 from modules.users.models import User
 
@@ -34,6 +36,14 @@ _METSIGHTS_PRO_BASIC_TYPE_CODES = {"1", "2"}
 
 def _blood_report_data_complete(blood_parameters: Any, diagnostic_report_url: Any) -> bool:
     return blood_parameters is not None and diagnostic_report_url is not None
+
+
+async def _canonicalize_provider_blood(
+    db: AsyncSession,
+    raw_customer: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    catalog = await DiagnosticsRepository().get_all_parameters(db)
+    return normalize_from_healthians(raw_customer, catalog=catalog)
 
 
 def _provider_code(provider_field: Any) -> str:
@@ -309,8 +319,10 @@ async def load_blood_reports(
                     db.add(ihr)
 
                 if fetched_blood is not None:
-                    ihr.blood_parameters = fetched_blood
-                    blood_parameters = fetched_blood
+                    canonical, raw = await _canonicalize_provider_blood(db, fetched_blood)
+                    ihr.blood_parameters = canonical
+                    ihr.blood_report_raw = raw
+                    blood_parameters = canonical
                 if fetched_diag_url is not None:
                     ihr.diagnostic_report_url = fetched_diag_url
                     diagnostic_report_url = fetched_diag_url

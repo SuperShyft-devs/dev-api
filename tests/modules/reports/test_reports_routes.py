@@ -23,6 +23,12 @@ from modules.diagnostics.schemas import (
     TestGroupResponse as DiagnosticTestGroupResponse,
 )
 from modules.questionnaire.healthy_habits_service import HealthyHabitsService
+from modules.questionnaire.models import (
+    QuestionnaireCategory,
+    QuestionnaireDefinition,
+    QuestionnaireOption,
+    QuestionnaireResponse,
+)
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.dependencies import get_reports_service
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
@@ -82,6 +88,11 @@ class _FakeMetsightsService:
         if self.should_fail:
             raise AssertionError("Metsights should not be called in this test")
         return self.fetch_collections_payload
+
+
+class _FailingMetsightsSyncService:
+    async def import_category_from_metsights(self, *args, **kwargs):
+        raise RuntimeError("simulated metsights sync failure")
 
 
 class _FailingMetsightsService:
@@ -158,6 +169,56 @@ class _FakeDiagnosticsService:
 
     async def get_health_parameter_by_parameter_key(self, db, *, parameter_key: str):
         return None
+
+
+async def _seed_glucose_questionnaire_response(
+    test_db_session,
+    *,
+    assessment_instance_id: int,
+    value: float = 91.0,
+    category_id: int = 88002,
+    question_id: int = 88002,
+    option_id: int = 88002,
+    response_id: int = 88002,
+):
+    test_db_session.add(
+        QuestionnaireCategory(
+            category_id=category_id,
+            category_key="blood-parameters",
+            display_name="Blood Parameters",
+            category_of="metsights",
+            status="active",
+        )
+    )
+    test_db_session.add(
+        QuestionnaireDefinition(
+            question_id=question_id,
+            question_key="glucose_fasting",
+            question_text="Glucose fasting",
+            question_type="scale",
+            status="active",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        QuestionnaireOption(
+            option_id=option_id,
+            question_id=question_id,
+            option_value="0",
+            display_name="mg/dL",
+        )
+    )
+    test_db_session.add(
+        QuestionnaireResponse(
+            response_id=response_id,
+            assessment_instance_id=assessment_instance_id,
+            question_id=question_id,
+            category_id=category_id,
+            answer={"value": value, "unit": "0"},
+            submitted_at=datetime.now(timezone.utc),
+        )
+    )
+    await test_db_session.flush()
 
 
 async def _seed_assessment(
@@ -293,8 +354,13 @@ async def test_get_blood_parameters_fetches_and_caches_on_miss(
         engagement_id=4802,
         record_id="XYZ1234DEF56",
     )
+    await _seed_glucose_questionnaire_response(
+        test_db_session,
+        assessment_instance_id=98002,
+    )
+    await test_db_session.commit()
 
-    fake_metsights = _FakeMetsightsService(payload={"glucose_fasting": 91, "glucose_fasting_unit": "mg/dL"})
+    fake_metsights = _FakeMetsightsService(payload={"glucose_fasting": 99}, should_fail=True)
     reports_service = ReportsService(
         repository=ReportsRepository(),
         assessments_repository=AssessmentsRepository(),
@@ -302,6 +368,7 @@ async def test_get_blood_parameters_fetches_and_caches_on_miss(
         diagnostics_service=_FakeDiagnosticsService(),
         audit_service=AuditService(AuditRepository()),
         healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+        questionnaire_repository=QuestionnaireRepository(),
     )
     fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
 
@@ -316,7 +383,7 @@ async def test_get_blood_parameters_fetches_and_caches_on_miss(
     assert glucose_test["unit"] == "mg/dL"
     assert glucose_test["lower_range"] == 70.0
     assert glucose_test["higher_range"] == 110.0
-    assert fake_metsights.calls == 1
+    assert fake_metsights.calls == 0
 
     # load_from=metsights does not save to DB
     saved = await test_db_session.execute(
@@ -1257,6 +1324,7 @@ async def test_refresh_user_blood_parameters_failure_sets_failed(test_db_session
         audit_service=AuditService(AuditRepository()),
         session_factory=session_factory,
         healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+        metsights_sync_service=_FailingMetsightsSyncService(),
     )
     await service._refresh_user_blood_parameters(user_id=3851)
 

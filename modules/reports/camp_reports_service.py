@@ -1339,39 +1339,28 @@ class CampReportsService:
         gender: str | None,
     ) -> tuple[float | None, float | None, float | None]:
         """Extract value and range for a single test from a participant's blood_parameters."""
-        is_provider = isinstance(blood_params.get("digital_data"), list)
+        from modules.reports.blood_parameters_read_service import BloodParametersReadService
+        from modules.reports.blood_parameters_schemas import (
+            is_canonical_blood_parameters,
+            is_legacy_healthians_format,
+            is_legacy_metsights_flat_format,
+        )
 
-        value: float | None = None
-        lower_range: float | None = None
-        higher_range: float | None = None
+        if is_canonical_blood_parameters(blood_params):
+            return BloodParametersReadService.extract_canonical_value_and_range(
+                blood_params,
+                parameter_key=test.parameter_key,
+                gender=gender,
+                catalog_lower_male=test.low_risk_lower_range_male,
+                catalog_higher_male=test.low_risk_higher_range_male,
+                catalog_lower_female=test.low_risk_lower_range_female,
+                catalog_higher_female=test.low_risk_higher_range_female,
+            )
 
-        if is_provider:
-            healthians_pid = test.healthians_parameter_id
-            if healthians_pid is None:
-                return None, None, None
-            for entry in blood_params["digital_data"]:
-                entry_pid = entry.get("parameter_id")
-                if entry_pid is not None and str(entry_pid) == str(healthians_pid):
-                    raw_val = entry.get("value")
-                    if raw_val is not None:
-                        try:
-                            value = float(raw_val)
-                        except (TypeError, ValueError):
-                            pass
-                    raw_min = entry.get("min_range")
-                    if raw_min is not None:
-                        try:
-                            lower_range = float(raw_min)
-                        except (TypeError, ValueError):
-                            pass
-                    raw_max = entry.get("max_range")
-                    if raw_max is not None:
-                        try:
-                            higher_range = float(raw_max)
-                        except (TypeError, ValueError):
-                            pass
-                    break
-        else:
+        if is_legacy_metsights_flat_format(blood_params):
+            value: float | None = None
+            lower_range: float | None = None
+            higher_range: float | None = None
             param_key = test.parameter_key
             if not param_key:
                 return None, None, None
@@ -1392,6 +1381,39 @@ class CampReportsService:
                     lower_range = float(test.low_risk_lower_range_female)
                 if test.low_risk_higher_range_female is not None:
                     higher_range = float(test.low_risk_higher_range_female)
+            return value, lower_range, higher_range
+
+        if not is_legacy_healthians_format(blood_params):
+            return None, None, None
+
+        value = None
+        lower_range = None
+        higher_range = None
+        healthians_pid = test.healthians_parameter_id
+        if healthians_pid is None:
+            return None, None, None
+        for entry in blood_params["digital_data"]:
+            entry_pid = entry.get("parameter_id")
+            if entry_pid is not None and str(entry_pid) == str(healthians_pid):
+                raw_val = entry.get("value")
+                if raw_val is not None:
+                    try:
+                        value = float(raw_val)
+                    except (TypeError, ValueError):
+                        pass
+                raw_min = entry.get("min_range")
+                if raw_min is not None:
+                    try:
+                        lower_range = float(raw_min)
+                    except (TypeError, ValueError):
+                        pass
+                raw_max = entry.get("max_range")
+                if raw_max is not None:
+                    try:
+                        higher_range = float(raw_max)
+                    except (TypeError, ValueError):
+                        pass
+                break
 
         return value, lower_range, higher_range
 
