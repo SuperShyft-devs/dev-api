@@ -169,5 +169,12 @@ class CreateMetsightsProfilesRequest(BaseModel):
     )
 
 
-class EngagementParticipantDepartmentUpdateRequest(BaseModel):
+class EngagementParticipantUpdateRequest(BaseModel):
     participant_department: Optional[str] = Field(default=None, max_length=100)
+    want_doctor_consultation: Optional[bool] = None
+    want_nutritionist_consultation: Optional[bool] = None
+    want_doctor_and_nutritionist_consultation: Optional[bool] = None
+
+
+# Backward-compatible alias
+EngagementParticipantDepartmentUpdateRequest = EngagementParticipantUpdateRequest

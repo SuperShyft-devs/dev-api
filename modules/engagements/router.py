@@ -20,7 +20,7 @@ from modules.engagements.schemas import (
     AssignParticipantsBatchRequest,
     CreateMetsightsProfilesRequest,
     EngagementCreateRequest,
-    EngagementParticipantDepartmentUpdateRequest,
+    EngagementParticipantUpdateRequest,
     EngagementStatusUpdateRequest,
     EngagementUpdateRequest,
     OnboardingAssistantsAddRequest,
@@ -401,21 +401,21 @@ async def remove_participant_from_engagement(
 
 
 @router.patch("/{engagement_id}/participants/{user_id}")
-async def update_participant_department(
+async def update_participant(
     engagement_id: int,
     user_id: int,
-    payload: EngagementParticipantDepartmentUpdateRequest,
+    payload: EngagementParticipantUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     engagements_service: EngagementsService = Depends(get_engagements_service),
 ):
-    data = await engagements_service.update_participant_department_for_employee(
+    data = await engagements_service.update_participant_for_employee(
         db,
         employee=employee,
         engagement_id=engagement_id,
         user_id=user_id,
-        participant_department=payload.participant_department,
+        payload=payload,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),

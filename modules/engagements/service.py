@@ -28,7 +28,11 @@ from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
 from modules.engagements.models import Engagement, EngagementKind, EngagementParticipant, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
-from modules.engagements.schemas import EngagementCreateRequest, EngagementUpdateRequest
+from modules.engagements.schemas import (
+    EngagementCreateRequest,
+    EngagementParticipantUpdateRequest,
+    EngagementUpdateRequest,
+)
 from modules.notifications.repository import NotificationsRepository
 from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.service import validate_participant_department_for_organization
@@ -827,19 +831,27 @@ class EngagementsService:
         organization = await self._organizations_repository.get_by_id(db, engagement.organization_id)
         return validate_participant_department_for_organization(organization, value)
 
-    async def update_participant_department_for_employee(
+    async def update_participant_for_employee(
         self,
         db: AsyncSession,
         *,
         employee: EmployeeContext,
         engagement_id: int,
         user_id: int,
-        participant_department: str | None,
+        payload: EngagementParticipantUpdateRequest,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> dict:
         ensure_admin(employee)
+
+        updates = payload.model_dump(exclude_unset=True)
+        if not updates:
+            raise AppError(
+                status_code=400,
+                error_code="PARTICIPANT_UPDATE_EMPTY",
+                message="At least one participant field must be provided",
+            )
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -853,23 +865,39 @@ class EngagementsService:
         if participant is None:
             raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant does not exist")
 
-        normalized: str | None
-        if participant_department is None:
-            normalized = None
-        else:
-            normalized = await self.resolve_participant_department_for_engagement(
-                db,
-                engagement=engagement,
-                participant_department=participant_department,
-            )
+        response: dict = {"engagement_id": engagement_id, "user_id": user_id}
 
-        participant.participant_department = normalized
+        if "participant_department" in updates:
+            participant_department = updates["participant_department"]
+            normalized: str | None
+            if participant_department is None:
+                normalized = None
+            else:
+                normalized = await self.resolve_participant_department_for_engagement(
+                    db,
+                    engagement=engagement,
+                    participant_department=participant_department,
+                )
+            participant.participant_department = normalized
+            response["participant_department"] = normalized
+
+        consultation_fields = (
+            "want_doctor_consultation",
+            "want_nutritionist_consultation",
+            "want_doctor_and_nutritionist_consultation",
+        )
+        for field in consultation_fields:
+            if field in updates:
+                value = updates[field]
+                setattr(participant, field, value)
+                response[field] = value
+
         await self._repository.update_participant(db, participant)
 
         audit = self._require_audit_service()
         await audit.log_event(
             db,
-            action="EMPLOYEE_UPDATE_PARTICIPANT_DEPARTMENT",
+            action="EMPLOYEE_UPDATE_PARTICIPANT",
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -877,11 +905,30 @@ class EngagementsService:
             session_id=None,
         )
 
-        return {
-            "engagement_id": engagement_id,
-            "user_id": user_id,
-            "participant_department": normalized,
-        }
+        return response
+
+    async def update_participant_department_for_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        participant_department: str | None,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        return await self.update_participant_for_employee(
+            db,
+            employee=employee,
+            engagement_id=engagement_id,
+            user_id=user_id,
+            payload=EngagementParticipantUpdateRequest(participant_department=participant_department),
+            ip_address=ip_address,
+            user_agent=user_agent,
+            endpoint=endpoint,
+        )
 
     async def update_participant_sync_flags(
         self,
