@@ -20,6 +20,10 @@ _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET: dict[str, str] = {
     "2": "30_60_mins",
     "3": "more_than_60_mins",
     "5": "rarely_or_never",
+    "less than 30 minutes a day": "less_than_30mins",
+    "30-60 minutes a day": "30_60_mins",
+    "more than 60 minutes a day": "more_than_60_mins",
+    "rarely or never": "rarely_or_never",
 }
 SLEEPING_HOURS_BUCKETS: tuple[str, ...] = (
     "less_than_5hrs",
@@ -32,6 +36,10 @@ _OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET: dict[str, str] = {
     "1": "between_5_7_hrs",
     "2": "between_7_9_hrs",
     "3": "more_than_9hrs",
+    "less than 5 hours": "less_than_5hrs",
+    "between 5 to 7 hours": "between_5_7_hrs",
+    "between 7 to 9 hours": "between_7_9_hrs",
+    "more than 9 hours": "more_than_9hrs",
 }
 
 
@@ -209,10 +217,11 @@ def normalize_camp_gender(value: object | None) -> str | None:
 
 
 def physical_activity_answer_to_bucket(answer: object | None) -> str | None:
-    """Map questionnaire option_value to a physical activity bucket key."""
+    """Map questionnaire option_value or display text to a physical activity bucket key."""
     if answer is None:
         return None
-    return _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET.get(str(answer).strip())
+    normalized = str(answer).strip().lower()
+    return _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET.get(normalized)
 
 
 def _build_gender_distribution(counts: dict[str, int], buckets: tuple[str, ...]) -> dict:
@@ -252,10 +261,11 @@ def build_distribution_by_physical_activity_frequency(
 
 
 def sleeping_hours_answer_to_bucket(answer: object | None) -> str | None:
-    """Map questionnaire option_value to a sleeping hours bucket key."""
+    """Map questionnaire option_value or display text to a sleeping hours bucket key."""
     if answer is None:
         return None
-    return _OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET.get(str(answer).strip())
+    normalized = str(answer).strip().lower()
+    return _OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET.get(normalized)
 
 
 def build_distribution_by_sleeping_hours(
