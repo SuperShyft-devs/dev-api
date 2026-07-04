@@ -10,6 +10,7 @@ from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
+from modules.engagements.console.schemas import ConsoleParticipantBookRequest
 from modules.engagements.console.service import ConsoleService
 from modules.engagements.dependencies import get_console_service
 
@@ -62,3 +63,22 @@ async def get_console_participants(
     )
 
     return success_response(participants, meta={"page": page, "limit": limit, "total": total})
+
+
+@router.post("/{engagement_id}/console/participants/{user_id}/book")
+async def book_console_participant(
+    engagement_id: int,
+    user_id: int,
+    payload: ConsoleParticipantBookRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    console_service: ConsoleService = Depends(get_console_service),
+):
+    data = await console_service.book_participant(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        user_id=user_id,
+        barcode=payload.barcode,
+    )
+    return success_response(data)

@@ -51,7 +51,10 @@ def get_onboarding_assistants_service() -> OnboardingAssistantsService:
 
 
 def get_console_service() -> ConsoleService:
-    return ConsoleService(repository=EngagementsRepository())
+    return ConsoleService(
+        repository=EngagementsRepository(),
+        users_repository=UsersRepository(),
+    )
 
 
 def get_engagement_assessment_packages_service() -> EngagementAssessmentPackagesService:

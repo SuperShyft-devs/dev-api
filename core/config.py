@@ -105,6 +105,7 @@ class Settings:
     HEALTHIANS_BASE_URL: str = os.getenv("HEALTHIANS_BASE_URL", "https://hbridge.healthians.com/api")
     HEALTHIANS_API_KEY: str = os.getenv("HEALTHIANS_API_KEY", "")
     HEALTHIANS_SECRET_KEY: str = os.getenv("HEALTHIANS_SECRET_KEY", "")
+    HEALTHIANS_CHECKSUM_KEY: str = os.getenv("HEALTHIANS_CHECKSUM_KEY", "")
 
     # Notification service (n8n webhooks)
     NOTIFICATION_SERVICE_BASE_URL: str = os.getenv("NOTIFICATION_SERVICE_BASE_URL", "https://n8n.supershyft.com")

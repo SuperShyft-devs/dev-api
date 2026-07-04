@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 import httpx
 
 from core.config import settings
+from modules.diagnostics.healthians.checksum import generate_checksum
 
 logger = logging.getLogger(__name__)
 
@@ -88,3 +90,53 @@ async def get_product_details(access_token: str, deal_type_id: int) -> dict:
     if not data.get("status"):
         raise RuntimeError(f"Healthians product details failed: {data}")
     return data["data"]
+
+
+async def check_serviceability_by_location_v2(
+    access_token: str,
+    *,
+    lat: str,
+    long: str,
+    zipcode: str,
+    is_ppmc_booking: int = 0,
+) -> dict:
+    """Check whether a location is serviceable for Healthians home collection."""
+    payload = {
+        "lat": lat,
+        "long": long,
+        "zipcode": zipcode,
+        "is_ppmc_booking": is_ppmc_booking,
+    }
+    url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/checkServiceabilityByLocation_v2"
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def create_booking_v3(
+    access_token: str,
+    payload: dict,
+    *,
+    checksum_key: str,
+) -> dict:
+    """Create a Healthians booking with HMAC checksum header."""
+    body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+    checksum = generate_checksum(body, checksum_key)
+    url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/createBooking_v3"
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "X-Checksum": checksum,
+                "Content-Type": "application/json",
+            },
+            content=body.encode("utf-8"),
+        )
+        resp.raise_for_status()
+        return resp.json()

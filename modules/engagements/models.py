@@ -108,3 +108,5 @@ class EngagementParticipant(Base):
     is_profile_created_on_metsights = Column(Boolean, nullable=False, default=False, server_default="false")
     is_primary_record_id_synced = Column(Boolean, nullable=False, default=False, server_default="false")
     is_fitprint_record_id_synced = Column(Boolean, nullable=False, default=False, server_default="false")
+    barcode = Column(String, nullable=True)
+    booking_id = Column(String, nullable=True)

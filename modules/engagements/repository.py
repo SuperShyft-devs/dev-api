@@ -243,6 +243,27 @@ class EngagementsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def update_participant_healthians_booking(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_participant_id: int,
+        barcode: str,
+        booking_id: str,
+    ) -> None:
+        result = await db.execute(
+            select(EngagementParticipant).where(
+                EngagementParticipant.engagement_participant_id == engagement_participant_id
+            )
+        )
+        participant = result.scalar_one_or_none()
+        if participant is None:
+            return
+        participant.barcode = barcode
+        participant.booking_id = booking_id
+        db.add(participant)
+        await db.flush()
+
     async def list_enrolled_user_ids_for_engagement(
         self,
         db: AsyncSession,
@@ -603,6 +624,8 @@ class EngagementsRepository:
                 EngagementParticipant.is_profile_created_on_metsights,
                 EngagementParticipant.is_primary_record_id_synced,
                 EngagementParticipant.is_fitprint_record_id_synced,
+                EngagementParticipant.barcode,
+                EngagementParticipant.booking_id,
                 func.row_number()
                 .over(
                     partition_by=EngagementParticipant.user_id,
@@ -730,6 +753,8 @@ class EngagementsRepository:
                 EngagementParticipant.is_profile_created_on_metsights,
                 EngagementParticipant.is_primary_record_id_synced,
                 EngagementParticipant.is_fitprint_record_id_synced,
+                EngagementParticipant.barcode,
+                EngagementParticipant.booking_id,
                 func.row_number()
                 .over(
                     partition_by=EngagementParticipant.user_id,

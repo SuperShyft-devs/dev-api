@@ -119,6 +119,8 @@ def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
         is_profile_created_on_metsights,
         is_primary_record_id_synced,
         is_fitprint_record_id_synced,
+        barcode,
+        booking_id,
     ) = row
     return {
         "engagement_participant_id": engagement_participant_id,
@@ -146,6 +148,8 @@ def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
         "is_profile_created_on_metsights": is_profile_created_on_metsights,
         "is_primary_record_id_synced": is_primary_record_id_synced,
         "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
+        "barcode": barcode,
+        "booking_id": booking_id,
     }
 
 
