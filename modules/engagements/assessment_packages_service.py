@@ -29,11 +29,44 @@ from modules.assessments.service import AssessmentsService
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
 from modules.engagements.repository import EngagementsRepository
+from modules.engagements.schemas import PUSH_QUESTIONNAIRE_CATEGORY_KEYS
 from modules.metsights.service import MetsightsService
 from modules.metsights.sync_service import MetsightsSyncService
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.repository import ReportsRepository
 from modules.users.repository import UsersRepository
+
+
+def _normalize_push_categories(categories: list[str] | None) -> list[str] | None:
+    """Validate and normalize optional category filter. ``None`` means push all."""
+
+    if categories is None:
+        return None
+
+    cleaned = [str(c).strip() for c in categories if str(c).strip()]
+    if not cleaned:
+        raise AppError(
+            status_code=422,
+            error_code="INVALID_INPUT",
+            message="At least one category must be selected",
+        )
+
+    unknown = sorted({c for c in cleaned if c not in PUSH_QUESTIONNAIRE_CATEGORY_KEYS})
+    if unknown:
+        raise AppError(
+            status_code=422,
+            error_code="INVALID_INPUT",
+            message=f"Unknown push categories: {', '.join(unknown)}",
+        )
+
+    # Preserve order, drop duplicates
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for key in cleaned:
+        if key not in seen:
+            seen.add(key)
+            ordered.append(key)
+    return ordered
 
 
 logger = logging.getLogger(__name__)
@@ -535,6 +568,7 @@ class EngagementAssessmentPackagesService:
         user_agent: str,
         endpoint: str,
         assessment_instance_id: int | None = None,
+        categories: list[str] | None = None,
     ) -> dict[str, Any]:
         """Push questionnaire answers to Metsights for a specific package's participants.
 
@@ -545,6 +579,8 @@ class EngagementAssessmentPackagesService:
 
         When ``assessment_instance_id`` is set, only that instance is pushed
         (for client-side sequential batching).
+
+        When ``categories`` is set, only those Metsights sub-resources are patched.
         """
         if employee is None:
             raise AppError(
@@ -552,6 +588,8 @@ class EngagementAssessmentPackagesService:
                 error_code="FORBIDDEN",
                 message="You do not have permission to perform this action",
             )
+
+        selected_categories = _normalize_push_categories(categories)
 
         engagement = await self._engagements.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -625,6 +663,7 @@ class EngagementAssessmentPackagesService:
                         assessment_instance_id=inst_id,
                         source_assessment_instance_ids=all_user_instance_ids,
                         options_cache=options_cache,
+                        categories=selected_categories,
                     )
                     if result.get("pushed"):
                         pushed += 1

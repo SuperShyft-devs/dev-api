@@ -377,3 +377,98 @@ async def test_submit_legacy_creates_integration_sync_logs(async_client, test_db
 
     assert any("/physical-measurement/" in r["api_endpoint_url"] for r in rows)
     assert any(r["response_payload"] == {"pushed": True} for r in rows)
+
+
+@pytest.mark.asyncio
+async def test_push_questionnaires_respects_selected_categories(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+    await _seed_employee(test_db_session, user_id=9721)
+    await _seed_push_engagement(test_db_session, engagement_id=9721, package_id=9722)
+
+    await _seed_user(test_db_session, user_id=5721)
+
+    pushed_rid = "MS-PUSH-CAT-01"
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9723,
+            user_id=5721,
+            package_id=9722,
+            engagement_id=9721,
+            status="active",
+            metsights_record_id=pushed_rid,
+        )
+    )
+    # height -> physical-measurement; living_region -> diet-lifestyle-parameters
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=9723,
+            question_id=1,
+            category_id=1,
+            answer={"value": 175.0, "unit": "0"},
+            submitted_at=None,
+        )
+    )
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=9723,
+            question_id=6,
+            category_id=1,
+            answer="1",
+            submitted_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    upserted: list[str] = []
+
+    async def _fake_upsert(self, *, record_id: str, resource: str, body: dict):
+        upserted.append(resource)
+        return {}
+
+    async def _fake_options(self, *, record_id: str, resource: str):
+        return {}
+
+    monkeypatch.setattr("modules.metsights.service.MetsightsService.upsert_record_subresource", _fake_upsert)
+    monkeypatch.setattr("modules.metsights.service.MetsightsService.options_record_subresource", _fake_options)
+
+    response = await async_client.post(
+        "/engagements/9721/push-questionnaires",
+        headers=_auth_header(9721),
+        json={
+            "package_id": 9722,
+            "assessment_instance_id": 9723,
+            "categories": ["diet-lifestyle-parameters"],
+        },
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()["data"]
+    assert data["pushed"] == 1
+    assert upserted == ["diet-lifestyle-parameters"]
+
+
+@pytest.mark.asyncio
+async def test_push_questionnaires_rejects_unknown_categories(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+    await _seed_employee(test_db_session, user_id=9731)
+    await _seed_push_engagement(test_db_session, engagement_id=9731, package_id=9732)
+
+    response = await async_client.post(
+        "/engagements/9731/push-questionnaires",
+        headers=_auth_header(9731),
+        json={"package_id": 9732, "categories": ["not-a-real-category"]},
+    )
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test_push_questionnaires_rejects_empty_categories(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+    await _seed_employee(test_db_session, user_id=9741)
+    await _seed_push_engagement(test_db_session, engagement_id=9741, package_id=9742)
+
+    response = await async_client.post(
+        "/engagements/9741/push-questionnaires",
+        headers=_auth_header(9741),
+        json={"package_id": 9742, "categories": []},
+    )
+    assert response.status_code == 422, response.text

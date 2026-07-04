@@ -118,6 +118,19 @@ class EngagementAssessmentPackageAddRequest(BaseModel):
     package_code: str = Field(..., min_length=1, max_length=100)
 
 
+# Metsights record sub-resource keys accepted by engagement questionnaire push.
+PUSH_QUESTIONNAIRE_CATEGORY_KEYS = frozenset(
+    {
+        "physical-measurement",
+        "vitals",
+        "diet-lifestyle-parameters",
+        "blood-parameters",
+        "advanced-blood-parameters",
+        "fitness-parameters",
+    }
+)
+
+
 class EngagementPushQuestionnairesRequest(BaseModel):
     """Request to push questionnaire answers for a specific package."""
 
@@ -126,6 +139,10 @@ class EngagementPushQuestionnairesRequest(BaseModel):
         default=None,
         gt=0,
         description="When set, push only this assessment instance (client-side batching).",
+    )
+    categories: list[str] | None = Field(
+        default=None,
+        description="Metsights resource keys to push. None = all for package type.",
     )
 
 

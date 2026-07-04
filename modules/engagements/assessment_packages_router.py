@@ -160,6 +160,7 @@ async def push_engagement_questionnaires(
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
         assessment_instance_id=payload.assessment_instance_id,
+        categories=payload.categories,
     )
     await db.commit()
     return success_response(data)

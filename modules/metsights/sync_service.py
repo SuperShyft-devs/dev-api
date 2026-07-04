@@ -1252,14 +1252,22 @@ class MetsightsSyncService:
         patched: list[str],
         skipped_sections: list[str],
         section_errors: list[str] | None = None,
+        categories: list[str] | None = None,
     ) -> None:
-        """Push merged questionnaire fields to Metsights sub-resources for one record."""
+        """Push merged questionnaire fields to Metsights sub-resources for one record.
+
+        When *categories* is set, only those resource keys are patched.
+        """
 
         mrid = (record_id or "").strip()
         if not mrid:
             return
 
+        allowed = set(categories) if categories is not None else None
+
         async def _patch_section(resource: str, body: dict[str, Any]) -> None:
+            if allowed is not None and resource not in allowed:
+                return
             api_url = f"/records/{mrid}/{resource}/"
             payload = {k: v for k, v in body.items() if k not in _METADATA_FIELDS}
             if not payload:
@@ -1528,6 +1536,7 @@ class MetsightsSyncService:
         assessment_instance_id: int,
         source_assessment_instance_ids: list[int] | None = None,
         options_cache: dict[str, dict[str, _FieldMeta]] | None = None,
+        categories: list[str] | None = None,
     ) -> dict[str, Any]:
         """Push local questionnaire answers to Metsights for a single instance (employee path).
 
@@ -1540,6 +1549,8 @@ class MetsightsSyncService:
         Pass *options_cache* (a mutable dict) to reuse OPTIONS metadata across
         multiple calls, avoiding redundant Metsights OPTIONS requests when
         pushing an entire engagement.
+
+        When *categories* is set, only those Metsights sub-resources are patched.
         """
 
         instance = await self._assessments.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
@@ -1630,6 +1641,7 @@ class MetsightsSyncService:
             patched=patched,
             skipped_sections=skipped_sections,
             section_errors=section_errors,
+            categories=categories,
         )
 
         if type_code in ("1", "2") and instance.engagement_id is not None:
@@ -1653,6 +1665,7 @@ class MetsightsSyncService:
                         patched=patched,
                         skipped_sections=skipped_sections,
                         section_errors=section_errors,
+                        categories=categories,
                     )
 
         if patched:
