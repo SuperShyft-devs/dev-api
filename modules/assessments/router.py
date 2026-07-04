@@ -202,6 +202,24 @@ async def import_metsights_questionnaire_answers_legacy(
     return success_response(result)
 
 
+@router.post("/{assessment_instance_id}/metsights/draft-blood-parameters")
+async def draft_blood_parameters_from_report(
+    assessment_instance_id: int,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    assessments_service: AssessmentsService = Depends(get_assessments_service),
+):
+    """Draft blood-parameter questionnaire answers from individual_health_report.blood_parameters."""
+
+    result = await assessments_service.draft_blood_parameters_from_report(
+        db,
+        user_id=user.user_id,
+        assessment_instance_id=assessment_instance_id,
+    )
+    await db.commit()
+    return success_response(result)
+
+
 @router.get("/{assessment_instance_id}/status")
 async def get_assessment_categories_status(
     assessment_instance_id: int,

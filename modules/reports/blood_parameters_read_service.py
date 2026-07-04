@@ -13,6 +13,7 @@ from modules.reports.blood_parameters_schemas import (
     is_canonical_blood_parameters,
     is_grouped_blood_parameters,
     is_legacy_healthians_format,
+    is_legacy_metsights_flat_format,
 )
 from modules.reports.schemas import (
     BloodParameterGroupInReportResponse,
@@ -35,6 +36,63 @@ def _parameter_type_value(parameter_type: Any) -> str:
     if hasattr(parameter_type, "value"):
         return str(parameter_type.value)
     return str(parameter_type)
+
+
+_METSIGHTS_FLAT_METADATA_KEYS = frozenset({"id", "is_complete", "created_at", "updated_at"})
+
+
+def build_parameter_value_map(blood_parameters: Any) -> dict[str, tuple[float, str | None]]:
+    """Build ``parameter_key -> (value, unit)`` from any supported IHR blood_parameters format."""
+    result: dict[str, tuple[float, str | None]] = {}
+
+    if is_grouped_blood_parameters(blood_parameters):
+        for group in blood_parameters:
+            if not isinstance(group, dict):
+                continue
+            tests = group.get("tests")
+            if not isinstance(tests, list):
+                continue
+            for test in tests:
+                if not isinstance(test, dict):
+                    continue
+                key = (test.get("parameter_key") or "").strip()
+                if not key:
+                    continue
+                value = _parse_float(test.get("value"))
+                if value is None:
+                    continue
+                raw_unit = test.get("unit")
+                unit = str(raw_unit).strip() if raw_unit is not None and str(raw_unit).strip() else None
+                result[key] = (value, unit)
+        return result
+
+    if is_canonical_blood_parameters(blood_parameters):
+        params = read_canonical_parameters(blood_parameters)
+        for key, entry in params.items():
+            if not isinstance(entry, dict):
+                continue
+            value = _parse_float(entry.get("value"))
+            if value is None:
+                continue
+            raw_unit = entry.get("unit")
+            unit = str(raw_unit).strip() if raw_unit is not None and str(raw_unit).strip() else None
+            result[str(key)] = (value, unit)
+        return result
+
+    if is_legacy_metsights_flat_format(blood_parameters):
+        for key, raw_val in blood_parameters.items():
+            key_str = str(key).strip()
+            if not key_str or key_str in _METSIGHTS_FLAT_METADATA_KEYS or key_str.endswith("_unit"):
+                continue
+            value = _parse_float(raw_val)
+            if value is None:
+                continue
+            raw_unit = blood_parameters.get(f"{key_str}_unit")
+            unit = str(raw_unit).strip() if raw_unit is not None and str(raw_unit).strip() else None
+            result[key_str] = (value, unit)
+        return result
+
+    return result
 
 
 class BloodParametersReadService:

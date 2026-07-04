@@ -12,12 +12,14 @@ from modules.assessments.service import AssessmentsService
 from modules.assessments.packages_service import AssessmentPackagesService
 from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
 from modules.questionnaire.repository import QuestionnaireRepository
+from modules.reports.repository import ReportsRepository
 
 
 def get_assessments_service() -> AssessmentsService:
     return AssessmentsService(
         repository=AssessmentsRepository(),
         questionnaire_repository=QuestionnaireRepository(),
+        reports_repository=ReportsRepository(),
         audit_service=AuditService(AuditRepository()),
     )
 
