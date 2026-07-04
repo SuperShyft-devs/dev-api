@@ -665,6 +665,8 @@ class EngagementsRepository:
                 ranked_rows.c.is_profile_created_on_metsights,
                 ranked_rows.c.is_primary_record_id_synced,
                 ranked_rows.c.is_fitprint_record_id_synced,
+                ranked_rows.c.barcode,
+                ranked_rows.c.booking_id,
             )
             .where(ranked_rows.c.rn == 1)
             .order_by(ranked_rows.c.engagement_participant_id.asc())
@@ -795,6 +797,8 @@ class EngagementsRepository:
                 ranked_rows.c.is_profile_created_on_metsights,
                 ranked_rows.c.is_primary_record_id_synced,
                 ranked_rows.c.is_fitprint_record_id_synced,
+                ranked_rows.c.barcode,
+                ranked_rows.c.booking_id,
             )
             .where(ranked_rows.c.rn == 1)
             .order_by(ranked_rows.c.engagement_participant_id.asc())
