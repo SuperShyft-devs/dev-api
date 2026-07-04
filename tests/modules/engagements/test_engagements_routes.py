@@ -413,6 +413,82 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
 
 
 @pytest.mark.asyncio
+async def test_list_engagements_filters_by_audience(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7004, employee_id=12)
+    await _seed_organization(test_db_session, organization_id=1, name="Org 1")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    from modules.engagements.models import Engagement
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=8201,
+            engagement_name="B2B Camp",
+            metsights_engagement_id=None,
+            organization_id=1,
+            engagement_code="B2B1",
+            engagement_type="bio_ai",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 1),
+            status="running",
+            participant_count=0,
+        )
+    )
+    test_db_session.add(
+        Engagement(
+            engagement_id=8202,
+            engagement_name="B2C Public",
+            metsights_engagement_id=None,
+            organization_id=None,
+            engagement_code="B2C1",
+            engagement_type="doctor",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="Mumbai",
+            slot_duration=20,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 1),
+            status="running",
+            participant_count=0,
+        )
+    )
+    await test_db_session.commit()
+
+    b2b_response = await async_client.get(
+        "/engagements?page=1&limit=10&audience=b2b&search=B2B",
+        headers=_auth_header(7004),
+    )
+    assert b2b_response.status_code == 200
+    b2b_body = b2b_response.json()
+    b2b_ids = {row["engagement_id"] for row in b2b_body["data"]}
+    assert 8201 in b2b_ids
+    assert 8202 not in b2b_ids
+    assert all(row["organization_id"] is not None for row in b2b_body["data"])
+
+    b2c_response = await async_client.get(
+        "/engagements?page=1&limit=10&audience=b2c&search=B2C",
+        headers=_auth_header(7004),
+    )
+    assert b2c_response.status_code == 200
+    b2c_body = b2c_response.json()
+    b2c_ids = {row["engagement_id"] for row in b2c_body["data"]}
+    assert 8202 in b2c_ids
+    assert 8201 not in b2c_ids
+    assert all(row["organization_id"] is None for row in b2c_body["data"])
+
+    invalid_response = await async_client.get(
+        "/engagements?audience=invalid",
+        headers=_auth_header(7004),
+    )
+    assert invalid_response.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_list_engagements_filters_by_camp_no(async_client, test_db_session):
     from modules.engagements.camp_no import compute_camp_no
     from modules.engagements.models import Engagement

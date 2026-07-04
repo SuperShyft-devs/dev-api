@@ -39,9 +39,14 @@ class EngagementsRepository:
         on_date=None,
         search: str | None = None,
         engagement_type: str | None = None,
+        audience: str | None = None,
     ):
         if organization_id is not None:
             query = query.where(Engagement.organization_id == organization_id)
+        if audience == "b2b":
+            query = query.where(Engagement.organization_id.isnot(None))
+        elif audience == "b2c":
+            query = query.where(Engagement.organization_id.is_(None))
         if camp_no is not None:
             query = query.where(Engagement.camp_no == camp_no)
         if status is not None:
@@ -119,6 +124,7 @@ class EngagementsRepository:
         on_date=None,
         search: str | None = None,
         engagement_type: str | None = None,
+        audience: str | None = None,
     ) -> int:
         query = select(func.count()).select_from(Engagement)
         query = self._apply_engagement_list_filters(
@@ -130,6 +136,7 @@ class EngagementsRepository:
             on_date=on_date,
             search=search,
             engagement_type=engagement_type,
+            audience=audience,
         )
 
         result = await db.execute(query)
@@ -148,6 +155,7 @@ class EngagementsRepository:
         on_date=None,
         search: str | None = None,
         engagement_type: str | None = None,
+        audience: str | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
     ) -> list[Engagement]:
@@ -162,6 +170,7 @@ class EngagementsRepository:
             on_date=on_date,
             search=search,
             engagement_type=engagement_type,
+            audience=audience,
         )
         query = apply_sort(
             query,

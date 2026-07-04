@@ -122,6 +122,7 @@ async def list_engagements(
     status: str | None = None,
     city: str | None = None,
     engagement_type: str | None = None,
+    audience: str | None = None,
     search: str | None = None,
     sort_by: str | None = None,
     sort_dir: str | None = None,
@@ -145,6 +146,7 @@ async def list_engagements(
         on_date=date,
         search=search,
         engagement_type=engagement_type,
+        audience=audience,
         sort_by=sort_by,
         sort_dir=sort_dir,
     )

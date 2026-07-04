@@ -411,6 +411,7 @@ class EngagementsService:
         on_date,
         search: str | None = None,
         engagement_type: str | None = None,
+        audience: str | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
     ) -> tuple[list[Engagement], int, dict[int, ChecklistReadiness]]:
@@ -423,6 +424,13 @@ class EngagementsService:
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
             status_value = normalized
 
+        audience_value = None
+        if audience is not None:
+            normalized_audience = audience.strip().lower()
+            if normalized_audience not in {"b2b", "b2c"}:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            audience_value = normalized_audience
+
         engagements = await self._repository.list_engagements(
             db,
             page=page,
@@ -434,6 +442,7 @@ class EngagementsService:
             on_date=on_date,
             search=search,
             engagement_type=engagement_type,
+            audience=audience_value,
             sort_by=sort_by,
             sort_dir=sort_dir,
         )
@@ -447,6 +456,7 @@ class EngagementsService:
             on_date=on_date,
             search=search,
             engagement_type=engagement_type,
+            audience=audience_value,
         )
 
         counts_by_id = await self._repository.count_distinct_participants_by_engagement_ids(
