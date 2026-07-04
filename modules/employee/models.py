@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import Column, DateTime, Enum as SAEnum, ForeignKey, Integer, String, func
+from sqlalchemy import Column, DateTime, Enum as SAEnum, ForeignKey, Index, Integer, String, func
 
 from db.base import Base
 
@@ -34,6 +34,7 @@ class Employee(Base):
     """SQLAlchemy model for `employee` table."""
 
     __tablename__ = "employee"
+    __table_args__ = (Index("ix_employee_user_id", "user_id"),)
 
     employee_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)

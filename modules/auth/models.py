@@ -7,7 +7,7 @@ Auth owns:
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String
 
 from db.base import Base
 
@@ -16,6 +16,7 @@ class AuthOtpSession(Base):
     """SQLAlchemy model for `auth_otp_sessions` table."""
 
     __tablename__ = "auth_otp_sessions"
+    __table_args__ = (Index("ix_auth_otp_sessions_user_id", "user_id"),)
 
     session_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
@@ -29,6 +30,7 @@ class AuthToken(Base):
     """SQLAlchemy model for `auth_tokens` table."""
 
     __tablename__ = "auth_tokens"
+    __table_args__ = (Index("ix_auth_tokens_user_id", "user_id"),)
 
     token_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)

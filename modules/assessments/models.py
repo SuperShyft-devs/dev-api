@@ -5,7 +5,7 @@ Schema must match `instructions/db-schema.txt`.
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, text
 
 from db.base import Base
 
@@ -26,6 +26,15 @@ class AssessmentInstance(Base):
     """SQLAlchemy model for `assessment_instances` table."""
 
     __tablename__ = "assessment_instances"
+    __table_args__ = (
+        Index("ix_ai_user_id", "user_id"),
+        Index("ix_ai_engagement_id", "engagement_id"),
+        Index(
+            "ix_ai_metsights_record_id",
+            "metsights_record_id",
+            postgresql_where=text("metsights_record_id IS NOT NULL"),
+        ),
+    )
 
     assessment_instance_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)

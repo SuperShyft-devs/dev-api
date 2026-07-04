@@ -5,7 +5,7 @@ Schema must match `instructions/db-schema.txt`.
 
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.types import JSON
 
 from db.base import Base
@@ -19,6 +19,14 @@ class IndividualHealthReport(Base):
     """
 
     __tablename__ = "individual_health_report"
+    __table_args__ = (
+        Index("ix_ihr_user_engagement", "user_id", "engagement_id"),
+        Index(
+            "ix_ihr_assessment_instance_id",
+            "assessment_instance_id",
+            postgresql_where=text("assessment_instance_id IS NOT NULL"),
+        ),
+    )
 
     report_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)

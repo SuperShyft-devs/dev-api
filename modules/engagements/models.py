@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import BigInteger, Boolean, Column, Date, Enum as SAEnum, Float, ForeignKey, Integer, String, Time, UniqueConstraint, Index
+from sqlalchemy import BigInteger, Boolean, Column, Date, Enum as SAEnum, Float, ForeignKey, Index, Integer, String, Time, UniqueConstraint
 
 from db.base import Base
 from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
@@ -33,6 +33,11 @@ class Engagement(Base):
     """SQLAlchemy model for `engagements` table."""
 
     __tablename__ = "engagements"
+    __table_args__ = (
+        Index("uq_engagements_engagement_code", "engagement_code", unique=True),
+        Index("ix_engagements_organization_id", "organization_id"),
+        Index("ix_engagements_camp_no", "camp_no"),
+    )
 
     engagement_id = Column(Integer, primary_key=True)
     engagement_name = Column(String)
@@ -93,6 +98,12 @@ class EngagementParticipant(Base):
     """SQLAlchemy model for `engagement_participants` table."""
 
     __tablename__ = "engagement_participants"
+    __table_args__ = (
+        Index("ix_ep_engagement_id_user_id", "engagement_id", "user_id"),
+        Index("ix_ep_user_id", "user_id"),
+        Index("ix_ep_engagement_date", "engagement_date"),
+        Index("ix_engagement_participants_booking_id", "booking_id"),
+    )
 
     engagement_participant_id = Column(Integer, primary_key=True)
     engagement_id = Column(Integer, ForeignKey("engagements.engagement_id"), nullable=False)

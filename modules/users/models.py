@@ -5,7 +5,7 @@ Auth depends on this module for read-only existence checks.
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, JSON, String, func, text
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, JSON, String, func, text
 
 from db.base import Base
 
@@ -14,6 +14,14 @@ class User(Base):
     """SQLAlchemy model for `users` table."""
 
     __tablename__ = "users"
+    __table_args__ = (
+        Index("ix_users_parent_id", "parent_id"),
+        Index(
+            "ix_users_metsights_profile_id",
+            "metsights_profile_id",
+            postgresql_where=text("metsights_profile_id IS NOT NULL"),
+        ),
+    )
 
     user_id = Column(Integer, primary_key=True)
     first_name = Column(String)

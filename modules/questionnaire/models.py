@@ -5,7 +5,7 @@ This module owns the `questionnaire_definitions` table.
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func, text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.types import JSON
 
 from db.base import Base
@@ -72,6 +72,10 @@ class QuestionnaireResponse(Base):
     """SQLAlchemy model for `questionnaire_responses` table."""
 
     __tablename__ = "questionnaire_responses"
+    __table_args__ = (
+        Index("ix_qr_assessment_instance_id", "assessment_instance_id"),
+        Index("ix_questionnaire_responses_category_id", "category_id"),
+    )
 
     response_id = Column(Integer, primary_key=True)
     assessment_instance_id = Column(
