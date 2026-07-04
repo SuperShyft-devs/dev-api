@@ -186,15 +186,11 @@ class CampReportsRepository:
             select(func.count(func.distinct(enrolled.c.user_id)))
             .select_from(enrolled)
             .join(
-                AssessmentInstance,
-                and_(
-                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
-                    AssessmentInstance.user_id == enrolled.c.user_id,
-                ),
-            )
-            .join(
                 IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+                and_(
+                    IndividualHealthReport.engagement_id == enrolled.c.engagement_id,
+                    IndividualHealthReport.user_id == enrolled.c.user_id,
+                ),
             )
             .where(IndividualHealthReport.blood_parameters.isnot(None))
         )
@@ -281,7 +277,10 @@ class CampReportsRepository:
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .join(
                 IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+                and_(
+                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
+                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
+                ),
             )
             .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
         ).subquery()
@@ -352,7 +351,10 @@ class CampReportsRepository:
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .join(
                 IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+                and_(
+                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
+                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
+                ),
             )
             .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
         ).subquery()
@@ -401,7 +403,10 @@ class CampReportsRepository:
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .join(
                 IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+                and_(
+                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
+                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
+                ),
             )
             .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
         ).subquery()
@@ -450,7 +455,10 @@ class CampReportsRepository:
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .join(
                 IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+                and_(
+                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
+                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
+                ),
             )
             .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
         ).subquery()
@@ -471,7 +479,7 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
-    ) -> list[tuple[str | None, dict[str, Any]]]:
+    ) -> list[tuple[str | None, Any]]:
         """Return (gender, blood_parameters) for enrolled users with blood data."""
         enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
 
@@ -488,15 +496,11 @@ class CampReportsRepository:
             )
             .select_from(enrolled)
             .join(
-                AssessmentInstance,
-                and_(
-                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
-                    AssessmentInstance.user_id == enrolled.c.user_id,
-                ),
-            )
-            .join(
                 IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+                and_(
+                    IndividualHealthReport.engagement_id == enrolled.c.engagement_id,
+                    IndividualHealthReport.user_id == enrolled.c.user_id,
+                ),
             )
             .where(IndividualHealthReport.blood_parameters.isnot(None))
         ).subquery()
@@ -505,11 +509,10 @@ class CampReportsRepository:
             select(ranked_reports.c.gender, ranked_reports.c.blood_parameters).where(ranked_reports.c.rn == 1)
         )
 
-        rows: list[tuple[str | None, dict[str, Any]]] = []
+        rows: list[tuple[str | None, Any]] = []
         for gender, blood_params in result.all():
-            bp: dict[str, Any] = blood_params if isinstance(blood_params, dict) else {}
-            if bp:
-                rows.append((gender, bp))
+            if blood_params:
+                rows.append((gender, blood_params))
         return rows
 
     async def list_physical_activity_frequency_by_gender(
@@ -801,7 +804,10 @@ class CampReportsRepository:
             .join(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
             .outerjoin(
                 IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+                and_(
+                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
+                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
+                ),
             )
             .where(ranked.c.rn == 1)
         )
@@ -871,7 +877,10 @@ class CampReportsRepository:
             .join(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
             .outerjoin(
                 IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+                and_(
+                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
+                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
+                ),
             )
             .where(ranked.c.rn == 1)
         )
@@ -941,7 +950,10 @@ class CampReportsRepository:
             .join(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
             .outerjoin(
                 IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id,
+                and_(
+                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
+                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
+                ),
             )
             .where(ranked.c.rn == 1)
         )

@@ -25,7 +25,7 @@ from modules.diagnostics.healthians import client as healthians_client
 from modules.notifications.dedup import should_skip_notification
 from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
-from modules.reports.blood_parameters_normalizer import normalize_from_healthians
+from modules.reports.blood_parameters_normalizer import build_grouped_from_healthians
 from modules.reports.blood_parameters_schemas import (
     has_usable_provider_blood_parameters,
     provider_code_from_field,
@@ -45,12 +45,19 @@ def _blood_report_data_complete(blood_parameters: Any, diagnostic_report_url: An
     )
 
 
-async def _canonicalize_provider_blood(
+async def _group_provider_blood(
     db: AsyncSession,
     raw_customer: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    catalog = await DiagnosticsRepository().get_all_parameters(db)
-    return normalize_from_healthians(raw_customer, catalog=catalog)
+    *,
+    diagnostic_package_id: int,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    from modules.diagnostics.service import DiagnosticsService
+
+    package_tests = await DiagnosticsService(repository=DiagnosticsRepository()).get_package_tests(
+        db=db,
+        package_id=diagnostic_package_id,
+    )
+    return build_grouped_from_healthians(raw_customer, package_groups=package_tests.groups)
 
 
 def _provider_code(provider_field: Any) -> str:
@@ -110,6 +117,7 @@ async def _get_eligible_participants(
             Engagement.blood_report_notification,
             IndividualHealthReport.report_id,
             AssessmentInstance.assessment_instance_id,
+            Engagement.diagnostic_package_id,
         )
         .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
         .join(User, User.user_id == EngagementParticipant.user_id)
@@ -121,7 +129,8 @@ async def _get_eligible_participants(
         .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
         .outerjoin(
             IndividualHealthReport,
-            (IndividualHealthReport.assessment_instance_id == AssessmentInstance.assessment_instance_id),
+            (IndividualHealthReport.engagement_id == EngagementParticipant.engagement_id)
+            & (IndividualHealthReport.user_id == EngagementParticipant.user_id),
         )
         .where(Engagement.status.ilike("running"))
         .where(EngagementParticipant.engagement_date <= today)
@@ -203,6 +212,7 @@ async def load_blood_reports(
             first_name, last_name,
             blood_params, diag_url,
             blood_report_notification, ihr_id, instance_id,
+            diagnostic_package_id,
         ) = row
 
         record_id = (record_id or "").strip()
@@ -324,10 +334,21 @@ async def load_blood_reports(
                     db.add(ihr)
 
                 if fetched_blood is not None:
-                    canonical, raw = await _canonicalize_provider_blood(db, fetched_blood)
-                    ihr.blood_parameters = canonical
-                    ihr.blood_report_raw = raw
-                    blood_parameters = canonical
+                    if diagnostic_package_id is None:
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped",
+                            "reason": "engagement has no diagnostic package for blood parameters",
+                        })
+                    else:
+                        grouped, raw = await _group_provider_blood(
+                            db,
+                            fetched_blood,
+                            diagnostic_package_id=int(diagnostic_package_id),
+                        )
+                        ihr.blood_parameters = grouped
+                        ihr.blood_report_raw = raw
+                        blood_parameters = grouped
                 if fetched_diag_url is not None:
                     ihr.diagnostic_report_url = fetched_diag_url
                     diagnostic_report_url = fetched_diag_url

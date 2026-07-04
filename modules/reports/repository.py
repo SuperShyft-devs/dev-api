@@ -5,7 +5,7 @@ Only database queries belong here.
 
 from __future__ import annotations
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
@@ -18,14 +18,28 @@ _METSIGHTS_PRO_BASIC_TYPE_CODES = ("1", "2")
 class ReportsRepository:
     """Database access for reports."""
 
+    async def get_individual_report_by_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+    ) -> IndividualHealthReport | None:
+        result = await db.execute(
+            select(IndividualHealthReport)
+            .where(IndividualHealthReport.user_id == user_id)
+            .where(IndividualHealthReport.engagement_id == engagement_id)
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def get_individual_report_by_assessment(
         self,
         db: AsyncSession,
         *,
         assessment_instance_id: int,
     ) -> IndividualHealthReport | None:
-        # assessment_instance_id is not unique; concurrent cache writes can leave duplicates.
-        # Always use the newest row so reads/updates stay consistent.
+        """Legacy fallback: prefer engagement lookup when assessment context is available."""
         result = await db.execute(
             select(IndividualHealthReport)
             .where(IndividualHealthReport.assessment_instance_id == assessment_instance_id)
@@ -58,9 +72,43 @@ class ReportsRepository:
         *,
         assessment_instance_id: int,
     ) -> int:
+        """Clear assessment-scoped fields; keep engagement-scoped blood data.
+
+        Nulls ``assessment_instance_id``, ``reports``, and ``report_url`` on matching rows.
+        Deletes the row only when no blood/diagnostic data remains.
+        """
+        result = await db.execute(
+            select(IndividualHealthReport).where(
+                IndividualHealthReport.assessment_instance_id == assessment_instance_id
+            )
+        )
+        rows = list(result.scalars().all())
+        deleted = 0
+        for row in rows:
+            row.assessment_instance_id = None
+            row.reports = None
+            row.report_url = None
+            has_blood = row.blood_parameters is not None or row.blood_report_raw is not None
+            has_diag = row.diagnostic_report_url is not None
+            if not has_blood and not has_diag:
+                await db.delete(row)
+                deleted += 1
+            else:
+                db.add(row)
+        await db.flush()
+        return deleted
+
+    async def delete_individual_reports_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+    ) -> int:
         result = await db.execute(
             delete(IndividualHealthReport).where(
-                IndividualHealthReport.assessment_instance_id == assessment_instance_id
+                IndividualHealthReport.user_id == user_id,
+                IndividualHealthReport.engagement_id == engagement_id,
             )
         )
         return int(result.rowcount or 0)
@@ -75,7 +123,10 @@ class ReportsRepository:
             select(IndividualHealthReport, AssessmentInstance)
             .join(
                 AssessmentInstance,
-                AssessmentInstance.assessment_instance_id == IndividualHealthReport.assessment_instance_id,
+                and_(
+                    AssessmentInstance.user_id == IndividualHealthReport.user_id,
+                    AssessmentInstance.engagement_id == IndividualHealthReport.engagement_id,
+                ),
             )
             .where(IndividualHealthReport.user_id == user_id)
             .order_by(

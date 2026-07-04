@@ -1,4 +1,4 @@
-"""Canonical blood parameters storage schemas (provider / lab results only)."""
+"""Blood parameters storage schemas (provider / lab results)."""
 
 from __future__ import annotations
 
@@ -7,13 +7,33 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class GroupedBloodParameterTest(BaseModel):
+    test_id: int
+    parameter_type: str = "test"
+    test_name: str
+    parameter_key: str | None = None
+    unit: str | None = None
+    value: float | None = None
+    machine_value: float | None = None
+    lower_range: float | None = None
+    higher_range: float | None = None
+    provider_test_name: str | None = None
+
+
+class GroupedBloodParameterGroup(BaseModel):
+    group_name: str
+    test_count: int
+    tests: list[GroupedBloodParameterTest] = Field(default_factory=list)
+
+
+# Legacy canonical format (pre-grouped storage) — kept for migration/read fallbacks.
 class CanonicalBloodParameterValue(BaseModel):
     value: float | None = None
     unit: str | None = None
     machine_value: float | None = None
     lower_range: float | None = None
     higher_range: float | None = None
-    healthians_parameter_id: int | None = None
+    external_parameter_id: int | None = None
     provider_test_name: str | None = None
 
 
@@ -30,8 +50,16 @@ class CanonicalBloodParameters(BaseModel):
     parameters: dict[str, CanonicalBloodParameterValue] = Field(default_factory=dict)
 
 
+def is_grouped_blood_parameters(blob: Any) -> bool:
+    """Return True when ``blob`` is a list of package-shaped groups."""
+    if not isinstance(blob, list) or not blob:
+        return False
+    first = blob[0]
+    return isinstance(first, dict) and "tests" in first and "group_name" in first
+
+
 def is_canonical_blood_parameters(blob: Any) -> bool:
-    """Return True when ``blob`` is normalized provider storage (top-level ``parameters`` dict)."""
+    """Return True when ``blob`` is legacy normalized provider storage (top-level ``parameters`` dict)."""
     if not isinstance(blob, dict):
         return False
     params = blob.get("parameters")
@@ -71,6 +99,17 @@ def is_empty_blood_parameters(blob: Any) -> bool:
 def has_usable_provider_blood_parameters(blob: Any) -> bool:
     """Return True when ``blob`` has provider/lab values worth serving from cache."""
     if is_empty_blood_parameters(blob) or is_metsights_metadata_only(blob):
+        return False
+    if is_grouped_blood_parameters(blob):
+        for group in blob:
+            if not isinstance(group, dict):
+                continue
+            tests = group.get("tests")
+            if not isinstance(tests, list):
+                continue
+            for test in tests:
+                if isinstance(test, dict) and test.get("value") is not None:
+                    return True
         return False
     if is_canonical_blood_parameters(blob):
         params = blob.get("parameters")
@@ -123,6 +162,8 @@ def describe_blood_parameters_blob(blob: Any) -> str:
     """Short description for migration error reporting."""
     if blob is None:
         return "null"
+    if isinstance(blob, list):
+        return f"list(len={len(blob)})"
     if isinstance(blob, dict):
         keys = sorted(str(k) for k in blob.keys())
         preview = ", ".join(keys[:8])
@@ -130,4 +171,3 @@ def describe_blood_parameters_blob(blob: Any) -> str:
             preview += ", ..."
         return f"dict(keys=[{preview}])"
     return type(blob).__name__
-

@@ -243,7 +243,7 @@ class DiagnosticsService:
             test_id=row.test_id,
             parameter_type=parameter_type,
             test_name=row.test_name,
-            healthians_parameter_id=row.healthians_parameter_id,
+            external_parameter_id=row.external_parameter_id,
             parameter_key=row.parameter_key,
             unit=row.unit,
             meaning=row.meaning,

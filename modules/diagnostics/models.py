@@ -224,7 +224,7 @@ class HealthParameter(Base):
     original_price = Column(Numeric(10, 2))
     is_most_popular = Column(Boolean, nullable=False, default=False, server_default="false")
     gender_suitability = Column(String)
-    healthians_parameter_id = Column(Integer, nullable=True)
+    external_parameter_id = Column(Integer, nullable=True)
 
     low_risk_lower_range_male = Column(Numeric(12, 4), nullable=True)
     low_risk_higher_range_male = Column(Numeric(12, 4), nullable=True)

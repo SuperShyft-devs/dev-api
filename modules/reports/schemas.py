@@ -7,14 +7,15 @@ from pydantic import BaseModel, Field
 
 class BloodParameterTestInReportResponse(BaseModel):
     test_id: int
+    parameter_type: str = "test"
     test_name: str
     parameter_key: str | None = None
-    healthians_parameter_id: int | None = None
     unit: str | None = None
     value: float | None = None
     machine_value: float | None = None
     lower_range: float | None = None
     higher_range: float | None = None
+    provider_test_name: str | None = None
 
 
 class BloodParameterGroupInReportResponse(BaseModel):

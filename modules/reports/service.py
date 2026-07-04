@@ -24,7 +24,7 @@ from modules.audit.service import AuditService
 from modules.diagnostics.service import DiagnosticsService
 from modules.metsights.service import MetsightsService
 from modules.metsights.sync_service import MetsightsSyncService
-from modules.reports.blood_parameters_normalizer import normalize_from_healthians
+from modules.reports.blood_parameters_normalizer import build_grouped_from_healthians
 from modules.reports.blood_parameters_read_service import BloodParametersReadService
 from modules.reports.blood_parameters_questionnaire_reader import BloodParametersQuestionnaireReader
 from modules.reports.blood_parameters_schemas import (
@@ -139,8 +139,25 @@ class ReportsService:
             raise RuntimeError("Audit service is required")
         return self._audit_service
 
-    async def _load_health_parameters_catalog(self, db: AsyncSession):
-        return await self._diagnostics_service.list_parameters(db)
+    async def _get_individual_report(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+        assessment_instance_id: int | None = None,
+    ) -> IndividualHealthReport | None:
+        report = await self._repository.get_individual_report_by_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        if report is None and assessment_instance_id is not None:
+            report = await self._repository.get_individual_report_by_assessment(
+                db,
+                assessment_instance_id=assessment_instance_id,
+            )
+        return report
 
     async def _persist_provider_blood_data(
         self,
@@ -148,14 +165,21 @@ class ReportsService:
         *,
         individual_report: IndividualHealthReport | None,
         assessment_instance: AssessmentInstance,
+        diagnostic_package_id: int,
         raw_customer: dict[str, Any],
     ) -> IndividualHealthReport:
-        catalog = await self._load_health_parameters_catalog(db)
-        canonical, raw = normalize_from_healthians(raw_customer, catalog=catalog)
-        if not has_usable_provider_blood_parameters(canonical):
+        package_tests = await self._diagnostics_service.get_package_tests(
+            db=db,
+            package_id=diagnostic_package_id,
+        )
+        grouped, raw = build_grouped_from_healthians(
+            raw_customer,
+            package_groups=package_tests.groups,
+        )
+        if not has_usable_provider_blood_parameters(grouped):
             logger.warning(
-                "Healthians normalize produced empty parameters for assessment_instance_id=%s",
-                assessment_instance.assessment_instance_id,
+                "Healthians normalize produced empty parameters for engagement_id=%s",
+                assessment_instance.engagement_id,
             )
         if individual_report is None:
             individual_report = IndividualHealthReport(
@@ -163,13 +187,15 @@ class ReportsService:
                 engagement_id=assessment_instance.engagement_id,
                 assessment_instance_id=assessment_instance.assessment_instance_id,
                 reports=None,
-                blood_parameters=canonical,
+                blood_parameters=grouped,
                 blood_report_raw=raw,
             )
             await self._repository.create_individual_report(db, individual_report)
         else:
-            individual_report.blood_parameters = canonical
+            individual_report.blood_parameters = grouped
             individual_report.blood_report_raw = raw
+            if individual_report.assessment_instance_id is None:
+                individual_report.assessment_instance_id = assessment_instance.assessment_instance_id
             await self._repository.update_individual_report(db, individual_report)
         return individual_report
 
@@ -373,8 +399,10 @@ class ReportsService:
             )
 
         # --- load_from=provider (default) ---
-        existing_report = await self._repository.get_individual_report_by_assessment(
+        existing_report = await self._get_individual_report(
             db,
+            user_id=user_id,
+            engagement_id=int(assessment_instance.engagement_id),
             assessment_instance_id=assessment_id,
         )
 
@@ -402,6 +430,7 @@ class ReportsService:
                     db,
                     individual_report=existing_report,
                     assessment_instance=assessment_instance,
+                    diagnostic_package_id=diagnostic_package_id,
                     raw_customer=raw_customer,
                 )
                 await self._require_audit_service().log_event(
@@ -413,8 +442,10 @@ class ReportsService:
                     user_id=user_id,
                     session_id=None,
                 )
-                refreshed = await self._repository.get_individual_report_by_assessment(
+                refreshed = await self._get_individual_report(
                     db,
+                    user_id=user_id,
+                    engagement_id=int(assessment_instance.engagement_id),
                     assessment_instance_id=assessment_id,
                 )
                 cached = refreshed.blood_parameters if refreshed is not None else None
@@ -450,6 +481,78 @@ class ReportsService:
             user_gender=normalized_gender,
         )
 
+    async def get_blood_parameters_for_user_by_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        user_id: int,
+        user_gender: str | None,
+        user_first_name: str = "",
+        user_last_name: str = "",
+        load_from: str = "provider",
+        reload: int = 0,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> Any:
+        """Resolve blood parameters for the current user via engagement_id."""
+        instances = await self._assessments_repository.list_instances_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        if not instances:
+            # Serve engagement-cached blood when no assessment instance exists.
+            existing_report = await self._repository.get_individual_report_by_engagement(
+                db,
+                user_id=user_id,
+                engagement_id=engagement_id,
+            )
+            if (
+                existing_report is not None
+                and has_usable_provider_blood_parameters(existing_report.blood_parameters)
+            ):
+                stored = self._blood_read_service.groups_from_stored(existing_report.blood_parameters)
+                if stored is not None:
+                    await self._require_audit_service().log_event(
+                        db,
+                        action="USER_FETCH_BLOOD_PARAMETERS_REPORT",
+                        endpoint=endpoint,
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        user_id=user_id,
+                        session_id=None,
+                    )
+                    return stored
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="No assessment or blood report found for this engagement",
+            )
+
+        # Prefer instances with a Metsights record id (provider booking link).
+        assessment_instance = instances[0]
+        for inst in instances:
+            record_id = (inst.metsights_record_id or "").strip()
+            if record_id:
+                assessment_instance = inst
+                break
+
+        return await self.get_blood_parameters_for_user(
+            db,
+            assessment_id=int(assessment_instance.assessment_instance_id),
+            user_id=user_id,
+            user_gender=user_gender,
+            user_first_name=user_first_name,
+            user_last_name=user_last_name,
+            load_from=load_from,
+            reload=reload,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            endpoint=endpoint,
+        )
+
     async def get_diagnostic_pdf_for_user(
         self,
         db: AsyncSession,
@@ -470,8 +573,10 @@ class ReportsService:
 
         assessment_instance, _package, _engagement = row
 
-        existing_report = await self._repository.get_individual_report_by_assessment(
+        existing_report = await self._get_individual_report(
             db,
+            user_id=user_id,
+            engagement_id=int(assessment_instance.engagement_id),
             assessment_instance_id=assessment_id,
         )
 
@@ -558,8 +663,10 @@ class ReportsService:
                 message="Assessment package is missing",
             )
 
-        existing_report = await self._repository.get_individual_report_by_assessment(
+        existing_report = await self._get_individual_report(
             db,
+            user_id=user_id,
+            engagement_id=int(assessment_instance.engagement_id),
             assessment_instance_id=assessment_id,
         )
 
@@ -783,11 +890,14 @@ class ReportsService:
                     db,
                     individual_report=individual_report,
                     assessment_instance=assessment_instance,
+                    diagnostic_package_id=diagnostic_package_id,
                     raw_customer=raw_customer,
                 )
-                refreshed = await self._repository.get_individual_report_by_assessment(
+                refreshed = await self._get_individual_report(
                     db,
-                    assessment_instance_id=assessment_instance.assessment_instance_id,
+                    user_id=int(assessment_instance.user_id),
+                    engagement_id=int(assessment_instance.engagement_id),
+                    assessment_instance_id=int(assessment_instance.assessment_instance_id),
                 )
                 if refreshed is not None and has_usable_provider_blood_parameters(
                     refreshed.blood_parameters
@@ -910,8 +1020,10 @@ class ReportsService:
                 message="FitPrint report overview is not allowed",
             )
 
-        individual_report = await self._repository.get_individual_report_by_assessment(
+        individual_report = await self._get_individual_report(
             db,
+            user_id=user_id,
+            engagement_id=int(assessment_instance.engagement_id),
             assessment_instance_id=assessment_id,
         )
 
@@ -932,8 +1044,10 @@ class ReportsService:
             cache_on_fetch=True,
         )
         if individual_report is None:
-            individual_report = await self._repository.get_individual_report_by_assessment(
+            individual_report = await self._get_individual_report(
                 db,
+                user_id=user_id,
+                engagement_id=int(assessment_instance.engagement_id),
                 assessment_instance_id=assessment_id,
             )
 
@@ -1032,8 +1146,10 @@ class ReportsService:
                 message="Assessment package is missing",
             )
 
-        existing_report = await self._repository.get_individual_report_by_assessment(
+        existing_report = await self._get_individual_report(
             db,
+            user_id=user_id,
+            engagement_id=int(assessment_instance.engagement_id),
             assessment_instance_id=assessment_id,
         )
 
@@ -1600,8 +1716,10 @@ class ReportsService:
             )
 
         # Step 2: Get or fetch the FitPrint report (cache in individual_health_report)
-        existing_report = await self._repository.get_individual_report_by_assessment(
+        existing_report = await self._get_individual_report(
             db,
+            user_id=user_id,
+            engagement_id=int(assessment_instance.engagement_id),
             assessment_instance_id=assessment_instance_id,
         )
 
@@ -1777,9 +1895,12 @@ class ReportsService:
         hp = await self._diagnostics_service.get_health_parameter_by_parameter_key(
             db, parameter_key=parameter_key,
         )
-        healthians_pid: int | None = hp.healthians_parameter_id if hp is not None else None
+        external_pid: int | None = hp.external_parameter_id if hp is not None else None
 
-        from modules.reports.blood_parameters_schemas import is_legacy_metsights_flat_format
+        from modules.reports.blood_parameters_schemas import (
+            is_grouped_blood_parameters,
+            is_legacy_metsights_flat_format,
+        )
 
         unit_key = f"{parameter_key}_unit"
         data_points: list[dict[str, Any]] = []
@@ -1816,13 +1937,17 @@ class ReportsService:
             numeric_value: float | None = None
             entry_unit: str | None = None
 
-            if isinstance(blood_parameters, dict):
+            if is_grouped_blood_parameters(blood_parameters) or isinstance(blood_parameters, dict):
                 numeric_value, entry_unit = await self._blood_read_service.extract_provider_parameter(
                     blood_parameters,
                     parameter_key=parameter_key,
-                    healthians_parameter_id=healthians_pid,
+                    external_parameter_id=external_pid,
                 )
-                if numeric_value is None and is_legacy_metsights_flat_format(blood_parameters):
+                if (
+                    numeric_value is None
+                    and isinstance(blood_parameters, dict)
+                    and is_legacy_metsights_flat_format(blood_parameters)
+                ):
                     raw_value = blood_parameters.get(parameter_key)
                     if raw_value is not None:
                         try:

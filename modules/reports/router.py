@@ -79,6 +79,33 @@ async def get_risk_analysis(
     return success_response(result.model_dump())
 
 
+@router.get("/engagement/{engagement_id}/blood-parameters")
+async def get_blood_parameters_report_by_engagement(
+    engagement_id: int,
+    request: Request,
+    load_from: str = Query(default="provider", pattern="^(provider|metsights)$"),
+    reload: int = Query(default=0, ge=0, le=1),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    reports_service: ReportsService = Depends(get_reports_service),
+):
+    blood_parameter_groups = await reports_service.get_blood_parameters_for_user_by_engagement(
+        db,
+        engagement_id=engagement_id,
+        user_id=user.user_id,
+        user_gender=user.gender,
+        user_first_name=getattr(user, "first_name", "") or "",
+        user_last_name=getattr(user, "last_name", "") or "",
+        load_from=load_from,
+        reload=reload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response([group.model_dump() for group in blood_parameter_groups])
+
+
 @router.get("/{assessment_id}/blood-parameters")
 async def get_blood_parameters_report(
     assessment_id: int,

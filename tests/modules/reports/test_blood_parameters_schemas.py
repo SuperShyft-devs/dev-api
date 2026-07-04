@@ -1,11 +1,11 @@
 """Tests for blood_parameters schema helpers."""
 
 from modules.reports.blood_parameters_schemas import (
-    describe_blood_parameters_blob,
     extract_healthians_customer_blob,
     has_usable_provider_blood_parameters,
     is_canonical_blood_parameters,
     is_empty_blood_parameters,
+    is_grouped_blood_parameters,
     is_legacy_healthians_format,
     is_legacy_metsights_flat_format,
     is_metsights_metadata_only,
@@ -48,6 +48,26 @@ def test_healthians_envelope_extraction():
     assert extract_healthians_customer_blob(envelope) == customer
 
 
+def test_grouped_detection():
+    blob = [
+        {
+            "group_name": "CBC",
+            "test_count": 1,
+            "tests": [
+                {
+                    "test_id": 1,
+                    "parameter_type": "test",
+                    "test_name": "Haemoglobin",
+                    "parameter_key": "haemoglobin",
+                    "value": 13.2,
+                }
+            ],
+        }
+    ]
+    assert is_grouped_blood_parameters(blob) is True
+    assert is_canonical_blood_parameters(blob) is False
+
+
 def test_has_usable_provider_blood_parameters():
     assert has_usable_provider_blood_parameters(None) is False
     assert has_usable_provider_blood_parameters({}) is False
@@ -66,6 +86,24 @@ def test_has_usable_provider_blood_parameters():
     ) is True
     assert has_usable_provider_blood_parameters(
         {"haemoglobin": 12.0, "haemoglobin_unit": "g/dL"}
+    ) is True
+    assert has_usable_provider_blood_parameters(
+        [
+            {
+                "group_name": "CBC",
+                "test_count": 1,
+                "tests": [{"test_id": 1, "test_name": "Hb", "value": None}],
+            }
+        ]
+    ) is False
+    assert has_usable_provider_blood_parameters(
+        [
+            {
+                "group_name": "CBC",
+                "test_count": 1,
+                "tests": [{"test_id": 1, "test_name": "Hb", "value": 13.2}],
+            }
+        ]
     ) is True
 
 

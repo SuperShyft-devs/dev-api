@@ -526,12 +526,10 @@ class UsersRepository:
                     AssessmentCategoryProgress.assessment_instance_id.in_(assessment_instance_ids)
                 )
             )
-            await db.execute(
-                delete(IndividualHealthReport).where(
-                    IndividualHealthReport.assessment_instance_id.in_(assessment_instance_ids)
-                )
-            )
 
+        await db.execute(
+            delete(IndividualHealthReport).where(IndividualHealthReport.user_id.in_(user_ids))
+        )
         await db.execute(delete(ReportsUserSyncState).where(ReportsUserSyncState.user_id.in_(user_ids)))
 
         # Payments / checkout: bookings belong to this user, but orders.user_id may be another
@@ -627,7 +625,7 @@ class UsersRepository:
                     )
                     await db.execute(
                         delete(IndividualHealthReport).where(
-                            IndividualHealthReport.assessment_instance_id.in_(orphan_assessment_ids)
+                            IndividualHealthReport.engagement_id.in_(orphan_engagement_ids)
                         )
                     )
                     await db.execute(

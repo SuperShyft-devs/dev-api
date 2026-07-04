@@ -165,7 +165,7 @@ class TagResponse(BaseModel):
 class HealthParameterCreate(BaseModel):
     parameter_type: ParameterType = ParameterType.TEST
     test_name: str = Field(min_length=1)
-    healthians_parameter_id: Optional[int] = None
+    external_parameter_id: Optional[int] = None
     parameter_key: Optional[str] = None
     unit: Optional[str] = None
     meaning: Optional[str] = None
@@ -198,7 +198,7 @@ class HealthParameterCreate(BaseModel):
 class HealthParameterUpdate(BaseModel):
     parameter_type: Optional[ParameterType] = None
     test_name: Optional[str] = None
-    healthians_parameter_id: Optional[int] = None
+    external_parameter_id: Optional[int] = None
     parameter_key: Optional[str] = None
     unit: Optional[str] = None
     meaning: Optional[str] = None
@@ -234,7 +234,7 @@ class HealthParameterResponse(BaseModel):
     test_id: int
     parameter_type: ParameterType
     test_name: str
-    healthians_parameter_id: Optional[int] = None
+    external_parameter_id: Optional[int] = None
     parameter_key: Optional[str] = None
     unit: Optional[str] = None
     meaning: Optional[str] = None

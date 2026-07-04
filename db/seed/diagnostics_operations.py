@@ -147,7 +147,7 @@ async def _apply_health_parameter_row(session: AsyncSession, raw: dict[str, str 
         _bool_cell(imp_hp) if imp_hp is not None and str(imp_hp).strip() != "" else False
     )
     row.gender_suitability = _str_or_none(raw.get("gender_suitability"))
-    row.healthians_parameter_id = _int(raw.get("healthians_parameter_id"))
+    row.external_parameter_id = _int(raw.get("external_parameter_id"))
 
     def _txt(key: str) -> str | None:
         v = raw.get(key)

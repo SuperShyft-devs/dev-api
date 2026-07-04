@@ -1452,7 +1452,7 @@ class CampReportsService:
 
     @staticmethod
     def _extract_test_value_and_range(
-        blood_params: dict[str, Any],
+        blood_params: Any,
         test,
         gender: str | None,
     ) -> tuple[float | None, float | None, float | None]:
@@ -1460,11 +1460,12 @@ class CampReportsService:
         from modules.reports.blood_parameters_read_service import BloodParametersReadService
         from modules.reports.blood_parameters_schemas import (
             is_canonical_blood_parameters,
+            is_grouped_blood_parameters,
             is_legacy_healthians_format,
             is_legacy_metsights_flat_format,
         )
 
-        if is_canonical_blood_parameters(blood_params):
+        if is_grouped_blood_parameters(blood_params) or is_canonical_blood_parameters(blood_params):
             return BloodParametersReadService.extract_canonical_value_and_range(
                 blood_params,
                 parameter_key=test.parameter_key,
@@ -1507,12 +1508,12 @@ class CampReportsService:
         value = None
         lower_range = None
         higher_range = None
-        healthians_pid = test.healthians_parameter_id
-        if healthians_pid is None:
+        external_pid = test.external_parameter_id
+        if external_pid is None:
             return None, None, None
         for entry in blood_params["digital_data"]:
             entry_pid = entry.get("parameter_id")
-            if entry_pid is not None and str(entry_pid) == str(healthians_pid):
+            if entry_pid is not None and str(entry_pid) == str(external_pid):
                 raw_val = entry.get("value")
                 if raw_val is not None:
                     try:
