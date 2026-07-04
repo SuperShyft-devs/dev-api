@@ -35,6 +35,11 @@ from db.seed.blood_parameters_registry import (
     ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
     BLOOD_PARAMETER_CATEGORY_KEY,
 )
+from modules.reports.camp_report_section_builders import (
+    extract_diseases,
+    extract_metabolic_age,
+    extract_metabolic_score,
+)
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.reports.repository import ReportsRepository
 from modules.users.models import User
@@ -759,8 +764,7 @@ class ReportsService:
         limit: int = 3,
     ) -> list[DiseaseOverview]:
         """Healthy diseases from a Metsights report, lowest risk_score_scaled first."""
-        dis = report_dict.get("diseases", [])
-        diseases_raw: list[Any] = dis if isinstance(dis, list) else []
+        diseases_raw = extract_diseases(report_dict)
         positive_wins_list: list[DiseaseOverview] = []
         for d in diseases_raw:
             if not isinstance(d, dict):
@@ -798,7 +802,9 @@ class ReportsService:
         """Return Metsights report JSON for an assessment, optionally persisting a fetch."""
         if individual_report is not None and individual_report.reports is not None:
             report_data = individual_report.reports
-            return report_data if isinstance(report_data, dict) else {}
+            # Non-empty dict only — empty {} must not block a Metsights refresh.
+            if isinstance(report_data, dict) and report_data:
+                return report_data
 
         record_id = (assessment_instance.metsights_record_id or "").strip()
         if not record_id:
@@ -1051,15 +1057,10 @@ class ReportsService:
                 assessment_instance_id=assessment_id,
             )
 
-        ma = report_dict.get("metabolic_age")
-        if isinstance(ma, (int, float)):
-            metabolic_age = float(ma)
-        else:
-            metabolic_age = None
+        metabolic_age = extract_metabolic_age(report_dict)
         if assessment_id in _OVERVIEW_METABOLIC_AGE_OVERRIDES:
             metabolic_age = _OVERVIEW_METABOLIC_AGE_OVERRIDES[assessment_id]
-        dis = report_dict.get("diseases", [])
-        diseases_raw: list[Any] = dis if isinstance(dis, list) else []
+        diseases_raw = extract_diseases(report_dict)
 
         positive_wins_list = self._top_low_risk_from_report_dict(report_dict)
         risk_analysis_list: list[RiskAnalysisItem] = []
@@ -1153,7 +1154,7 @@ class ReportsService:
             assessment_instance_id=assessment_id,
         )
 
-        if existing_report is not None and existing_report.reports is not None:
+        if existing_report is not None and isinstance(existing_report.reports, dict) and existing_report.reports:
             return existing_report.reports
 
         record_id = (assessment_instance.metsights_record_id or "").strip()
@@ -1220,14 +1221,9 @@ class ReportsService:
         )
 
         report_dict = report_data if isinstance(report_data, dict) else {}
-        ms = report_dict.get("metabolic_score")
-        if isinstance(ms, (int, float)):
-            metabolic_score = float(ms)
-        else:
-            metabolic_score = None
+        metabolic_score = extract_metabolic_score(report_dict)
 
-        raw_diseases = report_dict.get("diseases", [])
-        diseases_raw: list[Any] = raw_diseases if isinstance(raw_diseases, list) else []
+        diseases_raw = extract_diseases(report_dict)
         diseases: list[DiseaseListItem] = []
         for d in diseases_raw:
             if not isinstance(d, dict):
@@ -1281,8 +1277,7 @@ class ReportsService:
         )
 
         report_dict = report_data if isinstance(report_data, dict) else {}
-        raw_diseases = report_dict.get("diseases", [])
-        diseases_raw: list[Any] = raw_diseases if isinstance(raw_diseases, list) else []
+        diseases_raw = extract_diseases(report_dict)
 
         matched: dict[str, Any] | None = None
         for d in diseases_raw:
@@ -2178,8 +2173,7 @@ class ReportsService:
             if report_data is None:
                 continue
             report_dict = report_data if isinstance(report_data, dict) else {}
-            raw_diseases = report_dict.get("diseases", [])
-            diseases_raw: list[Any] = raw_diseases if isinstance(raw_diseases, list) else []
+            diseases_raw = extract_diseases(report_dict)
 
             matched = self._find_matching_disease_entry(diseases_raw, disease_key=disease_key)
             if matched is None:
