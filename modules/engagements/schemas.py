@@ -24,7 +24,13 @@ class EngagementCreateRequest(BaseModel):
     diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
     city: Optional[str] = Field(default=None, max_length=100)
     address: Optional[str] = Field(default=None, max_length=500)
+    sub_locality: Optional[str] = Field(default=None, max_length=200)
+    landmark: Optional[str] = Field(default=None, max_length=200)
     pincode: Optional[str] = Field(default=None, max_length=20)
+    state: Optional[str] = Field(default=None, max_length=100)
+    country: Optional[str] = Field(default=None, max_length=100)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     slot_duration: int = Field(gt=0, le=480)
     start_date: date
     end_date: date
@@ -50,7 +56,13 @@ class EngagementUpdateRequest(BaseModel):
     diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
     city: Optional[str] = Field(default=None, max_length=100)
     address: Optional[str] = Field(default=None, max_length=500)
+    sub_locality: Optional[str] = Field(default=None, max_length=200)
+    landmark: Optional[str] = Field(default=None, max_length=200)
     pincode: Optional[str] = Field(default=None, max_length=20)
+    state: Optional[str] = Field(default=None, max_length=100)
+    country: Optional[str] = Field(default=None, max_length=100)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     slot_duration: int = Field(gt=0, le=480)
     start_date: date
     end_date: date
@@ -82,7 +94,13 @@ class EngagementListItem(BaseModel):
     diagnostic_package_id: Optional[int] = None
     city: Optional[str] = None
     address: Optional[str] = None
+    sub_locality: Optional[str] = None
+    landmark: Optional[str] = None
     pincode: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     slot_duration: Optional[int] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None

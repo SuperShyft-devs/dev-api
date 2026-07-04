@@ -356,7 +356,13 @@ class EngagementsService:
             diagnostic_package_id=diagnostic_package_id,
             city=payload.city,
             address=payload.address,
+            sub_locality=payload.sub_locality,
+            landmark=payload.landmark,
             pincode=payload.pincode,
+            state=payload.state,
+            country=payload.country,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
             slot_duration=payload.slot_duration,
             start_date=payload.start_date,
             end_date=payload.end_date,
@@ -530,7 +536,13 @@ class EngagementsService:
         engagement.diagnostic_package_id = payload.diagnostic_package_id
         engagement.city = payload.city
         engagement.address = payload.address
+        engagement.sub_locality = payload.sub_locality
+        engagement.landmark = payload.landmark
         engagement.pincode = payload.pincode
+        engagement.state = payload.state
+        engagement.country = payload.country
+        engagement.latitude = payload.latitude
+        engagement.longitude = payload.longitude
         engagement.slot_duration = payload.slot_duration
         engagement.start_date = payload.start_date
         engagement.end_date = payload.end_date
@@ -663,7 +675,13 @@ class EngagementsService:
         diagnostic_package_id: int | None = None,
         engagement_type: EngagementKind = EngagementKind.bio_ai,
         address: str | None = None,
+        sub_locality: str | None = None,
+        landmark: str | None = None,
         pincode: str | None = None,
+        state: str | None = None,
+        country: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
         create_profile_on_metsights: bool = False,
         enroll_for_fitprint_full: bool = False,
     ) -> Engagement:
@@ -671,9 +689,27 @@ class EngagementsService:
 
         B2C engagements are created automatically during public user onboarding.
         Onboarding assistant assignments can be added later if needed.
+
+        When location fields are incomplete and an address (or address parts) is
+        available, missing fields are filled via Nominatim. Geocode failures are
+        ignored so engagement creation is never blocked.
         """
+        from modules.geocoding.client import enrich_location_fields
+
         name_part = (user_first_name or "user").strip() or "user"
         engagement_name = f"{name_part}-{engagement_date.isoformat()}"
+
+        location = await enrich_location_fields(
+            address=address,
+            sub_locality=sub_locality,
+            landmark=landmark,
+            city=city,
+            pincode=pincode,
+            state=state,
+            country=country,
+            latitude=latitude,
+            longitude=longitude,
+        )
 
         engagement = Engagement(
             engagement_name=engagement_name,
@@ -684,9 +720,15 @@ class EngagementsService:
             engagement_type=engagement_type,
             assessment_package_id=assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
-            city=city,
-            address=address,
-            pincode=pincode,
+            city=location.get("city"),
+            address=location.get("address"),
+            sub_locality=location.get("sub_locality"),
+            landmark=location.get("landmark"),
+            pincode=location.get("pincode"),
+            state=location.get("state"),
+            country=location.get("country"),
+            latitude=location.get("latitude"),
+            longitude=location.get("longitude"),
             slot_duration=20,
             start_date=engagement_date,
             end_date=engagement_date,
@@ -702,6 +744,7 @@ class EngagementsService:
             bioai_report_notification=None,
         )
         engagement = await self._repository.create_engagement(db, engagement)
+
 
         for emp_id in _B2C_DEFAULT_ONBOARDING_ASSISTANT_EMPLOYEE_IDS:
             assignment = OnboardingAssistantAssignment(

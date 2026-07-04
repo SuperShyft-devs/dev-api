@@ -825,7 +825,13 @@ class UsersService:
             diagnostic_package_id=diagnostic_package_id,
             engagement_type=EngagementKind.bio_ai,
             address=meta.get("address"),
+            sub_locality=meta.get("sub_locality"),
+            landmark=meta.get("landmark"),
             pincode=meta.get("pincode"),
+            state=meta.get("state"),
+            country=meta.get("country"),
+            latitude=meta.get("latitude"),
+            longitude=meta.get("longitude"),
             create_profile_on_metsights=True,
             enroll_for_fitprint_full=True,
         )
@@ -996,7 +1002,13 @@ class UsersService:
             diagnostic_package_id=diagnostic_package_id,
             engagement_type=EngagementKind.diagnostic,
             address=meta.get("address"),
+            sub_locality=meta.get("sub_locality"),
+            landmark=meta.get("landmark"),
             pincode=meta.get("pincode"),
+            state=meta.get("state"),
+            country=meta.get("country"),
+            latitude=meta.get("latitude"),
+            longitude=meta.get("longitude"),
             create_profile_on_metsights=False,
             enroll_for_fitprint_full=False,
         )
@@ -1709,7 +1721,13 @@ class UsersService:
             diagnostic_package_id=diagnostic_package_id,
             engagement_type=EngagementKind.bio_ai,
             address=payload.address,
+            sub_locality=getattr(payload, "sub_locality", None),
+            landmark=getattr(payload, "landmark", None),
             pincode=payload.pincode,
+            state=getattr(payload, "state", None),
+            country=getattr(payload, "country", None),
+            latitude=getattr(payload, "latitude", None),
+            longitude=getattr(payload, "longitude", None),
         )
 
         slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
@@ -2536,6 +2554,8 @@ class UsersService:
                     engagement_type=EngagementKind.bio_ai,
                     address=user.address,
                     pincode=user.pin_code,
+                    state=getattr(user, "state", None),
+                    country=getattr(user, "country", None),
                     create_profile_on_metsights=True,
                     enroll_for_fitprint_full=False,
                 )

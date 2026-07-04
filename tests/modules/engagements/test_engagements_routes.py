@@ -163,7 +163,94 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
+async def test_create_engagement_persists_location_fields(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7012, employee_id=18)
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    payload = {
+        "engagement_name": "Location Camp",
+        "organization_id": 1,
+        "engagement_type": "bio_ai",
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "address": "Marol Naka, Andheri",
+        "sub_locality": "Saki Naka",
+        "landmark": "Marol Naka (Line 1)",
+        "city": "Mumbai",
+        "pincode": "400072",
+        "state": "Maharashtra",
+        "country": "India",
+        "latitude": 19.1083663,
+        "longitude": 72.8788727,
+        "slot_duration": 20,
+        "start_date": "2026-02-01",
+        "end_date": "2026-02-02",
+    }
+
+    response = await async_client.post("/engagements", headers=_auth_header(7012), json=payload)
+    assert response.status_code == 201
+    engagement_id = response.json()["data"]["engagement_id"]
+
+    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7012))
+    assert details.status_code == 200
+    data = details.json()["data"]
+    assert data["address"] == "Marol Naka, Andheri"
+    assert data["sub_locality"] == "Saki Naka"
+    assert data["landmark"] == "Marol Naka (Line 1)"
+    assert data["city"] == "Mumbai"
+    assert data["pincode"] == "400072"
+    assert data["state"] == "Maharashtra"
+    assert data["country"] == "India"
+    assert data["latitude"] == pytest.approx(19.1083663)
+    assert data["longitude"] == pytest.approx(72.8788727)
+
+    listed = await async_client.get("/engagements", headers=_auth_header(7012))
+    assert listed.status_code == 200
+    row = next(item for item in listed.json()["data"] if item["engagement_id"] == engagement_id)
+    assert row["sub_locality"] == "Saki Naka"
+    assert row["state"] == "Maharashtra"
+    assert row["latitude"] == pytest.approx(19.1083663)
+
+    update_payload = {
+        "engagement_name": "Location Camp",
+        "engagement_code": data["engagement_code"],
+        "organization_id": 1,
+        "engagement_type": "bio_ai",
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "address": "Updated Address",
+        "sub_locality": "Andheri East",
+        "landmark": "Metro Station",
+        "city": "Mumbai",
+        "pincode": "400093",
+        "state": "Maharashtra",
+        "country": "India",
+        "latitude": 19.12,
+        "longitude": 72.88,
+        "slot_duration": 20,
+        "start_date": "2026-02-01",
+        "end_date": "2026-02-02",
+    }
+    updated = await async_client.put(
+        f"/engagements/{engagement_id}", headers=_auth_header(7012), json=update_payload
+    )
+    assert updated.status_code == 200
+
+    details2 = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7012))
+    data2 = details2.json()["data"]
+    assert data2["address"] == "Updated Address"
+    assert data2["sub_locality"] == "Andheri East"
+    assert data2["landmark"] == "Metro Station"
+    assert data2["pincode"] == "400093"
+    assert data2["latitude"] == pytest.approx(19.12)
+    assert data2["longitude"] == pytest.approx(72.88)
+
+
+@pytest.mark.asyncio
 async def test_create_engagement_sets_camp_no_for_org_8(async_client, test_db_session):
+
     await _seed_employee(test_db_session, user_id=7010, employee_id=16)
     await _seed_organization(test_db_session, organization_id=8, name="Org Eight")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")

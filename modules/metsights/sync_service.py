@@ -889,6 +889,8 @@ class MetsightsSyncService:
                     engagement_type=EngagementKind.bio_ai,
                     address=user.address,
                     pincode=user.pin_code,
+                    state=getattr(user, "state", None),
+                    country=getattr(user, "country", None),
                 )
             else:
                 if engagement.assessment_package_id is None or int(engagement.assessment_package_id) != int(package.package_id):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import BigInteger, Boolean, Column, Date, Enum as SAEnum, ForeignKey, Integer, String, Time, UniqueConstraint, Index
+from sqlalchemy import BigInteger, Boolean, Column, Date, Enum as SAEnum, Float, ForeignKey, Integer, String, Time, UniqueConstraint, Index
 
 from db.base import Base
 from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
@@ -44,8 +44,14 @@ class Engagement(Base):
     assessment_package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=True)
     diagnostic_package_id = Column(Integer, ForeignKey("diagnostic_package.diagnostic_package_id"), nullable=True)
     address = Column(String, nullable=True)
+    sub_locality = Column(String, nullable=True)
+    landmark = Column(String, nullable=True)
     pincode = Column(String, nullable=True)
     city = Column(String)
+    state = Column(String, nullable=True)
+    country = Column(String, nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     slot_duration = Column(Integer)
     start_date = Column(Date)
     end_date = Column(Date)

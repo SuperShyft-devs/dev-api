@@ -25,7 +25,9 @@ from modules.engagements.schemas import (
     EngagementUpdateRequest,
     OnboardingAssistantsAddRequest,
 )
+from modules.engagements.models import Engagement
 from modules.engagements.service import EngagementsService
+
 router = APIRouter(prefix="/engagements", tags=["engagements"])
 
 
@@ -38,6 +40,46 @@ def _client_ip(request: Request) -> str:
         return "unknown"
 
     return request.client.host
+
+
+def _engagement_to_dict(engagement: Engagement, *, readiness=None) -> dict:
+    data = {
+        "engagement_id": engagement.engagement_id,
+        "engagement_name": engagement.engagement_name,
+        "metsights_engagement_id": engagement.metsights_engagement_id,
+        "organization_id": engagement.organization_id,
+        "camp_no": engagement.camp_no,
+        "engagement_code": engagement.engagement_code,
+        "engagement_type": engagement.engagement_type.value if engagement.engagement_type else None,
+        "assessment_package_id": engagement.assessment_package_id,
+        "diagnostic_package_id": engagement.diagnostic_package_id,
+        "city": engagement.city,
+        "address": engagement.address,
+        "sub_locality": engagement.sub_locality,
+        "landmark": engagement.landmark,
+        "pincode": engagement.pincode,
+        "state": engagement.state,
+        "country": engagement.country,
+        "latitude": engagement.latitude,
+        "longitude": engagement.longitude,
+        "slot_duration": engagement.slot_duration,
+        "start_date": engagement.start_date,
+        "end_date": engagement.end_date,
+        "status": engagement.status,
+        "participant_count": engagement.participant_count,
+        "create_profile_on_metsights": engagement.create_profile_on_metsights,
+        "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
+        "notification_service_key": engagement.notification_service_key,
+        "pretest_guidelines_notification": engagement.pretest_guidelines_notification,
+        "questionnaire_reminder_1": engagement.questionnaire_reminder_1,
+        "questionnaire_reminder_2": engagement.questionnaire_reminder_2,
+        "blood_report_notification": engagement.blood_report_notification,
+        "bioai_report_notification": engagement.bioai_report_notification,
+    }
+    if readiness is not None:
+        data["readiness"] = readiness.model_dump(mode="json")
+    return data
+
 
 
 @router.post("", status_code=201)
@@ -107,41 +149,13 @@ async def list_engagements(
         sort_dir=sort_dir,
     )
 
-    data = []
-    for engagement in engagements:
-        readiness = readiness_by_id[engagement.engagement_id]
-        data.append(
-            {
-                "engagement_id": engagement.engagement_id,
-                "engagement_name": engagement.engagement_name,
-                "metsights_engagement_id": engagement.metsights_engagement_id,
-                "organization_id": engagement.organization_id,
-                "camp_no": engagement.camp_no,
-                "engagement_code": engagement.engagement_code,
-                "engagement_type": engagement.engagement_type.value if engagement.engagement_type else None,
-                "assessment_package_id": engagement.assessment_package_id,
-                "diagnostic_package_id": engagement.diagnostic_package_id,
-                "city": engagement.city,
-                "address": engagement.address,
-                "pincode": engagement.pincode,
-                "slot_duration": engagement.slot_duration,
-                "start_date": engagement.start_date,
-                "end_date": engagement.end_date,
-                "status": engagement.status,
-                "participant_count": engagement.participant_count,
-                "create_profile_on_metsights": engagement.create_profile_on_metsights,
-                "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
-                "notification_service_key": engagement.notification_service_key,
-                "pretest_guidelines_notification": engagement.pretest_guidelines_notification,
-                "questionnaire_reminder_1": engagement.questionnaire_reminder_1,
-                "questionnaire_reminder_2": engagement.questionnaire_reminder_2,
-                "blood_report_notification": engagement.blood_report_notification,
-                "bioai_report_notification": engagement.bioai_report_notification,
-                "readiness": readiness.model_dump(mode="json"),
-            }
-        )
+    data = [
+        _engagement_to_dict(engagement, readiness=readiness_by_id[engagement.engagement_id])
+        for engagement in engagements
+    ]
 
     return success_response(data, meta={"page": page, "limit": limit, "total": total})
+
 
 
 @router.get("/{engagement_id}")
@@ -157,35 +171,8 @@ async def get_engagement_details(
         engagement_id=engagement_id,
     )
 
-    return success_response(
-        {
-            "engagement_id": engagement.engagement_id,
-            "engagement_name": engagement.engagement_name,
-            "metsights_engagement_id": engagement.metsights_engagement_id,
-            "organization_id": engagement.organization_id,
-            "camp_no": engagement.camp_no,
-            "engagement_code": engagement.engagement_code,
-            "engagement_type": engagement.engagement_type.value if engagement.engagement_type else None,
-            "assessment_package_id": engagement.assessment_package_id,
-            "diagnostic_package_id": engagement.diagnostic_package_id,
-            "city": engagement.city,
-            "address": engagement.address,
-            "pincode": engagement.pincode,
-            "slot_duration": engagement.slot_duration,
-            "start_date": engagement.start_date,
-            "end_date": engagement.end_date,
-            "status": engagement.status,
-            "participant_count": engagement.participant_count,
-            "create_profile_on_metsights": engagement.create_profile_on_metsights,
-            "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
-            "notification_service_key": engagement.notification_service_key,
-            "pretest_guidelines_notification": engagement.pretest_guidelines_notification,
-            "questionnaire_reminder_1": engagement.questionnaire_reminder_1,
-            "questionnaire_reminder_2": engagement.questionnaire_reminder_2,
-            "blood_report_notification": engagement.blood_report_notification,
-            "bioai_report_notification": engagement.bioai_report_notification,
-        }
-    )
+    return success_response(_engagement_to_dict(engagement))
+
 
 
 @router.put("/{engagement_id}")

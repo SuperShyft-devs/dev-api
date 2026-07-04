@@ -38,6 +38,8 @@ from modules.experts.router import router as experts_router
 from modules.admin_temp.router import router as admin_temp_router
 from modules.notifications.router import router as notifications_router
 from modules.audit.router import router as audit_router
+from modules.geocoding.router import router as geocode_router
+
 
 # Configure logging
 configure_logging()
@@ -118,6 +120,8 @@ app.include_router(experts_router)
 app.include_router(admin_temp_router)
 app.include_router(notifications_router)
 app.include_router(audit_router)
+app.include_router(geocode_router)
+
 
 _media_root = Path(settings.MEDIA_ROOT)
 _media_root.mkdir(parents=True, exist_ok=True)
