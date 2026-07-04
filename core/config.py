@@ -106,6 +106,10 @@ class Settings:
     HEALTHIANS_API_KEY: str = os.getenv("HEALTHIANS_API_KEY", "")
     HEALTHIANS_SECRET_KEY: str = os.getenv("HEALTHIANS_SECRET_KEY", "")
     HEALTHIANS_CHECKSUM_KEY: str = os.getenv("HEALTHIANS_CHECKSUM_KEY", "")
+    HEALTHIANS_WEBHOOK_FORWARD_URL: str = os.getenv("HEALTHIANS_WEBHOOK_FORWARD_URL", "")
+    HEALTHIANS_WEBHOOK_FORWARD_TIMEOUT_SECONDS: int = int(
+        os.getenv("HEALTHIANS_WEBHOOK_FORWARD_TIMEOUT_SECONDS", "15")
+    )
 
     # Notification service (n8n webhooks)
     NOTIFICATION_SERVICE_BASE_URL: str = os.getenv("NOTIFICATION_SERVICE_BASE_URL", "https://n8n.supershyft.com")
@@ -186,6 +190,15 @@ class Settings:
     def get_refresh_token_secret(cls) -> str:
         """Return dedicated refresh-token HMAC secret, falling back to JWT_SECRET_KEY."""
         return cls.REFRESH_TOKEN_SECRET or cls.JWT_SECRET_KEY
+
+    @classmethod
+    def get_healthians_webhook_forward_urls(cls) -> list[str]:
+        """Parse comma-separated Healthians webhook forward targets."""
+        return [
+            url.strip()
+            for url in cls.HEALTHIANS_WEBHOOK_FORWARD_URL.split(",")
+            if url.strip()
+        ]
 
     def get_bypass_otp_by_phone(self) -> dict[str, str]:
         """Map phone lookup candidates to bypass OTP codes from BYPASS_OTP_BY_PHONE."""

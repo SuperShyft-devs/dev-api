@@ -82,6 +82,7 @@ from modules.platform_settings.router import router as platform_settings_router
 from modules.bookings.router import router as bookings_router
 from modules.experts.router import router as experts_router
 from modules.notifications.router import router as notifications_router
+from modules.webhooks.router import router as webhooks_router
 
 
 def _project_root() -> Path:
@@ -306,6 +307,7 @@ async def fastapi_app(
     app.include_router(bookings_router)
     app.include_router(experts_router)
     app.include_router(notifications_router)
+    app.include_router(webhooks_router)
 
     async def _get_test_db():
         yield test_db_session

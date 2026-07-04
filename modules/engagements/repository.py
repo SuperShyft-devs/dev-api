@@ -252,6 +252,20 @@ class EngagementsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_participant_by_booking_id(
+        self,
+        db: AsyncSession,
+        *,
+        booking_id: str,
+    ) -> EngagementParticipant | None:
+        result = await db.execute(
+            select(EngagementParticipant)
+            .where(EngagementParticipant.booking_id == booking_id)
+            .order_by(EngagementParticipant.engagement_participant_id.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def update_participant_healthians_booking(
         self,
         db: AsyncSession,
