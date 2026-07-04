@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 from sqlalchemy import select, text
@@ -15,7 +15,7 @@ from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.assessments.repository import AssessmentsRepository
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
-from modules.engagements.models import Engagement
+from modules.engagements.models import Engagement, EngagementParticipant
 from modules.diagnostics.models import DiagnosticPackage
 from modules.diagnostics.schemas import (
     HealthParameterResponse,
@@ -186,6 +186,41 @@ class _FakeDiagnosticsService:
         # Keep response static for tests; package_id is irrelevant here.
         return self._payload
 
+
+class _HealthiansDiagnosticsService(_FakeDiagnosticsService):
+    def __init__(self):
+        super().__init__()
+        base_test = self._payload.groups[0].tests[0]
+        self._payload.groups[0].tests[0] = HealthParameterResponse(
+            **{**base_test.model_dump(), "external_parameter_id": 1018}
+        )
+
+
+async def _fake_healthians_access_token() -> str:
+    return "fake-token"
+
+
+async def _fake_healthians_digital_value(access_token: str, booking_id: str) -> dict:
+    assert access_token == "fake-token"
+    assert booking_id == "1387716654555"
+    return {
+        "data": [
+            {
+                "customer_name": "Jane Doe",
+                "digital_data": [
+                    {
+                        "parameter_id": "1018",
+                        "value": "13.2",
+                        "unit": "g/dL",
+                        "min_range": "12",
+                        "max_range": "15",
+                        "test_name": "Hemoglobin Hb",
+                    }
+                ],
+            }
+        ]
+    }
+
     async def get_health_parameter_by_parameter_key(self, db, *, parameter_key: str):
         return None
 
@@ -248,6 +283,8 @@ async def _seed_assessment(
     engagement_id: int,
     record_id: str | None,
     diagnostic_package_id: int = 1,
+    diagnostic_provider: str = "test_provider",
+    participant_booking_id: str | None = None,
     user_gender: str = "male",
     package_code: str | None = None,
     assessment_type_code: str | None = None,
@@ -255,16 +292,28 @@ async def _seed_assessment(
     await test_db_session.execute(
         text(
             "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
-            "VALUES (:pid, :ref, :pname, 'test_provider', 'active') "
-            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+            "VALUES (:pid, :ref, :pname, :provider, 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
+            "status = EXCLUDED.status, diagnostic_provider = EXCLUDED.diagnostic_provider"
         ),
         {
             "pid": diagnostic_package_id,
             "ref": f"REF{diagnostic_package_id}",
             "pname": f"Diag Package {diagnostic_package_id}",
+            "provider": diagnostic_provider,
         },
     )
-    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000", age=30, gender=user_gender, status="active"))
+    test_db_session.add(
+        User(
+            user_id=user_id,
+            phone=f"{user_id}000000",
+            first_name="Jane",
+            last_name="Doe",
+            age=30,
+            gender=user_gender,
+            status="active",
+        )
+    )
     pkg_code = package_code if package_code is not None else f"P{assessment_id}"
     pkg_id = assessment_id % 1000
     atype_sql = (
@@ -310,6 +359,17 @@ async def _seed_assessment(
             completed_at=datetime.now(timezone.utc),
         )
     )
+    if participant_booking_id is not None:
+        test_db_session.add(
+            EngagementParticipant(
+                engagement_participant_id=assessment_id + 100000,
+                engagement_id=engagement_id,
+                user_id=user_id,
+                engagement_date=date(2026, 1, 1),
+                slot_start_time=time(10, 0),
+                booking_id=participant_booking_id,
+            )
+        )
     await test_db_session.commit()
 
 
@@ -357,6 +417,53 @@ async def test_get_blood_parameters_returns_cached_without_metsights(
     assert haemoglobin_test["lower_range"] == 13.0
     assert haemoglobin_test["higher_range"] == 17.0
     assert fake_metsights.calls == 0
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_blood_parameters_uses_participant_booking_without_fetch_collections(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=98004,
+        user_id=3804,
+        engagement_id=4804,
+        record_id="PARTICIPANTBOOK1",
+        diagnostic_package_id=98004,
+        diagnostic_provider="healthians",
+        participant_booking_id="1387716654555",
+    )
+
+    fake_metsights = _FakeMetsightsService(
+        payload={
+            "reference_id": "should-not-be-used",
+            "provider": {"code": "Healthians"},
+        },
+        should_fail=True,
+    )
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_HealthiansDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+        questionnaire_repository=QuestionnaireRepository(),
+        healthians_get_access_token=_fake_healthians_access_token,
+        healthians_get_booking_digital_value=_fake_healthians_digital_value,
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/98004/blood-parameters", headers=_auth_header(3804))
+    assert response.status_code == 200, response.text
+    data = response.json()["data"]
+    haemoglobin_test = next(t for g in data for t in g["tests"] if t["parameter_key"] == "haemoglobin")
+    assert haemoglobin_test["value"] == 13.2
+    assert haemoglobin_test["unit"] == "g/dL"
+    assert fake_metsights.fetch_collections_calls == 0
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
 

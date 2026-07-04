@@ -9,6 +9,7 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -27,9 +28,10 @@ from modules.metsights.sync_service import MetsightsSyncService
 from modules.reports.blood_parameters_normalizer import build_grouped_from_healthians
 from modules.reports.blood_parameters_read_service import BloodParametersReadService
 from modules.reports.blood_parameters_questionnaire_reader import BloodParametersQuestionnaireReader
-from modules.reports.blood_parameters_schemas import (
-    has_usable_provider_blood_parameters,
-    provider_code_from_field,
+from modules.reports.blood_parameters_schemas import has_usable_provider_blood_parameters
+from modules.reports.healthians_booking_resolver import (
+    HealthiansBookingSource,
+    resolve_healthians_booking_id,
 )
 from db.seed.blood_parameters_registry import (
     ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
@@ -121,6 +123,7 @@ class ReportsService:
         questionnaire_repository: QuestionnaireRepository | None = None,
         healthians_get_access_token: Callable[[], Coroutine[Any, Any, str]] | None = None,
         healthians_get_booking_digital_value: Callable[[str, str], Coroutine[Any, Any, dict]] | None = None,
+        healthians_get_booking_report: Callable[[str, str], Coroutine[Any, Any, dict]] | None = None,
         metsights_sync_service: MetsightsSyncService | None = None,
     ):
         self._repository = repository
@@ -133,6 +136,7 @@ class ReportsService:
         self._questionnaire_repository = questionnaire_repository
         self._healthians_get_access_token = healthians_get_access_token
         self._healthians_get_booking_digital_value = healthians_get_booking_digital_value
+        self._healthians_get_booking_report = healthians_get_booking_report
         self._metsights_sync_service = metsights_sync_service
         self._blood_read_service = BloodParametersReadService(
             diagnostics_service=diagnostics_service,
@@ -328,12 +332,15 @@ class ReportsService:
 
     async def _fetch_blood_parameters_from_provider(
         self,
+        db: AsyncSession,
         *,
+        user_id: int,
+        engagement_id: int,
         record_id: str,
         user_first_name: str,
         user_last_name: str,
     ) -> dict[str, Any]:
-        """Fetch blood report from Healthians via Metsights fetch-collections booking id."""
+        """Fetch blood report from Healthians using participant or Metsights booking id."""
         if self._healthians_get_access_token is None or self._healthians_get_booking_digital_value is None:
             raise AppError(
                 status_code=503,
@@ -341,25 +348,14 @@ class ReportsService:
                 message="Healthians integration is not configured",
             )
 
-        collection_data = await self._metsights_service.get_fetch_collections(record_id=record_id)
-        provider_code = provider_code_from_field(collection_data.get("provider"))
-        if provider_code.lower() != "healthians":
-            raise AppError(
-                status_code=422,
-                error_code="INVALID_STATE",
-                message=(
-                    f"Blood report provider is '{provider_code or 'unknown'}', "
-                    "only Healthians is supported for provider load"
-                ),
-            )
-
-        reference_id = str(collection_data.get("reference_id") or "").strip()
-        if not reference_id:
-            raise AppError(
-                status_code=422,
-                error_code="INVALID_STATE",
-                message="Metsights collection is missing the provider reference id",
-            )
+        resolved = await resolve_healthians_booking_id(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            record_id=record_id,
+            metsights_service=self._metsights_service,
+        )
+        booking_id = resolved.booking_id
 
         try:
             access_token = await self._healthians_get_access_token()
@@ -372,7 +368,7 @@ class ReportsService:
             ) from exc
 
         try:
-            result = await self._healthians_get_booking_digital_value(access_token, reference_id)
+            result = await self._healthians_get_booking_digital_value(access_token, booking_id)
         except Exception as exc:
             logger.error("Healthians getBookingDigitalValue failed: %s", exc)
             raise AppError(
@@ -496,6 +492,9 @@ class ReportsService:
         if record_id:
             try:
                 raw_customer = await self._fetch_blood_parameters_from_provider(
+                    db,
+                    user_id=user_id,
+                    engagement_id=int(assessment_instance.engagement_id),
                     record_id=record_id,
                     user_first_name=user_first_name,
                     user_last_name=user_last_name,
@@ -685,15 +684,73 @@ class ReportsService:
                 message="Metsights record id is missing for this assessment",
             )
 
-        collection_data = await self._metsights_service.get_fetch_collections(record_id=record_id)
-        file_url = collection_data.get("file")
-        if not isinstance(file_url, str) or not file_url.strip():
-            raise AppError(
-                status_code=422,
-                error_code="INVALID_STATE",
-                message="Diagnostic report PDF is not available for this record",
+        resolved = await resolve_healthians_booking_id(
+            db,
+            user_id=user_id,
+            engagement_id=int(assessment_instance.engagement_id),
+            record_id=record_id,
+            metsights_service=self._metsights_service,
+        )
+
+        if resolved.source == HealthiansBookingSource.PARTICIPANT:
+            if self._healthians_get_access_token is None or self._healthians_get_booking_report is None:
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Healthians integration is not configured",
+                )
+            try:
+                access_token = await self._healthians_get_access_token()
+                report_data = await self._healthians_get_booking_report(
+                    access_token, resolved.booking_id
+                )
+            except Exception as exc:
+                logger.error("Healthians getBookingReport failed: %s", exc)
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Healthians booking report request failed",
+                ) from exc
+
+            user_row = await db.execute(
+                select(User.first_name, User.last_name).where(User.user_id == user_id)
             )
-        report_url = file_url.strip()
+            user_names = user_row.one_or_none()
+            first_name = (user_names[0] if user_names else "") or ""
+            last_name = (user_names[1] if user_names else "") or ""
+
+            report_list = report_data.get("data")
+            if not isinstance(report_list, list) or not report_list:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Diagnostic report PDF is not available for this record",
+                )
+            matched_report = self._match_customer_by_name(report_list, first_name, last_name)
+            if matched_report is None:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Diagnostic report PDF is not available for this record",
+                )
+            report_url = matched_report.get("report_url") or matched_report.get("url")
+            if not isinstance(report_url, str) or not report_url.strip():
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Diagnostic report PDF is not available for this record",
+                )
+            report_url = report_url.strip()
+        else:
+            collection_data = resolved.collection_data or {}
+            file_url = collection_data.get("file")
+            if not isinstance(file_url, str) or not file_url.strip():
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Diagnostic report PDF is not available for this record",
+                )
+            report_url = file_url.strip()
 
         # Prefer engagement blood/diag row; else assessment row; else create assessment row.
         target = engagement_report if engagement_report is not None else assessment_report
@@ -978,6 +1035,9 @@ class ReportsService:
         ):
             try:
                 raw_customer = await self._fetch_blood_parameters_from_provider(
+                    db,
+                    user_id=int(assessment_instance.user_id),
+                    engagement_id=int(assessment_instance.engagement_id),
                     record_id=record_id,
                     user_first_name=user_first_name,
                     user_last_name=user_last_name,

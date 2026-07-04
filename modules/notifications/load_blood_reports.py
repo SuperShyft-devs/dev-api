@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
+from modules.diagnostics.models import DiagnosticPackage
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.diagnostics.repository import DiagnosticsRepository
 from modules.metsights.service import MetsightsService
@@ -29,6 +30,10 @@ from modules.reports.blood_parameters_normalizer import build_grouped_from_healt
 from modules.reports.blood_parameters_schemas import (
     has_usable_provider_blood_parameters,
     provider_code_from_field,
+)
+from modules.reports.healthians_booking_resolver import (
+    HealthiansBookingSource,
+    try_participant_booking_id,
 )
 from modules.reports.models import IndividualHealthReport
 from modules.users.models import User
@@ -58,10 +63,6 @@ async def _group_provider_blood(
         package_id=diagnostic_package_id,
     )
     return build_grouped_from_healthians(raw_customer, package_groups=package_tests.groups)
-
-
-def _provider_code(provider_field: Any) -> str:
-    return provider_code_from_field(provider_field)
 
 
 def _match_customer_by_name(
@@ -103,7 +104,8 @@ async def _get_eligible_participants(
 
     Returns tuples of:
     (user_id, engagement_id, record_id, first_name, last_name,
-     blood_parameters, diagnostic_report_url, blood_report_notification, ihr_id, instance_id)
+     blood_parameters, diagnostic_report_url, blood_report_notification, ihr_id, instance_id,
+     diagnostic_package_id, participant_booking_id, diagnostic_provider)
     """
     query = (
         select(
@@ -118,8 +120,14 @@ async def _get_eligible_participants(
             IndividualHealthReport.report_id,
             AssessmentInstance.assessment_instance_id,
             Engagement.diagnostic_package_id,
+            EngagementParticipant.booking_id,
+            DiagnosticPackage.diagnostic_provider,
         )
         .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
+        .outerjoin(
+            DiagnosticPackage,
+            DiagnosticPackage.diagnostic_package_id == Engagement.diagnostic_package_id,
+        )
         .join(User, User.user_id == EngagementParticipant.user_id)
         .join(
             AssessmentInstance,
@@ -212,7 +220,7 @@ async def load_blood_reports(
             first_name, last_name,
             blood_params, diag_url,
             blood_report_notification, ihr_id, instance_id,
-            diagnostic_package_id,
+            diagnostic_package_id, participant_booking_id, diagnostic_provider,
         ) = row
 
         record_id = (record_id or "").strip()
@@ -243,35 +251,40 @@ async def load_blood_reports(
             blood_parameters = blood_params
             diagnostic_report_url = diag_url
 
-            try:
-                collection_data = await metsights_service.get_fetch_collections(record_id=record_id)
-            except Exception:
-                skipped += 1
-                details.append({
-                    "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "skipped", "reason": "fetch-collections not available for this record",
-                })
-                continue
-
-            reference_id = str(collection_data.get("reference_id") or "").strip()
-            provider_code = _provider_code(collection_data.get("provider"))
+            reference_id = try_participant_booking_id(participant_booking_id, diagnostic_provider)
+            booking_source = HealthiansBookingSource.PARTICIPANT if reference_id else None
 
             if not reference_id:
-                skipped += 1
-                details.append({
-                    "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "skipped", "reason": "no reference_id from MetSights collections",
-                })
-                continue
+                try:
+                    collection_data = await metsights_service.get_fetch_collections(record_id=record_id)
+                except Exception:
+                    skipped += 1
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped", "reason": "fetch-collections not available for this record",
+                    })
+                    continue
 
-            if provider_code.lower() != "healthians":
-                skipped += 1
-                details.append({
-                    "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "skipped",
-                    "reason": f"provider code is '{provider_code or 'unknown'}', not Healthians",
-                })
-                continue
+                reference_id = str(collection_data.get("reference_id") or "").strip()
+                provider_code = provider_code_from_field(collection_data.get("provider"))
+
+                if not reference_id:
+                    skipped += 1
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped", "reason": "no reference_id from MetSights collections",
+                    })
+                    continue
+
+                if provider_code.lower() != "healthians":
+                    skipped += 1
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped",
+                        "reason": f"provider code is '{provider_code or 'unknown'}', not Healthians",
+                    })
+                    continue
+                booking_source = HealthiansBookingSource.METSIGHTS
 
             access_token = await healthians_client.get_access_token()
 
@@ -356,12 +369,20 @@ async def load_blood_reports(
                 await db.commit()
 
                 loaded += 1
+                source_label = (
+                    "participant booking_id"
+                    if booking_source == HealthiansBookingSource.PARTICIPANT
+                    else "Metsights reference_id"
+                )
                 if fetched_blood is not None and fetched_diag_url is not None:
-                    load_reason = "blood data and diagnostic_report_url fetched from Healthians"
+                    load_reason = (
+                        f"blood data and diagnostic_report_url fetched from Healthians "
+                        f"via {source_label}"
+                    )
                 elif fetched_blood is not None:
-                    load_reason = "blood data fetched from Healthians"
+                    load_reason = f"blood data fetched from Healthians via {source_label}"
                 else:
-                    load_reason = "diagnostic_report_url refreshed from Healthians"
+                    load_reason = f"diagnostic_report_url refreshed from Healthians via {source_label}"
                 details.append({
                     "user_id": user_id, "engagement_id": engagement_id,
                     "action": "loaded", "reason": load_reason,

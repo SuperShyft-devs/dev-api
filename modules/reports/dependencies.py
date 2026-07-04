@@ -12,6 +12,7 @@ from modules.diagnostics.dependencies import get_diagnostics_service
 from modules.diagnostics.healthians.client import (
     get_access_token as healthians_get_access_token,
     get_booking_digital_value as healthians_get_booking_digital_value,
+    get_booking_report as healthians_get_booking_report,
 )
 from modules.metsights.dependencies import get_metsights_service, get_metsights_sync_service
 from modules.questionnaire.healthy_habits_service import HealthyHabitsService
@@ -39,6 +40,7 @@ def get_reports_service() -> ReportsService:
         questionnaire_repository=questionnaire_repository,
         healthians_get_access_token=healthians_get_access_token,
         healthians_get_booking_digital_value=healthians_get_booking_digital_value,
+        healthians_get_booking_report=healthians_get_booking_report,
         metsights_sync_service=get_metsights_sync_service(),
     )
 
