@@ -5,7 +5,7 @@ Only database queries belong here.
 
 from __future__ import annotations
 
-from sqlalchemy import and_, delete, func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
@@ -25,10 +25,16 @@ class ReportsRepository:
         user_id: int,
         engagement_id: int,
     ) -> IndividualHealthReport | None:
+        """Engagement-scoped lookup; prefer a row that has blood or diagnostic data."""
         result = await db.execute(
             select(IndividualHealthReport)
             .where(IndividualHealthReport.user_id == user_id)
             .where(IndividualHealthReport.engagement_id == engagement_id)
+            .order_by(
+                IndividualHealthReport.blood_parameters.isnot(None).desc(),
+                IndividualHealthReport.diagnostic_report_url.isnot(None).desc(),
+                IndividualHealthReport.report_id.desc(),
+            )
             .limit(1)
         )
         return result.scalar_one_or_none()
@@ -39,7 +45,7 @@ class ReportsRepository:
         *,
         assessment_instance_id: int,
     ) -> IndividualHealthReport | None:
-        """Legacy fallback: prefer engagement lookup when assessment context is available."""
+        """Assessment-scoped lookup (primary key for Metsights reports / PDFs)."""
         result = await db.execute(
             select(IndividualHealthReport)
             .where(IndividualHealthReport.assessment_instance_id == assessment_instance_id)
@@ -123,12 +129,11 @@ class ReportsRepository:
             select(IndividualHealthReport, AssessmentInstance)
             .join(
                 AssessmentInstance,
-                and_(
-                    AssessmentInstance.user_id == IndividualHealthReport.user_id,
-                    AssessmentInstance.engagement_id == IndividualHealthReport.engagement_id,
-                ),
+                AssessmentInstance.assessment_instance_id
+                == IndividualHealthReport.assessment_instance_id,
             )
             .where(IndividualHealthReport.user_id == user_id)
+            .where(IndividualHealthReport.assessment_instance_id.isnot(None))
             .order_by(
                 AssessmentInstance.completed_at.asc().nulls_last(),
                 AssessmentInstance.assigned_at.asc().nulls_last(),

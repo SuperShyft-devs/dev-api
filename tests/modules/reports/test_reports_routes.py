@@ -2331,3 +2331,310 @@ async def test_get_risk_analysis_fitprint_allowed_empty_diseases(
     assert data["metabolic_score"] is None
     assert data["diseases"] == []
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+async def _add_assessment_instance(
+    test_db_session,
+    *,
+    assessment_id: int,
+    user_id: int,
+    engagement_id: int,
+    record_id: str,
+    package_code: str,
+    assessment_type_code: str,
+):
+    """Add another assessment instance for an existing user/engagement."""
+    pkg_id = assessment_id % 1000
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status, assessment_type_code) "
+            "VALUES (:pkg_id, :pcode, :dname, 'active', :atype) "
+            "ON CONFLICT (package_id) DO UPDATE SET package_code = EXCLUDED.package_code, "
+            "display_name = EXCLUDED.display_name, status = EXCLUDED.status, "
+            "assessment_type_code = EXCLUDED.assessment_type_code"
+        ),
+        {
+            "pkg_id": pkg_id,
+            "pcode": package_code,
+            "dname": f"Package {assessment_id}",
+            "atype": assessment_type_code,
+        },
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=assessment_id,
+            user_id=user_id,
+            package_id=pkg_id,
+            engagement_id=engagement_id,
+            status="completed",
+            metsights_record_id=record_id,
+            assigned_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(timezone.utc),
+        )
+    )
+    await test_db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_get_overview_uses_pro_reports_when_fitprint_row_also_exists(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    """Pro and FitPrint on same engagement must not share reports JSON."""
+    pro_id = 99201
+    fitprint_id = 99202
+    user_id = 39201
+    engagement_id = 59201
+
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=pro_id,
+        user_id=user_id,
+        engagement_id=engagement_id,
+        record_id="REC_PRO_99201",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    await _add_assessment_instance(
+        test_db_session,
+        assessment_id=fitprint_id,
+        user_id=user_id,
+        engagement_id=engagement_id,
+        record_id="REC_FIT_99202",
+        package_code="MY_FITNESS_PRINT",
+        assessment_type_code="7",
+    )
+
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=79201,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=pro_id,
+            reports={
+                "metabolic_age": 41.0,
+                "diseases": [
+                    {
+                        "code": "A",
+                        "name": "A",
+                        "risk_status": "Healthy",
+                        "risk_score_scaled": 8,
+                        "healthy_percentile": 90,
+                    },
+                    {
+                        "code": "B",
+                        "name": "B",
+                        "risk_status": "Increased",
+                        "risk_score_scaled": 60,
+                        "healthy_percentile": 30,
+                    },
+                ],
+            },
+        )
+    )
+    # Newer FitPrint row must not be used for Pro overview.
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=79202,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=fitprint_id,
+            reports={
+                "fitness_specification": {"score": 70},
+                "activity_specification": {"score": 65},
+            },
+        )
+    )
+    await test_db_session.commit()
+
+    fake_metsights = _FakeMetsightsService(payload={}, should_fail=True)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get(f"/reports/{pro_id}/overview", headers=_auth_header(user_id))
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["metabolic_age"] == 41.0
+    assert len(body["positive_wins"]["low_risk"]) == 1
+    assert body["positive_wins"]["low_risk"][0]["code"] == "A"
+    assert [x["code"] for x in body["risk_analysis"]] == ["B", "A"]
+    assert fake_metsights.report_calls == 0
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_overview_refetches_when_pro_row_has_fitprint_shaped_cache(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    """Corrupt shared-row cache (FitPrint JSON on Pro assessment) must re-fetch Pro report."""
+    pro_id = 99211
+    user_id = 39211
+    engagement_id = 59211
+
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=pro_id,
+        user_id=user_id,
+        engagement_id=engagement_id,
+        record_id="REC_PRO_99211",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=79211,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=pro_id,
+            reports={
+                "fitness_specification": {"score": 70},
+                "activity_specification": {"score": 65},
+            },
+        )
+    )
+    await test_db_session.commit()
+
+    pro_payload = {
+        "metabolic_age": 38.5,
+        "diseases": [
+            {
+                "code": "C",
+                "name": "C",
+                "risk_status": "Healthy",
+                "risk_score_scaled": 5,
+                "healthy_percentile": 95,
+            },
+            {
+                "code": "D",
+                "name": "D",
+                "risk_status": "Moderate",
+                "risk_score_scaled": 40,
+                "healthy_percentile": 50,
+            },
+        ],
+    }
+    fake_metsights = _FakeMetsightsService(payload={}, report_payload=pro_payload)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get(f"/reports/{pro_id}/overview", headers=_auth_header(user_id))
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["metabolic_age"] == 38.5
+    assert body["positive_wins"]["low_risk"][0]["code"] == "C"
+    assert [x["code"] for x in body["risk_analysis"]] == ["D", "C"]
+    assert fake_metsights.report_calls == 1
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_engagement_blood_parameters_reads_blood_from_other_assessment_row(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    """Blood on FitPrint row is still served for engagement and Pro assessment blood APIs."""
+    pro_id = 99221
+    fitprint_id = 99222
+    user_id = 39221
+    engagement_id = 59221
+
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=pro_id,
+        user_id=user_id,
+        engagement_id=engagement_id,
+        record_id="REC_PRO_99221",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    await _add_assessment_instance(
+        test_db_session,
+        assessment_id=fitprint_id,
+        user_id=user_id,
+        engagement_id=engagement_id,
+        record_id="REC_FIT_99222",
+        package_code="MY_FITNESS_PRINT",
+        assessment_type_code="7",
+    )
+
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=79221,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=pro_id,
+            reports={"metabolic_age": 40.0, "diseases": []},
+            blood_parameters=None,
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=79222,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=fitprint_id,
+            reports={
+                "fitness_specification": {"score": 70},
+                "activity_specification": {"score": 65},
+            },
+            blood_parameters={"haemoglobin": 13.2, "haemoglobin_unit": "g/dL"},
+        )
+    )
+    await test_db_session.commit()
+
+    fake_metsights = _FakeMetsightsService(payload={"haemoglobin": 99}, should_fail=True)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    eng_response = await async_client.get(
+        f"/reports/engagement/{engagement_id}/blood-parameters",
+        headers=_auth_header(user_id),
+    )
+    assert eng_response.status_code == 200
+    eng_groups = eng_response.json()["data"]
+    assert eng_groups
+    assert any(
+        t.get("parameter_key") == "haemoglobin" and t.get("value") == 13.2
+        for g in eng_groups
+        for t in g.get("tests", [])
+    )
+
+    pro_response = await async_client.get(
+        f"/reports/{pro_id}/blood-parameters",
+        headers=_auth_header(user_id),
+    )
+    assert pro_response.status_code == 200
+    pro_groups = pro_response.json()["data"]
+    assert pro_groups
+    assert any(
+        t.get("parameter_key") == "haemoglobin" and t.get("value") == 13.2
+        for g in pro_groups
+        for t in g.get("tests", [])
+    )
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)

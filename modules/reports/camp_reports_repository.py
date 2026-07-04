@@ -277,10 +277,8 @@ class CampReportsRepository:
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .join(
                 IndividualHealthReport,
-                and_(
-                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
-                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
-                ),
+                IndividualHealthReport.assessment_instance_id
+                == AssessmentInstance.assessment_instance_id,
             )
             .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
         ).subquery()
@@ -351,10 +349,8 @@ class CampReportsRepository:
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .join(
                 IndividualHealthReport,
-                and_(
-                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
-                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
-                ),
+                IndividualHealthReport.assessment_instance_id
+                == AssessmentInstance.assessment_instance_id,
             )
             .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
         ).subquery()
@@ -403,10 +399,8 @@ class CampReportsRepository:
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .join(
                 IndividualHealthReport,
-                and_(
-                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
-                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
-                ),
+                IndividualHealthReport.assessment_instance_id
+                == AssessmentInstance.assessment_instance_id,
             )
             .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
         ).subquery()
@@ -455,10 +449,8 @@ class CampReportsRepository:
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .join(
                 IndividualHealthReport,
-                and_(
-                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
-                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
-                ),
+                IndividualHealthReport.assessment_instance_id
+                == AssessmentInstance.assessment_instance_id,
             )
             .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
         ).subquery()
@@ -804,10 +796,8 @@ class CampReportsRepository:
             .join(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
             .outerjoin(
                 IndividualHealthReport,
-                and_(
-                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
-                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
-                ),
+                IndividualHealthReport.assessment_instance_id
+                == AssessmentInstance.assessment_instance_id,
             )
             .where(ranked.c.rn == 1)
         )
@@ -877,10 +867,8 @@ class CampReportsRepository:
             .join(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
             .outerjoin(
                 IndividualHealthReport,
-                and_(
-                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
-                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
-                ),
+                IndividualHealthReport.assessment_instance_id
+                == AssessmentInstance.assessment_instance_id,
             )
             .where(ranked.c.rn == 1)
         )
@@ -950,10 +938,8 @@ class CampReportsRepository:
             .join(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
             .outerjoin(
                 IndividualHealthReport,
-                and_(
-                    IndividualHealthReport.engagement_id == AssessmentInstance.engagement_id,
-                    IndividualHealthReport.user_id == AssessmentInstance.user_id,
-                ),
+                IndividualHealthReport.assessment_instance_id
+                == AssessmentInstance.assessment_instance_id,
             )
             .where(ranked.c.rn == 1)
         )

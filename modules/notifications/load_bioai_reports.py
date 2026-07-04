@@ -66,8 +66,8 @@ async def _get_eligible_participants(
         .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
         .outerjoin(
             IndividualHealthReport,
-            (IndividualHealthReport.engagement_id == EngagementParticipant.engagement_id)
-            & (IndividualHealthReport.user_id == EngagementParticipant.user_id),
+            IndividualHealthReport.assessment_instance_id
+            == AssessmentInstance.assessment_instance_id,
         )
         .where(Engagement.status.ilike("running"))
         .where(AssessmentInstance.status == "completed")

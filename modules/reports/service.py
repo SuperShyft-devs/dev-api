@@ -152,17 +152,61 @@ class ReportsService:
         engagement_id: int,
         assessment_instance_id: int | None = None,
     ) -> IndividualHealthReport | None:
-        report = await self._repository.get_individual_report_by_engagement(
+        """Load assessment-scoped IHR when assessment_instance_id is given; else engagement blood row."""
+        if assessment_instance_id is not None:
+            return await self._repository.get_individual_report_by_assessment(
+                db,
+                assessment_instance_id=assessment_instance_id,
+            )
+        return await self._repository.get_individual_report_by_engagement(
             db,
             user_id=user_id,
             engagement_id=engagement_id,
         )
-        if report is None and assessment_instance_id is not None:
+
+    async def _get_blood_individual_report(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+        assessment_instance_id: int | None = None,
+    ) -> IndividualHealthReport | None:
+        """Prefer assessment row with blood; fall back to any engagement row with blood."""
+        if assessment_instance_id is not None:
             report = await self._repository.get_individual_report_by_assessment(
                 db,
                 assessment_instance_id=assessment_instance_id,
             )
-        return report
+            if report is not None and has_usable_provider_blood_parameters(report.blood_parameters):
+                return report
+        return await self._repository.get_individual_report_by_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+
+    @staticmethod
+    def _reports_match_assessment_type(
+        report_dict: dict[str, Any],
+        assessment_type_code: str | None,
+    ) -> bool:
+        """Reject cached reports that belong to a different assessment type (Pro vs FitPrint)."""
+        code = (assessment_type_code or "").strip()
+        has_fitprint_shape = (
+            "fitness_specification" in report_dict or "activity_specification" in report_dict
+        )
+        if code == "7":
+            if has_fitprint_shape:
+                return True
+            # Pro/Basic-shaped payload on a FitPrint assessment.
+            if "metabolic_age" in report_dict or "diseases" in report_dict:
+                return False
+            return True
+        # Pro / Basic (and other non-FitPrint): reject FitPrint-shaped cache.
+        if has_fitprint_shape:
+            return False
+        return True
 
     async def _persist_provider_blood_data(
         self,
@@ -186,8 +230,26 @@ class ReportsService:
                 "Healthians normalize produced empty parameters for engagement_id=%s",
                 assessment_instance.engagement_id,
             )
-        if individual_report is None:
-            individual_report = IndividualHealthReport(
+
+        engagement_row = await self._repository.get_individual_report_by_engagement(
+            db,
+            user_id=int(assessment_instance.user_id),
+            engagement_id=int(assessment_instance.engagement_id),
+        )
+        # Prefer an existing blood-bearing engagement row; else assessment row; else any engagement row.
+        if engagement_row is not None and (
+            engagement_row.blood_parameters is not None or engagement_row.blood_report_raw is not None
+        ):
+            target = engagement_row
+        elif individual_report is not None:
+            target = individual_report
+        elif engagement_row is not None:
+            target = engagement_row
+        else:
+            target = None
+
+        if target is None:
+            target = IndividualHealthReport(
                 user_id=assessment_instance.user_id,
                 engagement_id=assessment_instance.engagement_id,
                 assessment_instance_id=assessment_instance.assessment_instance_id,
@@ -195,14 +257,15 @@ class ReportsService:
                 blood_parameters=grouped,
                 blood_report_raw=raw,
             )
-            await self._repository.create_individual_report(db, individual_report)
+            await self._repository.create_individual_report(db, target)
         else:
-            individual_report.blood_parameters = grouped
-            individual_report.blood_report_raw = raw
-            if individual_report.assessment_instance_id is None:
-                individual_report.assessment_instance_id = assessment_instance.assessment_instance_id
-            await self._repository.update_individual_report(db, individual_report)
-        return individual_report
+            target.blood_parameters = grouped
+            target.blood_report_raw = raw
+            # Do not re-point another assessment's row.
+            if target.assessment_instance_id is None:
+                target.assessment_instance_id = assessment_instance.assessment_instance_id
+            await self._repository.update_individual_report(db, target)
+        return target
 
     async def _import_metsights_blood_categories_if_requested(
         self,
@@ -404,7 +467,13 @@ class ReportsService:
             )
 
         # --- load_from=provider (default) ---
-        existing_report = await self._get_individual_report(
+        assessment_report = await self._get_individual_report(
+            db,
+            user_id=user_id,
+            engagement_id=int(assessment_instance.engagement_id),
+            assessment_instance_id=assessment_id,
+        )
+        existing_report = await self._get_blood_individual_report(
             db,
             user_id=user_id,
             engagement_id=int(assessment_instance.engagement_id),
@@ -433,7 +502,7 @@ class ReportsService:
                 )
                 await self._persist_provider_blood_data(
                     db,
-                    individual_report=existing_report,
+                    individual_report=assessment_report,
                     assessment_instance=assessment_instance,
                     diagnostic_package_id=diagnostic_package_id,
                     raw_customer=raw_customer,
@@ -447,7 +516,7 @@ class ReportsService:
                     user_id=user_id,
                     session_id=None,
                 )
-                refreshed = await self._get_individual_report(
+                refreshed = await self._get_blood_individual_report(
                     db,
                     user_id=user_id,
                     engagement_id=int(assessment_instance.engagement_id),
@@ -578,12 +647,22 @@ class ReportsService:
 
         assessment_instance, _package, _engagement = row
 
-        existing_report = await self._get_individual_report(
+        assessment_report = await self._get_individual_report(
             db,
             user_id=user_id,
             engagement_id=int(assessment_instance.engagement_id),
             assessment_instance_id=assessment_id,
         )
+        engagement_report = await self._repository.get_individual_report_by_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=int(assessment_instance.engagement_id),
+        )
+        existing_report = assessment_report
+        for candidate in (assessment_report, engagement_report):
+            if candidate is not None and (candidate.diagnostic_report_url or "").strip():
+                existing_report = candidate
+                break
 
         cached = (existing_report.diagnostic_report_url if existing_report is not None else None) or ""
         if cached.strip():
@@ -616,8 +695,10 @@ class ReportsService:
             )
         report_url = file_url.strip()
 
-        if existing_report is None:
-            report = IndividualHealthReport(
+        # Prefer engagement blood/diag row; else assessment row; else create assessment row.
+        target = engagement_report if engagement_report is not None else assessment_report
+        if target is None:
+            target = IndividualHealthReport(
                 user_id=assessment_instance.user_id,
                 engagement_id=assessment_instance.engagement_id,
                 assessment_instance_id=assessment_instance.assessment_instance_id,
@@ -625,10 +706,10 @@ class ReportsService:
                 blood_parameters=None,
                 diagnostic_report_url=report_url,
             )
-            await self._repository.create_individual_report(db, report)
+            await self._repository.create_individual_report(db, target)
         else:
-            existing_report.diagnostic_report_url = report_url
-            await self._repository.update_individual_report(db, existing_report)
+            target.diagnostic_report_url = report_url
+            await self._repository.update_individual_report(db, target)
 
         await self._require_audit_service().log_event(
             db,
@@ -803,7 +884,12 @@ class ReportsService:
         if individual_report is not None and individual_report.reports is not None:
             report_data = individual_report.reports
             # Non-empty dict only — empty {} must not block a Metsights refresh.
-            if isinstance(report_data, dict) and report_data:
+            # Reject wrong-type cache (e.g. FitPrint JSON on a Pro assessment row).
+            if (
+                isinstance(report_data, dict)
+                and report_data
+                and self._reports_match_assessment_type(report_data, package.assessment_type_code)
+            ):
                 return report_data
 
         record_id = (assessment_instance.metsights_record_id or "").strip()
@@ -828,6 +914,10 @@ class ReportsService:
                 await self._repository.create_individual_report(db, individual_report)
             else:
                 individual_report.reports = report_data
+                # Ensure row is pinned to this assessment (corrupt shared-row recovery).
+                individual_report.assessment_instance_id = (
+                    assessment_instance.assessment_instance_id
+                )
                 await self._repository.update_individual_report(db, individual_report)
 
         return report_dict
@@ -899,7 +989,7 @@ class ReportsService:
                     diagnostic_package_id=diagnostic_package_id,
                     raw_customer=raw_customer,
                 )
-                refreshed = await self._get_individual_report(
+                refreshed = await self._get_blood_individual_report(
                     db,
                     user_id=int(assessment_instance.user_id),
                     engagement_id=int(assessment_instance.engagement_id),
@@ -1034,13 +1124,21 @@ class ReportsService:
         )
 
         record_id = (assessment_instance.metsights_record_id or "").strip()
-        if individual_report is None or individual_report.reports is None:
-            if not record_id:
-                raise AppError(
-                    status_code=422,
-                    error_code="INVALID_STATE",
-                    message="Metsights record id is missing for this assessment",
-                )
+        cached_reports = (
+            individual_report.reports
+            if individual_report is not None and isinstance(individual_report.reports, dict)
+            else None
+        )
+        reports_usable = bool(
+            cached_reports
+            and self._reports_match_assessment_type(cached_reports, assessment_type_code)
+        )
+        if not reports_usable and not record_id:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Metsights record id is missing for this assessment",
+            )
 
         report_dict = await self._resolve_report_dict_for_instance(
             db,
@@ -1056,6 +1154,14 @@ class ReportsService:
                 engagement_id=int(assessment_instance.engagement_id),
                 assessment_instance_id=assessment_id,
             )
+
+        blood_report = await self._get_blood_individual_report(
+            db,
+            user_id=user_id,
+            engagement_id=int(assessment_instance.engagement_id),
+            assessment_instance_id=assessment_id,
+        )
+        profile_report = blood_report if blood_report is not None else individual_report
 
         metabolic_age = extract_metabolic_age(report_dict)
         if assessment_id in _OVERVIEW_METABOLIC_AGE_OVERRIDES:
@@ -1099,7 +1205,7 @@ class ReportsService:
             assessment_instance=assessment_instance,
             package=package,
             engagement=engagement,
-            individual_report=individual_report,
+            individual_report=profile_report,
             user_gender=user_gender,
         )
 
@@ -1154,7 +1260,14 @@ class ReportsService:
             assessment_instance_id=assessment_id,
         )
 
-        if existing_report is not None and isinstance(existing_report.reports, dict) and existing_report.reports:
+        if (
+            existing_report is not None
+            and isinstance(existing_report.reports, dict)
+            and existing_report.reports
+            and self._reports_match_assessment_type(
+                existing_report.reports, package.assessment_type_code
+            )
+        ):
             return existing_report.reports
 
         record_id = (assessment_instance.metsights_record_id or "").strip()
@@ -1181,6 +1294,7 @@ class ReportsService:
             await self._repository.create_individual_report(db, report)
         else:
             existing_report.reports = report_data
+            existing_report.assessment_instance_id = assessment_instance.assessment_instance_id
             await self._repository.update_individual_report(db, existing_report)
 
         return report_data
@@ -1718,8 +1832,13 @@ class ReportsService:
             assessment_instance_id=assessment_instance_id,
         )
 
-        if existing_report is not None and existing_report.reports is not None:
-            report_data: Any = existing_report.reports
+        cached = existing_report.reports if existing_report is not None else None
+        if (
+            isinstance(cached, dict)
+            and cached
+            and self._reports_match_assessment_type(cached, "7")
+        ):
+            report_data: Any = cached
         else:
             record_id = (assessment_instance.metsights_record_id or "").strip()
             if not record_id:
@@ -1745,6 +1864,9 @@ class ReportsService:
                 await self._repository.create_individual_report(db, existing_report)
             else:
                 existing_report.reports = report_data
+                existing_report.assessment_instance_id = (
+                    assessment_instance.assessment_instance_id
+                )
                 await self._repository.update_individual_report(db, existing_report)
 
         report_dict = report_data if isinstance(report_data, dict) else {}

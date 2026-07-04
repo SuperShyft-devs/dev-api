@@ -5,19 +5,20 @@ Schema must match `instructions/db-schema.txt`.
 
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.types import JSON
 
 from db.base import Base
 
 
 class IndividualHealthReport(Base):
-    """SQLAlchemy model for `individual_health_report` table."""
+    """SQLAlchemy model for `individual_health_report` table.
+
+    Multiple rows per engagement are allowed (typically one per assessment).
+    Blood fields may live on any row for the engagement.
+    """
 
     __tablename__ = "individual_health_report"
-    __table_args__ = (
-        UniqueConstraint("user_id", "engagement_id", name="uq_individual_health_report_user_engagement"),
-    )
 
     report_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
