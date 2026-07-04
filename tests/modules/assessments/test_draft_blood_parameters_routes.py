@@ -10,6 +10,7 @@ from sqlalchemy import select
 from core.config import settings
 from core.security import create_jwt_token
 from modules.assessments.models import AssessmentInstance, AssessmentPackage, AssessmentPackageCategory
+from modules.employee.models import Employee
 from modules.questionnaire.models import (
     QuestionnaireCategory,
     QuestionnaireCategoryQuestion,
@@ -19,12 +20,20 @@ from modules.questionnaire.models import (
 )
 from modules.reports.blood_parameters_read_service import build_parameter_value_map
 from modules.reports.models import IndividualHealthReport
+from modules.users.models import User
 from tests.modules.questionnaire.test_questionnaire_user_routes import _ensure_test_engagement, _seed_user
 
 
 def _auth_header(user_id: int) -> dict[str, str]:
     token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
     return {"Authorization": f"Bearer {token}"}
+
+
+async def _seed_employee(test_db_session, *, user_id: int, employee_id: int):
+    test_db_session.add(User(user_id=user_id, phone=f"{user_id}000000", age=30, status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
+    await test_db_session.commit()
 
 
 async def _seed_blood_category(
@@ -580,3 +589,84 @@ async def test_draft_blood_parameters_falls_back_to_engagement_report(async_clie
     )
     row = result.scalar_one()
     assert row.answer == {"value": 77.0, "unit": "0"}
+
+
+@pytest.mark.asyncio
+async def test_draft_blood_parameters_employee_can_draft_for_participant(async_client, test_db_session):
+    await _seed_basic_setup(
+        test_db_session,
+        user_id=66012,
+        package_id=66012,
+        assessment_id=66012,
+        category_id=77013,
+        question_id=77013,
+        option_id=77013,
+        mapping_id=77013,
+        report_id=77013,
+        blood_parameters=[
+            {
+                "group_name": "Metabolic",
+                "test_count": 1,
+                "tests": [{"parameter_key": "glucose_fasting", "value": 82.0, "unit": "mg/dL"}],
+            }
+        ],
+    )
+    await _seed_employee(test_db_session, user_id=66013, employee_id=66013)
+
+    response = await async_client.post(
+        "/assessments/66012/metsights/draft-blood-parameters",
+        headers=_auth_header(66013),
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["responses_drafted"] == 1
+
+    result = await test_db_session.execute(
+        select(QuestionnaireResponse).where(QuestionnaireResponse.assessment_instance_id == 66012)
+    )
+    row = result.scalar_one()
+    assert row.answer == {"value": 82.0, "unit": "0"}
+    assert row.submitted_at is None
+
+
+@pytest.mark.asyncio
+async def test_list_engagement_assessment_instances(async_client, test_db_session):
+    await _seed_basic_setup(
+        test_db_session,
+        user_id=66014,
+        package_id=66014,
+        assessment_id=66014,
+        category_id=77014,
+        question_id=77014,
+        option_id=77014,
+        mapping_id=77014,
+        report_id=77014,
+        blood_parameters=[
+            {
+                "group_name": "Metabolic",
+                "test_count": 1,
+                "tests": [{"parameter_key": "glucose_fasting", "value": 80.0, "unit": "mg/dL"}],
+            }
+        ],
+    )
+    await _seed_employee(test_db_session, user_id=66015, employee_id=66015)
+
+    response = await async_client.get(
+        "/engagements/1/assessment-instances",
+        headers=_auth_header(66015),
+    )
+    assert response.status_code == 200
+    rows = response.json()["data"]
+    assert any(r["assessment_instance_id"] == 66014 for r in rows)
+    match = next(r for r in rows if r["assessment_instance_id"] == 66014)
+    assert match["package_code"] == "METSIGHTS_BASIC"
+    assert match["user_id"] == 66014
+
+    filtered = await async_client.get(
+        "/engagements/1/assessment-instances",
+        headers=_auth_header(66015),
+        params={"package_id": 66014},
+    )
+    assert filtered.status_code == 200
+    filtered_rows = filtered.json()["data"]
+    assert len(filtered_rows) == 1
+    assert filtered_rows[0]["assessment_instance_id"] == 66014

@@ -461,6 +461,68 @@ class EngagementAssessmentPackagesService:
             "deleted_instances": deleted,
         }
 
+    async def list_assessment_instances_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        employee: EmployeeContext,
+        package_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return assessment instances for client-side sequential batching (employee only)."""
+        if employee is None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        engagement = await self._engagements.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+
+        if package_id is not None:
+            package = await self._assessments_repo.get_package_by_id(db, package_id=package_id)
+            if package is None:
+                raise AppError(
+                    status_code=404,
+                    error_code="PACKAGE_NOT_FOUND",
+                    message="Assessment package does not exist",
+                )
+            instances = await self._assessments_repo.list_instances_for_engagement_and_package(
+                db,
+                engagement_id=engagement_id,
+                package_id=package_id,
+            )
+        else:
+            instances = await self._assessments_repo.list_all_instances_for_engagement(
+                db,
+                engagement_id=engagement_id,
+            )
+
+        package_cache: dict[int, AssessmentPackage | None] = {}
+        rows: list[dict[str, Any]] = []
+        for inst in instances:
+            pid = int(inst.package_id)
+            if pid not in package_cache:
+                package_cache[pid] = await self._assessments_repo.get_package_by_id(db, package_id=pid)
+            package = package_cache[pid]
+            rows.append(
+                {
+                    "assessment_instance_id": int(inst.assessment_instance_id),
+                    "user_id": int(inst.user_id),
+                    "package_id": pid,
+                    "package_code": (getattr(package, "package_code", None) or "").strip() if package else None,
+                    "metsights_record_id": (inst.metsights_record_id or "").strip() or None,
+                    "status": inst.status,
+                }
+            )
+        return rows
+
     async def push_all_questionnaires_to_metsights(
         self,
         db: AsyncSession,
@@ -472,6 +534,7 @@ class EngagementAssessmentPackagesService:
         ip_address: str,
         user_agent: str,
         endpoint: str,
+        assessment_instance_id: int | None = None,
     ) -> dict[str, Any]:
         """Push questionnaire answers to Metsights for a specific package's participants.
 
@@ -479,6 +542,9 @@ class EngagementAssessmentPackagesService:
         All of a user's instance IDs within the engagement are passed as
         ``source_assessment_instance_ids`` so answers from every package merge
         into the target record.
+
+        When ``assessment_instance_id`` is set, only that instance is pushed
+        (for client-side sequential batching).
         """
         if employee is None:
             raise AppError(
@@ -525,6 +591,8 @@ class EngagementAssessmentPackagesService:
         # across all participants so we don't make 42×3 redundant HTTP calls.
         options_cache: dict = {}
 
+        single_instance_id = int(assessment_instance_id) if assessment_instance_id is not None else None
+
         for user_id, instances in user_instances.items():
             all_user_instance_ids = [int(i.assessment_instance_id) for i in instances]
 
@@ -536,6 +604,9 @@ class EngagementAssessmentPackagesService:
 
             for inst in target_instances:
                 inst_id = int(inst.assessment_instance_id)
+                if single_instance_id is not None and inst_id != single_instance_id:
+                    continue
+
                 mrid = (inst.metsights_record_id or "").strip()
                 if not mrid:
                     await sync_service.log_skipped_push(
@@ -573,6 +644,19 @@ class EngagementAssessmentPackagesService:
                         "pushed": False,
                         "reason": str(exc),
                     })
+
+                if single_instance_id is not None:
+                    break
+
+            if single_instance_id is not None and (pushed + skipped + errors_count) > 0:
+                break
+
+        if single_instance_id is not None and (pushed + skipped + errors_count) == 0:
+            raise AppError(
+                status_code=404,
+                error_code="ASSESSMENT_NOT_FOUND",
+                message="Assessment instance not found for this engagement and package",
+            )
 
         await self._audit.log_event(
             db,

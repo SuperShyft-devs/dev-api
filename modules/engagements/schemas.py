@@ -122,6 +122,11 @@ class EngagementPushQuestionnairesRequest(BaseModel):
     """Request to push questionnaire answers for a specific package."""
 
     package_id: int = Field(..., gt=0)
+    assessment_instance_id: int | None = Field(
+        default=None,
+        gt=0,
+        description="When set, push only this assessment instance (client-side batching).",
+    )
 
 
 class EngagementConnectMetsightsRecordsRequest(BaseModel):

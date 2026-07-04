@@ -528,6 +528,7 @@ class AssessmentsService:
         *,
         user_id: int,
         assessment_instance_id: int,
+        employee_ok: bool = False,
     ) -> dict[str, Any]:
         """Draft blood-parameter questionnaire answers from individual_health_report.blood_parameters."""
 
@@ -536,15 +537,31 @@ class AssessmentsService:
         if self._reports is None:
             raise RuntimeError("ReportsRepository is required for draft_blood_parameters_from_report")
 
-        row = await self._repository.get_instance_for_user(
-            db,
-            assessment_instance_id=assessment_instance_id,
-            user_id=user_id,
-        )
-        if row is None:
-            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+        if employee_ok:
+            instance = await self._repository.get_instance_by_id(
+                db, assessment_instance_id=assessment_instance_id
+            )
+            if instance is None:
+                raise AppError(
+                    status_code=404,
+                    error_code="ASSESSMENT_NOT_FOUND",
+                    message="Assessment does not exist",
+                )
+            package = await self._repository.get_package_by_id(db, package_id=int(instance.package_id))
+        else:
+            row = await self._repository.get_instance_for_user(
+                db,
+                assessment_instance_id=assessment_instance_id,
+                user_id=user_id,
+            )
+            if row is None:
+                raise AppError(
+                    status_code=404,
+                    error_code="ASSESSMENT_NOT_FOUND",
+                    message="Assessment does not exist",
+                )
+            instance, package = row
 
-        instance, package = row
         package_code = (getattr(package, "package_code", None) or "").strip() if package is not None else ""
         if package_code not in _METSIGHTS_BLOOD_PACKAGE_CODES:
             raise AppError(

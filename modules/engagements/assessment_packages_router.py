@@ -4,13 +4,14 @@ Routes:
 - ``GET /engagements/{engagement_id}/assessment-packages`` — participant or employee
 - ``POST /engagements/{engagement_id}/assessment-packages`` — participant or employee
 - ``DELETE /engagements/{engagement_id}/assessment-packages/{package_code}`` — employee only
+- ``GET /engagements/{engagement_id}/assessment-instances`` — employee only
 - ``POST /engagements/{engagement_id}/push-questionnaires`` — employee only
 - ``POST /engagements/{engagement_id}/connect-metsights-records`` — employee only
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -114,6 +115,27 @@ async def remove_engagement_assessment_package(
     return success_response(data)
 
 
+@router.get("/{engagement_id}/assessment-instances")
+async def list_engagement_assessment_instances(
+    engagement_id: int,
+    package_id: int | None = Query(default=None, gt=0),
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: EngagementAssessmentPackagesService = Depends(
+        get_engagement_assessment_packages_service
+    ),
+):
+    """List assessment instances for client-side sequential batching (employee only)."""
+
+    data = await service.list_assessment_instances_for_engagement(
+        db,
+        engagement_id=engagement_id,
+        employee=employee,
+        package_id=package_id,
+    )
+    return success_response(data)
+
+
 @router.post("/{engagement_id}/push-questionnaires")
 async def push_engagement_questionnaires(
     engagement_id: int,
@@ -137,6 +159,7 @@ async def push_engagement_questionnaires(
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
+        assessment_instance_id=payload.assessment_instance_id,
     )
     await db.commit()
     return success_response(data)
