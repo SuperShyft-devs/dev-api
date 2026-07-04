@@ -123,9 +123,20 @@ def has_usable_provider_blood_parameters(blob: Any) -> bool:
 
 
 def provider_code_from_field(provider_field: Any) -> str:
-    """Extract provider code from Metsights fetch-collections ``provider`` field."""
+    """Extract provider code from Metsights fetch-collections ``provider`` field.
+
+    Supports both shapes:
+    - ``{"code": "Healthians", ...}``
+    - ``{"lab_provider": {"code": "Healthians", ...}, ...}``
+    """
     if isinstance(provider_field, dict):
-        return str(provider_field.get("code") or "").strip()
+        code = str(provider_field.get("code") or "").strip()
+        if code:
+            return code
+        lab_provider = provider_field.get("lab_provider")
+        if isinstance(lab_provider, dict):
+            return str(lab_provider.get("code") or "").strip()
+        return ""
     if provider_field is None:
         return ""
     return str(provider_field).strip()

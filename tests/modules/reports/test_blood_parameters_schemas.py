@@ -109,5 +109,13 @@ def test_has_usable_provider_blood_parameters():
 
 def test_provider_code_from_field():
     assert provider_code_from_field({"code": "healthians"}) == "healthians"
+    assert provider_code_from_field(
+        {"name": "Healthians (No Package)", "lab_provider": {"code": "Healthians"}}
+    ) == "Healthians"
+    assert provider_code_from_field(
+        {"code": "A", "lab_provider": {"code": "B"}}
+    ) == "A"
+    assert provider_code_from_field({"lab_provider": {}}) == ""
+    assert provider_code_from_field({"name": "Healthians (No Package)"}) == ""
     assert provider_code_from_field(None) == ""
     assert provider_code_from_field("other") == "other"
