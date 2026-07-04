@@ -30,7 +30,7 @@ async def get_healthians_constituents(
     try:
         token = await healthians_client.get_access_token()
         product = await healthians_client.get_product_details(
-            token, payload.healthians_camp_id
+            token, payload.external_package_id
         )
     except Exception as exc:
         logger.exception("Healthians API error")
