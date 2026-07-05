@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import BigInteger, Boolean, Column, Date, Enum as SAEnum, Float, ForeignKey, Index, Integer, String, Time, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, Enum as SAEnum, Float, ForeignKey, Index, Integer, String, Time, UniqueConstraint
+from sqlalchemy.sql import func
 
 from db.base import Base
 from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
@@ -17,6 +18,23 @@ class EngagementKind(str, enum.Enum):
     diagnostic = "diagnostic"
     doctor = "doctor"
     nutritionist = "nutritionist"
+
+
+class BloodCollectionType(str, enum.Enum):
+    """PostgreSQL enum `blood_collection_type_enum`."""
+
+    home_collection = "home_collection"
+    camp_collection = "camp_collection"
+
+
+class EngagementStatus(str, enum.Enum):
+    """Application-level engagement status values."""
+
+    draft = "draft"
+    scheduled = "scheduled"
+    running = "running"
+    completed = "completed"
+    cancelled = "cancelled"
 
 
 _engagement_kind = SAEnum(
@@ -76,6 +94,12 @@ class Engagement(Base):
     questionnaire_reminder_2 = Column(String, nullable=True)
     blood_report_notification = Column(String, nullable=True)
     bioai_report_notification = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    healthians_zone_id = Column(String, nullable=True)
+    blood_collection_type = Column(
+        SAEnum(BloodCollectionType, name="blood_collection_type_enum", values_callable=lambda obj: [e.value for e in obj], create_type=False),
+        nullable=True,
+    )
 
 
 class OnboardingAssistantAssignment(Base):
@@ -121,3 +145,4 @@ class EngagementParticipant(Base):
     is_fitprint_record_id_synced = Column(Boolean, nullable=False, default=False, server_default="false")
     barcode = Column(String, nullable=True)
     booking_id = Column(String, nullable=True)
+    blood_collection_time_slot_id = Column(String, nullable=True)

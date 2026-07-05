@@ -118,6 +118,44 @@ async def check_serviceability_by_location_v2(
         return resp.json()
 
 
+async def get_slots_by_location(
+    access_token: str,
+    payload: dict,
+) -> dict:
+    """Fetch available slots by location from Healthians."""
+    url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/getSlotsByLocation"
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def freeze_slot_v1(
+    access_token: str,
+    *,
+    slot_id: str,
+    vendor_billing_user_id: str,
+) -> dict:
+    """Freeze (lock) a slot on Healthians."""
+    payload = {
+        "slot_id": slot_id,
+        "vendor_billing_user_id": vendor_billing_user_id,
+    }
+    url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/freezeSlot_v1"
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
 async def create_booking_v3(
     access_token: str,
     payload: dict,

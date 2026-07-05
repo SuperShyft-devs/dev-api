@@ -649,6 +649,7 @@ class EngagementsRepository:
                 EngagementParticipant.is_fitprint_record_id_synced,
                 EngagementParticipant.barcode,
                 EngagementParticipant.booking_id,
+                EngagementParticipant.blood_collection_time_slot_id,
                 func.row_number()
                 .over(
                     partition_by=EngagementParticipant.user_id,
@@ -690,6 +691,7 @@ class EngagementsRepository:
                 ranked_rows.c.is_fitprint_record_id_synced,
                 ranked_rows.c.barcode,
                 ranked_rows.c.booking_id,
+                ranked_rows.c.blood_collection_time_slot_id,
             )
             .where(ranked_rows.c.rn == 1)
             .order_by(ranked_rows.c.engagement_participant_id.asc())
@@ -780,6 +782,7 @@ class EngagementsRepository:
                 EngagementParticipant.is_fitprint_record_id_synced,
                 EngagementParticipant.barcode,
                 EngagementParticipant.booking_id,
+                EngagementParticipant.blood_collection_time_slot_id,
                 func.row_number()
                 .over(
                     partition_by=EngagementParticipant.user_id,
@@ -822,6 +825,7 @@ class EngagementsRepository:
                 ranked_rows.c.is_fitprint_record_id_synced,
                 ranked_rows.c.barcode,
                 ranked_rows.c.booking_id,
+                ranked_rows.c.blood_collection_time_slot_id,
             )
             .where(ranked_rows.c.rn == 1)
             .order_by(ranked_rows.c.engagement_participant_id.asc())
@@ -896,6 +900,40 @@ class EngagementsRepository:
             .where(self._running_engagement_status_filter())
             .where(Engagement.end_date < as_of)
             .values(status="completed")
+        )
+        result = await db.execute(stmt)
+        return int(result.rowcount or 0)
+
+    @staticmethod
+    def _scheduled_engagement_status_filter():
+        return func.lower(func.trim(Engagement.status)) == "scheduled"
+
+    async def count_scheduled_engagements_past_start_date(
+        self,
+        db: AsyncSession,
+        *,
+        as_of: date,
+    ) -> int:
+        query = (
+            select(func.count())
+            .select_from(Engagement)
+            .where(self._scheduled_engagement_status_filter())
+            .where(Engagement.start_date <= as_of)
+        )
+        result = await db.execute(query)
+        return int(result.scalar_one())
+
+    async def bulk_activate_scheduled_engagements(
+        self,
+        db: AsyncSession,
+        *,
+        as_of: date,
+    ) -> int:
+        stmt = (
+            update(Engagement)
+            .where(self._scheduled_engagement_status_filter())
+            .where(Engagement.start_date <= as_of)
+            .values(status="running")
         )
         result = await db.execute(stmt)
         return int(result.rowcount or 0)

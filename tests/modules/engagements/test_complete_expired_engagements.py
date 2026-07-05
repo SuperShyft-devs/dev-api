@@ -101,7 +101,7 @@ async def test_complete_expired_engagements_marks_past_running_as_completed(test
 
     assert result["as_of"] == "2026-05-30"
     assert result["dry_run"] is False
-    assert result["updated_count"] >= 1
+    assert result["completed_count"] >= 1
 
     statuses = {
         row.engagement_id: row.status
@@ -135,8 +135,8 @@ async def test_complete_expired_engagements_is_idempotent(test_db_session):
     second = await service.complete_expired_engagements(test_db_session, as_of=date(2026, 5, 30))
     await test_db_session.commit()
 
-    assert first["updated_count"] == 1
-    assert second["updated_count"] == 0
+    assert first["completed_count"] == 1
+    assert second["completed_count"] == 0
 
 
 @pytest.mark.asyncio
@@ -159,7 +159,7 @@ async def test_complete_expired_engagements_dry_run_does_not_update(test_db_sess
     )
     await test_db_session.commit()
 
-    assert result["updated_count"] == 1
+    assert result["completed_count"] == 1
     assert result["dry_run"] is True
 
     status = (

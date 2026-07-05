@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
 from modules.checklists.schemas import ChecklistReadiness
-from modules.engagements.models import EngagementKind
+from modules.engagements.models import BloodCollectionType, EngagementKind, EngagementStatus
 
 
 class EngagementCreateRequest(BaseModel):
@@ -34,6 +34,8 @@ class EngagementCreateRequest(BaseModel):
     slot_duration: int = Field(gt=0, le=480)
     start_date: date
     end_date: date
+    healthians_zone_id: Optional[str] = Field(default=None, max_length=50)
+    blood_collection_type: Optional[BloodCollectionType] = None
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
     notification_service_key: str | None = Field(default=None, max_length=200)
@@ -66,6 +68,8 @@ class EngagementUpdateRequest(BaseModel):
     slot_duration: int = Field(gt=0, le=480)
     start_date: date
     end_date: date
+    healthians_zone_id: Optional[str] = Field(default=None, max_length=50)
+    blood_collection_type: Optional[BloodCollectionType] = None
     metsights_engagement_id: Optional[str] = Field(default=None, max_length=200)
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
@@ -106,6 +110,9 @@ class EngagementListItem(BaseModel):
     end_date: Optional[date] = None
     status: Optional[str] = None
     participant_count: Optional[int] = None
+    created_at: Optional[datetime] = None
+    healthians_zone_id: Optional[str] = None
+    blood_collection_type: Optional[str] = None
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
     notification_service_key: str
@@ -214,6 +221,7 @@ class EngagementParticipantUpdateRequest(BaseModel):
     want_doctor_consultation: Optional[bool] = None
     want_nutritionist_consultation: Optional[bool] = None
     want_doctor_and_nutritionist_consultation: Optional[bool] = None
+    blood_collection_time_slot_id: Optional[str] = Field(default=None, max_length=100)
 
 
 # Backward-compatible alias

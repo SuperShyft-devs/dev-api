@@ -26,7 +26,7 @@ from modules.employee.access_control import ensure_admin
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
-from modules.engagements.models import Engagement, EngagementKind, EngagementParticipant, OnboardingAssistantAssignment
+from modules.engagements.models import BloodCollectionType, Engagement, EngagementKind, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.schemas import (
     EngagementCreateRequest,
@@ -52,7 +52,7 @@ def _generate_engagement_code(length: int = 8) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-_ALLOWED_ENGAGEMENT_STATUS = {"running", "completed"}
+_ALLOWED_ENGAGEMENT_STATUS = {"draft", "scheduled", "running", "completed", "cancelled"}
 DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID = 1
 _B2C_DEFAULT_ONBOARDING_ASSISTANT_EMPLOYEE_IDS = (1, 8)
 
@@ -121,6 +121,7 @@ def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
         is_fitprint_record_id_synced,
         barcode,
         booking_id,
+        blood_collection_time_slot_id,
     ) = row
     return {
         "engagement_participant_id": engagement_participant_id,
@@ -150,6 +151,7 @@ def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
         "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
         "barcode": barcode,
         "booking_id": booking_id,
+        "blood_collection_time_slot_id": blood_collection_time_slot_id,
     }
 
 
@@ -349,6 +351,8 @@ class EngagementsService:
         blood_notif = await self._validate_comma_separated_service_keys(db, payload.blood_report_notification)
         bioai_notif = await self._validate_comma_separated_service_keys(db, payload.bioai_report_notification)
 
+        initial_status = "running" if payload.start_date <= date.today() else "scheduled"
+
         engagement = Engagement(
             engagement_name=payload.engagement_name,
             metsights_engagement_id=payload.metsights_engagement_id,
@@ -370,8 +374,10 @@ class EngagementsService:
             slot_duration=payload.slot_duration,
             start_date=payload.start_date,
             end_date=payload.end_date,
-            status="running",
+            status=initial_status,
             participant_count=0,
+            healthians_zone_id=payload.healthians_zone_id,
+            blood_collection_type=payload.blood_collection_type,
             create_profile_on_metsights=payload.create_profile_on_metsights,
             enroll_for_fitprint_full=payload.enroll_for_fitprint_full,
             notification_service_key=notification_service_key,
@@ -561,6 +567,8 @@ class EngagementsService:
         engagement.start_date = payload.start_date
         engagement.end_date = payload.end_date
         engagement.camp_no = compute_camp_no(payload.organization_id, payload.start_date)
+        engagement.healthians_zone_id = payload.healthians_zone_id
+        engagement.blood_collection_type = payload.blood_collection_type
         engagement.metsights_engagement_id = payload.metsights_engagement_id
         engagement.create_profile_on_metsights = payload.create_profile_on_metsights
         engagement.enroll_for_fitprint_full = payload.enroll_for_fitprint_full
@@ -648,20 +656,31 @@ class EngagementsService:
         ip_address: str = "127.0.0.1",
         user_agent: str = "complete-expired-engagements-job",
     ) -> dict[str, int | str | bool]:
-        """Mark running engagements with end_date before as_of as completed."""
+        """Transition engagement statuses:
+        - scheduled -> running when start_date <= as_of
+        - running -> completed when end_date < as_of
+        """
         effective_as_of = as_of or date.today()
 
         if dry_run:
-            updated_count = await self._repository.count_running_engagements_past_end_date(
+            activated_count = await self._repository.count_scheduled_engagements_past_start_date(
+                db,
+                as_of=effective_as_of,
+            )
+            completed_count = await self._repository.count_running_engagements_past_end_date(
                 db,
                 as_of=effective_as_of,
             )
         else:
-            updated_count = await self._repository.bulk_complete_expired_engagements(
+            activated_count = await self._repository.bulk_activate_scheduled_engagements(
                 db,
                 as_of=effective_as_of,
             )
-            if updated_count and self._audit_service is not None:
+            completed_count = await self._repository.bulk_complete_expired_engagements(
+                db,
+                as_of=effective_as_of,
+            )
+            if (activated_count or completed_count) and self._audit_service is not None:
                 await self._audit_service.log_event(
                     db,
                     action="SYSTEM_COMPLETE_EXPIRED_ENGAGEMENTS",
@@ -674,7 +693,8 @@ class EngagementsService:
 
         return {
             "as_of": effective_as_of.isoformat(),
-            "updated_count": updated_count,
+            "activated_count": activated_count,
+            "completed_count": completed_count,
             "dry_run": dry_run,
         }
 
@@ -746,7 +766,7 @@ class EngagementsService:
             slot_duration=20,
             start_date=engagement_date,
             end_date=engagement_date,
-            status="running",
+            status="scheduled",
             participant_count=0,
             create_profile_on_metsights=create_profile_on_metsights,
             enroll_for_fitprint_full=enroll_for_fitprint_full,
@@ -845,8 +865,8 @@ class EngagementsService:
         is_primary_record_id_synced: bool = False,
         is_fitprint_record_id_synced: bool = False,
     ) -> EngagementParticipant:
-        if (engagement.status or "").lower() != "running":
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is not running")
+        if (engagement.status or "").lower() not in ("scheduled", "running", "draft"):
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is not accepting enrollments")
 
         participant = EngagementParticipant(
             engagement_id=engagement.engagement_id,

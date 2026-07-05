@@ -109,6 +109,6 @@ def main(argv: list[str] | None = None) -> int:
     mode = "dry-run" if result["dry_run"] else "applied"
     print(
         f"Complete expired engagements ({mode}): as_of={result['as_of']}, "
-        f"updated_count={result['updated_count']}"
+        f"activated_count={result['activated_count']}, completed_count={result['completed_count']}"
     )
     return 0
