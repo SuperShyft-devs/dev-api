@@ -1,4 +1,4 @@
-"""Tests for POST /upload/bio-ai/pdf and POST /upload/blood-parameters/pdf."""
+"""Tests for POST /uploads/bio-ai/pdf and POST /uploads/blood-parameters/pdf."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def pdf_media_root(tmp_path, monkeypatch):
 @pytest.mark.asyncio
 async def test_upload_bio_ai_pdf_success(pdf_upload_client, pdf_media_root):
     files = {"file": ("report.pdf", _MIN_PDF, "application/pdf")}
-    r = await pdf_upload_client.post("/upload/bio-ai/pdf", files=files, headers=_auth_header(1))
+    r = await pdf_upload_client.post("/uploads/bio-ai/pdf", files=files, headers=_auth_header(1))
     assert r.status_code == 200
     data = r.json()["data"]
     assert data["url"].startswith("http://testserver/media/bio-ai/")
@@ -75,7 +75,7 @@ async def test_upload_bio_ai_pdf_success(pdf_upload_client, pdf_media_root):
 @pytest.mark.asyncio
 async def test_upload_blood_parameters_pdf_success(pdf_upload_client, pdf_media_root):
     files = {"file": ("blood.pdf", _MIN_PDF, "application/pdf")}
-    r = await pdf_upload_client.post("/upload/blood-parameters/pdf", files=files, headers=_auth_header(1))
+    r = await pdf_upload_client.post("/uploads/blood-parameters/pdf", files=files, headers=_auth_header(1))
     assert r.status_code == 200
     data = r.json()["data"]
     assert "blood-parameters" in data["url"]
@@ -84,14 +84,14 @@ async def test_upload_blood_parameters_pdf_success(pdf_upload_client, pdf_media_
 @pytest.mark.asyncio
 async def test_upload_pdf_requires_auth(pdf_upload_client, pdf_media_root):
     files = {"file": ("report.pdf", _MIN_PDF, "application/pdf")}
-    r = await pdf_upload_client.post("/upload/bio-ai/pdf", files=files)
+    r = await pdf_upload_client.post("/uploads/bio-ai/pdf", files=files)
     assert r.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_upload_pdf_rejects_non_pdf_content_type(pdf_upload_client, pdf_media_root):
     files = {"file": ("x.png", _MIN_PDF, "image/png")}
-    r = await pdf_upload_client.post("/upload/bio-ai/pdf", files=files, headers=_auth_header(1))
+    r = await pdf_upload_client.post("/uploads/bio-ai/pdf", files=files, headers=_auth_header(1))
     assert r.status_code == 400
     assert r.json()["error_code"] == "INVALID_INPUT"
 
@@ -99,7 +99,7 @@ async def test_upload_pdf_rejects_non_pdf_content_type(pdf_upload_client, pdf_me
 @pytest.mark.asyncio
 async def test_upload_pdf_rejects_mismatched_magic_bytes(pdf_upload_client, pdf_media_root):
     files = {"file": ("fake.pdf", b"\xff\xd8\xff\xe0not a pdf", "application/pdf")}
-    r = await pdf_upload_client.post("/upload/bio-ai/pdf", files=files, headers=_auth_header(1))
+    r = await pdf_upload_client.post("/uploads/bio-ai/pdf", files=files, headers=_auth_header(1))
     assert r.status_code == 400
 
 
@@ -107,7 +107,7 @@ async def test_upload_pdf_rejects_mismatched_magic_bytes(pdf_upload_client, pdf_
 async def test_upload_pdf_rejects_oversize(pdf_upload_client, pdf_media_root, monkeypatch):
     monkeypatch.setattr(settings, "USER_PDF_UPLOAD_MAX_MB", 0)
     files = {"file": ("big.pdf", _MIN_PDF, "application/pdf")}
-    r = await pdf_upload_client.post("/upload/bio-ai/pdf", files=files, headers=_auth_header(1))
+    r = await pdf_upload_client.post("/uploads/bio-ai/pdf", files=files, headers=_auth_header(1))
     assert r.status_code == 400
     assert r.json()["error_code"] == "INVALID_INPUT"
     assert "large" in r.json()["message"].lower()

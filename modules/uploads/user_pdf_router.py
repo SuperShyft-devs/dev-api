@@ -9,7 +9,7 @@ from core.dependencies import get_current_user
 from modules.uploads.service import UploadsService
 
 
-router = APIRouter(prefix="/upload", tags=["upload"])
+router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 
 def get_uploads_service() -> UploadsService:
