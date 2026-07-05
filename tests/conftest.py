@@ -57,7 +57,11 @@ from modules.platform_settings import models as _platform_settings_models  # noq
 from modules.experts import models as _experts_models  # noqa: F401
 from modules.notifications import models as _notifications_models  # noqa: F401
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
 from core.config import settings
+from core.rate_limit import limiter
 from core.exceptions import add_exception_handlers
 from core.logging import request_id_middleware
 from db.session import get_db
@@ -80,6 +84,7 @@ from modules.reports.camp_report_sections_router import router as camp_report_se
 from modules.reports.camp_reports_router import router as camp_reports_router
 from modules.platform_settings.router import router as platform_settings_router
 from modules.bookings.router import router as bookings_router
+from modules.payments.routes import router as payments_router
 from modules.experts.router import router as experts_router
 from modules.notifications.router import router as notifications_router
 from modules.webhooks.router import router as webhooks_router
@@ -288,6 +293,8 @@ async def fastapi_app(
 
     app = FastAPI()
     add_exception_handlers(app)
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.middleware("http")(request_id_middleware)
     app.include_router(auth_router)
     app.include_router(users_router)
@@ -304,6 +311,7 @@ async def fastapi_app(
     app.include_router(reports_router)
     app.include_router(camp_report_sections_router)
     app.include_router(platform_settings_router)
+    app.include_router(payments_router)
     app.include_router(bookings_router)
     app.include_router(experts_router)
     app.include_router(notifications_router)

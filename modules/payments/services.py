@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import hmac
 import logging
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
@@ -63,6 +64,104 @@ async def _booking_ids_for_order(db: AsyncSession, order_row: Order) -> list[int
     ids = {row[0] for row in ob_result.all()}
     ids.add(order_row.booking_id)
     return sorted(ids)
+
+
+@dataclass(frozen=True)
+class FulfillmentResult:
+    booking_id: int
+    engagement_id: int
+    engagement_participant_id: int
+    booking_type: str
+    status: str = "completed"
+
+
+def _fulfillment_already_done(meta: dict | None) -> bool:
+    return (meta or {}).get("fulfillment", {}).get("status") == "completed"
+
+
+def _fulfillment_from_metadata(booking: Booking) -> FulfillmentResult | None:
+    meta = booking.metadata_ or {}
+    fulfillment = meta.get("fulfillment") or {}
+    if fulfillment.get("status") != "completed":
+        return None
+    engagement_id = fulfillment.get("engagement_id")
+    participant_id = fulfillment.get("engagement_participant_id")
+    booking_type = (fulfillment.get("booking_type") or booking.booking_type or "").strip()
+    if engagement_id is None or participant_id is None or not booking_type:
+        return None
+    return FulfillmentResult(
+        booking_id=int(booking.booking_id),
+        engagement_id=int(engagement_id),
+        engagement_participant_id=int(participant_id),
+        booking_type=booking_type,
+    )
+
+
+def _persist_fulfillment_metadata(booking: Booking, result: FulfillmentResult) -> None:
+    meta = dict(booking.metadata_ or {})
+    meta["fulfillment"] = {
+        "status": result.status,
+        "engagement_id": result.engagement_id,
+        "engagement_participant_id": result.engagement_participant_id,
+        "booking_type": result.booking_type,
+    }
+    booking.metadata_ = meta
+
+
+async def _user_may_access_order(
+    db: AsyncSession,
+    *,
+    order: Order,
+    authenticated_user_id: int,
+) -> bool:
+    """Return True when the authenticated user may act on the payer's order."""
+    payer_user_id = order.user_id
+    if payer_user_id == authenticated_user_id:
+        return True
+
+    payer_result = await db.execute(select(User).where(User.user_id == payer_user_id))
+    payer_user = payer_result.scalar_one_or_none()
+    if payer_user is None:
+        return False
+
+    auth_result = await db.execute(select(User).where(User.user_id == authenticated_user_id))
+    auth_user = auth_result.scalar_one_or_none()
+    if auth_user is None:
+        return False
+
+    return (
+        payer_user.parent_id == authenticated_user_id
+        or auth_user.parent_id == payer_user_id
+    )
+
+
+async def _same_order_has_typed_booking(
+    db: AsyncSession,
+    *,
+    order_id: int,
+    exclude_booking_id: int,
+) -> bool:
+    booking_ids_result = await db.execute(
+        select(OrderBooking.booking_id).where(OrderBooking.order_id == order_id)
+    )
+    booking_ids = {row[0] for row in booking_ids_result.all()}
+    order_row = await db.execute(select(Order).where(Order.order_id == order_id))
+    order = order_row.scalar_one_or_none()
+    if order is not None:
+        booking_ids.add(order.booking_id)
+
+    if not booking_ids:
+        return False
+
+    typed_result = await db.execute(
+        select(Booking.booking_id)
+        .where(Booking.booking_id.in_(booking_ids))
+        .where(Booking.booking_id != exclude_booking_id)
+        .where(Booking.booking_type.isnot(None))
+        .where(Booking.booking_type != "")
+        .limit(1)
+    )
+    return typed_result.scalar_one_or_none() is not None
 
 
 async def _resolve_line_pricing(
@@ -197,10 +296,12 @@ class PaymentsService:
             for member_user_id, entity_type, entity_id in items:
                 member_result = await db.execute(select(User).where(User.user_id == member_user_id))
                 if member_result.scalar_one_or_none() is None:
+                    await db.rollback()
                     return {"_error": (400, f"User not found for line (user_id={member_user_id})")}
 
                 resolved = await _resolve_line_pricing(db, entity_type=entity_type, entity_id=entity_id)
                 if isinstance(resolved, dict) and resolved.get("_error"):
+                    await db.rollback()
                     return resolved
                 assert isinstance(resolved, tuple)
                 line_paise, entity_name = resolved
@@ -223,6 +324,7 @@ class PaymentsService:
                 bookings_created.append(booking)
 
             if not bookings_created:
+                await db.rollback()
                 return {"_error": (400, "No booking lines")}
 
             anchor_booking_id = bookings_created[0].booking_id
@@ -236,16 +338,12 @@ class PaymentsService:
                 )
             except Exception as exc:
                 logger.exception("Razorpay order creation failed: %s", exc)
-                for b in bookings_created:
-                    await db.delete(b)
-                await db.commit()
+                await db.rollback()
                 return {"_error": (502, "Payment service unavailable")}
 
             razorpay_order_id = rz_order.get("id")
             if not razorpay_order_id:
-                for b in bookings_created:
-                    await db.delete(b)
-                await db.commit()
+                await db.rollback()
                 return {"_error": (502, "Payment service unavailable")}
 
             order_row = Order(
@@ -262,7 +360,7 @@ class PaymentsService:
             for b in bookings_created:
                 db.add(OrderBooking(order_id=order_row.order_id, booking_id=b.booking_id))
 
-            await db.commit()
+            await db.flush()
 
             booking_ids = [b.booking_id for b in bookings_created]
             return {
@@ -288,6 +386,7 @@ class PaymentsService:
         razorpay_payment_id: str,
         razorpay_order_id: str,
         razorpay_signature: str,
+        authenticated_user_id: int,
     ) -> dict[str, Any]:
         try:
             if not _verify_razorpay_signature(
@@ -304,6 +403,11 @@ class PaymentsService:
             if order_row is None:
                 return {"_error": (404, "Order not found")}
 
+            if not await _user_may_access_order(
+                db, order=order_row, authenticated_user_id=authenticated_user_id
+            ):
+                return {"_error": (403, "Not authorized to verify payment for this order")}
+
             if order_row.status == "paid":
                 pay_result = await db.execute(
                     select(Payment)
@@ -317,12 +421,22 @@ class PaymentsService:
                 existing = pay_result.scalar_one_or_none()
                 if existing is not None:
                     booking_ids = await _booking_ids_for_order(db, order_row)
+                    bookings_result = await db.execute(
+                        select(Booking).where(Booking.booking_id.in_(booking_ids))
+                    )
+                    bookings = list(bookings_result.scalars().all())
+                    fulfillment = [
+                        asdict(item)
+                        for b in bookings
+                        if (item := _fulfillment_from_metadata(b)) is not None
+                    ]
                     return {
                         "success": True,
                         "message": "Payment verified. Booking confirmed.",
                         "booking_ids": booking_ids,
                         "booking_id": booking_ids[0] if booking_ids else order_row.booking_id,
                         "payment_id": razorpay_payment_id,
+                        "fulfillment": fulfillment,
                     }
                 return {"_error": (422, "Order marked paid but no payment record")}
 
@@ -376,9 +490,11 @@ class PaymentsService:
 
             await db.flush()
 
-            await self._run_post_payment_fulfillment(db, bookings=bookings)
+            fulfillment_results = await self._run_post_payment_fulfillment(
+                db, bookings=bookings, order_id=order_row.order_id
+            )
 
-            await db.commit()
+            await db.flush()
 
             sorted_ids = sorted(booking_ids)
             return {
@@ -387,7 +503,12 @@ class PaymentsService:
                 "booking_ids": sorted_ids,
                 "booking_id": sorted_ids[0],
                 "payment_id": razorpay_payment_id,
+                "fulfillment": [asdict(item) for item in fulfillment_results],
             }
+        except ValueError as exc:
+            logger.warning("verify_payment validation failed: %s", exc)
+            await db.rollback()
+            return {"_error": (422, str(exc))}
         except Exception as exc:
             logger.exception("verify_payment failed: %s", exc)
             await db.rollback()
@@ -399,6 +520,7 @@ class PaymentsService:
         *,
         razorpay_order_id: str,
         failure_reason: str | None,
+        authenticated_user_id: int,
     ) -> dict[str, Any]:
         try:
             order_result = await db.execute(
@@ -407,6 +529,11 @@ class PaymentsService:
             order_row = order_result.scalar_one_or_none()
             if order_row is None:
                 return {"_error": (404, "Order not found")}
+
+            if not await _user_may_access_order(
+                db, order=order_row, authenticated_user_id=authenticated_user_id
+            ):
+                return {"_error": (403, "Not authorized to record failure for this order")}
 
             reason = failure_reason if failure_reason and failure_reason.strip() else "Unknown"
 
@@ -449,7 +576,7 @@ class PaymentsService:
                     order_row.order_id,
                 )
 
-            await db.commit()
+            await db.flush()
 
             return {
                 "success": False,
@@ -465,88 +592,108 @@ class PaymentsService:
         db: AsyncSession,
         *,
         bookings: list[Booking],
-    ) -> None:
+        order_id: int,
+    ) -> list[FulfillmentResult]:
         """Execute post-payment fulfillment for bookings.
 
-        When a booking has no booking_type (created by the direct
-        /payments/create-order route), we search for a "companion" booking — a
-        recently created booking for the same user + entity that was submitted via
-        /book/bio-ai and therefore carries a booking_type and full collection
-        metadata.  We use a lightweight proxy so the persisted booking row is not
-        mutated.
+        When a booking has no booking_type (legacy /payments/create-order-only checkout),
+        a companion booking with metadata may be used. Bookings on the same order that
+        already have a typed sibling cannot use companion lookup.
         """
         from modules.users.dependencies import get_users_service
 
         users_service = get_users_service()
+        results: list[FulfillmentResult] = []
 
         for booking in bookings:
-            try:
-                bt = (booking.booking_type or "").strip()
-                effective_booking = booking
+            cached = _fulfillment_from_metadata(booking)
+            if cached is not None:
+                results.append(cached)
+                continue
 
-                # ── Resolve missing booking_type / metadata via companion booking ──────
-                if not bt and booking.entity_type == "diagnostic_package":
-                    companion_result = await db.execute(
-                        select(Booking)
-                        .where(
-                            Booking.user_id == booking.user_id,
-                            Booking.entity_type == "diagnostic_package",
-                            Booking.entity_id == booking.entity_id,
-                            Booking.booking_type.isnot(None),
-                            Booking.booking_type != "",
-                            Booking.booking_id != booking.booking_id,
-                        )
-                        .order_by(Booking.booking_id.desc())
-                        .limit(1)
+            bt = (booking.booking_type or "").strip()
+            effective_booking = booking
+
+            if not bt and booking.entity_type == "diagnostic_package":
+                if await _same_order_has_typed_booking(
+                    db, order_id=order_id, exclude_booking_id=booking.booking_id
+                ):
+                    raise ValueError(
+                        f"Booking {booking.booking_id} is missing booking_type for fulfillment"
                     )
-                    companion = companion_result.scalar_one_or_none()
-                    if companion is not None:
-                        companion_meta = companion.metadata_ or {}
-                        if companion_meta.get("blood_collection_date"):
-                            resolved_bt = (companion.booking_type or "").strip()
-                            logger.info(
-                                "post_payment_fulfillment: booking_id=%s has no booking_type; "
-                                "using companion booking_id=%s (bt=%r)",
-                                booking.booking_id, companion.booking_id, resolved_bt,
-                            )
 
-                            class _BookingProxy:
-                                """Proxy that overrides booking_type and metadata_ only."""
-
-                                def __init__(self, base: Booking, booking_type: str, metadata_: dict) -> None:  # noqa: E501
-                                    self._base = base
-                                    self.booking_type = booking_type
-                                    self.metadata_ = metadata_
-
-                                def __getattr__(self, name: str):  # type: ignore[override]
-                                    return getattr(self._base, name)
-
-                            effective_booking = _BookingProxy(booking, resolved_bt, companion_meta)  # type: ignore[assignment]
-                            bt = resolved_bt
-
-                # ── Skip entirely if we still have no booking_type ───────────────────
-                if not bt:
-                    logger.warning(
-                        "post_payment_fulfillment: booking_id=%s has no booking_type "
-                        "and no companion booking with metadata was found; skipping",
-                        booking.booking_id,
+                companion_result = await db.execute(
+                    select(Booking)
+                    .where(
+                        Booking.user_id == booking.user_id,
+                        Booking.entity_type == "diagnostic_package",
+                        Booking.entity_id == booking.entity_id,
+                        Booking.booking_type.isnot(None),
+                        Booking.booking_type != "",
+                        Booking.booking_id != booking.booking_id,
                     )
-                    continue
-
-                if bt == "bio_ai":
-                    await users_service.fulfill_bio_ai_booking(db, booking=effective_booking)
-                elif bt == "blood_test":
-                    await users_service.fulfill_blood_test_booking(db, booking=effective_booking)
-                else:
-                    logger.warning(
-                        "Unknown booking_type=%r for booking_id=%s; skipping fulfillment",
-                        bt, booking.booking_id,
-                    )
-            except Exception as exc:
-                logger.exception(
-                    "Post-payment fulfillment failed for booking_id=%s: %s",
-                    booking.booking_id, exc,
+                    .order_by(Booking.booking_id.desc())
+                    .limit(1)
                 )
+                companion = companion_result.scalar_one_or_none()
+                if companion is not None:
+                    companion_meta = companion.metadata_ or {}
+                    if companion_meta.get("blood_collection_date"):
+                        resolved_bt = (companion.booking_type or "").strip()
+                        logger.info(
+                            "post_payment_fulfillment: booking_id=%s has no booking_type; "
+                            "using companion booking_id=%s (bt=%r)",
+                            booking.booking_id,
+                            companion.booking_id,
+                            resolved_bt,
+                        )
+
+                        class _BookingProxy:
+                            """Proxy that overrides booking_type and metadata_ only."""
+
+                            def __init__(self, base: Booking, booking_type: str, metadata_: dict) -> None:
+                                self._base = base
+                                self.booking_type = booking_type
+                                self.metadata_ = metadata_
+
+                            def __getattr__(self, name: str):  # type: ignore[override]
+                                return getattr(self._base, name)
+
+                        effective_booking = _BookingProxy(booking, resolved_bt, companion_meta)  # type: ignore[assignment]
+                        bt = resolved_bt
+
+            if not bt:
+                raise ValueError(
+                    f"Booking {booking.booking_id} has no booking_type and no companion booking with metadata"
+                )
+
+            if bt == "bio_ai":
+                onboard = await users_service.fulfill_bio_ai_booking(db, booking=effective_booking)
+                if onboard is None:
+                    raise RuntimeError(f"Bio AI fulfillment failed for booking_id={booking.booking_id}")
+                result = FulfillmentResult(
+                    booking_id=int(booking.booking_id),
+                    engagement_id=int(onboard.engagement_id),
+                    engagement_participant_id=int(onboard.engagement_participant_id),
+                    booking_type=bt,
+                )
+            elif bt == "blood_test":
+                blood_result = await users_service.fulfill_blood_test_booking(db, booking=effective_booking)
+                if blood_result is None:
+                    raise RuntimeError(f"Blood test fulfillment failed for booking_id={booking.booking_id}")
+                result = FulfillmentResult(
+                    booking_id=int(booking.booking_id),
+                    engagement_id=int(blood_result["engagement_id"]),
+                    engagement_participant_id=int(blood_result["engagement_participant_id"]),
+                    booking_type=bt,
+                )
+            else:
+                raise ValueError(f"Unknown booking_type={bt!r} for booking_id={booking.booking_id}")
+
+            _persist_fulfillment_metadata(booking, result)
+            results.append(result)
+
+        return results
 
     async def get_booking_status(
         self,

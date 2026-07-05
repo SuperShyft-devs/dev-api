@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, model_validator, validator
 
 _ALLOWED_DIET_PREFERENCES = {"veg", "non_veg", "vegan", "jain", "eggetarian", "keto"}
 _ALLOWED_ALLERGIES = {"peanuts", "dairy", "eggs", "fish", "soy", "wheat", "sesame", "mustard", "corn", "other"}
@@ -209,11 +209,25 @@ class BookBioAiMemberPayload(BaseModel):
 
 
 class BookBioAiBatchRequest(BaseModel):
-    members: list[BookBioAiMemberPayload] = Field(..., min_length=1)
+    members: list[BookBioAiMemberPayload] = Field(..., min_length=1, max_length=10)
+
+    @model_validator(mode="after")
+    def unique_member_user_ids(self) -> "BookBioAiBatchRequest":
+        ids = [m.user_id for m in self.members]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Duplicate user_id in members")
+        return self
 
 
 class BookBloodTestBatchRequest(BaseModel):
-    members: list[BookBioAiMemberPayload] = Field(..., min_length=1)
+    members: list[BookBioAiMemberPayload] = Field(..., min_length=1, max_length=10)
+
+    @model_validator(mode="after")
+    def unique_member_user_ids(self) -> "BookBloodTestBatchRequest":
+        ids = [m.user_id for m in self.members]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Duplicate user_id in members")
+        return self
 
 
 class PublicUserOnboardRequest(BaseModel):

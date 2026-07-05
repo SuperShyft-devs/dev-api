@@ -312,3 +312,148 @@ async def test_book_blood_test_batch_returns_payment_info(async_client, test_db_
     ).first()
     assert booking_row.booking_type == "blood_test"
     assert booking_row.metadata is not None
+
+
+@pytest.mark.asyncio
+async def test_book_bio_ai_batch_rejects_duplicate_member_user_id(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "")
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
+            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 500) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
+            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
+            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
+        )
+    )
+    await test_db_session.commit()
+
+    u = User(
+        user_id=920040,
+        age=30,
+        phone="9200400000",
+        status="active",
+        first_name="Dup",
+        last_name="User",
+        gender="male",
+        city="City",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+
+    member = {
+        "user_id": 920040,
+        "address": "Addr",
+        "pincode": "111111",
+        "city": "City",
+        "blood_collection_date": "2026-06-01",
+        "blood_collection_time_slot": "10:00",
+        "diagnostic_package_id": 1,
+    }
+    payload = {"members": [member, member]}
+    response = await async_client.post("/book/bio-ai", headers=_auth_header(920040), json=payload)
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_book_bio_ai_batch_rejects_more_than_ten_members(async_client, test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
+            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 500) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
+            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
+            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
+        )
+    )
+    await test_db_session.commit()
+
+    u = User(
+        user_id=920050,
+        age=30,
+        phone="9200500000",
+        status="active",
+        first_name="Big",
+        last_name="Batch",
+        gender="male",
+        city="City",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+
+    members = [
+        {
+            "user_id": 920050 + i,
+            "address": f"Addr {i}",
+            "pincode": "111111",
+            "city": "City",
+            "blood_collection_date": "2026-06-01",
+            "blood_collection_time_slot": "10:00",
+            "diagnostic_package_id": 1,
+        }
+        for i in range(11)
+    ]
+    response = await async_client.post("/book/bio-ai", headers=_auth_header(920050), json={"members": members})
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_book_bio_ai_batch_writes_audit_log(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "")
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
+            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 500) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
+            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
+            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
+        )
+    )
+    await test_db_session.commit()
+
+    u = User(
+        user_id=920060,
+        age=30,
+        phone="9200600000",
+        status="active",
+        first_name="Aud",
+        last_name="It",
+        gender="male",
+        city="City",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+
+    payload = {
+        "members": [
+            {
+                "user_id": 920060,
+                "address": "Addr",
+                "pincode": "111111",
+                "city": "City",
+                "blood_collection_date": "2026-06-01",
+                "blood_collection_time_slot": "10:00",
+                "diagnostic_package_id": 1,
+            }
+        ]
+    }
+
+    with patch(
+        "modules.payments.services._create_razorpay_order_sync",
+        side_effect=_mock_razorpay_order,
+    ):
+        response = await async_client.post("/book/bio-ai", headers=_auth_header(920060), json=payload)
+
+    assert response.status_code == 200
+
+    audit_count = (
+        await test_db_session.execute(
+            text(
+                "SELECT COUNT(*) FROM data_audit_logs "
+                "WHERE user_id = 920060 AND action = 'USER_BOOK_BIO_AI'"
+            )
+        )
+    ).scalar_one()
+    assert int(audit_count) >= 1

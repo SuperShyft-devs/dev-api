@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -33,7 +33,14 @@ class CreateOrderRequest(BaseModel):
     """Payer user_id plus at least one line (member user_id + entity)."""
 
     user_id: int = Field(..., ge=1)
-    items: list[CreateOrderLineItem] = Field(..., min_length=1)
+    items: list[CreateOrderLineItem] = Field(..., min_length=1, max_length=10)
+
+    @model_validator(mode="after")
+    def unique_line_user_ids(self) -> "CreateOrderRequest":
+        ids = [line.user_id for line in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Duplicate user_id in items")
+        return self
 
 
 class VerifyPaymentRequest(BaseModel):
@@ -65,11 +72,14 @@ async def create_order(
         )
         err = result.get("_error")
         if err:
+            await db.rollback()
             code, msg = err
             payload = {"success": False, "message": msg}
             return JSONResponse(status_code=code, content=payload)
+        await db.commit()
         return result
     except Exception:
+        await db.rollback()
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"success": False, "message": "Internal server error"},
@@ -89,21 +99,26 @@ async def verify_payment(
             razorpay_payment_id=body.razorpay_payment_id.strip(),
             razorpay_order_id=body.razorpay_order_id.strip(),
             razorpay_signature=body.razorpay_signature.strip(),
+            authenticated_user_id=current_user.user_id,
         )
         if result.get("_signature_invalid"):
+            await db.rollback()
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={"success": False, "message": "Invalid payment signature"},
             )
         err = result.get("_error")
         if err:
+            await db.rollback()
             code, msg = err
             return JSONResponse(
                 status_code=code,
                 content={"success": False, "message": msg},
             )
+        await db.commit()
         return result
     except Exception:
+        await db.rollback()
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"success": False, "message": "Internal server error"},
@@ -122,16 +137,20 @@ async def payment_failed(
             db,
             razorpay_order_id=body.razorpay_order_id.strip(),
             failure_reason=body.failure_reason,
+            authenticated_user_id=current_user.user_id,
         )
         err = result.get("_error")
         if err:
+            await db.rollback()
             code, msg = err
             return JSONResponse(
                 status_code=code,
                 content={"success": False, "message": msg},
             )
+        await db.commit()
         return result
     except Exception:
+        await db.rollback()
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"success": False, "message": "Internal server error"},

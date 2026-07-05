@@ -600,8 +600,16 @@ class UsersService:
 
         validated_items: list[tuple[int, str, int]] = []
         metadata_by_user: dict[int, dict] = {}
+        seen_user_ids: set[int] = set()
 
         for m in members:
+            if m.user_id in seen_user_ids:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="Duplicate user_id in members",
+                )
+            seen_user_ids.add(m.user_id)
             target = await self._get_user_bookable_by_primary(
                 db, primary_user_id=actor.user_id, target_user_id=m.user_id
             )
@@ -963,7 +971,7 @@ class UsersService:
         db: AsyncSession,
         *,
         booking,
-    ) -> None:
+    ) -> dict[str, int | str] | None:
         """Post-payment fulfillment for a blood_test (diagnostic-only) booking."""
         if self._engagements_service is None:
             raise RuntimeError("Engagements service is required")
@@ -972,19 +980,18 @@ class UsersService:
 
         meta = booking.metadata_ or {}
 
-        # Guard: without a collection date and time we cannot create an engagement.
         if not meta.get("blood_collection_date") or not meta.get("blood_collection_time_slot"):
             logger.warning(
                 "fulfill_blood_test_booking: booking_id=%s is missing blood_collection_date "
-                "or blood_collection_time_slot in metadata; skipping engagement creation",
+                "or blood_collection_time_slot in metadata",
                 getattr(booking, "booking_id", "unknown"),
             )
-            return
+            return None
 
         user = await self._repository.get_user_by_id(db, booking.user_id)
         if user is None:
             logger.warning("fulfill_blood_test_booking: user_id=%s not found", booking.user_id)
-            return
+            return None
 
         if not user.is_participant:
             await self._repository.update_user_partial(db, user.user_id, {"is_participant": True})
@@ -1014,7 +1021,7 @@ class UsersService:
         )
 
         slot_start = self._parse_time_slot(meta["blood_collection_time_slot"])
-        await self._engagements_service.enroll_user_in_engagement(
+        time_slot = await self._engagements_service.enroll_user_in_engagement(
             db,
             engagement=engagement,
             user_id=user.user_id,
@@ -1031,6 +1038,12 @@ class UsersService:
             collection_date=str(meta.get("blood_collection_date") or ""),
             collection_time=str(meta.get("blood_collection_time_slot") or ""),
         )
+
+        return {
+            "engagement_id": int(engagement.engagement_id),
+            "engagement_participant_id": int(time_slot.engagement_participant_id),
+            "booking_type": "blood_test",
+        }
 
     def _create_metsights_profile(self, user: User) -> None:
         """Legacy placeholder.
