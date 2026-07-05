@@ -345,7 +345,7 @@ class ConsoleService:
             "camp_id": diagnostic_package.external_camp_id,
             "slot": {"slot_id": ""},
             "sample_collected": "y",
-            "package": [{"deal_id": [f"profile_{diagnostic_package.external_package_id}"]}],
+            "package": [{"deal_id": [f"package_{diagnostic_package.external_package_id}"]}],
             "customer_calling_number": phone,
             "billing_cust_name": customer_name,
             "gender": gender,
