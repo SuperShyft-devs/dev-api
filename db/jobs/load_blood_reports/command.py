@@ -16,11 +16,17 @@ from datetime import date
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from core.config import settings
+from modules.assessments.dependencies import get_assessments_service
+from modules.engagements.dependencies import get_engagements_service
 from modules.metsights.client import MetsightsClient
 from modules.metsights.service import MetsightsService
+from modules.metsights.sync_service import MetsightsSyncService
 from modules.notifications.load_blood_reports import load_blood_reports
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.service import NotificationsService
+from modules.platform_settings.dependencies import get_platform_settings_service_readonly
+from modules.questionnaire.repository import QuestionnaireRepository
+from modules.users.repository import UsersRepository
 
 
 async def run_load(
@@ -44,7 +50,17 @@ async def run_load(
     )
     session_factory = async_sessionmaker(bind=engine, expire_on_commit=False)
 
-    metsights_service = MetsightsService(client=MetsightsClient())
+    metsights_client = MetsightsClient()
+    metsights_service = MetsightsService(client=metsights_client)
+    sync_service = MetsightsSyncService(
+        metsights_service=metsights_service,
+        users_repository=UsersRepository(),
+        engagements_service=get_engagements_service(),
+        assessments_service=get_assessments_service(),
+        platform_settings_service=get_platform_settings_service_readonly(),
+        questionnaire_repository=QuestionnaireRepository(),
+    )
+    assessments_service = get_assessments_service()
     notifications_service = NotificationsService(NotificationsRepository())
 
     async with session_factory() as session:
@@ -52,6 +68,8 @@ async def run_load(
             session,
             metsights_service=metsights_service,
             notifications_service=notifications_service,
+            assessments_service=assessments_service,
+            sync_service=sync_service,
             as_of=as_of,
             dry_run=dry_run,
         )

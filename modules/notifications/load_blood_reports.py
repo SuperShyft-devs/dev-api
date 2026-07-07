@@ -2,9 +2,11 @@
 
 For participants in running engagements with MetSights Pro/Basic assessments
 where today >= engagement_date:
-1. Always refresh individual_health_report.diagnostic_report_url from Healthians.
-2. Fetch blood_parameters from Healthians only when that field is null.
-3. When both fields are present, send notifications using
+1. Always refresh blood_parameters from Healthians and upsert individual_health_report.
+2. After a successful blood load, draft blood-parameter questionnaire responses.
+3. Push blood parameters to Metsights when BioAI report is not yet generated.
+4. Always refresh individual_health_report.diagnostic_report_url from Healthians.
+5. When both fields are present, send notifications using
    engagement.blood_report_notification (skipping services already sent).
 """
 
@@ -18,10 +20,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
+from modules.assessments.service import AssessmentsService, _PACKAGE_BLOOD_CATEGORY_KEYS
 from modules.diagnostics.models import DiagnosticPackage
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.diagnostics.repository import DiagnosticsRepository
 from modules.metsights.service import MetsightsService
+from modules.metsights.sync_service import MetsightsSyncService
 from modules.diagnostics.healthians import client as healthians_client
 from modules.notifications.dedup import should_skip_notification
 from modules.notifications.schemas import DispatchRequest
@@ -105,7 +109,8 @@ async def _get_eligible_participants(
     Returns tuples of:
     (user_id, engagement_id, record_id, first_name, last_name,
      blood_parameters, diagnostic_report_url, blood_report_notification, ihr_id, instance_id,
-     diagnostic_package_id, participant_booking_id, diagnostic_provider)
+     diagnostic_package_id, participant_booking_id, diagnostic_provider,
+     package_code, assessment_type_code)
     """
     query = (
         select(
@@ -122,6 +127,8 @@ async def _get_eligible_participants(
             Engagement.diagnostic_package_id,
             EngagementParticipant.booking_id,
             DiagnosticPackage.diagnostic_provider,
+            AssessmentPackage.package_code,
+            AssessmentPackage.assessment_type_code,
         )
         .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
         .outerjoin(
@@ -148,6 +155,31 @@ async def _get_eligible_participants(
     )
     result = await db.execute(query)
     return result.all()
+
+
+async def _get_or_create_ihr(
+    db: AsyncSession,
+    *,
+    ihr_id: int | None,
+    user_id: int,
+    engagement_id: int,
+    instance_id: int,
+) -> IndividualHealthReport:
+    ihr = None
+    if ihr_id:
+        ihr_result = await db.execute(
+            select(IndividualHealthReport).where(IndividualHealthReport.report_id == ihr_id)
+        )
+        ihr = ihr_result.scalar_one_or_none()
+
+    if ihr is None:
+        ihr = IndividualHealthReport(
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=instance_id,
+        )
+        db.add(ihr)
+    return ihr
 
 
 async def _send_report_notifications(
@@ -202,6 +234,8 @@ async def load_blood_reports(
     *,
     metsights_service: MetsightsService,
     notifications_service: NotificationsService,
+    assessments_service: AssessmentsService,
+    sync_service: MetsightsSyncService,
     as_of: date | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
@@ -221,9 +255,13 @@ async def load_blood_reports(
             blood_params, diag_url,
             blood_report_notification, ihr_id, instance_id,
             diagnostic_package_id, participant_booking_id, diagnostic_provider,
+            package_code, assessment_type_code,
         ) = row
 
         record_id = (record_id or "").strip()
+        package_code = (package_code or "").strip()
+        assessment_type_code = (assessment_type_code or "").strip()
+
         if not record_id:
             skipped += 1
             details.append({
@@ -234,9 +272,23 @@ async def load_blood_reports(
 
         if dry_run:
             complete = _blood_report_data_complete(blood_params, diag_url)
-            dry_run_reasons = ["would_refresh_diagnostic_report_url"]
-            if not has_usable_provider_blood_parameters(blood_params):
-                dry_run_reasons.append("would_fetch_blood_parameters")
+            dry_run_reasons = [
+                "would_fetch_blood_parameters",
+                "would_refresh_diagnostic_report_url",
+            ]
+            if package_code in _PACKAGE_BLOOD_CATEGORY_KEYS:
+                dry_run_reasons.append("would_draft_blood_questionnaires")
+                try:
+                    report_exists = await metsights_service.is_bioai_report_generated(
+                        record_id=record_id,
+                        assessment_type_code=assessment_type_code,
+                    )
+                    if report_exists:
+                        dry_run_reasons.append("would_skip_metsights_push_report_generated")
+                    else:
+                        dry_run_reasons.append("would_push_blood_to_metsights")
+                except Exception as exc:
+                    dry_run_reasons.append(f"would_skip_metsights_push_check_failed: {exc}")
             dry_run_reasons.append(
                 "blood_report_complete" if complete else "blood_report_incomplete"
             )
@@ -289,26 +341,151 @@ async def load_blood_reports(
             access_token = await healthians_client.get_access_token()
 
             fetched_blood = None
-            fetched_diag_url = None
+            blood_loaded_this_run = False
 
-            if not has_usable_provider_blood_parameters(blood_parameters):
-                try:
-                    digital_value = await healthians_client.get_booking_digital_value(
-                        access_token, reference_id
+            try:
+                digital_value = await healthians_client.get_booking_digital_value(
+                    access_token, reference_id
+                )
+                data_list = digital_value.get("data")
+                if isinstance(data_list, list) and data_list:
+                    matched_entry = _match_customer_by_name(
+                        data_list, first_name or "", last_name or ""
                     )
-                    data_list = digital_value.get("data")
-                    if isinstance(data_list, list) and data_list:
-                        matched_entry = _match_customer_by_name(
-                            data_list, first_name or "", last_name or ""
+                    if matched_entry:
+                        fetched_blood = matched_entry
+            except Exception as exc:
+                logger.warning(
+                    "Healthians getBookingDigitalValue failed for user=%s booking=%s: %s",
+                    user_id, reference_id, exc,
+                )
+
+            if fetched_blood is not None:
+                if diagnostic_package_id is None:
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped",
+                        "reason": "engagement has no diagnostic package for blood parameters",
+                    })
+                else:
+                    ihr = await _get_or_create_ihr(
+                        db,
+                        ihr_id=ihr_id,
+                        user_id=user_id,
+                        engagement_id=engagement_id,
+                        instance_id=instance_id,
+                    )
+                    grouped, raw = await _group_provider_blood(
+                        db,
+                        fetched_blood,
+                        diagnostic_package_id=int(diagnostic_package_id),
+                    )
+                    ihr.blood_parameters = grouped
+                    ihr.blood_report_raw = raw
+                    blood_parameters = grouped
+                    blood_loaded_this_run = True
+                    await db.flush()
+                    await db.commit()
+                    loaded += 1
+                    source_label = (
+                        "participant booking_id"
+                        if booking_source == HealthiansBookingSource.PARTICIPANT
+                        else "Metsights reference_id"
+                    )
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "loaded",
+                        "reason": f"blood data fetched from Healthians via {source_label}",
+                    })
+
+                    try:
+                        draft_result = await assessments_service.draft_blood_parameters_from_report(
+                            db,
+                            user_id=user_id,
+                            assessment_instance_id=instance_id,
+                            allow_completed=True,
                         )
-                        if matched_entry:
-                            fetched_blood = matched_entry
-                except Exception as exc:
-                    logger.warning(
-                        "Healthians getBookingDigitalValue failed for user=%s booking=%s: %s",
-                        user_id, reference_id, exc,
-                    )
+                        await db.commit()
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "drafted",
+                            "reason": (
+                                f"drafted {draft_result.get('responses_drafted', 0)} "
+                                "blood questionnaire responses"
+                            ),
+                        })
+                    except Exception as exc:
+                        await db.rollback()
+                        logger.warning(
+                            "Blood parameter draft failed for user=%s instance=%s: %s",
+                            user_id, instance_id, exc,
+                        )
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped",
+                            "reason": f"blood draft failed: {str(exc)[:120]}",
+                        })
 
+                    if blood_loaded_this_run and package_code in _PACKAGE_BLOOD_CATEGORY_KEYS:
+                        try:
+                            report_exists = await metsights_service.is_bioai_report_generated(
+                                record_id=record_id,
+                                assessment_type_code=assessment_type_code,
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                "BioAI report check failed for user=%s record=%s: %s",
+                                user_id, record_id, exc,
+                            )
+                            details.append({
+                                "user_id": user_id, "engagement_id": engagement_id,
+                                "action": "skipped",
+                                "reason": f"skipped metsights push: report check failed ({str(exc)[:80]})",
+                            })
+                            report_exists = True
+
+                        if report_exists:
+                            details.append({
+                                "user_id": user_id, "engagement_id": engagement_id,
+                                "action": "skipped",
+                                "reason": "skipped metsights push: BioAI report already generated",
+                            })
+                        else:
+                            category_keys = _PACKAGE_BLOOD_CATEGORY_KEYS[package_code]
+                            for category_key in category_keys:
+                                try:
+                                    push_result = await sync_service._push_category_to_metsights(
+                                        db,
+                                        assessment_instance_id=instance_id,
+                                        user_id=user_id,
+                                        category_key=category_key,
+                                    )
+                                    await db.commit()
+                                    fields_count = len(push_result.get("fields_pushed") or [])
+                                    details.append({
+                                        "user_id": user_id, "engagement_id": engagement_id,
+                                        "action": "pushed",
+                                        "reason": (
+                                            f"pushed {category_key} to Metsights "
+                                            f"({fields_count} fields)"
+                                        ),
+                                    })
+                                except Exception as exc:
+                                    await db.rollback()
+                                    logger.warning(
+                                        "Metsights blood push failed for user=%s category=%s: %s",
+                                        user_id, category_key, exc,
+                                    )
+                                    details.append({
+                                        "user_id": user_id, "engagement_id": engagement_id,
+                                        "action": "failed",
+                                        "reason": (
+                                            f"metsights push failed for {category_key}: "
+                                            f"{str(exc)[:100]}"
+                                        ),
+                                    })
+
+            fetched_diag_url = None
             try:
                 report_data = await healthians_client.get_booking_report(
                     access_token, reference_id
@@ -328,64 +505,29 @@ async def load_blood_reports(
                     user_id, reference_id, exc,
                 )
 
-            if fetched_blood is not None or fetched_diag_url is not None:
-                ihr = None
-                if ihr_id:
-                    ihr_result = await db.execute(
-                        select(IndividualHealthReport).where(
-                            IndividualHealthReport.report_id == ihr_id
-                        )
-                    )
-                    ihr = ihr_result.scalar_one_or_none()
-
-                if ihr is None:
-                    ihr = IndividualHealthReport(
-                        user_id=user_id,
-                        engagement_id=engagement_id,
-                        assessment_instance_id=instance_id,
-                    )
-                    db.add(ihr)
-
-                if fetched_blood is not None:
-                    if diagnostic_package_id is None:
-                        details.append({
-                            "user_id": user_id, "engagement_id": engagement_id,
-                            "action": "skipped",
-                            "reason": "engagement has no diagnostic package for blood parameters",
-                        })
-                    else:
-                        grouped, raw = await _group_provider_blood(
-                            db,
-                            fetched_blood,
-                            diagnostic_package_id=int(diagnostic_package_id),
-                        )
-                        ihr.blood_parameters = grouped
-                        ihr.blood_report_raw = raw
-                        blood_parameters = grouped
-                if fetched_diag_url is not None:
-                    ihr.diagnostic_report_url = fetched_diag_url
-                    diagnostic_report_url = fetched_diag_url
+            if fetched_diag_url is not None:
+                ihr = await _get_or_create_ihr(
+                    db,
+                    ihr_id=ihr_id,
+                    user_id=user_id,
+                    engagement_id=engagement_id,
+                    instance_id=instance_id,
+                )
+                ihr.diagnostic_report_url = fetched_diag_url
+                diagnostic_report_url = fetched_diag_url
                 await db.flush()
                 await db.commit()
-
-                loaded += 1
+                if not blood_loaded_this_run:
+                    loaded += 1
                 source_label = (
                     "participant booking_id"
                     if booking_source == HealthiansBookingSource.PARTICIPANT
                     else "Metsights reference_id"
                 )
-                if fetched_blood is not None and fetched_diag_url is not None:
-                    load_reason = (
-                        f"blood data and diagnostic_report_url fetched from Healthians "
-                        f"via {source_label}"
-                    )
-                elif fetched_blood is not None:
-                    load_reason = f"blood data fetched from Healthians via {source_label}"
-                else:
-                    load_reason = f"diagnostic_report_url refreshed from Healthians via {source_label}"
                 details.append({
                     "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "loaded", "reason": load_reason,
+                    "action": "loaded",
+                    "reason": f"diagnostic_report_url refreshed from Healthians via {source_label}",
                 })
 
             if not _blood_report_data_complete(blood_parameters, diagnostic_report_url):

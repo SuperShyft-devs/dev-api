@@ -557,3 +557,123 @@ async def test_submit_legacy_pro_pushes_fitprint_sibling_fitness(async_client, t
     assert len(fit) == 1
     assert fit[0][2].get("exercise_frequency_week") == "2"
     assert fit[0][2].get("is_complete") is True
+
+
+@pytest.mark.asyncio
+async def test_submit_legacy_blocked_when_bioai_report_generated(async_client, test_db_session, monkeypatch):
+    await _ensure_test_engagement(test_db_session)
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+
+    async def _report_exists(self, *, record_id: str, assessment_type_code: str | None):
+        return True
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.is_bioai_report_generated",
+        _report_exists,
+    )
+
+    uid = 55250
+    await _seed_user(test_db_session, user_id=uid)
+    pkg_id = 55550
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pkg_id,
+            package_code="MET_SUBMIT_GUARD",
+            display_name="Submit Guard Test",
+            assessment_type_code="1",
+            status="active",
+        )
+    )
+    test_db_session.add(AssessmentPackageCategory(package_id=pkg_id, category_id=1))
+    await test_db_session.commit()
+
+    aid = 55551
+    rid = "MS-SUBMIT-GUARD"
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=aid,
+            user_id=uid,
+            package_id=pkg_id,
+            engagement_id=1,
+            status="active",
+            metsights_record_id=rid,
+        )
+    )
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=aid,
+            question_id=1,
+            category_id=1,
+            answer={"value": 175.0, "unit": "0"},
+            submitted_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    r = await async_client.post(f"/assessments/{aid}/submit-legacy", headers=_auth_header(uid))
+    assert r.status_code == 422
+    body = r.json()
+    assert body["error_code"] == "REPORT_ALREADY_GENERATED"
+    assert "BioAI report has already been generated" in body["message"]
+
+
+@pytest.mark.asyncio
+async def test_submit_category_blocked_when_bioai_report_generated(async_client, test_db_session, monkeypatch):
+    await _ensure_test_engagement(test_db_session)
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+
+    async def _report_exists(self, *, record_id: str, assessment_type_code: str | None):
+        return True
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.is_bioai_report_generated",
+        _report_exists,
+    )
+
+    uid = 55251
+    await _seed_user(test_db_session, user_id=uid)
+    pkg_id = 55552
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pkg_id,
+            package_code="MET_CAT_GUARD",
+            display_name="Category Submit Guard",
+            assessment_type_code="1",
+            status="active",
+        )
+    )
+    test_db_session.add(AssessmentPackageCategory(package_id=pkg_id, category_id=1))
+    await test_db_session.commit()
+
+    aid = 55553
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=aid,
+            user_id=uid,
+            package_id=pkg_id,
+            engagement_id=1,
+            status="active",
+            metsights_record_id="MS-CAT-GUARD",
+        )
+    )
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=aid,
+            question_id=1,
+            category_id=1,
+            answer={"value": 175.0, "unit": "0"},
+            submitted_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    r = await async_client.post(
+        f"/assessments/{aid}/submit",
+        headers=_auth_header(uid),
+        json={"category": "physical-measurement", "category_of": "metsights"},
+    )
+    assert r.status_code == 422
+    body = r.json()
+    assert body["error_code"] == "REPORT_ALREADY_GENERATED"
+    assert "BioAI report has already been generated" in body["message"]
+

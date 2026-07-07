@@ -380,6 +380,51 @@ class MetsightsService:
         envelope = MetsightsEnvelope.model_validate(payload)
         return envelope.data
 
+    async def is_bioai_report_generated(
+        self,
+        *,
+        record_id: str,
+        assessment_type_code: str | None,
+    ) -> bool:
+        """Return True when Metsights GET report returns 200; False on 404."""
+        normalized_record_id = (record_id or "").strip()
+        if not normalized_record_id:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Metsights record id is missing")
+        if not settings.METSIGHTS_API_KEY:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights integration is not configured",
+            )
+
+        try:
+            await self._client.get_report(
+                record_id=normalized_record_id,
+                assessment_type_code=assessment_type_code,
+            )
+            return True
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 404:
+                return False
+            if status_code == 403:
+                raise AppError(
+                    status_code=503,
+                    error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                    message="Metsights authorization failed",
+                ) from exc
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights request failed",
+            ) from exc
+
     async def get_report_pdf(self, *, record_id: str, assessment_type_code: str | None) -> Any:
         normalized_record_id = (record_id or "").strip()
         if not normalized_record_id:

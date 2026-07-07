@@ -349,6 +349,55 @@ async def test_draft_blood_parameters_rejects_completed_assessment(async_client,
 
 
 @pytest.mark.asyncio
+async def test_draft_blood_parameters_allow_completed_for_internal_cron(test_db_session):
+    from modules.assessments.dependencies import get_assessments_service
+
+    await _seed_basic_setup(
+        test_db_session,
+        user_id=66071,
+        package_id=66071,
+        assessment_id=66071,
+        category_id=77071,
+        question_id=77071,
+        option_id=77071,
+        mapping_id=77071,
+        report_id=77071,
+        status="completed",
+        blood_parameters=[
+            {
+                "group_name": "Metabolic",
+                "test_count": 1,
+                "tests": [
+                    {
+                        "test_id": 1,
+                        "parameter_key": "glucose_fasting",
+                        "value": 92.0,
+                        "unit": "mg/dL",
+                    }
+                ],
+            }
+        ],
+    )
+
+    service = get_assessments_service()
+    result = await service.draft_blood_parameters_from_report(
+        test_db_session,
+        user_id=66071,
+        assessment_instance_id=66071,
+        allow_completed=True,
+    )
+    assert result["responses_drafted"] == 1
+
+    rows = (
+        await test_db_session.execute(
+            select(QuestionnaireResponse).where(QuestionnaireResponse.assessment_instance_id == 66071)
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].submitted_at is None
+
+
+@pytest.mark.asyncio
 async def test_draft_blood_parameters_basic_writes_draft_responses(async_client, test_db_session):
     await _seed_basic_setup(
         test_db_session,

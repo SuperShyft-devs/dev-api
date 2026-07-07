@@ -55,6 +55,10 @@ _CATEGORY_KEY_TO_API_PATH: dict[str, str] = {
 
 logger = logging.getLogger(__name__)
 
+_REPORT_ALREADY_GENERATED_MESSAGE = (
+    "BioAI report has already been generated for this record. Answers cannot be pushed or updated."
+)
+
 
 async def _resolve_active_diagnostic_package_id(db: AsyncSession, preferred_id: int) -> int:
     """Use ``preferred_id`` when active; otherwise first active diagnostic package."""
@@ -1432,6 +1436,8 @@ class MetsightsSyncService:
                 message="Assessment has no Metsights record id; cannot push questionnaire",
             )
 
+        await self._ensure_bioai_report_not_generated(record_id=mrid, assessment_type_code=type_code)
+
         # Determine which instance ids to pull responses from.
         effective_source_ids: list[int]
         if source_assessment_instance_ids:
@@ -1689,6 +1695,23 @@ class MetsightsSyncService:
     # Strategy-based push (category-level submit)
     # ------------------------------------------------------------------
 
+    async def _ensure_bioai_report_not_generated(
+        self,
+        *,
+        record_id: str,
+        assessment_type_code: str | None,
+    ) -> None:
+        """Raise when Metsights BioAI report already exists for this record."""
+        if await self._metsights.is_bioai_report_generated(
+            record_id=record_id,
+            assessment_type_code=assessment_type_code,
+        ):
+            raise AppError(
+                status_code=422,
+                error_code="REPORT_ALREADY_GENERATED",
+                message=_REPORT_ALREADY_GENERATED_MESSAGE,
+            )
+
     async def submit_category_to_metsights(
         self,
         db: AsyncSession,
@@ -1699,6 +1722,38 @@ class MetsightsSyncService:
         category_of: str = "metsights",
     ) -> dict[str, Any]:
         """Push answers for a single Metsights category using the strategy engine."""
+        instance = await self._assessments.get_instance_by_id(db, assessment_instance_id=assessment_instance_id)
+        if instance is None:
+            raise AppError(status_code=404, error_code="ASSESSMENT_NOT_FOUND", message="Assessment does not exist")
+        if int(instance.user_id) != int(user_id):
+            raise AppError(status_code=403, error_code="FORBIDDEN", message="You do not have permission to perform this action")
+
+        mrid = (instance.metsights_record_id or "").strip()
+        if not mrid:
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment has no Metsights record id")
+
+        package = await self._assessments.get_package_by_id(db, int(instance.package_id))
+        type_code = (package.assessment_type_code or "").strip() if package is not None else ""
+        await self._ensure_bioai_report_not_generated(record_id=mrid, assessment_type_code=type_code)
+
+        return await self._push_category_to_metsights(
+            db,
+            assessment_instance_id=assessment_instance_id,
+            user_id=user_id,
+            category_key=category_key,
+            category_of=category_of,
+        )
+
+    async def _push_category_to_metsights(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        user_id: int,
+        category_key: str,
+        category_of: str = "metsights",
+    ) -> dict[str, Any]:
+        """Push answers for a single Metsights category (no BioAI report guard)."""
         from modules.assessments.repository import AssessmentsRepository
 
         assessments_repo = AssessmentsRepository()

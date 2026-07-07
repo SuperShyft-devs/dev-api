@@ -149,6 +149,21 @@ def pytest_sessionstart(session: pytest.Session) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _default_bioai_report_not_generated(monkeypatch, request):
+    """Most tests assume Metsights BioAI report is not generated yet (submit/push allowed)."""
+    if request.node.fspath and "test_report_guard.py" in str(request.node.fspath):
+        return
+
+    async def _false(self, *, record_id: str, assessment_type_code: str | None):
+        return False
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.is_bioai_report_generated",
+        _false,
+    )
+
+
+@pytest.fixture(autouse=True)
 def _set_test_settings():
     """Set required settings for tests."""
     settings.JWT_SECRET_KEY = settings.JWT_SECRET_KEY or "test-secret"

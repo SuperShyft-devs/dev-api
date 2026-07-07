@@ -529,6 +529,7 @@ class AssessmentsService:
         user_id: int,
         assessment_instance_id: int,
         employee_ok: bool = False,
+        allow_completed: bool = False,
     ) -> dict[str, Any]:
         """Draft blood-parameter questionnaire answers from individual_health_report.blood_parameters."""
 
@@ -603,10 +604,14 @@ class AssessmentsService:
             )
 
         current_status = (instance.status or "").lower()
-        if current_status == "completed":
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment is already completed")
-        if current_status != "active":
-            raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment is not active")
+        if allow_completed:
+            if current_status not in {"active", "completed"}:
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment is not active")
+        else:
+            if current_status == "completed":
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment is already completed")
+            if current_status != "active":
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment is not active")
 
         report = await self._reports.get_individual_report_by_assessment(
             db,
