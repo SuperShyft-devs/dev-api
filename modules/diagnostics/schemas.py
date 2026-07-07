@@ -390,6 +390,7 @@ class DiagnosticPackageDetailResponse(DiagnosticPackageResponse):
 class DiagnosticPackageListItem(BaseModel):
     diagnostic_package_id: int
     package_name: str
+    diagnostic_provider: Optional[str] = None
     display_order: Optional[int] = None
     external_package_id: Optional[int] = None
     no_of_tests: Optional[int] = None

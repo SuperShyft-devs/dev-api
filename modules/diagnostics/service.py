@@ -410,6 +410,7 @@ class DiagnosticsService:
                 DiagnosticPackageListItem(
                     diagnostic_package_id=row.diagnostic_package_id,
                     package_name=row.package_name,
+                    diagnostic_provider=row.diagnostic_provider,
                     display_order=row.display_order,
                     external_package_id=row.external_package_id,
                     no_of_tests=n_tests,
