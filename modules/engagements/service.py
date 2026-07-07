@@ -8,15 +8,18 @@ Business rules:
 
 from __future__ import annotations
 
+import logging
 import secrets
 import string
 from datetime import date, datetime, time, timezone
 from typing import TYPE_CHECKING, Any
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.phone import phone_lookup_candidates as _phone_lookup_candidates
+from core.config import settings
 from core.exceptions import AppError
 from modules.assessments.repository import AssessmentsRepository
 from modules.assessments.service import AssessmentsService
@@ -32,6 +35,8 @@ from modules.engagements.schemas import (
     EngagementCreateRequest,
     EngagementParticipantUpdateRequest,
     EngagementUpdateRequest,
+    ResolveHealthiansZoneRequest,
+    ResolveHealthiansZoneResponse,
 )
 from modules.notifications.repository import NotificationsRepository
 from modules.organizations.repository import OrganizationsRepository
@@ -47,6 +52,9 @@ if TYPE_CHECKING:
     from modules.notifications.service import NotificationsService
 
 
+logger = logging.getLogger(__name__)
+
+
 def _generate_engagement_code(length: int = 8) -> str:
     alphabet = string.ascii_uppercase + string.digits
     return "".join(secrets.choice(alphabet) for _ in range(length))
@@ -59,6 +67,21 @@ _B2C_DEFAULT_ONBOARDING_ASSISTANT_EMPLOYEE_IDS = (1, 8)
 
 def _normalize_status(value: str | None) -> str:
     return (value or "").strip().lower()
+
+
+def _parse_status_filter(status: str | None) -> list[str] | None:
+    if status is None:
+        return None
+    raw_values = [part.strip() for part in status.split(",") if part.strip()]
+    if not raw_values:
+        return None
+    normalized_values: list[str] = []
+    for raw in raw_values:
+        normalized = _normalize_status(raw)
+        if normalized not in _ALLOWED_ENGAGEMENT_STATUS:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        normalized_values.append(normalized)
+    return normalized_values
 
 
 def _resolve_notification_service_key(raw: str | None) -> str:
@@ -423,12 +446,7 @@ class EngagementsService:
     ) -> tuple[list[Engagement], int, dict[int, ChecklistReadiness]]:
         ensure_admin(employee)
 
-        status_value = None
-        if status is not None:
-            normalized = _normalize_status(status)
-            if normalized not in _ALLOWED_ENGAGEMENT_STATUS:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            status_value = normalized
+        status_values = _parse_status_filter(status)
 
         audience_value = None
         if audience is not None:
@@ -443,7 +461,7 @@ class EngagementsService:
             limit=limit,
             organization_id=organization_id,
             camp_no=camp_no,
-            status=status_value,
+            statuses=status_values,
             city=city,
             on_date=on_date,
             search=search,
@@ -457,7 +475,7 @@ class EngagementsService:
             db,
             organization_id=organization_id,
             camp_no=camp_no,
-            status=status_value,
+            statuses=status_values,
             city=city,
             on_date=on_date,
             search=search,
@@ -483,6 +501,113 @@ class EngagementsService:
         ensure_admin(employee)
         types, cities = await self._repository.list_distinct_engagement_types_and_cities(db)
         return {"engagement_types": types, "cities": cities}
+
+    async def resolve_healthians_zone_for_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        payload: ResolveHealthiansZoneRequest,
+    ) -> ResolveHealthiansZoneResponse:
+        from modules.diagnostics.healthians import client as healthians_client
+        from modules.diagnostics.healthians.sync_log import finalize_healthians_sync_log, log_healthians_call
+        from modules.diagnostics.models import DiagnosticPackage
+
+        ensure_admin(employee)
+
+        result = await db.execute(
+            select(DiagnosticPackage).where(
+                DiagnosticPackage.diagnostic_package_id == payload.diagnostic_package_id
+            )
+        )
+        pkg = result.scalar_one_or_none()
+        if pkg is None:
+            raise AppError(
+                status_code=404,
+                error_code="PACKAGE_NOT_FOUND",
+                message=f"Diagnostic package {payload.diagnostic_package_id} not found",
+            )
+
+        provider = (pkg.diagnostic_provider or "").strip().lower()
+        if provider != "healthians":
+            return ResolveHealthiansZoneResponse(
+                serviceable=False,
+                zone_id=None,
+                message="Zone auto-fill applies only to Healthians diagnostic packages.",
+            )
+
+        lat = str(payload.latitude)
+        lng = str(payload.longitude)
+        zipcode = payload.pincode.strip()
+        serviceability_url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/checkServiceabilityByLocation_v2"
+        serviceability_payload = {
+            "lat": lat,
+            "long": lng,
+            "zipcode": zipcode,
+            "is_ppmc_booking": 0,
+        }
+
+        serviceability_log = await log_healthians_call(
+            db,
+            engagement_id=None,
+            user_id=None,
+            provider="healthians",
+            api_url=serviceability_url,
+            request_payload=serviceability_payload,
+            status="pending",
+        )
+
+        try:
+            access_token = await healthians_client.get_access_token()
+            serviceability_response = await healthians_client.check_serviceability_by_location_v2(
+                access_token,
+                lat=lat,
+                long=lng,
+                zipcode=zipcode,
+                is_ppmc_booking=0,
+            )
+            await finalize_healthians_sync_log(
+                db,
+                sync_log_id=serviceability_log.sync_log_id,
+                status="success" if serviceability_response.get("status") else "failed",
+                response_payload=serviceability_response,
+            )
+        except Exception as exc:
+            logger.exception("Healthians serviceability check failed for engagement zone resolution")
+            await finalize_healthians_sync_log(
+                db,
+                sync_log_id=serviceability_log.sync_log_id,
+                status="failed",
+                error_message=str(exc),
+            )
+            raise AppError(
+                status_code=502,
+                error_code="HEALTHIANS_SERVICEABILITY_FAILED",
+                message=str(exc),
+            ) from exc
+
+        if not serviceability_response.get("status"):
+            message = serviceability_response.get("message") or "Location is not serviceable"
+            return ResolveHealthiansZoneResponse(
+                serviceable=False,
+                zone_id=None,
+                message=message,
+            )
+
+        zone_data = serviceability_response.get("data") or {}
+        zone_id_raw = zone_data.get("zone_id")
+        if zone_id_raw is None:
+            return ResolveHealthiansZoneResponse(
+                serviceable=False,
+                zone_id=None,
+                message="Serviceability response did not include zone_id",
+            )
+
+        return ResolveHealthiansZoneResponse(
+            serviceable=True,
+            zone_id=str(zone_id_raw),
+            message="Zone ID auto-filled from Healthians.",
+        )
 
     async def get_engagement_details_for_employee(
         self,

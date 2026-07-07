@@ -413,6 +413,127 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
 
 
 @pytest.mark.asyncio
+async def test_list_engagements_filters_by_multiple_statuses(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=70031, employee_id=31)
+    await _seed_organization(test_db_session, organization_id=1, name="Org 1")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    from modules.engagements.models import Engagement
+
+    for engagement_id, name, status in [
+        (8111, "Scheduled Camp", "scheduled"),
+        (8112, "Running Camp", "running"),
+        (8113, "Completed Camp", "completed"),
+    ]:
+        test_db_session.add(
+            Engagement(
+                engagement_id=engagement_id,
+                engagement_name=name,
+                metsights_engagement_id=None,
+                organization_id=1,
+                engagement_code=f"CODE{engagement_id}",
+                engagement_type="bio_ai",
+                assessment_package_id=1,
+                diagnostic_package_id=1,
+                city="BLR",
+                slot_duration=20,
+                start_date=date(2026, 2, 1),
+                end_date=date(2026, 2, 3),
+                status=status,
+                participant_count=0,
+            )
+        )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        "/engagements?page=1&limit=10&org_id=1&status=scheduled,running",
+        headers=_auth_header(70031),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    returned_ids = {row["engagement_id"] for row in body["data"]}
+    assert returned_ids == {8111, 8112}
+    assert 8113 not in returned_ids
+    assert body["meta"]["total"] == 2
+
+    invalid_response = await async_client.get(
+        "/engagements?page=1&limit=10&status=running,invalid",
+        headers=_auth_header(70031),
+    )
+    assert invalid_response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_resolve_healthians_zone_for_non_healthians_package(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=70032, employee_id=32)
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    response = await async_client.post(
+        "/engagements/resolve-healthians-zone",
+        headers=_auth_header(70032),
+        json={
+            "diagnostic_package_id": 1,
+            "latitude": 12.9716,
+            "longitude": 77.5946,
+            "pincode": "560001",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["serviceable"] is False
+    assert body["zone_id"] is None
+    assert "Healthians" in body["message"]
+
+
+@pytest.mark.asyncio
+async def test_resolve_healthians_zone_serviceable(async_client, test_db_session, monkeypatch):
+    await _seed_employee(test_db_session, user_id=70033, employee_id=33)
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, bookings_count) "
+            "VALUES (99, 'REF99', 'Healthians Package', 'healthians', 'active', 0) "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET diagnostic_provider = EXCLUDED.diagnostic_provider"
+        )
+    )
+    await test_db_session.commit()
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_serviceability(*_args, **_kwargs):
+        return {"status": True, "data": {"zone_id": 42}, "message": "Serviceable"}
+
+    monkeypatch.setattr(
+        "modules.diagnostics.healthians.client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.diagnostics.healthians.client.check_serviceability_by_location_v2",
+        _fake_serviceability,
+    )
+
+    response = await async_client.post(
+        "/engagements/resolve-healthians-zone",
+        headers=_auth_header(70033),
+        json={
+            "diagnostic_package_id": 99,
+            "latitude": 12.9716,
+            "longitude": 77.5946,
+            "pincode": "560001",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["serviceable"] is True
+    assert body["zone_id"] == "42"
+    assert "auto-filled" in body["message"].lower()
+
+
+@pytest.mark.asyncio
 async def test_list_engagements_filters_by_audience(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7004, employee_id=12)
     await _seed_organization(test_db_session, organization_id=1, name="Org 1")

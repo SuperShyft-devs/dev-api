@@ -34,7 +34,7 @@ class EngagementsRepository:
         *,
         organization_id: int | None = None,
         camp_no: int | None = None,
-        status: str | None = None,
+        statuses: list[str] | None = None,
         city: str | None = None,
         on_date=None,
         search: str | None = None,
@@ -49,8 +49,8 @@ class EngagementsRepository:
             query = query.where(Engagement.organization_id.is_(None))
         if camp_no is not None:
             query = query.where(Engagement.camp_no == camp_no)
-        if status is not None:
-            query = query.where(Engagement.status == status)
+        if statuses:
+            query = query.where(Engagement.status.in_(statuses))
         if city is not None and city.strip():
             query = query.where(func.lower(func.trim(Engagement.city)) == city.strip().lower())
         if on_date is not None:
@@ -119,7 +119,7 @@ class EngagementsRepository:
         *,
         organization_id: int | None = None,
         camp_no: int | None = None,
-        status: str | None = None,
+        statuses: list[str] | None = None,
         city: str | None = None,
         on_date=None,
         search: str | None = None,
@@ -131,7 +131,7 @@ class EngagementsRepository:
             query,
             organization_id=organization_id,
             camp_no=camp_no,
-            status=status,
+            statuses=statuses,
             city=city,
             on_date=on_date,
             search=search,
@@ -150,7 +150,7 @@ class EngagementsRepository:
         limit: int,
         organization_id: int | None = None,
         camp_no: int | None = None,
-        status: str | None = None,
+        statuses: list[str] | None = None,
         city: str | None = None,
         on_date=None,
         search: str | None = None,
@@ -165,7 +165,7 @@ class EngagementsRepository:
             query,
             organization_id=organization_id,
             camp_no=camp_no,
-            status=status,
+            statuses=statuses,
             city=city,
             on_date=on_date,
             search=search,

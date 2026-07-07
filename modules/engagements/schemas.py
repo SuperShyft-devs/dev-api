@@ -87,6 +87,21 @@ class EngagementStatusUpdateRequest(BaseModel):
     status: str = Field(min_length=1, max_length=30)
 
 
+class ResolveHealthiansZoneRequest(BaseModel):
+    """Resolve Healthians zone ID for an engagement location."""
+
+    diagnostic_package_id: int = Field(gt=0)
+    latitude: float
+    longitude: float
+    pincode: str = Field(min_length=1, max_length=20)
+
+
+class ResolveHealthiansZoneResponse(BaseModel):
+    serviceable: bool
+    zone_id: Optional[str] = None
+    message: str
+
+
 class EngagementListItem(BaseModel):
     engagement_id: int
     engagement_name: Optional[str] = None

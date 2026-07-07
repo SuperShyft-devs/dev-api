@@ -27,6 +27,7 @@ from modules.engagements.schemas import (
     EngagementStatusUpdateRequest,
     EngagementUpdateRequest,
     OnboardingAssistantsAddRequest,
+    ResolveHealthiansZoneRequest,
 )
 from modules.engagements.models import Engagement
 from modules.engagements.service import EngagementsService
@@ -116,6 +117,21 @@ async def get_engagement_filter_options(
 ):
     options = await engagements_service.get_engagement_filter_options_for_employee(db, employee=employee)
     return success_response(options)
+
+
+@router.post("/resolve-healthians-zone")
+async def resolve_healthians_zone(
+    payload: ResolveHealthiansZoneRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    data = await engagements_service.resolve_healthians_zone_for_employee(
+        db,
+        employee=employee,
+        payload=payload,
+    )
+    return success_response(data.model_dump())
 
 
 @router.get("")
