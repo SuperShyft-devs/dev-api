@@ -135,12 +135,11 @@ async def check_service_availability(
             start_date=None,
             end_date=None,
             status="draft",
-            participant_count=1,
             healthians_zone_id=str(zone_id) if zone_id else None,
             blood_collection_type=BloodCollectionType.home_collection,
             create_profile_on_metsights=False,
             enroll_for_fitprint_full=False,
-            notification_service_key="booking-alert-whatsapp",
+            onboarding_notification="booking-alert-whatsapp",
         )
         db.add(engagement)
         await db.flush()

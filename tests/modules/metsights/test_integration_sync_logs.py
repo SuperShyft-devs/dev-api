@@ -49,7 +49,7 @@ async def _seed_push_engagement(test_db_session, *, engagement_id: int = 9701, p
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
-            "status, participant_count, organization_id) "
+            "status, organization_id) "
             "VALUES (:eid, 'Sync Log Camp', 'ENG9701', 'bio_ai', :pid, 1, 'BLR', 20, "
             "'2026-02-01', '2026-02-28', 'running', 0, NULL) "
             "ON CONFLICT (engagement_id) DO NOTHING"

@@ -126,7 +126,6 @@ async def test_participant_journey_summary_returns_instance_and_counts(async_cli
                 start_date=date(2026, 1, 1),
                 end_date=date(2026, 12, 31),
                 status="active",
-                participant_count=1,
             )
         )
     # Flush dependent rows so FKs exist before inserting AssessmentInstance.
@@ -262,7 +261,6 @@ async def test_participant_journey_detail_not_found_for_wrong_user(async_client,
                 start_date=date(2026, 1, 1),
                 end_date=date(2026, 12, 31),
                 status="active",
-                participant_count=0,
             )
         )
     # Flush so engagement exists before inserting AssessmentInstance.
@@ -329,7 +327,6 @@ async def test_participant_journey_detail_returns_categories_and_answer_state(as
                 start_date=date(2026, 1, 1),
                 end_date=date(2026, 12, 31),
                 status="active",
-                participant_count=0,
             )
         )
     # Flush engagement FK parents before inserting AssessmentInstance.

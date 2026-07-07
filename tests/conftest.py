@@ -387,8 +387,8 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
         # Restore B2C defaults (matches db.seed); tests that customize settings delete/replace this row.
         await test_db_session.execute(
             text(
-                "INSERT INTO platform_settings (settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
-                "VALUES (1, 1, 6)"
+                "INSERT INTO platform_settings (settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, default_onboarding_notification) "
+                "VALUES (1, 1, 6, 'booking-alert-whatsapp')"
             )
         )
     await test_db_session.execute(text("DELETE FROM engagements"))

@@ -87,7 +87,6 @@ async def _seed_participant_context(
             start_date=date(2026, 1, 1),
             end_date=date(2026, 1, 1),
             status="running",
-            participant_count=0,
         )
     )
     await db.flush()

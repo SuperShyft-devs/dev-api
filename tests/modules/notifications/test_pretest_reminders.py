@@ -67,8 +67,8 @@ async def _insert_engagement(
         text(
             "INSERT INTO engagements "
             "(engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, "
-            "diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count, "
-            "organization_id, notification_service_key, pretest_guidelines_notification) "
+            "diagnostic_package_id, city, slot_duration, start_date, end_date, status, "
+            "organization_id, onboarding_notification, pretest_guidelines_notification) "
             f"VALUES ({engagement_id}, 'Camp {engagement_id}', '{engagement_code}', 'bio_ai', 1, 1, 'BLR', 20, "
             f"'2026-06-01', '2026-06-30', '{status}', 0, NULL, 'pretest-whatsapp', {pretest_value})"
         )

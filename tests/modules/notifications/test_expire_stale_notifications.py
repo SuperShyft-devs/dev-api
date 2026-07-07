@@ -27,7 +27,6 @@ async def _seed_engagement(test_db_session, *, engagement_id: int) -> None:
             start_date=date(2026, 5, 1),
             end_date=date(2026, 5, 1),
             status="active",
-            participant_count=0,
         )
     )
     await test_db_session.commit()

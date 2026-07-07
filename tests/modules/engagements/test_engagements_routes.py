@@ -158,7 +158,7 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
     assert details.status_code == 200
     body = details.json()
     detail_data = body.get("data", body)
-    assert detail_data["notification_service_key"] == "booking-alert-whatsapp"
+    assert detail_data["onboarding_notification"] == "booking-alert-whatsapp"
     assert detail_data["camp_no"] == 1010226
 
 
@@ -301,7 +301,6 @@ async def test_update_engagement_recalculates_camp_no(async_client, test_db_sess
             start_date=date(2026, 6, 23),
             end_date=date(2026, 6, 24),
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -372,7 +371,6 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=0,
         )
     )
     test_db_session.add(
@@ -390,7 +388,6 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 3),
             status="completed",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -408,7 +405,7 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
 
     assert len(body["data"]) == 1
     assert body["data"][0]["engagement_id"] == 8101
-    assert body["data"][0]["notification_service_key"] == "booking-alert-whatsapp"
+    assert body["data"][0]["onboarding_notification"] == "booking-alert-whatsapp"
     assert body["data"][0]["assessment_package_id"] == 1
 
 
@@ -441,7 +438,6 @@ async def test_list_engagements_filters_by_multiple_statuses(async_client, test_
                 start_date=date(2026, 2, 1),
                 end_date=date(2026, 2, 3),
                 status=status,
-                participant_count=0,
             )
         )
     await test_db_session.commit()
@@ -557,7 +553,6 @@ async def test_list_engagements_filters_by_audience(async_client, test_db_sessio
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=0,
         )
     )
     test_db_session.add(
@@ -575,7 +570,6 @@ async def test_list_engagements_filters_by_audience(async_client, test_db_sessio
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -639,7 +633,6 @@ async def test_list_engagements_filters_by_camp_no(async_client, test_db_session
             start_date=start_a,
             end_date=start_a,
             status="running",
-            participant_count=0,
         )
     )
     test_db_session.add(
@@ -657,7 +650,6 @@ async def test_list_engagements_filters_by_camp_no(async_client, test_db_session
             start_date=start_b,
             end_date=start_b,
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -698,7 +690,6 @@ async def test_get_engagement_details_returns_row(async_client, test_db_session)
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -707,7 +698,7 @@ async def test_get_engagement_details_returns_row(async_client, test_db_session)
     assert response.status_code == 200
     body = response.json()["data"]
     assert body["engagement_id"] == 8201
-    assert body["notification_service_key"] == "booking-alert-whatsapp"
+    assert body["onboarding_notification"] is None
     assert body["assessment_package_id"] == 1
 
 
@@ -735,7 +726,6 @@ async def test_update_engagement_updates_fields(async_client, test_db_session):
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -790,7 +780,6 @@ async def test_update_b2c_engagement_without_organization(async_client, test_db_
             start_date=date(2026, 5, 21),
             end_date=date(2026, 5, 21),
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -842,7 +831,6 @@ async def test_update_engagement_rejects_duplicate_engagement_code(async_client,
                 start_date=date(2026, 2, 1),
                 end_date=date(2026, 2, 1),
                 status="running",
-                participant_count=0,
             ),
             Engagement(
                 engagement_id=8303,
@@ -857,7 +845,6 @@ async def test_update_engagement_rejects_duplicate_engagement_code(async_client,
                 start_date=date(2026, 2, 1),
                 end_date=date(2026, 2, 1),
                 status="running",
-                participant_count=0,
             ),
         ]
     )
@@ -918,7 +905,6 @@ async def test_get_occupied_slots_by_engagement_code_returns_grouped_slots(async
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 2),
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -1000,7 +986,6 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=0,
         )
     )
 
@@ -1020,7 +1005,6 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=0,
         )
     )
 
@@ -1040,7 +1024,6 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="completed",
-            participant_count=0,
         )
     )
 
@@ -1106,7 +1089,6 @@ async def test_patch_engagement_status_changes_status(async_client, test_db_sess
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -1161,7 +1143,6 @@ async def test_delete_engagement_removes_scoped_data_but_not_users(async_client,
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=1,
         )
     )
     await test_db_session.flush()
@@ -1258,7 +1239,6 @@ async def test_delete_participant_clears_notification_refs_before_instance_delet
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=1,
         )
     )
     await test_db_session.flush()
@@ -1365,7 +1345,6 @@ async def test_patch_participant_department_updates_slug(async_client, test_db_s
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=1,
         )
     )
     await test_db_session.flush()
@@ -1442,7 +1421,6 @@ async def _seed_engagement_participant_for_patch(
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=1,
         )
     )
     await test_db_session.flush()
@@ -1574,7 +1552,6 @@ async def test_update_engagement_onboarding_assistant_403(async_client, test_db_
             start_date=date(2026, 2, 1),
             end_date=date(2026, 2, 1),
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -1597,3 +1574,31 @@ async def test_update_engagement_onboarding_assistant_403(async_client, test_db_
         json=payload,
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_engagement_rejects_overlapping_questionnaire_reminders(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7050, employee_id=50)
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+    await _seed_notification_service(test_db_session, service_key="service-a")
+    await _seed_notification_service(test_db_session, service_key="service-b")
+
+    payload = {
+        "engagement_name": "Overlap Camp",
+        "organization_id": 1,
+        "engagement_type": "bio_ai",
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "city": "BLR",
+        "slot_duration": 20,
+        "start_date": "2026-02-01",
+        "end_date": "2026-02-02",
+        "questionnaire_reminder_1": "service-a,service-b",
+        "questionnaire_reminder_2": "service-b",
+    }
+
+    response = await async_client.post("/engagements", headers=_auth_header(7050), json=payload)
+    assert response.status_code == 400
+    assert "service-b" in response.json()["message"]

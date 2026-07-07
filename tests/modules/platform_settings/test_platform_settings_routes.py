@@ -129,3 +129,32 @@ async def test_patch_b2c_defaults_rejects_inactive_package(async_client, test_db
         json={"b2c_default_assessment_package_id": 99, "b2c_default_diagnostic_package_id": 1},
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_patch_engagement_notification_defaults_rejects_overlap(async_client, test_db_session):
+    uid = 9104
+    test_db_session.add(User(user_id=uid, age=30, phone="91040000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9104, user_id=uid, role="admin", status="active"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
+            "VALUES ('svc-a', 'A', 'whatsapp', 'a', true, false, false), "
+            "('svc-b', 'B', 'whatsapp', 'b', true, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/platform-settings/engagement-notification-defaults",
+        headers=_auth_header(uid),
+        json={
+            "default_questionnaire_reminder_1": "svc-a,svc-b",
+            "default_questionnaire_reminder_2": "svc-b",
+        },
+    )
+    assert response.status_code == 400
+    assert "svc-b" in response.json()["message"]

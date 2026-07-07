@@ -3,7 +3,6 @@
 Business rules:
 - Engagement creation
 - Enrolling users by creating `engagement_participants`
-- Updating `participant_count`
 """
 
 from __future__ import annotations
@@ -28,7 +27,6 @@ from modules.checklists.schemas import ChecklistReadiness
 from modules.employee.access_control import ensure_admin
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import compute_camp_no
-from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
 from modules.engagements.models import BloodCollectionType, Engagement, EngagementKind, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.schemas import (
@@ -40,6 +38,7 @@ from modules.engagements.schemas import (
 )
 from modules.notifications.repository import NotificationsRepository
 from modules.organizations.repository import OrganizationsRepository
+from modules.platform_settings.repository import PlatformSettingsRepository
 from modules.organizations.service import validate_participant_department_for_organization
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.repository import ReportsRepository
@@ -84,9 +83,8 @@ def _parse_status_filter(status: str | None) -> list[str] | None:
     return normalized_values
 
 
-def _resolve_notification_service_key(raw: str | None) -> str:
-    key = (raw or "").strip()
-    return key or DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
+def _parse_comma_separated_keys(raw: str | None) -> set[str]:
+    return {k.strip() for k in (raw or "").split(",") if k.strip()}
 
 
 def _normalize_phone_for_metsights(raw: str | None) -> str | None:
@@ -198,6 +196,7 @@ class EngagementsService:
         self._metsights_service = metsights_service
         self._notifications_repository = notifications_repository or NotificationsRepository()
         self._notifications_service = notifications_service
+        self._platform_settings_repository = PlatformSettingsRepository()
         self._assessments_repository = AssessmentsRepository()
         self._questionnaire_repository = QuestionnaireRepository()
         self._reports_repository = ReportsRepository()
@@ -229,13 +228,6 @@ class EngagementsService:
             raise RuntimeError("Audit service is required")
         return self._audit_service
 
-    async def _validate_optional_notification_service_key(self, db: AsyncSession, raw: str | None) -> str | None:
-        """Return ``None`` when *raw* is empty/None, otherwise validate and return the key."""
-        key = (raw or "").strip()
-        if not key:
-            return None
-        return await self._validate_notification_service_key(db, key)
-
     async def _validate_comma_separated_service_keys(self, db: AsyncSession, raw: str | None) -> str | None:
         """Validate a comma-separated list of service keys. Returns the cleaned string or None."""
         if not raw:
@@ -259,22 +251,64 @@ class EngagementsService:
                 )
         return ",".join(keys)
 
-    async def _validate_notification_service_key(self, db: AsyncSession, raw: str | None) -> str:
-        service_key = _resolve_notification_service_key(raw)
-        svc = await self._notifications_repository.get_service_by_key(db, service_key=service_key)
-        if svc is None:
-            raise AppError(
-                status_code=404,
-                error_code="NOTIFICATION_SERVICE_NOT_FOUND",
-                message=f"Notification service '{service_key}' does not exist",
-            )
-        if not svc.is_active:
+    @staticmethod
+    def _validate_questionnaire_reminders_disjoint(qr1: str | None, qr2: str | None) -> None:
+        overlap = _parse_comma_separated_keys(qr1) & _parse_comma_separated_keys(qr2)
+        if overlap:
+            joined = ", ".join(sorted(overlap))
             raise AppError(
                 status_code=400,
                 error_code="INVALID_INPUT",
-                message=f"Notification service '{service_key}' is not active",
+                message=(
+                    f"Notification service(s) {joined} cannot be used in both "
+                    "questionnaire_reminder_1 and questionnaire_reminder_2"
+                ),
             )
-        return service_key
+
+    async def _resolve_create_notification_fields(
+        self,
+        db: AsyncSession,
+        payload: EngagementCreateRequest,
+    ) -> tuple[str | None, str | None, str | None, str | None, str | None, str | None]:
+        settings = await self._platform_settings_repository.get_by_id(db)
+        onboarding_raw = payload.onboarding_notification
+        if onboarding_raw is None and settings is not None:
+            onboarding_raw = settings.default_onboarding_notification
+
+        pretest_raw = payload.pretest_guidelines_notification
+        if pretest_raw is None and settings is not None:
+            pretest_raw = settings.default_pretest_guidelines_notification
+
+        qr1_raw = payload.questionnaire_reminder_1
+        if qr1_raw is None and settings is not None:
+            qr1_raw = settings.default_questionnaire_reminder_1
+
+        qr2_raw = payload.questionnaire_reminder_2
+        if qr2_raw is None and settings is not None:
+            qr2_raw = settings.default_questionnaire_reminder_2
+
+        blood_raw = payload.blood_report_notification
+        if blood_raw is None and settings is not None:
+            blood_raw = settings.default_blood_report_notification
+
+        bioai_raw = payload.bioai_report_notification
+        if bioai_raw is None and settings is not None:
+            bioai_raw = settings.default_bioai_report_notification
+
+        onboarding = await self._validate_comma_separated_service_keys(db, onboarding_raw)
+        pretest = await self._validate_comma_separated_service_keys(db, pretest_raw)
+        qr1 = await self._validate_comma_separated_service_keys(db, qr1_raw)
+        qr2 = await self._validate_comma_separated_service_keys(db, qr2_raw)
+        blood = await self._validate_comma_separated_service_keys(db, blood_raw)
+        bioai = await self._validate_comma_separated_service_keys(db, bioai_raw)
+        self._validate_questionnaire_reminders_disjoint(qr1, qr2)
+        return onboarding, pretest, qr1, qr2, blood, bioai
+
+    async def count_participants_for_engagement(self, db: AsyncSession, *, engagement_id: int) -> int:
+        return await self._repository.count_distinct_participants_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
 
     async def get_by_code(self, db: AsyncSession, engagement_code: str) -> Engagement | None:
         return await self._repository.get_engagement_by_code(db, engagement_code)
@@ -363,16 +397,9 @@ class EngagementsService:
             else:
                 raise AppError(status_code=500, error_code="INTERNAL_ERROR", message="An unexpected error occurred")
 
-        notification_service_key = await self._validate_notification_service_key(
-            db, payload.notification_service_key
+        onboarding, pretest_notif, qr1, qr2, blood_notif, bioai_notif = (
+            await self._resolve_create_notification_fields(db, payload)
         )
-        pretest_notif = await self._validate_comma_separated_service_keys(
-            db, payload.pretest_guidelines_notification
-        )
-        qr1 = await self._validate_comma_separated_service_keys(db, payload.questionnaire_reminder_1)
-        qr2 = await self._validate_comma_separated_service_keys(db, payload.questionnaire_reminder_2)
-        blood_notif = await self._validate_comma_separated_service_keys(db, payload.blood_report_notification)
-        bioai_notif = await self._validate_comma_separated_service_keys(db, payload.bioai_report_notification)
 
         initial_status = "running" if payload.start_date <= date.today() else "scheduled"
 
@@ -398,12 +425,11 @@ class EngagementsService:
             start_date=payload.start_date,
             end_date=payload.end_date,
             status=initial_status,
-            participant_count=0,
             healthians_zone_id=payload.healthians_zone_id,
             blood_collection_type=payload.blood_collection_type,
             create_profile_on_metsights=payload.create_profile_on_metsights,
             enroll_for_fitprint_full=payload.enroll_for_fitprint_full,
-            notification_service_key=notification_service_key,
+            onboarding_notification=onboarding,
             pretest_guidelines_notification=pretest_notif,
             questionnaire_reminder_1=qr1,
             questionnaire_reminder_2=qr2,
@@ -487,15 +513,13 @@ class EngagementsService:
             db,
             engagement_ids=[int(row.engagement_id) for row in engagements],
         )
-        for row in engagements:
-            row.participant_count = counts_by_id.get(int(row.engagement_id), 0)
 
         checklists = self.lazy_checklists_service()
         readiness_by_id: dict[int, ChecklistReadiness] = {}
         for row in engagements:
             readiness_by_id[row.engagement_id] = await checklists.get_engagement_readiness(db, row.engagement_id)
 
-        return engagements, total, readiness_by_id
+        return engagements, total, readiness_by_id, counts_by_id
 
     async def get_engagement_filter_options_for_employee(self, db: AsyncSession, *, employee: EmployeeContext) -> dict:
         ensure_admin(employee)
@@ -622,15 +646,7 @@ class EngagementsService:
         if engagement is None:
             raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
 
-        await self._refresh_participant_count(db, engagement)
         return engagement
-
-    async def _refresh_participant_count(self, db: AsyncSession, engagement: Engagement) -> None:
-        engagement.participant_count = await self._repository.count_distinct_participants_for_engagement(
-            db,
-            engagement_id=int(engagement.engagement_id),
-        )
-        await self._repository.update_engagement(db, engagement)
 
     async def update_engagement_for_employee(
         self,
@@ -697,11 +713,11 @@ class EngagementsService:
         engagement.metsights_engagement_id = payload.metsights_engagement_id
         engagement.create_profile_on_metsights = payload.create_profile_on_metsights
         engagement.enroll_for_fitprint_full = payload.enroll_for_fitprint_full
-        notif_key_raw = payload.notification_service_key
-        if notif_key_raw is None:
-            notif_key_raw = engagement.notification_service_key
-        engagement.notification_service_key = await self._validate_notification_service_key(
-            db, notif_key_raw
+        onboarding_raw = payload.onboarding_notification
+        if onboarding_raw is None:
+            onboarding_raw = engagement.onboarding_notification
+        engagement.onboarding_notification = await self._validate_comma_separated_service_keys(
+            db, onboarding_raw
         )
         engagement.pretest_guidelines_notification = await self._validate_comma_separated_service_keys(
             db, payload.pretest_guidelines_notification
@@ -711,6 +727,10 @@ class EngagementsService:
         )
         engagement.questionnaire_reminder_2 = await self._validate_comma_separated_service_keys(
             db, payload.questionnaire_reminder_2
+        )
+        self._validate_questionnaire_reminders_disjoint(
+            engagement.questionnaire_reminder_1,
+            engagement.questionnaire_reminder_2,
         )
         engagement.blood_report_notification = await self._validate_comma_separated_service_keys(
             db, payload.blood_report_notification
@@ -870,6 +890,21 @@ class EngagementsService:
             longitude=longitude,
         )
 
+        settings = await self._platform_settings_repository.get_by_id(db)
+        onboarding = settings.default_onboarding_notification if settings else None
+        pretest = settings.default_pretest_guidelines_notification if settings else None
+        qr1 = settings.default_questionnaire_reminder_1 if settings else None
+        qr2 = settings.default_questionnaire_reminder_2 if settings else None
+        blood = settings.default_blood_report_notification if settings else None
+        bioai = settings.default_bioai_report_notification if settings else None
+        onboarding = await self._validate_comma_separated_service_keys(db, onboarding)
+        pretest = await self._validate_comma_separated_service_keys(db, pretest)
+        qr1 = await self._validate_comma_separated_service_keys(db, qr1)
+        qr2 = await self._validate_comma_separated_service_keys(db, qr2)
+        blood = await self._validate_comma_separated_service_keys(db, blood)
+        bioai = await self._validate_comma_separated_service_keys(db, bioai)
+        self._validate_questionnaire_reminders_disjoint(qr1, qr2)
+
         engagement = Engagement(
             engagement_name=engagement_name,
             metsights_engagement_id=None,
@@ -892,15 +927,14 @@ class EngagementsService:
             start_date=engagement_date,
             end_date=engagement_date,
             status="scheduled",
-            participant_count=0,
             create_profile_on_metsights=create_profile_on_metsights,
             enroll_for_fitprint_full=enroll_for_fitprint_full,
-            notification_service_key=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
-            pretest_guidelines_notification=None,
-            questionnaire_reminder_1=None,
-            questionnaire_reminder_2=None,
-            blood_report_notification=None,
-            bioai_report_notification=None,
+            onboarding_notification=onboarding,
+            pretest_guidelines_notification=pretest,
+            questionnaire_reminder_1=qr1,
+            questionnaire_reminder_2=qr2,
+            blood_report_notification=blood,
+            bioai_report_notification=bioai,
         )
         engagement = await self._repository.create_engagement(db, engagement)
 
@@ -979,7 +1013,6 @@ class EngagementsService:
         user_id: int,
         engagement_date: date,
         slot_start_time: time,
-        increment_participant_count: bool = False,
         participants_employee_id: str | None = None,
         participant_department: str | None = None,
         participant_blood_group: str | None = None,
@@ -1009,7 +1042,6 @@ class EngagementsService:
             is_fitprint_record_id_synced=is_fitprint_record_id_synced,
         )
         created = await self._repository.create_participant(db, participant)
-        await self._refresh_participant_count(db, engagement)
         return created
 
     async def resolve_participant_department_for_engagement(
@@ -1496,11 +1528,6 @@ class EngagementsService:
             user_id=user_id,
             engagement_id=engagement_id,
         )
-        engagement.participant_count = await self._repository.count_distinct_participants_for_engagement(
-            db,
-            engagement_id=engagement_id,
-        )
-        await self._repository.update_engagement(db, engagement)
 
         audit = self._require_audit_service()
         await audit.log_event(
@@ -1571,12 +1598,6 @@ class EngagementsService:
             totals["deleted_questionnaire_responses"] += purge["deleted_questionnaire_responses"]
             totals["deleted_reports"] += purge["deleted_reports"]
             totals["deleted_category_progress_rows"] += purge["deleted_category_progress_rows"]
-
-        engagement.participant_count = await self._repository.count_distinct_participants_for_engagement(
-            db,
-            engagement_id=engagement_id,
-        )
-        await self._repository.update_engagement(db, engagement)
 
         audit = self._require_audit_service()
         await audit.log_event(
@@ -2057,7 +2078,6 @@ class EngagementsService:
                             user_id=user_id,
                             engagement_date=engagement_date,
                             slot_start_time=default_slot,
-                            increment_participant_count=True,
                             is_profile_created_on_metsights=profile_on_metsights,
                             is_primary_record_id_synced=False,
                         )
@@ -2125,7 +2145,6 @@ class EngagementsService:
 
             results.append(base)
 
-        await self._refresh_participant_count(db, engagement)
         return {"results": results}
 
     async def create_metsights_profiles_for_engagement_participants(

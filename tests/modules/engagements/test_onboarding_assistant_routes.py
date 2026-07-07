@@ -96,7 +96,6 @@ async def test_list_onboarding_assistants_returns_empty_list(async_client, test_
             assessment_package_id=1,
             diagnostic_package_id=1,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )
@@ -128,7 +127,6 @@ async def test_list_onboarding_assistants_returns_assigned_employees(async_clien
             assessment_package_id=1,
             diagnostic_package_id=1,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )
@@ -203,7 +201,6 @@ async def test_add_onboarding_assistants_creates_assignment(async_client, test_d
             assessment_package_id=1,
             diagnostic_package_id=1,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )
@@ -249,7 +246,6 @@ async def test_add_onboarding_assistants_skips_duplicates(async_client, test_db_
             assessment_package_id=1,
             diagnostic_package_id=1,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )
@@ -289,7 +285,6 @@ async def test_add_onboarding_assistants_handles_multiple(async_client, test_db_
             assessment_package_id=1,
             diagnostic_package_id=1,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )
@@ -323,7 +318,6 @@ async def test_add_onboarding_assistants_returns_404_when_employee_missing(async
             assessment_package_id=1,
             diagnostic_package_id=1,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )
@@ -369,7 +363,6 @@ async def test_add_onboarding_assistants_validates_empty_list(async_client, test
             assessment_package_id=1,
             diagnostic_package_id=1,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )
@@ -422,7 +415,6 @@ async def test_remove_onboarding_assistant_deletes_assignment(async_client, test
             assessment_package_id=1,
             diagnostic_package_id=1,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )
@@ -466,7 +458,6 @@ async def test_remove_onboarding_assistant_returns_404_when_assignment_missing(a
             assessment_package_id=1,
             diagnostic_package_id=1,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )
@@ -514,7 +505,6 @@ async def test_onboarding_assistant_routes_require_admin(async_client, test_db_s
             assessment_package_id=1,
             diagnostic_package_id=1,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )
@@ -567,7 +557,6 @@ async def test_add_onboarding_assistants_accepts_organization_manager_when_conta
             diagnostic_package_id=1,
             organization_id=9501,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )
@@ -616,7 +605,6 @@ async def test_add_onboarding_assistants_rejects_organization_manager_wrong_org(
             diagnostic_package_id=1,
             organization_id=9502,
             status="running",
-            participant_count=0,
             start_date=date.today(),
             end_date=date.today(),
         )

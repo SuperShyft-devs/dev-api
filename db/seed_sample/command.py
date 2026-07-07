@@ -108,7 +108,6 @@ class SeedEngagement:
     start_date: date
     end_date: date
     status: str
-    participant_count: int
 
 
 @dataclass(frozen=True)
@@ -219,12 +218,12 @@ SAMPLE_DIAGNOSTIC_PACKAGES: tuple[SeedDiagnosticPackage, ...] = (
 )
 
 SAMPLE_ENGAGEMENTS: tuple[SeedEngagement, ...] = (
-    SeedEngagement(401, "Zenith Annual Healthcamp", "METS-401", 301, "HC-MUM-2026", "doctor", 11, 21, "Mumbai", 30, date(2026, 3, 10), date(2026, 3, 15), "running", 3),
-    SeedEngagement(402, "Apex Leadership Drive", "METS-402", 302, "FIN-BLR-2026", "doctor", 12, 22, "Hyderabad", 45, date(2026, 3, 20), date(2026, 3, 27), "running", 2),
-    SeedEngagement(403, "Nimbus Wellness Week", "METS-403", 303, "WELL-NMB-2026", "doctor", 13, 21, "Bengaluru", 30, date(2026, 2, 10), date(2026, 2, 14), "completed", 1),
-    SeedEngagement(404, "Open Community Camp", "METS-404", None, "OPEN-CARE-2026", "bio_ai", 11, 1, "Mumbai", 20, date(2026, 3, 5), date(2026, 3, 25), "running", 2),
-    SeedEngagement(405, "City Pop-up Screening", "METS-405", None, "CITY-POP-2026", "bio_ai", 11, 1, "Hyderabad", 20, date(2026, 1, 15), date(2026, 1, 20), "completed", 1),
-    SeedEngagement(406, "Legacy Recall Camp", "METS-406", 304, "LEG-RECALL-2026", "doctor", 11, 21, "Kolkata", 30, date(2025, 12, 1), date(2025, 12, 3), "completed", 0),
+    SeedEngagement(401, "Zenith Annual Healthcamp", "METS-401", 301, "HC-MUM-2026", "doctor", 11, 21, "Mumbai", 30, date(2026, 3, 10), date(2026, 3, 15), "running"),
+    SeedEngagement(402, "Apex Leadership Drive", "METS-402", 302, "FIN-BLR-2026", "doctor", 12, 22, "Hyderabad", 45, date(2026, 3, 20), date(2026, 3, 27), "running"),
+    SeedEngagement(403, "Nimbus Wellness Week", "METS-403", 303, "WELL-NMB-2026", "doctor", 13, 21, "Bengaluru", 30, date(2026, 2, 10), date(2026, 2, 14), "completed"),
+    SeedEngagement(404, "Open Community Camp", "METS-404", None, "OPEN-CARE-2026", "bio_ai", 11, 1, "Mumbai", 20, date(2026, 3, 5), date(2026, 3, 25), "running"),
+    SeedEngagement(405, "City Pop-up Screening", "METS-405", None, "CITY-POP-2026", "bio_ai", 11, 1, "Hyderabad", 20, date(2026, 1, 15), date(2026, 1, 20), "completed"),
+    SeedEngagement(406, "Legacy Recall Camp", "METS-406", 304, "LEG-RECALL-2026", "doctor", 11, 21, "Kolkata", 30, date(2025, 12, 1), date(2025, 12, 3), "completed"),
 )
 
 SAMPLE_CATEGORIES: tuple[SeedCategory, ...] = (
@@ -390,7 +389,6 @@ async def _upsert_engagements(session: AsyncSession, engagements: Iterable[SeedE
         row.start_date = seed.start_date
         row.end_date = seed.end_date
         row.status = seed.status
-        row.participant_count = seed.participant_count
 
 
 async def _upsert_categories(session: AsyncSession, categories: Iterable[SeedCategory]) -> None:

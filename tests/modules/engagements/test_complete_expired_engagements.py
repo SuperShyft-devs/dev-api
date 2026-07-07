@@ -47,10 +47,10 @@ async def _insert_engagement(
         text(
             "INSERT INTO engagements "
             "(engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, "
-            "diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count, "
-            "organization_id, notification_service_key) "
+            "diagnostic_package_id, city, slot_duration, start_date, end_date, status, "
+            "organization_id, onboarding_notification) "
             f"VALUES ({engagement_id}, 'Camp {engagement_id}', '{engagement_code}', 'bio_ai', 1, 1, 'BLR', 20, "
-            f"'2026-01-01', '{end_date}', '{status}', 0, NULL, 'booking-alert-whatsapp')"
+            f"'2026-01-01', '{end_date}', '{status}', NULL, 'booking-alert-whatsapp')"
         )
     )
 

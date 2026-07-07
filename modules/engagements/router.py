@@ -46,7 +46,12 @@ def _client_ip(request: Request) -> str:
     return request.client.host
 
 
-def _engagement_to_dict(engagement: Engagement, *, readiness=None) -> dict:
+def _engagement_to_dict(
+    engagement: Engagement,
+    *,
+    readiness=None,
+    participant_count: int | None = None,
+) -> dict:
     data = {
         "engagement_id": engagement.engagement_id,
         "engagement_name": engagement.engagement_name,
@@ -70,13 +75,13 @@ def _engagement_to_dict(engagement: Engagement, *, readiness=None) -> dict:
         "start_date": engagement.start_date,
         "end_date": engagement.end_date,
         "status": engagement.status,
-        "participant_count": engagement.participant_count,
+        "participant_count": participant_count if participant_count is not None else 0,
         "created_at": engagement.created_at.isoformat() if engagement.created_at else None,
         "healthians_zone_id": engagement.healthians_zone_id,
         "blood_collection_type": engagement.blood_collection_type.value if engagement.blood_collection_type else None,
         "create_profile_on_metsights": engagement.create_profile_on_metsights,
         "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
-        "notification_service_key": engagement.notification_service_key,
+        "onboarding_notification": engagement.onboarding_notification,
         "pretest_guidelines_notification": engagement.pretest_guidelines_notification,
         "questionnaire_reminder_1": engagement.questionnaire_reminder_1,
         "questionnaire_reminder_2": engagement.questionnaire_reminder_2,
@@ -156,7 +161,7 @@ async def list_engagements(
     if page < 1 or limit < 1 or limit > 100:
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-    engagements, total, readiness_by_id = await engagements_service.list_engagements_for_employee(
+    engagements, total, readiness_by_id, counts_by_id = await engagements_service.list_engagements_for_employee(
         db,
         employee=employee,
         page=page,
@@ -174,7 +179,11 @@ async def list_engagements(
     )
 
     data = [
-        _engagement_to_dict(engagement, readiness=readiness_by_id[engagement.engagement_id])
+        _engagement_to_dict(
+            engagement,
+            readiness=readiness_by_id[engagement.engagement_id],
+            participant_count=counts_by_id.get(int(engagement.engagement_id), 0),
+        )
         for engagement in engagements
     ]
 
@@ -203,7 +212,15 @@ async def get_engagement_for_user(
     if participant_result.scalar_one_or_none() is None:
         raise AppError(status_code=403, error_code="ACCESS_DENIED", message="You are not a participant in this engagement")
 
-    return success_response(_engagement_to_dict(engagement))
+    return success_response(
+        _engagement_to_dict(
+            engagement,
+            participant_count=await engagements_service.count_participants_for_engagement(
+                db,
+                engagement_id=engagement_id,
+            ),
+        )
+    )
 
 
 @router.get("/{engagement_id}")
@@ -219,7 +236,15 @@ async def get_engagement_details(
         engagement_id=engagement_id,
     )
 
-    return success_response(_engagement_to_dict(engagement))
+    return success_response(
+        _engagement_to_dict(
+            engagement,
+            participant_count=await engagements_service.count_participants_for_engagement(
+                db,
+                engagement_id=engagement_id,
+            ),
+        )
+    )
 
 
 

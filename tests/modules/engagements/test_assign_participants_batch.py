@@ -101,7 +101,7 @@ async def _seed_engagement(
         text(
             f"INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             f"assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
-            f"status, participant_count, organization_id) "
+            f"status, organization_id) "
             f"VALUES ({engagement_id}, 'Camp', '{code}', 'bio_ai', {pkg_sql}, 1, 'BLR', 20, "
             f"'2026-02-01', '2026-02-28', 'running', 0, NULL)"
         )

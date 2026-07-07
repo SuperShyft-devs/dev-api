@@ -108,7 +108,6 @@ async def test_get_assessment_categories_status_returns_incomplete_by_default(as
             assessment_package_id=6102,
             diagnostic_package_id=1,
             status="active",
-            participant_count=1,
         )
     )
     await test_db_session.commit()
@@ -148,7 +147,6 @@ async def test_get_assessment_categories_status_returns_complete_from_progress(a
             assessment_package_id=6103,
             diagnostic_package_id=1,
             status="active",
-            participant_count=1,
         )
     )
     await test_db_session.commit()

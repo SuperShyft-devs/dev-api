@@ -14,6 +14,8 @@ from modules.platform_settings.dependencies import get_platform_settings_service
 from modules.platform_settings.schemas import (
     B2cOnboardingDefaultsRead,
     B2cOnboardingDefaultsUpdate,
+    EngagementNotificationDefaultsRead,
+    EngagementNotificationDefaultsUpdate,
     MetsightsProfilesImportPageRequest,
 )
 from modules.platform_settings.service import PlatformSettingsService
@@ -51,6 +53,37 @@ async def patch_b2c_onboarding_defaults(
     service: PlatformSettingsService = Depends(get_platform_settings_service),
 ):
     data: B2cOnboardingDefaultsRead = await service.update_b2c_onboarding_defaults(
+        db,
+        employee=employee,
+        payload=payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data.model_dump())
+
+
+@router.get("/engagement-notification-defaults")
+async def get_engagement_notification_defaults(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: PlatformSettingsService = Depends(get_platform_settings_service),
+):
+    _ = employee
+    data = await service.get_engagement_notification_defaults(db)
+    return success_response(data.model_dump())
+
+
+@router.patch("/engagement-notification-defaults")
+async def patch_engagement_notification_defaults(
+    payload: EngagementNotificationDefaultsUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: PlatformSettingsService = Depends(get_platform_settings_service),
+):
+    data: EngagementNotificationDefaultsRead = await service.update_engagement_notification_defaults(
         db,
         employee=employee,
         payload=payload,

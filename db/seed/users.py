@@ -368,8 +368,7 @@ async def _seed_one_engagement_per_user(
         start_date=slot_date,
         end_date=slot_date,
         status="running",
-        participant_count=0,
-        notification_service_key=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
+        onboarding_notification=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
     )
     await er.create_engagement(session, engagement)
     eid = int(engagement.engagement_id)

@@ -62,7 +62,6 @@ async def _seed_camp(test_db_session, *, organization_id: int = 9101, engagement
             start_date=start,
             end_date=end,
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -138,7 +137,6 @@ async def _seed_refresh_camp_with_participants(
             start_date=start,
             end_date=date(2026, 6, 25),
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.flush()
@@ -539,7 +537,6 @@ async def _seed_organization_manager_for_camp(
             start_date=start,
             end_date=end,
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()

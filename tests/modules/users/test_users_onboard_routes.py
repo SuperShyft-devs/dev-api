@@ -123,7 +123,7 @@ async def test_public_onboard_creates_engagement_participant_and_assessment_inst
     engagement_row = (
         await test_db_session.execute(
             text(
-                "SELECT engagement_type, diagnostic_package_id, participant_count, city, start_date, end_date "
+                "SELECT engagement_type, diagnostic_package_id, city, start_date, end_date "
                 "FROM engagements WHERE engagement_id = :eid"
             ),
             {"eid": engagement_id},
@@ -133,7 +133,6 @@ async def test_public_onboard_creates_engagement_participant_and_assessment_inst
     et = engagement_row.engagement_type
     assert (getattr(et, "value", et) == "bio_ai")
     assert engagement_row.diagnostic_package_id == 6  # db.seed platform_settings B2C default (active diagnostic)
-    assert engagement_row.participant_count == 0
     assert engagement_row.city == "Delhi"
     assert str(engagement_row.start_date) == "2026-02-01"
     assert str(engagement_row.end_date) == "2026-02-01"
@@ -203,7 +202,7 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
     await test_db_session.execute(
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3001, 'Camp', 'ENG12345', 8001, 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
+            "VALUES (3001, 'Camp', 'ENG12345', 8001, 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running')"
         )
     )
     await test_db_session.commit()
@@ -240,12 +239,14 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
     assert slot_row.participant_blood_group == "B+"
     assert slot_row.is_profile_created_on_metsights is False
 
-    engagement_row = (
+    participant_count = (
         await test_db_session.execute(
-            text("SELECT participant_count FROM engagements WHERE engagement_id = 3001")
+            text(
+                "SELECT COUNT(DISTINCT user_id) FROM engagement_participants WHERE engagement_id = 3001"
+            )
         )
-    ).first()
-    assert engagement_row.participant_count == 1
+    ).scalar_one()
+    assert participant_count == 1
 
     instance_row = (
         await test_db_session.execute(
@@ -290,13 +291,13 @@ async def test_engagement_onboard_prefers_payload_referred_by(async_client, test
     await test_db_session.execute(
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3201, 'Camp-A', 'ENGA', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
+            "VALUES (3201, 'Camp-A', 'ENGA', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running')"
         )
     )
     await test_db_session.execute(
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3202, 'Camp-B', 'ENGB', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
+            "VALUES (3202, 'Camp-B', 'ENGB', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running')"
         )
     )
     await test_db_session.commit()
@@ -343,7 +344,7 @@ async def test_engagement_onboard_requires_active_engagement(async_client, test_
     await test_db_session.execute(
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3101, 'Camp', 'ENGINACT', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'completed', 0)"
+            "VALUES (3101, 'Camp', 'ENGINACT', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'completed')"
         )
     )
     await test_db_session.commit()
@@ -487,7 +488,7 @@ async def test_engagement_onboard_rejects_invalid_department_slug(async_client, 
     await test_db_session.execute(
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3101, 'Dept Camp', 'DEPT01', 8101, 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
+            "VALUES (3101, 'Dept Camp', 'DEPT01', 8101, 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running')"
         )
     )
     await test_db_session.commit()
@@ -523,7 +524,7 @@ async def test_engagement_onboard_rejects_department_without_organization(async_
     await test_db_session.execute(
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3102, 'B2C Camp', 'B2CDEPT', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', 0)"
+            "VALUES (3102, 'B2C Camp', 'B2CDEPT', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running')"
         )
     )
     await test_db_session.commit()

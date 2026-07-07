@@ -48,7 +48,7 @@ async def _seed_engagement_with_package(test_db_session, *, engagement_id: int =
         text(
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
-            "status, participant_count, organization_id) "
+            "status, organization_id) "
             "VALUES (:eid, 'Camp', 'ENG9201', 'bio_ai', :pid, 1, 'BLR', 20, "
             "'2026-02-01', '2026-02-28', 'running', 0, NULL)"
         ),

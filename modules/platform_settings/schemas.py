@@ -15,6 +15,24 @@ class B2cOnboardingDefaultsUpdate(BaseModel):
     b2c_default_diagnostic_package_id: int = Field(..., ge=1)
 
 
+class EngagementNotificationDefaultsRead(BaseModel):
+    default_onboarding_notification: str | None = None
+    default_pretest_guidelines_notification: str | None = None
+    default_questionnaire_reminder_1: str | None = None
+    default_questionnaire_reminder_2: str | None = None
+    default_blood_report_notification: str | None = None
+    default_bioai_report_notification: str | None = None
+
+
+class EngagementNotificationDefaultsUpdate(BaseModel):
+    default_onboarding_notification: str | None = Field(default=None, max_length=500)
+    default_pretest_guidelines_notification: str | None = Field(default=None, max_length=500)
+    default_questionnaire_reminder_1: str | None = Field(default=None, max_length=500)
+    default_questionnaire_reminder_2: str | None = Field(default=None, max_length=500)
+    default_blood_report_notification: str | None = Field(default=None, max_length=500)
+    default_bioai_report_notification: str | None = Field(default=None, max_length=500)
+
+
 class MetsightsProfilesImportPageRequest(BaseModel):
     page: int = Field(..., ge=1)
 

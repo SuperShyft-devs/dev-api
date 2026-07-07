@@ -81,7 +81,6 @@ async def _seed_org_with_camps(
                 start_date=start_a if camp_no != camp_no_b else start_b,
                 end_date=start_a if camp_no != camp_no_b else start_b,
                 status="running",
-                participant_count=0,
             )
         )
     await test_db_session.commit()

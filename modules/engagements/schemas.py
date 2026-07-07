@@ -38,7 +38,7 @@ class EngagementCreateRequest(BaseModel):
     blood_collection_type: Optional[BloodCollectionType] = None
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
-    notification_service_key: str | None = Field(default=None, max_length=200)
+    onboarding_notification: str | None = Field(default=None, max_length=500)
     pretest_guidelines_notification: str | None = Field(default=None, max_length=500)
     questionnaire_reminder_1: str | None = Field(default=None, max_length=500)
     questionnaire_reminder_2: str | None = Field(default=None, max_length=500)
@@ -73,7 +73,7 @@ class EngagementUpdateRequest(BaseModel):
     metsights_engagement_id: Optional[str] = Field(default=None, max_length=200)
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
-    notification_service_key: str | None = Field(default=None, max_length=200)
+    onboarding_notification: str | None = Field(default=None, max_length=500)
     pretest_guidelines_notification: str | None = Field(default=None, max_length=500)
     questionnaire_reminder_1: str | None = Field(default=None, max_length=500)
     questionnaire_reminder_2: str | None = Field(default=None, max_length=500)
@@ -130,7 +130,7 @@ class EngagementListItem(BaseModel):
     blood_collection_type: Optional[str] = None
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
-    notification_service_key: str
+    onboarding_notification: str | None = None
     pretest_guidelines_notification: str | None = None
     questionnaire_reminder_1: str | None = None
     questionnaire_reminder_2: str | None = None

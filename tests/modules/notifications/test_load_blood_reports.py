@@ -74,7 +74,6 @@ async def _seed_running_participant(
             start_date=date.today() - timedelta(days=7),
             end_date=date.today() + timedelta(days=7),
             status="running",
-            participant_count=1,
         )
     )
     await test_db_session.flush()

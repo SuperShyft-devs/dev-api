@@ -123,7 +123,6 @@ async def test_get_organization_participants_returns_empty_list_when_no_particip
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="active",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -176,7 +175,6 @@ async def test_get_organization_participants_returns_participants_from_single_en
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="active",
-            participant_count=2,
         )
     )
     await test_db_session.flush()
@@ -291,7 +289,6 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="active",
-            participant_count=2,
         )
     )
     test_db_session.add(
@@ -307,7 +304,6 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
             start_date=date(2026, 4, 1),
             end_date=date(2026, 4, 30),
             status="active",
-            participant_count=2,
         )
     )
     await test_db_session.flush()
@@ -474,7 +470,6 @@ async def test_get_organization_participants_paginates_results(async_client, tes
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="active",
-            participant_count=5,
         )
     )
     await test_db_session.flush()
@@ -590,7 +585,6 @@ async def test_get_organization_participants_excludes_other_organizations(async_
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="active",
-            participant_count=1,
         )
     )
     test_db_session.add(
@@ -606,7 +600,6 @@ async def test_get_organization_participants_excludes_other_organizations(async_
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="active",
-            participant_count=1,
         )
     )
     await test_db_session.flush()

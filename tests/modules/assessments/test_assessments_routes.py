@@ -50,7 +50,6 @@ async def test_list_my_assessments_returns_only_my_rows(async_client, test_db_se
             city="BLR",
             slot_duration=60,
             status="active",
-            participant_count=0,
         )
     )
     test_db_session.add(
@@ -64,7 +63,6 @@ async def test_list_my_assessments_returns_only_my_rows(async_client, test_db_se
             city="BLR",
             slot_duration=60,
             status="active",
-            participant_count=0,
         )
     )
     await test_db_session.flush()  # Ensure engagements exist before adding instances
@@ -124,7 +122,6 @@ async def test_get_assessment_details_blocks_cross_user_access(async_client, tes
             city="BLR",
             slot_duration=60,
             status="active",
-            participant_count=0,
         )
     )
     await test_db_session.flush()
@@ -163,7 +160,6 @@ async def test_patch_assessment_status_allows_active_to_completed(async_client, 
             city="BLR",
             slot_duration=60,
             status="active",
-            participant_count=0,
         )
     )
     await test_db_session.flush()
@@ -215,7 +211,6 @@ async def test_patch_assessment_status_rejects_invalid_status(async_client, test
             city="BLR",
             slot_duration=60,
             status="active",
-            participant_count=0,
         )
     )
     await test_db_session.flush()
@@ -259,7 +254,6 @@ async def test_patch_assessment_status_employee_can_revert_completed_to_active(a
             city="BLR",
             slot_duration=60,
             status="active",
-            participant_count=0,
         )
     )
     await test_db_session.flush()
@@ -311,7 +305,6 @@ async def test_patch_assessment_status_rejects_changes_after_completion(async_cl
             city="BLR",
             slot_duration=60,
             status="active",
-            participant_count=0,
         )
     )
     await test_db_session.flush()
@@ -370,7 +363,6 @@ async def test_put_metsights_record_id_rejects_empty_string(async_client, test_d
             city="BLR",
             slot_duration=60,
             status="active",
-            participant_count=0,
         )
     )
     await test_db_session.flush()
@@ -413,7 +405,6 @@ async def test_put_metsights_record_id_updates_and_get_returns_field(async_clien
             city="BLR",
             slot_duration=60,
             status="active",
-            participant_count=0,
         )
     )
     await test_db_session.flush()

@@ -74,8 +74,7 @@ async def test_notify_uses_engagement_service_key(test_db_session, monkeypatch):
         start_date=date(2026, 3, 1),
         end_date=date(2026, 3, 1),
         status="active",
-        participant_count=0,
-        notification_service_key=custom_key,
+        onboarding_notification=custom_key,
     )
     test_db_session.add(engagement)
     await test_db_session.commit()
@@ -134,8 +133,7 @@ async def test_notify_skips_when_participant_details_required_but_missing(test_d
         start_date=date(2026, 3, 1),
         end_date=date(2026, 3, 1),
         status="active",
-        participant_count=0,
-        notification_service_key=service_key,
+        onboarding_notification=service_key,
     )
     test_db_session.add(engagement)
     await test_db_session.commit()

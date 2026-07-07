@@ -1,4 +1,4 @@
-"""Fire-and-forget notifications to onboarding assistants when a user enrolls."""
+"""Dispatch onboarding notifications to admin-role assistants when a user enrolls."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
 from modules.engagements.repository import EngagementsRepository
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.schemas import DispatchRequest
@@ -61,6 +60,10 @@ def _with_participant_user_id(
     return {**participant_details, "participant_user_id": str(participant_user_id)}
 
 
+def _parse_service_keys(raw: str | None) -> list[str]:
+    return [k.strip() for k in (raw or "").split(",") if k.strip()]
+
+
 async def notify_onboarding_assistants_on_enrollment(
     db: AsyncSession,
     *,
@@ -71,61 +74,62 @@ async def notify_onboarding_assistants_on_enrollment(
     participant_user_id: int,
     participant_details: dict[str, str] | None,
 ) -> None:
-    """Dispatch the engagement's notification service to all onboarding assistants in one call."""
-    service_key = (getattr(engagement, "notification_service_key", None) or "").strip()
-    if not service_key:
-        service_key = DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
+    """Dispatch each configured onboarding notification service to admin-role assistants."""
+    service_keys = _parse_service_keys(getattr(engagement, "onboarding_notification", None))
+    if not service_keys:
+        return
 
-    try:
-        svc = await notifications_repository.get_service_by_key(db, service_key=service_key)
-        if svc is None:
-            logger.warning(
-                "Onboarding notification skipped: service_key=%s not found (engagement_id=%s)",
-                service_key,
-                getattr(engagement, "engagement_id", None),
+    assistant_user_ids = await engagements_repository.list_onboarding_assistant_user_ids(
+        db, engagement_id=int(engagement.engagement_id)
+    )
+    if not assistant_user_ids:
+        return
+
+    details = _with_participant_user_id(participant_details, participant_user_id)
+    engagement_id = int(engagement.engagement_id)
+
+    for service_key in service_keys:
+        try:
+            svc = await notifications_repository.get_service_by_key(db, service_key=service_key)
+            if svc is None:
+                logger.warning(
+                    "Onboarding notification skipped: service_key=%s not found (engagement_id=%s)",
+                    service_key,
+                    engagement_id,
+                )
+                continue
+            if not svc.is_active:
+                logger.warning(
+                    "Onboarding notification skipped: service_key=%s inactive (engagement_id=%s)",
+                    service_key,
+                    engagement_id,
+                )
+                continue
+
+            if svc.require_participant_detail and not participant_details:
+                logger.warning(
+                    "Onboarding notification skipped: service_key=%s requires participant_details "
+                    "(engagement_id=%s)",
+                    service_key,
+                    engagement_id,
+                )
+                continue
+
+            dispatch_payload = DispatchRequest(
+                service_key=service_key,
+                user_ids=assistant_user_ids,
+                engagement_id=engagement_id,
+                participant_details=details,
             )
-            return
-        if not svc.is_active:
-            logger.warning(
-                "Onboarding notification skipped: service_key=%s inactive (engagement_id=%s)",
-                service_key,
-                getattr(engagement, "engagement_id", None),
+            await notifications_service.dispatch(
+                db,
+                payload=dispatch_payload,
+                triggered_by_user_id=None,
             )
-            return
-
-        if svc.require_participant_detail and not participant_details:
+        except Exception as exc:
             logger.warning(
-                "Onboarding notification skipped: service_key=%s requires participant_details "
-                "(engagement_id=%s)",
+                "Onboarding assistant notification failed for engagement_id=%s service_key=%s: %s",
+                engagement_id,
                 service_key,
-                getattr(engagement, "engagement_id", None),
+                str(exc),
             )
-            return
-
-        assistant_user_ids = await engagements_repository.list_onboarding_assistant_user_ids(
-            db, engagement_id=int(engagement.engagement_id)
-        )
-        if not assistant_user_ids:
-            return
-
-        details = _with_participant_user_id(participant_details, participant_user_id)
-
-        engagement_id = int(engagement.engagement_id)
-
-        dispatch_payload = DispatchRequest(
-            service_key=service_key,
-            user_ids=assistant_user_ids,
-            engagement_id=engagement_id,
-            participant_details=details,
-        )
-        await notifications_service.dispatch(
-            db,
-            payload=dispatch_payload,
-            triggered_by_user_id=None,
-        )
-    except Exception as exc:
-        logger.warning(
-            "Onboarding assistant notification failed for engagement_id=%s: %s",
-            getattr(engagement, "engagement_id", None),
-            str(exc),
-        )

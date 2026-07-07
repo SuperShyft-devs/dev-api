@@ -84,7 +84,6 @@ async def test_list_notifications_enriched_fields(async_client, test_db_session)
             start_date=date(2026, 5, 1),
             end_date=date(2026, 5, 1),
             status="active",
-            participant_count=0,
         )
     )
     dispatched = datetime(2026, 5, 10, 12, 0, 0, tzinfo=timezone.utc)

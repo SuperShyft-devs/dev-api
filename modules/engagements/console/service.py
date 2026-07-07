@@ -56,7 +56,7 @@ class ConsoleService:
         self._users_repository = users_repository or UsersRepository()
 
     @staticmethod
-    def _engagement_to_console_dict(engagement: Engagement) -> dict:
+    def _engagement_to_console_dict(engagement: Engagement, *, participant_count: int) -> dict:
         return {
             "engagement_id": engagement.engagement_id,
             "engagement_name": engagement.engagement_name,
@@ -64,7 +64,7 @@ class ConsoleService:
             "start_date": engagement.start_date,
             "end_date": engagement.end_date,
             "status": engagement.status,
-            "participant_count": engagement.participant_count,
+            "participant_count": participant_count,
         }
 
     async def list_console_engagements(
@@ -92,7 +92,18 @@ class ConsoleService:
                 error_code="FORBIDDEN",
                 message="You do not have permission to perform this action",
             )
-        return [self._engagement_to_console_dict(e) for e in engagements]
+        engagement_ids = [int(e.engagement_id) for e in engagements]
+        counts_by_id = await self._repository.count_distinct_participants_by_engagement_ids(
+            db,
+            engagement_ids=engagement_ids,
+        )
+        return [
+            self._engagement_to_console_dict(
+                e,
+                participant_count=counts_by_id.get(int(e.engagement_id), 0),
+            )
+            for e in engagements
+        ]
 
     async def get_engagement_for_console(
         self,
@@ -111,7 +122,11 @@ class ConsoleService:
                 message="Engagement does not exist",
             )
 
-        return self._engagement_to_console_dict(engagement)
+        participant_count = await self._repository.count_distinct_participants_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+        return self._engagement_to_console_dict(engagement, participant_count=participant_count)
 
     async def list_participants_for_console(
         self,

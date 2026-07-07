@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
 
 from db.base import Base
 
@@ -23,5 +23,11 @@ class PlatformSettings(Base):
         ForeignKey("diagnostic_package.diagnostic_package_id"),
         nullable=False,
     )
+    default_onboarding_notification = Column(String(500), nullable=True)
+    default_pretest_guidelines_notification = Column(String(500), nullable=True)
+    default_questionnaire_reminder_1 = Column(String(500), nullable=True)
+    default_questionnaire_reminder_2 = Column(String(500), nullable=True)
+    default_blood_report_notification = Column(String(500), nullable=True)
+    default_bioai_report_notification = Column(String(500), nullable=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     updated_by_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)

@@ -851,7 +851,6 @@ class UsersService:
             user_id=user.user_id,
             engagement_date=date.fromisoformat(meta["blood_collection_date"]),
             slot_start_time=slot_start,
-            increment_participant_count=False,
         )
 
         await self._ensure_metsights_profile_id(db, user=user)
@@ -1027,7 +1026,6 @@ class UsersService:
             user_id=user.user_id,
             engagement_date=date.fromisoformat(meta["blood_collection_date"]),
             slot_start_time=slot_start,
-            increment_participant_count=False,
         )
 
         await self._notify_onboarding_assistants_for_user(
@@ -1750,7 +1748,6 @@ class UsersService:
             user_id=user.user_id,
             engagement_date=payload.blood_collection_date,
             slot_start_time=slot_start,
-            increment_participant_count=False,
             participants_employee_id=payload.participants_employee_id,
             participant_department=payload.participant_department,
             participant_blood_group=payload.participant_blood_group,
@@ -1967,7 +1964,6 @@ class UsersService:
             user_id=user.user_id,
             engagement_date=payload.blood_collection_date,
             slot_start_time=slot_start,
-            increment_participant_count=False,
             participants_employee_id=payload.participants_employee_id,
             participant_department=validated_department,
             participant_blood_group=payload.participant_blood_group,
@@ -2579,7 +2575,6 @@ class UsersService:
                     user_id=user.user_id,
                     engagement_date=engagement_date,
                     slot_start_time=default_slot,
-                    increment_participant_count=False,
                     is_profile_created_on_metsights=True,
                     is_primary_record_id_synced=False,
                 )

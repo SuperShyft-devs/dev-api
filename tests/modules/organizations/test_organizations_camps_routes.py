@@ -81,7 +81,6 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
                 start_date=start,
                 end_date=start,
                 status="running",
-                participant_count=0,
             )
         )
 
@@ -100,7 +99,6 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
             start_date=start,
             end_date=start,
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()

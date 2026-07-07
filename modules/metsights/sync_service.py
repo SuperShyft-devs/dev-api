@@ -917,7 +917,6 @@ class MetsightsSyncService:
                         user_id=target_user_id,
                         engagement_date=eng_date,
                         slot_start_time=default_slot,
-                        increment_participant_count=True,
                         is_profile_created_on_metsights=True,
                     )
                 except AppError as exc:

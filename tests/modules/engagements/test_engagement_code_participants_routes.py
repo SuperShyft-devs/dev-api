@@ -86,7 +86,6 @@ async def test_get_engagement_code_participants_returns_empty_list_when_no_parti
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -130,7 +129,6 @@ async def test_get_engagement_code_participants_returns_participants_from_engage
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="running",
-            participant_count=2,
         )
     )
     await test_db_session.flush()
@@ -231,7 +229,6 @@ async def test_get_engagement_code_participants_returns_distinct_users(async_cli
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="running",
-            participant_count=1,
         )
     )
     await test_db_session.flush()
@@ -310,7 +307,6 @@ async def test_get_engagement_code_participants_validates_pagination_params(asyn
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="running",
-            participant_count=0,
         )
     )
     await test_db_session.commit()
@@ -356,7 +352,6 @@ async def test_get_engagement_code_participants_paginates_results(async_client, 
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="running",
-            participant_count=5,
         )
     )
     await test_db_session.flush()
@@ -453,7 +448,6 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="running",
-            participant_count=1,
         )
     )
     test_db_session.add(
@@ -467,7 +461,6 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
             start_date=date(2026, 3, 1),
             end_date=date(2026, 3, 31),
             status="running",
-            participant_count=1,
         )
     )
     await test_db_session.flush()

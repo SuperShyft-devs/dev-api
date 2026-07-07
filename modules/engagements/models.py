@@ -8,7 +8,6 @@ from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, Enum as SAEn
 from sqlalchemy.sql import func
 
 from db.base import Base
-from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
 
 
 class EngagementKind(str, enum.Enum):
@@ -79,16 +78,9 @@ class Engagement(Base):
     start_date = Column(Date)
     end_date = Column(Date)
     status = Column(String)
-    participant_count = Column(Integer)
     create_profile_on_metsights = Column(Boolean, nullable=False, default=False, server_default="false")
     enroll_for_fitprint_full = Column(Boolean, nullable=False, default=False, server_default="false")
-    notification_service_key = Column(
-        String,
-        ForeignKey("notification_services.service_key"),
-        nullable=False,
-        default=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
-        server_default="booking-alert-whatsapp",
-    )
+    onboarding_notification = Column(String(500), nullable=True)
     pretest_guidelines_notification = Column(String, nullable=True)
     questionnaire_reminder_1 = Column(String, nullable=True)
     questionnaire_reminder_2 = Column(String, nullable=True)

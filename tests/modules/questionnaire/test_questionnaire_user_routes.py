@@ -96,7 +96,6 @@ async def _ensure_test_engagement(test_db_session, *, engagement_id: int = 1):
             diagnostic_package_id=1,
             slot_duration=20,
             status="active",
-            participant_count=0,
         )
         test_db_session.add(engagement)
         await test_db_session.commit()

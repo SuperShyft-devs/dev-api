@@ -71,7 +71,6 @@ async def _seed_engagement(
         assessment_package_id=1,
         diagnostic_package_id=1,
         status=status,
-        participant_count=0,
         start_date=date.today(),
         end_date=date.today(),
     )
