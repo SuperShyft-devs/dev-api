@@ -228,11 +228,11 @@ class ConsoleService:
                 message="Engagement diagnostic provider must be Healthians",
             )
 
-        if diagnostic_package.external_camp_id is None or diagnostic_package.external_package_id is None:
+        if engagement.external_camp_id is None or diagnostic_package.external_package_id is None:
             raise AppError(
                 status_code=422,
                 error_code="MISSING_DIAGNOSTIC_CONFIG",
-                message="Diagnostic package is missing external camp ID or external package ID",
+                message="Engagement is missing external camp ID or diagnostic package is missing external package ID",
             )
 
         if (
@@ -359,7 +359,7 @@ class ConsoleService:
                     "barcode": barcode.strip(),
                 }
             ],
-            "camp_id": diagnostic_package.external_camp_id,
+            "camp_id": engagement.external_camp_id,
             "slot": {"slot_id": ""},
             "sample_collected": "y",
             "package": [{"deal_id": [f"package_{diagnostic_package.external_package_id}"]}],

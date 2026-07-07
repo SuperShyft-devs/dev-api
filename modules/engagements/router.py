@@ -78,6 +78,7 @@ def _engagement_to_dict(
         "participant_count": participant_count if participant_count is not None else 0,
         "created_at": engagement.created_at.isoformat() if engagement.created_at else None,
         "healthians_zone_id": engagement.healthians_zone_id,
+        "external_camp_id": engagement.external_camp_id,
         "blood_collection_type": engagement.blood_collection_type.value if engagement.blood_collection_type else None,
         "create_profile_on_metsights": engagement.create_profile_on_metsights,
         "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,

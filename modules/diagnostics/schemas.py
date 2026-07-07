@@ -33,7 +33,6 @@ class DiagnosticPackageCreate(BaseModel):
     package_name: str = Field(min_length=1)
     diagnostic_provider: Optional[str] = None
     external_package_id: Optional[int] = None
-    external_camp_id: Optional[int] = None
     custom: bool = False
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
@@ -54,7 +53,6 @@ class DiagnosticPackageUpdate(BaseModel):
     package_name: Optional[str] = Field(default=None, min_length=1)
     diagnostic_provider: Optional[str] = None
     external_package_id: Optional[int] = None
-    external_camp_id: Optional[int] = None
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
     health_areas_covered: Optional[str] = None
@@ -80,7 +78,6 @@ class DiagnosticPackageResponse(BaseModel):
     package_name: str
     diagnostic_provider: Optional[str] = None
     external_package_id: Optional[int] = None
-    external_camp_id: Optional[int] = None
     created_by_user_id: Optional[int] = None
     no_of_tests: Optional[int] = None
     report_duration_hours: Optional[int] = None
@@ -395,7 +392,6 @@ class DiagnosticPackageListItem(BaseModel):
     package_name: str
     display_order: Optional[int] = None
     external_package_id: Optional[int] = None
-    external_camp_id: Optional[int] = None
     no_of_tests: Optional[int] = None
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None

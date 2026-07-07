@@ -428,6 +428,7 @@ class EngagementsService:
             end_date=payload.end_date,
             status=initial_status,
             healthians_zone_id=payload.healthians_zone_id,
+            external_camp_id=payload.external_camp_id,
             blood_collection_type=payload.blood_collection_type,
             create_profile_on_metsights=payload.create_profile_on_metsights,
             enroll_for_fitprint_full=payload.enroll_for_fitprint_full,
@@ -711,6 +712,7 @@ class EngagementsService:
         engagement.end_date = payload.end_date
         engagement.camp_no = compute_camp_no(payload.organization_id, payload.start_date)
         engagement.healthians_zone_id = payload.healthians_zone_id
+        engagement.external_camp_id = payload.external_camp_id
         engagement.blood_collection_type = payload.blood_collection_type
         engagement.metsights_engagement_id = payload.metsights_engagement_id
         engagement.create_profile_on_metsights = payload.create_profile_on_metsights

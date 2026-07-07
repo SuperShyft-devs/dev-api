@@ -41,7 +41,6 @@ async def test_console_cancel_booking_success(async_client, test_db_session):
                 reference_id="REF50",
                 package_name="Healthians Camp",
                 diagnostic_provider="healthians",
-                external_camp_id=1001,
                 external_package_id=1001,
                 status="active",
                 bookings_count=0,
@@ -49,7 +48,6 @@ async def test_console_cancel_booking_success(async_client, test_db_session):
         )
     else:
         existing_diag.diagnostic_provider = "healthians"
-        existing_diag.external_camp_id = 1001
         existing_diag.external_package_id = 1001
     test_db_session.add(User(user_id=93001, age=30, phone="9300100000", status="active", first_name="Admin", last_name="User"))
     await test_db_session.flush()
@@ -65,6 +63,7 @@ async def test_console_cancel_booking_success(async_client, test_db_session):
                 engagement_type="diagnostic",
                 assessment_package_id=1,
                 diagnostic_package_id=50,
+                external_camp_id=1001,
                 status="running",
                 start_date=date.today(),
                 end_date=date.today(),
@@ -76,6 +75,7 @@ async def test_console_cancel_booking_success(async_client, test_db_session):
         )
     else:
         existing_eng.diagnostic_package_id = 50
+        existing_eng.external_camp_id = 1001
         existing_eng.status = "running"
         existing_eng.latitude = 28.6
         existing_eng.longitude = 77.2

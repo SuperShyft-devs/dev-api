@@ -35,6 +35,7 @@ class EngagementCreateRequest(BaseModel):
     start_date: date
     end_date: date
     healthians_zone_id: Optional[str] = Field(default=None, max_length=50)
+    external_camp_id: Optional[int] = None
     blood_collection_type: Optional[BloodCollectionType] = None
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
@@ -69,6 +70,7 @@ class EngagementUpdateRequest(BaseModel):
     start_date: date
     end_date: date
     healthians_zone_id: Optional[str] = Field(default=None, max_length=50)
+    external_camp_id: Optional[int] = None
     blood_collection_type: Optional[BloodCollectionType] = None
     metsights_engagement_id: Optional[str] = Field(default=None, max_length=200)
     create_profile_on_metsights: bool = False
@@ -127,6 +129,7 @@ class EngagementListItem(BaseModel):
     participant_count: Optional[int] = None
     created_at: Optional[datetime] = None
     healthians_zone_id: Optional[str] = None
+    external_camp_id: Optional[int] = None
     blood_collection_type: Optional[str] = None
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False

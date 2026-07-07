@@ -89,6 +89,7 @@ class Engagement(Base):
     bioai_report_notification = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     healthians_zone_id = Column(String, nullable=True)
+    external_camp_id = Column(Integer, nullable=True)
     blood_collection_type = Column(
         SAEnum(BloodCollectionType, name="blood_collection_type_enum", values_callable=lambda obj: [e.value for e in obj], create_type=False),
         nullable=True,
