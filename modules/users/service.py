@@ -722,7 +722,9 @@ class UsersService:
                     .values(bookings_count=DiagnosticPackage.bookings_count + 1)
                 )
 
-                onboard = await self.fulfill_bio_ai_booking(db, booking=booking)
+                onboard = await self.fulfill_bio_ai_booking(
+                    db, booking=booking, booked_by_user_id=audit_user_id
+                )
                 if onboard is None:
                     raise AppError(
                         status_code=500,
@@ -795,6 +797,7 @@ class UsersService:
         db: AsyncSession,
         *,
         booking,
+        booked_by_user_id: int | None = None,
     ) -> UserOnboardResponse | None:
         """Post-payment fulfillment for a bio_ai booking.
 
@@ -845,12 +848,14 @@ class UsersService:
         )
 
         slot_start = self._parse_time_slot(meta["blood_collection_time_slot"])
+        booked_by = booked_by_user_id if booked_by_user_id is not None else user.user_id
         time_slot = await self._engagements_service.enroll_user_in_engagement(
             db,
             engagement=engagement,
             user_id=user.user_id,
             engagement_date=date.fromisoformat(meta["blood_collection_date"]),
             slot_start_time=slot_start,
+            booked_by_user_id=booked_by,
         )
 
         await self._ensure_metsights_profile_id(db, user=user)
@@ -970,6 +975,7 @@ class UsersService:
         db: AsyncSession,
         *,
         booking,
+        booked_by_user_id: int | None = None,
     ) -> dict[str, int | str] | None:
         """Post-payment fulfillment for a blood_test (diagnostic-only) booking."""
         if self._engagements_service is None:
@@ -1020,12 +1026,14 @@ class UsersService:
         )
 
         slot_start = self._parse_time_slot(meta["blood_collection_time_slot"])
+        booked_by = booked_by_user_id if booked_by_user_id is not None else user.user_id
         time_slot = await self._engagements_service.enroll_user_in_engagement(
             db,
             engagement=engagement,
             user_id=user.user_id,
             engagement_date=date.fromisoformat(meta["blood_collection_date"]),
             slot_start_time=slot_start,
+            booked_by_user_id=booked_by,
         )
 
         await self._notify_onboarding_assistants_for_user(

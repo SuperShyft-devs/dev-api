@@ -63,3 +63,62 @@ async def test_enroll_user_in_engagement_creates_participant_row(test_db_session
     assert count == 1
     assert slot.engagement_id == 9001
     assert slot.user_id == 1001
+    assert slot.booked_by_user_id == 1001
+
+
+@pytest.mark.asyncio
+async def test_enroll_user_in_engagement_explicit_booked_by(test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Test Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'Test Diagnostic', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
+            "VALUES ('booking-alert-whatsapp', 'Booking Alert', 'whatsapp', 'booking-alert', true, false, false) "
+            "ON CONFLICT (service_key) DO NOTHING"
+        )
+    )
+    await test_db_session.commit()
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
+            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, "
+            "organization_id, onboarding_notification) "
+            "VALUES (9002, 'Camp 2', 'ENG9002', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', "
+            "NULL, 'booking-alert-whatsapp')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, age, phone, status) VALUES "
+            "(1002, 30, '9999999998', 'active'), (1003, 40, '9999999997', 'active')"
+        )
+    )
+    await test_db_session.commit()
+
+    service = EngagementsService(EngagementsRepository())
+    engagement = await service.get_by_code(test_db_session, "ENG9002")
+    assert engagement is not None
+
+    slot = await service.enroll_user_in_engagement(
+        test_db_session,
+        engagement=engagement,
+        user_id=1002,
+        engagement_date=__import__("datetime").date(2026, 2, 1),
+        slot_start_time=__import__("datetime").time(10, 0),
+        booked_by_user_id=1003,
+    )
+
+    assert slot.user_id == 1002
+    assert slot.booked_by_user_id == 1003

@@ -143,6 +143,7 @@ def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
         barcode,
         booking_id,
         blood_collection_time_slot_id,
+        booked_by_user_id,
     ) = row
     return {
         "engagement_participant_id": engagement_participant_id,
@@ -173,6 +174,7 @@ def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
         "barcode": barcode,
         "booking_id": booking_id,
         "blood_collection_time_slot_id": blood_collection_time_slot_id,
+        "booked_by_user_id": booked_by_user_id,
     }
 
 
@@ -1022,13 +1024,16 @@ class EngagementsService:
         is_profile_created_on_metsights: bool = False,
         is_primary_record_id_synced: bool = False,
         is_fitprint_record_id_synced: bool = False,
+        booked_by_user_id: int | None = None,
     ) -> EngagementParticipant:
         if (engagement.status or "").lower() not in ("scheduled", "running", "draft"):
             raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is not accepting enrollments")
 
+        booked_by = booked_by_user_id if booked_by_user_id is not None else user_id
         participant = EngagementParticipant(
             engagement_id=engagement.engagement_id,
             user_id=user_id,
+            booked_by_user_id=booked_by,
             engagement_date=engagement_date,
             slot_start_time=slot_start_time,
             participants_employee_id=participants_employee_id,

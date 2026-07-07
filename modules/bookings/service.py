@@ -45,6 +45,7 @@ async def check_service_availability(
     *,
     members: list[dict[str, Any]],
     engagements_service: EngagementsService,
+    booked_by_user_id: int,
 ) -> list[dict[str, Any]]:
     """Check Healthians serviceability and create draft engagements for serviceable members."""
     results: list[dict[str, Any]] = []
@@ -147,6 +148,7 @@ async def check_service_availability(
         participant = EngagementParticipant(
             engagement_id=engagement.engagement_id,
             user_id=user_id,
+            booked_by_user_id=booked_by_user_id,
             engagement_date=date.today(),
             slot_start_time=time(0, 0),
         )
@@ -384,6 +386,7 @@ async def create_healthians_booking_after_payment(
     db: AsyncSession,
     *,
     members: list[dict[str, Any]],
+    caller_user_id: int,
 ) -> list[dict[str, Any]]:
     """After payment succeeds, create Healthians booking for each member using their drafted engagement."""
     results: list[dict[str, Any]] = []
@@ -417,6 +420,15 @@ async def create_healthians_booking_after_payment(
             results.append({"user_id": user_id, "engagement_id": engagement_id, "status": "error", "message": "User not enrolled"})
             continue
 
+        if caller_user_id not in (participant.user_id, participant.booked_by_user_id):
+            results.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "status": "error",
+                "message": "Not authorized to book for this participant",
+            })
+            continue
+
         if not engagement.diagnostic_package_id:
             results.append({"user_id": user_id, "engagement_id": engagement_id, "status": "error", "message": "No diagnostic package"})
             continue
@@ -444,12 +456,14 @@ async def create_healthians_booking_after_payment(
 
         external_package_id = pkg.external_package_id or 0
         slot_id = participant.blood_collection_time_slot_id or ""
+        relation = (user.relationship or "self").strip() or "self"
+        vendor_billing_user_id = str(participant.booked_by_user_id)
 
         booking_payload = {
             "customer": [{
                 "customer_id": str(user_id),
                 "customer_name": full_name.upper(),
-                "relation": "self",
+                "relation": relation,
                 "age": age,
                 "dob": dob,
                 "gender": gender_code,
@@ -468,7 +482,7 @@ async def create_healthians_booking_after_payment(
             "zipcode": engagement.pincode or "",
             "landmark": engagement.landmark or "",
             "hard_copy": 0,
-            "vendor_billing_user_id": str(user_id),
+            "vendor_billing_user_id": vendor_billing_user_id,
             "payment_option": "prepaid",
             "discounted_price": 0,
             "zone_id": int(engagement.healthians_zone_id) if engagement.healthians_zone_id else 0,
@@ -529,6 +543,188 @@ async def create_healthians_booking_after_payment(
             "message": resp.get("message", "Booking placed"),
             "booking_id": booking_id,
         })
+
+    return results
+
+
+async def _get_healthians_package_for_engagement(
+    db: AsyncSession,
+    engagement: Engagement,
+) -> DiagnosticPackage:
+    if not engagement.diagnostic_package_id:
+        raise AppError(status_code=422, error_code="INVALID_STATE", message="No diagnostic package")
+    pkg = await _get_diagnostic_package(db, engagement.diagnostic_package_id)
+    if not _is_healthians(pkg):
+        raise AppError(
+            status_code=422,
+            error_code="INVALID_DIAGNOSTIC_PROVIDER",
+            message="Diagnostic provider is not Healthians",
+        )
+    return pkg
+
+
+async def cancel_healthians_participant_booking(
+    db: AsyncSession,
+    *,
+    participant: EngagementParticipant,
+    engagement: Engagement,
+    remarks: str,
+    repository: EngagementsRepository,
+) -> dict[str, Any]:
+    """Cancel a Healthians booking for an engagement participant and clear local booking fields."""
+    booking_id = (participant.booking_id or "").strip()
+    if not booking_id:
+        raise AppError(
+            status_code=422,
+            error_code="NO_BOOKING",
+            message="No Healthians booking exists for this participant",
+        )
+
+    await _get_healthians_package_for_engagement(db, engagement)
+
+    access_token = await _get_healthians_token()
+    cancel_payload = {
+        "booking_id": booking_id,
+        "vendor_billing_user_id": str(participant.booked_by_user_id),
+        "vendor_customer_id": str(participant.user_id),
+        "remarks": remarks,
+    }
+
+    try:
+        resp = await healthians_client.cancel_booking(
+            access_token,
+            booking_id=booking_id,
+            vendor_billing_user_id=str(participant.booked_by_user_id),
+            vendor_customer_id=str(participant.user_id),
+            remarks=remarks,
+        )
+    except Exception as exc:
+        logger.exception(
+            "Healthians cancelBooking failed for participant %s",
+            participant.engagement_participant_id,
+        )
+        await log_healthians_call(
+            db,
+            engagement_id=engagement.engagement_id,
+            user_id=participant.user_id,
+            provider="healthians",
+            api_url=f"{settings.HEALTHIANS_BASE_URL}/toast4health/cancelBooking",
+            request_payload=cancel_payload,
+            status="failed",
+            error_message=str(exc),
+        )
+        raise AppError(
+            status_code=502,
+            error_code="HEALTHIANS_CANCEL_FAILED",
+            message=str(exc),
+        ) from exc
+
+    await log_healthians_call(
+        db,
+        engagement_id=engagement.engagement_id,
+        user_id=participant.user_id,
+        provider="healthians",
+        api_url=f"{settings.HEALTHIANS_BASE_URL}/toast4health/cancelBooking",
+        request_payload=cancel_payload,
+        response_payload=resp,
+        status="success" if resp.get("status") is True else "failed",
+    )
+
+    if resp.get("status") is not True:
+        raise AppError(
+            status_code=422,
+            error_code="HEALTHIANS_CANCEL_FAILED",
+            message=resp.get("message", "Booking cancellation failed"),
+        )
+
+    await repository.clear_participant_healthians_booking(
+        db,
+        engagement_participant_id=participant.engagement_participant_id,
+    )
+
+    return {
+        "status": True,
+        "message": resp.get("message", "Order Cancelled Successfully!"),
+        "booking_id": booking_id,
+    }
+
+
+async def cancel_healthians_bookings_batch(
+    db: AsyncSession,
+    *,
+    members: list[dict[str, Any]],
+    caller_user_id: int,
+    repository: EngagementsRepository,
+) -> list[dict[str, Any]]:
+    """Cancel Healthians bookings for multiple engagement participants."""
+    results: list[dict[str, Any]] = []
+
+    for member in members:
+        user_id = member["user_id"]
+        engagement_id = member["engagement_id"]
+        remarks = member["remarks"]
+
+        engagement_result = await db.execute(
+            select(Engagement).where(Engagement.engagement_id == engagement_id)
+        )
+        engagement = engagement_result.scalar_one_or_none()
+        if engagement is None:
+            results.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "status": "error",
+                "message": "Engagement not found",
+            })
+            continue
+
+        participant_result = await db.execute(
+            select(EngagementParticipant)
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .where(EngagementParticipant.user_id == user_id)
+            .order_by(EngagementParticipant.engagement_participant_id.desc())
+            .limit(1)
+        )
+        participant = participant_result.scalar_one_or_none()
+        if participant is None:
+            results.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "status": "error",
+                "message": "User not enrolled",
+            })
+            continue
+
+        if caller_user_id not in (participant.user_id, participant.booked_by_user_id):
+            results.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "status": "error",
+                "message": "Not authorized to cancel this booking",
+            })
+            continue
+
+        try:
+            cancel_result = await cancel_healthians_participant_booking(
+                db,
+                participant=participant,
+                engagement=engagement,
+                remarks=remarks,
+                repository=repository,
+            )
+            results.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "status": "success",
+                "message": cancel_result.get("message", "Order Cancelled Successfully!"),
+                "booking_id": cancel_result.get("booking_id"),
+            })
+        except AppError as exc:
+            results.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "status": "error",
+                "message": exc.message,
+            })
 
     return results
 

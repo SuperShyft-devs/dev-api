@@ -287,6 +287,25 @@ class EngagementsRepository:
         db.add(participant)
         await db.flush()
 
+    async def clear_participant_healthians_booking(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_participant_id: int,
+    ) -> None:
+        result = await db.execute(
+            select(EngagementParticipant).where(
+                EngagementParticipant.engagement_participant_id == engagement_participant_id
+            )
+        )
+        participant = result.scalar_one_or_none()
+        if participant is None:
+            return
+        participant.booking_id = None
+        participant.barcode = None
+        db.add(participant)
+        await db.flush()
+
     async def list_enrolled_user_ids_for_engagement(
         self,
         db: AsyncSession,
@@ -650,6 +669,7 @@ class EngagementsRepository:
                 EngagementParticipant.barcode,
                 EngagementParticipant.booking_id,
                 EngagementParticipant.blood_collection_time_slot_id,
+                EngagementParticipant.booked_by_user_id,
                 func.row_number()
                 .over(
                     partition_by=EngagementParticipant.user_id,
@@ -692,6 +712,7 @@ class EngagementsRepository:
                 ranked_rows.c.barcode,
                 ranked_rows.c.booking_id,
                 ranked_rows.c.blood_collection_time_slot_id,
+                ranked_rows.c.booked_by_user_id,
             )
             .where(ranked_rows.c.rn == 1)
             .order_by(ranked_rows.c.engagement_participant_id.asc())
@@ -783,6 +804,7 @@ class EngagementsRepository:
                 EngagementParticipant.barcode,
                 EngagementParticipant.booking_id,
                 EngagementParticipant.blood_collection_time_slot_id,
+                EngagementParticipant.booked_by_user_id,
                 func.row_number()
                 .over(
                     partition_by=EngagementParticipant.user_id,
@@ -826,6 +848,7 @@ class EngagementsRepository:
                 ranked_rows.c.barcode,
                 ranked_rows.c.booking_id,
                 ranked_rows.c.blood_collection_time_slot_id,
+                ranked_rows.c.booked_by_user_id,
             )
             .where(ranked_rows.c.rn == 1)
             .order_by(ranked_rows.c.engagement_participant_id.asc())

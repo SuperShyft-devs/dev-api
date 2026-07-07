@@ -5,6 +5,7 @@ from __future__ import annotations
 import enum
 
 from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, Enum as SAEnum, Float, ForeignKey, Index, Integer, String, Time, UniqueConstraint
+from sqlalchemy.orm import validates
 from sqlalchemy.sql import func
 
 from db.base import Base
@@ -117,6 +118,7 @@ class EngagementParticipant(Base):
     __table_args__ = (
         Index("ix_ep_engagement_id_user_id", "engagement_id", "user_id"),
         Index("ix_ep_user_id", "user_id"),
+        Index("ix_ep_booked_by_user_id", "booked_by_user_id"),
         Index("ix_ep_engagement_date", "engagement_date"),
         Index("ix_engagement_participants_booking_id", "booking_id"),
     )
@@ -124,6 +126,7 @@ class EngagementParticipant(Base):
     engagement_participant_id = Column(Integer, primary_key=True)
     engagement_id = Column(Integer, ForeignKey("engagements.engagement_id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    booked_by_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     slot_start_time = Column(Time, nullable=False)
     engagement_date = Column(Date, nullable=False)
     participants_employee_id = Column(String, nullable=True)
@@ -138,3 +141,9 @@ class EngagementParticipant(Base):
     barcode = Column(String, nullable=True)
     booking_id = Column(String, nullable=True)
     blood_collection_time_slot_id = Column(String, nullable=True)
+
+    @validates("user_id")
+    def _default_booked_by_user_id(self, _key: str, user_id: int) -> int:
+        if self.booked_by_user_id is None and user_id is not None:
+            self.booked_by_user_id = user_id
+        return user_id

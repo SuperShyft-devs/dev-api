@@ -491,7 +491,10 @@ class PaymentsService:
             await db.flush()
 
             fulfillment_results = await self._run_post_payment_fulfillment(
-                db, bookings=bookings, order_id=order_row.order_id
+                db,
+                bookings=bookings,
+                order_id=order_row.order_id,
+                booked_by_user_id=authenticated_user_id,
             )
 
             await db.flush()
@@ -593,6 +596,7 @@ class PaymentsService:
         *,
         bookings: list[Booking],
         order_id: int,
+        booked_by_user_id: int,
     ) -> list[FulfillmentResult]:
         """Execute post-payment fulfillment for bookings.
 
@@ -668,7 +672,9 @@ class PaymentsService:
                 )
 
             if bt == "bio_ai":
-                onboard = await users_service.fulfill_bio_ai_booking(db, booking=effective_booking)
+                onboard = await users_service.fulfill_bio_ai_booking(
+                    db, booking=effective_booking, booked_by_user_id=booked_by_user_id
+                )
                 if onboard is None:
                     raise RuntimeError(f"Bio AI fulfillment failed for booking_id={booking.booking_id}")
                 result = FulfillmentResult(
@@ -678,7 +684,9 @@ class PaymentsService:
                     booking_type=bt,
                 )
             elif bt == "blood_test":
-                blood_result = await users_service.fulfill_blood_test_booking(db, booking=effective_booking)
+                blood_result = await users_service.fulfill_blood_test_booking(
+                    db, booking=effective_booking, booked_by_user_id=booked_by_user_id
+                )
                 if blood_result is None:
                     raise RuntimeError(f"Blood test fulfillment failed for booking_id={booking.booking_id}")
                 result = FulfillmentResult(

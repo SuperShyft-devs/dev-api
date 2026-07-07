@@ -25,6 +25,10 @@ from modules.reports.repository import ReportsRepository
 from modules.users.repository import UsersRepository
 
 
+def get_engagements_repository() -> EngagementsRepository:
+    return EngagementsRepository()
+
+
 def get_engagements_service() -> EngagementsService:
     audit_service = AuditService(AuditRepository())
     organizations_repository = OrganizationsRepository()

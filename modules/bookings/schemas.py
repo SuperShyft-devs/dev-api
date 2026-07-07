@@ -67,3 +67,20 @@ class BookFromDraftRequest(BaseModel):
         if len(ids) != len(set(ids)):
             raise ValueError("Duplicate user_id in members")
         return self
+
+
+class CancelBookingMember(BaseModel):
+    user_id: int = Field(gt=0)
+    engagement_id: int = Field(gt=0)
+    remarks: str = Field(min_length=1, max_length=500)
+
+
+class CancelBookingRequest(BaseModel):
+    members: list[CancelBookingMember] = Field(..., min_length=1, max_length=10)
+
+    @model_validator(mode="after")
+    def unique_member_user_ids(self) -> "CancelBookingRequest":
+        ids = [m.user_id for m in self.members]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Duplicate user_id in members")
+        return self

@@ -354,6 +354,7 @@ async def test_console_participants_includes_age(async_client, test_db_session):
     data = parts_res.json()["data"]
     assert len(data) == 1
     assert data[0]["age"] == 42
+    assert data[0]["booked_by_user_id"] == 9201
 
 
 @pytest.mark.asyncio

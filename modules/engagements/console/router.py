@@ -81,4 +81,27 @@ async def book_console_participant(
         user_id=user_id,
         barcode=payload.barcode,
     )
+    await db.commit()
+    return success_response(data)
+
+
+@router.delete("/{engagement_id}/console/participants/{user_id}/book")
+async def cancel_console_participant_booking(
+    engagement_id: int,
+    user_id: int,
+    remarks: str,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    console_service: ConsoleService = Depends(get_console_service),
+):
+    if not remarks.strip():
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="remarks is required")
+    data = await console_service.cancel_participant_booking(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        user_id=user_id,
+        remarks=remarks.strip(),
+    )
+    await db.commit()
     return success_response(data)

@@ -277,6 +277,8 @@ class ConsoleService:
         lat = str(engagement.latitude)
         long = str(engagement.longitude)
         zipcode = str(engagement.pincode).strip()
+        relation = (user.relationship or "self").strip() or "self"
+        vendor_billing_user_id = str(participant.booked_by_user_id)
         provider_label = (provider or "healthians").lower()
 
         access_token = await healthians_client.get_access_token()
@@ -348,7 +350,7 @@ class ConsoleService:
                 {
                     "customer_id": str(user_id),
                     "customer_name": customer_name,
-                    "relation": "self",
+                    "relation": relation,
                     "age": user.age,
                     "dob": dob or "",
                     "gender": gender,
@@ -372,7 +374,7 @@ class ConsoleService:
             "address": (engagement.address or "").strip(),
             "zipcode": zipcode,
             "hard_copy": 0,
-            "vendor_billing_user_id": str(user_id),
+            "vendor_billing_user_id": vendor_billing_user_id,
             "payment_option": "prepaid",
             "discounted_price": 0,
             "zone_id": zone_id,
@@ -463,3 +465,46 @@ class ConsoleService:
             "engagement_participant_id": participant.engagement_participant_id,
             "user_id": user_id,
         }
+
+    async def cancel_participant_booking(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        remarks: str,
+    ) -> dict:
+        from modules.bookings.service import cancel_healthians_participant_booking
+
+        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+        ensure_engagement_running(engagement)
+
+        participant = await self._repository.get_participant_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(
+                status_code=404,
+                error_code="PARTICIPANT_NOT_FOUND",
+                message="Participant is not enrolled in this engagement",
+            )
+
+        result = await cancel_healthians_participant_booking(
+            db,
+            participant=participant,
+            engagement=engagement,
+            remarks=remarks,
+            repository=self._repository,
+        )
+        return result

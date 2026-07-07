@@ -13,11 +13,13 @@ from db.session import get_db
 from modules.bookings.schemas import (
     AvailableSlotsRequest,
     BookFromDraftRequest,
+    CancelBookingRequest,
     CheckServiceabilityRequest,
     LockSlotRequest,
 )
 from modules.bookings import service as booking_service
-from modules.engagements.dependencies import get_engagements_service
+from modules.engagements.dependencies import get_engagements_service, get_engagements_repository
+from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService
 from modules.users.dependencies import get_users_service
 from modules.users.schemas import BookBioAiBatchRequest, BookBloodTestBatchRequest
@@ -37,7 +39,9 @@ async def book_bio_ai_batch(
     users_service: UsersService = Depends(get_users_service),
 ):
     members = [{"user_id": m.user_id, "engagement_id": m.engagement_id} for m in payload.members]
-    result = await booking_service.create_healthians_booking_after_payment(db, members=members)
+    result = await booking_service.create_healthians_booking_after_payment(
+        db, members=members, caller_user_id=current_user.user_id
+    )
     await db.commit()
     return success_response({"members": result})
 
@@ -52,7 +56,55 @@ async def book_blood_test_batch(
     users_service: UsersService = Depends(get_users_service),
 ):
     members = [{"user_id": m.user_id, "engagement_id": m.engagement_id} for m in payload.members]
-    result = await booking_service.create_healthians_booking_after_payment(db, members=members)
+    result = await booking_service.create_healthians_booking_after_payment(
+        db, members=members, caller_user_id=current_user.user_id
+    )
+    await db.commit()
+    return success_response({"members": result})
+
+
+@router.post("/cancel/bio-ai")
+@limiter.limit("5/minute")
+async def cancel_bio_ai_bookings(
+    payload: CancelBookingRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    repository: EngagementsRepository = Depends(get_engagements_repository),
+):
+    members = [
+        {"user_id": m.user_id, "engagement_id": m.engagement_id, "remarks": m.remarks}
+        for m in payload.members
+    ]
+    result = await booking_service.cancel_healthians_bookings_batch(
+        db,
+        members=members,
+        caller_user_id=current_user.user_id,
+        repository=repository,
+    )
+    await db.commit()
+    return success_response({"members": result})
+
+
+@router.post("/cancel/blood-test")
+@limiter.limit("5/minute")
+async def cancel_blood_test_bookings(
+    payload: CancelBookingRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    repository: EngagementsRepository = Depends(get_engagements_repository),
+):
+    members = [
+        {"user_id": m.user_id, "engagement_id": m.engagement_id, "remarks": m.remarks}
+        for m in payload.members
+    ]
+    result = await booking_service.cancel_healthians_bookings_batch(
+        db,
+        members=members,
+        caller_user_id=current_user.user_id,
+        repository=repository,
+    )
     await db.commit()
     return success_response({"members": result})
 
@@ -93,7 +145,8 @@ async def check_service_availability(
         for m in payload.members
     ]
     result = await booking_service.check_service_availability(
-        db, members=members, engagements_service=engagements_service
+        db, members=members, engagements_service=engagements_service,
+        booked_by_user_id=current_user.user_id,
     )
     await db.commit()
     return success_response({"members": result})

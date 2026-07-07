@@ -178,3 +178,29 @@ async def create_booking_v3(
         )
         resp.raise_for_status()
         return resp.json()
+
+
+async def cancel_booking(
+    access_token: str,
+    *,
+    booking_id: str,
+    vendor_billing_user_id: str,
+    vendor_customer_id: str,
+    remarks: str,
+) -> dict:
+    """Cancel a Healthians booking."""
+    payload = {
+        "booking_id": booking_id,
+        "vendor_billing_user_id": vendor_billing_user_id,
+        "vendor_customer_id": vendor_customer_id,
+        "remarks": remarks,
+    }
+    url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/cancelBooking"
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json()
