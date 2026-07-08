@@ -795,15 +795,15 @@ class EngagementsService:
 
         return engagement
 
-    async def complete_expired_engagements(
+    async def transition_engagement_statuses(
         self,
         db: AsyncSession,
         *,
         as_of: date | None = None,
         dry_run: bool = False,
-        endpoint: str = "cron:complete-expired-engagements",
+        endpoint: str = "cron:transition-engagement-statuses",
         ip_address: str = "127.0.0.1",
-        user_agent: str = "complete-expired-engagements-job",
+        user_agent: str = "transition-engagement-statuses-job",
     ) -> dict[str, int | str | bool]:
         """Transition engagement statuses:
         - scheduled -> running when start_date <= as_of
@@ -832,7 +832,7 @@ class EngagementsService:
             if (activated_count or completed_count) and self._audit_service is not None:
                 await self._audit_service.log_event(
                     db,
-                    action="SYSTEM_COMPLETE_EXPIRED_ENGAGEMENTS",
+                    action="SYSTEM_TRANSITION_ENGAGEMENT_STATUSES",
                     endpoint=endpoint,
                     ip_address=ip_address,
                     user_agent=user_agent,

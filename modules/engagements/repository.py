@@ -897,6 +897,11 @@ class EngagementsRepository:
     def _running_engagement_status_filter():
         return func.lower(func.trim(Engagement.status)) == "running"
 
+    @staticmethod
+    def _scheduled_or_running_engagement_status_filter():
+        normalized = func.lower(func.trim(Engagement.status))
+        return normalized.in_(("scheduled", "running"))
+
     async def count_running_engagements_past_end_date(
         self,
         db: AsyncSession,
@@ -967,7 +972,7 @@ class EngagementsRepository:
         *,
         collection_date: date,
     ) -> list[tuple[int, int, str | None]]:
-        """Return (user_id, engagement_id, pretest_guidelines_notification) for running engagements with collection on collection_date."""
+        """Return (user_id, engagement_id, pretest_guidelines_notification) for scheduled or running engagements with collection on collection_date."""
         query = (
             select(
                 EngagementParticipant.user_id,
@@ -975,7 +980,7 @@ class EngagementsRepository:
                 Engagement.pretest_guidelines_notification,
             )
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
-            .where(self._running_engagement_status_filter())
+            .where(self._scheduled_or_running_engagement_status_filter())
             .where(EngagementParticipant.engagement_date == collection_date)
             .distinct()
             .order_by(
@@ -996,7 +1001,7 @@ class EngagementsRepository:
         target_dates: list[date],
     ) -> list[tuple[int, int, date, str | None, str | None]]:
         """Return (user_id, engagement_id, engagement_date, questionnaire_reminder_1, questionnaire_reminder_2)
-        for running engagements with participants whose engagement_date is in *target_dates*."""
+        for scheduled or running engagements with participants whose engagement_date is in *target_dates*."""
         query = (
             select(
                 EngagementParticipant.user_id,
@@ -1006,7 +1011,7 @@ class EngagementsRepository:
                 Engagement.questionnaire_reminder_2,
             )
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
-            .where(self._running_engagement_status_filter())
+            .where(self._scheduled_or_running_engagement_status_filter())
             .where(EngagementParticipant.engagement_date.in_(target_dates))
             .distinct()
             .order_by(

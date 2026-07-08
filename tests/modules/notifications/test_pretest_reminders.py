@@ -70,7 +70,7 @@ async def _insert_engagement(
             "diagnostic_package_id, city, slot_duration, start_date, end_date, status, "
             "organization_id, onboarding_notification, pretest_guidelines_notification) "
             f"VALUES ({engagement_id}, 'Camp {engagement_id}', '{engagement_code}', 'bio_ai', 1, 1, 'BLR', 20, "
-            f"'2026-06-01', '2026-06-30', '{status}', 0, NULL, 'pretest-whatsapp', {pretest_value})"
+            f"'2026-06-01', '2026-06-30', '{status}', NULL, NULL, {pretest_value})"
         )
     )
 
@@ -89,8 +89,9 @@ async def _insert_participant(
     await test_db_session.flush()
     await test_db_session.execute(
         text(
-            "INSERT INTO engagement_participants (engagement_id, user_id, engagement_date, slot_start_time) "
-            "VALUES (:eid, :uid, :ed, :slot)"
+            "INSERT INTO engagement_participants "
+            "(engagement_id, user_id, engagement_date, slot_start_time, booked_by_user_id) "
+            "VALUES (:eid, :uid, :ed, :slot, :uid)"
         ),
         {
             "eid": engagement_id,
@@ -231,6 +232,46 @@ async def test_pretest_reminders_excludes_completed_engagements(test_db_session,
 
     assert result["matched"] == 0
     assert len(webhook_calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_pretest_reminders_includes_scheduled_engagements(test_db_session, monkeypatch):
+    await _seed_dependencies(test_db_session)
+    await _insert_engagement(
+        test_db_session, engagement_id=9605, engagement_code="ENG9605", status="scheduled"
+    )
+    collection_date = "2026-06-02"
+    as_of = date(2026, 6, 1)
+    await _insert_participant(
+        test_db_session,
+        engagement_id=9605,
+        user_id=96051,
+        engagement_date=collection_date,
+        slot_start_time="08:00:00",
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+    monkeypatch.setattr(
+        "modules.notifications.service.httpx.AsyncClient",
+        _fake_httpx_client(webhook_calls),
+    )
+
+    notifications_service, engagements_repository = _services()
+    result = await dispatch_pretest_reminders(
+        test_db_session,
+        notifications_service=notifications_service,
+        engagements_repository=engagements_repository,
+        as_of=as_of,
+        dry_run=False,
+    )
+    await test_db_session.commit()
+
+    assert result["matched"] == 1
+    assert result["sent"] == 1
+    assert result["skipped"] == 0
+    assert result["failed"] == 0
+    assert len(webhook_calls) == 2
 
 
 @pytest.mark.asyncio

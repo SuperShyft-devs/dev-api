@@ -1,13 +1,14 @@
-"""Complete expired engagements job.
+"""Transition engagement statuses job.
 
-Marks all running engagements whose end_date is before today as completed.
-Intended to run once daily via an external scheduler (cron, Task Scheduler, etc.).
+Activates scheduled engagements whose start_date has arrived, and completes running
+engagements whose end_date has passed. Intended to run once daily via an external
+scheduler (cron, Task Scheduler, etc.).
 
 Production example (Linux cron, 2:00 AM daily):
 
-    0 2 * * * cd /path/to/dev-api && /path/to/venv/bin/python -m db.jobs.complete_expired_engagements --yes >> /var/log/supershyft/complete-engagements.log 2>&1
+    0 2 * * * cd /path/to/dev-api && /path/to/venv/bin/python -m db.jobs.transition_engagement_statuses --yes >> /var/log/supershyft/transition-engagement-statuses.log 2>&1
 
-Entrypoint: ``python -m db.jobs.complete_expired_engagements --yes``
+Entrypoint: ``python -m db.jobs.transition_engagement_statuses --yes``
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService
 
 
-async def run_complete_expired_engagements(
+async def run_transition_engagement_statuses(
     *,
     yes: bool,
     dry_run: bool,
@@ -53,7 +54,7 @@ async def run_complete_expired_engagements(
 
     async with session_factory() as session:
         async with session.begin():
-            result = await service.complete_expired_engagements(
+            result = await service.transition_engagement_statuses(
                 session,
                 as_of=as_of,
                 dry_run=dry_run,
@@ -73,8 +74,8 @@ def _parse_as_of(value: str) -> date:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Mark running engagements with end_date before today as completed. "
-            "Safe to re-run daily (idempotent)."
+            "Activate scheduled engagements whose start_date has arrived, and complete "
+            "running engagements whose end_date has passed. Safe to re-run daily (idempotent)."
         )
     )
     parser.add_argument(
@@ -92,7 +93,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=_parse_as_of,
         default=None,
         metavar="YYYY-MM-DD",
-        help="Reference date for expiry check (default: today). Useful for testing or backfill.",
+        help="Reference date for status transitions (default: today). Useful for testing or backfill.",
     )
     return parser
 
@@ -100,7 +101,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     result = asyncio.run(
-        run_complete_expired_engagements(
+        run_transition_engagement_statuses(
             yes=args.yes,
             dry_run=args.dry_run,
             as_of=args.as_of,
@@ -108,7 +109,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     mode = "dry-run" if result["dry_run"] else "applied"
     print(
-        f"Complete expired engagements ({mode}): as_of={result['as_of']}, "
+        f"Transition engagement statuses ({mode}): as_of={result['as_of']}, "
         f"activated_count={result['activated_count']}, completed_count={result['completed_count']}"
     )
     return 0

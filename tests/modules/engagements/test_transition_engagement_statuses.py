@@ -42,6 +42,7 @@ async def _insert_engagement(
     engagement_code: str,
     end_date: str,
     status: str,
+    start_date: str = "2026-01-01",
 ) -> None:
     await test_db_session.execute(
         text(
@@ -50,7 +51,7 @@ async def _insert_engagement(
             "diagnostic_package_id, city, slot_duration, start_date, end_date, status, "
             "organization_id, onboarding_notification) "
             f"VALUES ({engagement_id}, 'Camp {engagement_id}', '{engagement_code}', 'bio_ai', 1, 1, 'BLR', 20, "
-            f"'2026-01-01', '{end_date}', '{status}', NULL, 'booking-alert-whatsapp')"
+            f"'{start_date}', '{end_date}', '{status}', NULL, 'booking-alert-whatsapp')"
         )
     )
 
@@ -63,7 +64,7 @@ def _service() -> EngagementsService:
 
 
 @pytest.mark.asyncio
-async def test_complete_expired_engagements_marks_past_running_as_completed(test_db_session):
+async def test_transition_engagement_statuses_marks_past_running_as_completed(test_db_session):
     await _seed_engagement_dependencies(test_db_session)
     await _insert_engagement(
         test_db_session,
@@ -96,7 +97,7 @@ async def test_complete_expired_engagements_marks_past_running_as_completed(test
     await test_db_session.commit()
 
     service = _service()
-    result = await service.complete_expired_engagements(test_db_session, as_of=date(2026, 5, 30))
+    result = await service.transition_engagement_statuses(test_db_session, as_of=date(2026, 5, 30))
     await test_db_session.commit()
 
     assert result["as_of"] == "2026-05-30"
@@ -118,7 +119,47 @@ async def test_complete_expired_engagements_marks_past_running_as_completed(test
 
 
 @pytest.mark.asyncio
-async def test_complete_expired_engagements_is_idempotent(test_db_session):
+async def test_transition_engagement_statuses_activates_scheduled_engagements(test_db_session):
+    await _seed_engagement_dependencies(test_db_session)
+    await _insert_engagement(
+        test_db_session,
+        engagement_id=9151,
+        engagement_code="ENG9151",
+        start_date="2026-05-28",
+        end_date="2026-06-30",
+        status="scheduled",
+    )
+    await _insert_engagement(
+        test_db_session,
+        engagement_id=9152,
+        engagement_code="ENG9152",
+        start_date="2026-06-01",
+        end_date="2026-06-30",
+        status="scheduled",
+    )
+    await test_db_session.commit()
+
+    service = _service()
+    result = await service.transition_engagement_statuses(test_db_session, as_of=date(2026, 5, 30))
+    await test_db_session.commit()
+
+    assert result["activated_count"] == 1
+    assert result["completed_count"] == 0
+
+    statuses = {
+        row.engagement_id: row.status
+        for row in (
+            await test_db_session.execute(
+                text("SELECT engagement_id, status FROM engagements WHERE engagement_id IN (9151, 9152)")
+            )
+        ).all()
+    }
+    assert statuses[9151] == "running"
+    assert statuses[9152] == "scheduled"
+
+
+@pytest.mark.asyncio
+async def test_transition_engagement_statuses_is_idempotent(test_db_session):
     await _seed_engagement_dependencies(test_db_session)
     await _insert_engagement(
         test_db_session,
@@ -130,9 +171,9 @@ async def test_complete_expired_engagements_is_idempotent(test_db_session):
     await test_db_session.commit()
 
     service = _service()
-    first = await service.complete_expired_engagements(test_db_session, as_of=date(2026, 5, 30))
+    first = await service.transition_engagement_statuses(test_db_session, as_of=date(2026, 5, 30))
     await test_db_session.commit()
-    second = await service.complete_expired_engagements(test_db_session, as_of=date(2026, 5, 30))
+    second = await service.transition_engagement_statuses(test_db_session, as_of=date(2026, 5, 30))
     await test_db_session.commit()
 
     assert first["completed_count"] == 1
@@ -140,7 +181,7 @@ async def test_complete_expired_engagements_is_idempotent(test_db_session):
 
 
 @pytest.mark.asyncio
-async def test_complete_expired_engagements_dry_run_does_not_update(test_db_session):
+async def test_transition_engagement_statuses_dry_run_does_not_update(test_db_session):
     await _seed_engagement_dependencies(test_db_session)
     await _insert_engagement(
         test_db_session,
@@ -152,7 +193,7 @@ async def test_complete_expired_engagements_dry_run_does_not_update(test_db_sess
     await test_db_session.commit()
 
     service = _service()
-    result = await service.complete_expired_engagements(
+    result = await service.transition_engagement_statuses(
         test_db_session,
         as_of=date(2026, 5, 30),
         dry_run=True,
@@ -169,7 +210,7 @@ async def test_complete_expired_engagements_dry_run_does_not_update(test_db_sess
 
 
 @pytest.mark.asyncio
-async def test_complete_expired_engagements_writes_audit_log_when_updates_occur(test_db_session):
+async def test_transition_engagement_statuses_writes_audit_log_when_updates_occur(test_db_session):
     await _seed_engagement_dependencies(test_db_session)
     await _insert_engagement(
         test_db_session,
@@ -181,16 +222,16 @@ async def test_complete_expired_engagements_writes_audit_log_when_updates_occur(
     await test_db_session.commit()
 
     service = _service()
-    await service.complete_expired_engagements(test_db_session, as_of=date(2026, 5, 30))
+    await service.transition_engagement_statuses(test_db_session, as_of=date(2026, 5, 30))
     await test_db_session.commit()
 
     audit_action = (
         await test_db_session.execute(
             text(
                 "SELECT action FROM data_audit_logs "
-                "WHERE action = 'SYSTEM_COMPLETE_EXPIRED_ENGAGEMENTS' "
+                "WHERE action = 'SYSTEM_TRANSITION_ENGAGEMENT_STATUSES' "
                 "ORDER BY audit_id DESC LIMIT 1"
             )
         )
     ).scalar_one_or_none()
-    assert audit_action == "SYSTEM_COMPLETE_EXPIRED_ENGAGEMENTS"
+    assert audit_action == "SYSTEM_TRANSITION_ENGAGEMENT_STATUSES"

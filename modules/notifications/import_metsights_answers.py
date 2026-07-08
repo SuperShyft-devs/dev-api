@@ -1,6 +1,6 @@
 """Auto-import questionnaire answers from MetSights for incomplete assessment instances.
 
-For participants in running engagements whose assessment_instance.status != 'completed':
+For participants in scheduled or running engagements whose assessment_instance.status != 'completed':
 1. Check MetSights record sub-resources for is_complete flags.
 2. If any sub-resource is complete, import answers per-category via the strategy engine.
 3. After import, mark the assessment instance as completed if all categories are done.
@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.assessments.repository import AssessmentsRepository
 from modules.engagements.models import Engagement, EngagementParticipant
+from modules.engagements.repository import EngagementsRepository
 from modules.metsights.service import MetsightsService
 from modules.metsights.sync_service import MetsightsSyncService
 from modules.questionnaire.repository import QuestionnaireRepository
@@ -31,10 +32,10 @@ _PRIMARY_SUB_KEYS = ("physical_measurement", "vital_parameter", "diet_lifestyle_
 _FITNESS_SUB_KEY = "fitness_parameter"
 
 
-async def _get_running_engagement_instances(
+async def _get_active_engagement_instances(
     db: AsyncSession,
 ) -> list[tuple[AssessmentInstance, AssessmentPackage, int]]:
-    """Return all incomplete assessment instances for participants in running engagements."""
+    """Return all incomplete assessment instances for participants in scheduled or running engagements."""
     query = (
         select(AssessmentInstance, AssessmentPackage, EngagementParticipant.user_id)
         .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
@@ -44,7 +45,7 @@ async def _get_running_engagement_instances(
             & (EngagementParticipant.user_id == AssessmentInstance.user_id),
         )
         .join(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
-        .where(Engagement.status.ilike("running"))
+        .where(EngagementsRepository._scheduled_or_running_engagement_status_filter())
         .where(AssessmentInstance.status != "completed")
         .where(AssessmentInstance.metsights_record_id.isnot(None))
         .where(AssessmentInstance.metsights_record_id != "")
@@ -120,7 +121,7 @@ async def import_metsights_answers(
     q_repo = questionnaire_repository or QuestionnaireRepository()
     assessments_repo = AssessmentsRepository()
 
-    instances = await _get_running_engagement_instances(db)
+    instances = await _get_active_engagement_instances(db)
     matched = len(instances)
     imported = 0
     skipped = 0

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dotenv import load_dotenv
 
-from db.jobs.complete_expired_engagements.command import main
+from db.jobs.transition_engagement_statuses.command import main
 
 
 if __name__ == "__main__":
