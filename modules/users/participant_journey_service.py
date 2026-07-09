@@ -100,7 +100,10 @@ class ParticipantJourneyService:
 
             ihr = ihr_by_instance.get(instance.assessment_instance_id)
             has_blood = bool((ihr.diagnostic_report_url or "").strip()) if ihr else False
-            has_bio = bool((ihr.report_url or "").strip()) if ihr else False
+            type_code = (getattr(package, "assessment_type_code", None) or "").strip()
+            has_report_url = bool((ihr.report_url or "").strip()) if ihr else False
+            has_bio = has_report_url and type_code in ("1", "2")
+            has_fitprint = has_report_url and type_code == "7"
 
             instances_out.append(
                 {
@@ -112,11 +115,13 @@ class ParticipantJourneyService:
                     "package_id": instance.package_id,
                     "package_code": getattr(package, "package_code", None) if package else None,
                     "package_display_name": getattr(package, "display_name", None) if package else None,
+                    "assessment_type_code": type_code or None,
                     "engagement_id": instance.engagement_id,
                     "engagement_name": getattr(engagement, "engagement_name", None) if engagement else None,
                     "engagement_code": getattr(engagement, "engagement_code", None) if engagement else None,
                     "has_blood_report_url": has_blood,
                     "has_bio_ai_report_url": has_bio,
+                    "has_fitprint_report_url": has_fitprint,
                     "category_progress": category_progress,
                     "questionnaire": {
                         "response_count": len(responses),

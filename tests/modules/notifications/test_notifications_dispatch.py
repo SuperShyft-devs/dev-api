@@ -646,10 +646,10 @@ async def _seed_fitprint_package(test_db_session, *, package_id: int = 2):
 
 
 @pytest.mark.asyncio
-async def test_dispatch_uses_assessment_instance_id_over_engagement_fallback(
+async def test_dispatch_rejects_bioai_service_for_fitprint_instance(
     async_client, test_db_session, monkeypatch
 ):
-    """Selecting FitPrint instance must send FitPrint report URL, not Basic."""
+    """FitPrint assessments must not be sent through BioAI notification services."""
     await _seed_employee(test_db_session, user_id=9701, employee_id=971)
     await _seed_metsights_basic_package(test_db_session, package_id=1)
     await _seed_fitprint_package(test_db_session, package_id=2)
@@ -746,10 +746,96 @@ async def test_dispatch_uses_assessment_instance_id_over_engagement_fallback(
             "assessment_instance_id": 9704,
         },
     )
+    assert response.status_code == 400, response.text
+    assert "BioAI reports are only available" in response.text
+
+
+@pytest.mark.asyncio
+async def test_dispatch_uses_assessment_instance_id_for_metsights_pro(
+    async_client, test_db_session, monkeypatch
+):
+    """Selecting MetSights Pro instance must send that instance's BioAI report URL."""
+    await _seed_employee(test_db_session, user_id=9705, employee_id=972)
+    await _seed_metsights_basic_package(test_db_session, package_id=1)
+    await _seed_fitprint_package(test_db_session, package_id=2)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9705, engagement_code="ENG-NOTIF-9705")
+
+    test_db_session.add(User(user_id=9706, age=30, phone="9706000000", status="active"))
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9707,
+            user_id=9706,
+            package_id=1,
+            engagement_id=9705,
+            status="completed",
+            metsights_record_id="BASIC-RECORD",
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=9707,
+            user_id=9706,
+            engagement_id=9705,
+            assessment_instance_id=9707,
+            report_url="https://example.com/bio-ai/basic",
+        )
+    )
+    service_key = "bio_ai_pro_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'BioAI Pro', 'whatsapp', 'bio-ai-pro', true, false, true, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_bio_ai_report_url = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_auth_header(9705),
+        json={
+            "service_key": service_key,
+            "user_ids": [9706],
+            "engagement_id": 9705,
+            "assessment_instance_id": 9707,
+        },
+    )
     assert response.status_code == 201, response.text
     assert webhook_calls
     member = webhook_calls[0]["json"]["members"][0]
-    assert member["bio_ai_report_url"] == "https://example.com/bio-ai/fitprint"
+    assert member["bio_ai_report_url"] == "https://example.com/bio-ai/basic"
 
 
 @pytest.mark.asyncio

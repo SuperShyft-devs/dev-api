@@ -1,10 +1,9 @@
-"""Tests for MetsightsClient report PDF routing and fallbacks."""
+"""Tests for MetsightsClient report PDF routing."""
 
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 
 from core.config import settings
@@ -12,7 +11,7 @@ from modules.metsights.client import MetsightsClient
 
 
 @pytest.mark.asyncio
-async def test_get_report_pdf_fitprint_falls_back_when_fitness_pdf_unauthorized(monkeypatch):
+async def test_get_report_pdf_fitprint_uses_fitness_reports_path_only(monkeypatch):
     monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
     monkeypatch.setattr(settings, "METSIGHTS_BASE_URL", "https://api.metsights.com")
     monkeypatch.setattr(settings, "METSIGHTS_TIMEOUT_SECONDS", 5)
@@ -23,14 +22,12 @@ async def test_get_report_pdf_fitprint_falls_back_when_fitness_pdf_unauthorized(
     async def _fake_get(self, url, headers=None):
         calls.append(url)
         response = MagicMock()
-        response.status_code = 401 if "fitness-reports" in url else 200
-        if response.status_code != 200:
-            raise httpx.HTTPStatusError("unauthorized", request=MagicMock(), response=response)
+        response.status_code = 200
         response.json.return_value = {
-            "detail": "PDF file for Metabolic Health Report",
+            "detail": "PDF file for Fitness Report",
             "data": {
-                "id": "FITPRINT01",
-                "file": "https://storages.metsights.com/reports/example.pdf",
+                "record": "FITPRINT01",
+                "file": "https://storages.metsights.com/reports/fitness/FITPRINT01.pdf",
             },
         }
         return response
@@ -44,10 +41,9 @@ async def test_get_report_pdf_fitprint_falls_back_when_fitness_pdf_unauthorized(
 
         payload = await client.get_report_pdf(record_id="FITPRINT01", assessment_type_code="7")
 
-    assert len(calls) == 2
+    assert len(calls) == 1
     assert calls[0].endswith("/reports/fitness-reports/FITPRINT01/pdf/")
-    assert calls[1].endswith("/reports/FITPRINT01/pdf/")
-    assert payload["data"]["file"].endswith("example.pdf")
+    assert "fitness" in payload["data"]["file"]
 
 
 @pytest.mark.asyncio

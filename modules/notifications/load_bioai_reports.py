@@ -28,7 +28,6 @@ from modules.reports.models import IndividualHealthReport
 logger = logging.getLogger(__name__)
 
 _PRO_BASIC_TYPE_CODES = {"1", "2"}
-_FITPRINT_TYPE_CODES = {"7"}
 
 
 def _report_data_complete(reports: Any, report_url: Any) -> bool:
@@ -49,11 +48,9 @@ async def _get_eligible_participants(
     db: AsyncSession,
     today: date,
 ) -> list[tuple]:
-    """Return participants with complete assessments where today >= engagement_date.
+    """Return participants with complete MetSights Basic/Pro assessments where today >= engagement_date.
 
-    Includes both MetSights Pro/Basic and FitPrint instances.  The IHR is
-    joined on ``assessment_instance_id`` so each assessment type gets its own
-    report row.
+    FitPrint (type 7) fitness reports are loaded separately — they are not BioAI reports.
     """
     query = (
         select(
@@ -84,7 +81,7 @@ async def _get_eligible_participants(
         .where(EngagementParticipant.engagement_date <= today)
         .where(AssessmentInstance.metsights_record_id.isnot(None))
         .where(AssessmentInstance.metsights_record_id != "")
-        .where(AssessmentPackage.assessment_type_code.in_(_PRO_BASIC_TYPE_CODES | _FITPRINT_TYPE_CODES))
+        .where(AssessmentPackage.assessment_type_code.in_(_PRO_BASIC_TYPE_CODES))
     )
     result = await db.execute(query)
     return result.all()

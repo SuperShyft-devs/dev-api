@@ -806,6 +806,20 @@ class ReportsService:
                 message="Assessment package is missing",
             )
 
+        assessment_type_code = (package.assessment_type_code or "").strip()
+        if assessment_type_code == "7":
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="FitPrint assessments do not have a BioAI report; use the FitPrint fitness report instead",
+            )
+        if assessment_type_code not in ("1", "2"):
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="BioAI reports are only available for MetSights Basic or MetSights Pro assessments",
+            )
+
         existing_report = await self._get_individual_report(
             db,
             user_id=user_id,

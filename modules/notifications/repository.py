@@ -331,6 +331,21 @@ class NotificationsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_assessment_type_code_for_instance(
+        self, db: AsyncSession, *, assessment_instance_id: int
+    ) -> str | None:
+        result = await db.execute(
+            select(AssessmentPackage.assessment_type_code)
+            .join(
+                AssessmentInstance,
+                AssessmentInstance.package_id == AssessmentPackage.package_id,
+            )
+            .where(AssessmentInstance.assessment_instance_id == assessment_instance_id)
+            .limit(1)
+        )
+        code = result.scalar_one_or_none()
+        return (str(code).strip() if code is not None else None) or None
+
     async def get_assessment_instance_by_record_id(
         self, db: AsyncSession, *, metsights_record_id: str
     ) -> AssessmentInstance | None:
