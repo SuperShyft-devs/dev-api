@@ -106,7 +106,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\nconst engagementId = body.engagement_id;\nconst participantDetails = body.participant_details;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    engagement_id: engagementId,\n    participant_details: participantDetails,\n    first_name: member.first_name || 'Agent',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || '',\n    record_id: member.record_id || ''\n  }\n}));"
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\nconst engagementId = body.engagement_id;\nconst participantDetails = body.participant_details;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    engagement_id: engagementId,\n    participant_details: participantDetails,\n    first_name: member.first_name || 'Agent',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || ''\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

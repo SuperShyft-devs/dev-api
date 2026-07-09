@@ -307,6 +307,30 @@ class NotificationsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_health_reports_for_instances(
+        self, db: AsyncSession, *, assessment_instance_ids: list[int]
+    ) -> dict[int, IndividualHealthReport]:
+        if not assessment_instance_ids:
+            return {}
+        result = await db.execute(
+            select(IndividualHealthReport).where(
+                IndividualHealthReport.assessment_instance_id.in_(assessment_instance_ids)
+            )
+        )
+        reports = list(result.scalars().all())
+        return {r.assessment_instance_id: r for r in reports if r.assessment_instance_id is not None}
+
+    async def get_instance_for_user(
+        self, db: AsyncSession, *, user_id: int, assessment_instance_id: int
+    ) -> AssessmentInstance | None:
+        result = await db.execute(
+            select(AssessmentInstance)
+            .where(AssessmentInstance.assessment_instance_id == assessment_instance_id)
+            .where(AssessmentInstance.user_id == user_id)
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def get_assessment_instance_by_record_id(
         self, db: AsyncSession, *, metsights_record_id: str
     ) -> AssessmentInstance | None:
@@ -321,14 +345,12 @@ class NotificationsRepository:
         return result.scalar_one_or_none()
 
     def _metsights_instance_base_query(self, *, user_id: int, engagement_id: int | None = None):
-        """Shared filter for Metsights Basic/Pro instances with a record id."""
+        """Shared filter for assessment instances for a user (optionally scoped to engagement)."""
         metsights_type_codes = ("1", "2")
         query = (
             select(AssessmentInstance)
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .where(AssessmentInstance.user_id == user_id)
-            .where(AssessmentInstance.metsights_record_id.isnot(None))
-            .where(AssessmentInstance.metsights_record_id != "")
         )
         if engagement_id is not None:
             query = query.where(AssessmentInstance.engagement_id == engagement_id)
@@ -337,7 +359,7 @@ class NotificationsRepository:
     async def get_metsights_instance_for_user_engagement(
         self, db: AsyncSession, *, user_id: int, engagement_id: int
     ) -> AssessmentInstance | None:
-        """Pick the latest Metsights Basic/Pro instance with a record id for user + engagement."""
+        """Pick the latest Metsights Basic/Pro instance for user + engagement."""
         base, metsights_type_codes = self._metsights_instance_base_query(
             user_id=user_id, engagement_id=engagement_id
         )
@@ -359,7 +381,7 @@ class NotificationsRepository:
     async def get_latest_metsights_instance_for_user(
         self, db: AsyncSession, *, user_id: int
     ) -> AssessmentInstance | None:
-        """Pick the latest Metsights Basic/Pro instance with a record id for the user."""
+        """Pick the latest Metsights Basic/Pro instance for the user."""
         base, metsights_type_codes = self._metsights_instance_base_query(user_id=user_id)
         result = await db.execute(
             base.where(AssessmentPackage.assessment_type_code.in_(metsights_type_codes))

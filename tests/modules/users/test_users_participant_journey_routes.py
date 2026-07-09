@@ -20,6 +20,7 @@ from modules.questionnaire.models import (
     QuestionnaireDefinition,
     QuestionnaireResponse,
 )
+from modules.reports.models import IndividualHealthReport
 from modules.users.models import User
 
 
@@ -195,6 +196,16 @@ async def test_participant_journey_summary_returns_instance_and_counts(async_cli
             submitted_at=datetime.now(timezone.utc),
         )
     )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=9611,
+            user_id=9611,
+            engagement_id=9611,
+            assessment_instance_id=inst.assessment_instance_id,
+            report_url="https://example.com/bio-ai/9611",
+            diagnostic_report_url="https://example.com/blood/9611",
+        )
+    )
     await test_db_session.commit()
 
     response = await async_client.get("/users/9611/participant-journey", headers=_auth_header(9610))
@@ -212,6 +223,8 @@ async def test_participant_journey_summary_returns_instance_and_counts(async_cli
     assert q["draft_count"] == 1
     assert q["submitted_count"] == 1
     assert q["categories_touched"] == 1
+    assert row["has_blood_report_url"] is True
+    assert row["has_bio_ai_report_url"] is True
 
 
 @pytest.mark.asyncio

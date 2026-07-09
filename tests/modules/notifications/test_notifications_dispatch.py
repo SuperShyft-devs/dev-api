@@ -614,3 +614,205 @@ async def test_dispatch_creates_n8n_sync_log_on_failure(async_client, test_db_se
     assert row["status"] == "failed"
     assert "webhook failed" in row["error_message"]
     assert row["response_payload"] is None
+
+
+async def _seed_fitprint_package(test_db_session, *, package_id: int = 2):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, assessment_type_code, status) "
+            "VALUES (:pid, 'FITPRINT', 'FitPrint', '7', 'active') "
+            "ON CONFLICT (package_id) DO UPDATE SET assessment_type_code = EXCLUDED.assessment_type_code"
+        ),
+        {"pid": package_id},
+    )
+    await test_db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_uses_assessment_instance_id_over_engagement_fallback(
+    async_client, test_db_session, monkeypatch
+):
+    """Selecting FitPrint instance must send FitPrint report URL, not Basic."""
+    await _seed_employee(test_db_session, user_id=9701, employee_id=971)
+    await _seed_metsights_basic_package(test_db_session, package_id=1)
+    await _seed_fitprint_package(test_db_session, package_id=2)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9701, engagement_code="ENG-NOTIF-9701")
+
+    test_db_session.add(User(user_id=9702, age=30, phone="9702000000", status="active"))
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9703,
+            user_id=9702,
+            package_id=1,
+            engagement_id=9701,
+            status="active",
+            metsights_record_id="BASIC-RECORD",
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9704,
+            user_id=9702,
+            package_id=2,
+            engagement_id=9701,
+            status="completed",
+            metsights_record_id="FITPRINT-RECORD",
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=9703,
+            user_id=9702,
+            engagement_id=9701,
+            assessment_instance_id=9703,
+            report_url="https://example.com/bio-ai/basic",
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=9704,
+            user_id=9702,
+            engagement_id=9701,
+            assessment_instance_id=9704,
+            report_url="https://example.com/bio-ai/fitprint",
+        )
+    )
+    service_key = "bio_ai_fitprint_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'BioAI FitPrint', 'whatsapp', 'bio-ai-fitprint', true, false, true, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_bio_ai_report_url = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_auth_header(9701),
+        json={
+            "service_key": service_key,
+            "user_ids": [9702],
+            "engagement_id": 9701,
+            "assessment_instance_id": 9704,
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert webhook_calls
+    member = webhook_calls[0]["json"]["members"][0]
+    assert member["bio_ai_report_url"] == "https://example.com/bio-ai/fitprint"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_rejects_assessment_instance_id_for_wrong_user(
+    async_client, test_db_session, monkeypatch
+):
+    await _seed_employee(test_db_session, user_id=9711, employee_id=981)
+    await _seed_metsights_basic_package(test_db_session)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9711, engagement_code="ENG-NOTIF-9711")
+
+    test_db_session.add(User(user_id=9712, age=30, phone="9712000000", status="active"))
+    test_db_session.add(User(user_id=9713, age=30, phone="9713000000", status="active"))
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9715,
+            user_id=9713,
+            package_id=1,
+            engagement_id=9711,
+            status="active",
+            metsights_record_id="OTHER-USER-RECORD",
+        )
+    )
+    service_key = "bio_ai_wrong_user_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'BioAI Wrong User', 'whatsapp', 'bio-ai-wrong', true, false, true, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_bio_ai_report_url = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_auth_header(9711),
+        json={
+            "service_key": service_key,
+            "user_ids": [9712],
+            "engagement_id": 9711,
+            "assessment_instance_id": 9715,
+        },
+    )
+    assert response.status_code == 400
+    assert "not found" in response.json()["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_rejects_assessment_instance_id_with_multiple_users(
+    async_client, test_db_session, monkeypatch
+):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
+    test_db_session.add(User(user_id=9721, age=30, phone="9721000000", status="active"))
+    test_db_session.add(User(user_id=9722, age=30, phone="9722000000", status="active"))
+    service_key = "multi_user_assessment_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'Multi User', 'whatsapp', 'multi-user', true, false, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_api_key_header(),
+        json={
+            "service_key": service_key,
+            "user_ids": [9721, 9722],
+            "assessment_instance_id": 9999,
+        },
+    )
+    assert response.status_code == 400
+    assert "single-user" in response.json()["message"].lower()

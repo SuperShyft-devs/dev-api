@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.assessments.repository import AssessmentsRepository
+from modules.notifications.repository import NotificationsRepository
 from modules.questionnaire.models import QuestionnaireResponse
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.questionnaire.service import QuestionnaireService
@@ -27,11 +28,13 @@ class ParticipantJourneyService:
         assessments_repository: AssessmentsRepository,
         questionnaire_repository: QuestionnaireRepository,
         questionnaire_service: QuestionnaireService,
+        notifications_repository: NotificationsRepository | None = None,
     ) -> None:
         self._users_repository = users_repository
         self._assessments_repository = assessments_repository
         self._questionnaire_repository = questionnaire_repository
         self._questionnaire_service = questionnaire_service
+        self._notifications_repository = notifications_repository or NotificationsRepository()
 
     def _ensure_employee_access(self, employee) -> None:
         if employee is None:
@@ -63,6 +66,11 @@ class ParticipantJourneyService:
             db, user_id=user_id, page=page, limit=limit
         )
 
+        instance_ids = [instance.assessment_instance_id for instance, _, _ in rows]
+        ihr_by_instance = await self._notifications_repository.get_health_reports_for_instances(
+            db, assessment_instance_ids=instance_ids
+        )
+
         instances_out: list[dict] = []
         for instance, package, engagement in rows:
             progress_rows = await self._assessments_repository.list_category_progress_for_instance(
@@ -90,6 +98,10 @@ class ParticipantJourneyService:
                     }
                 )
 
+            ihr = ihr_by_instance.get(instance.assessment_instance_id)
+            has_blood = bool((ihr.diagnostic_report_url or "").strip()) if ihr else False
+            has_bio = bool((ihr.report_url or "").strip()) if ihr else False
+
             instances_out.append(
                 {
                     "assessment_instance_id": instance.assessment_instance_id,
@@ -103,6 +115,8 @@ class ParticipantJourneyService:
                     "engagement_id": instance.engagement_id,
                     "engagement_name": getattr(engagement, "engagement_name", None) if engagement else None,
                     "engagement_code": getattr(engagement, "engagement_code", None) if engagement else None,
+                    "has_blood_report_url": has_blood,
+                    "has_bio_ai_report_url": has_bio,
                     "category_progress": category_progress,
                     "questionnaire": {
                         "response_count": len(responses),

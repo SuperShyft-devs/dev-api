@@ -96,12 +96,35 @@ class NotificationsService:
 
         needs_report = svc.require_blood_report_url or svc.require_bio_ai_report_url
 
+        if payload.assessment_instance_id is not None and len(payload.user_ids) > 1:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="assessment_instance_id is only supported for single-user dispatch",
+            )
+
         members: list[dict] = []
-        assessment_instance_id: int | None = None
+        resolved_assessment_instance_id: int | None = None
+        resolved_engagement_id: int | None = payload.engagement_id
 
         for user in users:
             instance = None
-            if payload.engagement_id is not None:
+            if payload.assessment_instance_id is not None:
+                instance = await self._repo.get_instance_for_user(
+                    db,
+                    user_id=user.user_id,
+                    assessment_instance_id=payload.assessment_instance_id,
+                )
+                if instance is None:
+                    raise AppError(
+                        status_code=400,
+                        error_code="INVALID_INPUT",
+                        message=(
+                            f"Assessment instance {payload.assessment_instance_id} "
+                            f"not found for user_id={user.user_id}"
+                        ),
+                    )
+            elif payload.engagement_id is not None:
                 instance = await self._repo.get_metsights_instance_for_user_engagement(
                     db,
                     user_id=user.user_id,
@@ -113,7 +136,11 @@ class NotificationsService:
                 )
 
             if instance:
-                assessment_instance_id = assessment_instance_id or instance.assessment_instance_id
+                resolved_assessment_instance_id = (
+                    resolved_assessment_instance_id or instance.assessment_instance_id
+                )
+                if resolved_engagement_id is None and instance.engagement_id is not None:
+                    resolved_engagement_id = instance.engagement_id
 
             member: dict = {
                 "first_name": user.first_name or "",
@@ -160,8 +187,8 @@ class NotificationsService:
             status="pending",
             channel=svc.channel,
             user={"user_ids": payload.user_ids},
-            engagement_id=payload.engagement_id,
-            assessment_instance_id=assessment_instance_id,
+            engagement_id=resolved_engagement_id,
+            assessment_instance_id=resolved_assessment_instance_id,
             message="Notification dispatch initiated",
             triggered_by_user_id=triggered_by_user_id,
         )
@@ -172,8 +199,8 @@ class NotificationsService:
             "notification_id": notification.notification_id,
             "members": members,
         }
-        if payload.engagement_id is not None:
-            webhook_payload["engagement_id"] = payload.engagement_id
+        if resolved_engagement_id is not None:
+            webhook_payload["engagement_id"] = resolved_engagement_id
         if payload.participant_details:
             webhook_payload["participant_details"] = payload.participant_details
 

@@ -9,6 +9,7 @@ class DispatchRequest(BaseModel):
     service_key: str = Field(..., min_length=1)
     user_ids: list[int] = Field(..., min_length=1)
     engagement_id: int | None = None
+    assessment_instance_id: int | None = None
     participant_details: dict | None = None
     otp: str | None = None
 
