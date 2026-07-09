@@ -7,8 +7,15 @@ from datetime import date, datetime, timezone
 import pytest
 from sqlalchemy import text
 
+from core.config import settings
 from modules.engagements.models import Engagement
 from modules.notifications.models import Notification
+
+TEST_NOTIFICATION_API_KEY = "test-notif-callback-key"
+
+
+def _api_key_header() -> dict[str, str]:
+    return {"x-api-key": TEST_NOTIFICATION_API_KEY}
 
 
 async def _seed_engagement(test_db_session, *, engagement_id: int) -> None:
@@ -34,8 +41,8 @@ async def _seed_service(test_db_session, *, service_key: str) -> None:
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
-            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
-            "VALUES (:sk, :dn, 'email', 'test-webhook', true, false, false) "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES (:sk, :dn, 'email', 'test-webhook', true, false, false, false) "
             "ON CONFLICT (service_key) DO NOTHING"
         ),
         {"sk": service_key, "dn": service_key},
@@ -67,13 +74,15 @@ async def _create_notification(
 
 
 @pytest.mark.asyncio
-async def test_callback_sets_sent_and_completed_at(async_client, test_db_session):
+async def test_callback_sets_sent_and_completed_at(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
     await _seed_engagement(test_db_session, engagement_id=9901)
     await _seed_service(test_db_session, service_key="callback-sent-svc")
     notification = await _create_notification(test_db_session, service_key="callback-sent-svc")
 
     response = await async_client.post(
         "/notifications/callback",
+        headers=_api_key_header(),
         json={
             "notification_id": notification.notification_id,
             "status": "sent",
@@ -92,13 +101,15 @@ async def test_callback_sets_sent_and_completed_at(async_client, test_db_session
 
 
 @pytest.mark.asyncio
-async def test_callback_sets_failed_without_completed_at(async_client, test_db_session):
+async def test_callback_sets_failed_without_completed_at(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
     await _seed_engagement(test_db_session, engagement_id=9901)
     await _seed_service(test_db_session, service_key="callback-failed-svc")
     notification = await _create_notification(test_db_session, service_key="callback-failed-svc")
 
     response = await async_client.post(
         "/notifications/callback",
+        headers=_api_key_header(),
         json={
             "notification_id": notification.notification_id,
             "status": "failed",
@@ -114,9 +125,11 @@ async def test_callback_sets_failed_without_completed_at(async_client, test_db_s
 
 
 @pytest.mark.asyncio
-async def test_callback_returns_404_for_unknown_notification(async_client, test_db_session):
+async def test_callback_returns_404_for_unknown_notification(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
     response = await async_client.post(
         "/notifications/callback",
+        headers=_api_key_header(),
         json={
             "notification_id": 99999999,
             "status": "sent",

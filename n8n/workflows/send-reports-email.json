@@ -2,90 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "bio-fetch-err-001",
-              "name": "notification_id",
-              "value": "={{ $('Split Members9').item.json.notification_id }}",
-              "type": "number"
-            },
-            {
-              "id": "bio-fetch-err-002",
-              "name": "status",
-              "value": "failed",
-              "type": "string"
-            },
-            {
-              "id": "bio-fetch-err-003",
-              "name": "message",
-              "value": "Report fetch failed",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        25344,
-        -720
-      ],
-      "id": "74509451-b421-4d95-a6a9-3965ba169cd7",
-      "name": "Bio Fetch Failed"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "blood-fetch-err-001",
-              "name": "notification_id",
-              "value": "={{ $('Split Members9').item.json.notification_id }}",
-              "type": "number"
-            },
-            {
-              "id": "blood-fetch-err-002",
-              "name": "status",
-              "value": "failed",
-              "type": "string"
-            },
-            {
-              "id": "blood-fetch-err-003",
-              "name": "message",
-              "value": "Report fetch failed",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        25888,
-        -864
-      ],
-      "id": "62ea11b2-25ec-4832-b512-030ca4fe9288",
-      "name": "Blood Fetch Failed"
-    },
-    {
-      "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || '',\n    record_id: member.record_id || ''\n  }\n}));"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        24880,
-        -880
-      ],
-      "id": "c451a3c2-b19b-46ac-96e2-a8c9ad5bc55a",
-      "name": "Split Members9"
-    },
-    {
-      "parameters": {
-        "content": "## Send Email\nIt will send Bio AI and Blood Report to each member.\nEach member has their own record_id.\nExpects: { notification_id, members: [{ first_name, email, record_id }] }",
+        "content": "## Send Email\nIt will send Bio AI and Blood Report to each member.\nEach member has their own blood_report_url and bio_ai_report_url.\nExpects: { notification_id, members: [{ first_name, email, blood_report_url, bio_ai_report_url }] }",
         "height": 752,
         "width": 2880
       },
@@ -169,129 +86,123 @@
     },
     {
       "parameters": {
-        "url": "=https://api.metsights.com/reports/{{ $json.record_id }}/pdf",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-API-KEY",
-              "value": "01993398a5aadb4a2798b6e98c2e08ee"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        25104,
-        -1024
-      ],
-      "id": "417ed38f-17fa-4fcc-b9b4-4a6a87258c9c",
-      "name": "Fetch BioAI Report7",
-      "onError": "continueErrorOutput"
-    },
-    {
-      "parameters": {
-        "url": "=https://api.metsights.com/records/{{ $json.data.record }}/fetch-collections",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-API-KEY",
-              "value": "01993398a5aadb4a2798b6e98c2e08ee"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        25600,
-        -1056
-      ],
-      "id": "78bc2ea5-34de-4596-bddd-0f621d698478",
-      "name": "Fetch Blood Report4",
-      "onError": "continueErrorOutput"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "0d8c3df4-ba09-4a45-b1a9-ddf01426e52e",
-              "leftValue": "={{ $json.data.file }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "exists",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        25344,
-        -1040
-      ],
-      "id": "bc320cd7-02a2-48ca-87a6-d76a783618a4",
-      "name": "If13"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "be2bb721-e410-4f17-a0b9-5413f6bf8fea",
-              "leftValue": "={{ $json.data.file }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "exists",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        25888,
-        -1072
-      ],
-      "id": "713518eb-debc-4c3b-8bcb-f672fff69322",
-      "name": "If14"
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const bioLink   = $('Fetch BioAI Report7').item.json.data.file;\nconst bloodLink = $('Fetch Blood Report4').item.json.data.file;\nconst member    = $('Split Members9').item.json;\n\nconst body = `Hi ${member.first_name},\n\nThank you for completing your blood sample collection and Lifestyle Questionnaire.\n\nYour reports are now ready:\n\n- Blood Test Report: ${bloodLink}\n- Personalized Bio-AI Health Report: ${bioLink}\n\nWarm regards,\nTeam SuperShyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Your Blood and Bio-AI Reports are Ready',\n    body\n  }\n};"
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || '',\n    blood_report_url: member.blood_report_url || '',\n    bio_ai_report_url: member.bio_ai_report_url || ''\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26176,
+        24880,
+        -880
+      ],
+      "id": "c451a3c2-b19b-46ac-96e2-a8c9ad5bc55a",
+      "name": "Split Members9"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "url-check-blood-001",
+              "leftValue": "={{ $json.blood_report_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "url-check-blood-002",
+              "leftValue": "={{ $json.blood_report_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "url-check-bio-001",
+              "leftValue": "={{ $json.bio_ai_report_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "url-check-bio-002",
+              "leftValue": "={{ $json.bio_ai_report_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        25104,
+        -880
+      ],
+      "id": "e5f6a7b8-url5-4005-b005-000000000001",
+      "name": "URLs Exist?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "urls-notfound-001",
+              "name": "notification_id",
+              "value": "={{ $('Split Members9').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "urls-notfound-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "urls-notfound-003",
+              "name": "message",
+              "value": "Report URLs not found",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        25344,
+        -720
+      ],
+      "id": "e5f6a7b8-url5-4005-b005-000000000002",
+      "name": "URLs Not Found Response"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const bioLink   = $('Split Members9').item.json.bio_ai_report_url;\nconst bloodLink = $('Split Members9').item.json.blood_report_url;\nconst member    = $('Split Members9').item.json;\n\nconst body = `Hi ${member.first_name},\n\nThank you for completing your blood sample collection and Lifestyle Questionnaire.\n\nYour reports are now ready:\n\n- Blood Test Report: ${bloodLink}\n- Personalized Bio-AI Health Report: ${bioLink}\n\nWarm regards,\nTeam SuperShyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Your Blood and Bio-AI Reports are Ready',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        25344,
         -1088
       ],
       "id": "fd125ea2-5485-4648-b183-947da0b810e9",
@@ -311,7 +222,7 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        26400,
+        25600,
         -1088
       ],
       "id": "7d3f1675-40e9-40ef-8043-71c2412c1649",
@@ -356,7 +267,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        26688,
+        25888,
         -1104
       ],
       "id": "acd7e7c3-2b3c-465e-bdca-f2ccc4bec1e1",
@@ -391,81 +302,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        26688,
+        25888,
         -896
       ],
       "id": "89e765cb-f24d-4f1a-b175-79d1c990d639",
       "name": "Edit Fields17"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "b1691335-0239-4f89-80b7-e620e85ef3fa",
-              "name": "notification_id",
-              "value": "={{ $('Split Members9').item.json.notification_id }}",
-              "type": "number"
-            },
-            {
-              "id": "f1f9c74e-aa34-45ab-ab0b-a0dca59578ae",
-              "name": "status",
-              "value": "failed",
-              "type": "string"
-            },
-            {
-              "id": "5cec76fe-f5ce-4e7a-b8e3-82ab92e6b3f5",
-              "name": "message",
-              "value": "BioAI report file not found",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        25600,
-        -800
-      ],
-      "id": "412f5d3b-4a05-4b85-8f7c-7455a17cb828",
-      "name": "Edit Fields18"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "ef347b9f-5ee9-4e15-8e81-f81f0242c110",
-              "name": "notification_id",
-              "value": "={{ $('Split Members9').item.json.notification_id }}",
-              "type": "number"
-            },
-            {
-              "id": "84af5b39-4c8b-475a-974b-baccb7ad5f06",
-              "name": "status",
-              "value": "failed",
-              "type": "string"
-            },
-            {
-              "id": "3bdca55a-89c8-41ef-a92c-18b1056bc7e4",
-              "name": "message",
-              "value": "Blood report file not found",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        26176,
-        -912
-      ],
-      "id": "2de9b64c-8210-47a5-84a8-065913412bb2",
-      "name": "Edit Fields19"
     },
     {
       "parameters": {
@@ -506,6 +347,8 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
@@ -514,50 +357,23 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        27040,
+        26176,
         -624
       ],
       "id": "7e1d5399-65d0-46ac-9a9a-df8c4b2b32d3",
       "name": "Call Back5",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
       "alwaysOutputData": true,
       "retryOnFail": true,
       "onError": "continueRegularOutput"
     }
   ],
   "connections": {
-    "Bio Fetch Failed": {
-      "main": [
-        [
-          {
-            "node": "Call Back5",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Blood Fetch Failed": {
-      "main": [
-        [
-          {
-            "node": "Call Back5",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Split Members9": {
-      "main": [
-        [
-          {
-            "node": "Fetch BioAI Report7",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Send Reports | Email2": {
       "main": [
         [
@@ -587,61 +403,18 @@
         ]
       ]
     },
-    "Fetch BioAI Report7": {
+    "Split Members9": {
       "main": [
         [
           {
-            "node": "If13",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Bio Fetch Failed",
+            "node": "URLs Exist?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch Blood Report4": {
-      "main": [
-        [
-          {
-            "node": "If14",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Blood Fetch Failed",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If13": {
-      "main": [
-        [
-          {
-            "node": "Fetch Blood Report4",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Edit Fields18",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If14": {
+    "URLs Exist?": {
       "main": [
         [
           {
@@ -652,7 +425,7 @@
         ],
         [
           {
-            "node": "Edit Fields19",
+            "node": "URLs Not Found Response",
             "type": "main",
             "index": 0
           }
@@ -710,18 +483,7 @@
         ]
       ]
     },
-    "Edit Fields18": {
-      "main": [
-        [
-          {
-            "node": "Call Back5",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Edit Fields19": {
+    "URLs Not Found Response": {
       "main": [
         [
           {

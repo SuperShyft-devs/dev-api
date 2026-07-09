@@ -87,12 +87,9 @@ async def _send_report_notifications(
     service_keys: list[str],
     user_id: int,
     engagement_id: int,
-    record_id: str,
-    type_code: str,
     details: list[dict[str, Any]],
 ) -> int:
     """Dispatch configured notification services that have not already been sent."""
-    dispatch_record_id = record_id if type_code in _PRO_BASIC_TYPE_CODES else None
     sent_count = 0
 
     for sk in service_keys:
@@ -114,7 +111,6 @@ async def _send_report_notifications(
                 service_key=sk,
                 user_ids=[user_id],
                 engagement_id=engagement_id,
-                record_id=dispatch_record_id,
             ),
             triggered_by_user_id=None,
         )
@@ -293,8 +289,6 @@ async def load_bioai_reports(
                 service_keys=service_keys,
                 user_id=user_id,
                 engagement_id=engagement_id,
-                record_id=record_id,
-                type_code=type_code,
                 details=details,
             )
             await db.commit()

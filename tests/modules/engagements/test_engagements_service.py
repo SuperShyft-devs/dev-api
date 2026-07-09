@@ -24,8 +24,8 @@ async def test_enroll_user_in_engagement_creates_participant_row(test_db_session
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
-            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
-            "VALUES ('booking-alert-whatsapp', 'Booking Alert', 'whatsapp', 'booking-alert', true, false, false) "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES ('booking-alert-whatsapp', 'Booking Alert', 'whatsapp', 'booking-alert', true, false, false, false) "
             "ON CONFLICT (service_key) DO NOTHING"
         )
     )
@@ -83,8 +83,8 @@ async def test_enroll_user_in_engagement_explicit_booked_by(test_db_session):
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
-            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
-            "VALUES ('booking-alert-whatsapp', 'Booking Alert', 'whatsapp', 'booking-alert', true, false, false) "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES ('booking-alert-whatsapp', 'Booking Alert', 'whatsapp', 'booking-alert', true, false, false, false) "
             "ON CONFLICT (service_key) DO NOTHING"
         )
     )

@@ -253,7 +253,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
-        "options": {}
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -265,7 +267,13 @@
       "name": "Email Callback3",
       "alwaysOutputData": true,
       "retryOnFail": true,
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      }
     }
   ],
   "connections": {

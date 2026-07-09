@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.engagements.models import Engagement
 from modules.notifications.models import Notification, NotificationService
+from modules.reports.models import IndividualHealthReport
 from modules.users.models import User
 
 
@@ -295,6 +296,16 @@ class NotificationsRepository:
             return []
         result = await db.execute(select(User).where(User.user_id.in_(user_ids)))
         return list(result.scalars().all())
+
+    async def get_health_report_for_instance(
+        self, db: AsyncSession, *, assessment_instance_id: int
+    ) -> IndividualHealthReport | None:
+        result = await db.execute(
+            select(IndividualHealthReport)
+            .where(IndividualHealthReport.assessment_instance_id == assessment_instance_id)
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
 
     async def get_assessment_instance_by_record_id(
         self, db: AsyncSession, *, metsights_record_id: str

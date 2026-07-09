@@ -170,7 +170,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
-        "options": {}
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -182,7 +184,13 @@
       "name": "Callback",
       "alwaysOutputData": true,
       "retryOnFail": true,
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      }
     },
     {
       "parameters": {
@@ -266,6 +274,75 @@
       ],
       "id": "e4c09b29-293b-4f9d-8f4f-a9f2b34cc9de",
       "name": "WhatsApp Failed Response6"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "071065ba-8ee1-41ca-8d29-623fad3803c5",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3168,
+        3488
+      ],
+      "id": "f0be8eb3-f9ac-4bd9-9b98-e3701af1fbd1",
+      "name": "WhatAPI Accepted?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0fed3ba-9ece-421c-b334-63ecd4d043f2",
+              "name": "notification_id",
+              "value": "={{ $('Prepare HA Reminder Message').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "61081a70-392c-44b4-8be7-1f010932a274",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "9c022602-0d3d-45a6-93f2-76d5a0376e65",
+              "name": "message",
+              "value": "WhatsApp sending failed: message not accepted",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3168,
+        3664
+      ],
+      "id": "69f7fcfe-70fd-4b8b-8ed7-ca5d18cd7b0c",
+      "name": "WhatAPI Not Accepted"
     }
   ],
   "connections": {
@@ -313,7 +390,7 @@
       "main": [
         [
           {
-            "node": "WhatsApp Sent Response6",
+            "node": "WhatAPI Accepted?",
             "type": "main",
             "index": 0
           }
@@ -361,6 +438,35 @@
       ]
     },
     "WhatsApp Failed Response6": {
+      "main": [
+        [
+          {
+            "node": "Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Accepted?": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Sent Response6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatAPI Not Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Not Accepted": {
       "main": [
         [
           {

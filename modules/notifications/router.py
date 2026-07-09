@@ -15,7 +15,10 @@ from modules.employee.service import EmployeeContext
 from modules.engagements.repository import EngagementsRepository
 from modules.assessments.dependencies import get_assessment_package_categories_service
 from modules.metsights.dependencies import get_metsights_service
-from modules.notifications.dependencies import get_notifications_service
+from modules.notifications.dependencies import (
+    authenticate_notification_endpoint,
+    get_notifications_service,
+)
 from modules.notifications.questionnaire_reminders import dispatch_questionnaire_reminders
 from modules.notifications.schemas import (
     CallbackRequest,
@@ -37,35 +40,39 @@ def _service_dict(s) -> dict:
         "channel": s.channel,
         "webhook_path": s.webhook_path,
         "is_active": s.is_active,
-        "require_record_id": s.require_record_id,
+        "require_blood_report_url": s.require_blood_report_url,
+        "require_bio_ai_report_url": s.require_bio_ai_report_url,
         "require_participant_detail": s.require_participant_detail,
         "require_otp": s.require_otp,
         "created_at": s.created_at.isoformat() if s.created_at else None,
     }
 
 
-# ── Public callback (called by external service) ───────────────────────
+# ── Authenticated callback (called by n8n / external service) ───────────
 
 @router.post("/callback")
 async def notification_callback(
     payload: CallbackRequest,
     db: AsyncSession = Depends(get_db),
     svc: NotificationsService = Depends(get_notifications_service),
+    auth=Depends(authenticate_notification_endpoint),
 ):
     result = await svc.callback(db, payload=payload)
     await db.commit()
     return success_response(result)
 
 
-# ── Public dispatch ───────────────────────────────────────────────────────
+# ── Authenticated dispatch ────────────────────────────────────────────────
 
 @router.post("/dispatch", status_code=201)
 async def dispatch_notification(
     payload: DispatchRequest,
     db: AsyncSession = Depends(get_db),
     svc: NotificationsService = Depends(get_notifications_service),
+    auth=Depends(authenticate_notification_endpoint),
 ):
-    result = await svc.dispatch(db, payload=payload)
+    triggered_by = auth.user_id if auth is not None else None
+    result = await svc.dispatch(db, payload=payload, triggered_by_user_id=triggered_by)
     await db.commit()
     return success_response(result)
 

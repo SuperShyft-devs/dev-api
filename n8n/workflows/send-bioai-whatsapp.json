@@ -2,7 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Sends Bio AI Report on Whatsapp\nExpects: { notification_id, members: [{ first_name, phone, record_id }] }",
+        "content": "## Sends Bio AI Report on Whatsapp\nExpects: { notification_id, members: [{ first_name, phone, bio_ai_report_url }] }",
         "height": 672,
         "width": 2192
       },
@@ -86,7 +86,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    phone: member.phone || '',\n    record_id: member.record_id || ''\n  }\n}));"
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    phone: member.phone || '',\n    bio_ai_report_url: member.bio_ai_report_url || ''\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -100,7 +100,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message =\n`camp15,${name},\nYour personalized Bio-AI Health Report is attached below.,\nYour report includes personalized metabolic health insights and recommendations.,\nYou can find everything you need below for easy access,\nPlease visit: app.supershyft.com`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    record_id: member.record_id,\n    first_name: name,\n    phone,\n    message\n  }\n};"
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message =\n`camp15,${name},\nYour personalized Bio-AI Health Report is attached below.,\nYour report includes personalized metabolic health insights and recommendations.,\nYou can find everything you need below for easy access,\nPlease visit: app.supershyft.com`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    bio_ai_report_url: member.bio_ai_report_url,\n    first_name: name,\n    phone,\n    message\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -113,48 +113,67 @@
     },
     {
       "parameters": {
-        "url": "=https://api.metsights.com/reports/{{ $json.record_id }}/pdf",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
             {
-              "name": "X-API-KEY",
-              "value": "01993398a5aadb4a2798b6e98c2e08ee"
+              "id": "url-check-001",
+              "leftValue": "={{ $json.bio_ai_report_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "url-check-002",
+              "leftValue": "={{ $json.bio_ai_report_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
             }
-          ]
+          ],
+          "combinator": "and"
         },
         "options": {}
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
         3856,
         944
       ],
-      "id": "33b28def-8df8-47fd-9735-b1c9cedd59fa",
-      "name": "Fetch BioAI Report3",
-      "onError": "continueErrorOutput"
+      "id": "b2c3d4e5-url2-4002-b002-000000000001",
+      "name": "URL Exists?"
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
             {
-              "id": "bio-fetch-fail-001",
+              "id": "url-notfound-001",
               "name": "notification_id",
               "value": "={{ $('Code in JavaScript1').item.json.notification_id }}",
               "type": "number"
             },
             {
-              "id": "bio-fetch-fail-002",
+              "id": "url-notfound-002",
               "name": "status",
               "value": "failed",
               "type": "string"
             },
             {
-              "id": "bio-fetch-fail-003",
+              "id": "url-notfound-003",
               "name": "message",
-              "value": "Report fetch failed",
+              "value": "BioAI report URL not found",
               "type": "string"
             }
           ]
@@ -167,42 +186,8 @@
         4080,
         1120
       ],
-      "id": "a5b6c7d8-e9f0-1234-abcd-567890123ef0",
-      "name": "Edit Fields12"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "46a16321-428d-4d3e-8162-f06e1575bdff",
-              "leftValue": "={{ $json.data.file }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "exists",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        4080,
-        944
-      ],
-      "id": "947bbe0c-dc63-4762-b780-d8aa6eb86462",
-      "name": "If9"
+      "id": "b2c3d4e5-url2-4002-b002-000000000002",
+      "name": "Set URL Not Found Status"
     },
     {
       "parameters": {
@@ -220,7 +205,7 @@
             },
             {
               "name": "medialink",
-              "value": "={{ $('Fetch BioAI Report3').item.json.data.file }}"
+              "value": "={{ $('Code in JavaScript1').item.json.bio_ai_report_url }}"
             }
           ]
         },
@@ -229,7 +214,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        4288,
+        4080,
         928
       ],
       "id": "908554e0-20fa-450c-a6ee-ddece185ecc7",
@@ -240,38 +225,37 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
             {
-              "id": "bio-wa-fail-001",
-              "name": "notification_id",
-              "value": "={{ $('Code in JavaScript1').item.json.notification_id }}",
-              "type": "number"
-            },
-            {
-              "id": "bio-wa-fail-002",
-              "name": "status",
-              "value": "failed",
-              "type": "string"
-            },
-            {
-              "id": "bio-wa-fail-003",
-              "name": "message",
-              "value": "WhatsApp sending failed",
-              "type": "string"
+              "id": "wa-accepted-001",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
             }
-          ]
+          ],
+          "combinator": "and"
         },
         "options": {}
       },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
-        4528,
-        1120
+        4304,
+        928
       ],
-      "id": "b6c7d8e9-f0a1-2345-bcde-678901234f01",
-      "name": "Edit Fields13"
+      "id": "b2c3d4e5-wapi-4002-b002-000000000003",
+      "name": "WhatAPI Accepted?"
     },
     {
       "parameters": {
@@ -313,21 +297,21 @@
         "assignments": {
           "assignments": [
             {
-              "id": "3133ee24-7c3a-4a3f-b663-9e46f58d046c",
+              "id": "wa-notaccepted-001",
               "name": "notification_id",
               "value": "={{ $('Code in JavaScript1').item.json.notification_id }}",
               "type": "number"
             },
             {
-              "id": "90cf0b62-9df2-4de5-a43a-d59aa33bbfd0",
+              "id": "wa-notaccepted-002",
               "name": "status",
               "value": "failed",
               "type": "string"
             },
             {
-              "id": "e24088e3-d250-46df-8dcc-aa10cc0985ba",
+              "id": "wa-notaccepted-003",
               "name": "message",
-              "value": "BioAI report file not found",
+              "value": "WhatsApp sending failed: message not accepted",
               "type": "string"
             }
           ]
@@ -337,11 +321,46 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4288,
+        4528,
         1120
       ],
-      "id": "4b2cf1c3-9a39-4617-b35f-ea0b7c47b4b7",
-      "name": "Edit Fields10"
+      "id": "b2c3d4e5-wapi-4002-b002-000000000004",
+      "name": "Set Not Accepted Status"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bio-wa-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Code in JavaScript1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "bio-wa-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "bio-wa-fail-003",
+              "name": "message",
+              "value": "WhatsApp sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4304,
+        1120
+      ],
+      "id": "b6c7d8e9-f0a1-2345-bcde-678901234f01",
+      "name": "Edit Fields13"
     },
     {
       "parameters": {
@@ -382,6 +401,8 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
@@ -395,6 +416,12 @@
       ],
       "id": "d8aacdbc-34e3-4f15-88d3-aa060c113152",
       "name": "Call Back3",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
       "alwaysOutputData": true,
       "retryOnFail": true,
       "onError": "continueRegularOutput"
@@ -445,43 +472,14 @@
       "main": [
         [
           {
-            "node": "Fetch BioAI Report3",
+            "node": "URL Exists?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch BioAI Report3": {
-      "main": [
-        [
-          {
-            "node": "If9",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Edit Fields12",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Edit Fields12": {
-      "main": [
-        [
-          {
-            "node": "Call Back3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If9": {
+    "URL Exists?": {
       "main": [
         [
           {
@@ -492,7 +490,7 @@
         ],
         [
           {
-            "node": "Edit Fields10",
+            "node": "Set URL Not Found Status",
             "type": "main",
             "index": 0
           }
@@ -503,7 +501,7 @@
       "main": [
         [
           {
-            "node": "Edit Fields9",
+            "node": "WhatAPI Accepted?",
             "type": "main",
             "index": 0
           }
@@ -511,6 +509,24 @@
         [
           {
             "node": "Edit Fields13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Accepted?": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields9",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Not Accepted Status",
             "type": "main",
             "index": 0
           }
@@ -539,7 +555,18 @@
         ]
       ]
     },
-    "Edit Fields10": {
+    "Set Not Accepted Status": {
+      "main": [
+        [
+          {
+            "node": "Call Back3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set URL Not Found Status": {
       "main": [
         [
           {

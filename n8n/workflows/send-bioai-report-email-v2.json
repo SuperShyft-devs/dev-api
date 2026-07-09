@@ -2,7 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Send BioAI Report Email\nFetches BioAI report PDF from Metsights and emails it to each member.\nExpects: { notification_id, engagement_id, members: [{ first_name, email, phone, record_id }] }",
+        "content": "## Send BioAI Report Email\nEmails BioAI report to each member.\nExpects: { notification_id, engagement_id, members: [{ first_name, email, phone, bio_ai_report_url }] }",
         "height": 672,
         "width": 2400
       },
@@ -30,36 +30,6 @@
       "id": "a769c77d-16d4-4cae-a365-e75e4ebb4e02",
       "name": "BioAI Report Email",
       "webhookId": "f46g4hi9-2345-6789-bcde-bioai002email"
-    },
-    {
-      "parameters": {
-        "fromEmail": "support@supershyft.com",
-        "toEmail": "={{ $json.to }}",
-        "subject": "={{ $json.subject }}",
-        "html": "={{ $json.htmlBody }}",
-        "options": {
-          "appendAttribution": false,
-          "attachments": "={{ $json.fileUrl }}"
-        }
-      },
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
-      "position": [
-        4288,
-        3808
-      ],
-      "id": "582d0379-fd13-4c42-a1f7-ea9f3a5be6ba",
-      "name": "Send BioAI Report Email",
-      "retryOnFail": true,
-      "waitBetweenTries": 3000,
-      "webhookId": "3abdec11-5662-465a-81f4-a881a87a2505",
-      "credentials": {
-        "smtp": {
-          "id": "eCub7Y6RwBvqnurK",
-          "name": "SMTP account"
-        }
-      },
-      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -116,7 +86,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\nconst engagementId = body.engagement_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    engagement_id: engagementId,\n    first_name: member.first_name || 'Participant',\n    email: member.email || '',\n    phone: member.phone || '',\n    record_id: member.record_id || ''\n  }\n}));"
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\nconst engagementId = body.engagement_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    engagement_id: engagementId,\n    first_name: member.first_name || 'Participant',\n    email: member.email || '',\n    phone: member.phone || '',\n    bio_ai_report_url: member.bio_ai_report_url || ''\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -129,52 +99,67 @@
     },
     {
       "parameters": {
-        "url": "=https://api.metsights.com/reports/{{ $json.record_id }}/pdf",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
             {
-              "name": "X-API-KEY",
-              "value": "01993398a5aadb4a2798b6e98c2e08ee"
+              "id": "url-check-001",
+              "leftValue": "={{ $json.bio_ai_report_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
             },
             {
-              "name": "Accept",
-              "value": "application/json"
+              "id": "url-check-002",
+              "leftValue": "={{ $json.bio_ai_report_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
             }
-          ]
+          ],
+          "combinator": "and"
         },
         "options": {}
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
         3632,
         3888
       ],
-      "id": "2b4b45f5-648d-43fd-843f-5476569c2b3e",
-      "name": "Fetch BioAI Report4",
-      "onError": "continueErrorOutput"
+      "id": "d4e5f6a7-url4-4004-b004-000000000001",
+      "name": "URL Exists?"
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
             {
-              "id": "resp-fetchfail-001",
+              "id": "url-notfound-001",
               "name": "notification_id",
               "value": "={{ $('Split Members4').item.json.notification_id }}",
               "type": "number"
             },
             {
-              "id": "resp-fetchfail-002",
+              "id": "url-notfound-002",
               "name": "status",
               "value": "failed",
               "type": "string"
             },
             {
-              "id": "resp-fetchfail-003",
+              "id": "url-notfound-003",
               "name": "message",
-              "value": "Report fetch failed",
+              "value": "BioAI report URL not found",
               "type": "string"
             }
           ]
@@ -187,56 +172,52 @@
         3856,
         4080
       ],
-      "id": "c7d8e9f0-a1b2-3456-cdef-789012345012",
-      "name": "Fetch Failed Response1"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "file-check-001",
-              "leftValue": "={{ $json.data.file }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "exists",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        3856,
-        3888
-      ],
-      "id": "0a385f2d-8e26-48f3-a2e7-d16ada837826",
-      "name": "File Link Exists?3"
+      "id": "d4e5f6a7-url4-4004-b004-000000000002",
+      "name": "URL Not Found Response"
     },
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const member = $('Split Members4').item.json;\nconst fileUrl = $('Fetch BioAI Report4').item.json.data.file;\nconst name = (member.first_name || 'Participant').trim();\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<body>\n  <div class=\"container\">\n    <p>Hi ${name},</p>\n    <p>Thank you for completing your Bio-AI health assessment with Supershyft.</p>\n    <p>Please find your personalized Bio-AI Health Report attached to this email. The report combines your blood biomarkers and lifestyle inputs to provide deeper insights into your metabolic health, potential future risk areas, and preventive health recommendations.</p>\n    <p>You can also access and review your reports and insights through:<br>\n    <a href=\"${fileUrl}\">BioAI Report</a></p>\n    <p>Please log in using your registered mobile number and OTP.</p>\n    <p>If you need any assistance accessing your reports or understanding the findings, please feel free to reach out to our support team.</p>\n    <p>Warm regards,<br>\n    Support Team<br>\n    Supershyft<br>\n    <a href=\"https://www.supershyft.com\">www.supershyft.com</a></p>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    engagement_id: member.engagement_id,\n    to: member.email,\n    subject: 'Your Personalized Bio-AI Health Report',\n    htmlBody,\n    fileUrl\n  }\n};"
+        "jsCode": "const member = $('Split Members4').item.json;\nconst fileUrl = member.bio_ai_report_url;\nconst name = (member.first_name || 'Participant').trim();\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<body>\n  <div class=\"container\">\n    <p>Hi ${name},</p>\n    <p>Thank you for completing your Bio-AI health assessment with Supershyft.</p>\n    <p>Please find your personalized Bio-AI Health Report attached to this email. The report combines your blood biomarkers and lifestyle inputs to provide deeper insights into your metabolic health, potential future risk areas, and preventive health recommendations.</p>\n    <p>You can also access and review your reports and insights through:<br>\n    <a href=\"${fileUrl}\">BioAI Report</a></p>\n    <p>Please log in using your registered mobile number and OTP.</p>\n    <p>If you need any assistance accessing your reports or understanding the findings, please feel free to reach out to our support team.</p>\n    <p>Warm regards,<br>\n    Support Team<br>\n    Supershyft<br>\n    <a href=\"https://www.supershyft.com\">www.supershyft.com</a></p>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    engagement_id: member.engagement_id,\n    to: member.email,\n    subject: 'Your Personalized Bio-AI Health Report',\n    htmlBody,\n    fileUrl\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4064,
+        3856,
         3808
       ],
       "id": "96c75b65-b328-4393-bc61-5252bc7d77bb",
       "name": "Prepare Email3"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.htmlBody }}",
+        "options": {
+          "appendAttribution": false,
+          "attachments": "={{ $json.fileUrl }}"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        4080,
+        3808
+      ],
+      "id": "582d0379-fd13-4c42-a1f7-ea9f3a5be6ba",
+      "name": "Send BioAI Report Email",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "3abdec11-5662-465a-81f4-a881a87a2505",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -267,7 +248,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4656,
+        4416,
         3792
       ],
       "id": "a7fe7bcd-b969-450b-bc55-32619c991cf3",
@@ -302,46 +283,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4512,
+        4304,
         3904
       ],
       "id": "fae414aa-7ed1-423a-ab4b-9581d83c70b1",
       "name": "Email Failed Response1"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "resp-nofile-001",
-              "name": "notification_id",
-              "value": "={{ $('Split Members4').item.json.notification_id }}",
-              "type": "number"
-            },
-            {
-              "id": "resp-nofile-002",
-              "name": "status",
-              "value": "failed",
-              "type": "string"
-            },
-            {
-              "id": "resp-nofile-003",
-              "name": "message",
-              "value": "BioAI report file not found",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        4064,
-        4000
-      ],
-      "id": "5435b5a8-b856-4458-a9ae-069f09a0798a",
-      "name": "File Not Found Response1"
     },
     {
       "parameters": {
@@ -382,6 +328,8 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
@@ -395,6 +343,12 @@
       ],
       "id": "e4fe57f0-0d00-4f9a-b232-2a91eb334e45",
       "name": "Callback3",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
       "alwaysOutputData": true,
       "retryOnFail": true,
       "onError": "continueRegularOutput"
@@ -406,24 +360,6 @@
         [
           {
             "node": "Validate Payload3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Send BioAI Report Email": {
-      "main": [
-        [
-          {
-            "node": "Email Sent Response1",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Email Failed Response1",
             "type": "main",
             "index": 0
           }
@@ -452,43 +388,14 @@
       "main": [
         [
           {
-            "node": "Fetch BioAI Report4",
+            "node": "URL Exists?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch BioAI Report4": {
-      "main": [
-        [
-          {
-            "node": "File Link Exists?3",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Fetch Failed Response1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Failed Response1": {
-      "main": [
-        [
-          {
-            "node": "Callback3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "File Link Exists?3": {
+    "URL Exists?": {
       "main": [
         [
           {
@@ -499,7 +406,7 @@
         ],
         [
           {
-            "node": "File Not Found Response1",
+            "node": "URL Not Found Response",
             "type": "main",
             "index": 0
           }
@@ -511,6 +418,24 @@
         [
           {
             "node": "Send BioAI Report Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send BioAI Report Email": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response1",
             "type": "main",
             "index": 0
           }
@@ -539,7 +464,7 @@
         ]
       ]
     },
-    "File Not Found Response1": {
+    "URL Not Found Response": {
       "main": [
         [
           {

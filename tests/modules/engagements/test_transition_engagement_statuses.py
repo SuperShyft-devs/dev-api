@@ -27,8 +27,8 @@ async def _seed_engagement_dependencies(test_db_session) -> None:
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
-            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
-            "VALUES ('booking-alert-whatsapp', 'Booking Alert', 'whatsapp', 'booking-alert', true, false, false) "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES ('booking-alert-whatsapp', 'Booking Alert', 'whatsapp', 'booking-alert', true, false, false, false) "
             "ON CONFLICT (service_key) DO NOTHING"
         )
     )

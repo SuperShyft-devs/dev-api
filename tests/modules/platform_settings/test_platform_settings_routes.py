@@ -140,9 +140,9 @@ async def test_patch_engagement_notification_defaults_rejects_overlap(async_clie
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
-            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
-            "VALUES ('svc-a', 'A', 'whatsapp', 'a', true, false, false), "
-            "('svc-b', 'B', 'whatsapp', 'b', true, false, false) "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES ('svc-a', 'A', 'whatsapp', 'a', true, false, false, false), "
+            "('svc-b', 'B', 'whatsapp', 'b', true, false, false, false) "
             "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
         )
     )

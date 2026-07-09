@@ -26,8 +26,8 @@ async def _seed_notification_service(
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
-            "(service_key, display_name, channel, webhook_path, is_active, require_record_id, require_participant_detail) "
-            "VALUES (:sk, :dn, 'whatsapp', 'test-webhook', :active, false, :rpd) "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES (:sk, :dn, 'whatsapp', 'test-webhook', :active, false, false, :rpd) "
             "ON CONFLICT (service_key) DO UPDATE SET "
             "is_active = :active, require_participant_detail = :rpd"
         ),

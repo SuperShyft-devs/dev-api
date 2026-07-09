@@ -253,7 +253,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
-        "options": {}
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -265,7 +267,82 @@
       "name": "WhatsApp Callback4",
       "alwaysOutputData": true,
       "retryOnFail": true,
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "934b7bf7-6ee8-4256-8649-93597f326073",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3040,
+        1056
+      ],
+      "id": "d3513d2d-c82b-4ef0-a773-848737cddc87",
+      "name": "WhatAPI Accepted?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9578910a-5d1f-49f0-8308-be7cb35a64b2",
+              "name": "notification_id",
+              "value": "={{ $('Prepare WhatsApp Message4').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "ea874ca3-c3bd-46ce-9cc1-e4d1ff1d2733",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "637ea8a2-a161-4df8-8d8e-efc1bc1e026b",
+              "name": "message",
+              "value": "WhatsApp sending failed: message not accepted",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3040,
+        1232
+      ],
+      "id": "226ad351-ea98-4563-8057-848e971c0aed",
+      "name": "WhatAPI Not Accepted"
     }
   ],
   "connections": {
@@ -324,7 +401,7 @@
       "main": [
         [
           {
-            "node": "WhatsApp Sent Response4",
+            "node": "WhatAPI Accepted?",
             "type": "main",
             "index": 0
           }
@@ -361,6 +438,35 @@
       ]
     },
     "WhatsApp Validation Failed4": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Accepted?": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Sent Response4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatAPI Not Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Not Accepted": {
       "main": [
         [
           {

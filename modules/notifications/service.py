@@ -94,41 +94,26 @@ class NotificationsService:
                 message="This service requires otp but none was provided",
             )
 
+        needs_report = svc.require_blood_report_url or svc.require_bio_ai_report_url
+
         members: list[dict] = []
         assessment_instance_id: int | None = None
 
         for user in users:
-            record_id: str | None = payload.record_id
-
-            if record_id:
-                instance = await self._repo.get_assessment_instance_by_record_id(
-                    db, metsights_record_id=record_id
-                )
-                if instance:
-                    assessment_instance_id = instance.assessment_instance_id
-            elif payload.engagement_id is not None:
+            instance = None
+            if payload.engagement_id is not None:
                 instance = await self._repo.get_metsights_instance_for_user_engagement(
                     db,
                     user_id=user.user_id,
                     engagement_id=payload.engagement_id,
                 )
-                if instance:
-                    assessment_instance_id = assessment_instance_id or instance.assessment_instance_id
-                    record_id = instance.metsights_record_id
             else:
                 instance = await self._repo.get_latest_metsights_instance_for_user(
                     db, user_id=user.user_id
                 )
-                if instance:
-                    assessment_instance_id = assessment_instance_id or instance.assessment_instance_id
-                    record_id = instance.metsights_record_id
 
-            if svc.require_record_id and not record_id:
-                raise AppError(
-                    status_code=400,
-                    error_code="INVALID_INPUT",
-                    message=f"This service requires a record_id but none was found for user_id={user.user_id}",
-                )
+            if instance:
+                assessment_instance_id = assessment_instance_id or instance.assessment_instance_id
 
             member: dict = {
                 "first_name": user.first_name or "",
@@ -136,8 +121,36 @@ class NotificationsService:
                 "phone": user.phone or "",
                 "email": user.email or "",
             }
-            if record_id:
-                member["record_id"] = record_id
+
+            if needs_report:
+                if not instance:
+                    raise AppError(
+                        status_code=400,
+                        error_code="INVALID_INPUT",
+                        message=f"No assessment instance found for user_id={user.user_id}",
+                    )
+                ihr = await self._repo.get_health_report_for_instance(
+                    db, assessment_instance_id=instance.assessment_instance_id
+                )
+                if svc.require_blood_report_url:
+                    url = ihr.diagnostic_report_url if ihr else None
+                    if not url:
+                        raise AppError(
+                            status_code=400,
+                            error_code="INVALID_INPUT",
+                            message=f"Blood report URL not available for user_id={user.user_id}",
+                        )
+                    member["blood_report_url"] = url
+                if svc.require_bio_ai_report_url:
+                    url = ihr.report_url if ihr else None
+                    if not url:
+                        raise AppError(
+                            status_code=400,
+                            error_code="INVALID_INPUT",
+                            message=f"BioAI report URL not available for user_id={user.user_id}",
+                        )
+                    member["bio_ai_report_url"] = url
+
             if svc.require_otp:
                 member["otp"] = otp_value
             members.append(member)
@@ -386,7 +399,8 @@ class NotificationsService:
             channel=payload.channel,
             webhook_path=payload.webhook_path,
             is_active=payload.is_active,
-            require_record_id=payload.require_record_id,
+            require_blood_report_url=payload.require_blood_report_url,
+            require_bio_ai_report_url=payload.require_bio_ai_report_url,
             require_participant_detail=payload.require_participant_detail,
             require_otp=payload.require_otp,
         )
@@ -414,8 +428,10 @@ class NotificationsService:
             svc.webhook_path = payload.webhook_path
         if payload.is_active is not None:
             svc.is_active = payload.is_active
-        if payload.require_record_id is not None:
-            svc.require_record_id = payload.require_record_id
+        if payload.require_blood_report_url is not None:
+            svc.require_blood_report_url = payload.require_blood_report_url
+        if payload.require_bio_ai_report_url is not None:
+            svc.require_bio_ai_report_url = payload.require_bio_ai_report_url
         if payload.require_participant_detail is not None:
             svc.require_participant_detail = payload.require_participant_detail
         if payload.require_otp is not None:

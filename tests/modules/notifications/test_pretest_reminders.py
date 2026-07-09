@@ -40,10 +40,10 @@ async def _seed_dependencies(test_db_session) -> None:
         await test_db_session.execute(
             text(
                 "INSERT INTO notification_services "
-                "(service_key, display_name, channel, webhook_path, is_active, require_record_id, "
+                "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, "
                 "require_participant_detail) "
-                "VALUES (:sk, :dn, :ch, :wp, true, false, false) "
-                "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_record_id = false"
+                "VALUES (:sk, :dn, :ch, :wp, true, false, false, false) "
+                "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
             ),
             {"sk": service_key, "dn": service_key, "ch": channel, "wp": webhook_path},
         )

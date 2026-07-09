@@ -458,7 +458,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"service_key\": \"welcome-whatsapp-metsights\",\n  \"user_ids\": {{ JSON.stringify($json.user_ids) }},\n  \"engagement_id\": {{ $json.engagement_id }}\n}",
-        "options": {}
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -471,7 +473,13 @@
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 5000,
-      "onError": "continueErrorOutput"
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      }
     },
     {
       "parameters": {
@@ -480,7 +488,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $('Combine Results2').first().json.notification_id }},\n  \"status\": \"{{ $('Combine Results2').first().json.status }}\",\n  \"message\": \"{{ $('Combine Results2').first().json.message }}\"\n}",
-        "options": {}
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -492,7 +502,13 @@
       "name": "Booking Callback3",
       "alwaysOutputData": true,
       "retryOnFail": true,
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      }
     },
     {
       "parameters": {
@@ -563,6 +579,87 @@
       ],
       "id": "4011dafa-72b0-4516-b3d7-42e3085ba378",
       "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "39bd5bdf-ecc2-453d-80eb-d1b4f4ba6114",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4624,
+        928
+      ],
+      "id": "25321153-d833-4ddf-920d-7d971f25129f",
+      "name": "WhatAPI Accepted?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "63400d12-aeb7-4b0b-83f5-bd1fd33b153a",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Booking Message3').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "a680140f-2b52-4884-8803-b1144c81aca8",
+              "name": "engagement_id",
+              "value": "={{ $('Prepare Booking Message3').item.json.engagement_id }}",
+              "type": "number"
+            },
+            {
+              "id": "72f9b42d-4649-4041-8f2e-a9d7655ca565",
+              "name": "participant_user_id",
+              "value": "={{ $('Prepare Booking Message3').item.json.participant_details.participant_user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "57063229-9ba9-4fd3-b7b4-de596d6ab1cd",
+              "name": "channel",
+              "value": "whatsapp",
+              "type": "string"
+            },
+            {
+              "id": "2148d5fa-be6e-4db4-a829-df6c3a62e699",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4624,
+        1104
+      ],
+      "id": "5a89fcc7-e426-4246-a417-da9f6d4795a6",
+      "name": "WhatAPI Not Accepted"
     }
   ],
   "connections": {
@@ -637,7 +734,7 @@
       "main": [
         [
           {
-            "node": "WhatsApp Sent Response2",
+            "node": "WhatAPI Accepted?",
             "type": "main",
             "index": 0
           }
@@ -780,6 +877,35 @@
         [
           {
             "node": "Booking Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Accepted?": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Sent Response2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatAPI Not Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Not Accepted": {
+      "main": [
+        [
+          {
+            "node": "Merge WhatsApp & Email Results2",
             "type": "main",
             "index": 0
           }
