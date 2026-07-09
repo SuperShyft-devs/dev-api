@@ -55,9 +55,12 @@ class AuditRepository:
         engagement_id: int | None = None,
         created_from: datetime | None = None,
         created_to: datetime | None = None,
+        search: str | None = None,
     ):
         if provider is not None:
             query = query.where(IntegrationSyncLog.provider == provider)
+        if search:
+            query = query.where(IntegrationSyncLog.api_endpoint_url.ilike(f"%{search}%"))
         if statuses:
             query = query.where(IntegrationSyncLog.status.in_(statuses))
         if user_id is not None:
@@ -82,6 +85,7 @@ class AuditRepository:
         engagement_id: int | None = None,
         created_from: datetime | None = None,
         created_to: datetime | None = None,
+        search: str | None = None,
     ) -> list[IntegrationSyncLog]:
         offset = (page - 1) * limit
         query = (
@@ -98,6 +102,7 @@ class AuditRepository:
             engagement_id=engagement_id,
             created_from=created_from,
             created_to=created_to,
+            search=search,
         )
         result = await db.execute(query)
         return list(result.scalars().all())
@@ -112,6 +117,7 @@ class AuditRepository:
         engagement_id: int | None = None,
         created_from: datetime | None = None,
         created_to: datetime | None = None,
+        search: str | None = None,
     ) -> int:
         query = select(func.count()).select_from(IntegrationSyncLog)
         query = self._apply_sync_log_filters(
@@ -122,6 +128,7 @@ class AuditRepository:
             engagement_id=engagement_id,
             created_from=created_from,
             created_to=created_to,
+            search=search,
         )
         result = await db.execute(query)
         return int(result.scalar_one())

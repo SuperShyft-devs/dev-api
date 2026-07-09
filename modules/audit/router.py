@@ -27,6 +27,7 @@ async def list_integration_sync_logs(
     status: str | None = None,
     user_id: int | None = None,
     engagement_id: int | None = None,
+    search: str | None = None,
     from_: datetime | None = Query(default=None, alias="from"),
     to: datetime | None = None,
     db: AsyncSession = Depends(get_db),
@@ -50,5 +51,6 @@ async def list_integration_sync_logs(
         engagement_id=engagement_id,
         created_from=from_,
         created_to=to,
+        search=(search or "").strip() or None,
     )
     return success_response(items, meta={"page": page, "limit": limit, "total": total})

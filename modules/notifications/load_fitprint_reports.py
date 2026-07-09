@@ -18,7 +18,9 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
+from modules.audit.cron_sync_logging import tracked_integration_call
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.metsights.service import MetsightsService
 from modules.notifications.load_bioai_reports import (
@@ -30,6 +32,12 @@ from modules.reports.models import IndividualHealthReport
 logger = logging.getLogger(__name__)
 
 _FITPRINT_TYPE_CODE = "7"
+
+
+def _fitprint_report_url(*, record_id: str, pdf: bool = False) -> str:
+    base = settings.METSIGHTS_BASE_URL.rstrip("/")
+    suffix = "/pdf/" if pdf else "/"
+    return f"{base}/reports/fitness-reports/{record_id}{suffix}"
 
 
 async def _get_eligible_participants(db: AsyncSession, today: date) -> list[tuple]:
@@ -124,37 +132,51 @@ async def load_fitprint_reports(
                 fetched_url = None
 
                 if reports is None:
-                    try:
-                        report_data = await metsights_service.get_report(
+                    report_data = await tracked_integration_call(
+                        db,
+                        provider="metsights",
+                        api_url=_fitprint_report_url(record_id=record_id),
+                        engagement_id=engagement_id,
+                        user_id=user_id,
+                        request_payload={"record_id": record_id, "assessment_type_code": type_code},
+                        operation=lambda: metsights_service.get_report(
                             record_id=record_id,
                             assessment_type_code=type_code,
-                        )
-                        if report_data:
-                            fetched_reports = report_data
-                            if fetched_url is None:
-                                fetched_url = _extract_report_file_url(report_data)
-                    except Exception as exc:
+                        ),
+                        reraise=False,
+                    )
+                    if report_data is not None and report_data:
+                        fetched_reports = report_data
+                        if fetched_url is None:
+                            fetched_url = _extract_report_file_url(report_data)
+                    elif report_data is None:
                         logger.warning(
-                            "MetSights FitPrint get_report failed for record=%s: %s",
+                            "MetSights FitPrint get_report failed for record=%s",
                             record_id,
-                            exc,
                         )
 
                 if report_url is None:
-                    try:
-                        pdf_data = await metsights_service.get_report_pdf(
+                    pdf_data = await tracked_integration_call(
+                        db,
+                        provider="metsights",
+                        api_url=_fitprint_report_url(record_id=record_id, pdf=True),
+                        engagement_id=engagement_id,
+                        user_id=user_id,
+                        request_payload={"record_id": record_id, "assessment_type_code": type_code},
+                        operation=lambda: metsights_service.get_report_pdf(
                             record_id=record_id,
                             assessment_type_code=type_code,
-                        )
-                        if pdf_data:
-                            file_url = pdf_data.get("file") or pdf_data.get("url")
-                            if file_url:
-                                fetched_url = file_url
-                    except Exception as exc:
+                        ),
+                        reraise=False,
+                    )
+                    if pdf_data is not None:
+                        file_url = pdf_data.get("file") or pdf_data.get("url")
+                        if file_url:
+                            fetched_url = file_url
+                    else:
                         logger.warning(
-                            "MetSights FitPrint get_report_pdf failed for record=%s: %s",
+                            "MetSights FitPrint get_report_pdf failed for record=%s",
                             record_id,
-                            exc,
                         )
 
                 if fetched_reports is None and fetched_url is None:

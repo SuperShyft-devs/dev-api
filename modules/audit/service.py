@@ -54,6 +54,7 @@ class AuditService:
         engagement_id: int | None = None,
         created_from: datetime | None = None,
         created_to: datetime | None = None,
+        search: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         rows = await self._repository.list_sync_logs(
             db,
@@ -65,6 +66,7 @@ class AuditService:
             engagement_id=engagement_id,
             created_from=created_from,
             created_to=created_to,
+            search=search,
         )
         total = await self._repository.count_sync_logs(
             db,
@@ -74,6 +76,7 @@ class AuditService:
             engagement_id=engagement_id,
             created_from=created_from,
             created_to=created_to,
+            search=search,
         )
         return [self._serialize_sync_log(row) for row in rows], total
 

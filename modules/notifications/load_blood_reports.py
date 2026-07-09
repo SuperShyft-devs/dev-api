@@ -19,8 +19,10 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.assessments.service import AssessmentsService, _PACKAGE_BLOOD_CATEGORY_KEYS
+from modules.audit.cron_sync_logging import tracked_integration_call
 from modules.diagnostics.models import DiagnosticPackage
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.diagnostics.repository import DiagnosticsRepository
@@ -45,6 +47,18 @@ from modules.users.models import User
 logger = logging.getLogger(__name__)
 
 _METSIGHTS_PRO_BASIC_TYPE_CODES = {"1", "2"}
+
+
+def _healthians_url(path: str) -> str:
+    return f"{settings.HEALTHIANS_BASE_URL.rstrip('/')}/{path.lstrip('/')}"
+
+
+def _metsights_fetch_collections_url(*, record_id: str) -> str:
+    return f"{settings.METSIGHTS_BASE_URL.rstrip('/')}/records/{record_id}/fetch-collections/"
+
+
+def _metsights_report_url(*, record_id: str, assessment_type_code: str) -> str:
+    return f"{settings.METSIGHTS_BASE_URL.rstrip('/')}/reports/{record_id}/"
 
 
 def _blood_report_data_complete(blood_parameters: Any, diagnostic_report_url: Any) -> bool:
@@ -306,8 +320,24 @@ async def load_blood_reports(
 
             if not reference_id:
                 try:
-                    collection_data = await metsights_service.get_fetch_collections(record_id=record_id)
+                    collection_data = await tracked_integration_call(
+                        db,
+                        provider="metsights",
+                        api_url=_metsights_fetch_collections_url(record_id=record_id),
+                        engagement_id=engagement_id,
+                        user_id=user_id,
+                        request_payload={"record_id": record_id},
+                        operation=lambda: metsights_service.get_fetch_collections(record_id=record_id),
+                    )
                 except Exception:
+                    skipped += 1
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped", "reason": "fetch-collections not available for this record",
+                    })
+                    continue
+
+                if collection_data is None:
                     skipped += 1
                     details.append({
                         "user_id": user_id, "engagement_id": engagement_id,
@@ -336,15 +366,39 @@ async def load_blood_reports(
                     continue
                 booking_source = HealthiansBookingSource.METSIGHTS
 
-            access_token = await healthians_client.get_access_token()
+            access_token = await tracked_integration_call(
+                db,
+                provider="healthians",
+                api_url=_healthians_url("toast4health/getAccessToken"),
+                engagement_id=engagement_id,
+                user_id=user_id,
+                request_payload=None,
+                operation=healthians_client.get_access_token,
+            )
+            if access_token is None:
+                skipped += 1
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "skipped", "reason": "Healthians authentication failed",
+                })
+                continue
 
             fetched_blood = None
             blood_loaded_this_run = False
 
-            try:
-                digital_value = await healthians_client.get_booking_digital_value(
+            digital_value = await tracked_integration_call(
+                db,
+                provider="healthians",
+                api_url=_healthians_url("toast4health/getBookingDigitalValue"),
+                engagement_id=engagement_id,
+                user_id=user_id,
+                request_payload={"booking_id": str(reference_id)},
+                operation=lambda: healthians_client.get_booking_digital_value(
                     access_token, reference_id
-                )
+                ),
+                reraise=False,
+            )
+            if digital_value is not None:
                 data_list = digital_value.get("data")
                 if isinstance(data_list, list) and data_list:
                     matched_entry = _match_customer_by_name(
@@ -352,10 +406,10 @@ async def load_blood_reports(
                     )
                     if matched_entry:
                         fetched_blood = matched_entry
-            except Exception as exc:
+            else:
                 logger.warning(
-                    "Healthians getBookingDigitalValue failed for user=%s booking=%s: %s",
-                    user_id, reference_id, exc,
+                    "Healthians getBookingDigitalValue failed for user=%s booking=%s",
+                    user_id, reference_id,
                 )
 
             if fetched_blood is not None:
@@ -425,20 +479,35 @@ async def load_blood_reports(
                         })
 
                     if blood_loaded_this_run and package_code in _PACKAGE_BLOOD_CATEGORY_KEYS:
-                        try:
-                            report_exists = await metsights_service.is_bioai_report_generated(
+                        report_exists = await tracked_integration_call(
+                            db,
+                            provider="metsights",
+                            api_url=_metsights_report_url(
                                 record_id=record_id,
                                 assessment_type_code=assessment_type_code,
-                            )
-                        except Exception as exc:
+                            ),
+                            engagement_id=engagement_id,
+                            user_id=user_id,
+                            request_payload={
+                                "record_id": record_id,
+                                "assessment_type_code": assessment_type_code,
+                                "check": "bioai_report_generated",
+                            },
+                            operation=lambda: metsights_service.is_bioai_report_generated(
+                                record_id=record_id,
+                                assessment_type_code=assessment_type_code,
+                            ),
+                            reraise=False,
+                        )
+                        if report_exists is None:
                             logger.warning(
-                                "BioAI report check failed for user=%s record=%s: %s",
-                                user_id, record_id, exc,
+                                "BioAI report check failed for user=%s record=%s",
+                                user_id, record_id,
                             )
                             details.append({
                                 "user_id": user_id, "engagement_id": engagement_id,
                                 "action": "skipped",
-                                "reason": f"skipped metsights push: report check failed ({str(exc)[:80]})",
+                                "reason": "skipped metsights push: report check failed",
                             })
                             report_exists = True
 
@@ -484,10 +553,19 @@ async def load_blood_reports(
                                     })
 
             fetched_diag_url = None
-            try:
-                report_data = await healthians_client.get_booking_report(
+            report_data = await tracked_integration_call(
+                db,
+                provider="healthians",
+                api_url=_healthians_url("toast4health/getBookingReport"),
+                engagement_id=engagement_id,
+                user_id=user_id,
+                request_payload={"booking_id": str(reference_id)},
+                operation=lambda: healthians_client.get_booking_report(
                     access_token, reference_id
-                )
+                ),
+                reraise=False,
+            )
+            if report_data is not None:
                 report_list = report_data.get("data")
                 if isinstance(report_list, list) and report_list:
                     matched_report = _match_customer_by_name(
@@ -497,10 +575,10 @@ async def load_blood_reports(
                         fetched_diag_url = (
                             matched_report.get("report_url") or matched_report.get("url")
                         )
-            except Exception as exc:
+            else:
                 logger.warning(
-                    "Healthians getBookingReport failed for user=%s booking=%s: %s",
-                    user_id, reference_id, exc,
+                    "Healthians getBookingReport failed for user=%s booking=%s",
+                    user_id, reference_id,
                 )
 
             if fetched_diag_url is not None:
