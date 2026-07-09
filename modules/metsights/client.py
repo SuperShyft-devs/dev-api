@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
 import httpx
 
 from core.config import settings
+
+logger = logging.getLogger(__name__)
 
 _SAFE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
 
@@ -144,13 +147,32 @@ class MetsightsClient:
         rid = _validate_record_id(record_id)
         base_url = settings.METSIGHTS_BASE_URL.rstrip("/")
         type_code = (assessment_type_code or "").strip()
-        if type_code == "7":
-            url = f"{base_url}/reports/fitness-reports/{rid}/pdf/"
-        else:
-            url = f"{base_url}/reports/{rid}/pdf/"
         headers = {"X-API-KEY": settings.METSIGHTS_API_KEY}
         timeout = settings.METSIGHTS_TIMEOUT_SECONDS
 
+        if type_code == "7":
+            fitness_url = f"{base_url}/reports/fitness-reports/{rid}/pdf/"
+            try:
+                return await self._get_report_pdf_url(fitness_url, headers=headers, timeout=timeout)
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code not in (401, 403, 404, 405):
+                    raise
+                logger.warning(
+                    "Metsights fitness PDF unavailable for record=%s (status=%s); falling back to /reports/pdf/",
+                    rid,
+                    exc.response.status_code,
+                )
+
+        url = f"{base_url}/reports/{rid}/pdf/"
+        return await self._get_report_pdf_url(url, headers=headers, timeout=timeout)
+
+    async def _get_report_pdf_url(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str],
+        timeout: float | int,
+    ) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(url, headers=headers)
             response.raise_for_status()

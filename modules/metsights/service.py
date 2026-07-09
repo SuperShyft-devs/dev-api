@@ -15,6 +15,43 @@ from modules.metsights.schemas import MetsightsEnvelope, MetsightsProfilesPage
 logger = logging.getLogger(__name__)
 
 
+def _normalize_phone_digits(raw: str | None) -> str:
+    return "".join(ch for ch in str(raw or "") if ch.isdigit())
+
+
+def _phones_equivalent(left: str | None, right: str | None) -> bool:
+    left_digits = _normalize_phone_digits(left)
+    right_digits = _normalize_phone_digits(right)
+    if not left_digits or not right_digits:
+        return False
+    if left_digits == right_digits:
+        return True
+    # Treat +91XXXXXXXXXX and 10-digit local numbers as equivalent.
+    if len(left_digits) >= 10 and len(right_digits) >= 10:
+        return left_digits[-10:] == right_digits[-10:]
+    return False
+
+
+def _profile_name_matches(row: dict[str, Any], *, first_name: str, last_name: str) -> bool:
+    row_first = str(row.get("first_name") or "").strip().lower()
+    row_last = str(row.get("last_name") or "").strip().lower()
+    target_first = (first_name or "").strip().lower()
+    target_last = (last_name or "").strip().lower()
+    if not row_first or not row_last or not target_first or not target_last:
+        return False
+    if row_first == target_first and row_last == target_last:
+        return True
+    # MetSights may store a leading initial (e.g. "S Pratheek").
+    row_first_tokens = row_first.split()
+    target_first_tokens = target_first.split()
+    return row_last == target_last and (
+        row_first == target_first
+        or row_first.endswith(target_first)
+        or target_first.endswith(row_first)
+        or row_first_tokens[-1:] == target_first_tokens[-1:]
+    )
+
+
 class MetsightsService:
     """Encapsulates Metsights error handling and resource retrieval."""
 
@@ -667,6 +704,15 @@ class MetsightsService:
         if not safe_first or not safe_last or not safe_phone or not safe_gender:
             raise AppError(status_code=422, error_code="INVALID_STATE", message="Missing required profile fields")
 
+        existing_id = await self._find_best_existing_profile_id(
+            first_name=safe_first,
+            last_name=safe_last,
+            phone=safe_phone,
+            email=safe_email,
+        )
+        if existing_id:
+            return existing_id
+
         payload: dict[str, Any] = {
             "first_name": safe_first,
             "last_name": safe_last,
@@ -703,38 +749,14 @@ class MetsightsService:
                     message="Metsights authorization failed",
                 ) from exc
             if status_code == 400:
-                # Common case: profile already exists (phone/email uniqueness).
-                # Try to locate it via search and reuse its id.
-                async def _find_existing_by_search(search: str | None, field: str, expected: str) -> str | None:
-                    if not search:
-                        return None
-                    listed = await self._client.list_profiles(search=search)
-                    envelope = MetsightsEnvelope.model_validate(listed)
-                    rows = envelope.data if isinstance(envelope.data, list) else []
-                    for row in rows:
-                        if not isinstance(row, dict):
-                            continue
-                        if str(row.get(field) or "").strip().lower() != expected.strip().lower():
-                            continue
-                        existing_id = str(row.get("id") or "").strip()
-                        if existing_id:
-                            return existing_id
-                    return None
-
-                try:
-                    existing_by_phone = await _find_existing_by_search(safe_phone, "phone", safe_phone)
-                    if existing_by_phone:
-                        return existing_by_phone
-                except Exception:
-                    pass
-
-                if safe_email:
-                    try:
-                        existing_by_email = await _find_existing_by_search(safe_email, "email", safe_email)
-                        if existing_by_email:
-                            return existing_by_email
-                    except Exception:
-                        pass
+                existing_id = await self._find_best_existing_profile_id(
+                    first_name=safe_first,
+                    last_name=safe_last,
+                    phone=safe_phone,
+                    email=safe_email,
+                )
+                if existing_id:
+                    return existing_id
 
                 # If email is causing uniqueness conflicts, retry creation without email.
                 if safe_email:
@@ -760,6 +782,65 @@ class MetsightsService:
                 error_code="EXTERNAL_SERVICE_UNAVAILABLE",
                 message="Metsights request failed",
             ) from exc
+
+    async def _find_best_existing_profile_id(
+        self,
+        *,
+        first_name: str,
+        last_name: str,
+        phone: str,
+        email: str | None,
+    ) -> str | None:
+        """Reuse an existing Metsights profile when phone/email already exist."""
+
+        search_terms: list[str] = []
+        phone_digits = _normalize_phone_digits(phone)
+        if phone_digits:
+            search_terms.append(phone_digits[-10:] if len(phone_digits) >= 10 else phone_digits)
+            search_terms.append(phone.strip())
+        if email:
+            search_terms.append(email.strip())
+
+        seen_ids: set[str] = set()
+        candidates: list[dict[str, Any]] = []
+        for term in search_terms:
+            if not term:
+                continue
+            try:
+                listed = await self._client.list_profiles(search=term)
+            except Exception:
+                continue
+            envelope = MetsightsEnvelope.model_validate(listed)
+            rows = envelope.data if isinstance(envelope.data, list) else []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                profile_id = str(row.get("id") or "").strip()
+                if not profile_id or profile_id in seen_ids:
+                    continue
+                phone_ok = _phones_equivalent(str(row.get("phone") or ""), phone)
+                email_ok = (
+                    bool(email)
+                    and str(row.get("email") or "").strip().lower() == email.strip().lower()
+                )
+                if not phone_ok and not email_ok:
+                    continue
+                seen_ids.add(profile_id)
+                candidates.append(row)
+
+        if not candidates:
+            return None
+
+        for row in candidates:
+            if _profile_name_matches(row, first_name=first_name, last_name=last_name):
+                return str(row.get("id") or "").strip() or None
+
+        # Prefer the oldest profile (original participant record) when names differ slightly.
+        def _created_key(row: dict[str, Any]) -> str:
+            return str(row.get("created_at") or "")
+
+        oldest = min(candidates, key=_created_key)
+        return str(oldest.get("id") or "").strip() or None
 
     async def create_profile_for_engagement(
         self,

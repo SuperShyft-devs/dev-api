@@ -35,6 +35,16 @@ def _report_data_complete(reports: Any, report_url: Any) -> bool:
     return reports is not None and report_url is not None
 
 
+def _extract_report_file_url(report_data: Any) -> str | None:
+    if not isinstance(report_data, dict):
+        return None
+    file_url = report_data.get("file") or report_data.get("url")
+    if file_url is None:
+        return None
+    normalized = str(file_url).strip()
+    return normalized or None
+
+
 async def _get_eligible_participants(
     db: AsyncSession,
     today: date,
@@ -202,6 +212,8 @@ async def load_bioai_reports(
                         )
                         if report_data:
                             fetched_reports = report_data
+                            if fetched_url is None:
+                                fetched_url = _extract_report_file_url(report_data)
                     except Exception as exc:
                         logger.warning(
                             "MetSights get_report failed for record=%s: %s",
