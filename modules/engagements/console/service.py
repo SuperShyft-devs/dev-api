@@ -17,9 +17,13 @@ from modules.employee.access_control import (
 )
 from modules.employee.models import EmployeeRole
 from modules.employee.service import EmployeeContext
-from modules.engagements.models import Engagement
+from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
+from modules.assessments.repository import AssessmentsRepository
+from modules.engagements.models import Engagement, EngagementParticipant
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import _participant_enrollment_to_dict
+from modules.metsights.sync_service import MetsightsSyncService
+from modules.questionnaire.service import QuestionnaireService
 from modules.users.models import User
 from modules.users.repository import UsersRepository
 
@@ -46,14 +50,131 @@ def _format_healthians_dob(user: User) -> str | None:
     return None
 
 
+def _assessment_instance_to_dict(instance, package) -> dict:
+    return {
+        "assessment_instance_id": instance.assessment_instance_id,
+        "package_id": instance.package_id,
+        "package_code": getattr(package, "package_code", None) if package is not None else None,
+        "package_display_name": getattr(package, "display_name", None) if package is not None else None,
+        "assessment_type_code": getattr(package, "assessment_type_code", None) if package is not None else None,
+        "engagement_id": instance.engagement_id,
+        "status": instance.status,
+        "metsights_record_id": instance.metsights_record_id,
+        "assigned_at": instance.assigned_at,
+        "completed_at": instance.completed_at,
+    }
+
+
 class ConsoleService:
     def __init__(
         self,
         repository: EngagementsRepository,
         users_repository: UsersRepository | None = None,
+        assessments_repository: AssessmentsRepository | None = None,
+        categories_service: AssessmentPackageCategoriesService | None = None,
+        questionnaire_service: QuestionnaireService | None = None,
+        metsights_sync_service: MetsightsSyncService | None = None,
     ):
         self._repository = repository
         self._users_repository = users_repository or UsersRepository()
+        self._assessments_repository = assessments_repository or AssessmentsRepository()
+        self._categories_service = categories_service
+        self._questionnaire_service = questionnaire_service
+        self._metsights_sync_service = metsights_sync_service
+
+    async def _ensure_console_participant_access(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+    ) -> EngagementParticipant:
+        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+
+        participant = await self._repository.get_participant_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(
+                status_code=404,
+                error_code="PARTICIPANT_NOT_FOUND",
+                message="Participant is not enrolled in this engagement",
+            )
+        return participant
+
+    async def _ensure_console_participant_instance(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+        assessment_instance_id: int,
+    ):
+        row = await self._assessments_repository.get_instance_for_user(
+            db,
+            assessment_instance_id=assessment_instance_id,
+            user_id=user_id,
+        )
+        if row is None:
+            raise AppError(
+                status_code=404,
+                error_code="ASSESSMENT_NOT_FOUND",
+                message="Assessment does not exist",
+            )
+        instance, _package = row
+        if int(instance.engagement_id or 0) != int(engagement_id):
+            raise AppError(
+                status_code=404,
+                error_code="ASSESSMENT_NOT_FOUND",
+                message="Assessment does not exist",
+            )
+        return row
+
+    async def _ensure_console_write_access(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> Engagement:
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+        ensure_engagement_running(engagement)
+        return engagement
+
+    def _require_categories_service(self) -> AssessmentPackageCategoriesService:
+        if self._categories_service is None:
+            raise AppError(
+                status_code=500,
+                error_code="CONFIG_ERROR",
+                message="Assessment categories service is not configured",
+            )
+        return self._categories_service
+
+    def _require_questionnaire_service(self) -> QuestionnaireService:
+        if self._questionnaire_service is None:
+            raise AppError(
+                status_code=500,
+                error_code="CONFIG_ERROR",
+                message="Questionnaire service is not configured",
+            )
+        return self._questionnaire_service
+
+    def _require_metsights_sync_service(self) -> MetsightsSyncService:
+        if self._metsights_sync_service is None:
+            raise AppError(
+                status_code=500,
+                error_code="CONFIG_ERROR",
+                message="Metsights sync service is not configured",
+            )
+        return self._metsights_sync_service
 
     @staticmethod
     def _engagement_to_console_dict(engagement: Engagement, *, participant_count: int) -> dict:
@@ -508,3 +629,164 @@ class ConsoleService:
             repository=self._repository,
         )
         return result
+
+    async def list_participant_assessments(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+    ) -> list[dict]:
+        await self._ensure_console_participant_access(
+            db,
+            employee=employee,
+            engagement_id=engagement_id,
+            user_id=user_id,
+        )
+
+        instances = await self._assessments_repository.list_instances_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        data: list[dict] = []
+        for instance in instances:
+            package = await self._assessments_repository.get_package_by_id(
+                db,
+                package_id=int(instance.package_id),
+            )
+            data.append(_assessment_instance_to_dict(instance, package))
+        return data
+
+    async def get_participant_assessment_status(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        assessment_instance_id: int,
+        category_of: str = "supershyft",
+    ) -> list[dict]:
+        await self._ensure_console_participant_access(
+            db,
+            employee=employee,
+            engagement_id=engagement_id,
+            user_id=user_id,
+        )
+        await self._ensure_console_participant_instance(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=assessment_instance_id,
+        )
+
+        return await self._require_categories_service().list_category_completion_for_assessment_instance(
+            db,
+            user_id=user_id,
+            assessment_instance_id=assessment_instance_id,
+            category_of=category_of,
+        )
+
+    async def get_participant_questionnaire(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        assessment_instance_id: int,
+        category_id: int,
+    ) -> dict:
+        await self._ensure_console_participant_access(
+            db,
+            employee=employee,
+            engagement_id=engagement_id,
+            user_id=user_id,
+        )
+        await self._ensure_console_participant_instance(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=assessment_instance_id,
+        )
+
+        return await self._require_questionnaire_service().get_questionnaire_for_user(
+            db,
+            user_id=user_id,
+            assessment_instance_id=assessment_instance_id,
+            category_id=category_id,
+        )
+
+    async def upsert_participant_questionnaire_responses(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        assessment_instance_id: int,
+        category_id: int,
+        responses: list[dict],
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> None:
+        await self._ensure_console_participant_access(
+            db,
+            employee=employee,
+            engagement_id=engagement_id,
+            user_id=user_id,
+        )
+        await self._ensure_console_write_access(db, engagement_id=engagement_id)
+        await self._ensure_console_participant_instance(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=assessment_instance_id,
+        )
+
+        await self._require_questionnaire_service().upsert_responses_for_user(
+            db,
+            user_id=user_id,
+            assessment_instance_id=assessment_instance_id,
+            category_id=category_id,
+            responses=responses,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            endpoint=endpoint,
+        )
+
+    async def submit_participant_assessment_category(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        assessment_instance_id: int,
+        category: str,
+        category_of: str,
+    ) -> dict:
+        await self._ensure_console_participant_access(
+            db,
+            employee=employee,
+            engagement_id=engagement_id,
+            user_id=user_id,
+        )
+        await self._ensure_console_write_access(db, engagement_id=engagement_id)
+        await self._ensure_console_participant_instance(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=assessment_instance_id,
+        )
+
+        return await self._require_metsights_sync_service().submit_category_to_metsights(
+            db,
+            assessment_instance_id=assessment_instance_id,
+            user_id=user_id,
+            category_key=category,
+            category_of=category_of,
+        )

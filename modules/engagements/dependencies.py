@@ -55,9 +55,17 @@ def get_onboarding_assistants_service() -> OnboardingAssistantsService:
 
 
 def get_console_service() -> ConsoleService:
+    from modules.assessments.dependencies import get_assessment_package_categories_service
+    from modules.metsights.dependencies import get_metsights_sync_service
+    from modules.questionnaire.dependencies import get_questionnaire_user_service
+
     return ConsoleService(
         repository=EngagementsRepository(),
         users_repository=UsersRepository(),
+        assessments_repository=AssessmentsRepository(),
+        categories_service=get_assessment_package_categories_service(),
+        questionnaire_service=get_questionnaire_user_service(),
+        metsights_sync_service=get_metsights_sync_service(),
     )
 
 
