@@ -232,10 +232,15 @@ async def test_load_bioai_reports_sends_notifications_when_configured(test_db_se
     monkeypatch.setattr(metsights_service, "get_report", _fake_report)
     monkeypatch.setattr(metsights_service, "get_report_pdf", _fake_report_pdf)
 
-    dispatch_calls: list[int] = []
+    dispatch_calls: list[dict] = []
 
     async def _fake_dispatch(self, db, *, payload, triggered_by_user_id=None):
-        dispatch_calls.extend(payload.user_ids)
+        dispatch_calls.append(
+            {
+                "user_ids": list(payload.user_ids),
+                "assessment_instance_id": payload.assessment_instance_id,
+            }
+        )
         return {"dispatched": len(payload.user_ids)}
 
     monkeypatch.setattr(NotificationsService, "dispatch", _fake_dispatch)
@@ -248,7 +253,7 @@ async def test_load_bioai_reports_sends_notifications_when_configured(test_db_se
 
     assert result["loaded"] == 1
     assert result["notified"] == 1
-    assert dispatch_calls == [99001]
+    assert dispatch_calls == [{"user_ids": [99001], "assessment_instance_id": 99001}]
 
 
 @pytest.mark.asyncio

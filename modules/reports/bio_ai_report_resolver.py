@@ -74,9 +74,34 @@ async def resolve_bio_ai_report_url(
             ),
         )
 
-    cached = (existing_ihr.report_url if existing_ihr is not None else None) or ""
-    if cached.strip():
-        return _normalize_report_url(cached)
+    repo = reports_repository or ReportsRepository()
+
+    assessment_report = await repo.get_individual_report_by_assessment(
+        db, assessment_instance_id=assessment_instance_id
+    )
+    engagement_report = await repo.get_individual_report_by_engagement(
+        db,
+        user_id=user_id,
+        engagement_id=engagement_id,
+    )
+
+    cached_ihr: IndividualHealthReport | None = None
+    for candidate in (assessment_report, engagement_report, existing_ihr):
+        if candidate is None:
+            continue
+        cached_url = (candidate.report_url or "").strip()
+        if cached_url:
+            return _normalize_report_url(cached_url)
+        if cached_ihr is None:
+            cached_ihr = candidate
+
+    if cached_ihr is not None and cached_ihr.reports is not None:
+        url_from_reports = _extract_file_url(cached_ihr.reports)
+        if url_from_reports:
+            report_url = _normalize_report_url(url_from_reports)
+            cached_ihr.report_url = report_url
+            await repo.update_individual_report(db, cached_ihr)
+            return report_url
 
     record_id = (metsights_record_id or "").strip()
     if not record_id:
@@ -108,9 +133,9 @@ async def resolve_bio_ai_report_url(
         )
 
     report_url = _normalize_report_url(fetched_url)
-    repo = reports_repository or ReportsRepository()
 
-    if existing_ihr is None:
+    target = assessment_report or engagement_report or existing_ihr or cached_ihr
+    if target is None:
         report = IndividualHealthReport(
             user_id=user_id,
             engagement_id=engagement_id,
@@ -121,8 +146,10 @@ async def resolve_bio_ai_report_url(
         await repo.create_individual_report(db, report)
     else:
         if fetched_reports is not None:
-            existing_ihr.reports = fetched_reports
-        existing_ihr.report_url = report_url
-        await repo.update_individual_report(db, existing_ihr)
+            target.reports = fetched_reports
+        target.report_url = report_url
+        if target.assessment_instance_id is None:
+            target.assessment_instance_id = assessment_instance_id
+        await repo.update_individual_report(db, target)
 
     return report_url

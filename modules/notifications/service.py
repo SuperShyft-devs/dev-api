@@ -25,7 +25,9 @@ from modules.notifications.schemas import (
     NotificationServiceCreate,
     NotificationServiceUpdate,
 )
+from modules.notifications.report_prepare import prepare_user_report_urls
 from modules.reports.bio_ai_report_resolver import resolve_bio_ai_report_url
+from modules.reports.blood_report_resolver import resolve_blood_report_url
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,24 @@ class NotificationsService:
     ) -> None:
         self._repo = repository
         self._metsights_service = metsights_service or MetsightsService(client=MetsightsClient())
+
+    # ── Report preparation ──────────────────────────────────────────────
+
+    async def prepare_reports_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        require_blood_report_url: bool,
+        require_bio_ai_report_url: bool,
+    ) -> list[dict]:
+        return await prepare_user_report_urls(
+            db,
+            user_id=user_id,
+            require_blood=require_blood_report_url,
+            require_bioai=require_bio_ai_report_url,
+            metsights_service=self._metsights_service,
+        )
 
     # ── Dispatch ────────────────────────────────────────────────────────
 
@@ -174,15 +194,34 @@ class NotificationsService:
                     db, assessment_instance_id=instance.assessment_instance_id
                 )
                 if svc.require_blood_report_url:
-                    url = ihr.diagnostic_report_url if ihr else None
-                    if not url:
+                    url = (ihr.diagnostic_report_url if ihr else None) or None
+                    if not (url and str(url).strip()):
+                        try:
+                            url = await resolve_blood_report_url(
+                                db,
+                                user_id=user.user_id,
+                                engagement_id=int(instance.engagement_id),
+                                assessment_instance_id=instance.assessment_instance_id,
+                                metsights_record_id=(instance.metsights_record_id or ""),
+                                metsights_service=self._metsights_service,
+                                existing_ihr=ihr,
+                                first_name=user.first_name or "",
+                                last_name=user.last_name or "",
+                            )
+                        except AppError:
+                            url = None
+                    if not url or not str(url).strip():
                         raise AppError(
                             status_code=400,
                             error_code="INVALID_INPUT",
                             message=f"Blood report URL not available for user_id={user.user_id}",
                         )
-                    member["blood_report_url"] = url
+                    member["blood_report_url"] = str(url).strip()
                 if svc.require_bio_ai_report_url:
+                    if svc.require_blood_report_url:
+                        ihr = await self._repo.get_health_report_for_instance(
+                            db, assessment_instance_id=instance.assessment_instance_id
+                        )
                     type_code = await self._repo.get_assessment_type_code_for_instance(
                         db, assessment_instance_id=instance.assessment_instance_id
                     )
@@ -195,17 +234,28 @@ class NotificationsService:
                                 f"assessment_instance_id={instance.assessment_instance_id} is type {type_code!r}"
                             ),
                         )
-                    url = await resolve_bio_ai_report_url(
-                        db,
-                        user_id=user.user_id,
-                        engagement_id=int(instance.engagement_id),
-                        assessment_instance_id=instance.assessment_instance_id,
-                        metsights_record_id=(instance.metsights_record_id or ""),
-                        assessment_type_code=type_code or "",
-                        metsights_service=self._metsights_service,
-                        existing_ihr=ihr,
-                    )
-                    member["bio_ai_report_url"] = url
+                    bio_url = (ihr.report_url if ihr else None) or None
+                    if not (bio_url and str(bio_url).strip()):
+                        try:
+                            bio_url = await resolve_bio_ai_report_url(
+                                db,
+                                user_id=user.user_id,
+                                engagement_id=int(instance.engagement_id),
+                                assessment_instance_id=instance.assessment_instance_id,
+                                metsights_record_id=(instance.metsights_record_id or ""),
+                                assessment_type_code=type_code or "",
+                                metsights_service=self._metsights_service,
+                                existing_ihr=ihr,
+                            )
+                        except AppError:
+                            bio_url = None
+                    if not bio_url or not str(bio_url).strip():
+                        raise AppError(
+                            status_code=400,
+                            error_code="INVALID_INPUT",
+                            message=f"BioAI report URL not available for user_id={user.user_id}",
+                        )
+                    member["bio_ai_report_url"] = str(bio_url).strip()
 
             if svc.require_otp:
                 member["otp"] = otp_value
@@ -234,11 +284,12 @@ class NotificationsService:
             webhook_payload["participant_details"] = payload.participant_details
 
         audit_repo = AuditRepository()
+        sync_log_user_id = payload.user_ids[0] if len(payload.user_ids) == 1 else None
         sync_log = await audit_repo.create_sync_log(
             db,
             IntegrationSyncLog(
-                engagement_id=None,
-                user_id=None,
+                engagement_id=resolved_engagement_id,
+                user_id=sync_log_user_id,
                 provider="n8n",
                 api_endpoint_url=webhook_url,
                 request_payload=webhook_payload,
@@ -246,6 +297,7 @@ class NotificationsService:
             ),
         )
 
+        webhook_failed = False
         try:
             async with httpx.AsyncClient(timeout=settings.NOTIFICATION_SERVICE_TIMEOUT_SECONDS) as client:
                 resp = await client.post(webhook_url, json=webhook_payload)
@@ -268,6 +320,7 @@ class NotificationsService:
         except Exception as exc:
             logger.error("Notification webhook call failed: %s", exc)
             webhook_message = f"Webhook call failed: {exc}"
+            webhook_failed = True
             await audit_repo.update_sync_log_status(
                 db,
                 sync_log_id=sync_log.sync_log_id,
@@ -275,10 +328,12 @@ class NotificationsService:
                 error_message=str(exc),
             )
 
+        notification_status = "failed" if webhook_failed else notification.status
         await self._repo.update_notification(
             db,
             notification_id=notification.notification_id,
             values={
+                "status": notification_status,
                 "message": webhook_message,
                 "dispatched_at": datetime.now(timezone.utc),
             },
@@ -286,7 +341,7 @@ class NotificationsService:
 
         return {
             "notification_id": notification.notification_id,
-            "status": notification.status,
+            "status": notification_status,
             "message": webhook_message,
         }
 
@@ -299,6 +354,13 @@ class NotificationsService:
         if notification is None:
             raise AppError(
                 status_code=404, error_code="NOT_FOUND", message="Notification not found"
+            )
+
+        if notification.status not in ("pending", "failed"):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_STATE",
+                message=f"Cannot update notification with status '{notification.status}'",
             )
 
         values: dict = {

@@ -10,6 +10,7 @@ from core.config import settings
 from core.dependencies import authenticate_bearer_user
 from core.exceptions import AppError
 from db.session import get_db
+from modules.employee.access_control import ensure_internal_employee
 from modules.employee.dependencies import get_employee_service
 from modules.employee.service import EmployeeContext, EmployeeService
 from modules.metsights.client import MetsightsClient
@@ -34,7 +35,7 @@ async def authenticate_notification_endpoint(
     x_api_key: str | None = Header(None),
     employee_service: EmployeeService = Depends(get_employee_service),
 ) -> EmployeeContext | None:
-    """Accept either a valid employee JWT or a matching x-api-key header.
+    """Accept either a valid internal employee JWT or a matching x-api-key header.
 
     Returns EmployeeContext when authenticated via JWT, None when via API key.
     Raises 401 if neither method succeeds.
@@ -42,7 +43,9 @@ async def authenticate_notification_endpoint(
     if credentials is not None and credentials.scheme.lower() == "bearer":
         try:
             user = await authenticate_bearer_user(db, credentials, access_token=None)
-            return await employee_service.get_active_employee_by_user_id(db, user.user_id)
+            employee = await employee_service.get_active_employee_by_user_id(db, user.user_id)
+            ensure_internal_employee(employee)
+            return employee
         except AppError:
             pass
 

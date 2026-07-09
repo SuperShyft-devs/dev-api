@@ -25,8 +25,12 @@ from modules.notifications.schemas import (
     DispatchRequest,
     NotificationServiceCreate,
     NotificationServiceUpdate,
+    PrepareReportsRequest,
 )
 from modules.notifications.service import NotificationsService
+from modules.users.dependencies import get_participant_journey_service
+from modules.users.participant_journey_service import ParticipantJourneyService
+from modules.employee.access_control import ensure_internal_employee
 
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -75,6 +79,41 @@ async def dispatch_notification(
     result = await svc.dispatch(db, payload=payload, triggered_by_user_id=triggered_by)
     await db.commit()
     return success_response(result)
+
+
+@router.post("/prepare-reports")
+async def prepare_reports(
+    payload: PrepareReportsRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    svc: NotificationsService = Depends(get_notifications_service),
+    journey_service: ParticipantJourneyService = Depends(get_participant_journey_service),
+):
+    ensure_internal_employee(employee)
+    if not payload.require_blood_report_url and not payload.require_bio_ai_report_url:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message="At least one of require_blood_report_url or require_bio_ai_report_url must be true",
+        )
+    prepare_details = await svc.prepare_reports_for_user(
+        db,
+        user_id=payload.user_id,
+        require_blood_report_url=payload.require_blood_report_url,
+        require_bio_ai_report_url=payload.require_bio_ai_report_url,
+    )
+    await db.commit()
+    summary, meta = await journey_service.get_summary(
+        db,
+        employee=employee,
+        user_id=payload.user_id,
+        page=1,
+        limit=100,
+    )
+    return success_response(
+        {"instances": summary["instances"], "prepare_details": prepare_details},
+        meta=meta,
+    )
 
 
 # ── Questionnaire reminders (triggered by external scheduler) ────────────

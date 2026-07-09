@@ -203,6 +203,7 @@ async def _send_report_notifications(
     service_keys: list[str],
     user_id: int,
     engagement_id: int,
+    assessment_instance_id: int,
     details: list[dict[str, Any]],
 ) -> int:
     """Dispatch configured notification services that have not already been sent."""
@@ -227,6 +228,7 @@ async def _send_report_notifications(
                 service_key=sk,
                 user_ids=[user_id],
                 engagement_id=engagement_id,
+                assessment_instance_id=assessment_instance_id,
             ),
             triggered_by_user_id=None,
         )
@@ -639,6 +641,7 @@ async def load_blood_reports(
                 service_keys=service_keys,
                 user_id=user_id,
                 engagement_id=engagement_id,
+                assessment_instance_id=instance_id,
                 details=details,
             )
             await db.commit()

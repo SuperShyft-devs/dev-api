@@ -717,7 +717,15 @@ async def test_dispatch_creates_n8n_sync_log_on_failure(async_client, test_db_se
         json={"service_key": service_key, "user_ids": [9602]},
     )
     assert response.status_code == 201, response.text
+    assert response.json()["data"]["status"] == "failed"
     assert "Webhook call failed" in response.json()["data"]["message"]
+
+    notification_id = response.json()["data"]["notification_id"]
+    notif_row = await test_db_session.execute(
+        text("SELECT status FROM notifications WHERE notification_id = :nid"),
+        {"nid": notification_id},
+    )
+    assert notif_row.scalar_one() == "failed"
 
     result = await test_db_session.execute(
         text(
@@ -1107,3 +1115,373 @@ async def test_dispatch_report_service_without_scope_returns_400(
     )
     assert response.status_code == 400
     assert "assessment_instance_id" in response.json()["message"].lower() or "engagement_id" in response.json()["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_fetches_blood_report_when_cache_missing(
+    async_client, test_db_session, monkeypatch
+):
+    """Blood dispatch should fetch from Healthians when diagnostic_report_url is not cached."""
+    await _seed_employee(test_db_session, user_id=9751, employee_id=991)
+    await _seed_metsights_basic_package(test_db_session)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9751, engagement_code="ENG-NOTIF-9751")
+
+    test_db_session.add(
+        User(
+            user_id=9752,
+            age=30,
+            phone="9752000000",
+            status="active",
+            first_name="Blood",
+            last_name="User",
+        )
+    )
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9753,
+            user_id=9752,
+            package_id=1,
+            engagement_id=9751,
+            status="completed",
+            metsights_record_id="FETCH-ME-BLOOD",
+        )
+    )
+    service_key = "blood_report_fetch_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'Blood Report Fetch', 'whatsapp', 'blood-report-fetch', true, true, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_blood_report_url = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    async def _fake_resolve_booking_id(*, db, user_id, engagement_id, record_id, metsights_service):
+        from modules.reports.healthians_booking_resolver import (
+            HealthiansBookingSource,
+            ResolvedHealthiansBooking,
+        )
+
+        return ResolvedHealthiansBooking(
+            booking_id="BOOK-9753",
+            source=HealthiansBookingSource.PARTICIPANT,
+            collection_data=None,
+        )
+
+    async def _fake_get_access_token():
+        return "token"
+
+    async def _fake_get_booking_report(access_token, booking_id):
+        return {
+            "data": [
+                {
+                    "customer_name": "Blood User",
+                    "report_url": f"https://example.com/blood/{booking_id}.pdf",
+                }
+            ]
+        }
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+    monkeypatch.setattr(
+        "modules.reports.blood_report_resolver.resolve_healthians_booking_id",
+        _fake_resolve_booking_id,
+    )
+    monkeypatch.setattr(
+        "modules.diagnostics.healthians.client.get_access_token",
+        _fake_get_access_token,
+    )
+    monkeypatch.setattr(
+        "modules.diagnostics.healthians.client.get_booking_report",
+        _fake_get_booking_report,
+    )
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_auth_header(9751),
+        json={
+            "service_key": service_key,
+            "user_ids": [9752],
+            "assessment_instance_id": 9753,
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert webhook_calls
+    member = webhook_calls[0]["json"]["members"][0]
+    assert member["blood_report_url"] == "https://example.com/blood/BOOK-9753.pdf"
+
+    cached = await test_db_session.execute(
+        text(
+            "SELECT diagnostic_report_url FROM individual_health_report "
+            "WHERE assessment_instance_id = 9753"
+        )
+    )
+    assert cached.scalar_one() == "https://example.com/blood/BOOK-9753.pdf"
+
+
+@pytest.mark.asyncio
+async def test_prepare_reports_refreshes_journey_instances(
+    async_client, test_db_session, monkeypatch
+):
+    await _seed_employee(test_db_session, user_id=9761, employee_id=992)
+    await _seed_metsights_basic_package(test_db_session)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9761, engagement_code="ENG-NOTIF-9761")
+
+    test_db_session.add(User(user_id=9762, age=30, phone="9762000000", status="active"))
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9763,
+            user_id=9762,
+            package_id=1,
+            engagement_id=9761,
+            status="active",
+            metsights_record_id="PREPARE-BIOAI",
+        )
+    )
+    await test_db_session.commit()
+
+    async def _fake_get_report(self, *, record_id: str, assessment_type_code: str | None):
+        return {"file": f"https://example.com/bio-ai/{record_id}.pdf"}
+
+    async def _fake_get_report_pdf(self, *, record_id: str, assessment_type_code: str | None):
+        raise AssertionError("PDF fallback should not be needed")
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.get_report",
+        _fake_get_report,
+    )
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.get_report_pdf",
+        _fake_get_report_pdf,
+    )
+
+    response = await async_client.post(
+        "/notifications/prepare-reports",
+        headers=_auth_header(9761),
+        json={
+            "user_id": 9762,
+            "require_blood_report_url": False,
+            "require_bio_ai_report_url": True,
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()["data"]
+    instances = body["instances"]
+    assert any(i["assessment_instance_id"] == 9763 for i in instances)
+    prepared = next(i for i in instances if i["assessment_instance_id"] == 9763)
+    assert prepared["has_bio_ai_report_url"] is True
+    assert body["prepare_details"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_reports_dual_report_uses_single_ihr_row(
+    async_client, test_db_session, monkeypatch
+):
+    await _seed_employee(test_db_session, user_id=9771, employee_id=993)
+    await _seed_metsights_basic_package(test_db_session)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9771, engagement_code="ENG-NOTIF-9771")
+
+    test_db_session.add(
+        User(
+            user_id=9772,
+            age=30,
+            phone="9772000000",
+            status="active",
+            first_name="Dual",
+            last_name="Report",
+        )
+    )
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9773,
+            user_id=9772,
+            package_id=1,
+            engagement_id=9771,
+            status="completed",
+            metsights_record_id="DUAL-REPORT",
+        )
+    )
+    await test_db_session.commit()
+
+    async def _fake_resolve_booking_id(*, db, user_id, engagement_id, record_id, metsights_service):
+        from modules.reports.healthians_booking_resolver import (
+            HealthiansBookingSource,
+            ResolvedHealthiansBooking,
+        )
+
+        return ResolvedHealthiansBooking(
+            booking_id="BOOK-9773",
+            source=HealthiansBookingSource.PARTICIPANT,
+            collection_data=None,
+        )
+
+    async def _fake_get_access_token():
+        return "token"
+
+    async def _fake_get_booking_report(access_token, booking_id):
+        return {
+            "data": [
+                {
+                    "customer_name": "Dual Report",
+                    "report_url": f"https://example.com/blood/{booking_id}.pdf",
+                }
+            ]
+        }
+
+    async def _fake_get_report(self, *, record_id: str, assessment_type_code: str | None):
+        return {"file": f"https://example.com/bio-ai/{record_id}.pdf"}
+
+    async def _fake_get_report_pdf(self, *, record_id: str, assessment_type_code: str | None):
+        raise AssertionError("PDF fallback should not be needed")
+
+    monkeypatch.setattr(
+        "modules.reports.blood_report_resolver.resolve_healthians_booking_id",
+        _fake_resolve_booking_id,
+    )
+    monkeypatch.setattr(
+        "modules.diagnostics.healthians.client.get_access_token",
+        _fake_get_access_token,
+    )
+    monkeypatch.setattr(
+        "modules.diagnostics.healthians.client.get_booking_report",
+        _fake_get_booking_report,
+    )
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.get_report",
+        _fake_get_report,
+    )
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.get_report_pdf",
+        _fake_get_report_pdf,
+    )
+
+    response = await async_client.post(
+        "/notifications/prepare-reports",
+        headers=_auth_header(9771),
+        json={
+            "user_id": 9772,
+            "require_blood_report_url": True,
+            "require_bio_ai_report_url": True,
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    rows = (
+        await test_db_session.execute(
+            text(
+                "SELECT COUNT(*) FROM individual_health_report "
+                "WHERE assessment_instance_id = 9773"
+            )
+        )
+    ).scalar_one()
+    assert rows == 1
+
+    row = (
+        await test_db_session.execute(
+            text(
+                "SELECT diagnostic_report_url, report_url FROM individual_health_report "
+                "WHERE assessment_instance_id = 9773"
+            )
+        )
+    ).one()
+    assert row[0] == "https://example.com/blood/BOOK-9773.pdf"
+    assert row[1] == "https://example.com/bio-ai/DUAL-REPORT.pdf"
+
+
+@pytest.mark.asyncio
+async def test_bio_ai_resolver_uses_cached_reports_json(test_db_session):
+    from modules.metsights.client import MetsightsClient
+    from modules.metsights.service import MetsightsService
+    from modules.reports.bio_ai_report_resolver import resolve_bio_ai_report_url
+
+    test_db_session.add(User(user_id=9781, age=30, phone="9781000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=9781,
+            user_id=9781,
+            engagement_id=9782,
+            assessment_instance_id=9783,
+            reports={"file": "https://example.com/bio-ai/cached.pdf"},
+            report_url=None,
+        )
+    )
+    await test_db_session.commit()
+
+    async def _should_not_call(*args, **kwargs):
+        raise AssertionError("MetSights should not be called when reports JSON has file URL")
+
+    metsights_service = MetsightsService(client=MetsightsClient())
+    metsights_service.get_report = _should_not_call  # type: ignore[method-assign]
+    metsights_service.get_report_pdf = _should_not_call  # type: ignore[method-assign]
+
+    url = await resolve_bio_ai_report_url(
+        test_db_session,
+        user_id=9781,
+        engagement_id=9782,
+        assessment_instance_id=9783,
+        metsights_record_id="CACHED-RECORD",
+        assessment_type_code="1",
+        metsights_service=metsights_service,
+    )
+    assert url == "https://example.com/bio-ai/cached.pdf"
+
+
+@pytest.mark.asyncio
+async def test_callback_rejects_update_when_already_sent(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notifications "
+            "(notification_id, service_key, status, channel, \"user\", message) "
+            "VALUES (9799, 'callback_test', 'sent', 'email', '{\"user_ids\": [1]}', 'done')"
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/notifications/callback",
+        headers=_api_key_header(),
+        json={"notification_id": 9799, "status": "failed", "message": "too late"},
+    )
+    assert response.status_code == 400
+    assert "status" in response.json()["message"].lower()

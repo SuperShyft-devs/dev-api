@@ -5,6 +5,12 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class PrepareReportsRequest(BaseModel):
+    user_id: int = Field(..., gt=0)
+    require_blood_report_url: bool = False
+    require_bio_ai_report_url: bool = False
+
+
 class DispatchRequest(BaseModel):
     service_key: str = Field(..., min_length=1)
     user_ids: list[int] = Field(..., min_length=1)

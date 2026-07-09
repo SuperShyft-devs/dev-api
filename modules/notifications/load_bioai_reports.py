@@ -1,7 +1,7 @@
 """Load BioAI reports from MetSights and send notifications.
 
 For participants in running engagements where the MetSights Basic/Pro assessment is
-in progress or completed and today >= engagement_date:
+completed and today >= engagement_date:
 1. Check MetSights blood parameters for is_complete (Pro/Basic only).
 2. If individual_health_report.reports or report_url is null, fetch from MetSights.
 3. When both reports and report_url are present, send notifications using
@@ -14,7 +14,7 @@ import logging
 from datetime import date
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
@@ -91,7 +91,7 @@ async def _get_eligible_participants(
             == AssessmentInstance.assessment_instance_id,
         )
         .where(Engagement.status.ilike("running"))
-        .where(func.lower(AssessmentInstance.status).in_(["active", "completed", "complete"]))
+        .where(AssessmentInstance.status == "completed")
         .where(EngagementParticipant.engagement_date <= today)
         .where(AssessmentInstance.metsights_record_id.isnot(None))
         .where(AssessmentInstance.metsights_record_id != "")
@@ -108,6 +108,7 @@ async def _send_report_notifications(
     service_keys: list[str],
     user_id: int,
     engagement_id: int,
+    assessment_instance_id: int,
     details: list[dict[str, Any]],
 ) -> int:
     """Dispatch configured notification services that have not already been sent."""
@@ -132,6 +133,7 @@ async def _send_report_notifications(
                 service_key=sk,
                 user_ids=[user_id],
                 engagement_id=engagement_id,
+                assessment_instance_id=assessment_instance_id,
             ),
             triggered_by_user_id=None,
         )
@@ -361,6 +363,7 @@ async def load_bioai_reports(
                 service_keys=service_keys,
                 user_id=user_id,
                 engagement_id=engagement_id,
+                assessment_instance_id=instance_id,
                 details=details,
             )
             await db.commit()

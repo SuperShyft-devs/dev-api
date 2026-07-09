@@ -58,6 +58,13 @@ def upgrade() -> None:
         )
 
     if _column_exists(inspector, "notification_services", "require_record_id"):
+        op.execute(
+            sa.text(
+                "UPDATE notification_services "
+                "SET require_bio_ai_report_url = true "
+                "WHERE require_record_id = true"
+            )
+        )
         op.drop_column("notification_services", "require_record_id")
 
 
