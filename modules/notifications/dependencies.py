@@ -12,6 +12,8 @@ from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_employee_service
 from modules.employee.service import EmployeeContext, EmployeeService
+from modules.metsights.client import MetsightsClient
+from modules.metsights.service import MetsightsService
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.service import NotificationsService
 
@@ -20,7 +22,10 @@ _optional_http_bearer = HTTPBearer(auto_error=False)
 
 
 def get_notifications_service() -> NotificationsService:
-    return NotificationsService(repository=NotificationsRepository())
+    return NotificationsService(
+        repository=NotificationsRepository(),
+        metsights_service=MetsightsService(client=MetsightsClient()),
+    )
 
 
 async def authenticate_notification_endpoint(

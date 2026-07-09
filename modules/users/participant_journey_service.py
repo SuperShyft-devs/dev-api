@@ -104,6 +104,8 @@ class ParticipantJourneyService:
             has_report_url = bool((ihr.report_url or "").strip()) if ihr else False
             has_bio = has_report_url and type_code in ("1", "2")
             has_fitprint = has_report_url and type_code == "7"
+            record_id = (instance.metsights_record_id or "").strip()
+            bio_ai_report_available = has_bio or (type_code in ("1", "2") and bool(record_id))
 
             instances_out.append(
                 {
@@ -111,7 +113,7 @@ class ParticipantJourneyService:
                     "status": instance.status,
                     "assigned_at": _dt_iso(instance.assigned_at),
                     "completed_at": _dt_iso(instance.completed_at),
-                    "metsights_record_id": (instance.metsights_record_id or "").strip() or None,
+                    "metsights_record_id": record_id or None,
                     "package_id": instance.package_id,
                     "package_code": getattr(package, "package_code", None) if package else None,
                     "package_display_name": getattr(package, "display_name", None) if package else None,
@@ -121,6 +123,7 @@ class ParticipantJourneyService:
                     "engagement_code": getattr(engagement, "engagement_code", None) if engagement else None,
                     "has_blood_report_url": has_blood,
                     "has_bio_ai_report_url": has_bio,
+                    "bio_ai_report_available": bio_ai_report_available,
                     "has_fitprint_report_url": has_fitprint,
                     "category_progress": category_progress,
                     "questionnaire": {

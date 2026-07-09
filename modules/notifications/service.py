@@ -15,6 +15,8 @@ from core.config import settings
 from core.exceptions import AppError
 from modules.audit.models import IntegrationSyncLog
 from modules.audit.repository import AuditRepository
+from modules.metsights.client import MetsightsClient
+from modules.metsights.service import MetsightsService
 from modules.notifications.models import Notification, NotificationService
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.schemas import (
@@ -23,6 +25,7 @@ from modules.notifications.schemas import (
     NotificationServiceCreate,
     NotificationServiceUpdate,
 )
+from modules.reports.bio_ai_report_resolver import resolve_bio_ai_report_url
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +52,14 @@ def _parse_status_filter(status: str | None) -> list[str] | None:
 class NotificationsService:
     """Notification service layer."""
 
-    def __init__(self, repository: NotificationsRepository) -> None:
+    def __init__(
+        self,
+        repository: NotificationsRepository,
+        *,
+        metsights_service: MetsightsService | None = None,
+    ) -> None:
         self._repo = repository
+        self._metsights_service = metsights_service or MetsightsService(client=MetsightsClient())
 
     # ── Dispatch ────────────────────────────────────────────────────────
 
@@ -186,13 +195,16 @@ class NotificationsService:
                                 f"assessment_instance_id={instance.assessment_instance_id} is type {type_code!r}"
                             ),
                         )
-                    url = ihr.report_url if ihr else None
-                    if not url:
-                        raise AppError(
-                            status_code=400,
-                            error_code="INVALID_INPUT",
-                            message=f"BioAI report URL not available for user_id={user.user_id}",
-                        )
+                    url = await resolve_bio_ai_report_url(
+                        db,
+                        user_id=user.user_id,
+                        engagement_id=int(instance.engagement_id),
+                        assessment_instance_id=instance.assessment_instance_id,
+                        metsights_record_id=(instance.metsights_record_id or ""),
+                        assessment_type_code=type_code or "",
+                        metsights_service=self._metsights_service,
+                        existing_ihr=ihr,
+                    )
                     member["bio_ai_report_url"] = url
 
             if svc.require_otp:

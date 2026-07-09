@@ -163,6 +163,105 @@ async def test_dispatch_succeeds_when_bio_ai_report_url_present(
 
 
 @pytest.mark.asyncio
+async def test_dispatch_fetches_bio_ai_report_when_cache_missing(
+    async_client, test_db_session, monkeypatch
+):
+    """BioAI dispatch should fetch from MetSights when report_url is not cached yet."""
+    await _seed_employee(test_db_session, user_id=9561, employee_id=961)
+    await _seed_metsights_basic_package(test_db_session)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9561, engagement_code="ENG-NOTIF-9561")
+
+    test_db_session.add(User(user_id=9562, age=30, phone="9562000000", status="active"))
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9568,
+            user_id=9562,
+            package_id=1,
+            engagement_id=9561,
+            status="active",
+            metsights_record_id="FETCH-ME-BIOAI",
+        )
+    )
+    service_key = "bio_ai_report_fetch_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'BioAI Report Fetch', 'whatsapp', 'bio-ai-report-fetch', true, false, true, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_bio_ai_report_url = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    async def _fake_get_report(self, *, record_id: str, assessment_type_code: str | None):
+        return {"file": f"https://example.com/bio-ai/{record_id}.pdf"}
+
+    async def _fake_get_report_pdf(self, *, record_id: str, assessment_type_code: str | None):
+        raise AssertionError("PDF fallback should not be needed when report detail has file")
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.get_report",
+        _fake_get_report,
+    )
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.get_report_pdf",
+        _fake_get_report_pdf,
+    )
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_auth_header(9561),
+        json={
+            "service_key": service_key,
+            "user_ids": [9562],
+            "assessment_instance_id": 9568,
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert webhook_calls
+    member = webhook_calls[0]["json"]["members"][0]
+    assert member["bio_ai_report_url"] == "https://example.com/bio-ai/FETCH-ME-BIOAI.pdf"
+
+    cached = await test_db_session.execute(
+        text(
+            "SELECT report_url FROM individual_health_report "
+            "WHERE assessment_instance_id = 9568"
+        )
+    )
+    assert cached.scalar_one() == "https://example.com/bio-ai/FETCH-ME-BIOAI.pdf"
+
+
+@pytest.mark.asyncio
 async def test_dispatch_validates_bio_ai_report_url_for_correct_engagement(
     async_client, test_db_session, monkeypatch
 ):
