@@ -1471,6 +1471,15 @@ async def test_callback_rejects_update_when_already_sent(async_client, test_db_s
     monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
     await test_db_session.execute(
         text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, "
+            "require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES ('callback_test', 'Callback Test', 'email', 'callback-test', true, false, false, false, false) "
+            "ON CONFLICT (service_key) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
             "INSERT INTO notifications "
             "(notification_id, service_key, status, channel, \"user\", message) "
             "VALUES (9799, 'callback_test', 'sent', 'email', '{\"user_ids\": [1]}', 'done')"
