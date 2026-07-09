@@ -329,7 +329,24 @@ async def test_dispatch_with_api_key_auth(async_client, test_db_session, monkeyp
 @pytest.mark.asyncio
 async def test_dispatch_without_bio_ai_report_url_returns_400_when_required(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9511, employee_id=961)
+    await _seed_metsights_basic_package(test_db_session)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9511, engagement_code="ENG-NOTIF-9511")
     test_db_session.add(User(user_id=9512, age=30, phone="9512000000", status="active"))
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9513,
+            user_id=9512,
+            package_id=1,
+            engagement_id=9511,
+            status="active",
+            metsights_record_id="MISSING-REPORT-RECORD",
+        )
+    )
     missing_service_key = "bio_ai_report_whatsapp_missing"
     await test_db_session.execute(
         text(
@@ -348,7 +365,7 @@ async def test_dispatch_without_bio_ai_report_url_returns_400_when_required(asyn
         json={
             "service_key": missing_service_key,
             "user_ids": [9512],
-            "engagement_id": None,
+            "engagement_id": 9511,
         },
     )
     assert response.status_code == 400
@@ -816,3 +833,92 @@ async def test_dispatch_rejects_assessment_instance_id_with_multiple_users(
     )
     assert response.status_code == 400
     assert "single-user" in response.json()["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_non_report_without_scope_leaves_engagement_null(
+    async_client, test_db_session, monkeypatch
+):
+    """Welcome-style dispatch with no engagement/assessment must not auto-resolve engagement."""
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
+    await _seed_metsights_basic_package(test_db_session)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9731, engagement_code="ENG-NOTIF-9731")
+
+    test_db_session.add(User(user_id=9732, age=30, phone="9732000000", status="active"))
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9733,
+            user_id=9732,
+            package_id=1,
+            engagement_id=9731,
+            status="active",
+            metsights_record_id="AUTO-ENG-RECORD",
+        )
+    )
+    service_key = "welcome_no_scope_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'Welcome No Scope', 'email', 'welcome-no-scope', true, false, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    monkeypatch.setattr(
+        "modules.notifications.service.httpx.AsyncClient",
+        _fake_httpx_client(succeed=True),
+    )
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_api_key_header(),
+        json={"service_key": service_key, "user_ids": [9732]},
+    )
+    assert response.status_code == 201, response.text
+    notification_id = response.json()["data"]["notification_id"]
+
+    result = await test_db_session.execute(
+        text(
+            "SELECT engagement_id, assessment_instance_id FROM notifications "
+            "WHERE notification_id = :nid"
+        ),
+        {"nid": notification_id},
+    )
+    row = result.mappings().one()
+    assert row["engagement_id"] is None
+    assert row["assessment_instance_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_dispatch_report_service_without_scope_returns_400(
+    async_client, test_db_session, monkeypatch
+):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
+    test_db_session.add(User(user_id=9741, age=30, phone="9741000000", status="active"))
+    service_key = "report_no_scope_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'Report No Scope', 'email', 'report-no-scope', true, true, true, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_blood_report_url = true, require_bio_ai_report_url = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_api_key_header(),
+        json={"service_key": service_key, "user_ids": [9741]},
+    )
+    assert response.status_code == 400
+    assert "assessment_instance_id" in response.json()["message"].lower() or "engagement_id" in response.json()["message"].lower()

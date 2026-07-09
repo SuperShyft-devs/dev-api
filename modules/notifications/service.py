@@ -130,9 +130,14 @@ class NotificationsService:
                     user_id=user.user_id,
                     engagement_id=payload.engagement_id,
                 )
-            else:
-                instance = await self._repo.get_latest_metsights_instance_for_user(
-                    db, user_id=user.user_id
+            elif needs_report:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message=(
+                        "This service requires report URLs; provide assessment_instance_id "
+                        "or engagement_id"
+                    ),
                 )
 
             if instance:
