@@ -158,3 +158,96 @@ async def test_patch_engagement_notification_defaults_rejects_overlap(async_clie
     )
     assert response.status_code == 400
     assert "svc-b" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_get_default_onboarding_assistants_requires_auth(async_client):
+    response = await async_client.get("/platform-settings/default-onboarding-assistants")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_patch_default_onboarding_assistants_persists(async_client, test_db_session):
+    uid = 9105
+    test_db_session.add(User(user_id=uid, age=30, phone="91050000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9105, user_id=uid, role="admin", status="active"))
+
+    aid = 9201
+    oid = 9202
+    test_db_session.add(User(user_id=aid, age=30, phone="92010000001", status="active", first_name="Ada", last_name="Admin"))
+    await test_db_session.flush()
+    test_db_session.add(User(user_id=oid, age=30, phone="92020000001", status="active", first_name="Omar", last_name="OA"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9201, user_id=aid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9202, user_id=oid, role="onboarding_assistant", status="active"))
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES "
+            "(1, 'P1', 'One', 'active') ON CONFLICT (package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'R1', 'D1', 'p', 'active') ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/platform-settings/default-onboarding-assistants",
+        headers=_auth_header(uid),
+        json={"employee_ids": [9201, 9202, 9201]},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["employee_ids"] == [9201, 9202]
+    assert len(data["assistants"]) == 2
+
+    response2 = await async_client.get(
+        "/platform-settings/default-onboarding-assistants",
+        headers=_auth_header(uid),
+    )
+    assert response2.status_code == 200
+    assert response2.json()["data"]["employee_ids"] == [9201, 9202]
+
+
+@pytest.mark.asyncio
+async def test_patch_default_onboarding_assistants_rejects_unknown_employee(async_client, test_db_session):
+    uid = 9106
+    test_db_session.add(User(user_id=uid, age=30, phone="91060000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9106, user_id=uid, role="admin", status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/platform-settings/default-onboarding-assistants",
+        headers=_auth_header(uid),
+        json={"employee_ids": [999999]},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_patch_default_onboarding_assistants_rejects_inactive_employee(async_client, test_db_session):
+    uid = 9107
+    test_db_session.add(User(user_id=uid, age=30, phone="91070000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9107, user_id=uid, role="admin", status="active"))
+
+    inactive_uid = 9301
+    test_db_session.add(User(user_id=inactive_uid, age=30, phone="93010000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(
+        Employee(employee_id=9301, user_id=inactive_uid, role="onboarding_assistant", status="inactive")
+    )
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/platform-settings/default-onboarding-assistants",
+        headers=_auth_header(uid),
+        json={"employee_ids": [9301]},
+    )
+    assert response.status_code == 422

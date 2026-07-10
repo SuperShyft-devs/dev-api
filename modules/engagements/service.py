@@ -24,7 +24,13 @@ from modules.assessments.repository import AssessmentsRepository
 from modules.assessments.service import AssessmentsService
 from modules.audit.service import AuditService
 from modules.checklists.schemas import ChecklistReadiness
-from modules.employee.access_control import ensure_admin
+from modules.employee.access_control import (
+    ONBOARDING_ASSISTANT_ASSIGNEE_ROLES,
+    ensure_admin,
+    ensure_org_manager_assignable_to_engagement,
+)
+from modules.employee.models import EmployeeRole
+from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.models import BloodCollectionType, Engagement, EngagementKind, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
@@ -61,7 +67,6 @@ def _generate_engagement_code(length: int = 8) -> str:
 
 _ALLOWED_ENGAGEMENT_STATUS = {"draft", "scheduled", "running", "completed", "cancelled"}
 DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID = 1
-_B2C_DEFAULT_ONBOARDING_ASSISTANT_EMPLOYEE_IDS = (1, 8)
 
 
 def _normalize_status(value: str | None) -> str:
@@ -199,6 +204,7 @@ class EngagementsService:
         self._notifications_repository = notifications_repository or NotificationsRepository()
         self._notifications_service = notifications_service
         self._platform_settings_repository = PlatformSettingsRepository()
+        self._employee_repository = EmployeeRepository()
         self._assessments_repository = AssessmentsRepository()
         self._questionnaire_repository = QuestionnaireRepository()
         self._reports_repository = ReportsRepository()
@@ -451,6 +457,12 @@ class EngagementsService:
             user_agent=user_agent,
             user_id=employee.user_id,
             session_id=None,
+        )
+
+        await self._assign_default_onboarding_assistants(
+            db,
+            engagement_id=engagement.engagement_id,
+            organization_id=engagement.organization_id,
         )
 
         return engagement
@@ -868,10 +880,10 @@ class EngagementsService:
         create_profile_on_metsights: bool = False,
         enroll_for_fitprint_full: bool = False,
     ) -> Engagement:
-        """Create a B2C engagement with no onboarding assistants assigned by default.
+        """Create a B2C engagement and auto-assign default onboarding assistants from platform settings.
 
         B2C engagements are created automatically during public user onboarding.
-        Onboarding assistant assignments can be added later if needed.
+        Default assistants come from platform_settings.default_onboarding_assistant_employee_ids.
 
         When location fields are incomplete and an address (or address parts) is
         available, missing fields are filled via Nominatim. Geocode failures are
@@ -942,15 +954,76 @@ class EngagementsService:
         )
         engagement = await self._repository.create_engagement(db, engagement)
 
+        await self._assign_default_onboarding_assistants(
+            db,
+            engagement_id=engagement.engagement_id,
+            organization_id=None,
+        )
 
-        for emp_id in _B2C_DEFAULT_ONBOARDING_ASSISTANT_EMPLOYEE_IDS:
+        return engagement
+
+    async def _resolve_default_onboarding_assistant_employee_ids(self, db: AsyncSession) -> list[int]:
+        return await self._platform_settings_repository.resolve_default_onboarding_assistant_employee_ids(db)
+
+    async def _assign_default_onboarding_assistants(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        organization_id: int | None,
+    ) -> None:
+        employee_ids = await self._resolve_default_onboarding_assistant_employee_ids(db)
+        if not employee_ids:
+            return
+
+        for emp_id in employee_ids:
+            row = await self._employee_repository.get_by_id(db, emp_id)
+            if row is None:
+                logger.warning("Skipping default onboarding assistant %s: employee not found", emp_id)
+                continue
+            if (row.status or "").lower() != "active":
+                logger.warning("Skipping default onboarding assistant %s: employee not active", emp_id)
+                continue
+            if row.role not in ONBOARDING_ASSISTANT_ASSIGNEE_ROLES:
+                logger.warning("Skipping default onboarding assistant %s: invalid role", emp_id)
+                continue
+            if organization_id is None and row.role == EmployeeRole.organization_manager:
+                logger.info(
+                    "Skipping default onboarding assistant %s: organization_manager on B2C engagement",
+                    emp_id,
+                )
+                continue
+
+            try:
+                await ensure_org_manager_assignable_to_engagement(
+                    db,
+                    assignee_user_id=row.user_id,
+                    assignee_role=row.role,
+                    engagement_id=engagement_id,
+                    repository=self._repository,
+                    organizations_repository=self._organizations_repository,
+                )
+            except AppError as exc:
+                logger.info(
+                    "Skipping default onboarding assistant %s: %s",
+                    emp_id,
+                    exc.message,
+                )
+                continue
+
+            existing = await self._repository.get_onboarding_assistant_assignment(
+                db,
+                engagement_id=engagement_id,
+                employee_id=emp_id,
+            )
+            if existing is not None:
+                continue
+
             assignment = OnboardingAssistantAssignment(
-                engagement_id=engagement.engagement_id,
+                engagement_id=engagement_id,
                 employee_id=emp_id,
             )
             await self._repository.create_onboarding_assistant_assignment(db, assignment)
-
-        return engagement
 
     async def list_onboarding_assistant_user_ids(
         self,

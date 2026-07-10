@@ -7,8 +7,8 @@ from datetime import date
 import pytest
 from sqlalchemy import text
 
-from modules.engagements.models import Engagement, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
+from modules.engagements.service import EngagementsService
 
 
 @pytest.mark.asyncio
@@ -380,9 +380,8 @@ async def test_get_nonexistent_assignment_returns_none(test_db_session):
 
 
 @pytest.mark.asyncio
-async def test_b2c_engagement_created_without_onboarding_assistants(test_db_session):
-    """Test that B2C engagements are created without any onboarding assistants by default."""
-    # Seed required packages
+async def test_b2c_engagement_assigns_no_assistants_when_defaults_empty(test_db_session):
+    """B2C engagements created via service assign nothing when platform defaults are empty."""
     await test_db_session.execute(
         text(
             "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
@@ -396,34 +395,88 @@ async def test_b2c_engagement_created_without_onboarding_assistants(test_db_sess
             "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
         )
     )
-    
-    # Seed users table for foreign key
+    await test_db_session.execute(text("DELETE FROM platform_settings"))
     await test_db_session.execute(
-        text("INSERT INTO users (user_id, age, phone, status) VALUES (5009, 30, '5009000000', 'active')")
-    )
-    await test_db_session.commit()
-    
-    # Create a B2C engagement directly
-    test_db_session.add(
-        Engagement(
-            engagement_id=6008,
-            engagement_name="B2C-Test",
-            engagement_code="B2C6008",
-            engagement_type="bio_ai",
-            assessment_package_id=1,
-            diagnostic_package_id=1,
-            city="Mumbai",
-            slot_duration=20,
-            start_date=date(2026, 2, 1),
-            end_date=date(2026, 2, 1),
-            status="running",
-            organization_id=None,  # B2C has no organization
+        text(
+            "INSERT INTO platform_settings "
+            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
+            "default_onboarding_assistant_employee_ids) "
+            "VALUES (1, 1, 1, NULL)"
         )
     )
     await test_db_session.commit()
 
-    # Verify no onboarding assistants are assigned
+    service = EngagementsService(EngagementsRepository())
+    engagement = await service.create_b2c_engagement(
+        test_db_session,
+        user_first_name="Test",
+        engagement_date=date(2026, 2, 1),
+        city="Mumbai",
+        assessment_package_id=1,
+        diagnostic_package_id=1,
+    )
+    await test_db_session.commit()
+
     repository = EngagementsRepository()
-    assignments = await repository.list_onboarding_assistants(test_db_session, engagement_id=6008)
-    
+    assignments = await repository.list_onboarding_assistants(
+        test_db_session, engagement_id=engagement.engagement_id
+    )
     assert len(assignments) == 0
+
+
+@pytest.mark.asyncio
+async def test_b2c_engagement_assigns_default_assistants_from_platform_settings(test_db_session):
+    """B2C engagements auto-assign assistants configured in platform settings."""
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Package 1', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'REF1', 'Diag 1', 'Provider', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.execute(
+        text("INSERT INTO users (user_id, age, phone, status) VALUES (5010, 30, '5010000000', 'active')")
+    )
+    await test_db_session.execute(
+        text("INSERT INTO users (user_id, age, phone, status) VALUES (5011, 30, '5011000000', 'active')")
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO employee (employee_id, user_id, role, status) VALUES "
+            "(110, 5010, 'admin', 'active'), (111, 5011, 'onboarding_assistant', 'active')"
+        )
+    )
+    await test_db_session.execute(text("DELETE FROM platform_settings"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO platform_settings "
+            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
+            "default_onboarding_assistant_employee_ids) "
+            "VALUES (1, 1, 1, '110,111')"
+        )
+    )
+    await test_db_session.commit()
+
+    service = EngagementsService(EngagementsRepository())
+    engagement = await service.create_b2c_engagement(
+        test_db_session,
+        user_first_name="Test",
+        engagement_date=date(2026, 2, 1),
+        city="Mumbai",
+        assessment_package_id=1,
+        diagnostic_package_id=1,
+    )
+    await test_db_session.commit()
+
+    repository = EngagementsRepository()
+    assignments = await repository.list_onboarding_assistants(
+        test_db_session, engagement_id=engagement.engagement_id
+    )
+    assigned_ids = sorted(a.employee_id for a in assignments)
+    assert assigned_ids == [110, 111]

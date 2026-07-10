@@ -8,14 +8,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.assessments.models import AssessmentPackage
 from modules.diagnostics.models import DiagnosticPackage
+from modules.employee.access_control import ONBOARDING_ASSISTANT_ASSIGNEE_ROLES
+from modules.employee.models import EmployeeRole
+from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.service import DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
 from modules.audit.service import AuditService
 from modules.notifications.repository import NotificationsRepository
-from modules.platform_settings.repository import PlatformSettingsRepository
+from modules.platform_settings.repository import (
+    PlatformSettingsRepository,
+    parse_comma_separated_employee_ids,
+    serialize_comma_separated_employee_ids,
+)
 from modules.platform_settings.schemas import (
     B2cOnboardingDefaultsRead,
     B2cOnboardingDefaultsUpdate,
+    DefaultOnboardingAssistantItem,
+    DefaultOnboardingAssistantsRead,
+    DefaultOnboardingAssistantsUpdate,
     EngagementNotificationDefaultsRead,
     EngagementNotificationDefaultsUpdate,
 )
@@ -29,10 +39,12 @@ class PlatformSettingsService:
         repository: PlatformSettingsRepository,
         audit_service: AuditService | None = None,
         notifications_repository: NotificationsRepository | None = None,
+        employee_repository: EmployeeRepository | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
         self._notifications_repository = notifications_repository or NotificationsRepository()
+        self._employee_repository = employee_repository or EmployeeRepository()
 
     async def resolve_b2c_default_package_ids(self, db: AsyncSession) -> tuple[int, int]:
         row = await self._repository.get_by_id(db)
@@ -219,3 +231,101 @@ class PlatformSettingsService:
             )
 
         return await self.get_engagement_notification_defaults(db)
+
+    async def _validate_default_onboarding_assistant_ids(
+        self,
+        db: AsyncSession,
+        employee_ids: list[int],
+    ) -> list[int]:
+        normalized: list[int] = []
+        seen: set[int] = set()
+        for raw in employee_ids:
+            if not isinstance(raw, int) or raw <= 0 or raw in seen:
+                continue
+            seen.add(raw)
+            row = await self._employee_repository.get_by_id_with_user_names(db, raw)
+            if row is None:
+                raise AppError(
+                    status_code=404,
+                    error_code="EMPLOYEE_NOT_FOUND",
+                    message=f"Employee with ID {raw} does not exist",
+                )
+            emp, _first_name, _last_name = row
+            if (emp.status or "").lower() != "active":
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_ONBOARDING_ASSISTANT",
+                    message=f"Employee {raw} is not active",
+                )
+            if emp.role not in ONBOARDING_ASSISTANT_ASSIGNEE_ROLES:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_ONBOARDING_ASSISTANT",
+                    message=f"Employee {raw} cannot be assigned as an onboarding assistant",
+                )
+            normalized.append(raw)
+        return normalized
+
+    async def _build_default_onboarding_assistants_read(
+        self,
+        db: AsyncSession,
+        employee_ids: list[int],
+    ) -> DefaultOnboardingAssistantsRead:
+        assistants: list[DefaultOnboardingAssistantItem] = []
+        for emp_id in employee_ids:
+            row = await self._employee_repository.get_by_id_with_user_names(db, emp_id)
+            if row is None:
+                continue
+            emp, first_name, last_name = row
+            assistants.append(
+                DefaultOnboardingAssistantItem(
+                    employee_id=emp.employee_id,
+                    user_id=emp.user_id,
+                    role=emp.role.value if isinstance(emp.role, EmployeeRole) else str(emp.role),
+                    status=emp.status,
+                    first_name=first_name,
+                    last_name=last_name,
+                )
+            )
+        return DefaultOnboardingAssistantsRead(employee_ids=employee_ids, assistants=assistants)
+
+    async def get_default_onboarding_assistants(self, db: AsyncSession) -> DefaultOnboardingAssistantsRead:
+        row = await self._repository.get_by_id(db)
+        employee_ids = parse_comma_separated_employee_ids(
+            row.default_onboarding_assistant_employee_ids if row else None
+        )
+        return await self._build_default_onboarding_assistants_read(db, employee_ids)
+
+    async def update_default_onboarding_assistants(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        payload: DefaultOnboardingAssistantsUpdate,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> DefaultOnboardingAssistantsRead:
+        normalized_ids = await self._validate_default_onboarding_assistant_ids(db, payload.employee_ids)
+        serialized = serialize_comma_separated_employee_ids(normalized_ids)
+        a_id, d_id = await self.resolve_b2c_default_package_ids(db)
+        await self._repository.upsert_default_onboarding_assistants(
+            db,
+            default_onboarding_assistant_employee_ids=serialized,
+            updated_by_user_id=employee.user_id,
+            assessment_package_id=a_id,
+            diagnostic_package_id=d_id,
+        )
+
+        if self._audit_service is not None:
+            await self._audit_service.log_event(
+                db,
+                action="EMPLOYEE_UPDATE_DEFAULT_ONBOARDING_ASSISTANTS",
+                endpoint=endpoint,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                user_id=employee.user_id,
+                session_id=None,
+            )
+
+        return await self._build_default_onboarding_assistants_read(db, normalized_ids)

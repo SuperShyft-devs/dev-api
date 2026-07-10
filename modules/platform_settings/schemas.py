@@ -43,3 +43,21 @@ class MetsightsProfilesStatsRead(BaseModel):
     local_without_metsights_profile_id: int
     metsights_total: int
     estimated_not_imported: int
+
+
+class DefaultOnboardingAssistantItem(BaseModel):
+    employee_id: int
+    user_id: int
+    role: str
+    status: str
+    first_name: str | None = None
+    last_name: str | None = None
+
+
+class DefaultOnboardingAssistantsRead(BaseModel):
+    employee_ids: list[int]
+    assistants: list[DefaultOnboardingAssistantItem]
+
+
+class DefaultOnboardingAssistantsUpdate(BaseModel):
+    employee_ids: list[int] = Field(default_factory=list)

@@ -29,5 +29,6 @@ class PlatformSettings(Base):
     default_questionnaire_reminder_2 = Column(String(500), nullable=True)
     default_blood_report_notification = Column(String(500), nullable=True)
     default_bioai_report_notification = Column(String(500), nullable=True)
+    default_onboarding_assistant_employee_ids = Column(String(500), nullable=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     updated_by_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)

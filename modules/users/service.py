@@ -1730,7 +1730,7 @@ class UsersService:
         )
 
         # Create a new engagement for this user.
-        # B2C engagements are created with no onboarding assistants by default.
+        # B2C engagements auto-assign default onboarding assistants from platform settings.
         engagement = await self._engagements_service.create_b2c_engagement(
             db,
             user_first_name=user.first_name,

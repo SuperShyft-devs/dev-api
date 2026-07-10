@@ -135,6 +135,16 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+    await test_db_session.execute(text("DELETE FROM platform_settings"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO platform_settings "
+            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
+            "default_onboarding_assistant_employee_ids) "
+            "VALUES (1, 1, 1, '10')"
+        )
+    )
+    await test_db_session.commit()
 
     payload = {
         "engagement_name": "Camp",
@@ -160,6 +170,14 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
     detail_data = body.get("data", body)
     assert detail_data["onboarding_notification"] == "booking-alert-whatsapp"
     assert detail_data["camp_no"] == 1010226
+
+    assistants = await async_client.get(
+        f"/engagements/{engagement_id}/onboarding-assistants",
+        headers=_auth_header(7002),
+    )
+    assert assistants.status_code == 200
+    assistant_ids = sorted(a["employee_id"] for a in assistants.json()["data"])
+    assert assistant_ids == [10]
 
 
 @pytest.mark.asyncio
