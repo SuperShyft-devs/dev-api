@@ -3,32 +3,32 @@
     {
       "parameters": {
         "content": "## Send Health Assessment Reminder WhatsApp Metsights\nSends camp17 incomplete health assessment reminder to each member.\nExpects: { notification_id, members: [{ first_name, phone }] }",
-        "height": 560,
-        "width": 1984
+        "height": 672,
+        "width": 2336
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        1952,
+        4448,
         3328
       ],
       "typeVersion": 1,
-      "id": "51f66a17-38c5-4dfc-a934-d7fc70f9eb73",
-      "name": "Sticky Note HA Reminder"
+      "id": "95950761-b31c-4c2d-82c4-432da78f8af3",
+      "name": "Sticky Note HA Reminder1"
     },
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "assessment-reminder-whatsapp-metsights-v2",
+        "path": "assessment-reminder-whatsapp-metsights-v3",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        2080,
+        4576,
         3520
       ],
-      "id": "fd291d5b-1194-4b4d-95fa-a2a2e0db198a",
-      "name": "HA Reminder WhatsApp",
+      "id": "04d9294a-e6ff-4849-ba21-48e180d94ae8",
+      "name": "HA Reminder WhatsApp1",
       "webhookId": "i79j7kl2-5678-9012-efgh-ha005reminder"
     },
     {
@@ -78,11 +78,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2288,
+        4784,
         3520
       ],
-      "id": "74f3fc41-d631-4e05-87cd-28997c357c19",
-      "name": "Validate Payload"
+      "id": "09698c1c-57b9-4bbc-8570-96f91a6ddd21",
+      "name": "Validate Payload1"
     },
     {
       "parameters": {
@@ -92,11 +92,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2768,
+        5264,
         3504
       ],
-      "id": "79234142-c60d-412b-a671-846ef52eca5f",
-      "name": "Prepare HA Reminder Message"
+      "id": "943a539d-4f9e-41b9-8af4-946f743a9f23",
+      "name": "Prepare HA Reminder Message1"
     },
     {
       "parameters": {
@@ -119,11 +119,11 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2992,
+        5488,
         3504
       ],
-      "id": "323a00a3-71c1-4585-bb8e-696c36c6eec4",
-      "name": "Send HA Reminder WhatsApp",
+      "id": "c58cb27e-dbdd-4979-97a4-42c70010713f",
+      "name": "Send HA Reminder WhatsApp1",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
       "onError": "continueErrorOutput"
@@ -135,7 +135,7 @@
             {
               "id": "resp-valfail-001",
               "name": "notification_id",
-              "value": "={{ $('HA Reminder WhatsApp').item.json.body.notification_id }}",
+              "value": "={{ $('HA Reminder WhatsApp1').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -157,40 +157,40 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2512,
-        3696
+        5008,
+        3760
       ],
-      "id": "e0de1afe-0598-41f2-904b-68305c1918df",
-      "name": "Validation Failed Response"
+      "id": "884a9469-a9eb-4cc1-a696-50564877e38e",
+      "name": "Validation Failed Response1"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
-        "options": {},
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        3680,
-        3696
+        6576,
+        3776
       ],
-      "id": "54be9601-b1db-40cd-a774-397d8406fa9c",
-      "name": "Callback",
+      "id": "f0d39f12-75a1-4a18-bbca-10f07400b8ee",
+      "name": "Callback1",
       "alwaysOutputData": true,
       "retryOnFail": true,
-      "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
           "id": "djiMPtATquR2OnRc",
           "name": "Notification Header Auth | api.supershyft"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -199,11 +199,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2512,
+        5008,
         3504
       ],
-      "id": "5bc7781a-1cb3-4ce9-8c19-4d30026cb3e7",
-      "name": "Split Members5"
+      "id": "cd538f18-2c69-4ec1-901c-24225180c506",
+      "name": "Split Members11"
     },
     {
       "parameters": {
@@ -212,7 +212,7 @@
             {
               "id": "resp-sent-001",
               "name": "notification_id",
-              "value": "={{ $('Prepare HA Reminder Message').item.json.notification_id }}",
+              "value": "={{ $('Prepare HA Reminder Message1').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -234,11 +234,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3344,
-        3488
+        6208,
+        3472
       ],
-      "id": "b69de02d-1a1c-4685-a1ae-10c4edcecd7b",
-      "name": "WhatsApp Sent Response6"
+      "id": "90267890-5b92-40b5-92cf-47127ed5b41d",
+      "name": "WhatsApp Sent Response10"
     },
     {
       "parameters": {
@@ -247,7 +247,7 @@
             {
               "id": "resp-fail-001",
               "name": "notification_id",
-              "value": "={{ $('Prepare HA Reminder Message').item.json.notification_id }}",
+              "value": "={{ $('Prepare HA Reminder Message1').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -269,11 +269,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3200,
-        3584
+        5808,
+        3680
       ],
-      "id": "e4c09b29-293b-4f9d-8f4f-a9f2b34cc9de",
-      "name": "WhatsApp Failed Response6"
+      "id": "f97eeb2c-ee44-4d8b-b3e3-4babe39ee4c2",
+      "name": "WhatsApp Failed Response10"
     },
     {
       "parameters": {
@@ -303,11 +303,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3168,
+        5808,
         3488
       ],
-      "id": "f0be8eb3-f9ac-4bd9-9b98-e3701af1fbd1",
-      "name": "WhatAPI Accepted?"
+      "id": "58aa0f60-f731-4379-be67-ce12634de3cc",
+      "name": "WhatAPI Accepted?3"
     },
     {
       "parameters": {
@@ -316,7 +316,7 @@
             {
               "id": "a0fed3ba-9ece-421c-b334-63ecd4d043f2",
               "name": "notification_id",
-              "value": "={{ $('Prepare HA Reminder Message').item.json.notification_id }}",
+              "value": "={{ $('Prepare HA Reminder Message1').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -338,139 +338,139 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3168,
-        3664
+        6032,
+        3584
       ],
-      "id": "69f7fcfe-70fd-4b8b-8ed7-ca5d18cd7b0c",
-      "name": "WhatAPI Not Accepted"
+      "id": "1747e495-d2af-4d93-aaa8-322ac8c62d87",
+      "name": "WhatAPI Not Accepted3"
     }
   ],
   "connections": {
-    "HA Reminder WhatsApp": {
+    "HA Reminder WhatsApp1": {
       "main": [
         [
           {
-            "node": "Validate Payload",
+            "node": "Validate Payload1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate Payload": {
+    "Validate Payload1": {
       "main": [
         [
           {
-            "node": "Split Members5",
+            "node": "Split Members11",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Validation Failed Response",
+            "node": "Validation Failed Response1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare HA Reminder Message": {
+    "Prepare HA Reminder Message1": {
       "main": [
         [
           {
-            "node": "Send HA Reminder WhatsApp",
+            "node": "Send HA Reminder WhatsApp1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send HA Reminder WhatsApp": {
+    "Send HA Reminder WhatsApp1": {
       "main": [
         [
           {
-            "node": "WhatAPI Accepted?",
+            "node": "WhatAPI Accepted?3",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "WhatsApp Failed Response6",
+            "node": "WhatsApp Failed Response10",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validation Failed Response": {
+    "Validation Failed Response1": {
       "main": [
         [
           {
-            "node": "Callback",
+            "node": "Callback1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Split Members5": {
+    "Split Members11": {
       "main": [
         [
           {
-            "node": "Prepare HA Reminder Message",
+            "node": "Prepare HA Reminder Message1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "WhatsApp Sent Response6": {
+    "WhatsApp Sent Response10": {
       "main": [
         [
           {
-            "node": "Callback",
+            "node": "Callback1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "WhatsApp Failed Response6": {
+    "WhatsApp Failed Response10": {
       "main": [
         [
           {
-            "node": "Callback",
+            "node": "Callback1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "WhatAPI Accepted?": {
+    "WhatAPI Accepted?3": {
       "main": [
         [
           {
-            "node": "WhatsApp Sent Response6",
+            "node": "WhatsApp Sent Response10",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "WhatAPI Not Accepted",
+            "node": "WhatAPI Not Accepted3",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "WhatAPI Not Accepted": {
+    "WhatAPI Not Accepted3": {
       "main": [
         [
           {
-            "node": "Callback",
+            "node": "Callback1",
             "type": "main",
             "index": 0
           }

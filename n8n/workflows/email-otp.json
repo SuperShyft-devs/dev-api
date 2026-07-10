@@ -8,27 +8,27 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -416,
+        2032,
         -32
       ],
       "typeVersion": 1,
-      "id": "53ede8b4-c382-4de6-8f66-a1eabe16d812",
-      "name": "Sticky Note OTP Email"
+      "id": "9a83e2dc-bb3b-40f3-87cc-af3409d45d4d",
+      "name": "Sticky Note OTP Email1"
     },
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "send-otp-email-v2",
+        "path": "send-otp-email-v3",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -288,
+        2160,
         160
       ],
-      "id": "0f9f8947-c394-42e6-9c47-a7b85b3a3929",
-      "name": "OTP Email",
+      "id": "c1ca7dbf-f136-4483-bbe3-06fc1b3c748d",
+      "name": "OTP Email1",
       "webhookId": "g57h5ij0-3456-7890-cdef-otp003email1"
     },
     {
@@ -78,11 +78,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -80,
+        2368,
         160
       ],
-      "id": "f9b2349d-0a73-4a6c-9db5-d3a9892b4b2f",
-      "name": "Validate Payload"
+      "id": "8c941008-b2aa-437c-9ddc-a0a2a7e5101a",
+      "name": "Validate Payload2"
     },
     {
       "parameters": {
@@ -91,11 +91,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        144,
+        2592,
         144
       ],
-      "id": "e11ff3ca-7f7c-40e5-9d83-c3c4ad9729f4",
-      "name": "Split Members"
+      "id": "c4092c2a-7fb7-454b-98a6-e6cb14eba99a",
+      "name": "Split Members2"
     },
     {
       "parameters": {
@@ -105,11 +105,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        368,
+        2816,
         144
       ],
-      "id": "0d954817-7ae1-48dc-a484-feec5168254a",
-      "name": "Prepare OTP Email"
+      "id": "ffdf985b-b5d5-4a75-9246-415631398611",
+      "name": "Prepare OTP Email1"
     },
     {
       "parameters": {
@@ -124,11 +124,11 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        592,
+        3040,
         144
       ],
-      "id": "871753e9-e060-4555-92f4-81bf9a36e9f2",
-      "name": "Send OTP Email",
+      "id": "509540f2-2979-4922-bc62-58762bb4e98c",
+      "name": "Send OTP Email1",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
       "webhookId": "67a42148-3bc1-467f-bb1b-cabd84103ac8",
@@ -147,7 +147,7 @@
             {
               "id": "resp-sent-001",
               "name": "notification_id",
-              "value": "={{ $('Prepare OTP Email').item.json.notification_id }}",
+              "value": "={{ $('Prepare OTP Email1').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -169,11 +169,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1008,
+        3456,
         128
       ],
-      "id": "7211ca4d-104a-4dbd-8426-e328b4c1642c",
-      "name": "Email Sent Response"
+      "id": "13f86b18-a905-414b-b5d0-fbd6b3f88e4f",
+      "name": "Email Sent Response1"
     },
     {
       "parameters": {
@@ -182,7 +182,7 @@
             {
               "id": "resp-fail-001",
               "name": "notification_id",
-              "value": "={{ $('Prepare OTP Email').item.json.notification_id }}",
+              "value": "={{ $('Prepare OTP Email1').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -204,11 +204,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        832,
+        3280,
         224
       ],
-      "id": "9511825c-e91a-4d80-adf8-df0e73ed0b56",
-      "name": "Email Failed Response"
+      "id": "fed84b8a-c0a5-4a4e-9c9e-256cb06db862",
+      "name": "Email Failed Response1"
     },
     {
       "parameters": {
@@ -217,7 +217,7 @@
             {
               "id": "resp-valfail-001",
               "name": "notification_id",
-              "value": "={{ $('OTP Email').item.json.body.notification_id }}",
+              "value": "={{ $('OTP Email1').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -239,139 +239,139 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        144,
+        2592,
         336
       ],
-      "id": "c204d1a7-66ce-44eb-8aad-2266e457ba08",
-      "name": "Validation Failed Response"
+      "id": "b333135e-a600-40f7-8211-56af87af5d57",
+      "name": "Validation Failed Response2"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
-        "options": {},
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1312,
+        3760,
         336
       ],
-      "id": "30ee59e3-895f-49f6-b6b5-db28cdb1053a",
-      "name": "Callback",
+      "id": "295a545f-51bf-4a41-aa9c-2a4e3611d54a",
+      "name": "Callback2",
       "alwaysOutputData": true,
       "retryOnFail": true,
-      "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
           "id": "djiMPtATquR2OnRc",
           "name": "Notification Header Auth | api.supershyft"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
-    "OTP Email": {
+    "OTP Email1": {
       "main": [
         [
           {
-            "node": "Validate Payload",
+            "node": "Validate Payload2",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate Payload": {
+    "Validate Payload2": {
       "main": [
         [
           {
-            "node": "Split Members",
+            "node": "Split Members2",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Validation Failed Response",
+            "node": "Validation Failed Response2",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Split Members": {
+    "Split Members2": {
       "main": [
         [
           {
-            "node": "Prepare OTP Email",
+            "node": "Prepare OTP Email1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare OTP Email": {
+    "Prepare OTP Email1": {
       "main": [
         [
           {
-            "node": "Send OTP Email",
+            "node": "Send OTP Email1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send OTP Email": {
+    "Send OTP Email1": {
       "main": [
         [
           {
-            "node": "Email Sent Response",
+            "node": "Email Sent Response1",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Email Failed Response",
+            "node": "Email Failed Response1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Email Sent Response": {
+    "Email Sent Response1": {
       "main": [
         [
           {
-            "node": "Callback",
+            "node": "Callback2",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Email Failed Response": {
+    "Email Failed Response1": {
       "main": [
         [
           {
-            "node": "Callback",
+            "node": "Callback2",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validation Failed Response": {
+    "Validation Failed Response2": {
       "main": [
         [
           {
-            "node": "Callback",
+            "node": "Callback2",
             "type": "main",
             "index": 0
           }

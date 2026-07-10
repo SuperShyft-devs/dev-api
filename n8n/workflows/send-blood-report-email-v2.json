@@ -2,33 +2,68 @@
   "nodes": [
     {
       "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "url-notfound-001",
+              "name": "notification_id",
+              "value": "={{ $('Split Members13').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "url-notfound-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "url-notfound-003",
+              "name": "message",
+              "value": "Blood report URL not found",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        10592,
+        3040
+      ],
+      "id": "4ffdc0e0-802b-4009-a34b-54f9ab6eb94e",
+      "name": "URL Not Found Response"
+    },
+    {
+      "parameters": {
         "content": "## Send Blood Report Email\nEmails blood report to each member.\nExpects: { notification_id, engagement_id, members: [{ first_name, email, phone, blood_report_url }] }",
         "height": 672,
         "width": 2304
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        2880,
-        2768
+        9584,
+        2720
       ],
       "typeVersion": 1,
-      "id": "b47f2fec-8bab-4fc3-b9c5-94fab9dcd6a6",
-      "name": "Sticky Note Blood Email"
+      "id": "4bcbd5fc-f7ea-4930-9882-0f42a4fd006f",
+      "name": "Sticky Note Blood Email2"
     },
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "send-blood-report-email-v2",
+        "path": "send-blood-report-email-v4",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        2976,
-        2960
+        9680,
+        2912
       ],
-      "id": "d92c10de-c9aa-4933-a081-7fd596400089",
-      "name": "Blood Report Email",
+      "id": "0496f4ac-3ad8-45a5-81aa-3dcf3fd45578",
+      "name": "Blood Report Email2",
       "webhookId": "e35f3gh8-1234-5678-abcd-blood001email"
     },
     {
@@ -78,11 +113,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3184,
-        2960
+        9888,
+        2912
       ],
-      "id": "d4791b4d-c260-4e5c-92f6-2a97cb2747e2",
-      "name": "Validate Payload2"
+      "id": "69b054bc-bf8a-46f6-8ccd-e8a899d9e52a",
+      "name": "Validate Payload8"
     },
     {
       "parameters": {
@@ -91,11 +126,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3408,
-        2944
+        10112,
+        2896
       ],
-      "id": "1e995618-6e01-41f1-870e-519576f50922",
-      "name": "Split Members3"
+      "id": "524466d8-f09d-4b12-bb42-d7e982af5907",
+      "name": "Split Members13"
     },
     {
       "parameters": {
@@ -134,60 +169,25 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3648,
-        2944
+        10352,
+        2896
       ],
-      "id": "c3d4e5f6-url3-4003-b003-000000000001",
-      "name": "URL Exists?"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "url-notfound-001",
-              "name": "notification_id",
-              "value": "={{ $('Split Members3').item.json.notification_id }}",
-              "type": "number"
-            },
-            {
-              "id": "url-notfound-002",
-              "name": "status",
-              "value": "failed",
-              "type": "string"
-            },
-            {
-              "id": "url-notfound-003",
-              "name": "message",
-              "value": "Blood report URL not found",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        3872,
-        3136
-      ],
-      "id": "c3d4e5f6-url3-4003-b003-000000000002",
-      "name": "URL Not Found Response"
+      "id": "ffd1532e-f32b-45e5-99c8-c8867f742d33",
+      "name": "URL Exists?2"
     },
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const member = $('Split Members3').item.json;\nconst fileUrl = member.blood_report_url;\nconst name = (member.first_name || 'Participant').trim();\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<body>\n  <div class=\"container\">\n    <p>Hi ${name},</p>\n    <p>Thank you for completing your blood collection with Supershyft.</p>\n    <p>Please find your blood test report attached to this email for your reference. Please review the report carefully.</p>\n    <p>Your personalized Bio-AI Health Report, which offers a more comprehensive understanding of your health insights and preventive risk analysis, will be shared separately once you complete the health assessment on the Supershyft app.</p>\n    <p>You can also access your reports and health insights through:<br>\n    <a href=\"${fileUrl}\">Blood Report</a></p>\n    <p>Please log in using your registered mobile number and OTP.</p>\n    <p>If you need any assistance or have questions regarding your reports, feel free to reach out to our support team.</p>\n    <p>Warm regards,<br>\n    Support Team<br>\n    Supershyft<br>\n    <a href=\"https://www.supershyft.com\">www.supershyft.com</a></p>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    engagement_id: member.engagement_id,\n    to: member.email,\n    subject: 'Supershyft Blood Report',\n    htmlBody,\n    fileUrl\n  }\n};"
+        "jsCode": "const member = $('Split Members13').item.json;\nconst fileUrl = member.blood_report_url;\nconst name = (member.first_name || 'Participant').trim();\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<body>\n  <div class=\"container\">\n    <p>Hi ${name},</p>\n    <p>Thank you for completing your blood collection with Supershyft.</p>\n    <p>Please find your blood test report attached to this email for your reference. Please review the report carefully.</p>\n    <p>Your personalized Bio-AI Health Report, which offers a more comprehensive understanding of your health insights and preventive risk analysis, will be shared separately once you complete the health assessment on the Supershyft app.</p>\n    <p>You can also access your reports and health insights through:<br>\n    <a href=\"${fileUrl}\">Blood Report</a></p>\n    <p>Please log in using your registered mobile number and OTP.</p>\n    <p>If you need any assistance or have questions regarding your reports, feel free to reach out to our support team.</p>\n    <p>Warm regards,<br>\n    Support Team<br>\n    Supershyft<br>\n    <a href=\"https://www.supershyft.com\">www.supershyft.com</a></p>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    engagement_id: member.engagement_id,\n    to: member.email,\n    subject: 'Supershyft Blood Report',\n    htmlBody,\n    fileUrl\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3872,
-        2864
+        10576,
+        2816
       ],
-      "id": "4007d1d5-1511-492f-96b3-00e9a8b33a8a",
-      "name": "Prepare Email2"
+      "id": "d37915fa-0dbe-4dfa-93ec-c5bcf70fae07",
+      "name": "Prepare Email8"
     },
     {
       "parameters": {
@@ -203,11 +203,11 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        4096,
-        2864
+        10800,
+        2816
       ],
-      "id": "111fc449-4813-414f-ad7d-bc367e52c25e",
-      "name": "Send Blood Report Email",
+      "id": "7a8f090b-1c3f-4df6-9b89-ff9546c45689",
+      "name": "Send Blood Report Email2",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
       "webhookId": "938be4d8-9c2f-48a4-8027-36fd4f74118e",
@@ -226,7 +226,7 @@
             {
               "id": "resp-sent-001",
               "name": "notification_id",
-              "value": "={{ $('Prepare Email2').item.json.notification_id }}",
+              "value": "={{ $('Prepare Email8').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -248,11 +248,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4416,
-        2848
+        11120,
+        2800
       ],
-      "id": "e4a16531-e320-46f3-bd4b-92eafb9cba36",
-      "name": "Email Sent Response"
+      "id": "d2fe406f-b6f5-4221-8f4e-b7867d9a81ce",
+      "name": "Email Sent Response4"
     },
     {
       "parameters": {
@@ -261,7 +261,7 @@
             {
               "id": "resp-fail-001",
               "name": "notification_id",
-              "value": "={{ $('Prepare Email2').item.json.notification_id }}",
+              "value": "={{ $('Prepare Email8').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -283,11 +283,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4304,
-        3008
+        11008,
+        2960
       ],
-      "id": "8828b2b6-1add-4749-9751-2d37df680dd5",
-      "name": "Email Failed Response"
+      "id": "8e899cd2-59a2-4671-a109-553d3062a23b",
+      "name": "Email Failed Response4"
     },
     {
       "parameters": {
@@ -296,7 +296,7 @@
             {
               "id": "resp-valFail-001",
               "name": "notification_id",
-              "value": "={{ $('Blood Report Email').item.json.body.notification_id }}",
+              "value": "={{ $('Blood Report Email2').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -318,11 +318,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3408,
-        3216
+        10112,
+        3168
       ],
-      "id": "df73a0ab-cded-4340-a974-7dcf5d2f2aaa",
-      "name": "Validation Failed Response"
+      "id": "996b53d3-fccf-460a-983a-36617d0c2047",
+      "name": "Validation Failed Response4"
     },
     {
       "parameters": {
@@ -338,68 +338,79 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        4944,
-        3216
+        11600,
+        3184
       ],
-      "id": "57c3e781-4996-4524-8221-aa1f296ceb77",
-      "name": "Callback2",
+      "id": "e9adebbc-e448-4d8c-8e24-a8271a1e4a2a",
+      "name": "Callback8",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
       "credentials": {
         "httpHeaderAuth": {
           "id": "djiMPtATquR2OnRc",
           "name": "Notification Header Auth | api.supershyft"
         }
       },
-      "alwaysOutputData": true,
-      "retryOnFail": true,
       "onError": "continueRegularOutput"
     }
   ],
   "connections": {
-    "Blood Report Email": {
+    "URL Not Found Response": {
       "main": [
         [
           {
-            "node": "Validate Payload2",
+            "node": "Callback8",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate Payload2": {
+    "Blood Report Email2": {
       "main": [
         [
           {
-            "node": "Split Members3",
+            "node": "Validate Payload8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload8": {
+      "main": [
+        [
+          {
+            "node": "Split Members13",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Validation Failed Response",
+            "node": "Validation Failed Response4",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Split Members3": {
+    "Split Members13": {
       "main": [
         [
           {
-            "node": "URL Exists?",
+            "node": "URL Exists?2",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "URL Exists?": {
+    "URL Exists?2": {
       "main": [
         [
           {
-            "node": "Prepare Email2",
+            "node": "Prepare Email8",
             "type": "main",
             "index": 0
           }
@@ -413,73 +424,62 @@
         ]
       ]
     },
-    "Prepare Email2": {
+    "Prepare Email8": {
       "main": [
         [
           {
-            "node": "Send Blood Report Email",
+            "node": "Send Blood Report Email2",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send Blood Report Email": {
+    "Send Blood Report Email2": {
       "main": [
         [
           {
-            "node": "Email Sent Response",
+            "node": "Email Sent Response4",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Email Failed Response",
+            "node": "Email Failed Response4",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Email Sent Response": {
+    "Email Sent Response4": {
       "main": [
         [
           {
-            "node": "Callback2",
+            "node": "Callback8",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Email Failed Response": {
+    "Email Failed Response4": {
       "main": [
         [
           {
-            "node": "Callback2",
+            "node": "Callback8",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "URL Not Found Response": {
+    "Validation Failed Response4": {
       "main": [
         [
           {
-            "node": "Callback2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Validation Failed Response": {
-      "main": [
-        [
-          {
-            "node": "Callback2",
+            "node": "Callback8",
             "type": "main",
             "index": 0
           }

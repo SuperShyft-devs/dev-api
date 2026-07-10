@@ -8,27 +8,27 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        2864,
-        3712
+        9584,
+        3664
       ],
       "typeVersion": 1,
-      "id": "54780ff6-e0de-4c25-a1b5-12206e0b5aaf",
-      "name": "Sticky Note BioAI Email"
+      "id": "dc097809-fa03-4e18-b814-61fcdaa9c0de",
+      "name": "Sticky Note BioAI Email2"
     },
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "send-bioai-report-email-v2",
+        "path": "send-bioai-report-email-v4",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        2960,
-        3904
+        9680,
+        3856
       ],
-      "id": "a769c77d-16d4-4cae-a365-e75e4ebb4e02",
-      "name": "BioAI Report Email",
+      "id": "48bc4f06-4772-4f4b-8993-6c45d9d51ce5",
+      "name": "BioAI Report Email2",
       "webhookId": "f46g4hi9-2345-6789-bcde-bioai002email"
     },
     {
@@ -78,11 +78,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3168,
-        3904
+        9888,
+        3856
       ],
-      "id": "f6bf7304-2c74-43a3-ac50-bf51641cc245",
-      "name": "Validate Payload3"
+      "id": "18d38a1f-0a09-47af-9d3d-9fdf09496508",
+      "name": "Validate Payload9"
     },
     {
       "parameters": {
@@ -91,11 +91,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3392,
-        3888
+        10112,
+        3840
       ],
-      "id": "b9196ee1-dadd-4950-a0dc-3ce59fbc6642",
-      "name": "Split Members4"
+      "id": "f496bbe3-7b88-45db-8df8-93594a1425e5",
+      "name": "Split Members14"
     },
     {
       "parameters": {
@@ -134,11 +134,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3632,
-        3888
+        10352,
+        3840
       ],
-      "id": "d4e5f6a7-url4-4004-b004-000000000001",
-      "name": "URL Exists?"
+      "id": "f6db1509-8563-496d-b285-9815dfc15888",
+      "name": "URL Exists?3"
     },
     {
       "parameters": {
@@ -147,7 +147,7 @@
             {
               "id": "url-notfound-001",
               "name": "notification_id",
-              "value": "={{ $('Split Members4').item.json.notification_id }}",
+              "value": "={{ $('Split Members14').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -169,25 +169,25 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3856,
-        4080
+        10608,
+        3984
       ],
-      "id": "d4e5f6a7-url4-4004-b004-000000000002",
-      "name": "URL Not Found Response"
+      "id": "254154da-7249-41dd-a112-c3fe9e703ffb",
+      "name": "URL Not Found Response1"
     },
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const member = $('Split Members4').item.json;\nconst fileUrl = member.bio_ai_report_url;\nconst name = (member.first_name || 'Participant').trim();\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<body>\n  <div class=\"container\">\n    <p>Hi ${name},</p>\n    <p>Thank you for completing your Bio-AI health assessment with Supershyft.</p>\n    <p>Please find your personalized Bio-AI Health Report attached to this email. The report combines your blood biomarkers and lifestyle inputs to provide deeper insights into your metabolic health, potential future risk areas, and preventive health recommendations.</p>\n    <p>You can also access and review your reports and insights through:<br>\n    <a href=\"${fileUrl}\">BioAI Report</a></p>\n    <p>Please log in using your registered mobile number and OTP.</p>\n    <p>If you need any assistance accessing your reports or understanding the findings, please feel free to reach out to our support team.</p>\n    <p>Warm regards,<br>\n    Support Team<br>\n    Supershyft<br>\n    <a href=\"https://www.supershyft.com\">www.supershyft.com</a></p>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    engagement_id: member.engagement_id,\n    to: member.email,\n    subject: 'Your Personalized Bio-AI Health Report',\n    htmlBody,\n    fileUrl\n  }\n};"
+        "jsCode": "const member = $('Split Members14').item.json;\nconst fileUrl = member.bio_ai_report_url;\nconst name = (member.first_name || 'Participant').trim();\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<body>\n  <div class=\"container\">\n    <p>Hi ${name},</p>\n    <p>Thank you for completing your Bio-AI health assessment with Supershyft.</p>\n    <p>Please find your personalized Bio-AI Health Report attached to this email. The report combines your blood biomarkers and lifestyle inputs to provide deeper insights into your metabolic health, potential future risk areas, and preventive health recommendations.</p>\n    <p>You can also access and review your reports and insights through:<br>\n    <a href=\"${fileUrl}\">BioAI Report</a></p>\n    <p>Please log in using your registered mobile number and OTP.</p>\n    <p>If you need any assistance accessing your reports or understanding the findings, please feel free to reach out to our support team.</p>\n    <p>Warm regards,<br>\n    Support Team<br>\n    Supershyft<br>\n    <a href=\"https://www.supershyft.com\">www.supershyft.com</a></p>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    engagement_id: member.engagement_id,\n    to: member.email,\n    subject: 'Your Personalized Bio-AI Health Report',\n    htmlBody,\n    fileUrl\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3856,
-        3808
+        10576,
+        3760
       ],
-      "id": "96c75b65-b328-4393-bc61-5252bc7d77bb",
-      "name": "Prepare Email3"
+      "id": "046bcb59-fbba-4e70-8aa8-acdb23c581a1",
+      "name": "Prepare Email9"
     },
     {
       "parameters": {
@@ -203,11 +203,11 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        4080,
-        3808
+        10800,
+        3760
       ],
-      "id": "582d0379-fd13-4c42-a1f7-ea9f3a5be6ba",
-      "name": "Send BioAI Report Email",
+      "id": "6c8584d7-d1c3-44f6-a174-dc4f1e71d953",
+      "name": "Send BioAI Report Email2",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
       "webhookId": "3abdec11-5662-465a-81f4-a881a87a2505",
@@ -226,7 +226,7 @@
             {
               "id": "resp-sent-001",
               "name": "notification_id",
-              "value": "={{ $('Prepare Email3').item.json.notification_id }}",
+              "value": "={{ $('Prepare Email9').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -248,11 +248,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4416,
-        3792
+        11136,
+        3744
       ],
-      "id": "a7fe7bcd-b969-450b-bc55-32619c991cf3",
-      "name": "Email Sent Response1"
+      "id": "635edbb5-1cc8-48d7-b0b5-d7dc48cf50d0",
+      "name": "Email Sent Response5"
     },
     {
       "parameters": {
@@ -261,7 +261,7 @@
             {
               "id": "resp-fail-001",
               "name": "notification_id",
-              "value": "={{ $('Prepare Email3').item.json.notification_id }}",
+              "value": "={{ $('Prepare Email9').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -283,11 +283,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4304,
-        3904
+        11072,
+        3920
       ],
-      "id": "fae414aa-7ed1-423a-ab4b-9581d83c70b1",
-      "name": "Email Failed Response1"
+      "id": "d303444f-e035-448f-8934-374fc6ab449a",
+      "name": "Email Failed Response5"
     },
     {
       "parameters": {
@@ -296,7 +296,7 @@
             {
               "id": "resp-valfail-001",
               "name": "notification_id",
-              "value": "={{ $('BioAI Report Email').item.json.body.notification_id }}",
+              "value": "={{ $('BioAI Report Email2').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -318,11 +318,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3392,
-        4160
+        10112,
+        4112
       ],
-      "id": "dbd803ad-99ea-4bcd-ab82-c890b264297f",
-      "name": "Validation Failed Response1"
+      "id": "eaada525-7585-4d96-a77c-02810f843a9a",
+      "name": "Validation Failed Response5"
     },
     {
       "parameters": {
@@ -338,148 +338,148 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        5056,
-        4160
+        11776,
+        4112
       ],
-      "id": "e4fe57f0-0d00-4f9a-b232-2a91eb334e45",
-      "name": "Callback3",
+      "id": "77bf921d-30a1-4774-8299-e8f818d0cd6a",
+      "name": "Callback9",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
       "credentials": {
         "httpHeaderAuth": {
           "id": "djiMPtATquR2OnRc",
           "name": "Notification Header Auth | api.supershyft"
         }
       },
-      "alwaysOutputData": true,
-      "retryOnFail": true,
       "onError": "continueRegularOutput"
     }
   ],
   "connections": {
-    "BioAI Report Email": {
+    "BioAI Report Email2": {
       "main": [
         [
           {
-            "node": "Validate Payload3",
+            "node": "Validate Payload9",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate Payload3": {
+    "Validate Payload9": {
       "main": [
         [
           {
-            "node": "Split Members4",
+            "node": "Split Members14",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Validation Failed Response1",
+            "node": "Validation Failed Response5",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Split Members4": {
+    "Split Members14": {
       "main": [
         [
           {
-            "node": "URL Exists?",
+            "node": "URL Exists?3",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "URL Exists?": {
+    "URL Exists?3": {
       "main": [
         [
           {
-            "node": "Prepare Email3",
+            "node": "Prepare Email9",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "URL Not Found Response",
+            "node": "URL Not Found Response1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Email3": {
+    "URL Not Found Response1": {
       "main": [
         [
           {
-            "node": "Send BioAI Report Email",
+            "node": "Callback9",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send BioAI Report Email": {
+    "Prepare Email9": {
       "main": [
         [
           {
-            "node": "Email Sent Response1",
+            "node": "Send BioAI Report Email2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send BioAI Report Email2": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response5",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Email Failed Response1",
+            "node": "Email Failed Response5",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Email Sent Response1": {
+    "Email Sent Response5": {
       "main": [
         [
           {
-            "node": "Callback3",
+            "node": "Callback9",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Email Failed Response1": {
+    "Email Failed Response5": {
       "main": [
         [
           {
-            "node": "Callback3",
+            "node": "Callback9",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "URL Not Found Response": {
+    "Validation Failed Response5": {
       "main": [
         [
           {
-            "node": "Callback3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Validation Failed Response1": {
-      "main": [
-        [
-          {
-            "node": "Callback3",
+            "node": "Callback9",
             "type": "main",
             "index": 0
           }

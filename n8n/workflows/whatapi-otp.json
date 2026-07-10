@@ -2,33 +2,102 @@
   "nodes": [
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "417c2347-9399-4a3d-b757-268f6f1c2573",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3264,
+        848
+      ],
+      "id": "6ad9144b-319f-4979-a9c7-1cbeb4b7629a",
+      "name": "WhatAPI Accepted?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "24ff2cc4-2183-4793-8455-1124b3af9fcf",
+              "name": "notification_id",
+              "value": "={{ $('Prepare OTP Message1').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "260c3405-00ec-4b59-9ea6-35bf7476bf3c",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "618224a2-585b-45ad-9806-bf302e5bb874",
+              "name": "message",
+              "value": "WhatsApp sending failed: message not accepted",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3472,
+        960
+      ],
+      "id": "ffad884f-e950-4bba-854c-b46adbed179b",
+      "name": "WhatAPI Not Accepted"
+    },
+    {
+      "parameters": {
         "content": "## Send OTP WhatsApp\nSends OTP via WhatsApp to each member.\nExpects: { notification_id, members: [{ first_name, phone, otp }] }",
-        "height": 560,
-        "width": 1984
+        "height": 720,
+        "width": 2128
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -400,
+        2048,
         688
       ],
       "typeVersion": 1,
-      "id": "b1db14c7-99b9-401e-bde6-16a23bd46c01",
-      "name": "Sticky Note OTP WhatsApp"
+      "id": "cb9d6a31-8530-42e5-8c80-9f85d71cdca6",
+      "name": "Sticky Note OTP WhatsApp1"
     },
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "send-otp-whatsapp-v2",
+        "path": "send-otp-whatsapp-v3",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -272,
+        2176,
         880
       ],
-      "id": "108ba5bc-cb7a-4836-927d-ae0483a2b9ac",
-      "name": "OTP WhatsApp",
+      "id": "260b5d58-d831-404b-8fee-134ba2b1fbea",
+      "name": "OTP WhatsApp1",
       "webhookId": "h68i6jk1-4567-8901-defg-otp004whatsap"
     },
     {
@@ -39,11 +108,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
+        2848,
         864
       ],
-      "id": "ad9293fd-86bc-4214-a5e6-e44e9893ef74",
-      "name": "Prepare OTP Message"
+      "id": "67110038-7ea2-45a4-81b8-429c361e1b92",
+      "name": "Prepare OTP Message1"
     },
     {
       "parameters": {
@@ -66,11 +135,11 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        624,
+        3072,
         864
       ],
-      "id": "f8e1d405-c431-4363-b533-f83f8e063aae",
-      "name": "Send OTP WhatsApp",
+      "id": "4ebcf61f-d2fe-4736-a956-f242cfd90889",
+      "name": "Send OTP WhatsApp1",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
       "onError": "continueErrorOutput"
@@ -82,7 +151,7 @@
             {
               "id": "resp-sent-001",
               "name": "notification_id",
-              "value": "={{ $('Prepare OTP Message').item.json.notification_id }}",
+              "value": "={{ $('Prepare OTP Message1').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -104,11 +173,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1008,
-        848
+        3632,
+        832
       ],
-      "id": "acce294a-2b1a-4807-a0d1-7d902f4b97c1",
-      "name": "WhatsApp Sent Response"
+      "id": "90f8a107-e4c8-4d99-8fb9-8675fa84d435",
+      "name": "WhatsApp Sent Response1"
     },
     {
       "parameters": {
@@ -117,7 +186,7 @@
             {
               "id": "resp-fail-001",
               "name": "notification_id",
-              "value": "={{ $('Prepare OTP Message').item.json.notification_id }}",
+              "value": "={{ $('Prepare OTP Message1').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -139,11 +208,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        848,
-        944
+        3264,
+        1072
       ],
-      "id": "3af986d3-ae1c-4c6f-9ffb-519ecb15327b",
-      "name": "WhatsApp Failed Response"
+      "id": "fbf5f250-2b13-4dca-8d66-5523a4cb7262",
+      "name": "WhatsApp Failed Response1"
     },
     {
       "parameters": {
@@ -192,11 +261,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -64,
+        2384,
         880
       ],
-      "id": "991278a5-a535-467a-81f3-cfb1f9c7d09f",
-      "name": "Validate Payload1"
+      "id": "10dc6595-90f5-4e5e-ac00-0faf5ad228cc",
+      "name": "Validate Payload3"
     },
     {
       "parameters": {
@@ -205,11 +274,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        160,
+        2608,
         864
       ],
-      "id": "239e867e-952f-4bb6-a56f-2c018afdf536",
-      "name": "Split Members1"
+      "id": "a62119c5-0833-4aba-b646-ef2407fc12b7",
+      "name": "Split Members3"
     },
     {
       "parameters": {
@@ -218,7 +287,7 @@
             {
               "id": "resp-valfail-001",
               "name": "notification_id",
-              "value": "={{ $('OTP WhatsApp').item.json.body.notification_id }}",
+              "value": "={{ $('OTP WhatsApp1').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -240,219 +309,48 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        160,
-        1056
+        2832,
+        1184
       ],
-      "id": "e9e99411-f65b-4f7c-ab07-485ff416b6a5",
-      "name": "Validation Failed Response1"
+      "id": "d284d9f3-2f3a-4edd-9d4e-89b80d5e0d88",
+      "name": "Validation Failed Response3"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
-        "options": {},
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1264,
-        1056
+        3920,
+        1200
       ],
-      "id": "85514cb5-5a5d-4e5a-b631-b0b0abdb08a5",
-      "name": "Callback1",
+      "id": "6622a694-4cd9-4fe0-ac64-fea56f072eb5",
+      "name": "Callback3",
       "alwaysOutputData": true,
       "retryOnFail": true,
-      "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
           "id": "djiMPtATquR2OnRc",
           "name": "Notification Header Auth | api.supershyft"
         }
-      }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "417c2347-9399-4a3d-b757-268f6f1c2573",
-              "leftValue": "={{ $json.accepted }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
       },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        816,
-        848
-      ],
-      "id": "4bd177a7-8ac7-4859-8cda-8df5cc8ec90d",
-      "name": "WhatAPI Accepted?"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "24ff2cc4-2183-4793-8455-1124b3af9fcf",
-              "name": "notification_id",
-              "value": "={{ $('Prepare OTP Message').item.json.notification_id }}",
-              "type": "number"
-            },
-            {
-              "id": "260c3405-00ec-4b59-9ea6-35bf7476bf3c",
-              "name": "status",
-              "value": "failed",
-              "type": "string"
-            },
-            {
-              "id": "618224a2-585b-45ad-9806-bf302e5bb874",
-              "name": "message",
-              "value": "WhatsApp sending failed: message not accepted",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        816,
-        1024
-      ],
-      "id": "836407aa-9a0e-4146-9bcd-c13fd64eb724",
-      "name": "WhatAPI Not Accepted"
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
-    "OTP WhatsApp": {
-      "main": [
-        [
-          {
-            "node": "Validate Payload1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare OTP Message": {
-      "main": [
-        [
-          {
-            "node": "Send OTP WhatsApp",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Send OTP WhatsApp": {
-      "main": [
-        [
-          {
-            "node": "WhatAPI Accepted?",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "WhatsApp Failed Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "WhatsApp Sent Response": {
-      "main": [
-        [
-          {
-            "node": "Callback1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "WhatsApp Failed Response": {
-      "main": [
-        [
-          {
-            "node": "Callback1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Validate Payload1": {
-      "main": [
-        [
-          {
-            "node": "Split Members1",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Validation Failed Response1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Split Members1": {
-      "main": [
-        [
-          {
-            "node": "Prepare OTP Message",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Validation Failed Response1": {
-      "main": [
-        [
-          {
-            "node": "Callback1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "WhatAPI Accepted?": {
       "main": [
         [
           {
-            "node": "WhatsApp Sent Response",
+            "node": "WhatsApp Sent Response1",
             "type": "main",
             "index": 0
           }
@@ -470,7 +368,109 @@
       "main": [
         [
           {
-            "node": "Callback1",
+            "node": "Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OTP WhatsApp1": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare OTP Message1": {
+      "main": [
+        [
+          {
+            "node": "Send OTP WhatsApp1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send OTP WhatsApp1": {
+      "main": [
+        [
+          {
+            "node": "WhatAPI Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Failed Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Sent Response1": {
+      "main": [
+        [
+          {
+            "node": "Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Failed Response1": {
+      "main": [
+        [
+          {
+            "node": "Callback3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload3": {
+      "main": [
+        [
+          {
+            "node": "Split Members3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validation Failed Response3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members3": {
+      "main": [
+        [
+          {
+            "node": "Prepare OTP Message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Failed Response3": {
+      "main": [
+        [
+          {
+            "node": "Callback3",
             "type": "main",
             "index": 0
           }

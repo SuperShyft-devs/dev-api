@@ -2,103 +2,6 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Send Email\nIt will send Bio AI and Blood Report to each member.\nEach member has their own blood_report_url and bio_ai_report_url.\nExpects: { notification_id, members: [{ first_name, email, blood_report_url, bio_ai_report_url }] }",
-        "height": 752,
-        "width": 2880
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        24352,
-        -1152
-      ],
-      "typeVersion": 1,
-      "id": "85efd145-dfc1-4155-90f7-02b55f0f9cf2",
-      "name": "Sticky Note8"
-    },
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "send-reports-email-v3",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
-      "position": [
-        24448,
-        -720
-      ],
-      "id": "9102ba5a-f05d-4a29-bc17-16049bdfc4c3",
-      "name": "Send Reports | Email2",
-      "webhookId": "c13f1ef6-90de-41e0-8f92-551fb211d6ac"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "ffd9b6a9-91cd-44bc-8d1d-62bc70a4baed",
-              "leftValue": "={{ $json.body.notification_id }}",
-              "rightValue": 0,
-              "operator": {
-                "type": "number",
-                "operation": "exists",
-                "singleValue": true
-              }
-            },
-            {
-              "id": "9c616895-d218-4d85-9368-b5c42bbc46dc",
-              "leftValue": "={{ $json.body.members }}",
-              "rightValue": "",
-              "operator": {
-                "type": "array",
-                "operation": "exists",
-                "singleValue": true
-              }
-            },
-            {
-              "id": "fd24cccd-da53-48d2-96f1-e580846dc058",
-              "leftValue": "={{ $json.body.members.length }}",
-              "rightValue": 0,
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        24656,
-        -720
-      ],
-      "id": "d0286597-272a-4546-8e33-78bba119a093",
-      "name": "If12"
-    },
-    {
-      "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || '',\n    blood_report_url: member.blood_report_url || '',\n    bio_ai_report_url: member.bio_ai_report_url || ''\n  }\n}));"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        24880,
-        -880
-      ],
-      "id": "c451a3c2-b19b-46ac-96e2-a8c9ad5bc55a",
-      "name": "Split Members9"
-    },
-    {
-      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
@@ -153,10 +56,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        25104,
-        -880
+        10336,
+        -208
       ],
-      "id": "e5f6a7b8-url5-4005-b005-000000000001",
+      "id": "06de873f-2505-4381-899f-ef141400483e",
       "name": "URLs Exist?"
     },
     {
@@ -166,7 +69,7 @@
             {
               "id": "urls-notfound-001",
               "name": "notification_id",
-              "value": "={{ $('Split Members9').item.json.notification_id }}",
+              "value": "={{ $('Split Members10').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -188,25 +91,122 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        25344,
-        -720
+        10624,
+        -64
       ],
-      "id": "e5f6a7b8-url5-4005-b005-000000000002",
+      "id": "03d09ca4-1d40-4b6f-b65f-e89e71bd7c9b",
       "name": "URLs Not Found Response"
     },
     {
       "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const bioLink   = $('Split Members9').item.json.bio_ai_report_url;\nconst bloodLink = $('Split Members9').item.json.blood_report_url;\nconst member    = $('Split Members9').item.json;\n\nconst body = `Hi ${member.first_name},\n\nThank you for completing your blood sample collection and Lifestyle Questionnaire.\n\nYour reports are now ready:\n\n- Blood Test Report: ${bloodLink}\n- Personalized Bio-AI Health Report: ${bioLink}\n\nWarm regards,\nTeam SuperShyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Your Blood and Bio-AI Reports are Ready',\n    body\n  }\n};"
+        "content": "## Send Email\nIt will send Bio AI and Blood Report to each member.\nEach member has their own blood_report_url and bio_ai_report_url.\nExpects: { notification_id, members: [{ first_name, email, blood_report_url, bio_ai_report_url }] }",
+        "height": 752,
+        "width": 2128
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        9584,
+        -480
+      ],
+      "typeVersion": 1,
+      "id": "469fa0d2-0b0e-42e3-a090-d832462e5fd3",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-reports-email-v4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        9680,
+        -48
+      ],
+      "id": "05959c0d-786f-4d81-a9b7-e275add72b92",
+      "name": "Send Reports | Email3",
+      "webhookId": "c13f1ef6-90de-41e0-8f92-551fb211d6ac"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ffd9b6a9-91cd-44bc-8d1d-62bc70a4baed",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "9c616895-d218-4d85-9368-b5c42bbc46dc",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "fd24cccd-da53-48d2-96f1-e580846dc058",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        9888,
+        -48
+      ],
+      "id": "bbebe281-3c68-41f9-8d47-2d981869c0bc",
+      "name": "If15"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || '',\n    blood_report_url: member.blood_report_url || '',\n    bio_ai_report_url: member.bio_ai_report_url || ''\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25344,
-        -1088
+        10112,
+        -208
       ],
-      "id": "fd125ea2-5485-4648-b183-947da0b810e9",
-      "name": "Prepare Email6"
+      "id": "7ef72e31-d5c4-4664-88a0-8385d8e0fba8",
+      "name": "Split Members10"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const bioLink   = $('Split Members10').item.json.bio_ai_report_url;\nconst bloodLink = $('Split Members10').item.json.blood_report_url;\nconst member    = $('Split Members10').item.json;\n\nconst body = `Hi ${member.first_name},\n\nThank you for completing your blood sample collection and Lifestyle Questionnaire.\n\nYour reports are now ready:\n\n- Blood Test Report: ${bloodLink}\n- Personalized Bio-AI Health Report: ${bioLink}\n\nWarm regards,\nTeam SuperShyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Your Blood and Bio-AI Reports are Ready',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10624,
+        -224
+      ],
+      "id": "cea06ed9-d75d-4297-b359-c1260c680554",
+      "name": "Prepare Email7"
     },
     {
       "parameters": {
@@ -222,11 +222,11 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        25600,
-        -1088
+        10880,
+        -224
       ],
-      "id": "7d3f1675-40e9-40ef-8043-71c2412c1649",
-      "name": "Send an Email2",
+      "id": "c62bb1ff-c0ba-4ff6-8139-4242b185dc73",
+      "name": "Send an Email3",
       "webhookId": "b390d0fb-b402-4675-bf2a-530f3c060c1a",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
@@ -245,7 +245,7 @@
             {
               "id": "142a83ea-738c-4817-8a59-23e1d393f64e",
               "name": "notification_id",
-              "value": "={{ $('Prepare Email6').item.json.notification_id }}",
+              "value": "={{ $('Prepare Email7').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -267,11 +267,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        25888,
-        -1104
+        11120,
+        -416
       ],
-      "id": "acd7e7c3-2b3c-465e-bdca-f2ccc4bec1e1",
-      "name": "Prepare Response4"
+      "id": "ae1075b8-437e-4745-9d04-abd0d801e837",
+      "name": "Prepare Response6"
     },
     {
       "parameters": {
@@ -280,7 +280,7 @@
             {
               "id": "345bfda5-bd6c-48f3-b1ce-5f9e18c9127d",
               "name": "notification_id",
-              "value": "={{ $('Prepare Email6').item.json.notification_id }}",
+              "value": "={{ $('Prepare Email7').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -302,11 +302,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        25888,
-        -896
+        11120,
+        -208
       ],
-      "id": "89e765cb-f24d-4f1a-b175-79d1c990d639",
-      "name": "Edit Fields17"
+      "id": "5cc4f7c5-738a-459f-b797-a6b55f239e50",
+      "name": "Edit Fields20"
     },
     {
       "parameters": {
@@ -315,7 +315,7 @@
             {
               "id": "73c4a7c5-095c-4d1f-88de-0a2165f1ac0a",
               "name": "notification_id",
-              "value": "={{ $('Send Reports | Email2').item.json.body.notification_id }}",
+              "value": "={{ $('Send Reports | Email3').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -337,11 +337,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        24880,
-        -624
+        10112,
+        48
       ],
-      "id": "5dea7415-8766-436b-961f-d91e2be028da",
-      "name": "Prepare Response5"
+      "id": "71145360-fa4c-4af2-989e-99e0eac79085",
+      "name": "Prepare Response7"
     },
     {
       "parameters": {
@@ -357,68 +357,28 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        26176,
-        -624
+        11472,
+        64
       ],
-      "id": "7e1d5399-65d0-46ac-9a9a-df8c4b2b32d3",
-      "name": "Call Back5",
+      "id": "44c4542b-38c3-4b29-815b-53f6a914e3d8",
+      "name": "Call Back6",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
       "credentials": {
         "httpHeaderAuth": {
           "id": "djiMPtATquR2OnRc",
           "name": "Notification Header Auth | api.supershyft"
         }
       },
-      "alwaysOutputData": true,
-      "retryOnFail": true,
       "onError": "continueRegularOutput"
     }
   ],
   "connections": {
-    "Send Reports | Email2": {
-      "main": [
-        [
-          {
-            "node": "If12",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If12": {
-      "main": [
-        [
-          {
-            "node": "Split Members9",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Prepare Response5",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Split Members9": {
-      "main": [
-        [
-          {
-            "node": "URLs Exist?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "URLs Exist?": {
       "main": [
         [
           {
-            "node": "Prepare Email6",
+            "node": "Prepare Email7",
             "type": "main",
             "index": 0
           }
@@ -432,73 +392,113 @@
         ]
       ]
     },
-    "Prepare Email6": {
+    "URLs Not Found Response": {
       "main": [
         [
           {
-            "node": "Send an Email2",
+            "node": "Call Back6",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send an Email2": {
+    "Send Reports | Email3": {
       "main": [
         [
           {
-            "node": "Prepare Response4",
+            "node": "If15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If15": {
+      "main": [
+        [
+          {
+            "node": "Split Members10",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Edit Fields17",
+            "node": "Prepare Response7",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Response4": {
+    "Split Members10": {
       "main": [
         [
           {
-            "node": "Call Back5",
+            "node": "URLs Exist?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Edit Fields17": {
+    "Prepare Email7": {
       "main": [
         [
           {
-            "node": "Call Back5",
+            "node": "Send an Email3",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "URLs Not Found Response": {
+    "Send an Email3": {
       "main": [
         [
           {
-            "node": "Call Back5",
+            "node": "Prepare Response6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields20",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Response5": {
+    "Prepare Response6": {
       "main": [
         [
           {
-            "node": "Call Back5",
+            "node": "Call Back6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields20": {
+      "main": [
+        [
+          {
+            "node": "Call Back6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Response7": {
+      "main": [
+        [
+          {
+            "node": "Call Back6",
             "type": "main",
             "index": 0
           }

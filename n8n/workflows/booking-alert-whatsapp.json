@@ -2,33 +2,114 @@
   "nodes": [
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "183bb390-c946-4959-bb01-b5b54c3757a1",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        9440,
+        2528
+      ],
+      "id": "3648dd2b-bd86-4666-a983-0f135d32407b",
+      "name": "WhatAPI Accepted?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "60ab693a-3058-4b37-9094-7e36bf8edd94",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Booking Message5').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "daacaf46-6491-4daa-b8f0-a3e1ee2e3931",
+              "name": "engagement_id",
+              "value": "={{ $('Prepare Booking Message5').item.json.engagement_id }}",
+              "type": "number"
+            },
+            {
+              "id": "ad55f003-1bc3-44d2-8dbf-45e2296a1e38",
+              "name": "participant_user_id",
+              "value": "={{ $('Prepare Booking Message5').item.json.participant_details.participant_user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "72f179e7-19c6-4925-8a5d-58635bcc5f45",
+              "name": "channel",
+              "value": "whatsapp",
+              "type": "string"
+            },
+            {
+              "id": "7459a2e4-4ddb-49f1-901d-443793a0122e",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        9776,
+        2704
+      ],
+      "id": "f3f4d414-85f1-4bb6-9b5e-603c5b96f16a",
+      "name": "WhatAPI Not Accepted"
+    },
+    {
+      "parameters": {
         "content": "## Send Booking Alert – WhatsApp + Email to Members + Dispatch\nSends booking alert WhatsApp + Email to each member in the list.\nAfter all sends, calls dispatch API with participant_user_id.\nExpects: { notification_id, engagement_id, members[], participant_details{} }",
         "height": 1168,
         "width": 3872
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        3200,
-        2448
+        7872,
+        2432
       ],
       "typeVersion": 1,
-      "id": "565d61da-ae96-4538-bc43-288e1f334544",
-      "name": "Sticky Note Booking4"
+      "id": "629ae4e0-3f21-4b64-856b-689ce163ed00",
+      "name": "Sticky Note Booking5"
     },
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "booking-alert-email+whatsapp+participant-welcome-supershyft",
+        "path": "booking-alert-email+whatsapp+participant-welcome-supershyft-v2",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        3312,
-        2928
+        7984,
+        2912
       ],
-      "id": "a542c7f0-e7f9-40e0-aec9-3ad447146614",
-      "name": "Booking Alert WhatsApp4",
+      "id": "62d0e9f0-57b8-4549-bee6-a6e4e9b113c2",
+      "name": "Booking Alert WhatsApp5",
       "webhookId": "5e5e7e05-df35-839f-fbf8-jdj22f20963f"
     },
     {
@@ -98,11 +179,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3552,
-        2928
+        8224,
+        2912
       ],
-      "id": "8d09efdd-10fe-4591-a452-3260b93b4809",
-      "name": "Validate Booking Payload6"
+      "id": "c527a89f-1809-431f-8bd7-e9a461801aa1",
+      "name": "Validate Booking Payload7"
     },
     {
       "parameters": {
@@ -111,11 +192,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3904,
-        2912
+        8576,
+        2896
       ],
-      "id": "c6e1028d-e54d-45dd-8620-bfc599131126",
-      "name": "Split Members"
+      "id": "16f5a502-a7ff-48b3-8925-2318d23f863f",
+      "name": "Split Members2"
     },
     {
       "parameters": {
@@ -124,7 +205,7 @@
             {
               "id": "h2000021-0000-0000-0000-000000000021",
               "name": "notification_id",
-              "value": "={{ $('Booking Alert WhatsApp4').item.json.body.notification_id }}",
+              "value": "={{ $('Booking Alert WhatsApp5').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -146,11 +227,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3904,
-        3408
+        8576,
+        3392
       ],
-      "id": "16e3b8f6-fc86-49ef-a4ea-e92c6781d140",
-      "name": "Booking Validation Failed4"
+      "id": "2f25d2a8-4cb5-444d-a379-72f0ec86da82",
+      "name": "Booking Validation Failed5"
     },
     {
       "parameters": {
@@ -160,11 +241,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4192,
-        2912
+        8864,
+        2896
       ],
-      "id": "360e68fc-c9b9-4237-9b42-d7adf9141d21",
-      "name": "Prepare Booking Message4"
+      "id": "3c2776a9-bf67-4438-a6d8-c2d00bb7b3f0",
+      "name": "Prepare Booking Message5"
     },
     {
       "parameters": {
@@ -187,11 +268,11 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        4480,
-        2768
+        9152,
+        2752
       ],
-      "id": "8c1f30df-cd87-4e3e-8a14-b4fcddddc4de",
-      "name": "Send Booking WhatsApp4",
+      "id": "cda645df-8b2c-4b40-8642-c65aff177593",
+      "name": "Send Booking WhatsApp5",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
       "onError": "continueErrorOutput"
@@ -199,16 +280,16 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const item = $('Prepare Booking Message4').item.json;\nconst pd = item.participant_details || {};\n\nconst apptDate = pd.collection_date || 'N/A';\nconst timeSlot = pd.collection_time || '';\nlet formattedTime = timeSlot;\ntry {\n  const [hStr, mStr] = timeSlot.split(':');\n  const h = parseInt(hStr, 10);\n  const m = parseInt(mStr, 10);\n  const ampm = h >= 12 ? 'PM' : 'AM';\n  const h12 = h % 12 || 12;\n  formattedTime = `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;\n} catch (_) {}\n\nconst currentTime = new Date().toISOString().replace('T', ' ').substring(0, 19);\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n    .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }\n    .content { background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; }\n    .field { margin: 10px 0; }\n    .label { font-weight: bold; color: #555; }\n    .value { color: #333; }\n    .footer { background-color: #333; color: white; padding: 15px; text-align: center; border-radius: 0 0 5px 5px; }\n    .highlight { background-color: #e8f5e8; padding: 10px; border-radius: 5px; margin: 15px 0; }\n  </style>\n</head>\n<body>\n  <div class=\\\"container\\\">\n    <div class=\\\"header\\\"><h2>&#127881; New Health Camp Registration</h2><p>SuperShyft Health Camp</p></div>\n    <div class=\\\"content\\\">\n      <div class=\\\"highlight\\\"><strong>&#128197; New registration received at:</strong> ${currentTime}</div>\n      <h3>&#128100; Participant Information</h3>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Name:</span> <span class=\\\"value\\\">${pd.name || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Email:</span> <span class=\\\"value\\\">${pd.email || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Phone:</span> <span class=\\\"value\\\">${pd.phone || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Age:</span> <span class=\\\"value\\\">${pd.age || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Gender:</span> <span class=\\\"value\\\">${pd.gender || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Address:</span> <span class=\\\"value\\\">${pd.address || 'Not provided'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Pincode:</span> <span class=\\\"value\\\">${pd.pincode || 'Not provided'}</span></div>\n      <h3>&#128197; Appointment Details</h3>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Date:</span> <span class=\\\"value\\\">${apptDate}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Time:</span> <span class=\\\"value\\\">${formattedTime}</span></div>\n      <div class=\\\"highlight\\\"><strong>&#128161; Next Steps:</strong><ul><li>Review the registration details</li><li>Confirm the appointment if needed</li><li>Access the admin panel: <a href=\\\"https://admin.supershyft.com/\\\">admin.supershyft.com</a></li></ul></div>\n    </div>\n    <div class=\\\"footer\\\"><p>Automated notification from SuperShyft Health Camp Registration System</p><p>Please do not reply to this email</p></div>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: item.notification_id,\n    engagement_id: item.engagement_id,\n    participant_details: item.participant_details,\n    to: item.email,\n    subject: 'Booking Alert - SuperShyft',\n    htmlBody\n  }\n};"
+        "jsCode": "const item = $('Prepare Booking Message5').item.json;\nconst pd = item.participant_details || {};\n\nconst apptDate = pd.collection_date || 'N/A';\nconst timeSlot = pd.collection_time || '';\nlet formattedTime = timeSlot;\ntry {\n  const [hStr, mStr] = timeSlot.split(':');\n  const h = parseInt(hStr, 10);\n  const m = parseInt(mStr, 10);\n  const ampm = h >= 12 ? 'PM' : 'AM';\n  const h12 = h % 12 || 12;\n  formattedTime = `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;\n} catch (_) {}\n\nconst currentTime = new Date().toISOString().replace('T', ' ').substring(0, 19);\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n    .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }\n    .content { background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; }\n    .field { margin: 10px 0; }\n    .label { font-weight: bold; color: #555; }\n    .value { color: #333; }\n    .footer { background-color: #333; color: white; padding: 15px; text-align: center; border-radius: 0 0 5px 5px; }\n    .highlight { background-color: #e8f5e8; padding: 10px; border-radius: 5px; margin: 15px 0; }\n  </style>\n</head>\n<body>\n  <div class=\\\"container\\\">\n    <div class=\\\"header\\\"><h2>&#127881; New Health Camp Registration</h2><p>SuperShyft Health Camp</p></div>\n    <div class=\\\"content\\\">\n      <div class=\\\"highlight\\\"><strong>&#128197; New registration received at:</strong> ${currentTime}</div>\n      <h3>&#128100; Participant Information</h3>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Name:</span> <span class=\\\"value\\\">${pd.name || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Email:</span> <span class=\\\"value\\\">${pd.email || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Phone:</span> <span class=\\\"value\\\">${pd.phone || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Age:</span> <span class=\\\"value\\\">${pd.age || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Gender:</span> <span class=\\\"value\\\">${pd.gender || 'N/A'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Address:</span> <span class=\\\"value\\\">${pd.address || 'Not provided'}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Pincode:</span> <span class=\\\"value\\\">${pd.pincode || 'Not provided'}</span></div>\n      <h3>&#128197; Appointment Details</h3>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Date:</span> <span class=\\\"value\\\">${apptDate}</span></div>\n      <div class=\\\"field\\\"><span class=\\\"label\\\">Time:</span> <span class=\\\"value\\\">${formattedTime}</span></div>\n      <div class=\\\"highlight\\\"><strong>&#128161; Next Steps:</strong><ul><li>Review the registration details</li><li>Confirm the appointment if needed</li><li>Access the admin panel: <a href=\\\"https://admin.supershyft.com/\\\">admin.supershyft.com</a></li></ul></div>\n    </div>\n    <div class=\\\"footer\\\"><p>Automated notification from SuperShyft Health Camp Registration System</p><p>Please do not reply to this email</p></div>\n  </div>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    notification_id: item.notification_id,\n    engagement_id: item.engagement_id,\n    participant_details: item.participant_details,\n    to: item.email,\n    subject: 'Booking Alert - SuperShyft',\n    htmlBody\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4480,
-        3040
+        9152,
+        3024
       ],
-      "id": "b81380b2-f24d-48eb-abfc-743000da0991",
-      "name": "Prepare Booking Email3"
+      "id": "837ddcc4-f2f1-4b54-93a8-116543356d83",
+      "name": "Prepare Booking Email4"
     },
     {
       "parameters": {
@@ -223,11 +304,11 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        4768,
-        3040
+        9440,
+        3024
       ],
-      "id": "9f80e054-9cbb-4988-a3c7-39e108240fb0",
-      "name": "Send Booking Email3",
+      "id": "a79497f1-039e-4cad-9334-c92d1a2c76b7",
+      "name": "Send Booking Email4",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
       "webhookId": "0950e8c1-2854-487e-9396-2eef74575f75",
@@ -246,19 +327,19 @@
             {
               "id": "h2000001-0000-0000-0000-000000000001",
               "name": "notification_id",
-              "value": "={{ $('Prepare Booking Message4').item.json.notification_id }}",
+              "value": "={{ $('Prepare Booking Message5').item.json.notification_id }}",
               "type": "number"
             },
             {
               "id": "h2000002-0000-0000-0000-000000000002",
               "name": "engagement_id",
-              "value": "={{ $('Prepare Booking Message4').item.json.engagement_id }}",
+              "value": "={{ $('Prepare Booking Message5').item.json.engagement_id }}",
               "type": "number"
             },
             {
               "id": "h2000003-0000-0000-0000-000000000003",
               "name": "participant_user_id",
-              "value": "={{ $('Prepare Booking Message4').item.json.participant_details.participant_user_id }}",
+              "value": "={{ $('Prepare Booking Message5').item.json.participant_details.participant_user_id }}",
               "type": "string"
             },
             {
@@ -280,11 +361,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4768,
-        2544
+        9776,
+        2512
       ],
-      "id": "1ad6c7c0-d801-4a53-87e2-0a670d23ace1",
-      "name": "WhatsApp Sent Response3"
+      "id": "b20484ba-ad19-4630-b50e-682c469d57ff",
+      "name": "WhatsApp Sent Response4"
     },
     {
       "parameters": {
@@ -293,19 +374,19 @@
             {
               "id": "h2000011-0000-0000-0000-000000000011",
               "name": "notification_id",
-              "value": "={{ $('Prepare Booking Message4').item.json.notification_id }}",
+              "value": "={{ $('Prepare Booking Message5').item.json.notification_id }}",
               "type": "number"
             },
             {
               "id": "h2000012-0000-0000-0000-000000000012",
               "name": "engagement_id",
-              "value": "={{ $('Prepare Booking Message4').item.json.engagement_id }}",
+              "value": "={{ $('Prepare Booking Message5').item.json.engagement_id }}",
               "type": "number"
             },
             {
               "id": "h2000013-0000-0000-0000-000000000013",
               "name": "participant_user_id",
-              "value": "={{ $('Prepare Booking Message4').item.json.participant_details.participant_user_id }}",
+              "value": "={{ $('Prepare Booking Message5').item.json.participant_details.participant_user_id }}",
               "type": "string"
             },
             {
@@ -327,11 +408,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4768,
-        2784
+        9440,
+        2768
       ],
-      "id": "26890241-74b4-4d7f-9b4f-7de3f0580781",
-      "name": "WhatsApp Failed Response3"
+      "id": "9f818209-7c1a-409b-86be-7d0fde8f57f1",
+      "name": "WhatsApp Failed Response4"
     },
     {
       "parameters": {
@@ -340,19 +421,19 @@
             {
               "id": "aa000011-0000-0000-0000-000000000011",
               "name": "notification_id",
-              "value": "={{ $('Prepare Booking Email3').item.json.notification_id }}",
+              "value": "={{ $('Prepare Booking Email4').item.json.notification_id }}",
               "type": "number"
             },
             {
               "id": "aa000012-0000-0000-0000-000000000012",
               "name": "engagement_id",
-              "value": "={{ $('Prepare Booking Email3').item.json.engagement_id }}",
+              "value": "={{ $('Prepare Booking Email4').item.json.engagement_id }}",
               "type": "number"
             },
             {
               "id": "aa000013-0000-0000-0000-000000000013",
               "name": "participant_user_id",
-              "value": "={{ $('Prepare Booking Email3').item.json.participant_details.participant_user_id }}",
+              "value": "={{ $('Prepare Booking Email4').item.json.participant_details.participant_user_id }}",
               "type": "string"
             },
             {
@@ -374,11 +455,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        5104,
-        3024
+        9776,
+        3008
       ],
-      "id": "9033f5e5-5a2b-4cf1-a05c-55e6f5406cf8",
-      "name": "Email Sent Response3"
+      "id": "90c14f56-8124-4883-b6f8-14583fac45d9",
+      "name": "Email Sent Response4"
     },
     {
       "parameters": {
@@ -387,19 +468,19 @@
             {
               "id": "aa000021-0000-0000-0000-000000000021",
               "name": "notification_id",
-              "value": "={{ $('Prepare Booking Email3').item.json.notification_id }}",
+              "value": "={{ $('Prepare Booking Email4').item.json.notification_id }}",
               "type": "number"
             },
             {
               "id": "aa000022-0000-0000-0000-000000000022",
               "name": "engagement_id",
-              "value": "={{ $('Prepare Booking Email3').item.json.engagement_id }}",
+              "value": "={{ $('Prepare Booking Email4').item.json.engagement_id }}",
               "type": "number"
             },
             {
               "id": "aa000023-0000-0000-0000-000000000023",
               "name": "participant_user_id",
-              "value": "={{ $('Prepare Booking Email3').item.json.participant_details.participant_user_id }}",
+              "value": "={{ $('Prepare Booking Email4').item.json.participant_details.participant_user_id }}",
               "type": "string"
             },
             {
@@ -421,22 +502,22 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        5104,
-        3232
+        9776,
+        3216
       ],
-      "id": "73c7ee8c-dc21-4368-bb03-bdff901a3ed1",
-      "name": "Email Failed Response3"
+      "id": "926faec3-aefb-4c4b-b10c-45e458960ece",
+      "name": "Email Failed Response4"
     },
     {
       "parameters": {},
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        5472,
-        2896
+        10144,
+        2880
       ],
-      "id": "46ea5e3d-17e1-4521-ad5f-6b5b3c42539a",
-      "name": "Merge WhatsApp & Email Results3"
+      "id": "3276b86b-dab1-47d3-84c2-2742b263d6be",
+      "name": "Merge WhatsApp & Email Results4"
     },
     {
       "parameters": {
@@ -445,70 +526,70 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5760,
-        2896
+        10432,
+        2880
       ],
-      "id": "38ef1df1-1606-4fd8-837b-d9f89528a2b1",
-      "name": "Combine Results3"
+      "id": "bae8b35a-4e99-4fa5-a775-4977c6d83e74",
+      "name": "Combine Results4"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.supershyft.com/notifications/dispatch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"service_key\": \"welcome-whatsapp\",\n  \"user_ids\": {{ JSON.stringify($json.user_ids) }},\n  \"engagement_id\": {{ $json.engagement_id }}\n}",
-        "options": {},
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        6000,
-        2896
+        10672,
+        2880
       ],
-      "id": "2cadb007-6540-4a1b-947e-e7a819bf436e",
-      "name": "Dispatch Notification",
+      "id": "a2645285-6004-40c9-805a-aafebc399b7f",
+      "name": "Dispatch Notification2",
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 5000,
-      "onError": "continueErrorOutput",
       "credentials": {
         "httpHeaderAuth": {
           "id": "djiMPtATquR2OnRc",
           "name": "Notification Header Auth | api.supershyft"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"notification_id\": {{ $('Combine Results3').first().json.notification_id }},\n  \"status\": \"{{ $('Combine Results3').first().json.status }}\",\n  \"message\": \"{{ $('Combine Results3').first().json.message }}\"\n}",
-        "options": {},
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "jsonBody": "={\n  \"notification_id\": {{ $('Combine Results4').first().json.notification_id }},\n  \"status\": \"{{ $('Combine Results4').first().json.status }}\",\n  \"message\": \"{{ $('Combine Results4').first().json.message }}\"\n}",
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        6800,
-        3408
+        11472,
+        3392
       ],
-      "id": "0e94327b-29f1-4149-9924-b601bf4b1d9f",
-      "name": "Booking Callback4",
+      "id": "f24a0f4c-dc02-46b2-9129-7ec58c5d85df",
+      "name": "Booking Callback5",
       "alwaysOutputData": true,
       "retryOnFail": true,
-      "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
           "id": "djiMPtATquR2OnRc",
           "name": "Notification Header Auth | api.supershyft"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -517,7 +598,7 @@
             {
               "id": "de8bd379-246a-429f-9ab2-93624739c5a8",
               "name": "notification_id",
-              "value": "={{ $('Combine Results3').item.json.notification_id }}",
+              "value": "={{ $('Combine Results4').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -529,7 +610,7 @@
             {
               "id": "14ffc142-b19e-48dd-bbdb-625773a2c516",
               "name": "message",
-              "value": "={{ $('Combine Results3').item.json.message }} Participant Notification Failed",
+              "value": "={{ $('Combine Results4').item.json.message }} Participant Notification Failed",
               "type": "string"
             }
           ]
@@ -539,11 +620,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        6288,
-        3184
+        10960,
+        3168
       ],
-      "id": "c85cfe68-0b0a-426a-9987-edd3aea2b066",
-      "name": "Edit Fields2"
+      "id": "cf8420e5-f53f-4619-9499-15ef0825765b",
+      "name": "Edit Fields4"
     },
     {
       "parameters": {
@@ -552,13 +633,13 @@
             {
               "id": "4323c66f-1b68-4b23-bf8e-935887baf848",
               "name": "notification_id",
-              "value": "={{ $('Combine Results3').item.json.notification_id }}",
+              "value": "={{ $('Combine Results4').item.json.notification_id }}",
               "type": "string"
             },
             {
               "id": "b5b44448-538d-4d9f-823b-abfba38d9b09",
               "name": "message",
-              "value": "={{ $('Combine Results3').item.json.message }} | Participant Notification sent Successfyllu",
+              "value": "={{ $('Combine Results4').item.json.message }} | Participant Notification sent Successfyllu",
               "type": "string"
             },
             {
@@ -574,320 +655,19 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        6288,
-        2880
+        10960,
+        2864
       ],
-      "id": "7b4bf4b0-bb8a-4074-9c0b-829f1162df83",
-      "name": "Edit Fields3"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "183bb390-c946-4959-bb01-b5b54c3757a1",
-              "leftValue": "={{ $json.accepted }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        4624,
-        2544
-      ],
-      "id": "0bcda750-a9b5-4ff8-ab09-0a9ccdde04e3",
-      "name": "WhatAPI Accepted?"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "60ab693a-3058-4b37-9094-7e36bf8edd94",
-              "name": "notification_id",
-              "value": "={{ $('Prepare Booking Message4').item.json.notification_id }}",
-              "type": "number"
-            },
-            {
-              "id": "daacaf46-6491-4daa-b8f0-a3e1ee2e3931",
-              "name": "engagement_id",
-              "value": "={{ $('Prepare Booking Message4').item.json.engagement_id }}",
-              "type": "number"
-            },
-            {
-              "id": "ad55f003-1bc3-44d2-8dbf-45e2296a1e38",
-              "name": "participant_user_id",
-              "value": "={{ $('Prepare Booking Message4').item.json.participant_details.participant_user_id }}",
-              "type": "string"
-            },
-            {
-              "id": "72f179e7-19c6-4925-8a5d-58635bcc5f45",
-              "name": "channel",
-              "value": "whatsapp",
-              "type": "string"
-            },
-            {
-              "id": "7459a2e4-4ddb-49f1-901d-443793a0122e",
-              "name": "status",
-              "value": "failed",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        4624,
-        2720
-      ],
-      "id": "67cb5451-22a2-40df-8808-3767d27c8c82",
-      "name": "WhatAPI Not Accepted"
+      "id": "a0cbd649-8628-4ea9-b755-d532b353a04f",
+      "name": "Edit Fields5"
     }
   ],
   "connections": {
-    "Booking Alert WhatsApp4": {
-      "main": [
-        [
-          {
-            "node": "Validate Booking Payload6",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Validate Booking Payload6": {
-      "main": [
-        [
-          {
-            "node": "Split Members",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Booking Validation Failed4",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Split Members": {
-      "main": [
-        [
-          {
-            "node": "Prepare Booking Message4",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Booking Validation Failed4": {
-      "main": [
-        [
-          {
-            "node": "Booking Callback4",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare Booking Message4": {
-      "main": [
-        [
-          {
-            "node": "Send Booking WhatsApp4",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Prepare Booking Email3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Send Booking WhatsApp4": {
-      "main": [
-        [
-          {
-            "node": "WhatAPI Accepted?",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "WhatsApp Failed Response3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare Booking Email3": {
-      "main": [
-        [
-          {
-            "node": "Send Booking Email3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Send Booking Email3": {
-      "main": [
-        [
-          {
-            "node": "Email Sent Response3",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Email Failed Response3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "WhatsApp Sent Response3": {
-      "main": [
-        [
-          {
-            "node": "Merge WhatsApp & Email Results3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "WhatsApp Failed Response3": {
-      "main": [
-        [
-          {
-            "node": "Merge WhatsApp & Email Results3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Email Sent Response3": {
-      "main": [
-        [
-          {
-            "node": "Merge WhatsApp & Email Results3",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Email Failed Response3": {
-      "main": [
-        [
-          {
-            "node": "Merge WhatsApp & Email Results3",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge WhatsApp & Email Results3": {
-      "main": [
-        [
-          {
-            "node": "Combine Results3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Combine Results3": {
-      "main": [
-        [
-          {
-            "node": "Dispatch Notification",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Dispatch Notification": {
-      "main": [
-        [
-          {
-            "node": "Edit Fields3",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Edit Fields2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Edit Fields2": {
-      "main": [
-        [
-          {
-            "node": "Booking Callback4",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Edit Fields3": {
-      "main": [
-        [
-          {
-            "node": "Booking Callback4",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "WhatAPI Accepted?": {
       "main": [
         [
           {
-            "node": "WhatsApp Sent Response3",
+            "node": "WhatsApp Sent Response4",
             "type": "main",
             "index": 0
           }
@@ -905,7 +685,227 @@
       "main": [
         [
           {
-            "node": "Merge WhatsApp & Email Results3",
+            "node": "Merge WhatsApp & Email Results4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Alert WhatsApp5": {
+      "main": [
+        [
+          {
+            "node": "Validate Booking Payload7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Booking Payload7": {
+      "main": [
+        [
+          {
+            "node": "Split Members2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Booking Validation Failed5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members2": {
+      "main": [
+        [
+          {
+            "node": "Prepare Booking Message5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Validation Failed5": {
+      "main": [
+        [
+          {
+            "node": "Booking Callback5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Booking Message5": {
+      "main": [
+        [
+          {
+            "node": "Send Booking WhatsApp5",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Booking Email4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Booking WhatsApp5": {
+      "main": [
+        [
+          {
+            "node": "WhatAPI Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Failed Response4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Booking Email4": {
+      "main": [
+        [
+          {
+            "node": "Send Booking Email4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Booking Email4": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Sent Response4": {
+      "main": [
+        [
+          {
+            "node": "Merge WhatsApp & Email Results4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Failed Response4": {
+      "main": [
+        [
+          {
+            "node": "Merge WhatsApp & Email Results4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response4": {
+      "main": [
+        [
+          {
+            "node": "Merge WhatsApp & Email Results4",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Email Failed Response4": {
+      "main": [
+        [
+          {
+            "node": "Merge WhatsApp & Email Results4",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge WhatsApp & Email Results4": {
+      "main": [
+        [
+          {
+            "node": "Combine Results4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Results4": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Notification2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Notification2": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields4": {
+      "main": [
+        [
+          {
+            "node": "Booking Callback5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields5": {
+      "main": [
+        [
+          {
+            "node": "Booking Callback5",
             "type": "main",
             "index": 0
           }

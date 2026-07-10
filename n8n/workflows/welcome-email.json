@@ -7,11 +7,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2448,
-        -304
+        4944,
+        -320
       ],
-      "id": "d2d5b07d-d29e-498d-b40d-e68415d95d19",
-      "name": "Split Members"
+      "id": "1beea7fb-21c5-4974-9089-871ad672c242",
+      "name": "Split Members6"
     },
     {
       "parameters": {
@@ -21,27 +21,27 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        1904,
-        -464
+        4400,
+        -480
       ],
       "typeVersion": 1,
-      "id": "94dc44cb-76dc-45f7-9d8d-ff74450e37d5",
-      "name": "Sticky Note Email2"
+      "id": "5d20f1b4-3600-4e78-89ee-4513913f2088",
+      "name": "Sticky Note Email4"
     },
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "welcome-email-v2",
+        "path": "welcome-email-v3",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        2000,
-        -224
+        4496,
+        -240
       ],
-      "id": "3461457d-92af-4d73-9f5b-a24137f23a5b",
-      "name": "Welcome Email1",
+      "id": "f14f98c8-8883-4244-b808-05027ad7a408",
+      "name": "Welcome Email2",
       "webhookId": "1a1a3a01-9b01-405b-b7a4-f9f88b86529b"
     },
     {
@@ -91,11 +91,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2224,
-        -224
+        4720,
+        -240
       ],
-      "id": "49ecb7fb-e202-4d5e-9993-dcf7c4b6f455",
-      "name": "Validate Email Payload2"
+      "id": "3c4ec863-42b2-4ff8-a426-89cb04843276",
+      "name": "Validate Email Payload4"
     },
     {
       "parameters": {
@@ -105,11 +105,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2656,
-        -304
+        5152,
+        -320
       ],
-      "id": "9cf46a4f-73d5-4a9e-bc89-a344edd47aa7",
-      "name": "Prepare Welcome Email1"
+      "id": "5d6ac825-462f-4145-a151-ce7c0dcae945",
+      "name": "Prepare Welcome Email2"
     },
     {
       "parameters": {
@@ -125,11 +125,11 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        2880,
-        -304
+        5376,
+        -320
       ],
-      "id": "a5264805-2ea0-4bd5-8af3-9a569388f4f1",
-      "name": "Send Welcome Email1",
+      "id": "d151b93f-a0d5-418c-9ad5-9263773625db",
+      "name": "Send Welcome Email2",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
       "webhookId": "b6dd4cc8-c9de-44dd-9d3f-4cbd38038bf3",
@@ -148,7 +148,7 @@
             {
               "id": "f5000001-0000-0000-0000-000000000001",
               "name": "notification_id",
-              "value": "={{ $('Welcome Email1').item.json.body.notification_id }}",
+              "value": "={{ $('Welcome Email2').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -170,11 +170,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3232,
-        -320
+        5728,
+        -336
       ],
-      "id": "f0deecf8-2cd3-40ba-87d1-9d4e7629bb7d",
-      "name": "Email Sent Response2"
+      "id": "174927a2-5da2-4896-905f-d287a48242ba",
+      "name": "Email Sent Response4"
     },
     {
       "parameters": {
@@ -183,7 +183,7 @@
             {
               "id": "f5000011-0000-0000-0000-000000000011",
               "name": "notification_id",
-              "value": "={{ $('Welcome Email1').item.json.body.notification_id }}",
+              "value": "={{ $('Welcome Email2').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -205,11 +205,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3088,
-        -192
+        5584,
+        -208
       ],
-      "id": "322bec81-f8e2-4c4b-90ac-1f2626d3fcb7",
-      "name": "Email Failed Response2"
+      "id": "bc94830f-d905-4668-b2d6-f60497f6e66d",
+      "name": "Email Failed Response4"
     },
     {
       "parameters": {
@@ -218,7 +218,7 @@
             {
               "id": "f5000021-0000-0000-0000-000000000021",
               "name": "notification_id",
-              "value": "={{ $('Welcome Email1').item.json.body.notification_id }}",
+              "value": "={{ $('Welcome Email2').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -240,139 +240,139 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2448,
-        -48
+        4944,
+        -64
       ],
-      "id": "44877f4a-51c9-4090-8c02-753cbb6d7371",
-      "name": "Email Validation Failed2"
+      "id": "f9e97aec-1901-4c4e-a9c4-28caf125b6eb",
+      "name": "Email Validation Failed4"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
-        "options": {},
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        3504,
-        -48
+        6000,
+        -64
       ],
-      "id": "ed538ed9-7694-4451-9c6b-3bc557bd070f",
-      "name": "Email Callback2",
+      "id": "3f3e748d-2120-422e-a1c2-c29572d4c716",
+      "name": "Email Callback4",
       "alwaysOutputData": true,
       "retryOnFail": true,
-      "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
           "id": "djiMPtATquR2OnRc",
           "name": "Notification Header Auth | api.supershyft"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
-    "Split Members": {
+    "Split Members6": {
       "main": [
         [
           {
-            "node": "Prepare Welcome Email1",
+            "node": "Prepare Welcome Email2",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Welcome Email1": {
+    "Welcome Email2": {
       "main": [
         [
           {
-            "node": "Validate Email Payload2",
+            "node": "Validate Email Payload4",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate Email Payload2": {
+    "Validate Email Payload4": {
       "main": [
         [
           {
-            "node": "Split Members",
+            "node": "Split Members6",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Email Validation Failed2",
+            "node": "Email Validation Failed4",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Welcome Email1": {
+    "Prepare Welcome Email2": {
       "main": [
         [
           {
-            "node": "Send Welcome Email1",
+            "node": "Send Welcome Email2",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send Welcome Email1": {
+    "Send Welcome Email2": {
       "main": [
         [
           {
-            "node": "Email Sent Response2",
+            "node": "Email Sent Response4",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Email Failed Response2",
+            "node": "Email Failed Response4",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Email Sent Response2": {
+    "Email Sent Response4": {
       "main": [
         [
           {
-            "node": "Email Callback2",
+            "node": "Email Callback4",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Email Failed Response2": {
+    "Email Failed Response4": {
       "main": [
         [
           {
-            "node": "Email Callback2",
+            "node": "Email Callback4",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Email Validation Failed2": {
+    "Email Validation Failed4": {
       "main": [
         [
           {
-            "node": "Email Callback2",
+            "node": "Email Callback4",
             "type": "main",
             "index": 0
           }

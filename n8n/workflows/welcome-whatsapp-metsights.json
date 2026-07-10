@@ -7,41 +7,41 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2480,
-        1152
+        4976,
+        1168
       ],
-      "id": "42e3631c-a924-48ae-996b-9fbb257819c9",
-      "name": "Split Members2"
+      "id": "a0bd8a86-6fab-4c41-90ff-83ea6c5c48e8",
+      "name": "Split Members8"
     },
     {
       "parameters": {
         "content": "## Send Welcome WhatsApp (Redirect to Metsights)\nSends a welcome WhatsApp message to each member in the payload.\nExpects: { notification_id, members: [{ first_name, last_name, email, phone }] }",
-        "height": 560,
-        "width": 1984
+        "height": 576,
+        "width": 2192
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        1920,
-        1024
+        4416,
+        1040
       ],
       "typeVersion": 1,
-      "id": "0d2de99a-c750-4481-89f4-abe8935ecedd",
-      "name": "Sticky Note WhatsApp4"
+      "id": "b11e2011-156a-44da-ae2f-f47dad3ecc52",
+      "name": "Sticky Note WhatsApp7"
     },
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "welcome-whatsapp-metsights-v2",
+        "path": "welcome-whatsapp-metsights-v3",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        2016,
-        1264
+        4512,
+        1280
       ],
-      "id": "10a40d7c-1a77-4c65-a14c-556533442cdd",
-      "name": "Welcome WhatsApp3",
+      "id": "0b9cb1d1-a182-4d6b-a7fc-f1962fe19fe3",
+      "name": "Welcome WhatsApp5",
       "webhookId": "2b2b4b02-ac02-506c-c8b5-gag99c97630c"
     },
     {
@@ -91,11 +91,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2224,
-        1264
+        4720,
+        1280
       ],
-      "id": "d70faa89-43c4-4d29-999d-e7ffdc01adff",
-      "name": "Validate WhatsApp Payload4"
+      "id": "cbee261d-bff1-4955-af91-b17bb98feb1d",
+      "name": "Validate WhatsApp Payload7"
     },
     {
       "parameters": {
@@ -105,11 +105,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2704,
-        1152
+        5200,
+        1168
       ],
-      "id": "705c582d-c09e-4976-b862-df024db7501b",
-      "name": "Prepare WhatsApp Message4"
+      "id": "8cf161ff-208d-465f-bb61-075a6ce18b09",
+      "name": "Prepare WhatsApp Message7"
     },
     {
       "parameters": {
@@ -132,11 +132,11 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2928,
-        1152
+        5424,
+        1168
       ],
-      "id": "e5efffb6-6a0f-4dd3-8cdf-e19ad987fe8c",
-      "name": "Send WhatsApp Message4",
+      "id": "068d6b85-80c6-4231-a30e-7f7ce161d90e",
+      "name": "Send WhatsApp Message7",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
       "onError": "continueErrorOutput"
@@ -148,7 +148,7 @@
             {
               "id": "f5000031-0000-0000-0000-000000000031",
               "name": "notification_id",
-              "value": "={{ $('Prepare WhatsApp Message4').item.json.notification_id }}",
+              "value": "={{ $('Prepare WhatsApp Message7').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -170,11 +170,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3152,
+        6096,
         1056
       ],
-      "id": "84c923d4-0087-4740-a9a7-c339ee7a6475",
-      "name": "WhatsApp Sent Response4"
+      "id": "cb3ec61e-b829-467a-abe9-5a84221fe8ad",
+      "name": "WhatsApp Sent Response8"
     },
     {
       "parameters": {
@@ -183,7 +183,7 @@
             {
               "id": "f5000041-0000-0000-0000-000000000041",
               "name": "notification_id",
-              "value": "={{ $('Prepare WhatsApp Message4').item.json.notification_id }}",
+              "value": "={{ $('Prepare WhatsApp Message7').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -205,11 +205,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3152,
-        1232
+        5712,
+        1280
       ],
-      "id": "9c035025-dd80-486d-9fa6-3a611332a175",
-      "name": "WhatsApp Failed Response4"
+      "id": "7618c98f-324d-4070-a7c2-2390964b0d01",
+      "name": "WhatsApp Failed Response8"
     },
     {
       "parameters": {
@@ -218,7 +218,7 @@
             {
               "id": "f5000051-0000-0000-0000-000000000051",
               "name": "notification_id",
-              "value": "={{ $('Welcome WhatsApp3').item.json.body.notification_id }}",
+              "value": "={{ $('Welcome WhatsApp5').item.json.body.notification_id }}",
               "type": "number"
             },
             {
@@ -240,40 +240,40 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2480,
-        1360
+        4976,
+        1408
       ],
-      "id": "43eebf31-ef0f-472d-8ba4-b4c2af581d8a",
-      "name": "WhatsApp Validation Failed4"
+      "id": "188f5149-54ba-4c61-b5c4-a980ec4cd78f",
+      "name": "WhatsApp Validation Failed7"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
-        "options": {},
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        3504,
-        1360
+        6368,
+        1424
       ],
-      "id": "400e00a2-e641-4a67-b5ee-15081b42e17c",
-      "name": "WhatsApp Callback4",
+      "id": "c87c8161-7738-4afe-bd0c-8c41e6f2b559",
+      "name": "WhatsApp Callback7",
       "alwaysOutputData": true,
       "retryOnFail": true,
-      "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
           "id": "djiMPtATquR2OnRc",
           "name": "Notification Header Auth | api.supershyft"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -303,11 +303,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3040,
-        1056
+        5712,
+        1072
       ],
-      "id": "d3513d2d-c82b-4ef0-a773-848737cddc87",
-      "name": "WhatAPI Accepted?"
+      "id": "1e1e4674-f45c-447e-b2a9-43f997044a80",
+      "name": "WhatAPI Accepted?1"
     },
     {
       "parameters": {
@@ -316,7 +316,7 @@
             {
               "id": "9578910a-5d1f-49f0-8308-be7cb35a64b2",
               "name": "notification_id",
-              "value": "={{ $('Prepare WhatsApp Message4').item.json.notification_id }}",
+              "value": "={{ $('Prepare WhatsApp Message7').item.json.notification_id }}",
               "type": "number"
             },
             {
@@ -338,139 +338,139 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3040,
-        1232
+        5952,
+        1200
       ],
-      "id": "226ad351-ea98-4563-8057-848e971c0aed",
-      "name": "WhatAPI Not Accepted"
+      "id": "57eaa171-5335-4ddc-994a-d008b9af51a2",
+      "name": "WhatAPI Not Accepted1"
     }
   ],
   "connections": {
-    "Split Members2": {
+    "Split Members8": {
       "main": [
         [
           {
-            "node": "Prepare WhatsApp Message4",
+            "node": "Prepare WhatsApp Message7",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Welcome WhatsApp3": {
+    "Welcome WhatsApp5": {
       "main": [
         [
           {
-            "node": "Validate WhatsApp Payload4",
+            "node": "Validate WhatsApp Payload7",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate WhatsApp Payload4": {
+    "Validate WhatsApp Payload7": {
       "main": [
         [
           {
-            "node": "Split Members2",
+            "node": "Split Members8",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "WhatsApp Validation Failed4",
+            "node": "WhatsApp Validation Failed7",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare WhatsApp Message4": {
+    "Prepare WhatsApp Message7": {
       "main": [
         [
           {
-            "node": "Send WhatsApp Message4",
+            "node": "Send WhatsApp Message7",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send WhatsApp Message4": {
+    "Send WhatsApp Message7": {
       "main": [
         [
           {
-            "node": "WhatAPI Accepted?",
+            "node": "WhatAPI Accepted?1",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "WhatsApp Failed Response4",
+            "node": "WhatsApp Failed Response8",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "WhatsApp Sent Response4": {
+    "WhatsApp Sent Response8": {
       "main": [
         [
           {
-            "node": "WhatsApp Callback4",
+            "node": "WhatsApp Callback7",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "WhatsApp Failed Response4": {
+    "WhatsApp Failed Response8": {
       "main": [
         [
           {
-            "node": "WhatsApp Callback4",
+            "node": "WhatsApp Callback7",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "WhatsApp Validation Failed4": {
+    "WhatsApp Validation Failed7": {
       "main": [
         [
           {
-            "node": "WhatsApp Callback4",
+            "node": "WhatsApp Callback7",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "WhatAPI Accepted?": {
+    "WhatAPI Accepted?1": {
       "main": [
         [
           {
-            "node": "WhatsApp Sent Response4",
+            "node": "WhatsApp Sent Response8",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "WhatAPI Not Accepted",
+            "node": "WhatAPI Not Accepted1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "WhatAPI Not Accepted": {
+    "WhatAPI Not Accepted1": {
       "main": [
         [
           {
-            "node": "WhatsApp Callback4",
+            "node": "WhatsApp Callback7",
             "type": "main",
             "index": 0
           }
