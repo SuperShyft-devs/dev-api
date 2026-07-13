@@ -13,7 +13,10 @@ from core.exceptions import AppError
 from modules.diagnostics.models import DiagnosticPackage
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.metsights.service import MetsightsService
-from modules.reports.blood_parameters_schemas import provider_code_from_field
+from modules.reports.blood_parameters_schemas import (
+    booking_id_from_fetch_collections,
+    provider_code_from_field,
+)
 
 
 class HealthiansBookingSource(str, Enum):
@@ -114,12 +117,12 @@ async def resolve_healthians_booking_id(
             ),
         )
 
-    reference_id = str(collection_data.get("reference_id") or "").strip()
+    reference_id = booking_id_from_fetch_collections(collection_data)
     if not reference_id:
         raise AppError(
             status_code=422,
             error_code="INVALID_STATE",
-            message="Metsights collection is missing the provider reference id",
+            message="Metsights collection is missing the provider booking id",
         )
 
     return ResolvedHealthiansBooking(

@@ -327,3 +327,117 @@ async def test_load_blood_reports_skips_metsights_push_when_bioai_report_generat
     ).scalar_one_or_none()
     assert ihr is not None
     assert ihr.blood_parameters is not None
+
+
+@pytest.mark.asyncio
+async def test_load_blood_reports_uses_fetch_collections_data_booking_id(
+    test_db_session, monkeypatch
+):
+    await _seed_running_participant(
+        test_db_session,
+        user_id=88003,
+        engagement_id=88003,
+        assessment_id=88003,
+        booking_id=None,
+        metsights_record_id="5650A9ED33FD",
+    )
+
+    fetch_payload = {
+        "reference_id": None,
+        "is_success": False,
+        "data": {
+            "file_type": "pdf",
+            "booking_id": "19121084542",
+            "file_category": "blood_report_pdf",
+        },
+        "provider": {
+            "name": "Healthians (No Package)",
+            "lab_provider": {"code": "Healthians"},
+        },
+    }
+
+    digital_calls: list[str] = []
+
+    async def _fake_fetch_collections(self, *, record_id: str):
+        assert record_id == "5650A9ED33FD"
+        return fetch_payload
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_digital(_token, booking_id):
+        digital_calls.append(booking_id)
+        return {
+            "data": [
+                {
+                    "customer_name": "John Doe",
+                    "digital_data": [{"parameter_id": "1", "value": "91.0", "unit": "mg/dL"}],
+                }
+            ]
+        }
+
+    async def _fake_report(_token, _booking_id):
+        return {"data": []}
+
+    async def _fake_group(_db, _raw, *, diagnostic_package_id):
+        grouped = [
+            {
+                "group_name": "Metabolic",
+                "test_count": 1,
+                "tests": [{"parameter_key": "glucose_fasting", "value": 91.0, "unit": "mg/dL"}],
+            }
+        ]
+        return grouped, _raw
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.get_fetch_collections",
+        _fake_fetch_collections,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_digital_value",
+        _fake_digital,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_report",
+        _fake_report,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports._group_provider_blood",
+        _fake_group,
+    )
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    async def _fake_draft(db, *, user_id, assessment_instance_id, allow_completed=False):
+        return {"responses_drafted": 1}
+
+    monkeypatch.setattr(
+        assessments_service,
+        "draft_blood_parameters_from_report",
+        _fake_draft,
+    )
+
+    async def _fake_push(self, db, *, assessment_instance_id, user_id, category_key, category_of="metsights"):
+        return {"fields_pushed": ["glucose_fasting_value"]}
+
+    monkeypatch.setattr(
+        "modules.metsights.sync_service.MetsightsSyncService._push_category_to_metsights",
+        _fake_push,
+    )
+
+    result = await load_blood_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=notifications_service,
+        assessments_service=assessments_service,
+        sync_service=sync_service,
+    )
+
+    assert len(digital_calls) == 1
+    assert digital_calls[0] == "19121084542"
+    loaded = [d for d in result["details"] if d["action"] == "loaded"]
+    assert any("Metsights reference_id" in d["reason"] for d in loaded)

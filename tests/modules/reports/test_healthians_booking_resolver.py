@@ -254,4 +254,37 @@ async def test_resolve_metsights_requires_reference_id(test_db_session):
         )
 
     assert exc_info.value.error_code == "INVALID_STATE"
-    assert "missing the provider reference id" in exc_info.value.message
+    assert "missing the provider booking id" in exc_info.value.message
+
+
+@pytest.mark.asyncio
+async def test_resolve_metsights_uses_data_booking_id_when_reference_id_null(test_db_session):
+    await _seed_participant_context(test_db_session, booking_id=None)
+    await test_db_session.commit()
+
+    fake_metsights = _FakeMetsightsService(
+        payload={
+            "reference_id": None,
+            "is_success": False,
+            "data": {
+                "file_type": "pdf",
+                "booking_id": "19121084542",
+                "file_category": "blood_report_pdf",
+            },
+            "provider": {
+                "name": "Healthians (No Package)",
+                "lab_provider": {"code": "Healthians"},
+            },
+        }
+    )
+    resolved = await resolve_healthians_booking_id(
+        test_db_session,
+        user_id=50101,
+        engagement_id=40101,
+        record_id="REC50101",
+        metsights_service=fake_metsights,
+    )
+
+    assert resolved.booking_id == "19121084542"
+    assert resolved.source == HealthiansBookingSource.METSIGHTS
+    assert fake_metsights.calls == 1

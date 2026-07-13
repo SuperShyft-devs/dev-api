@@ -34,6 +34,7 @@ from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
 from modules.reports.blood_parameters_normalizer import build_grouped_from_healthians
 from modules.reports.blood_parameters_schemas import (
+    booking_id_from_fetch_collections,
     has_usable_provider_blood_parameters,
     provider_code_from_field,
 )
@@ -347,14 +348,14 @@ async def load_blood_reports(
                     })
                     continue
 
-                reference_id = str(collection_data.get("reference_id") or "").strip()
+                reference_id = booking_id_from_fetch_collections(collection_data)
                 provider_code = provider_code_from_field(collection_data.get("provider"))
 
                 if not reference_id:
                     skipped += 1
                     details.append({
                         "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "no reference_id from MetSights collections",
+                        "action": "skipped", "reason": "no booking id from MetSights collections",
                     })
                     continue
 

@@ -142,6 +142,24 @@ def provider_code_from_field(provider_field: Any) -> str:
     return str(provider_field).strip()
 
 
+def booking_id_from_fetch_collections(collection_data: Any) -> str:
+    """Extract Healthians booking id from Metsights fetch-collections payload.
+
+    Supports both shapes:
+    - ``{"reference_id": "12345", ...}``
+    - ``{"reference_id": null, "data": {"booking_id": "12345", ...}, ...}``
+    """
+    if not isinstance(collection_data, dict):
+        return ""
+    reference_id = str(collection_data.get("reference_id") or "").strip()
+    if reference_id:
+        return reference_id
+    nested = collection_data.get("data")
+    if isinstance(nested, dict):
+        return str(nested.get("booking_id") or "").strip()
+    return ""
+
+
 def is_metsights_metadata_only(blob: Any) -> bool:
     """Metsights API wrapper with only record metadata and no parameter values."""
     if not isinstance(blob, dict) or not blob:

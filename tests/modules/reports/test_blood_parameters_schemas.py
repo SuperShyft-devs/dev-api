@@ -9,6 +9,7 @@ from modules.reports.blood_parameters_schemas import (
     is_legacy_healthians_format,
     is_legacy_metsights_flat_format,
     is_metsights_metadata_only,
+    booking_id_from_fetch_collections,
     provider_code_from_field,
 )
 
@@ -119,3 +120,22 @@ def test_provider_code_from_field():
     assert provider_code_from_field({"name": "Healthians (No Package)"}) == ""
     assert provider_code_from_field(None) == ""
     assert provider_code_from_field("other") == "other"
+
+
+def test_booking_id_from_fetch_collections():
+    assert booking_id_from_fetch_collections({"reference_id": "12345"}) == "12345"
+    assert booking_id_from_fetch_collections(
+        {
+            "reference_id": None,
+            "data": {"booking_id": "19121084542", "file_type": "pdf"},
+        }
+    ) == "19121084542"
+    assert booking_id_from_fetch_collections(
+        {
+            "reference_id": "primary-id",
+            "data": {"booking_id": "fallback-id"},
+        }
+    ) == "primary-id"
+    assert booking_id_from_fetch_collections({"reference_id": "", "data": {}}) == ""
+    assert booking_id_from_fetch_collections({}) == ""
+    assert booking_id_from_fetch_collections(None) == ""
