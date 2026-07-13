@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+import hashlib
+import hmac
+from datetime import date, time, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -22,319 +24,47 @@ def _mock_razorpay_order(*, amount_paise: int, receipt: str):
     return {"id": f"order_test_{receipt}", "amount": amount_paise, "currency": "INR"}
 
 
+def _razorpay_signature(*, order_id: str, payment_id: str) -> str:
+    message = f"{order_id}|{payment_id}"
+    return hmac.new(
+        key=settings.RAZORPAY_KEY_SECRET.encode(),
+        msg=message.encode(),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+
+
+_VERIFY_PAYLOAD = {
+    "razorpay_order_id": "order_test_x",
+    "razorpay_payment_id": "pay_test_x",
+    "razorpay_signature": "sig",
+}
+
+
 @pytest.mark.asyncio
 async def test_book_bio_ai_batch_requires_auth(async_client):
+    response = await async_client.post("/book/bio-ai", json=_VERIFY_PAYLOAD)
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_book_pay_requires_auth(async_client):
     response = await async_client.post(
-        "/book/bio-ai",
-        json={
-            "members": [
-                {
-                    "user_id": 1,
-                    "address": "A",
-                    "pincode": "1",
-                    "city": "C",
-                    "blood_collection_date": "2026-06-01",
-                    "blood_collection_time_slot": "10:00",
-                    "diagnostic_package_id": 1,
-                }
-            ]
-        },
+        "/book/pay",
+        json={"members": [{"user_id": 1, "engagement_id": 1}]},
     )
     assert response.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_book_bio_ai_batch_rejects_sub_profile_actor(async_client, test_db_session, monkeypatch):
-    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "")
-
-    await test_db_session.execute(
-        text(
-            "INSERT INTO assessment_packages (package_id, package_code, display_name, assessment_type_code, status) "
-            "VALUES (1, 'PK1', 'Package', '1', 'active') ON CONFLICT (package_id) DO UPDATE SET "
-            "assessment_type_code = EXCLUDED.assessment_type_code, status = EXCLUDED.status"
-        )
-    )
-    await test_db_session.execute(
-        text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
-            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 500) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
-            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
-            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
-        )
-    )
-    await test_db_session.commit()
-
-    parent = User(
-        user_id=920001,
-        age=40,
-        phone="9200010000",
-        status="active",
-        first_name="Par",
-        last_name="Ent",
-        gender="male",
-        city="City",
-        parent_id=None,
-    )
-    child = User(
-        user_id=920002,
-        age=10,
-        phone="9200010000",
-        status="active",
-        first_name="Chi",
-        last_name="Ld",
-        gender="male",
-        city="City",
-        parent_id=920001,
-    )
-    test_db_session.add_all([parent, child])
-    await test_db_session.commit()
-
-    payload = {
-        "members": [
-            {
-                "user_id": 920002,
-                "address": "A1",
-                "pincode": "111111",
-                "city": "City",
-                "blood_collection_date": "2026-06-01",
-                "blood_collection_time_slot": "10:00",
-                "diagnostic_package_id": 1,
-            }
-        ]
-    }
-    response = await async_client.post("/book/bio-ai", headers=_auth_header(920002), json=payload)
-    assert response.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_book_bio_ai_batch_returns_payment_info(async_client, test_db_session, monkeypatch):
-    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "")
-
-    await test_db_session.execute(
-        text(
-            "INSERT INTO assessment_packages (package_id, package_code, display_name, assessment_type_code, status) "
-            "VALUES (1, 'PK1', 'Package', '1', 'active') ON CONFLICT (package_id) DO UPDATE SET "
-            "assessment_type_code = EXCLUDED.assessment_type_code, status = EXCLUDED.status"
-        )
-    )
-    await test_db_session.execute(
-        text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) VALUES "
-            "(1, 'REF1', 'Diag 1', 'test_provider', 'active', 1000) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
-            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
-            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
-        )
-    )
-    await test_db_session.commit()
-
-    parent = User(
-        user_id=920010,
-        age=40,
-        phone="9200100000",
-        status="active",
-        first_name="Par",
-        last_name="Ent",
-        gender="male",
-        city="Mumbai",
-        parent_id=None,
-    )
-    child = User(
-        user_id=920011,
-        age=12,
-        phone="9200100000",
-        status="active",
-        first_name="Chi",
-        last_name="Ld",
-        gender="male",
-        city="Mumbai",
-        parent_id=920010,
-    )
-    test_db_session.add_all([parent, child])
-    await test_db_session.commit()
-
-    payload = {
-        "members": [
-            {
-                "user_id": 920010,
-                "address": "Addr P",
-                "pincode": "400001",
-                "city": "Mumbai",
-                "blood_collection_date": "2026-06-10",
-                "blood_collection_time_slot": "09:00",
-                "diagnostic_package_id": 1,
-            },
-            {
-                "user_id": 920011,
-                "address": "Addr C",
-                "pincode": "400002",
-                "city": "Mumbai",
-                "blood_collection_date": "2026-06-10",
-                "blood_collection_time_slot": "09:30",
-                "diagnostic_package_id": 1,
-            },
-        ]
-    }
-
-    with patch(
-        "modules.payments.services._create_razorpay_order_sync",
-        side_effect=_mock_razorpay_order,
-    ):
-        response = await async_client.post("/book/bio-ai", headers=_auth_header(920010), json=payload)
-
-    assert response.status_code == 200
-    data = response.json()["data"]
-    assert "razorpay_order_id" in data
-    assert len(data["booking_ids"]) == 2
-    assert data["amount_paise"] == 200000
-    assert data["currency"] == "INR"
-
-
-@pytest.mark.asyncio
-async def test_book_bio_ai_batch_forbidden_for_unrelated_user(async_client, test_db_session, monkeypatch):
-    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "")
-
-    await test_db_session.execute(
-        text(
-            "INSERT INTO assessment_packages (package_id, package_code, display_name, assessment_type_code, status) "
-            "VALUES (1, 'PK1', 'Package', '1', 'active') ON CONFLICT (package_id) DO UPDATE SET "
-            "assessment_type_code = EXCLUDED.assessment_type_code, status = EXCLUDED.status"
-        )
-    )
-    await test_db_session.execute(
-        text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
-            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 500) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
-            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
-            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
-        )
-    )
-    await test_db_session.commit()
-
-    a = User(
-        user_id=920020,
-        age=30,
-        phone="9200200000",
-        status="active",
-        first_name="A",
-        last_name="A",
-        gender="male",
-        city="X",
-        parent_id=None,
-    )
-    b = User(
-        user_id=920021,
-        age=30,
-        phone="9200210000",
-        status="active",
-        first_name="B",
-        last_name="B",
-        gender="female",
-        city="Y",
-        parent_id=None,
-    )
-    test_db_session.add_all([a, b])
-    await test_db_session.commit()
-
-    payload = {
-        "members": [
-            {
-                "user_id": 920021,
-                "address": "Addr",
-                "pincode": "111111",
-                "city": "Y",
-                "blood_collection_date": "2026-07-01",
-                "blood_collection_time_slot": "10:00",
-                "diagnostic_package_id": 1,
-            }
-        ]
-    }
-    response = await async_client.post("/book/bio-ai", headers=_auth_header(920020), json=payload)
-    assert response.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_book_blood_test_batch_returns_payment_info(async_client, test_db_session):
-    await test_db_session.execute(
-        text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
-            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 750) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
-            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
-            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
-        )
-    )
-    await test_db_session.commit()
-
+async def test_book_pay_rejects_duplicate_member_user_id(async_client, test_db_session):
+    await _seed_healthians_diagnostic_package(test_db_session)
     u = User(
-        user_id=920030,
-        age=25,
-        phone="9200300000",
-        status="active",
-        first_name="S",
-        last_name="olo",
-        gender="male",
-        city="Pune",
-        parent_id=None,
-    )
-    test_db_session.add(u)
-    await test_db_session.commit()
-
-    payload = {
-        "members": [
-            {
-                "user_id": 920030,
-                "address": "Lab St",
-                "pincode": "411001",
-                "city": "Pune",
-                "blood_collection_date": "2026-08-01",
-                "blood_collection_time_slot": "08:00",
-                "diagnostic_package_id": 1,
-            }
-        ]
-    }
-
-    with patch(
-        "modules.payments.services._create_razorpay_order_sync",
-        side_effect=_mock_razorpay_order,
-    ):
-        response = await async_client.post("/book/blood-test", headers=_auth_header(920030), json=payload)
-
-    assert response.status_code == 200
-    data = response.json()["data"]
-    assert "razorpay_order_id" in data
-    assert data["amount_paise"] == 75000
-    assert len(data["booking_ids"]) == 1
-
-    booking_row = (
-        await test_db_session.execute(
-            text("SELECT booking_type, metadata FROM bookings WHERE booking_id = :bid"),
-            {"bid": data["booking_id"]},
-        )
-    ).first()
-    assert booking_row.booking_type == "blood_test"
-    assert booking_row.metadata is not None
-
-
-@pytest.mark.asyncio
-async def test_book_bio_ai_batch_rejects_duplicate_member_user_id(async_client, test_db_session, monkeypatch):
-    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "")
-
-    await test_db_session.execute(
-        text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
-            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 500) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
-            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
-            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
-        )
-    )
-    await test_db_session.commit()
-
-    u = User(
-        user_id=920040,
+        user_id=940001,
         age=30,
-        phone="9200400000",
+        phone="9400010000",
         status="active",
         first_name="Dup",
-        last_name="User",
+        last_name="Pay",
         gender="male",
         city="City",
         parent_id=None,
@@ -342,122 +72,13 @@ async def test_book_bio_ai_batch_rejects_duplicate_member_user_id(async_client, 
     test_db_session.add(u)
     await test_db_session.commit()
 
-    member = {
-        "user_id": 920040,
-        "address": "Addr",
-        "pincode": "111111",
-        "city": "City",
-        "blood_collection_date": "2026-06-01",
-        "blood_collection_time_slot": "10:00",
-        "diagnostic_package_id": 1,
-    }
-    payload = {"members": [member, member]}
-    response = await async_client.post("/book/bio-ai", headers=_auth_header(920040), json=payload)
+    member = {"user_id": 940001, "engagement_id": 940101}
+    response = await async_client.post(
+        "/book/pay",
+        headers=_auth_header(940001),
+        json={"members": [member, member]},
+    )
     assert response.status_code == 400
-
-
-@pytest.mark.asyncio
-async def test_book_bio_ai_batch_rejects_more_than_ten_members(async_client, test_db_session):
-    await test_db_session.execute(
-        text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
-            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 500) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
-            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
-            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
-        )
-    )
-    await test_db_session.commit()
-
-    u = User(
-        user_id=920050,
-        age=30,
-        phone="9200500000",
-        status="active",
-        first_name="Big",
-        last_name="Batch",
-        gender="male",
-        city="City",
-        parent_id=None,
-    )
-    test_db_session.add(u)
-    await test_db_session.commit()
-
-    members = [
-        {
-            "user_id": 920050 + i,
-            "address": f"Addr {i}",
-            "pincode": "111111",
-            "city": "City",
-            "blood_collection_date": "2026-06-01",
-            "blood_collection_time_slot": "10:00",
-            "diagnostic_package_id": 1,
-        }
-        for i in range(11)
-    ]
-    response = await async_client.post("/book/bio-ai", headers=_auth_header(920050), json={"members": members})
-    assert response.status_code == 400
-
-
-@pytest.mark.asyncio
-async def test_book_bio_ai_batch_writes_audit_log(async_client, test_db_session, monkeypatch):
-    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "")
-
-    await test_db_session.execute(
-        text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price) "
-            "VALUES (1, 'REF1', 'Diag Package', 'test_provider', 'active', 500) ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
-            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, "
-            "diagnostic_provider = EXCLUDED.diagnostic_provider, status = EXCLUDED.status, price = EXCLUDED.price"
-        )
-    )
-    await test_db_session.commit()
-
-    u = User(
-        user_id=920060,
-        age=30,
-        phone="9200600000",
-        status="active",
-        first_name="Aud",
-        last_name="It",
-        gender="male",
-        city="City",
-        parent_id=None,
-    )
-    test_db_session.add(u)
-    await test_db_session.commit()
-
-    payload = {
-        "members": [
-            {
-                "user_id": 920060,
-                "address": "Addr",
-                "pincode": "111111",
-                "city": "City",
-                "blood_collection_date": "2026-06-01",
-                "blood_collection_time_slot": "10:00",
-                "diagnostic_package_id": 1,
-            }
-        ]
-    }
-
-    with patch(
-        "modules.payments.services._create_razorpay_order_sync",
-        side_effect=_mock_razorpay_order,
-    ):
-        response = await async_client.post("/book/bio-ai", headers=_auth_header(920060), json=payload)
-
-    assert response.status_code == 200
-
-    audit_count = (
-        await test_db_session.execute(
-            text(
-                "SELECT COUNT(*) FROM data_audit_logs "
-                "WHERE user_id = 920060 AND action = 'USER_BOOK_BIO_AI'"
-            )
-        )
-    ).scalar_one()
-    assert int(audit_count) >= 1
-
 
 # --- Booking flow API tests (drafts, serviceability, slots, lock) ---
 
@@ -484,6 +105,7 @@ async def _seed_draft_engagement(
     user_id: int,
     booked_by_user_id: int,
     address: str | None = "Flat 1, Block A, Near Park, Mumbai - 400001",
+    locked: bool = False,
 ) -> None:
     from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant
 
@@ -506,15 +128,23 @@ async def _seed_draft_engagement(
             blood_collection_type=BloodCollectionType.home_collection,
         )
     )
-    test_db_session.add(
-        EngagementParticipant(
-            engagement_id=engagement_id,
-            user_id=user_id,
-            booked_by_user_id=booked_by_user_id,
-            engagement_date=None,
-            slot_start_time=None,
-        )
-    )
+    participant_kwargs: dict = {
+        "engagement_id": engagement_id,
+        "user_id": user_id,
+        "booked_by_user_id": booked_by_user_id,
+    }
+    if locked:
+        participant_kwargs.update({
+            "engagement_date": date(2026, 7, 15),
+            "slot_start_time": time(6, 0),
+            "blood_collection_time_slot_id": "slot-123",
+        })
+    else:
+        participant_kwargs.update({
+            "engagement_date": None,
+            "slot_start_time": None,
+        })
+    test_db_session.add(EngagementParticipant(**participant_kwargs))
     await test_db_session.commit()
 
 
@@ -970,3 +600,290 @@ async def test_lock_updates_slot_start_time(async_client, test_db_session):
     assert str(part_row.engagement_date) == "2026-07-16"
     assert str(part_row.slot_start_time) == "09:30:00"
     assert part_row.blood_collection_time_slot_id == "999"
+
+
+@pytest.mark.asyncio
+async def test_book_pay_creates_razorpay_order(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
+    await _seed_healthians_diagnostic_package(test_db_session)
+    u = User(
+        user_id=940010,
+        age=30,
+        phone="9400100000",
+        status="active",
+        first_name="Pay",
+        last_name="User",
+        gender="male",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=940110,
+        user_id=940010,
+        booked_by_user_id=940010,
+        locked=True,
+    )
+
+    with patch(
+        "modules.payments.services._create_razorpay_order_sync",
+        side_effect=_mock_razorpay_order,
+    ):
+        response = await async_client.post(
+            "/book/pay",
+            headers=_auth_header(940010),
+            json={"members": [{"user_id": 940010, "engagement_id": 940110}]},
+        )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["razorpay_order_id"]
+    assert data["amount_paise"] == 50000
+    assert data["key_id"]
+
+    meta_row = (
+        await test_db_session.execute(
+            text("SELECT metadata FROM bookings WHERE booking_id = :bid"),
+            {"bid": data["booking_ids"][0]},
+        )
+    ).scalar_one()
+    assert meta_row["engagement_id"] == 940110
+
+
+@pytest.mark.asyncio
+async def test_book_pay_rejects_unlocked_draft(async_client, test_db_session):
+    await _seed_healthians_diagnostic_package(test_db_session)
+    u = User(
+        user_id=940011,
+        age=30,
+        phone="9400110000",
+        status="active",
+        first_name="Un",
+        last_name="Locked",
+        gender="male",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=940111,
+        user_id=940011,
+        booked_by_user_id=940011,
+        locked=False,
+    )
+
+    response = await async_client.post(
+        "/book/pay",
+        headers=_auth_header(940011),
+        json={"members": [{"user_id": 940011, "engagement_id": 940111}]},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_book_bio_ai_verifies_and_finalizes(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
+    monkeypatch.setattr(settings, "HEALTHIANS_CHECKSUM_KEY", "test-checksum")
+    await _seed_healthians_diagnostic_package(test_db_session)
+    u = User(
+        user_id=940020,
+        age=30,
+        phone="9400200000",
+        status="active",
+        first_name="Bio",
+        last_name="Final",
+        gender="male",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=940120,
+        user_id=940020,
+        booked_by_user_id=940020,
+        locked=True,
+    )
+
+    with patch(
+        "modules.payments.services._create_razorpay_order_sync",
+        side_effect=_mock_razorpay_order,
+    ):
+        pay_resp = await async_client.post(
+            "/book/pay",
+            headers=_auth_header(940020),
+            json={"members": [{"user_id": 940020, "engagement_id": 940120}]},
+        )
+    razorpay_order_id = pay_resp.json()["data"]["razorpay_order_id"]
+    payment_id = "pay_test_940020"
+    signature = _razorpay_signature(order_id=razorpay_order_id, payment_id=payment_id)
+
+    healthians_resp = {"status": True, "booking_id": "HI940020", "message": "Booking placed"}
+
+    with patch(
+        "modules.bookings.service.healthians_client.get_access_token",
+        new_callable=AsyncMock,
+        return_value="tok",
+    ), patch(
+        "modules.bookings.service.healthians_client.create_booking_v3",
+        new_callable=AsyncMock,
+        return_value=healthians_resp,
+    ):
+        response = await async_client.post(
+            "/book/bio-ai",
+            headers=_auth_header(940020),
+            json={
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": payment_id,
+                "razorpay_signature": signature,
+            },
+        )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["payment_verified"] is True
+    assert data["members"][0]["status"] == "success"
+    assert data["members"][0]["booking_id"] == "HI940020"
+
+    eng_row = (
+        await test_db_session.execute(
+            text("SELECT status, engagement_type FROM engagements WHERE engagement_id = 940120")
+        )
+    ).one()
+    assert eng_row.status == "scheduled"
+    assert eng_row.engagement_type == "bio_ai"
+
+
+@pytest.mark.asyncio
+async def test_book_blood_test_sets_engagement_type_diagnostic(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
+    monkeypatch.setattr(settings, "HEALTHIANS_CHECKSUM_KEY", "test-checksum")
+    await _seed_healthians_diagnostic_package(test_db_session)
+    u = User(
+        user_id=940021,
+        age=30,
+        phone="9400210000",
+        status="active",
+        first_name="Blood",
+        last_name="Test",
+        gender="male",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=940121,
+        user_id=940021,
+        booked_by_user_id=940021,
+        locked=True,
+    )
+
+    with patch(
+        "modules.payments.services._create_razorpay_order_sync",
+        side_effect=_mock_razorpay_order,
+    ):
+        pay_resp = await async_client.post(
+            "/book/pay",
+            headers=_auth_header(940021),
+            json={"members": [{"user_id": 940021, "engagement_id": 940121}]},
+        )
+    razorpay_order_id = pay_resp.json()["data"]["razorpay_order_id"]
+    payment_id = "pay_test_940021"
+    signature = _razorpay_signature(order_id=razorpay_order_id, payment_id=payment_id)
+
+    with patch(
+        "modules.bookings.service.healthians_client.get_access_token",
+        new_callable=AsyncMock,
+        return_value="tok",
+    ), patch(
+        "modules.bookings.service.healthians_client.create_booking_v3",
+        new_callable=AsyncMock,
+        return_value={"status": True, "booking_id": "HI940021", "message": "OK"},
+    ):
+        response = await async_client.post(
+            "/book/blood-test",
+            headers=_auth_header(940021),
+            json={
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": payment_id,
+                "razorpay_signature": signature,
+            },
+        )
+
+    assert response.status_code == 200
+    eng_type = (
+        await test_db_session.execute(
+            text("SELECT engagement_type FROM engagements WHERE engagement_id = 940121")
+        )
+    ).scalar_one()
+    assert eng_type == "diagnostic"
+
+
+@pytest.mark.asyncio
+async def test_book_bio_ai_idempotent_when_already_paid(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
+    monkeypatch.setattr(settings, "HEALTHIANS_CHECKSUM_KEY", "test-checksum")
+    await _seed_healthians_diagnostic_package(test_db_session)
+    u = User(
+        user_id=940022,
+        age=30,
+        phone="9400220000",
+        status="active",
+        first_name="Idem",
+        last_name="Potent",
+        gender="male",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=940122,
+        user_id=940022,
+        booked_by_user_id=940022,
+        locked=True,
+    )
+
+    with patch(
+        "modules.payments.services._create_razorpay_order_sync",
+        side_effect=_mock_razorpay_order,
+    ):
+        pay_resp = await async_client.post(
+            "/book/pay",
+            headers=_auth_header(940022),
+            json={"members": [{"user_id": 940022, "engagement_id": 940122}]},
+        )
+    razorpay_order_id = pay_resp.json()["data"]["razorpay_order_id"]
+    payment_id = "pay_test_940022"
+    signature = _razorpay_signature(order_id=razorpay_order_id, payment_id=payment_id)
+    verify_payload = {
+        "razorpay_order_id": razorpay_order_id,
+        "razorpay_payment_id": payment_id,
+        "razorpay_signature": signature,
+    }
+
+    healthians_mock = AsyncMock(return_value={"status": True, "booking_id": "HI940022", "message": "OK"})
+
+    with patch(
+        "modules.bookings.service.healthians_client.get_access_token",
+        new_callable=AsyncMock,
+        return_value="tok",
+    ), patch(
+        "modules.bookings.service.healthians_client.create_booking_v3",
+        healthians_mock,
+    ):
+        first = await async_client.post("/book/bio-ai", headers=_auth_header(940022), json=verify_payload)
+        second = await async_client.post("/book/bio-ai", headers=_auth_header(940022), json=verify_payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["data"]["members"][0]["status"] == "success"
+    assert healthians_mock.await_count == 1

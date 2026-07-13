@@ -51,6 +51,28 @@ class LockSlotRequest(BaseModel):
     members: list[LockSlotMember] = Field(..., min_length=1, max_length=10)
 
 
+class BookPayMember(BaseModel):
+    user_id: int = Field(gt=0)
+    engagement_id: int = Field(gt=0)
+
+
+class BookPayRequest(BaseModel):
+    members: list[BookPayMember] = Field(..., min_length=1, max_length=10)
+
+    @model_validator(mode="after")
+    def unique_member_user_ids(self) -> "BookPayRequest":
+        ids = [m.user_id for m in self.members]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Duplicate user_id in members")
+        return self
+
+
+class VerifyAndBookRequest(BaseModel):
+    razorpay_payment_id: str = Field(min_length=1)
+    razorpay_order_id: str = Field(min_length=1)
+    razorpay_signature: str = Field(min_length=1)
+
+
 class BookFromDraftMember(BaseModel):
     user_id: int = Field(gt=0)
     engagement_id: int = Field(gt=0)

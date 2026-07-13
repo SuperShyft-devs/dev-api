@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -79,27 +80,18 @@ async def test_payment_failed_forbidden_for_unrelated_user(async_client, test_db
     await test_db_session.commit()
 
     payload = {
-        "members": [
-            {
-                "user_id": 930001,
-                "address": "Addr",
-                "pincode": "111111",
-                "city": "City",
-                "blood_collection_date": "2026-09-01",
-                "blood_collection_time_slot": "10:00",
-                "diagnostic_package_id": 1,
-            }
-        ]
+        "user_id": 930001,
+        "items": [{"user_id": 930001, "entity_type": "diagnostic_package", "entity_id": 1}],
     }
 
     with patch(
         "modules.payments.services._create_razorpay_order_sync",
         side_effect=_mock_razorpay_order,
     ):
-        book_resp = await async_client.post("/book/bio-ai", headers=_auth_header(930001), json=payload)
+        book_resp = await async_client.post("/payments/create-order", headers=_auth_header(930001), json=payload)
 
     assert book_resp.status_code == 200
-    razorpay_order_id = book_resp.json()["data"]["razorpay_order_id"]
+    razorpay_order_id = book_resp.json()["razorpay_order_id"]
 
     failed_resp = await async_client.post(
         "/payments/failed",
@@ -148,26 +140,17 @@ async def test_verify_payment_forbidden_for_unrelated_user(async_client, test_db
     await test_db_session.commit()
 
     payload = {
-        "members": [
-            {
-                "user_id": 930010,
-                "address": "Addr",
-                "pincode": "111111",
-                "city": "City",
-                "blood_collection_date": "2026-09-01",
-                "blood_collection_time_slot": "10:00",
-                "diagnostic_package_id": 1,
-            }
-        ]
+        "user_id": 930010,
+        "items": [{"user_id": 930010, "entity_type": "diagnostic_package", "entity_id": 1}],
     }
 
     with patch(
         "modules.payments.services._create_razorpay_order_sync",
         side_effect=_mock_razorpay_order,
     ):
-        book_resp = await async_client.post("/book/bio-ai", headers=_auth_header(930010), json=payload)
+        book_resp = await async_client.post("/payments/create-order", headers=_auth_header(930010), json=payload)
 
-    razorpay_order_id = book_resp.json()["data"]["razorpay_order_id"]
+    razorpay_order_id = book_resp.json()["razorpay_order_id"]
     payment_id = "pay_test_930010"
     signature = _razorpay_signature(order_id=razorpay_order_id, payment_id=payment_id)
 
@@ -204,27 +187,36 @@ async def test_verify_payment_rolls_back_when_fulfillment_fails(async_client, te
     await test_db_session.commit()
 
     payload = {
-        "members": [
-            {
-                "user_id": 930020,
-                "address": "Addr",
-                "pincode": "111111",
-                "city": "City",
-                "blood_collection_date": "2026-09-01",
-                "blood_collection_time_slot": "10:00",
-                "diagnostic_package_id": 1,
-            }
-        ]
+        "user_id": 930020,
+        "items": [{"user_id": 930020, "entity_type": "diagnostic_package", "entity_id": 1}],
     }
 
     with patch(
         "modules.payments.services._create_razorpay_order_sync",
         side_effect=_mock_razorpay_order,
     ):
-        book_resp = await async_client.post("/book/bio-ai", headers=_auth_header(930020), json=payload)
+        book_resp = await async_client.post("/payments/create-order", headers=_auth_header(930020), json=payload)
 
-    booking_id = book_resp.json()["data"]["booking_id"]
-    razorpay_order_id = book_resp.json()["data"]["razorpay_order_id"]
+    booking_id = book_resp.json()["booking_id"]
+    razorpay_order_id = book_resp.json()["razorpay_order_id"]
+    await test_db_session.execute(
+        text(
+            "UPDATE bookings SET booking_type = 'bio_ai', metadata = CAST(:meta AS json) "
+            "WHERE booking_id = :bid"
+        ),
+        {
+            "bid": booking_id,
+            "meta": json.dumps({
+                "address": "Addr",
+                "pincode": "111111",
+                "city": "City",
+                "blood_collection_date": "2026-09-01",
+                "blood_collection_time_slot": "10:00",
+                "diagnostic_package_id": 1,
+            }),
+        },
+    )
+    await test_db_session.commit()
     payment_id = "pay_test_930020"
     signature = _razorpay_signature(order_id=razorpay_order_id, payment_id=payment_id)
 

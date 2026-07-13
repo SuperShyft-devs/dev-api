@@ -7,60 +7,80 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
 from core.dependencies import get_current_user
-from core.network import get_client_ip
 from core.rate_limit import limiter
 from db.session import get_db
 from modules.bookings.schemas import (
     AvailableSlotsRequest,
-    BookFromDraftRequest,
+    BookPayRequest,
     CancelBookingRequest,
     CheckServiceabilityRequest,
     LockSlotRequest,
+    VerifyAndBookRequest,
 )
 from modules.bookings import service as booking_service
-from modules.engagements.dependencies import get_engagements_service, get_engagements_repository
+from modules.engagements.dependencies import get_engagements_repository, get_engagements_service
+from modules.engagements.models import EngagementKind
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService
-from modules.users.dependencies import get_users_service
-from modules.users.schemas import BookBioAiBatchRequest, BookBloodTestBatchRequest
-from modules.users.service import UsersService
 
 
 router = APIRouter(prefix="/book", tags=["bookings"])
 
 
-@router.post("/bio-ai")
+@router.post("/pay")
 @limiter.limit("5/minute")
-async def book_bio_ai_batch(
-    payload: BookFromDraftRequest,
+async def book_pay(
+    payload: BookPayRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
-    users_service: UsersService = Depends(get_users_service),
 ):
     members = [{"user_id": m.user_id, "engagement_id": m.engagement_id} for m in payload.members]
-    result = await booking_service.create_healthians_booking_after_payment(
-        db, members=members, caller_user_id=current_user.user_id
+    result = await booking_service.create_pay_order_for_draft_engagements(
+        db, members=members, payer_user_id=current_user.user_id
     )
     await db.commit()
-    return success_response({"members": result})
+    return success_response(result)
+
+
+@router.post("/bio-ai")
+@limiter.limit("5/minute")
+async def book_bio_ai_batch(
+    payload: VerifyAndBookRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    result = await booking_service.verify_and_finalize_draft_bookings(
+        db,
+        razorpay_payment_id=payload.razorpay_payment_id,
+        razorpay_order_id=payload.razorpay_order_id,
+        razorpay_signature=payload.razorpay_signature,
+        caller_user_id=current_user.user_id,
+        engagement_type=EngagementKind.bio_ai,
+    )
+    await db.commit()
+    return success_response(result)
 
 
 @router.post("/blood-test")
 @limiter.limit("5/minute")
 async def book_blood_test_batch(
-    payload: BookFromDraftRequest,
+    payload: VerifyAndBookRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
-    users_service: UsersService = Depends(get_users_service),
 ):
-    members = [{"user_id": m.user_id, "engagement_id": m.engagement_id} for m in payload.members]
-    result = await booking_service.create_healthians_booking_after_payment(
-        db, members=members, caller_user_id=current_user.user_id
+    result = await booking_service.verify_and_finalize_draft_bookings(
+        db,
+        razorpay_payment_id=payload.razorpay_payment_id,
+        razorpay_order_id=payload.razorpay_order_id,
+        razorpay_signature=payload.razorpay_signature,
+        caller_user_id=current_user.user_id,
+        engagement_type=EngagementKind.diagnostic,
     )
     await db.commit()
-    return success_response({"members": result})
+    return success_response(result)
 
 
 @router.post("/cancel/bio-ai")

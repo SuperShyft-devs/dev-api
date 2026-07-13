@@ -15,10 +15,12 @@ from core.exceptions import AppError
 from modules.diagnostics.healthians import client as healthians_client
 from modules.diagnostics.healthians.sync_log import log_healthians_call
 from modules.diagnostics.models import DiagnosticPackage
-from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant
+from modules.engagements.models import BloodCollectionType, Engagement, EngagementKind, EngagementParticipant
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService, _generate_engagement_code
 from modules.geocoding.client import search_places
+from modules.payments.models import Booking
+from modules.payments.services import PaymentsService
 from modules.users.models import User
 
 logger = logging.getLogger(__name__)
@@ -492,11 +494,185 @@ async def lock_slots(
     return results
 
 
+async def _validate_locked_draft_for_pay(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    engagement_id: int,
+    caller_user_id: int,
+) -> tuple[Engagement, EngagementParticipant, DiagnosticPackage]:
+    """Validate a draft engagement is locked and ready for payment."""
+    engagement_result = await db.execute(
+        select(Engagement).where(Engagement.engagement_id == engagement_id)
+    )
+    engagement = engagement_result.scalar_one_or_none()
+    if engagement is None:
+        raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement not found")
+    if (engagement.status or "").lower() != "draft":
+        raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is not in draft status")
+    if not engagement.diagnostic_package_id:
+        raise AppError(status_code=422, error_code="INVALID_STATE", message="No diagnostic package on engagement")
+
+    participant_result = await db.execute(
+        select(EngagementParticipant)
+        .where(EngagementParticipant.engagement_id == engagement_id)
+        .where(EngagementParticipant.user_id == user_id)
+        .order_by(EngagementParticipant.engagement_participant_id.desc())
+        .limit(1)
+    )
+    participant = participant_result.scalar_one_or_none()
+    if participant is None:
+        raise AppError(status_code=404, error_code="NOT_ENROLLED", message="User is not a participant")
+    if caller_user_id not in (participant.user_id, participant.booked_by_user_id):
+        raise AppError(status_code=403, error_code="FORBIDDEN", message="Not authorized to pay for this participant")
+    if not participant.blood_collection_time_slot_id:
+        raise AppError(status_code=422, error_code="SLOT_NOT_LOCKED", message="Blood collection slot is not locked")
+    if participant.engagement_date is None:
+        raise AppError(status_code=422, error_code="SLOT_NOT_LOCKED", message="Blood collection date is not set")
+    if participant.slot_start_time is None:
+        raise AppError(status_code=422, error_code="SLOT_NOT_LOCKED", message="Blood collection time is not set")
+
+    pkg = await _get_diagnostic_package(db, engagement.diagnostic_package_id)
+    if not _is_healthians(pkg):
+        raise AppError(status_code=422, error_code="INVALID_PROVIDER", message="Not a Healthians package")
+    if (pkg.status or "").strip().lower() != "active":
+        raise AppError(status_code=422, error_code="PACKAGE_INACTIVE", message="Diagnostic package is not active")
+
+    return engagement, participant, pkg
+
+
+async def create_pay_order_for_draft_engagements(
+    db: AsyncSession,
+    *,
+    members: list[dict[str, Any]],
+    payer_user_id: int,
+) -> dict[str, Any]:
+    """Create a Razorpay order for locked draft engagements."""
+    validated_items: list[tuple[int, str, int]] = []
+    metadata_by_user: dict[int, dict[str, Any]] = {}
+    member_statuses: list[dict[str, Any]] = []
+
+    for member in members:
+        user_id = member["user_id"]
+        engagement_id = member["engagement_id"]
+        engagement, _participant, pkg = await _validate_locked_draft_for_pay(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            caller_user_id=payer_user_id,
+        )
+        package_id = int(engagement.diagnostic_package_id)
+        validated_items.append((user_id, "diagnostic_package", package_id))
+        metadata_by_user[user_id] = {"engagement_id": engagement_id}
+        member_statuses.append({
+            "user_id": user_id,
+            "engagement_id": engagement_id,
+            "status": "success",
+        })
+
+    payments_service = PaymentsService()
+    result = await payments_service.create_order(
+        db,
+        payer_user_id=payer_user_id,
+        items=validated_items,
+        authenticated_user_id=payer_user_id,
+        booking_type=None,
+        metadata_by_user=metadata_by_user,
+    )
+    err = result.get("_error")
+    if err:
+        code, msg = err
+        raise AppError(status_code=code, error_code="PAYMENT_ERROR", message=msg)
+
+    return {
+        "razorpay_order_id": result["razorpay_order_id"],
+        "amount_paise": result["amount_paise"],
+        "amount_rupees": result["amount_rupees"],
+        "currency": result["currency"],
+        "key_id": result["key_id"],
+        "booking_ids": result["booking_ids"],
+        "booking_id": result["booking_id"],
+        "members": member_statuses,
+    }
+
+
+def _members_from_order_bookings(bookings: list[Booking]) -> list[dict[str, Any]]:
+    members: list[dict[str, Any]] = []
+    for booking in bookings:
+        meta = booking.metadata_ or {}
+        engagement_id = meta.get("engagement_id")
+        if engagement_id is None:
+            raise AppError(
+                status_code=422,
+                error_code="MISSING_ENGAGEMENT_ID",
+                message=f"Booking {booking.booking_id} is missing engagement_id in metadata",
+            )
+        members.append({
+            "user_id": int(booking.user_id),
+            "engagement_id": int(engagement_id),
+        })
+    return members
+
+
+async def verify_and_finalize_draft_bookings(
+    db: AsyncSession,
+    *,
+    razorpay_payment_id: str,
+    razorpay_order_id: str,
+    razorpay_signature: str,
+    caller_user_id: int,
+    engagement_type: EngagementKind | None = None,
+) -> dict[str, Any]:
+    """Verify Razorpay payment and finalize Healthians bookings for draft engagements."""
+    payments_service = PaymentsService()
+    verify_result = await payments_service.verify_payment(
+        db,
+        razorpay_payment_id=razorpay_payment_id,
+        razorpay_order_id=razorpay_order_id,
+        razorpay_signature=razorpay_signature,
+        authenticated_user_id=caller_user_id,
+        skip_fulfillment=True,
+    )
+
+    if verify_result.get("_signature_invalid"):
+        raise AppError(status_code=400, error_code="INVALID_SIGNATURE", message="Invalid payment signature")
+    err = verify_result.get("_error")
+    if err:
+        code, msg = err
+        raise AppError(status_code=code, error_code="PAYMENT_VERIFY_FAILED", message=msg)
+
+    bookings = verify_result.get("bookings") or []
+    if not bookings:
+        booking_ids = verify_result.get("booking_ids") or []
+        if booking_ids:
+            bookings_result = await db.execute(
+                select(Booking).where(Booking.booking_id.in_(booking_ids))
+            )
+            bookings = list(bookings_result.scalars().all())
+
+    members = _members_from_order_bookings(bookings)
+    member_results = await create_healthians_booking_after_payment(
+        db,
+        members=members,
+        caller_user_id=caller_user_id,
+        engagement_type=engagement_type,
+    )
+
+    return {
+        "payment_verified": True,
+        "razorpay_order_id": razorpay_order_id,
+        "razorpay_payment_id": verify_result.get("payment_id") or razorpay_payment_id,
+        "booking_ids": verify_result.get("booking_ids") or [],
+        "members": member_results,
+    }
+
+
 async def create_healthians_booking_after_payment(
     db: AsyncSession,
     *,
     members: list[dict[str, Any]],
     caller_user_id: int,
+    engagement_type: EngagementKind | None = None,
 ) -> list[dict[str, Any]]:
     """After payment succeeds, create Healthians booking for each member using their drafted engagement."""
     results: list[dict[str, Any]] = []
@@ -512,10 +688,6 @@ async def create_healthians_booking_after_payment(
         engagement = engagement_result.scalar_one_or_none()
         if engagement is None:
             results.append({"user_id": user_id, "engagement_id": engagement_id, "status": "error", "message": "Engagement not found"})
-            continue
-
-        if (engagement.status or "").lower() != "draft":
-            results.append({"user_id": user_id, "engagement_id": engagement_id, "status": "error", "message": "Engagement is not in draft status"})
             continue
 
         participant_result = await db.execute(
@@ -537,6 +709,21 @@ async def create_healthians_booking_after_payment(
                 "status": "error",
                 "message": "Not authorized to book for this participant",
             })
+            continue
+
+        status_lower = (engagement.status or "").lower()
+        if status_lower == "scheduled" and participant.booking_id:
+            results.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "status": "success",
+                "message": "Booking already placed",
+                "booking_id": participant.booking_id,
+            })
+            continue
+
+        if status_lower != "draft":
+            results.append({"user_id": user_id, "engagement_id": engagement_id, "status": "error", "message": "Engagement is not in draft status"})
             continue
 
         if not engagement.diagnostic_package_id:
@@ -643,6 +830,8 @@ async def create_healthians_booking_after_payment(
         booking_id = resp.get("booking_id", "")
         participant.booking_id = str(booking_id)
         participant.barcode = str(booking_id)
+        if engagement_type is not None and engagement.engagement_type is None:
+            engagement.engagement_type = engagement_type
         engagement.status = "scheduled"
         await db.flush()
 

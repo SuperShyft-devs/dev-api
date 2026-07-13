@@ -387,6 +387,7 @@ class PaymentsService:
         razorpay_order_id: str,
         razorpay_signature: str,
         authenticated_user_id: int,
+        skip_fulfillment: bool = False,
     ) -> dict[str, Any]:
         try:
             if not _verify_razorpay_signature(
@@ -408,6 +409,14 @@ class PaymentsService:
             ):
                 return {"_error": (403, "Not authorized to verify payment for this order")}
 
+            booking_ids = await _booking_ids_for_order(db, order_row)
+            bookings_result = await db.execute(
+                select(Booking).where(Booking.booking_id.in_(booking_ids))
+            )
+            bookings = list(bookings_result.scalars().all())
+            if len(bookings) != len(booking_ids):
+                return {"_error": (404, "Booking not found")}
+
             if order_row.status == "paid":
                 pay_result = await db.execute(
                     select(Payment)
@@ -420,33 +429,23 @@ class PaymentsService:
                 )
                 existing = pay_result.scalar_one_or_none()
                 if existing is not None:
-                    booking_ids = await _booking_ids_for_order(db, order_row)
-                    bookings_result = await db.execute(
-                        select(Booking).where(Booking.booking_id.in_(booking_ids))
-                    )
-                    bookings = list(bookings_result.scalars().all())
-                    fulfillment = [
-                        asdict(item)
-                        for b in bookings
-                        if (item := _fulfillment_from_metadata(b)) is not None
-                    ]
+                    fulfillment = []
+                    if not skip_fulfillment:
+                        fulfillment = [
+                            asdict(item)
+                            for b in bookings
+                            if (item := _fulfillment_from_metadata(b)) is not None
+                        ]
                     return {
                         "success": True,
                         "message": "Payment verified. Booking confirmed.",
                         "booking_ids": booking_ids,
                         "booking_id": booking_ids[0] if booking_ids else order_row.booking_id,
-                        "payment_id": razorpay_payment_id,
+                        "payment_id": existing.razorpay_payment_id or razorpay_payment_id,
                         "fulfillment": fulfillment,
+                        "bookings": bookings,
                     }
                 return {"_error": (422, "Order marked paid but no payment record")}
-
-            booking_ids = await _booking_ids_for_order(db, order_row)
-            bookings_result = await db.execute(
-                select(Booking).where(Booking.booking_id.in_(booking_ids))
-            )
-            bookings = list(bookings_result.scalars().all())
-            if len(bookings) != len(booking_ids):
-                return {"_error": (404, "Booking not found")}
 
             for b in bookings:
                 if b.status != "pending":
@@ -490,14 +489,15 @@ class PaymentsService:
 
             await db.flush()
 
-            fulfillment_results = await self._run_post_payment_fulfillment(
-                db,
-                bookings=bookings,
-                order_id=order_row.order_id,
-                booked_by_user_id=authenticated_user_id,
-            )
-
-            await db.flush()
+            fulfillment_results: list[FulfillmentResult] = []
+            if not skip_fulfillment:
+                fulfillment_results = await self._run_post_payment_fulfillment(
+                    db,
+                    bookings=bookings,
+                    order_id=order_row.order_id,
+                    booked_by_user_id=authenticated_user_id,
+                )
+                await db.flush()
 
             sorted_ids = sorted(booking_ids)
             return {
@@ -507,6 +507,7 @@ class PaymentsService:
                 "booking_id": sorted_ids[0],
                 "payment_id": razorpay_payment_id,
                 "fulfillment": [asdict(item) for item in fulfillment_results],
+                "bookings": bookings,
             }
         except ValueError as exc:
             logger.warning("verify_payment validation failed: %s", exc)
@@ -667,6 +668,9 @@ class PaymentsService:
                         bt = resolved_bt
 
             if not bt:
+                meta = booking.metadata_ or {}
+                if meta.get("engagement_id") is not None:
+                    continue
                 raise ValueError(
                     f"Booking {booking.booking_id} has no booking_type and no companion booking with metadata"
                 )
