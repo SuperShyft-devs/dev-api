@@ -10,14 +10,11 @@ from pydantic import BaseModel, Field, model_validator
 
 class CheckServiceabilityMember(BaseModel):
     user_id: int = Field(gt=0)
-    address: str = Field(min_length=1, max_length=500)
-    sub_locality: Optional[str] = Field(default=None, max_length=200)
+    house_flat_no: str = Field(min_length=1, max_length=200)
+    building_area: str = Field(min_length=1, max_length=200)
     landmark: Optional[str] = Field(default=None, max_length=200)
     city: str = Field(min_length=1, max_length=100)
-    state: Optional[str] = Field(default=None, max_length=100)
-    country: Optional[str] = Field(default=None, max_length=100)
-    latitude: float
-    longitude: float
+    pincode: str = Field(min_length=1, max_length=20)
     diagnostic_package_id: int = Field(gt=0)
 
 
@@ -47,6 +44,7 @@ class LockSlotMember(BaseModel):
     engagement_id: int = Field(gt=0)
     blood_collection_date: date
     blood_collection_time_slot_id: str = Field(min_length=1, max_length=50)
+    blood_collection_time_slot: str = Field(min_length=1, max_length=50)
 
 
 class LockSlotRequest(BaseModel):

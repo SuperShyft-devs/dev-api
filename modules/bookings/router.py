@@ -114,10 +114,10 @@ async def get_my_drafts(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    engagement_ids = await booking_service.get_user_draft_engagement_ids(
+    engagements = await booking_service.get_user_draft_engagements(
         db, user_id=current_user.user_id
     )
-    return success_response({"engagement_ids": engagement_ids})
+    return success_response({"engagements": engagements})
 
 
 @router.post("/check-service-availability")
@@ -132,14 +132,11 @@ async def check_service_availability(
     members = [
         {
             "user_id": m.user_id,
-            "address": m.address,
-            "sub_locality": m.sub_locality,
+            "house_flat_no": m.house_flat_no,
+            "building_area": m.building_area,
             "landmark": m.landmark,
             "city": m.city,
-            "state": m.state,
-            "country": m.country,
-            "latitude": m.latitude,
-            "longitude": m.longitude,
+            "pincode": m.pincode,
             "diagnostic_package_id": m.diagnostic_package_id,
         }
         for m in payload.members
@@ -187,6 +184,7 @@ async def lock_slots(
             "engagement_id": m.engagement_id,
             "blood_collection_date": m.blood_collection_date,
             "blood_collection_time_slot_id": m.blood_collection_time_slot_id,
+            "blood_collection_time_slot": m.blood_collection_time_slot,
         }
         for m in payload.members
     ]

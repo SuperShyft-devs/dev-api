@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, time
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
@@ -17,6 +18,7 @@ from modules.diagnostics.models import DiagnosticPackage
 from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService, _generate_engagement_code
+from modules.geocoding.client import search_places
 from modules.users.models import User
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,76 @@ async def _get_healthians_token() -> str:
     return await healthians_client.get_access_token()
 
 
+def _build_booking_address(
+    house_flat_no: str,
+    building_area: str,
+    landmark: str | None,
+    city: str,
+    pincode: str,
+) -> str:
+    parts: list[str] = []
+    for value in (house_flat_no, building_area, landmark):
+        text = (value or "").strip()
+        if text:
+            parts.append(text)
+    city_pin = f"{city.strip()} - {pincode.strip()}"
+    parts.append(city_pin)
+    return ", ".join(parts)
+
+
+def _build_geocode_query(
+    building_area: str,
+    landmark: str | None,
+    city: str,
+    pincode: str,
+) -> str:
+    parts: list[str] = []
+    for value in (building_area, landmark):
+        text = (value or "").strip()
+        if text:
+            parts.append(text)
+    parts.append(f"{city.strip()} - {pincode.strip()}")
+    return ", ".join(parts)
+
+
+async def _geocode_for_booking(query: str) -> dict[str, Any]:
+    results = await search_places(query, limit=1)
+    if not results:
+        return {}
+    return results[0]
+
+
+def _parse_slot_time(slot_str: str) -> time:
+    text = (slot_str or "").strip()
+    if not text:
+        raise ValueError("Empty slot time")
+
+    meridiem_match = re.search(r"\b(AM|PM)\b", text, re.IGNORECASE)
+    meridiem = meridiem_match.group(1).upper() if meridiem_match else None
+    time_part = re.sub(r"\s*(AM|PM)\s*", "", text, flags=re.IGNORECASE).strip()
+
+    segments = time_part.split(":")
+    if len(segments) < 2:
+        raise ValueError(f"Invalid slot time format: {slot_str}")
+
+    hour = int(segments[0])
+    minute = int(segments[1])
+    if meridiem == "PM" and hour != 12:
+        hour += 12
+    elif meridiem == "AM" and hour == 12:
+        hour = 0
+    return time(hour, minute)
+
+
+def _slim_healthians_slot(slot: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "end_time": slot.get("end_time"),
+        "slot_date": slot.get("slot_date"),
+        "slot_time": slot.get("slot_time"),
+        "stm_id": slot.get("stm_id"),
+    }
+
+
 async def check_service_availability(
     db: AsyncSession,
     *,
@@ -54,15 +126,77 @@ async def check_service_availability(
     for member in members:
         user_id = member["user_id"]
         diagnostic_package_id = member["diagnostic_package_id"]
+        house_flat_no = member["house_flat_no"]
+        building_area = member["building_area"]
+        landmark = member.get("landmark")
+        city = member["city"]
+        pincode = member["pincode"]
 
         pkg = await _get_diagnostic_package(db, diagnostic_package_id)
         if not _is_healthians(pkg):
             results.append({"user_id": user_id, "status": "error", "message": "Diagnostic provider is not Healthians"})
             continue
 
-        lat = str(member["latitude"])
-        lng = str(member["longitude"])
-        zipcode = member.get("pincode") or ""
+        geocode_query = _build_geocode_query(building_area, landmark, city, pincode)
+        geocoded = await _geocode_for_booking(geocode_query)
+        latitude = geocoded.get("latitude")
+        longitude = geocoded.get("longitude")
+        if latitude is None or longitude is None:
+            results.append({"user_id": user_id, "status": "error", "message": "Could not geocode address"})
+            continue
+
+        user_result = await db.execute(select(User).where(User.user_id == user_id))
+        user = user_result.scalar_one_or_none()
+        if user is None:
+            results.append({"user_id": user_id, "status": "error", "message": "User not found"})
+            continue
+
+        address = _build_booking_address(house_flat_no, building_area, landmark, city, pincode)
+
+        engagement = Engagement(
+            engagement_name=f"{(user.first_name or 'user').strip()}-draft",
+            metsights_engagement_id=None,
+            organization_id=None,
+            camp_no=None,
+            engagement_code=_generate_engagement_code(),
+            engagement_type=None,
+            assessment_package_id=None,
+            diagnostic_package_id=diagnostic_package_id,
+            city=city,
+            address=address,
+            sub_locality=building_area,
+            landmark=landmark,
+            pincode=pincode,
+            state=geocoded.get("state"),
+            country=geocoded.get("country"),
+            latitude=latitude,
+            longitude=longitude,
+            slot_duration=20,
+            start_date=None,
+            end_date=None,
+            status="draft",
+            healthians_zone_id=None,
+            blood_collection_type=BloodCollectionType.home_collection,
+            create_profile_on_metsights=False,
+            enroll_for_fitprint_full=False,
+            onboarding_notification="booking-alert-whatsapp",
+        )
+        db.add(engagement)
+        await db.flush()
+
+        participant = EngagementParticipant(
+            engagement_id=engagement.engagement_id,
+            user_id=user_id,
+            booked_by_user_id=booked_by_user_id,
+            engagement_date=None,
+            slot_start_time=None,
+        )
+        db.add(participant)
+        await db.flush()
+
+        lat = str(latitude)
+        lng = str(longitude)
+        zipcode = pincode
 
         try:
             resp = await healthians_client.check_serviceability_by_location_v2(
@@ -76,7 +210,7 @@ async def check_service_availability(
             logger.exception("Healthians serviceability check failed for user %s", user_id)
             await log_healthians_call(
                 db,
-                engagement_id=None,
+                engagement_id=engagement.engagement_id,
                 user_id=user_id,
                 provider="healthians",
                 api_url=f"{settings.HEALTHIANS_BASE_URL}/toast4health/checkServiceabilityByLocation_v2",
@@ -89,7 +223,7 @@ async def check_service_availability(
 
         await log_healthians_call(
             db,
-            engagement_id=None,
+            engagement_id=engagement.engagement_id,
             user_id=user_id,
             provider="healthians",
             api_url=f"{settings.HEALTHIANS_BASE_URL}/toast4health/checkServiceabilityByLocation_v2",
@@ -99,60 +233,18 @@ async def check_service_availability(
         )
 
         if not resp.get("status"):
+            engagement.status = "cancelled"
+            await db.flush()
             results.append({
                 "user_id": user_id,
+                "engagement_id": engagement.engagement_id,
                 "status": "not_serviceable",
                 "message": resp.get("message", "This location is not serviceable."),
             })
             continue
 
         zone_id = resp.get("data", {}).get("zone_id") if resp.get("data") else None
-
-        user_result = await db.execute(select(User).where(User.user_id == user_id))
-        user = user_result.scalar_one_or_none()
-        if user is None:
-            results.append({"user_id": user_id, "status": "error", "message": "User not found"})
-            continue
-
-        engagement = Engagement(
-            engagement_name=f"{(user.first_name or 'user').strip()}-draft",
-            metsights_engagement_id=None,
-            organization_id=None,
-            camp_no=None,
-            engagement_code=_generate_engagement_code(),
-            engagement_type=None,
-            assessment_package_id=None,
-            diagnostic_package_id=diagnostic_package_id,
-            city=member.get("city"),
-            address=member.get("address"),
-            sub_locality=member.get("sub_locality"),
-            landmark=member.get("landmark"),
-            pincode=zipcode or None,
-            state=member.get("state"),
-            country=member.get("country"),
-            latitude=member["latitude"],
-            longitude=member["longitude"],
-            slot_duration=20,
-            start_date=None,
-            end_date=None,
-            status="draft",
-            healthians_zone_id=str(zone_id) if zone_id else None,
-            blood_collection_type=BloodCollectionType.home_collection,
-            create_profile_on_metsights=False,
-            enroll_for_fitprint_full=False,
-            onboarding_notification="booking-alert-whatsapp",
-        )
-        db.add(engagement)
-        await db.flush()
-
-        participant = EngagementParticipant(
-            engagement_id=engagement.engagement_id,
-            user_id=user_id,
-            booked_by_user_id=booked_by_user_id,
-            engagement_date=date.today(),
-            slot_start_time=time(0, 0),
-        )
-        db.add(participant)
+        engagement.healthians_zone_id = str(zone_id) if zone_id else None
         await db.flush()
 
         results.append({
@@ -267,11 +359,14 @@ async def get_available_slots(
             })
             continue
 
+        raw_slots = resp.get("data", []) or []
+        slim_slots = [_slim_healthians_slot(slot) for slot in raw_slots if isinstance(slot, dict)]
+
         results.append({
             "user_id": user_id,
             "engagement_id": engagement_id,
             "status": "success",
-            "slots": resp.get("data", []),
+            "slots": slim_slots,
         })
 
     return results
@@ -291,6 +386,7 @@ async def lock_slots(
         engagement_id = member["engagement_id"]
         blood_collection_date: date = member["blood_collection_date"]
         slot_id: str = member["blood_collection_time_slot_id"]
+        blood_collection_time_slot: str = member["blood_collection_time_slot"]
 
         engagement_result = await db.execute(
             select(Engagement).where(Engagement.engagement_id == engagement_id)
@@ -325,11 +421,13 @@ async def lock_slots(
             results.append({"user_id": user_id, "engagement_id": engagement_id, "status": "error", "message": "Not a Healthians package"})
             continue
 
+        vendor_billing_user_id = str(participant.booked_by_user_id)
+
         try:
             resp = await healthians_client.freeze_slot_v1(
                 access_token,
                 slot_id=slot_id,
-                vendor_billing_user_id=str(user_id),
+                vendor_billing_user_id=vendor_billing_user_id,
             )
         except Exception as exc:
             logger.exception("Healthians freezeSlot_v1 failed for user %s", user_id)
@@ -339,7 +437,7 @@ async def lock_slots(
                 user_id=user_id,
                 provider="healthians",
                 api_url=f"{settings.HEALTHIANS_BASE_URL}/toast4health/freezeSlot_v1",
-                request_payload={"slot_id": slot_id, "vendor_billing_user_id": str(user_id)},
+                request_payload={"slot_id": slot_id, "vendor_billing_user_id": vendor_billing_user_id},
                 status="failed",
                 error_message=str(exc),
             )
@@ -352,7 +450,7 @@ async def lock_slots(
             user_id=user_id,
             provider="healthians",
             api_url=f"{settings.HEALTHIANS_BASE_URL}/toast4health/freezeSlot_v1",
-            request_payload={"slot_id": slot_id, "vendor_billing_user_id": str(user_id)},
+            request_payload={"slot_id": slot_id, "vendor_billing_user_id": vendor_billing_user_id},
             response_payload=resp,
             status="success" if resp.get("status") and resp.get("resCode") == "RES0001" else "failed",
         )
@@ -366,8 +464,20 @@ async def lock_slots(
             })
             continue
 
+        try:
+            slot_start_time = _parse_slot_time(blood_collection_time_slot)
+        except ValueError as exc:
+            results.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "status": "error",
+                "message": str(exc),
+            })
+            continue
+
         participant.blood_collection_time_slot_id = slot_id
         participant.engagement_date = blood_collection_date
+        participant.slot_start_time = slot_start_time
         await db.flush()
 
         results.append({
@@ -729,18 +839,39 @@ async def cancel_healthians_bookings_batch(
     return results
 
 
-async def get_user_draft_engagement_ids(
+async def get_user_draft_engagements(
     db: AsyncSession,
     *,
     user_id: int,
-) -> list[int]:
-    """Return engagement IDs where user is a participant and engagement is in draft status."""
+) -> list[dict[str, Any]]:
+    """Return draft engagements where user is participant or booker."""
     query = (
-        select(Engagement.engagement_id)
+        select(Engagement)
         .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
-        .where(EngagementParticipant.user_id == user_id)
+        .where(
+            or_(
+                EngagementParticipant.user_id == user_id,
+                EngagementParticipant.booked_by_user_id == user_id,
+            )
+        )
         .where(Engagement.status == "draft")
         .distinct()
     )
     result = await db.execute(query)
-    return [row[0] for row in result.all()]
+    engagements = result.scalars().all()
+
+    output: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for engagement in engagements:
+        if engagement.engagement_id in seen:
+            continue
+        seen.add(engagement.engagement_id)
+        address = (engagement.address or "").strip() or None
+        resume_step = "booking_date" if address else "address"
+        output.append({
+            "engagement_id": engagement.engagement_id,
+            "status": engagement.status,
+            "resume_step": resume_step,
+            "address": address,
+        })
+    return output
