@@ -56,6 +56,7 @@ from modules.reports import models as _reports_models  # noqa: F401
 from modules.platform_settings import models as _platform_settings_models  # noqa: F401
 from modules.experts import models as _experts_models  # noqa: F401
 from modules.notifications import models as _notifications_models  # noqa: F401
+from modules.support import models as _support_models  # noqa: F401
 
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded

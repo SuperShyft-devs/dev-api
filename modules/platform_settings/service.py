@@ -28,6 +28,8 @@ from modules.platform_settings.schemas import (
     DefaultOnboardingAssistantsUpdate,
     EngagementNotificationDefaultsRead,
     EngagementNotificationDefaultsUpdate,
+    SupportQueryNotificationRead,
+    SupportQueryNotificationUpdate,
 )
 
 _FALLBACK_B2C_ASSESSMENT_PACKAGE_ID = 1
@@ -329,3 +331,46 @@ class PlatformSettingsService:
             )
 
         return await self._build_default_onboarding_assistants_read(db, normalized_ids)
+
+    async def get_support_query_notification(self, db: AsyncSession) -> SupportQueryNotificationRead:
+        row = await self._repository.get_by_id(db)
+        if row is None:
+            return SupportQueryNotificationRead()
+        return SupportQueryNotificationRead(
+            default_support_query_notification=row.default_support_query_notification,
+        )
+
+    async def update_support_query_notification(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        payload: SupportQueryNotificationUpdate,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> SupportQueryNotificationRead:
+        keys = await self._validate_comma_separated_service_keys(
+            db, payload.default_support_query_notification
+        )
+        a_id, d_id = await self.resolve_b2c_default_package_ids(db)
+        await self._repository.upsert_support_query_notification(
+            db,
+            default_support_query_notification=keys,
+            updated_by_user_id=employee.user_id,
+            assessment_package_id=a_id,
+            diagnostic_package_id=d_id,
+        )
+
+        if self._audit_service is not None:
+            await self._audit_service.log_event(
+                db,
+                action="EMPLOYEE_UPDATE_SUPPORT_QUERY_NOTIFICATION",
+                endpoint=endpoint,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                user_id=employee.user_id,
+                session_id=None,
+            )
+
+        return await self.get_support_query_notification(db)

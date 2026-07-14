@@ -251,3 +251,95 @@ async def test_patch_default_onboarding_assistants_rejects_inactive_employee(asy
         json={"employee_ids": [9301]},
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_get_support_query_notification_requires_auth(async_client):
+    response = await async_client.get("/platform-settings/support-query-notification")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_patch_support_query_notification_persists(async_client, test_db_session):
+    uid = 9108
+    test_db_session.add(User(user_id=uid, age=30, phone="91080000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9108, user_id=uid, role="admin", status="active"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES ('support-svc-a', 'A', 'email', 'notify-admin-contact-query', true, false, false, false), "
+            "('support-svc-b', 'B', 'whatsapp', 'notify-admin-contact-query', true, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES "
+            "(1, 'P1', 'One', 'active') ON CONFLICT (package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'R1', 'D1', 'p', 'active') ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/platform-settings/support-query-notification",
+        headers=_auth_header(uid),
+        json={"default_support_query_notification": "support-svc-a,support-svc-b"},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["default_support_query_notification"] == "support-svc-a,support-svc-b"
+
+    response2 = await async_client.get(
+        "/platform-settings/support-query-notification",
+        headers=_auth_header(uid),
+    )
+    assert response2.status_code == 200
+    assert response2.json()["data"] == data
+
+
+@pytest.mark.asyncio
+async def test_patch_support_query_notification_rejects_unknown_service(async_client, test_db_session):
+    uid = 9109
+    test_db_session.add(User(user_id=uid, age=30, phone="91090000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9109, user_id=uid, role="admin", status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/platform-settings/support-query-notification",
+        headers=_auth_header(uid),
+        json={"default_support_query_notification": "missing-svc"},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_patch_support_query_notification_rejects_inactive_service(async_client, test_db_session):
+    uid = 9110
+    test_db_session.add(User(user_id=uid, age=30, phone="91100000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9110, user_id=uid, role="admin", status="active"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES ('support-inactive', 'Inactive', 'email', 'notify-admin-contact-query', false, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = false"
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/platform-settings/support-query-notification",
+        headers=_auth_header(uid),
+        json={"default_support_query_notification": "support-inactive"},
+    )
+    assert response.status_code == 400

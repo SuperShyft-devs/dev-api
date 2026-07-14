@@ -143,6 +143,33 @@ class PlatformSettingsRepository:
         await db.flush()
         return existing
 
+    async def upsert_support_query_notification(
+        self,
+        db: AsyncSession,
+        *,
+        default_support_query_notification: str | None,
+        updated_by_user_id: int | None,
+        assessment_package_id: int,
+        diagnostic_package_id: int,
+    ) -> PlatformSettings:
+        existing = await self.get_by_id(db)
+        if existing is None:
+            row = PlatformSettings(
+                settings_id=_PLATFORM_SETTINGS_PK,
+                b2c_default_assessment_package_id=assessment_package_id,
+                b2c_default_diagnostic_package_id=diagnostic_package_id,
+                default_support_query_notification=default_support_query_notification,
+                updated_by_user_id=updated_by_user_id,
+            )
+            db.add(row)
+            await db.flush()
+            return row
+
+        existing.default_support_query_notification = default_support_query_notification
+        existing.updated_by_user_id = updated_by_user_id
+        await db.flush()
+        return existing
+
     async def resolve_default_onboarding_assistant_employee_ids(self, db: AsyncSession) -> list[int]:
         row = await self.get_by_id(db)
         if row is None:

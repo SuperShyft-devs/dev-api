@@ -9,6 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
+from modules.notifications.repository import NotificationsRepository
+from modules.notifications.service import NotificationsService
+from modules.platform_settings.repository import PlatformSettingsRepository
 from modules.support.models import SupportTicket
 from modules.support.repository import SupportRepository
 from modules.support.schemas import SupportTicketCreate
@@ -26,10 +29,16 @@ class SupportService:
         repository: SupportRepository,
         audit_service: AuditService | None = None,
         users_repository: UsersRepository | None = None,
+        notifications_service: NotificationsService | None = None,
+        notifications_repository: NotificationsRepository | None = None,
+        platform_settings_repository: PlatformSettingsRepository | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
         self._users_repository = users_repository or UsersRepository()
+        self._notifications_service = notifications_service
+        self._notifications_repository = notifications_repository or NotificationsRepository()
+        self._platform_settings_repository = platform_settings_repository or PlatformSettingsRepository()
 
     def _require_audit_service(self) -> AuditService:
         if self._audit_service is None:
@@ -42,11 +51,7 @@ class SupportService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         return normalized
 
-    async def _resolve_contact_input(self, db: AsyncSession, user_id: int) -> str:
-        user = await self._users_repository.get_user_by_id(db, user_id)
-        if user is None:
-            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
-
+    def _contact_input_from_user(self, user, user_id: int) -> str:
         for value in (user.phone, user.email):
             normalized = str(value or "").strip()
             if normalized:
@@ -64,7 +69,11 @@ class SupportService:
         endpoint: str,
     ) -> SupportTicket:
         user_id = data.user_id
-        contact_input = await self._resolve_contact_input(db, user_id)
+        user = await self._users_repository.get_user_by_id(db, user_id)
+        if user is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        contact_input = self._contact_input_from_user(user, user_id)
 
         ticket = await self._repository.create_ticket(
             db,
@@ -85,6 +94,21 @@ class SupportService:
             user_id=user_id,
             session_id=None,
         )
+
+        if self._notifications_service is not None:
+            from modules.notifications.support_notify import (
+                notify_default_onboarding_assistants_on_support_query,
+            )
+
+            await notify_default_onboarding_assistants_on_support_query(
+                db,
+                notifications_service=self._notifications_service,
+                notifications_repository=self._notifications_repository,
+                platform_settings_repository=self._platform_settings_repository,
+                ticket=ticket,
+                user=user,
+            )
+
         return ticket
 
     async def list_tickets(self, db: AsyncSession, *, status_filter: str | None = None) -> list[SupportTicket]:

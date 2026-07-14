@@ -11,6 +11,11 @@ from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
+from modules.metsights.client import MetsightsClient
+from modules.metsights.service import MetsightsService
+from modules.notifications.repository import NotificationsRepository
+from modules.notifications.service import NotificationsService
+from modules.platform_settings.repository import PlatformSettingsRepository
 from modules.support.schemas import SupportTicketCreate, SupportTicketStatusUpdate
 from modules.support.service import SupportService
 from modules.support.repository import SupportRepository
@@ -21,7 +26,16 @@ router = APIRouter(prefix="/support", tags=["support"])
 
 def get_support_service() -> SupportService:
     audit_service = AuditService(AuditRepository())
-    return SupportService(repository=SupportRepository(), audit_service=audit_service)
+    return SupportService(
+        repository=SupportRepository(),
+        audit_service=audit_service,
+        notifications_service=NotificationsService(
+            repository=NotificationsRepository(),
+            metsights_service=MetsightsService(client=MetsightsClient()),
+        ),
+        notifications_repository=NotificationsRepository(),
+        platform_settings_repository=PlatformSettingsRepository(),
+    )
 
 
 def _client_ip(request: Request) -> str:

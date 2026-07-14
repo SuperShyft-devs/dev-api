@@ -61,3 +61,11 @@ class DefaultOnboardingAssistantsRead(BaseModel):
 
 class DefaultOnboardingAssistantsUpdate(BaseModel):
     employee_ids: list[int] = Field(default_factory=list)
+
+
+class SupportQueryNotificationRead(BaseModel):
+    default_support_query_notification: str | None = None
+
+
+class SupportQueryNotificationUpdate(BaseModel):
+    default_support_query_notification: str | None = Field(default=None, max_length=500)
