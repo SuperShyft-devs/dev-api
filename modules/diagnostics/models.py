@@ -24,6 +24,7 @@ class DiagnosticPackage(Base):
     diagnostic_package_id = Column(Integer, primary_key=True)
     reference_id = Column(String)
     package_name = Column(String, nullable=False)
+    package_image = Column(String, nullable=True)
     diagnostic_provider = Column(String)
     external_package_id = Column(Integer, nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)

@@ -330,6 +330,7 @@ class DiagnosticsService:
             diagnostic_package_id=row.diagnostic_package_id,
             reference_id=row.reference_id,
             package_name=row.package_name,
+            package_image=row.package_image,
             diagnostic_provider=row.diagnostic_provider,
             external_package_id=row.external_package_id,
             created_by_user_id=row.created_by_user_id,
@@ -410,6 +411,7 @@ class DiagnosticsService:
                 DiagnosticPackageListItem(
                     diagnostic_package_id=row.diagnostic_package_id,
                     package_name=row.package_name,
+                    package_image=row.package_image,
                     diagnostic_provider=row.diagnostic_provider,
                     display_order=row.display_order,
                     external_package_id=row.external_package_id,

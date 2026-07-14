@@ -45,3 +45,13 @@ async def upload_expert_profile_photo(
 ):
     url = await uploads_service.save_expert_profile_photo(file)
     return success_response({"url": url})
+
+
+@router.post("/packages/image")
+async def upload_package_image(
+    file: UploadFile = File(...),
+    _: EmployeeContext = Depends(get_current_employee),
+    uploads_service: UploadsService = Depends(get_uploads_service),
+):
+    url = await uploads_service.save_package_image(file)
+    return success_response({"url": url})

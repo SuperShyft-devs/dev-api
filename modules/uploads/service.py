@@ -31,6 +31,7 @@ class UploadsService:
         self._user_max_bytes = settings.USER_PROFILE_PHOTO_MAX_MB * 1024 * 1024
         self._org_max_bytes = settings.ORG_LOGO_MAX_MB * 1024 * 1024
         self._expert_max_bytes = settings.EXPERT_PROFILE_PHOTO_MAX_MB * 1024 * 1024
+        self._package_max_bytes = settings.PACKAGE_IMAGE_MAX_MB * 1024 * 1024
         self._pdf_max_bytes = settings.USER_PDF_UPLOAD_MAX_MB * 1024 * 1024
 
     async def save_user_profile_photo(self, file: UploadFile) -> str:
@@ -41,6 +42,9 @@ class UploadsService:
 
     async def save_expert_profile_photo(self, file: UploadFile) -> str:
         return await self._save_image(file, folder="experts", max_bytes=self._expert_max_bytes)
+
+    async def save_package_image(self, file: UploadFile) -> str:
+        return await self._save_image(file, folder="packages", max_bytes=self._package_max_bytes)
 
     async def save_bio_ai_pdf(self, file: UploadFile) -> str:
         return await self._save_pdf(file, folder="bio-ai", max_bytes=self._pdf_max_bytes)

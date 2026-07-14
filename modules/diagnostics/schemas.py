@@ -31,6 +31,7 @@ class FilterChipForSchema(str, Enum):
 
 class DiagnosticPackageCreate(BaseModel):
     package_name: str = Field(min_length=1)
+    package_image: Optional[str] = None
     diagnostic_provider: Optional[str] = None
     external_package_id: Optional[int] = None
     custom: bool = False
@@ -51,6 +52,7 @@ class DiagnosticPackageCreate(BaseModel):
 
 class DiagnosticPackageUpdate(BaseModel):
     package_name: Optional[str] = Field(default=None, min_length=1)
+    package_image: Optional[str] = None
     diagnostic_provider: Optional[str] = None
     external_package_id: Optional[int] = None
     report_duration_hours: Optional[int] = None
@@ -76,6 +78,7 @@ class DiagnosticPackageResponse(BaseModel):
     diagnostic_package_id: int
     reference_id: Optional[str] = None
     package_name: str
+    package_image: Optional[str] = None
     diagnostic_provider: Optional[str] = None
     external_package_id: Optional[int] = None
     created_by_user_id: Optional[int] = None
@@ -390,6 +393,7 @@ class DiagnosticPackageDetailResponse(DiagnosticPackageResponse):
 class DiagnosticPackageListItem(BaseModel):
     diagnostic_package_id: int
     package_name: str
+    package_image: Optional[str] = None
     diagnostic_provider: Optional[str] = None
     display_order: Optional[int] = None
     external_package_id: Optional[int] = None
