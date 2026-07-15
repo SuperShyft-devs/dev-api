@@ -101,6 +101,29 @@ async def _resolve_consultation_from_pkg(
     return new_kind, cc
 
 
+def _validate_requested_consultations(
+    requested: dict[str, bool] | None,
+    allowed: dict[str, bool] | None,
+) -> dict[str, bool]:
+    """Reject true consultation flags unless enabled on the engagement.
+
+    A requested value may be true only when ``allowed[expert_type]`` is true.
+    False / omitted values are always accepted.
+    """
+    requested = dict(requested or {})
+    allowed = allowed if isinstance(allowed, dict) else {}
+    invalid = sorted(
+        key for key, value in requested.items() if value is True and allowed.get(key) is not True
+    )
+    if invalid:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message=f"Consultation not available for this engagement: {', '.join(invalid)}",
+        )
+    return requested
+
+
 class UsersService:
     def _normalize_phone_for_metsights(self, raw: str | None) -> str | None:
         value = (raw or "").strip().replace(" ", "").replace("-", "")
@@ -1790,6 +1813,11 @@ class UsersService:
             longitude=getattr(payload, "longitude", None),
         )
 
+        consultations = _validate_requested_consultations(
+            payload.consultations,
+            engagement.consultations,
+        )
+
         slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
         time_slot = await self._engagements_service.enroll_user_in_engagement(
             db,
@@ -1800,7 +1828,7 @@ class UsersService:
             participants_employee_id=payload.participants_employee_id,
             participant_department=payload.participant_department,
             participant_blood_group=payload.participant_blood_group,
-            consultations=payload.consultations,
+            consultations=consultations,
             is_profile_created_on_metsights=bool((user.metsights_profile_id or "").strip()),
         )
 
@@ -1967,6 +1995,11 @@ class UsersService:
         if engagement is None:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
+        consultations = _validate_requested_consultations(
+            payload.consultations,
+            engagement.consultations,
+        )
+
         email = str(payload.email) if payload.email is not None else None
 
         patch_data = {
@@ -2014,7 +2047,7 @@ class UsersService:
             participants_employee_id=payload.participants_employee_id,
             participant_department=validated_department,
             participant_blood_group=payload.participant_blood_group,
-            consultations=payload.consultations,
+            consultations=consultations,
             is_profile_created_on_metsights=False,
             is_primary_record_id_synced=False,
             is_fitprint_record_id_synced=False,
