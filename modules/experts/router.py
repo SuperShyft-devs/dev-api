@@ -17,6 +17,8 @@ from modules.experts.dependencies import get_expert_types_service, get_experts_s
 from modules.experts.schemas import (
     AvailabilityBlockCreate,
     AvailabilityBulkSave,
+    ConsultationBookRequest,
+    ConsultationConfirmRequest,
     ExpertCreateRequest,
     ExpertReviewCreateRequest,
     ExpertStatusUpdateRequest,
@@ -93,7 +95,7 @@ def _override_dict(override) -> dict:
         "id": override.id,
         "expert_id": override.expert_id,
         "override_date": override.override_date.isoformat() if override.override_date else None,
-        "availability": override.availability,
+        "status": override.status,
         "start_time": override.start_time.strftime("%H:%M") if override.start_time else None,
         "end_time": override.end_time.strftime("%H:%M") if override.end_time else None,
         "buffer_time": override.buffer_time,
@@ -163,6 +165,55 @@ async def list_experts(
         sort_dir=sort_dir,
     )
     return success_response([_expert_dict(e) for e in experts], meta={"page": page, "limit": limit, "total": total})
+
+
+@router.get("/consultations/slots")
+async def get_consultation_slots(
+    expert_type: str | None = None,
+    expert_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.get_consultation_slots(
+        db,
+        expert_type=expert_type,
+        expert_id=expert_id,
+    )
+    return success_response(data)
+
+
+@router.post("/consultations/book")
+async def book_consultation_slot(
+    payload: ConsultationBookRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.book_consultation_slot(db, user_id=user.user_id, payload=payload)
+    await db.commit()
+    return success_response(data)
+
+
+@portal_router.get("/requests")
+async def portal_list_consultation_requests(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.list_consultation_requests(db, employee=employee)
+    return success_response(data)
+
+
+@portal_router.post("/confirm")
+async def portal_confirm_consultation(
+    payload: ConsultationConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.confirm_consultation_request(db, employee=employee, payload=payload)
+    await db.commit()
+    return success_response(data)
 
 
 @router.get("/{expert_id}")

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, model_validator, validator
 
@@ -256,18 +256,24 @@ class PublicUserOnboardRequest(BaseModel):
     want_doctor_consultation: Optional[bool] = None
     want_nutritionist_consultation: Optional[bool] = None
     want_doctor_and_nutritionist_consultation: Optional[bool] = None
-    # New field
-    consultations: Optional[dict[str, bool]] = None
+    # New field: { expert_type: { want, date, slot, expert_id } }
+    consultations: Optional[dict[str, Any]] = None
 
     @model_validator(mode="after")
     def normalize_consultations(self):
+        from modules.experts.consultations import empty_preference, normalize_consultations_map
+
         if self.consultations is None:
             doctor = bool(self.want_doctor_consultation or self.want_doctor_and_nutritionist_consultation)
             nutritionist = bool(self.want_nutritionist_consultation or self.want_doctor_and_nutritionist_consultation)
-            if doctor or nutritionist:
-                self.consultations = {"doctor": doctor, "nutritionist": nutritionist}
-            else:
-                self.consultations = {}
+            built: dict[str, Any] = {}
+            if doctor:
+                built["doctor"] = empty_preference(want=True)
+            if nutritionist:
+                built["nutritionist"] = empty_preference(want=True)
+            self.consultations = built
+        else:
+            self.consultations = normalize_consultations_map(self.consultations)
         return self
 
     @validator("age")
@@ -309,18 +315,24 @@ class EngagementUserOnboardRequest(BaseModel):
     want_doctor_consultation: Optional[bool] = None
     want_nutritionist_consultation: Optional[bool] = None
     want_doctor_and_nutritionist_consultation: Optional[bool] = None
-    # New field
-    consultations: Optional[dict[str, bool]] = None
+    # New field: { expert_type: { want, date, slot, expert_id } }
+    consultations: Optional[dict[str, Any]] = None
 
     @model_validator(mode="after")
     def normalize_consultations(self):
+        from modules.experts.consultations import empty_preference, normalize_consultations_map
+
         if self.consultations is None:
             doctor = bool(self.want_doctor_consultation or self.want_doctor_and_nutritionist_consultation)
             nutritionist = bool(self.want_nutritionist_consultation or self.want_doctor_and_nutritionist_consultation)
-            if doctor or nutritionist:
-                self.consultations = {"doctor": doctor, "nutritionist": nutritionist}
-            else:
-                self.consultations = {}
+            built: dict[str, Any] = {}
+            if doctor:
+                built["doctor"] = empty_preference(want=True)
+            if nutritionist:
+                built["nutritionist"] = empty_preference(want=True)
+            self.consultations = built
+        else:
+            self.consultations = normalize_consultations_map(self.consultations)
         return self
 
     @validator("age")

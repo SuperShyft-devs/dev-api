@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -239,7 +239,7 @@ class CreateMetsightsProfilesRequest(BaseModel):
 
 class EngagementParticipantUpdateRequest(BaseModel):
     participant_department: Optional[str] = Field(default=None, max_length=100)
-    consultations: Optional[dict[str, bool]] = None
+    consultations: Optional[dict[str, Any]] = None
     blood_collection_time_slot_id: Optional[str] = Field(default=None, max_length=100)
 
 

@@ -138,18 +138,48 @@ class AvailabilityBulkSave(BaseModel):
     blocks: list[AvailabilityBlockCreate]
 
 
+OverrideStatusLiteral = Literal["available", "unavailable", "booked"]
+
+
 class OverrideCreate(BaseModel):
     override_date: date
-    availability: bool
+    status: OverrideStatusLiteral
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     buffer_time: Optional[int] = Field(default=None, ge=0, le=120)
 
     @model_validator(mode="after")
-    def _times_required_when_available(self) -> "OverrideCreate":
-        if self.availability:
+    def _times_for_status(self) -> "OverrideCreate":
+        if self.status in ("available", "unavailable"):
             if self.start_time is None or self.end_time is None:
-                raise ValueError("start_time and end_time are required when available is true")
+                raise ValueError("start_time and end_time are required for available/unavailable")
             if self.end_time <= self.start_time:
                 raise ValueError("end_time must be after start_time")
+        elif self.status == "booked":
+            if self.start_time is None:
+                raise ValueError("start_time is required when status is booked")
         return self
+
+
+class ConsultationPreferenceSchema(BaseModel):
+    want: bool = False
+    date: Optional[str] = None
+    slot: Optional[str] = None
+    expert_id: Optional[int] = Field(default=None, gt=0)
+
+
+class ConsultationBookRequest(BaseModel):
+    engagement_id: int = Field(gt=0)
+    expert_type: str = Field(min_length=1, max_length=100)
+    expert_id: Optional[int] = Field(default=None, gt=0)
+    date: date
+    slot: str = Field(min_length=1, max_length=20)
+
+
+class ConsultationConfirmRequest(BaseModel):
+    user_id: int = Field(gt=0)
+    engagement_id: int = Field(gt=0)
+    expert_type: str = Field(min_length=1, max_length=100)
+    date: date
+    slot: str = Field(min_length=1, max_length=20)
+    expert_id: Optional[int] = Field(default=None, gt=0)

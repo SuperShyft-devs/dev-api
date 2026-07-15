@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, Time, func
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, Time, func
 from sqlalchemy.orm import relationship
 
 from db.base import Base
@@ -88,7 +88,7 @@ class ExpertAvailabilityOverrideModel(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     expert_id = Column(Integer, ForeignKey("experts.expert_id", ondelete="CASCADE"), nullable=False)
     override_date = Column(Date, nullable=False)
-    availability = Column(Boolean, nullable=False)
+    status = Column(String, nullable=False)  # available | unavailable | booked
     start_time = Column(Time, nullable=True)
     end_time = Column(Time, nullable=True)
     buffer_time = Column(Integer, nullable=True)

@@ -205,7 +205,7 @@ class CampReportsRepository:
             )
             .where(Engagement.camp_no == camp_no)
             .where(
-                EngagementParticipant.consultations["doctor"].as_boolean().is_(True)
+                EngagementParticipant.consultations["doctor"]["want"].as_boolean().is_(True)
             )
         )
         if department is not None:
@@ -222,7 +222,7 @@ class CampReportsRepository:
             )
             .where(Engagement.camp_no == camp_no)
             .where(
-                EngagementParticipant.consultations["nutritionist"].as_boolean().is_(True)
+                EngagementParticipant.consultations["nutritionist"]["want"].as_boolean().is_(True)
             )
         )
         if department is not None:
@@ -241,8 +241,8 @@ class CampReportsRepository:
             )
             .where(Engagement.camp_no == camp_no)
             .where(
-                EngagementParticipant.consultations["doctor"].as_boolean().is_(True),
-                EngagementParticipant.consultations["nutritionist"].as_boolean().is_(True),
+                EngagementParticipant.consultations["doctor"]["want"].as_boolean().is_(True),
+                EngagementParticipant.consultations["nutritionist"]["want"].as_boolean().is_(True),
             )
         )
         if department is not None:

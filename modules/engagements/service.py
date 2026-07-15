@@ -870,7 +870,7 @@ class EngagementsService:
         assessment_package_id: int | None,
         diagnostic_package_id: int | None = None,
         engagement_type: EngagementKind = EngagementKind.bio_ai,
-        consultations: dict[str, bool] | None = None,
+        consultations: dict | None = None,
         address: str | None = None,
         sub_locality: str | None = None,
         landmark: str | None = None,
@@ -1096,7 +1096,7 @@ class EngagementsService:
         participants_employee_id: str | None = None,
         participant_department: str | None = None,
         participant_blood_group: str | None = None,
-        consultations: dict[str, bool] | None = None,
+        consultations: dict | None = None,
         is_profile_created_on_metsights: bool = False,
         is_primary_record_id_synced: bool = False,
         is_fitprint_record_id_synced: bool = False,
@@ -1195,8 +1195,11 @@ class EngagementsService:
             response["participant_department"] = normalized
 
         if "consultations" in updates:
-            participant.consultations = updates["consultations"]
-            response["consultations"] = updates["consultations"]
+            from modules.experts.consultations import normalize_consultations_map
+
+            normalized_consultations = normalize_consultations_map(updates["consultations"])
+            participant.consultations = normalized_consultations
+            response["consultations"] = normalized_consultations
 
         await self._repository.update_participant(db, participant)
 

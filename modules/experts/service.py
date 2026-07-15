@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
+from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
@@ -10,6 +13,12 @@ from modules.employee.access_control import ensure_expert_portal_access, ensure_
 from modules.employee.models import Employee, EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
+from modules.engagements.models import Engagement, EngagementParticipant
+from modules.experts.consultations import (
+    normalize_consultations_map,
+    normalize_hhmm,
+    normalize_preference,
+)
 from modules.experts.models import (
     Expert,
     ExpertAvailabilityModel,
@@ -27,6 +36,8 @@ from modules.experts.repository import (
 from modules.experts.schemas import (
     AvailabilityBlockCreate,
     AvailabilityBulkSave,
+    ConsultationBookRequest,
+    ConsultationConfirmRequest,
     ExpertCreateRequest,
     ExpertReviewCreateRequest,
     ExpertTagCreateRequest,
@@ -35,7 +46,18 @@ from modules.experts.schemas import (
     ExpertUpdateRequest,
     OverrideCreate,
 )
+from modules.experts.slot_engine import (
+    aggregate_slots,
+    compute_expert_day_slots,
+    expert_effective_on,
+    is_slot_available_for_expert,
+    next_n_days,
+    parse_slot_time,
+)
+from modules.users.models import User
 from modules.users.repository import UsersRepository
+from sqlalchemy import select
+from sqlalchemy.orm.attributes import flag_modified
 
 
 _ALLOWED_STATUS = {"active", "inactive"}
@@ -528,7 +550,7 @@ class ExpertAvailabilityService:
         override = ExpertAvailabilityOverrideModel(
             expert_id=expert_id,
             override_date=payload.override_date,
-            availability=payload.availability,
+            status=payload.status,
             start_time=payload.start_time,
             end_time=payload.end_time,
             buffer_time=payload.buffer_time,
@@ -540,3 +562,359 @@ class ExpertAvailabilityService:
         if override is None or override.expert_id != expert_id:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Override not found")
         await self._overrides.delete(db, override)
+
+    # ─── Consultation slots / booking ──────────────────────────────────────
+
+    async def get_consultation_slots(
+        self,
+        db,
+        *,
+        expert_type: str | None = None,
+        expert_id: int | None = None,
+        days: int = 7,
+    ) -> dict[str, dict[str, list[dict[str, Any]]]]:
+        if expert_id is not None:
+            expert = await self._get_expert_or_404(db, expert_id)
+            if expert_type and expert.expert_type != expert_type:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="expert_id does not match expert_type",
+                )
+            experts = [expert] if (expert.status or "").lower() == "active" else []
+        else:
+            experts = await self._experts.list_for_slots(db, expert_type=expert_type)
+
+        dates = next_n_days(days)
+        if not experts:
+            if expert_type:
+                return {expert_type: {d.isoformat(): [] for d in dates}}
+            types = await ExpertTypesRepository().list_all(db)
+            return {t.type_key: {d.isoformat(): [] for d in dates} for t in types}
+
+        expert_ids = [e.expert_id for e in experts]
+        blocks = await self._availability.list_by_expert_ids(db, expert_ids)
+        overrides = await self._overrides.list_by_expert_ids_and_dates(
+            db, expert_ids, start_date=dates[0], end_date=dates[-1]
+        )
+
+        blocks_by_expert: dict[int, list[ExpertAvailabilityModel]] = defaultdict(list)
+        for b in blocks:
+            blocks_by_expert[b.expert_id].append(b)
+        overrides_by_expert: dict[int, list[ExpertAvailabilityOverrideModel]] = defaultdict(list)
+        for o in overrides:
+            overrides_by_expert[o.expert_id].append(o)
+
+        by_type_raw: dict[str, list[tuple[str, str, int]]] = defaultdict(list)
+        for expert in experts:
+            default_duration = expert.session_duration_mins or 30
+            e_blocks = blocks_by_expert.get(expert.expert_id, [])
+            e_overrides = overrides_by_expert.get(expert.expert_id, [])
+            for day in dates:
+                if not expert_effective_on(expert, day):
+                    continue
+                day_slots = compute_expert_day_slots(
+                    day=day,
+                    blocks=e_blocks,
+                    overrides=e_overrides,
+                    default_duration=default_duration,
+                )
+                date_iso = day.isoformat()
+                for start, duration in day_slots:
+                    by_type_raw[expert.expert_type].append((date_iso, start, duration))
+
+        type_keys: list[str]
+        if expert_type:
+            type_keys = [expert_type]
+        elif expert_id is not None and experts:
+            type_keys = [experts[0].expert_type]
+        else:
+            types = await ExpertTypesRepository().list_all(db)
+            type_keys = [t.type_key for t in types]
+            for key in by_type_raw:
+                if key not in type_keys:
+                    type_keys.append(key)
+
+        result: dict[str, dict[str, list[dict[str, Any]]]] = {}
+        for key in type_keys:
+            aggregated = aggregate_slots(by_type_raw.get(key, []))
+            # Ensure all dates present
+            day_map: dict[str, list[dict[str, Any]]] = {
+                d.isoformat(): aggregated.get(d.isoformat(), []) for d in dates
+            }
+            for d_iso, slots in aggregated.items():
+                day_map[d_iso] = slots
+            result[key] = day_map
+        return result
+
+    async def _slot_is_available(
+        self,
+        db,
+        *,
+        expert_type: str,
+        day: date,
+        slot_hhmm: str,
+        expert_id: int | None,
+    ) -> bool:
+        if expert_id is not None:
+            experts = await self._experts.list_for_slots(db, expert_id=expert_id)
+        else:
+            experts = await self._experts.list_for_slots(db, expert_type=expert_type)
+
+        if not experts:
+            return False
+
+        expert_ids = [e.expert_id for e in experts]
+        blocks = await self._availability.list_by_expert_ids(db, expert_ids)
+        overrides = await self._overrides.list_by_expert_ids_and_dates(
+            db, expert_ids, start_date=day, end_date=day
+        )
+        blocks_by_expert: dict[int, list[ExpertAvailabilityModel]] = defaultdict(list)
+        for b in blocks:
+            blocks_by_expert[b.expert_id].append(b)
+        overrides_by_expert: dict[int, list[ExpertAvailabilityOverrideModel]] = defaultdict(list)
+        for o in overrides:
+            overrides_by_expert[o.expert_id].append(o)
+
+        for expert in experts:
+            if expert.expert_type != expert_type:
+                continue
+            if not expert_effective_on(expert, day):
+                continue
+            if is_slot_available_for_expert(
+                day=day,
+                slot_hhmm=slot_hhmm,
+                blocks=blocks_by_expert.get(expert.expert_id, []),
+                overrides=overrides_by_expert.get(expert.expert_id, []),
+                default_duration=expert.session_duration_mins or 30,
+            ):
+                return True
+        return False
+
+    async def book_consultation_slot(
+        self,
+        db,
+        *,
+        user_id: int,
+        payload: ConsultationBookRequest,
+    ) -> dict[str, Any]:
+        slot_hhmm = normalize_hhmm(payload.slot)
+        engagement = await db.get(Engagement, payload.engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Engagement not found")
+
+        allowed = engagement.consultations if isinstance(engagement.consultations, dict) else {}
+        if allowed.get(payload.expert_type) is not True:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"Consultation not available for this engagement: {payload.expert_type}",
+            )
+
+        result = await db.execute(
+            select(EngagementParticipant)
+            .where(EngagementParticipant.user_id == user_id)
+            .where(EngagementParticipant.engagement_id == payload.engagement_id)
+            .order_by(EngagementParticipant.engagement_participant_id.desc())
+            .limit(1)
+        )
+        participant = result.scalar_one_or_none()
+        if participant is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Participant not found")
+
+        consultations = normalize_consultations_map(participant.consultations)
+        pref = consultations.get(payload.expert_type) or normalize_preference(None)
+        if not pref.get("want"):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation was not requested for this expert type",
+            )
+        if pref.get("expert_id") is not None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation already confirmed by an expert",
+            )
+
+        available = await self._slot_is_available(
+            db,
+            expert_type=payload.expert_type,
+            day=payload.date,
+            slot_hhmm=slot_hhmm,
+            expert_id=payload.expert_id,
+        )
+        if not available:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Selected slot is not available",
+            )
+
+        pref["date"] = payload.date.isoformat()
+        pref["slot"] = slot_hhmm
+        # expert_id stays null until confirm
+        consultations[payload.expert_type] = pref
+        participant.consultations = consultations
+        flag_modified(participant, "consultations")
+        db.add(participant)
+        await db.flush()
+
+        return {
+            "message": "We have received your slot. We will let you know when expert confirms",
+            "engagement_id": payload.engagement_id,
+            "expert_type": payload.expert_type,
+            "date": payload.date.isoformat(),
+            "slot": slot_hhmm,
+        }
+
+    async def list_consultation_requests(self, db, *, employee: EmployeeContext) -> list[dict[str, Any]]:
+        ensure_expert_portal_access(employee)
+        result = await db.execute(
+            select(EngagementParticipant, Engagement, User)
+            .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
+            .join(User, User.user_id == EngagementParticipant.user_id)
+            .where(Engagement.status == "running")
+            .where(Engagement.organization_id.is_(None))
+            .where(EngagementParticipant.consultations.isnot(None))
+            .order_by(EngagementParticipant.engagement_participant_id.desc())
+        )
+        rows = result.all()
+        items: list[dict[str, Any]] = []
+        for participant, engagement, user in rows:
+            consultations = normalize_consultations_map(participant.consultations)
+            for expert_type, pref in consultations.items():
+                if not pref.get("want"):
+                    continue
+                if pref.get("expert_id") is not None:
+                    continue
+                items.append(
+                    {
+                        "user_id": user.user_id,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "email": user.email,
+                        "phone": user.phone,
+                        "engagement_id": engagement.engagement_id,
+                        "engagement_code": engagement.engagement_code,
+                        "expert_type": expert_type,
+                        "date": pref.get("date"),
+                        "slot": pref.get("slot"),
+                        "engagement_participant_id": participant.engagement_participant_id,
+                    }
+                )
+        return items
+
+    async def confirm_consultation_request(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        payload: ConsultationConfirmRequest,
+    ) -> dict[str, Any]:
+        ensure_expert_portal_access(employee)
+        slot_hhmm = normalize_hhmm(payload.slot)
+
+        confirming_expert_id = payload.expert_id
+        if confirming_expert_id is None:
+            expert = await self._experts.get_by_user_id(db, employee.user_id)
+            if expert is None:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="expert_id is required when the current user is not linked to an expert",
+                )
+            confirming_expert_id = expert.expert_id
+
+        expert = await self._get_expert_or_404(db, confirming_expert_id)
+        if expert.expert_type != payload.expert_type:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Expert type does not match the request",
+            )
+
+        # Experts may only confirm as themselves
+        if employee.role == EmployeeRole.expert:
+            own = await self._experts.get_by_user_id(db, employee.user_id)
+            if own is None or own.expert_id != confirming_expert_id:
+                raise AppError(status_code=403, error_code="FORBIDDEN", message="Cannot confirm for another expert")
+
+        engagement = await db.get(Engagement, payload.engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Engagement not found")
+
+        result = await db.execute(
+            select(EngagementParticipant)
+            .where(EngagementParticipant.user_id == payload.user_id)
+            .where(EngagementParticipant.engagement_id == payload.engagement_id)
+            .order_by(EngagementParticipant.engagement_participant_id.desc())
+            .limit(1)
+        )
+        participant = result.scalar_one_or_none()
+        if participant is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Participant not found")
+
+        consultations = normalize_consultations_map(participant.consultations)
+        pref = consultations.get(payload.expert_type) or normalize_preference(None)
+        if not pref.get("want"):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Participant did not request this consultation",
+            )
+        if pref.get("expert_id") is not None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation already confirmed",
+            )
+
+        # Prefer participant date/slot if set; payload must match when set
+        if pref.get("date") and pref["date"] != payload.date.isoformat():
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Date does not match requested slot")
+        if pref.get("slot") and normalize_hhmm(pref["slot"]) != slot_hhmm:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Slot does not match requested slot")
+
+        available = await self._slot_is_available(
+            db,
+            expert_type=payload.expert_type,
+            day=payload.date,
+            slot_hhmm=slot_hhmm,
+            expert_id=confirming_expert_id,
+        )
+        if not available:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Selected slot is not available for this expert",
+            )
+
+        pref["date"] = payload.date.isoformat()
+        pref["slot"] = slot_hhmm
+        pref["expert_id"] = confirming_expert_id
+        consultations[payload.expert_type] = pref
+        participant.consultations = consultations
+        flag_modified(participant, "consultations")
+        db.add(participant)
+
+        override = ExpertAvailabilityOverrideModel(
+            expert_id=confirming_expert_id,
+            override_date=payload.date,
+            status="booked",
+            start_time=parse_slot_time(slot_hhmm),
+            end_time=None,
+            buffer_time=None,
+        )
+        await self._overrides.create(db, override)
+        await db.flush()
+
+        return {
+            "message": "Consultation confirmed",
+            "user_id": payload.user_id,
+            "engagement_id": payload.engagement_id,
+            "expert_type": payload.expert_type,
+            "expert_id": confirming_expert_id,
+            "date": payload.date.isoformat(),
+            "slot": slot_hhmm,
+        }

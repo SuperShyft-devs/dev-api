@@ -1,0 +1,81 @@
+"""Helpers for participant consultation preference JSON."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from core.exceptions import AppError
+
+
+def empty_preference(*, want: bool = False) -> dict[str, Any]:
+    return {"want": want, "date": None, "slot": None, "expert_id": None}
+
+
+def normalize_preference(value: Any) -> dict[str, Any]:
+    """Normalize a single expert-type consultation value to the object shape."""
+    if value is None:
+        return empty_preference(want=False)
+    if isinstance(value, bool):
+        return empty_preference(want=value)
+    if isinstance(value, dict):
+        want = bool(value.get("want", False))
+        date_val = value.get("date")
+        slot_val = value.get("slot")
+        expert_id = value.get("expert_id")
+        if expert_id is not None:
+            try:
+                expert_id = int(expert_id)
+            except (TypeError, ValueError):
+                expert_id = None
+        return {
+            "want": want,
+            "date": str(date_val) if date_val else None,
+            "slot": str(slot_val) if slot_val else None,
+            "expert_id": expert_id,
+        }
+    return empty_preference(want=False)
+
+
+def normalize_consultations_map(raw: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    raw = raw if isinstance(raw, dict) else {}
+    return {str(key): normalize_preference(value) for key, value in raw.items()}
+
+
+def preference_wants(value: Any) -> bool:
+    return bool(normalize_preference(value).get("want"))
+
+
+def validate_requested_consultations(
+    requested: dict[str, Any] | None,
+    allowed: dict[str, bool] | None,
+) -> dict[str, dict[str, Any]]:
+    """Reject want=true unless enabled on the engagement. Returns normalized map."""
+    requested_norm = normalize_consultations_map(requested)
+    allowed = allowed if isinstance(allowed, dict) else {}
+    invalid = sorted(
+        key
+        for key, pref in requested_norm.items()
+        if pref.get("want") is True and allowed.get(key) is not True
+    )
+    if invalid:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message=f"Consultation not available for this engagement: {', '.join(invalid)}",
+        )
+    return requested_norm
+
+
+def normalize_hhmm(slot: str) -> str:
+    """Normalize '10:00' or '10:00:00' to 'HH:MM'."""
+    parts = (slot or "").strip().split(":")
+    if len(parts) < 2:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid slot time")
+    try:
+        hour = int(parts[0])
+        minute = int(parts[1])
+    except ValueError as exc:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid slot time") from exc
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid slot time")
+    return f"{hour:02d}:{minute:02d}"

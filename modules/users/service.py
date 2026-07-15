@@ -102,27 +102,13 @@ async def _resolve_consultation_from_pkg(
 
 
 def _validate_requested_consultations(
-    requested: dict[str, bool] | None,
+    requested: dict | None,
     allowed: dict[str, bool] | None,
-) -> dict[str, bool]:
-    """Reject true consultation flags unless enabled on the engagement.
+) -> dict:
+    """Reject want=true consultation flags unless enabled on the engagement."""
+    from modules.experts.consultations import validate_requested_consultations
 
-    A requested value may be true only when ``allowed[expert_type]`` is true.
-    False / omitted values are always accepted.
-    """
-    requested = dict(requested or {})
-    allowed = allowed if isinstance(allowed, dict) else {}
-    invalid = sorted(
-        key for key, value in requested.items() if value is True and allowed.get(key) is not True
-    )
-    if invalid:
-        raise AppError(
-            status_code=400,
-            error_code="INVALID_INPUT",
-            message=f"Consultation not available for this engagement: {', '.join(invalid)}",
-        )
-    return requested
-
+    return validate_requested_consultations(requested, allowed)
 
 class UsersService:
     def _normalize_phone_for_metsights(self, raw: str | None) -> str | None:

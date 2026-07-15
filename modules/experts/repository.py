@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import func, or_, select
@@ -129,6 +129,22 @@ class ExpertsRepository:
         result = await db.execute(query)
         return list(result.scalars().all())
 
+    async def list_for_slots(
+        self,
+        db: AsyncSession,
+        *,
+        expert_type: str | None = None,
+        expert_id: int | None = None,
+    ) -> list[Expert]:
+        query = select(Expert).where(Expert.status == "active")
+        if expert_id is not None:
+            query = query.where(Expert.expert_id == expert_id)
+        if expert_type is not None:
+            query = query.where(Expert.expert_type == expert_type)
+        query = query.order_by(Expert.expert_id.asc())
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
     async def create(self, db: AsyncSession, expert: Expert) -> Expert:
         db.add(expert)
         await db.flush()
@@ -238,6 +254,16 @@ class ExpertAvailabilityRepository:
         )
         return list(result.scalars().all())
 
+    async def list_by_expert_ids(
+        self, db: AsyncSession, expert_ids: list[int]
+    ) -> list[ExpertAvailabilityModel]:
+        if not expert_ids:
+            return []
+        result = await db.execute(
+            select(ExpertAvailabilityModel).where(ExpertAvailabilityModel.expert_id.in_(expert_ids))
+        )
+        return list(result.scalars().all())
+
     async def get_by_id(self, db: AsyncSession, block_id: int) -> ExpertAvailabilityModel | None:
         result = await db.execute(
             select(ExpertAvailabilityModel).where(ExpertAvailabilityModel.id == block_id)
@@ -281,6 +307,25 @@ class ExpertAvailabilityOverrideRepository:
             select(ExpertAvailabilityOverrideModel)
             .where(ExpertAvailabilityOverrideModel.expert_id == expert_id)
             .order_by(ExpertAvailabilityOverrideModel.override_date.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_by_expert_ids_and_dates(
+        self,
+        db: AsyncSession,
+        expert_ids: list[int],
+        *,
+        start_date: date,
+        end_date: date,
+    ) -> list[ExpertAvailabilityOverrideModel]:
+        if not expert_ids:
+            return []
+        result = await db.execute(
+            select(ExpertAvailabilityOverrideModel).where(
+                ExpertAvailabilityOverrideModel.expert_id.in_(expert_ids),
+                ExpertAvailabilityOverrideModel.override_date >= start_date,
+                ExpertAvailabilityOverrideModel.override_date <= end_date,
+            )
         )
         return list(result.scalars().all())
 
