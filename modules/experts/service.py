@@ -726,12 +726,9 @@ class ExpertAvailabilityService:
 
         consultations = normalize_consultations_map(participant.consultations)
         pref = consultations.get(payload.expert_type) or normalize_preference(None)
+        # Engagement already allows this type; auto-opt-in if participant has not requested yet.
         if not pref.get("want"):
-            raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message="Consultation was not requested for this expert type",
-            )
+            pref["want"] = True
         if pref.get("expert_id") is not None:
             raise AppError(
                 status_code=400,
