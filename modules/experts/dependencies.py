@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
-from modules.experts.repository import ExpertsRepository, ExpertTypesRepository
-from modules.experts.service import ExpertsService, ExpertTypesService
+from modules.experts.repository import (
+    ExpertAvailabilityRepository,
+    ExpertAvailabilityOverrideRepository,
+    ExpertsRepository,
+    ExpertTypesRepository,
+)
+from modules.experts.service import ExpertAvailabilityService, ExpertsService, ExpertTypesService
 
 
 def get_expert_types_service() -> ExpertTypesService:
@@ -22,4 +27,12 @@ def get_experts_service() -> ExpertsService:
         audit_service=audit_service,
         expert_types_service=expert_types_service,
         employee_repository=EmployeeRepository(),
+    )
+
+
+def get_availability_service() -> ExpertAvailabilityService:
+    return ExpertAvailabilityService(
+        experts_repository=ExpertsRepository(),
+        availability_repository=ExpertAvailabilityRepository(),
+        override_repository=ExpertAvailabilityOverrideRepository(),
     )

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import date, time
 from decimal import Decimal
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ExpertTypeCreateRequest(BaseModel):
@@ -53,6 +54,8 @@ class ExpertCreateRequest(BaseModel):
     appointment_fee_paise: Optional[int] = Field(default=None, ge=0)
     original_fee_paise: Optional[int] = Field(default=None, ge=0)
     patient_count: Optional[int] = Field(default=0, ge=0)
+    effective_from: Optional[date] = None
+    effective_until: Optional[date] = None
 
     @field_validator("languages")
     @classmethod
@@ -79,6 +82,8 @@ class ExpertUpdateRequest(BaseModel):
     appointment_fee_paise: Optional[int] = Field(default=None, ge=0)
     original_fee_paise: Optional[int] = Field(default=None, ge=0)
     patient_count: Optional[int] = Field(default=None, ge=0)
+    effective_from: Optional[date] = None
+    effective_until: Optional[date] = None
 
     @field_validator("languages")
     @classmethod
@@ -103,3 +108,48 @@ class ExpertTagCreateRequest(BaseModel):
 class ExpertReviewCreateRequest(BaseModel):
     rating: Decimal = Field(ge=Decimal("1.0"), le=Decimal("5.0"))
     review_text: Optional[str] = Field(default=None, max_length=4000)
+
+
+# ─── Availability schemas ─────────────────────────────────────────────────────
+
+class AvailabilityBlockCreate(BaseModel):
+    day_of_week: int = Field(ge=0, le=6)
+    start_time: time
+    end_time: time
+    slot_duration: int = Field(gt=0, le=480)
+    buffer_time: int = Field(default=5, ge=0, le=120)
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> "AvailabilityBlockCreate":
+        if self.end_time <= self.start_time:
+            raise ValueError("end_time must be after start_time")
+        return self
+
+
+class AvailabilityBlockUpdate(BaseModel):
+    day_of_week: Optional[int] = Field(default=None, ge=0, le=6)
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    slot_duration: Optional[int] = Field(default=None, gt=0, le=480)
+    buffer_time: Optional[int] = Field(default=None, ge=0, le=120)
+
+
+class AvailabilityBulkSave(BaseModel):
+    blocks: list[AvailabilityBlockCreate]
+
+
+class OverrideCreate(BaseModel):
+    override_date: date
+    availability: bool
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    buffer_time: Optional[int] = Field(default=None, ge=0, le=120)
+
+    @model_validator(mode="after")
+    def _times_required_when_available(self) -> "OverrideCreate":
+        if self.availability:
+            if self.start_time is None or self.end_time is None:
+                raise ValueError("start_time and end_time are required when available is true")
+            if self.end_time <= self.start_time:
+                raise ValueError("end_time must be after start_time")
+        return self

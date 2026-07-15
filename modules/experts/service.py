@@ -10,15 +10,30 @@ from modules.employee.access_control import ensure_expert_portal_access, ensure_
 from modules.employee.models import Employee, EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
-from modules.experts.models import Expert, ExpertExpertiseTag, ExpertReview, ExpertTypeModel
-from modules.experts.repository import ExpertsRepository, ExpertTypesRepository
+from modules.experts.models import (
+    Expert,
+    ExpertAvailabilityModel,
+    ExpertAvailabilityOverrideModel,
+    ExpertExpertiseTag,
+    ExpertReview,
+    ExpertTypeModel,
+)
+from modules.experts.repository import (
+    ExpertAvailabilityRepository,
+    ExpertAvailabilityOverrideRepository,
+    ExpertsRepository,
+    ExpertTypesRepository,
+)
 from modules.experts.schemas import (
+    AvailabilityBlockCreate,
+    AvailabilityBulkSave,
     ExpertCreateRequest,
     ExpertReviewCreateRequest,
     ExpertTagCreateRequest,
     ExpertTypeCreateRequest,
     ExpertTypeUpdateRequest,
     ExpertUpdateRequest,
+    OverrideCreate,
 )
 from modules.users.repository import UsersRepository
 
@@ -205,6 +220,8 @@ class ExpertsService:
             appointment_fee_paise=payload.appointment_fee_paise,
             original_fee_paise=payload.original_fee_paise,
             patient_count=payload.patient_count or 0,
+            effective_from=payload.effective_from,
+            effective_until=payload.effective_until,
             status="active",
         )
         expert = await self._repository.create(db, expert)
@@ -253,6 +270,8 @@ class ExpertsService:
         expert.session_duration_mins = payload.session_duration_mins
         expert.appointment_fee_paise = payload.appointment_fee_paise
         expert.original_fee_paise = payload.original_fee_paise
+        expert.effective_from = payload.effective_from
+        expert.effective_until = payload.effective_until
         if payload.patient_count is not None:
             expert.patient_count = payload.patient_count
 
@@ -421,3 +440,103 @@ class ExpertsService:
         review = await self._repository.create_review(db, review)
         await self._repository.refresh_expert_rating_from_reviews(db, expert_id)
         return review
+
+
+class ExpertAvailabilityService:
+    def __init__(
+        self,
+        experts_repository: ExpertsRepository,
+        availability_repository: ExpertAvailabilityRepository,
+        override_repository: ExpertAvailabilityOverrideRepository,
+    ):
+        self._experts = experts_repository
+        self._availability = availability_repository
+        self._overrides = override_repository
+
+    async def _get_expert_or_404(self, db, expert_id: int) -> Expert:
+        expert = await self._experts.get_by_id(db, expert_id)
+        if expert is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Expert does not exist")
+        return expert
+
+    # ─── Weekly blocks ─────────────────────────────────────────────────────
+
+    async def list_blocks(self, db, *, expert_id: int) -> list[ExpertAvailabilityModel]:
+        await self._get_expert_or_404(db, expert_id)
+        return await self._availability.list_by_expert(db, expert_id)
+
+    async def create_block(
+        self, db, *, expert_id: int, payload: AvailabilityBlockCreate
+    ) -> ExpertAvailabilityModel:
+        await self._get_expert_or_404(db, expert_id)
+        block = ExpertAvailabilityModel(
+            expert_id=expert_id,
+            day_of_week=payload.day_of_week,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+            slot_duration=payload.slot_duration,
+            buffer_time=payload.buffer_time,
+        )
+        return await self._availability.create(db, block)
+
+    async def update_block(
+        self, db, *, expert_id: int, block_id: int, payload: AvailabilityBlockCreate
+    ) -> ExpertAvailabilityModel:
+        block = await self._availability.get_by_id(db, block_id)
+        if block is None or block.expert_id != expert_id:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Availability block not found")
+        block.day_of_week = payload.day_of_week
+        block.start_time = payload.start_time
+        block.end_time = payload.end_time
+        block.slot_duration = payload.slot_duration
+        block.buffer_time = payload.buffer_time
+        return await self._availability.update(db, block)
+
+    async def delete_block(self, db, *, expert_id: int, block_id: int) -> None:
+        block = await self._availability.get_by_id(db, block_id)
+        if block is None or block.expert_id != expert_id:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Availability block not found")
+        await self._availability.delete(db, block)
+
+    async def bulk_save_blocks(
+        self, db, *, expert_id: int, payload: AvailabilityBulkSave
+    ) -> list[ExpertAvailabilityModel]:
+        await self._get_expert_or_404(db, expert_id)
+        models = [
+            ExpertAvailabilityModel(
+                expert_id=expert_id,
+                day_of_week=b.day_of_week,
+                start_time=b.start_time,
+                end_time=b.end_time,
+                slot_duration=b.slot_duration,
+                buffer_time=b.buffer_time,
+            )
+            for b in payload.blocks
+        ]
+        return await self._availability.bulk_replace(db, expert_id, models)
+
+    # ─── Overrides ─────────────────────────────────────────────────────────
+
+    async def list_overrides(self, db, *, expert_id: int) -> list[ExpertAvailabilityOverrideModel]:
+        await self._get_expert_or_404(db, expert_id)
+        return await self._overrides.list_by_expert(db, expert_id)
+
+    async def create_override(
+        self, db, *, expert_id: int, payload: OverrideCreate
+    ) -> ExpertAvailabilityOverrideModel:
+        await self._get_expert_or_404(db, expert_id)
+        override = ExpertAvailabilityOverrideModel(
+            expert_id=expert_id,
+            override_date=payload.override_date,
+            availability=payload.availability,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+            buffer_time=payload.buffer_time,
+        )
+        return await self._overrides.create(db, override)
+
+    async def delete_override(self, db, *, expert_id: int, override_id: int) -> None:
+        override = await self._overrides.get_by_id(db, override_id)
+        if override is None or override.expert_id != expert_id:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Override not found")
+        await self._overrides.delete(db, override)

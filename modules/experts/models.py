@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, func
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, Time, func
 from sqlalchemy.orm import relationship
 
 from db.base import Base
@@ -36,10 +36,14 @@ class Expert(Base):
     appointment_fee_paise = Column(Integer, nullable=True)
     original_fee_paise = Column(Integer, nullable=True)
     status = Column(String, nullable=False, server_default="active")
+    effective_from = Column(Date, nullable=True)
+    effective_until = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     expertise_tags = relationship("ExpertExpertiseTag", back_populates="expert", cascade="all, delete-orphan")
+    availability_blocks = relationship("ExpertAvailabilityModel", back_populates="expert", cascade="all, delete-orphan")
+    availability_overrides = relationship("ExpertAvailabilityOverrideModel", back_populates="expert", cascade="all, delete-orphan")
 
 
 class ExpertExpertiseTag(Base):
@@ -62,3 +66,31 @@ class ExpertReview(Base):
     rating = Column(Numeric(2, 1), nullable=False)
     review_text = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ExpertAvailabilityModel(Base):
+    __tablename__ = "expert_availability"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    expert_id = Column(Integer, ForeignKey("experts.expert_id", ondelete="CASCADE"), nullable=False)
+    day_of_week = Column(Integer, nullable=False)
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    slot_duration = Column(Integer, nullable=False)
+    buffer_time = Column(Integer, nullable=False, server_default="5")
+
+    expert = relationship("Expert", back_populates="availability_blocks")
+
+
+class ExpertAvailabilityOverrideModel(Base):
+    __tablename__ = "expert_availability_overrides"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    expert_id = Column(Integer, ForeignKey("experts.expert_id", ondelete="CASCADE"), nullable=False)
+    override_date = Column(Date, nullable=False)
+    availability = Column(Boolean, nullable=False)
+    start_time = Column(Time, nullable=True)
+    end_time = Column(Time, nullable=True)
+    buffer_time = Column(Integer, nullable=True)
+
+    expert = relationship("Expert", back_populates="availability_overrides")

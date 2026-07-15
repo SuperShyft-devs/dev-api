@@ -9,7 +9,14 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
-from modules.experts.models import Expert, ExpertExpertiseTag, ExpertReview, ExpertTypeModel
+from modules.experts.models import (
+    Expert,
+    ExpertAvailabilityModel,
+    ExpertAvailabilityOverrideModel,
+    ExpertExpertiseTag,
+    ExpertReview,
+    ExpertTypeModel,
+)
 
 
 class ExpertTypesRepository:
@@ -219,3 +226,75 @@ class ExpertsRepository:
         else:
             expert.rating = Decimal(str(round(float(avg_rating), 2))).quantize(Decimal("0.01"))
         await self.update(db, expert)
+
+
+class ExpertAvailabilityRepository:
+
+    async def list_by_expert(self, db: AsyncSession, expert_id: int) -> list[ExpertAvailabilityModel]:
+        result = await db.execute(
+            select(ExpertAvailabilityModel)
+            .where(ExpertAvailabilityModel.expert_id == expert_id)
+            .order_by(ExpertAvailabilityModel.day_of_week.asc(), ExpertAvailabilityModel.start_time.asc())
+        )
+        return list(result.scalars().all())
+
+    async def get_by_id(self, db: AsyncSession, block_id: int) -> ExpertAvailabilityModel | None:
+        result = await db.execute(
+            select(ExpertAvailabilityModel).where(ExpertAvailabilityModel.id == block_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def create(self, db: AsyncSession, block: ExpertAvailabilityModel) -> ExpertAvailabilityModel:
+        db.add(block)
+        await db.flush()
+        return block
+
+    async def update(self, db: AsyncSession, block: ExpertAvailabilityModel) -> ExpertAvailabilityModel:
+        db.add(block)
+        await db.flush()
+        return block
+
+    async def delete(self, db: AsyncSession, block: ExpertAvailabilityModel) -> None:
+        await db.delete(block)
+        await db.flush()
+
+    async def delete_all_for_expert(self, db: AsyncSession, expert_id: int) -> None:
+        existing = await self.list_by_expert(db, expert_id)
+        for block in existing:
+            await db.delete(block)
+        await db.flush()
+
+    async def bulk_replace(
+        self, db: AsyncSession, expert_id: int, blocks: list[ExpertAvailabilityModel]
+    ) -> list[ExpertAvailabilityModel]:
+        await self.delete_all_for_expert(db, expert_id)
+        for block in blocks:
+            db.add(block)
+        await db.flush()
+        return blocks
+
+
+class ExpertAvailabilityOverrideRepository:
+
+    async def list_by_expert(self, db: AsyncSession, expert_id: int) -> list[ExpertAvailabilityOverrideModel]:
+        result = await db.execute(
+            select(ExpertAvailabilityOverrideModel)
+            .where(ExpertAvailabilityOverrideModel.expert_id == expert_id)
+            .order_by(ExpertAvailabilityOverrideModel.override_date.asc())
+        )
+        return list(result.scalars().all())
+
+    async def get_by_id(self, db: AsyncSession, override_id: int) -> ExpertAvailabilityOverrideModel | None:
+        result = await db.execute(
+            select(ExpertAvailabilityOverrideModel).where(ExpertAvailabilityOverrideModel.id == override_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def create(self, db: AsyncSession, override: ExpertAvailabilityOverrideModel) -> ExpertAvailabilityOverrideModel:
+        db.add(override)
+        await db.flush()
+        return override
+
+    async def delete(self, db: AsyncSession, override: ExpertAvailabilityOverrideModel) -> None:
+        await db.delete(override)
+        await db.flush()

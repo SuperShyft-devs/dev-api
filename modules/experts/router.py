@@ -13,8 +13,10 @@ from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_current_employee, get_optional_employee_if_authenticated
 from modules.employee.service import EmployeeContext
-from modules.experts.dependencies import get_experts_service
+from modules.experts.dependencies import get_expert_types_service, get_experts_service, get_availability_service
 from modules.experts.schemas import (
+    AvailabilityBlockCreate,
+    AvailabilityBulkSave,
     ExpertCreateRequest,
     ExpertReviewCreateRequest,
     ExpertStatusUpdateRequest,
@@ -22,9 +24,9 @@ from modules.experts.schemas import (
     ExpertTypeCreateRequest,
     ExpertTypeUpdateRequest,
     ExpertUpdateRequest,
+    OverrideCreate,
 )
-from modules.experts.service import ExpertsService, ExpertTypesService
-from modules.experts.dependencies import get_expert_types_service
+from modules.experts.service import ExpertAvailabilityService, ExpertsService, ExpertTypesService
 from modules.users.models import User
 
 
@@ -66,9 +68,35 @@ def _expert_dict(expert) -> dict:
         "session_duration_mins": expert.session_duration_mins,
         "appointment_fee_paise": expert.appointment_fee_paise,
         "original_fee_paise": expert.original_fee_paise,
+        "effective_from": expert.effective_from.isoformat() if expert.effective_from else None,
+        "effective_until": expert.effective_until.isoformat() if expert.effective_until else None,
         "status": expert.status,
         "created_at": expert.created_at,
         "updated_at": expert.updated_at,
+    }
+
+
+def _availability_block_dict(block) -> dict:
+    return {
+        "id": block.id,
+        "expert_id": block.expert_id,
+        "day_of_week": block.day_of_week,
+        "start_time": block.start_time.strftime("%H:%M") if block.start_time else None,
+        "end_time": block.end_time.strftime("%H:%M") if block.end_time else None,
+        "slot_duration": block.slot_duration,
+        "buffer_time": block.buffer_time,
+    }
+
+
+def _override_dict(override) -> dict:
+    return {
+        "id": override.id,
+        "expert_id": override.expert_id,
+        "override_date": override.override_date.isoformat() if override.override_date else None,
+        "availability": override.availability,
+        "start_time": override.start_time.strftime("%H:%M") if override.start_time else None,
+        "end_time": override.end_time.strftime("%H:%M") if override.end_time else None,
+        "buffer_time": override.buffer_time,
     }
 
 
@@ -291,6 +319,182 @@ async def create_expert_review(
     )
     await db.commit()
     return success_response(_review_dict(review))
+
+
+# ─── Admin Availability endpoints ─────────────────────────────────────────────
+
+
+@router.get("/{expert_id}/availability")
+async def list_expert_availability(
+    expert_id: int,
+    db: AsyncSession = Depends(get_db),
+    _employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    blocks = await availability_service.list_blocks(db, expert_id=expert_id)
+    return success_response([_availability_block_dict(b) for b in blocks])
+
+
+@router.put("/{expert_id}/availability")
+async def bulk_save_expert_availability(
+    expert_id: int,
+    payload: AvailabilityBulkSave,
+    db: AsyncSession = Depends(get_db),
+    _employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    blocks = await availability_service.bulk_save_blocks(db, expert_id=expert_id, payload=payload)
+    await db.commit()
+    return success_response([_availability_block_dict(b) for b in blocks])
+
+
+@router.get("/{expert_id}/overrides")
+async def list_expert_overrides(
+    expert_id: int,
+    db: AsyncSession = Depends(get_db),
+    _employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    overrides = await availability_service.list_overrides(db, expert_id=expert_id)
+    return success_response([_override_dict(o) for o in overrides])
+
+
+@router.post("/{expert_id}/overrides", status_code=201)
+async def create_expert_override(
+    expert_id: int,
+    payload: OverrideCreate,
+    db: AsyncSession = Depends(get_db),
+    _employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    override = await availability_service.create_override(db, expert_id=expert_id, payload=payload)
+    await db.commit()
+    return success_response(_override_dict(override))
+
+
+@router.delete("/{expert_id}/overrides/{override_id}")
+async def delete_expert_override(
+    expert_id: int,
+    override_id: int,
+    db: AsyncSession = Depends(get_db),
+    _employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    await availability_service.delete_override(db, expert_id=expert_id, override_id=override_id)
+    await db.commit()
+    return success_response({"id": override_id})
+
+
+# ─── Portal Availability endpoints ────────────────────────────────────────────
+
+
+@portal_router.get("/availability")
+async def portal_list_availability(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    experts_service: ExpertsService = Depends(get_experts_service),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    blocks = await availability_service.list_blocks(db, expert_id=expert.expert_id)
+    return success_response([_availability_block_dict(b) for b in blocks])
+
+
+@portal_router.post("/availability", status_code=201)
+async def portal_create_availability(
+    payload: AvailabilityBlockCreate,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    experts_service: ExpertsService = Depends(get_experts_service),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    block = await availability_service.create_block(db, expert_id=expert.expert_id, payload=payload)
+    await db.commit()
+    return success_response(_availability_block_dict(block))
+
+
+@portal_router.put("/availability/{block_id}")
+async def portal_update_availability(
+    block_id: int,
+    payload: AvailabilityBlockCreate,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    experts_service: ExpertsService = Depends(get_experts_service),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    block = await availability_service.update_block(db, expert_id=expert.expert_id, block_id=block_id, payload=payload)
+    await db.commit()
+    return success_response(_availability_block_dict(block))
+
+
+@portal_router.delete("/availability/{block_id}")
+async def portal_delete_availability(
+    block_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    experts_service: ExpertsService = Depends(get_experts_service),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    await availability_service.delete_block(db, expert_id=expert.expert_id, block_id=block_id)
+    await db.commit()
+    return success_response({"id": block_id})
+
+
+@portal_router.put("/availability")
+async def portal_bulk_save_availability(
+    payload: AvailabilityBulkSave,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    experts_service: ExpertsService = Depends(get_experts_service),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    blocks = await availability_service.bulk_save_blocks(db, expert_id=expert.expert_id, payload=payload)
+    await db.commit()
+    return success_response([_availability_block_dict(b) for b in blocks])
+
+
+@portal_router.get("/overrides")
+async def portal_list_overrides(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    experts_service: ExpertsService = Depends(get_experts_service),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    overrides = await availability_service.list_overrides(db, expert_id=expert.expert_id)
+    return success_response([_override_dict(o) for o in overrides])
+
+
+@portal_router.post("/overrides", status_code=201)
+async def portal_create_override(
+    payload: OverrideCreate,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    experts_service: ExpertsService = Depends(get_experts_service),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    override = await availability_service.create_override(db, expert_id=expert.expert_id, payload=payload)
+    await db.commit()
+    return success_response(_override_dict(override))
+
+
+@portal_router.delete("/overrides/{override_id}")
+async def portal_delete_override(
+    override_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    experts_service: ExpertsService = Depends(get_experts_service),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    await availability_service.delete_override(db, expert_id=expert.expert_id, override_id=override_id)
+    await db.commit()
+    return success_response({"id": override_id})
 
 
 # ─── Expert Types CRUD ────────────────────────────────────────────────────────
