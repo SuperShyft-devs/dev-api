@@ -139,9 +139,7 @@ def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
         participants_employee_id,
         participant_department,
         participant_blood_group,
-        want_doctor_consultation,
-        want_nutritionist_consultation,
-        want_doctor_and_nutritionist_consultation,
+        consultations,
         is_profile_created_on_metsights,
         is_primary_record_id_synced,
         is_fitprint_record_id_synced,
@@ -170,9 +168,7 @@ def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
         "participants_employee_id": participants_employee_id,
         "participant_department": participant_department,
         "participant_blood_group": participant_blood_group,
-        "want_doctor_consultation": want_doctor_consultation,
-        "want_nutritionist_consultation": want_nutritionist_consultation,
-        "want_doctor_and_nutritionist_consultation": want_doctor_and_nutritionist_consultation,
+        "consultations": consultations,
         "is_profile_created_on_metsights": is_profile_created_on_metsights,
         "is_primary_record_id_synced": is_primary_record_id_synced,
         "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
@@ -418,6 +414,7 @@ class EngagementsService:
             camp_no=compute_camp_no(payload.organization_id, payload.start_date),
             engagement_code=code,
             engagement_type=payload.engagement_type,
+            consultations=payload.consultations,
             assessment_package_id=payload.assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
             city=payload.city,
@@ -648,6 +645,9 @@ class EngagementsService:
             message="Zone ID auto-filled from Healthians.",
         )
 
+    async def get_engagement_by_code_public(self, db: AsyncSession, *, engagement_code: str):
+        return await self._repository.get_engagement_by_code(db, engagement_code)
+
     async def get_engagement_details_for_employee(
         self,
         db: AsyncSession,
@@ -708,6 +708,7 @@ class EngagementsService:
         engagement.engagement_code = code
         engagement.organization_id = payload.organization_id
         engagement.engagement_type = payload.engagement_type
+        engagement.consultations = payload.consultations
         engagement.assessment_package_id = payload.assessment_package_id
         engagement.diagnostic_package_id = payload.diagnostic_package_id
         engagement.city = payload.city
@@ -869,6 +870,7 @@ class EngagementsService:
         assessment_package_id: int | None,
         diagnostic_package_id: int | None = None,
         engagement_type: EngagementKind = EngagementKind.bio_ai,
+        consultations: dict[str, bool] | None = None,
         address: str | None = None,
         sub_locality: str | None = None,
         landmark: str | None = None,
@@ -928,6 +930,7 @@ class EngagementsService:
             camp_no=None,
             engagement_code=_generate_engagement_code(),
             engagement_type=engagement_type,
+            consultations=consultations,
             assessment_package_id=assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
             city=location.get("city"),
@@ -1093,9 +1096,7 @@ class EngagementsService:
         participants_employee_id: str | None = None,
         participant_department: str | None = None,
         participant_blood_group: str | None = None,
-        want_doctor_consultation: bool | None = None,
-        want_nutritionist_consultation: bool | None = None,
-        want_doctor_and_nutritionist_consultation: bool | None = None,
+        consultations: dict[str, bool] | None = None,
         is_profile_created_on_metsights: bool = False,
         is_primary_record_id_synced: bool = False,
         is_fitprint_record_id_synced: bool = False,
@@ -1114,9 +1115,7 @@ class EngagementsService:
             participants_employee_id=participants_employee_id,
             participant_department=participant_department,
             participant_blood_group=participant_blood_group,
-            want_doctor_consultation=want_doctor_consultation,
-            want_nutritionist_consultation=want_nutritionist_consultation,
-            want_doctor_and_nutritionist_consultation=want_doctor_and_nutritionist_consultation,
+            consultations=consultations,
             is_profile_created_on_metsights=is_profile_created_on_metsights,
             is_primary_record_id_synced=is_primary_record_id_synced,
             is_fitprint_record_id_synced=is_fitprint_record_id_synced,
@@ -1195,16 +1194,9 @@ class EngagementsService:
             participant.participant_department = normalized
             response["participant_department"] = normalized
 
-        consultation_fields = (
-            "want_doctor_consultation",
-            "want_nutritionist_consultation",
-            "want_doctor_and_nutritionist_consultation",
-        )
-        for field in consultation_fields:
-            if field in updates:
-                value = updates[field]
-                setattr(participant, field, value)
-                response[field] = value
+        if "consultations" in updates:
+            participant.consultations = updates["consultations"]
+            response["consultations"] = updates["consultations"]
 
         await self._repository.update_participant(db, participant)
 

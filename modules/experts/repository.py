@@ -9,7 +9,36 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
-from modules.experts.models import Expert, ExpertExpertiseTag, ExpertReview
+from modules.experts.models import Expert, ExpertExpertiseTag, ExpertReview, ExpertTypeModel
+
+
+class ExpertTypesRepository:
+
+    async def list_all(self, db: AsyncSession) -> list[ExpertTypeModel]:
+        result = await db.execute(select(ExpertTypeModel).order_by(ExpertTypeModel.id.asc()))
+        return list(result.scalars().all())
+
+    async def get_by_id(self, db: AsyncSession, expert_type_id: int) -> ExpertTypeModel | None:
+        result = await db.execute(select(ExpertTypeModel).where(ExpertTypeModel.id == expert_type_id))
+        return result.scalar_one_or_none()
+
+    async def get_by_key(self, db: AsyncSession, type_key: str) -> ExpertTypeModel | None:
+        result = await db.execute(select(ExpertTypeModel).where(ExpertTypeModel.type_key == type_key))
+        return result.scalar_one_or_none()
+
+    async def create(self, db: AsyncSession, expert_type: ExpertTypeModel) -> ExpertTypeModel:
+        db.add(expert_type)
+        await db.flush()
+        return expert_type
+
+    async def update(self, db: AsyncSession, expert_type: ExpertTypeModel) -> ExpertTypeModel:
+        db.add(expert_type)
+        await db.flush()
+        return expert_type
+
+    async def delete(self, db: AsyncSession, expert_type: ExpertTypeModel) -> None:
+        await db.delete(expert_type)
+        await db.flush()
 
 
 class ExpertsRepository:

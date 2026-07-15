@@ -205,10 +205,7 @@ class CampReportsRepository:
             )
             .where(Engagement.camp_no == camp_no)
             .where(
-                or_(
-                    EngagementParticipant.want_doctor_consultation.is_(True),
-                    EngagementParticipant.want_doctor_and_nutritionist_consultation.is_(True),
-                )
+                EngagementParticipant.consultations["doctor"].as_boolean().is_(True)
             )
         )
         if department is not None:
@@ -225,10 +222,7 @@ class CampReportsRepository:
             )
             .where(Engagement.camp_no == camp_no)
             .where(
-                or_(
-                    EngagementParticipant.want_nutritionist_consultation.is_(True),
-                    EngagementParticipant.want_doctor_and_nutritionist_consultation.is_(True),
-                )
+                EngagementParticipant.consultations["nutritionist"].as_boolean().is_(True)
             )
         )
         if department is not None:
@@ -246,7 +240,10 @@ class CampReportsRepository:
                 EngagementParticipant.engagement_id == Engagement.engagement_id,
             )
             .where(Engagement.camp_no == camp_no)
-            .where(EngagementParticipant.want_doctor_and_nutritionist_consultation.is_(True))
+            .where(
+                EngagementParticipant.consultations["doctor"].as_boolean().is_(True),
+                EngagementParticipant.consultations["nutritionist"].as_boolean().is_(True),
+            )
         )
         if department is not None:
             both_query = both_query.where(EngagementParticipant.participant_department == department)

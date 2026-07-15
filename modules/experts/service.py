@@ -7,12 +7,14 @@ from decimal import Decimal
 from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
-from modules.experts.models import Expert, ExpertExpertiseTag, ExpertReview
-from modules.experts.repository import ExpertsRepository
+from modules.experts.models import Expert, ExpertExpertiseTag, ExpertReview, ExpertTypeModel
+from modules.experts.repository import ExpertsRepository, ExpertTypesRepository
 from modules.experts.schemas import (
     ExpertCreateRequest,
     ExpertReviewCreateRequest,
     ExpertTagCreateRequest,
+    ExpertTypeCreateRequest,
+    ExpertTypeUpdateRequest,
     ExpertUpdateRequest,
 )
 from modules.users.repository import UsersRepository
@@ -22,11 +24,56 @@ _ALLOWED_STATUS = {"active", "inactive"}
 _ALLOWED_MODES = {"video", "voice", "chat"}
 
 
+class ExpertTypesService:
+    def __init__(self, repository: ExpertTypesRepository):
+        self._repository = repository
+
+    async def list_expert_types(self, db) -> list[ExpertTypeModel]:
+        return await self._repository.list_all(db)
+
+    async def create_expert_type(self, db, *, payload: ExpertTypeCreateRequest) -> ExpertTypeModel:
+        existing = await self._repository.get_by_key(db, payload.type_key)
+        if existing is not None:
+            raise AppError(status_code=409, error_code="CONFLICT", message="Expert type with this key already exists")
+        expert_type = ExpertTypeModel(type_key=payload.type_key, type=payload.type.strip())
+        return await self._repository.create(db, expert_type)
+
+    async def update_expert_type(self, db, *, expert_type_id: int, payload: ExpertTypeUpdateRequest) -> ExpertTypeModel:
+        expert_type = await self._repository.get_by_id(db, expert_type_id)
+        if expert_type is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Expert type not found")
+        if payload.type_key is not None and payload.type_key != expert_type.type_key:
+            existing = await self._repository.get_by_key(db, payload.type_key)
+            if existing is not None:
+                raise AppError(status_code=409, error_code="CONFLICT", message="Expert type with this key already exists")
+            expert_type.type_key = payload.type_key
+        if payload.type is not None:
+            expert_type.type = payload.type.strip()
+        return await self._repository.update(db, expert_type)
+
+    async def delete_expert_type(self, db, *, expert_type_id: int) -> None:
+        expert_type = await self._repository.get_by_id(db, expert_type_id)
+        if expert_type is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Expert type not found")
+        await self._repository.delete(db, expert_type)
+
+    async def validate_type_key(self, db, type_key: str) -> None:
+        existing = await self._repository.get_by_key(db, type_key)
+        if existing is None:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message=f"Unknown expert type: {type_key}")
+
+
 class ExpertsService:
-    def __init__(self, repository: ExpertsRepository, audit_service: AuditService | None = None):
+    def __init__(
+        self,
+        repository: ExpertsRepository,
+        audit_service: AuditService | None = None,
+        expert_types_service: ExpertTypesService | None = None,
+    ):
         self._repository = repository
         self._audit_service = audit_service
         self._users_repository = UsersRepository()
+        self._expert_types_service = expert_types_service
 
     def _require_audit(self) -> AuditService:
         if self._audit_service is None:
@@ -68,10 +115,7 @@ class ExpertsService:
     ) -> tuple[list[Expert], int]:
         expert_type_filter = None
         if expert_type is not None:
-            normalized = (expert_type or "").strip().lower()
-            if normalized not in {"doctor", "nutritionist"}:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            expert_type_filter = normalized
+            expert_type_filter = (expert_type or "").strip().lower()
 
         status_filter: str | None = "active"
         if employee is not None and status_query is not None:
@@ -127,6 +171,8 @@ class ExpertsService:
     ) -> Expert:
         await self._ensure_user_exists(db, payload.user_id)
         self._validate_modes(list(payload.consultation_modes) if payload.consultation_modes else None)
+        if self._expert_types_service:
+            await self._expert_types_service.validate_type_key(db, payload.expert_type)
 
         expert = Expert(
             user_id=payload.user_id,
@@ -173,6 +219,8 @@ class ExpertsService:
 
         await self._ensure_user_exists(db, payload.user_id)
         self._validate_modes(list(payload.consultation_modes) if payload.consultation_modes else None)
+        if self._expert_types_service:
+            await self._expert_types_service.validate_type_key(db, payload.expert_type)
 
         expert.user_id = payload.user_id
         expert.expert_type = payload.expert_type

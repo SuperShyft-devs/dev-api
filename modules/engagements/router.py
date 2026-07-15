@@ -60,6 +60,7 @@ def _engagement_to_dict(
         "camp_no": engagement.camp_no,
         "engagement_code": engagement.engagement_code,
         "engagement_type": engagement.engagement_type.value if engagement.engagement_type else None,
+        "consultations": engagement.consultations,
         "assessment_package_id": engagement.assessment_package_id,
         "diagnostic_package_id": engagement.diagnostic_package_id,
         "city": engagement.city,
@@ -93,6 +94,28 @@ def _engagement_to_dict(
         data["readiness"] = readiness.model_dump(mode="json")
     return data
 
+
+
+@router.get("/by-code/{engagement_code}")
+async def get_engagement_by_code(
+    engagement_code: str,
+    db: AsyncSession = Depends(get_db),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    row = await engagements_service.get_engagement_by_code_public(db, engagement_code=engagement_code)
+    if row is None:
+        raise AppError(status_code=404, error_code="NOT_FOUND", message="Engagement not found")
+    engagement, org_name, org_logo = row
+    return success_response({
+        "engagement_name": engagement.engagement_name,
+        "organization_name": org_name,
+        "organization_logo_url": org_logo,
+        "engagement_code": engagement.engagement_code,
+        "engagement_type": engagement.engagement_type.value if engagement.engagement_type else None,
+        "slot_duration": engagement.slot_duration,
+        "status": engagement.status,
+        "consultations": engagement.consultations,
+    })
 
 
 @router.post("", status_code=201)

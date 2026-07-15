@@ -33,6 +33,7 @@ from modules.platform_settings.service import PlatformSettingsService
 from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
 from modules.engagements.models import EngagementKind
+from modules.diagnostics.repository import DiagnosticsRepository
 from common.phone import phone_lookup_candidates as _phone_lookup_candidates
 from modules.users.schemas import (
     BookBioAiBatchRequest,
@@ -71,6 +72,33 @@ def _integrity_error_reason(exc: IntegrityError) -> str:
         if len(text) <= 200:
             return text
     return "Database constraint violation"
+
+
+_diagnostics_repo = DiagnosticsRepository()
+
+
+async def _resolve_consultation_from_pkg(
+    db: AsyncSession,
+    diagnostic_package_id: int | None,
+    base_kind: EngagementKind,
+) -> tuple[EngagementKind, dict[str, bool] | None]:
+    if diagnostic_package_id is None:
+        return base_kind, None
+    pkg = await _diagnostics_repo.get_package_by_id_basic(db, package_id=diagnostic_package_id)
+    if pkg is None:
+        return base_kind, None
+    cc = pkg.complementary_consultation
+    if not cc or not isinstance(cc, dict):
+        return base_kind, None
+    has_any = any(v is True for v in cc.values())
+    if not has_any:
+        return base_kind, None
+    with_consultation_map = {
+        EngagementKind.bio_ai: EngagementKind.bio_ai_with_consultation,
+        EngagementKind.blood_test: EngagementKind.blood_test_with_consultation,
+    }
+    new_kind = with_consultation_map.get(base_kind, base_kind)
+    return new_kind, cc
 
 
 class UsersService:
@@ -827,6 +855,9 @@ class UsersService:
         await self._platform_settings_service.ensure_active_b2c_packages(db, assessment_package_id, diagnostic_package_id)
 
         eng_city = (meta.get("city") or "").strip() or user.city
+        resolved_kind, resolved_consultations = await _resolve_consultation_from_pkg(
+            db, diagnostic_package_id, EngagementKind.bio_ai,
+        )
         engagement = await self._engagements_service.create_b2c_engagement(
             db,
             user_first_name=user.first_name,
@@ -834,7 +865,8 @@ class UsersService:
             city=eng_city,
             assessment_package_id=assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
-            engagement_type=EngagementKind.bio_ai,
+            engagement_type=resolved_kind,
+            consultations=resolved_consultations,
             address=meta.get("address"),
             sub_locality=meta.get("sub_locality"),
             landmark=meta.get("landmark"),
@@ -1005,6 +1037,9 @@ class UsersService:
         diagnostic_package_id = meta.get("diagnostic_package_id") or booking.entity_id
         await self._platform_settings_service.ensure_active_diagnostic_package(db, diagnostic_package_id)
 
+        resolved_kind, resolved_consultations = await _resolve_consultation_from_pkg(
+            db, diagnostic_package_id, EngagementKind.blood_test,
+        )
         engagement = await self._engagements_service.create_b2c_engagement(
             db,
             user_first_name=user.first_name,
@@ -1012,7 +1047,8 @@ class UsersService:
             city=meta.get("city") or user.city,
             assessment_package_id=None,
             diagnostic_package_id=diagnostic_package_id,
-            engagement_type=EngagementKind.diagnostic,
+            engagement_type=resolved_kind,
+            consultations=resolved_consultations,
             address=meta.get("address"),
             sub_locality=meta.get("sub_locality"),
             landmark=meta.get("landmark"),
@@ -1731,6 +1767,10 @@ class UsersService:
 
         # Create a new engagement for this user.
         # B2C engagements auto-assign default onboarding assistants from platform settings.
+        resolved_kind, resolved_consultations = await _resolve_consultation_from_pkg(
+            db, diagnostic_package_id, EngagementKind.bio_ai,
+        )
+
         engagement = await self._engagements_service.create_b2c_engagement(
             db,
             user_first_name=user.first_name,
@@ -1738,7 +1778,8 @@ class UsersService:
             city=payload.city or user.city,
             assessment_package_id=assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
-            engagement_type=EngagementKind.bio_ai,
+            engagement_type=resolved_kind,
+            consultations=resolved_consultations,
             address=payload.address,
             sub_locality=getattr(payload, "sub_locality", None),
             landmark=getattr(payload, "landmark", None),
@@ -1759,9 +1800,7 @@ class UsersService:
             participants_employee_id=payload.participants_employee_id,
             participant_department=payload.participant_department,
             participant_blood_group=payload.participant_blood_group,
-            want_doctor_consultation=payload.want_doctor_consultation,
-            want_nutritionist_consultation=payload.want_nutritionist_consultation,
-            want_doctor_and_nutritionist_consultation=payload.want_doctor_and_nutritionist_consultation,
+            consultations=payload.consultations,
             is_profile_created_on_metsights=bool((user.metsights_profile_id or "").strip()),
         )
 
@@ -1975,9 +2014,7 @@ class UsersService:
             participants_employee_id=payload.participants_employee_id,
             participant_department=validated_department,
             participant_blood_group=payload.participant_blood_group,
-            want_doctor_consultation=payload.want_doctor_consultation,
-            want_nutritionist_consultation=payload.want_nutritionist_consultation,
-            want_doctor_and_nutritionist_consultation=payload.want_doctor_and_nutritionist_consultation,
+            consultations=payload.consultations,
             is_profile_created_on_metsights=False,
             is_primary_record_id_synced=False,
             is_fitprint_record_id_synced=False,

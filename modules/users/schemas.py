@@ -252,9 +252,23 @@ class PublicUserOnboardRequest(BaseModel):
     participants_employee_id: Optional[str] = Field(default=None, max_length=100)
     participant_department: Optional[str] = Field(default=None, max_length=100)
     participant_blood_group: Optional[str] = Field(default=None, max_length=20)
+    # Legacy fields (deprecated, kept for backward compat)
     want_doctor_consultation: Optional[bool] = None
     want_nutritionist_consultation: Optional[bool] = None
     want_doctor_and_nutritionist_consultation: Optional[bool] = None
+    # New field
+    consultations: Optional[dict[str, bool]] = None
+
+    @model_validator(mode="after")
+    def normalize_consultations(self):
+        if self.consultations is None:
+            doctor = bool(self.want_doctor_consultation or self.want_doctor_and_nutritionist_consultation)
+            nutritionist = bool(self.want_nutritionist_consultation or self.want_doctor_and_nutritionist_consultation)
+            if doctor or nutritionist:
+                self.consultations = {"doctor": doctor, "nutritionist": nutritionist}
+            else:
+                self.consultations = {}
+        return self
 
     @validator("age")
     def age_must_be_valid(cls, v):
@@ -291,9 +305,23 @@ class EngagementUserOnboardRequest(BaseModel):
     participants_employee_id: Optional[str] = Field(default=None, max_length=100)
     participant_department: Optional[str] = Field(default=None, max_length=100)
     participant_blood_group: Optional[str] = Field(default=None, max_length=20)
+    # Legacy fields (deprecated, kept for backward compat)
     want_doctor_consultation: Optional[bool] = None
     want_nutritionist_consultation: Optional[bool] = None
     want_doctor_and_nutritionist_consultation: Optional[bool] = None
+    # New field
+    consultations: Optional[dict[str, bool]] = None
+
+    @model_validator(mode="after")
+    def normalize_consultations(self):
+        if self.consultations is None:
+            doctor = bool(self.want_doctor_consultation or self.want_doctor_and_nutritionist_consultation)
+            nutritionist = bool(self.want_nutritionist_consultation or self.want_doctor_and_nutritionist_consultation)
+            if doctor or nutritionist:
+                self.consultations = {"doctor": doctor, "nutritionist": nutritionist}
+            else:
+                self.consultations = {}
+        return self
 
     @validator("age")
     def age_must_be_valid(cls, v):

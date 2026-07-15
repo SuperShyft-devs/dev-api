@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
 from modules.engagements.models import Engagement, EngagementParticipant, OnboardingAssistantAssignment
+from modules.organizations.models import Organization
 
 
 class EngagementsRepository:
@@ -112,6 +113,19 @@ class EngagementsRepository:
     async def get_engagement_by_id(self, db: AsyncSession, engagement_id: int) -> Engagement | None:
         result = await db.execute(select(Engagement).where(Engagement.engagement_id == engagement_id))
         return result.scalar_one_or_none()
+
+    async def get_engagement_by_code(self, db: AsyncSession, engagement_code: str):
+        query = (
+            select(
+                Engagement,
+                Organization.name.label("organization_name"),
+                Organization.logo.label("organization_logo_url"),
+            )
+            .outerjoin(Organization, Engagement.organization_id == Organization.organization_id)
+            .where(Engagement.engagement_code == engagement_code)
+        )
+        result = await db.execute(query)
+        return result.one_or_none()
 
     async def count_engagements(
         self,
@@ -660,9 +674,7 @@ class EngagementsRepository:
                 EngagementParticipant.participants_employee_id,
                 EngagementParticipant.participant_department,
                 EngagementParticipant.participant_blood_group,
-                EngagementParticipant.want_doctor_consultation,
-                EngagementParticipant.want_nutritionist_consultation,
-                EngagementParticipant.want_doctor_and_nutritionist_consultation,
+                EngagementParticipant.consultations,
                 EngagementParticipant.is_profile_created_on_metsights,
                 EngagementParticipant.is_primary_record_id_synced,
                 EngagementParticipant.is_fitprint_record_id_synced,
@@ -703,9 +715,7 @@ class EngagementsRepository:
                 ranked_rows.c.participants_employee_id,
                 ranked_rows.c.participant_department,
                 ranked_rows.c.participant_blood_group,
-                ranked_rows.c.want_doctor_consultation,
-                ranked_rows.c.want_nutritionist_consultation,
-                ranked_rows.c.want_doctor_and_nutritionist_consultation,
+                ranked_rows.c.consultations,
                 ranked_rows.c.is_profile_created_on_metsights,
                 ranked_rows.c.is_primary_record_id_synced,
                 ranked_rows.c.is_fitprint_record_id_synced,
@@ -795,9 +805,7 @@ class EngagementsRepository:
                 EngagementParticipant.participants_employee_id,
                 EngagementParticipant.participant_department,
                 EngagementParticipant.participant_blood_group,
-                EngagementParticipant.want_doctor_consultation,
-                EngagementParticipant.want_nutritionist_consultation,
-                EngagementParticipant.want_doctor_and_nutritionist_consultation,
+                EngagementParticipant.consultations,
                 EngagementParticipant.is_profile_created_on_metsights,
                 EngagementParticipant.is_primary_record_id_synced,
                 EngagementParticipant.is_fitprint_record_id_synced,
@@ -839,9 +847,7 @@ class EngagementsRepository:
                 ranked_rows.c.participants_employee_id,
                 ranked_rows.c.participant_department,
                 ranked_rows.c.participant_blood_group,
-                ranked_rows.c.want_doctor_consultation,
-                ranked_rows.c.want_nutritionist_consultation,
-                ranked_rows.c.want_doctor_and_nutritionist_consultation,
+                ranked_rows.c.consultations,
                 ranked_rows.c.is_profile_created_on_metsights,
                 ranked_rows.c.is_primary_record_id_synced,
                 ranked_rows.c.is_fitprint_record_id_synced,

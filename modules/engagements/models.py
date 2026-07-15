@@ -7,6 +7,7 @@ import enum
 from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, Enum as SAEnum, Float, ForeignKey, Index, Integer, String, Time, UniqueConstraint
 from sqlalchemy.orm import validates
 from sqlalchemy.sql import func
+from sqlalchemy.types import JSON
 
 from db.base import Base
 
@@ -15,9 +16,10 @@ class EngagementKind(str, enum.Enum):
     """PostgreSQL enum `engagement_kind` / column `engagements.engagement_type`."""
 
     bio_ai = "bio_ai"
-    diagnostic = "diagnostic"
-    doctor = "doctor"
-    nutritionist = "nutritionist"
+    blood_test = "blood_test"
+    consultation = "consultation"
+    blood_test_with_consultation = "blood_test_with_consultation"
+    bio_ai_with_consultation = "bio_ai_with_consultation"
 
 
 class BloodCollectionType(str, enum.Enum):
@@ -64,6 +66,7 @@ class Engagement(Base):
     camp_no = Column(BigInteger, nullable=True)
     engagement_code = Column(String, nullable=False)
     engagement_type = Column(_engagement_kind, nullable=True)
+    consultations = Column(JSON, nullable=True)
     assessment_package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=True)
     diagnostic_package_id = Column(Integer, ForeignKey("diagnostic_package.diagnostic_package_id"), nullable=True)
     address = Column(String, nullable=True)
@@ -133,9 +136,7 @@ class EngagementParticipant(Base):
     participants_employee_id = Column(String, nullable=True)
     participant_department = Column(String, nullable=True)
     participant_blood_group = Column(String, nullable=True)
-    want_doctor_consultation = Column(Boolean, nullable=True)
-    want_nutritionist_consultation = Column(Boolean, nullable=True)
-    want_doctor_and_nutritionist_consultation = Column(Boolean, nullable=True)
+    consultations = Column(JSON, nullable=True)
     is_profile_created_on_metsights = Column(Boolean, nullable=False, default=False, server_default="false")
     is_primary_record_id_synced = Column(Boolean, nullable=False, default=False, server_default="false")
     is_fitprint_record_id_synced = Column(Boolean, nullable=False, default=False, server_default="false")

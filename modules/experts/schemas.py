@@ -8,13 +8,40 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 
-ExpertTypeLiteral = Literal["doctor", "nutritionist"]
+class ExpertTypeCreateRequest(BaseModel):
+    type_key: str = Field(min_length=1, max_length=100)
+    type: str = Field(min_length=1, max_length=200)
+
+    @field_validator("type_key")
+    @classmethod
+    def _type_key_slug(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not v.replace("_", "").isalnum():
+            raise ValueError("type_key must be alphanumeric with underscores only")
+        return v
+
+
+class ExpertTypeUpdateRequest(BaseModel):
+    type_key: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    type: Optional[str] = Field(default=None, min_length=1, max_length=200)
+
+    @field_validator("type_key")
+    @classmethod
+    def _type_key_slug(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip().lower()
+        if not v.replace("_", "").isalnum():
+            raise ValueError("type_key must be alphanumeric with underscores only")
+        return v
+
+
 ConsultationModeLiteral = Literal["video", "voice", "chat"]
 
 
 class ExpertCreateRequest(BaseModel):
     user_id: int = Field(gt=0)
-    expert_type: ExpertTypeLiteral
+    expert_type: str = Field(min_length=1, max_length=100)
     specialization: str = Field(min_length=1, max_length=200)
     profile_photo: Optional[str] = Field(default=None, max_length=500)
     experience_years: Optional[int] = Field(default=None, ge=0, le=80)
@@ -40,7 +67,7 @@ class ExpertCreateRequest(BaseModel):
 
 class ExpertUpdateRequest(BaseModel):
     user_id: int = Field(gt=0)
-    expert_type: ExpertTypeLiteral
+    expert_type: str = Field(min_length=1, max_length=100)
     specialization: str = Field(min_length=1, max_length=200)
     profile_photo: Optional[str] = Field(default=None, max_length=500)
     experience_years: Optional[int] = Field(default=None, ge=0, le=80)

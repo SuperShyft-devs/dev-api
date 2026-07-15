@@ -19,13 +19,17 @@ from modules.experts.schemas import (
     ExpertReviewCreateRequest,
     ExpertStatusUpdateRequest,
     ExpertTagCreateRequest,
+    ExpertTypeCreateRequest,
+    ExpertTypeUpdateRequest,
     ExpertUpdateRequest,
 )
-from modules.experts.service import ExpertsService
+from modules.experts.service import ExpertsService, ExpertTypesService
+from modules.experts.dependencies import get_expert_types_service
 from modules.users.models import User
 
 
 router = APIRouter(prefix="/experts", tags=["experts"])
+expert_types_router = APIRouter(prefix="/expert-types", tags=["expert-types"])
 
 
 def _client_ip(request: Request) -> str:
@@ -274,3 +278,60 @@ async def create_expert_review(
     )
     await db.commit()
     return success_response(_review_dict(review))
+
+
+# ─── Expert Types CRUD ────────────────────────────────────────────────────────
+
+
+def _expert_type_dict(et) -> dict:
+    return {
+        "id": et.id,
+        "type_key": et.type_key,
+        "type": et.type,
+    }
+
+
+@expert_types_router.get("")
+async def list_expert_types(
+    db: AsyncSession = Depends(get_db),
+    expert_types_service: ExpertTypesService = Depends(get_expert_types_service),
+):
+    items = await expert_types_service.list_expert_types(db)
+    return success_response([_expert_type_dict(et) for et in items])
+
+
+@expert_types_router.post("", status_code=201)
+async def create_expert_type(
+    payload: ExpertTypeCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    _employee: EmployeeContext = Depends(get_current_employee),
+    expert_types_service: ExpertTypesService = Depends(get_expert_types_service),
+):
+    et = await expert_types_service.create_expert_type(db, payload=payload)
+    await db.commit()
+    return success_response(_expert_type_dict(et))
+
+
+@expert_types_router.put("/{expert_type_id}")
+async def update_expert_type(
+    expert_type_id: int,
+    payload: ExpertTypeUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    _employee: EmployeeContext = Depends(get_current_employee),
+    expert_types_service: ExpertTypesService = Depends(get_expert_types_service),
+):
+    et = await expert_types_service.update_expert_type(db, expert_type_id=expert_type_id, payload=payload)
+    await db.commit()
+    return success_response(_expert_type_dict(et))
+
+
+@expert_types_router.delete("/{expert_type_id}")
+async def delete_expert_type(
+    expert_type_id: int,
+    db: AsyncSession = Depends(get_db),
+    _employee: EmployeeContext = Depends(get_current_employee),
+    expert_types_service: ExpertTypesService = Depends(get_expert_types_service),
+):
+    await expert_types_service.delete_expert_type(db, expert_type_id=expert_type_id)
+    await db.commit()
+    return success_response({"id": expert_type_id})

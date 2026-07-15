@@ -8,6 +8,14 @@ from sqlalchemy.orm import relationship
 from db.base import Base
 
 
+class ExpertTypeModel(Base):
+    __tablename__ = "expert_types"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    type_key = Column(String, unique=True, nullable=False)
+    type = Column(String, nullable=False)
+
+
 class Expert(Base):
     __tablename__ = "experts"
 

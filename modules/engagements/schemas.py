@@ -19,6 +19,7 @@ class EngagementCreateRequest(BaseModel):
     organization_id: int = Field(gt=0)
     camp_no: Optional[int] = None
     engagement_type: EngagementKind
+    consultations: Optional[dict[str, bool]] = None
     engagement_code: Optional[str] = Field(default=None, max_length=50)
     assessment_package_id: Optional[int] = Field(default=None, gt=0)
     diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
@@ -55,6 +56,7 @@ class EngagementUpdateRequest(BaseModel):
     organization_id: Optional[int] = Field(default=None, gt=0)
     camp_no: Optional[int] = None
     engagement_type: EngagementKind
+    consultations: Optional[dict[str, bool]] = None
     assessment_package_id: Optional[int] = Field(default=None, gt=0)
     diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
     city: Optional[str] = Field(default=None, max_length=100)
@@ -111,6 +113,7 @@ class EngagementListItem(BaseModel):
     camp_no: Optional[int] = None
     engagement_code: str
     engagement_type: Optional[str] = None
+    consultations: Optional[dict[str, bool]] = None
     assessment_package_id: Optional[int] = None
     diagnostic_package_id: Optional[int] = None
     city: Optional[str] = None
@@ -236,9 +239,7 @@ class CreateMetsightsProfilesRequest(BaseModel):
 
 class EngagementParticipantUpdateRequest(BaseModel):
     participant_department: Optional[str] = Field(default=None, max_length=100)
-    want_doctor_consultation: Optional[bool] = None
-    want_nutritionist_consultation: Optional[bool] = None
-    want_doctor_and_nutritionist_consultation: Optional[bool] = None
+    consultations: Optional[dict[str, bool]] = None
     blood_collection_time_slot_id: Optional[str] = Field(default=None, max_length=100)
 
 
