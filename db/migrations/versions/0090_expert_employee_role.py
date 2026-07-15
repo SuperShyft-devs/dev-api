@@ -1,4 +1,4 @@
-"""Add expert employee role and backfill from experts.
+"""Add expert employee role to employee_role enum.
 
 Revision ID: 0090_expert_employee_role
 Revises: 0089_participant_consult
@@ -18,22 +18,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    with op.get_context().autocommit_block():
-        op.execute(text("ALTER TYPE employee_role ADD VALUE IF NOT EXISTS 'expert'"))
-
-    op.execute(
-        text(
-            """
-            INSERT INTO employee (user_id, role, status)
-            SELECT DISTINCT e.user_id, 'expert', 'active'
-            FROM experts e
-            WHERE e.user_id IS NOT NULL
-              AND NOT EXISTS (
-                  SELECT 1 FROM employee emp WHERE emp.user_id = e.user_id
-              )
-            """
-        )
-    )
+    # Same pattern as 0066 (organization_manager). Do not use autocommit_block —
+    # async Alembic here has no outer transaction for that helper.
+    # Backfill that *uses* the new enum value must be a later revision so the
+    # ADD VALUE is committed first (Postgres unsafe-use rule).
+    op.execute(text("ALTER TYPE employee_role ADD VALUE IF NOT EXISTS 'expert'"))
 
 
 def downgrade() -> None:
