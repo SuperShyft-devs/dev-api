@@ -18,11 +18,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Same pattern as 0066 (organization_manager). Do not use autocommit_block —
-    # async Alembic here has no outer transaction for that helper.
-    # Backfill that *uses* the new enum value must be a later revision so the
-    # ADD VALUE is committed first (Postgres unsafe-use rule).
-    op.execute(text("ALTER TYPE employee_role ADD VALUE IF NOT EXISTS 'expert'"))
+    connection = op.get_bind()
+    # Same pattern as 0088: ADD VALUE then COMMIT so Postgres allows using the
+    # new enum value in later statements / the next revision (0091 backfill).
+    # Alembic wraps upgrade head in one transaction (see env.py).
+    connection.execute(text("ALTER TYPE employee_role ADD VALUE IF NOT EXISTS 'expert'"))
+    connection.execute(text("COMMIT"))
 
 
 def downgrade() -> None:
