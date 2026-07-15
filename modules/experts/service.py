@@ -776,7 +776,7 @@ class ExpertAvailabilityService:
             select(EngagementParticipant, Engagement, User)
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
             .join(User, User.user_id == EngagementParticipant.user_id)
-            .where(Engagement.status == "running")
+            .where(Engagement.status.in_(("running", "scheduled")))
             .where(Engagement.organization_id.is_(None))
             .where(EngagementParticipant.consultations.isnot(None))
             .order_by(EngagementParticipant.engagement_participant_id.desc())
