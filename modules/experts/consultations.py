@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime, time
 from typing import Any
 
 from core.exceptions import AppError
 
 
 def empty_preference(*, want: bool = False) -> dict[str, Any]:
-    return {"want": want, "date": None, "slot": None, "expert_id": None}
+    return {"want": want, "date": None, "slot": None, "expert_id": None, "done": False}
 
 
 def normalize_preference(value: Any) -> dict[str, Any]:
@@ -32,6 +33,7 @@ def normalize_preference(value: Any) -> dict[str, Any]:
             "date": str(date_val) if date_val else None,
             "slot": str(slot_val) if slot_val else None,
             "expert_id": expert_id,
+            "done": bool(value.get("done", False)),
         }
     return empty_preference(want=False)
 
@@ -79,3 +81,25 @@ def normalize_hhmm(slot: str) -> str:
     if hour < 0 or hour > 23 or minute < 0 or minute > 59:
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid slot time")
     return f"{hour:02d}:{minute:02d}"
+
+
+def consultation_datetime(date_str: str | None, slot_str: str | None) -> datetime | None:
+    """Parse preference date + slot into a naive local datetime, or None if incomplete/invalid."""
+    if not date_str or not slot_str:
+        return None
+    try:
+        day = date.fromisoformat(str(date_str)[:10])
+        hhmm = normalize_hhmm(str(slot_str))
+        hour, minute = map(int, hhmm.split(":"))
+        return datetime.combine(day, time(hour=hour, minute=minute))
+    except (AppError, TypeError, ValueError):
+        return None
+
+
+def is_upcoming_slot(date_str: str | None, slot_str: str | None, *, now: datetime | None = None) -> bool:
+    """True when date+slot is today-or-later and not already past relative to now."""
+    when = consultation_datetime(date_str, slot_str)
+    if when is None:
+        return False
+    current = now or datetime.now()
+    return when >= current

@@ -166,6 +166,7 @@ class ConsultationPreferenceSchema(BaseModel):
     date: Optional[str] = None
     slot: Optional[str] = None
     expert_id: Optional[int] = Field(default=None, gt=0)
+    done: bool = False
 
 
 class ConsultationBookRequest(BaseModel):
@@ -182,4 +183,11 @@ class ConsultationConfirmRequest(BaseModel):
     expert_type: str = Field(min_length=1, max_length=100)
     date: date
     slot: str = Field(min_length=1, max_length=20)
+    expert_id: Optional[int] = Field(default=None, gt=0)
+
+
+class ConsultationDoneRequest(BaseModel):
+    user_id: int = Field(gt=0)
+    engagement_id: int = Field(gt=0)
+    expert_type: str = Field(min_length=1, max_length=100)
     expert_id: Optional[int] = Field(default=None, gt=0)

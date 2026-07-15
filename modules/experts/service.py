@@ -15,6 +15,7 @@ from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.experts.consultations import (
+    is_upcoming_slot,
     normalize_consultations_map,
     normalize_hhmm,
     normalize_preference,
@@ -38,6 +39,7 @@ from modules.experts.schemas import (
     AvailabilityBulkSave,
     ConsultationBookRequest,
     ConsultationConfirmRequest,
+    ConsultationDoneRequest,
     ExpertCreateRequest,
     ExpertReviewCreateRequest,
     ExpertTagCreateRequest,
@@ -893,6 +895,7 @@ class ExpertAvailabilityService:
         pref["date"] = payload.date.isoformat()
         pref["slot"] = slot_hhmm
         pref["expert_id"] = confirming_expert_id
+        pref["done"] = False
         consultations[payload.expert_type] = pref
         participant.consultations = consultations
         flag_modified(participant, "consultations")
@@ -917,4 +920,136 @@ class ExpertAvailabilityService:
             "expert_id": confirming_expert_id,
             "date": payload.date.isoformat(),
             "slot": slot_hhmm,
+        }
+
+    async def list_upcoming_consultations(self, db, *, employee: EmployeeContext) -> list[dict[str, Any]]:
+        ensure_expert_portal_access(employee)
+        expert = await self._experts.get_by_user_id(db, employee.user_id)
+        if expert is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Current user is not linked to an expert profile",
+            )
+
+        result = await db.execute(
+            select(EngagementParticipant, Engagement, User)
+            .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
+            .join(User, User.user_id == EngagementParticipant.user_id)
+            .where(EngagementParticipant.consultations.isnot(None))
+            .order_by(EngagementParticipant.engagement_participant_id.desc())
+        )
+        rows = result.all()
+        items: list[dict[str, Any]] = []
+        for participant, engagement, user in rows:
+            consultations = normalize_consultations_map(participant.consultations)
+            for expert_type, pref in consultations.items():
+                if not pref.get("want"):
+                    continue
+                if pref.get("done"):
+                    continue
+                if pref.get("expert_id") != expert.expert_id:
+                    continue
+                if not is_upcoming_slot(pref.get("date"), pref.get("slot")):
+                    continue
+                items.append(
+                    {
+                        "user_id": user.user_id,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "email": user.email,
+                        "phone": user.phone,
+                        "engagement_id": engagement.engagement_id,
+                        "engagement_code": engagement.engagement_code,
+                        "expert_type": expert_type,
+                        "date": pref.get("date"),
+                        "slot": pref.get("slot"),
+                        "expert_id": expert.expert_id,
+                        "engagement_participant_id": participant.engagement_participant_id,
+                    }
+                )
+
+        items.sort(key=lambda x: (x.get("date") or "", x.get("slot") or ""))
+        return items
+
+    async def mark_consultation_done(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        payload: ConsultationDoneRequest,
+    ) -> dict[str, Any]:
+        ensure_expert_portal_access(employee)
+
+        actor_expert = await self._experts.get_by_user_id(db, employee.user_id)
+        acting_expert_id = payload.expert_id
+        if acting_expert_id is None:
+            if actor_expert is None:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="expert_id is required when the current user is not linked to an expert",
+                )
+            acting_expert_id = actor_expert.expert_id
+
+        if employee.role == EmployeeRole.expert:
+            if actor_expert is None or actor_expert.expert_id != acting_expert_id:
+                raise AppError(
+                    status_code=403,
+                    error_code="FORBIDDEN",
+                    message="Cannot mark done for another expert",
+                )
+
+        result = await db.execute(
+            select(EngagementParticipant)
+            .where(EngagementParticipant.user_id == payload.user_id)
+            .where(EngagementParticipant.engagement_id == payload.engagement_id)
+            .order_by(EngagementParticipant.engagement_participant_id.desc())
+            .limit(1)
+        )
+        participant = result.scalar_one_or_none()
+        if participant is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Participant not found")
+
+        consultations = normalize_consultations_map(participant.consultations)
+        pref = consultations.get(payload.expert_type) or normalize_preference(None)
+        if not pref.get("want"):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Participant did not request this consultation",
+            )
+        if pref.get("expert_id") is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation is not assigned to an expert yet",
+            )
+        if pref.get("expert_id") != acting_expert_id:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation is assigned to a different expert",
+            )
+        if pref.get("done"):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation is already marked done",
+            )
+
+        pref["done"] = True
+        consultations[payload.expert_type] = pref
+        participant.consultations = consultations
+        flag_modified(participant, "consultations")
+        db.add(participant)
+        await db.flush()
+
+        return {
+            "message": "Consultation marked as done",
+            "user_id": payload.user_id,
+            "engagement_id": payload.engagement_id,
+            "expert_type": payload.expert_type,
+            "expert_id": acting_expert_id,
+            "done": True,
         }

@@ -19,6 +19,7 @@ from modules.experts.schemas import (
     AvailabilityBulkSave,
     ConsultationBookRequest,
     ConsultationConfirmRequest,
+    ConsultationDoneRequest,
     ExpertCreateRequest,
     ExpertReviewCreateRequest,
     ExpertStatusUpdateRequest,
@@ -212,6 +213,28 @@ async def portal_confirm_consultation(
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
     data = await availability_service.confirm_consultation_request(db, employee=employee, payload=payload)
+    await db.commit()
+    return success_response(data)
+
+
+@portal_router.get("/upcoming")
+async def portal_list_upcoming_consultations(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.list_upcoming_consultations(db, employee=employee)
+    return success_response(data)
+
+
+@portal_router.post("/consultations/done")
+async def portal_mark_consultation_done(
+    payload: ConsultationDoneRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.mark_consultation_done(db, employee=employee, payload=payload)
     await db.commit()
     return success_response(data)
 
