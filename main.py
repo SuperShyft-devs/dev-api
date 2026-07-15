@@ -34,7 +34,7 @@ from modules.reports.camp_reports_router import router as camp_reports_router
 from modules.platform_settings.router import router as platform_settings_router
 from modules.payments.routes import router as payments_router
 from modules.bookings.router import router as bookings_router
-from modules.experts.router import router as experts_router, expert_types_router
+from modules.experts.router import router as experts_router, portal_router as experts_portal_router, expert_types_router
 from modules.admin_temp.router import router as admin_temp_router
 from modules.notifications.router import router as notifications_router
 from modules.webhooks.router import router as webhooks_router
@@ -117,6 +117,7 @@ app.include_router(camp_report_sections_router)
 app.include_router(platform_settings_router)
 app.include_router(payments_router)
 app.include_router(bookings_router)
+app.include_router(experts_portal_router)
 app.include_router(experts_router)
 app.include_router(expert_types_router)
 app.include_router(admin_temp_router)

@@ -17,6 +17,8 @@ ONBOARDING_ASSISTANT_ASSIGNEE_ROLES = frozenset(
     {EmployeeRole.admin, EmployeeRole.onboarding_assistant, EmployeeRole.organization_manager}
 )
 
+EXPERT_PORTAL_ROLES = frozenset({EmployeeRole.admin, EmployeeRole.expert})
+
 
 def is_internal_employee(role: EmployeeRole) -> bool:
     return role in INTERNAL_ROLES
@@ -44,6 +46,46 @@ def ensure_internal_employee(employee: EmployeeContext | None) -> None:
 def ensure_admin(employee: EmployeeContext | None) -> None:
     ensure_employee_present(employee)
     if employee.role != EmployeeRole.admin:
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+
+def ensure_not_expert_employee(employee: EmployeeContext | None) -> None:
+    """Expert-role employees may not use admin expert CRUD endpoints."""
+    ensure_employee_present(employee)
+    if employee.role == EmployeeRole.expert:
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+
+def ensure_expert_portal_access(employee: EmployeeContext | None) -> None:
+    """Only admin and expert roles may access /experts/portal/*."""
+    ensure_employee_present(employee)
+    if employee.role not in EXPERT_PORTAL_ROLES:
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+
+def ensure_expert_portal_owns(
+    employee: EmployeeContext,
+    *,
+    resource_expert_id: int,
+    caller_expert_id: int | None,
+) -> None:
+    """Admins may access any expert; experts only their own expert_id."""
+    ensure_expert_portal_access(employee)
+    if employee.role == EmployeeRole.admin:
+        return
+    if caller_expert_id is None or caller_expert_id != resource_expert_id:
         raise AppError(
             status_code=403,
             error_code="FORBIDDEN",

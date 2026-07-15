@@ -8,7 +8,9 @@ import pytest
 
 from core.config import settings
 from core.security import create_jwt_token
-from modules.employee.models import Employee
+from sqlalchemy import select
+
+from modules.employee.models import Employee, EmployeeRole
 from modules.experts.models import Expert
 from modules.users.models import User
 
@@ -121,6 +123,53 @@ async def test_create_expert_persists_specialization(async_client, test_db_sessi
     assert row.specialization == "Pediatrics"
     assert row.expert_type == "doctor"
     assert row.user_id == 78505
+
+    emp = (
+        await test_db_session.execute(select(Employee).where(Employee.user_id == 78505))
+    ).scalar_one_or_none()
+    assert emp is not None
+    assert emp.role == EmployeeRole.expert
+    assert emp.status == "active"
+
+
+@pytest.mark.asyncio
+async def test_experts_portal_me_returns_own_expert(async_client, test_db_session):
+    expert_user = User(user_id=78520, age=33, phone="785200000000", status="active")
+    test_db_session.add(expert_user)
+    await test_db_session.flush()
+    test_db_session.add(
+        Employee(employee_id=420, user_id=78520, role="expert", status="active")
+    )
+    expert = Expert(
+        user_id=78520,
+        expert_type="doctor",
+        specialization="Dermatology",
+        status="active",
+    )
+    test_db_session.add(expert)
+    await test_db_session.flush()
+    await test_db_session.commit()
+
+    response = await async_client.get("/experts/portal/me", headers=_auth_header(78520))
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["expert_id"] == expert.expert_id
+    assert data["specialization"] == "Dermatology"
+    assert "expertise_tags" in data
+
+
+@pytest.mark.asyncio
+async def test_experts_portal_me_forbidden_for_onboarding_assistant(async_client, test_db_session):
+    user = User(user_id=78521, age=30, phone="785210000000", status="active")
+    test_db_session.add(user)
+    await test_db_session.flush()
+    test_db_session.add(
+        Employee(employee_id=421, user_id=78521, role="onboarding_assistant", status="active")
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get("/experts/portal/me", headers=_auth_header(78521))
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio

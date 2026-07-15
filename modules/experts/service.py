@@ -6,6 +6,9 @@ from decimal import Decimal
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
+from modules.employee.access_control import ensure_expert_portal_access, ensure_not_expert_employee
+from modules.employee.models import Employee, EmployeeRole
+from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.experts.models import Expert, ExpertExpertiseTag, ExpertReview, ExpertTypeModel
 from modules.experts.repository import ExpertsRepository, ExpertTypesRepository
@@ -69,11 +72,13 @@ class ExpertsService:
         repository: ExpertsRepository,
         audit_service: AuditService | None = None,
         expert_types_service: ExpertTypesService | None = None,
+        employee_repository: EmployeeRepository | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
         self._users_repository = UsersRepository()
         self._expert_types_service = expert_types_service
+        self._employee_repository = employee_repository or EmployeeRepository()
 
     def _require_audit(self) -> AuditService:
         if self._audit_service is None:
@@ -94,6 +99,17 @@ class ExpertsService:
         user = await self._users_repository.get_user_by_id(db, user_id)
         if user is None:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    async def _ensure_expert_employee(self, db, user_id: int) -> None:
+        existing = await self._employee_repository.get_by_user_id(db, user_id)
+        if existing is not None:
+            return
+        row = Employee(
+            user_id=user_id,
+            role=EmployeeRole.expert,
+            status="active",
+        )
+        await self._employee_repository.create(db, row)
 
     def _expert_visible_to_public(self, expert: Expert, employee: EmployeeContext | None) -> bool:
         if employee is not None:
@@ -169,6 +185,7 @@ class ExpertsService:
         user_agent: str,
         endpoint: str,
     ) -> Expert:
+        ensure_not_expert_employee(employee)
         await self._ensure_user_exists(db, payload.user_id)
         self._validate_modes(list(payload.consultation_modes) if payload.consultation_modes else None)
         if self._expert_types_service:
@@ -191,6 +208,7 @@ class ExpertsService:
             status="active",
         )
         expert = await self._repository.create(db, expert)
+        await self._ensure_expert_employee(db, payload.user_id)
         audit = self._require_audit()
         await audit.log_event(
             db,
@@ -213,6 +231,7 @@ class ExpertsService:
         user_agent: str,
         endpoint: str,
     ) -> Expert:
+        ensure_not_expert_employee(employee)
         expert = await self._repository.get_by_id(db, expert_id)
         if expert is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Expert does not exist")
@@ -238,6 +257,7 @@ class ExpertsService:
             expert.patient_count = payload.patient_count
 
         expert = await self._repository.update(db, expert)
+        await self._ensure_expert_employee(db, payload.user_id)
         audit = self._require_audit()
         await audit.log_event(
             db,
@@ -260,6 +280,7 @@ class ExpertsService:
         user_agent: str,
         endpoint: str,
     ) -> Expert:
+        ensure_not_expert_employee(employee)
         normalized = self._normalize_status(status)
         if normalized not in _ALLOWED_STATUS:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
@@ -292,6 +313,7 @@ class ExpertsService:
         user_agent: str,
         endpoint: str,
     ) -> ExpertExpertiseTag:
+        ensure_not_expert_employee(employee)
         expert = await self._repository.get_by_id(db, expert_id)
         if expert is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Expert does not exist")
@@ -324,6 +346,7 @@ class ExpertsService:
         user_agent: str,
         endpoint: str,
     ) -> None:
+        ensure_not_expert_employee(employee)
         tag = await self._repository.get_tag(db, tag_id, expert_id)
         if tag is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Tag does not exist")
@@ -338,6 +361,19 @@ class ExpertsService:
             user_agent=user_agent,
             user_id=employee.user_id,
         )
+
+    async def get_portal_me(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+    ) -> tuple[Expert, list[ExpertExpertiseTag]]:
+        ensure_expert_portal_access(employee)
+        expert = await self._repository.get_by_user_id(db, employee.user_id)
+        if expert is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Expert does not exist")
+        tags = await self._repository.list_tags(db, expert.expert_id)
+        return expert, tags
 
     async def list_reviews(
         self,

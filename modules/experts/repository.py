@@ -77,6 +77,12 @@ class ExpertsRepository:
         result = await db.execute(select(Expert).where(Expert.expert_id == expert_id))
         return result.scalar_one_or_none()
 
+    async def get_by_user_id(self, db: AsyncSession, user_id: int) -> Expert | None:
+        result = await db.execute(
+            select(Expert).where(Expert.user_id == user_id).order_by(Expert.expert_id.asc()).limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def count_experts(
         self,
         db: AsyncSession,

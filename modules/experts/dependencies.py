@@ -13,10 +13,13 @@ def get_expert_types_service() -> ExpertTypesService:
 
 
 def get_experts_service() -> ExpertsService:
+    from modules.employee.repository import EmployeeRepository
+
     audit_service = AuditService(AuditRepository())
     expert_types_service = get_expert_types_service()
     return ExpertsService(
         repository=ExpertsRepository(),
         audit_service=audit_service,
         expert_types_service=expert_types_service,
+        employee_repository=EmployeeRepository(),
     )

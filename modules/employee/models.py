@@ -18,6 +18,7 @@ class EmployeeRole(str, enum.Enum):
     admin = "admin"
     onboarding_assistant = "onboarding_assistant"
     organization_manager = "organization_manager"
+    expert = "expert"
 
 
 _employee_role = SAEnum(

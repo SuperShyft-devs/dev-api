@@ -29,6 +29,7 @@ from modules.users.models import User
 
 
 router = APIRouter(prefix="/experts", tags=["experts"])
+portal_router = APIRouter(prefix="/experts/portal", tags=["experts-portal"])
 expert_types_router = APIRouter(prefix="/expert-types", tags=["expert-types"])
 
 
@@ -89,6 +90,18 @@ def _review_dict(review) -> dict:
         "review_text": review.review_text,
         "created_at": review.created_at,
     }
+
+
+@portal_router.get("/me")
+async def get_experts_portal_me(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    experts_service: ExpertsService = Depends(get_experts_service),
+):
+    expert, tags = await experts_service.get_portal_me(db, employee=employee)
+    data = _expert_dict(expert)
+    data["expertise_tags"] = [_tag_dict(t) for t in tags]
+    return success_response(data)
 
 
 @router.get("")
