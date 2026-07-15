@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
@@ -50,7 +50,8 @@ class EmployeeRepository:
                     User.first_name.ilike(pattern),
                     User.last_name.ilike(pattern),
                     full_name.ilike(pattern),
-                    Employee.role.ilike(pattern),
+                    # role is a native PG enum; cast to text before ILIKE
+                    cast(Employee.role, String).ilike(pattern),
                 )
             )
         return query

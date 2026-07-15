@@ -106,7 +106,7 @@ async def test_list_employees_paginates_and_filters(async_client, test_db_sessio
     test_db_session.add_all(
         [
             Employee(employee_id=100, user_id=9100, role="admin", status="active"),
-            Employee(employee_id=101, user_id=9101, role="ops", status="inactive"),
+            Employee(employee_id=101, user_id=9101, role="onboarding_assistant", status="inactive"),
         ]
     )
     await test_db_session.commit()
@@ -129,6 +129,44 @@ async def test_list_employees_paginates_and_filters(async_client, test_db_sessio
 
 
 @pytest.mark.asyncio
+async def test_list_employees_search_matches_name_and_role_substring(async_client, test_db_session):
+    """Free-text search must not 500 when ILIKE runs against the employee_role enum."""
+    await _seed_admin_employee(test_db_session, user_id=8013, employee_id=16)
+
+    test_db_session.add(
+        User(user_id=9110, phone="9110000000", age=30, status="active", first_name="Rina", last_name="Shah")
+    )
+    test_db_session.add(
+        User(user_id=9111, phone="9111000000", age=30, status="active", first_name="Deepa", last_name="Gupta")
+    )
+    await test_db_session.flush()
+    test_db_session.add_all(
+        [
+            Employee(employee_id=110, user_id=9110, role="expert", status="active"),
+            Employee(employee_id=111, user_id=9111, role="organization_manager", status="active"),
+        ]
+    )
+    await test_db_session.commit()
+
+    # Partial role match ("ro" ⊆ organization_manager) previously raised LookupError on the enum column.
+    by_role = await async_client.get(
+        "/employees?page=1&limit=10&search=ro&sort_by=employee_id&sort_dir=desc",
+        headers=_auth_header(8013),
+    )
+    assert by_role.status_code == 200
+    role_ids = {row["employee_id"] for row in by_role.json()["data"]}
+    assert 111 in role_ids
+
+    by_name = await async_client.get(
+        "/employees?page=1&limit=10&search=Rina",
+        headers=_auth_header(8013),
+    )
+    assert by_name.status_code == 200
+    name_ids = {row["employee_id"] for row in by_name.json()["data"]}
+    assert 110 in name_ids
+
+
+@pytest.mark.asyncio
 async def test_get_employee_returns_details(async_client, test_db_session):
     await _seed_admin_employee(test_db_session, user_id=8004, employee_id=13)
 
@@ -136,7 +174,7 @@ async def test_get_employee_returns_details(async_client, test_db_session):
         User(user_id=9201, phone="9201000000", age=30, status="active", first_name="Carol", last_name="Operator")
     )
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=201, user_id=9201, role="ops", status="active"))
+    test_db_session.add(Employee(employee_id=201, user_id=9201, role="onboarding_assistant", status="active"))
     await test_db_session.commit()
 
     response = await async_client.get("/employees/201", headers=_auth_header(8004))
@@ -153,7 +191,7 @@ async def test_update_employee_updates_fields(async_client, test_db_session):
 
     test_db_session.add(User(user_id=9301, phone="9301000000", age=30, status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=301, user_id=9301, role="ops", status="active"))
+    test_db_session.add(Employee(employee_id=301, user_id=9301, role="onboarding_assistant", status="active"))
     await test_db_session.commit()
 
     payload = {"user_id": 9301, "role": "admin"}
@@ -171,7 +209,7 @@ async def test_update_employee_status_sets_inactive(async_client, test_db_sessio
 
     test_db_session.add(User(user_id=9401, phone="9401000000", age=30, status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=401, user_id=9401, role="ops", status="active"))
+    test_db_session.add(Employee(employee_id=401, user_id=9401, role="onboarding_assistant", status="active"))
     await test_db_session.commit()
 
     response = await async_client.patch(
@@ -192,7 +230,7 @@ async def test_update_employee_status_rejects_inactive_for_employee_one(async_cl
 
     test_db_session.add(User(user_id=9402, phone="9402000000", age=30, status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9500, user_id=9402, role="ops", status="active"))
+    test_db_session.add(Employee(employee_id=9500, user_id=9402, role="onboarding_assistant", status="active"))
     await test_db_session.commit()
 
     response = await async_client.patch(
