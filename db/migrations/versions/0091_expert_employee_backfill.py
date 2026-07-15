@@ -22,7 +22,7 @@ def upgrade() -> None:
         text(
             """
             INSERT INTO employee (user_id, role, status)
-            SELECT DISTINCT e.user_id, 'expert', 'active'
+            SELECT DISTINCT e.user_id, 'expert'::employee_role, 'active'
             FROM experts e
             WHERE e.user_id IS NOT NULL
               AND NOT EXISTS (
