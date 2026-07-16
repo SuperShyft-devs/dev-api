@@ -93,6 +93,25 @@ def _normalize_question_type(value: str | None) -> str:
     return _QUESTION_TYPE_ALIASES.get(normalized, normalized)
 
 
+_VALID_QUESTION_FILTERS = {"all", "answered", "unanswered"}
+
+
+def _is_answered(answer: object, question_type: str) -> bool:
+    """Return True if the question has a meaningful answer.
+
+    For ``scale`` questions the answer is a dict ``{"value": ..., "unit": ...}``.
+    We only treat it as answered when ``value`` is not None.
+    For all other types a non-None answer is sufficient.
+    """
+    if answer is None:
+        return False
+    if question_type == _SCALE_TYPE:
+        if isinstance(answer, dict):
+            return answer.get("value") is not None
+        return False
+    return True
+
+
 class QuestionnaireService:
     def __init__(
         self,
@@ -1279,6 +1298,7 @@ class QuestionnaireService:
         user_id: int,
         assessment_instance_id: int,
         category_id: int,
+        question_filter: str = "unanswered",
     ) -> dict:
         """Get category questionnaire questions and existing draft answers for a user."""
         from modules.assessments.repository import AssessmentsRepository
@@ -1410,6 +1430,19 @@ class QuestionnaireService:
                     "answer": answer,
                 }
             )
+
+        # Apply question filter
+        if question_filter == "answered":
+            questions_with_answers = [
+                q for q in questions_with_answers
+                if _is_answered(q["answer"], q["question_type"])
+            ]
+        elif question_filter == "unanswered":
+            questions_with_answers = [
+                q for q in questions_with_answers
+                if not _is_answered(q["answer"], q["question_type"])
+            ]
+        # "all" — no filtering needed
 
         return {
             **meta_top,

@@ -7,7 +7,7 @@ fill draft questionnaires under the `/questionnaire` prefix. Final submit is
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -33,7 +33,7 @@ from modules.questionnaire.schemas import (
     QuestionnaireQuestionUpdateRequest,
     QuestionnaireResponsesUpsertRequest,
 )
-from modules.questionnaire.service import QuestionnaireService
+from modules.questionnaire.service import QuestionnaireService, _VALID_QUESTION_FILTERS
 from core.dependencies import get_current_user
 
 
@@ -501,16 +501,34 @@ async def get_questionnaire(
     assessment_instance_id: int,
     category_id: int,
     request: Request,
+    question: str = Query(
+        default="unanswered",
+        description="Filter questions by answer state. One of: all, answered, unanswered.",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
     service: QuestionnaireService = Depends(get_questionnaire_user_service),
 ):
-    """Get category questionnaire questions and existing draft answers for a user."""
+    """Get category questionnaire questions and existing draft answers for a user.
+
+    Use the ``question`` query parameter to filter by answer state:
+    - ``all``        – return every question (answered and unanswered)
+    - ``answered``   – return only questions that have a saved answer
+    - ``unanswered`` – return only questions without a saved answer (default)
+    """
+    if question not in _VALID_QUESTION_FILTERS:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message=f"'question' must be one of: {', '.join(sorted(_VALID_QUESTION_FILTERS))}",
+        )
+
     result = await service.get_questionnaire_for_user(
         db,
         user_id=current_user.user_id,
         assessment_instance_id=assessment_instance_id,
         category_id=category_id,
+        question_filter=question,
     )
 
     return success_response(result)

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.assessments.models import AssessmentPackage, AssessmentPackageCategory
 from modules.employee.models import Employee
+from modules.notifications.models import NotificationService
 from modules.questionnaire.models import (
     QuestionnaireCategory,
     QuestionnaireCategoryQuestion,
@@ -21,6 +22,7 @@ from db.seed.seed_dataclasses import (
     SeedCategory,
     SeedCategoryQuestion,
     SeedEmployee,
+    SeedNotificationService,
     SeedOption,
     SeedPackageCategory,
     SeedQuestion,
@@ -402,6 +404,39 @@ async def reset_sequences(session: AsyncSession) -> None:
         """
         )
     )
+
+
+async def upsert_notification_services(
+    session: AsyncSession, services: Iterable[SeedNotificationService]
+) -> None:
+    for seed in services:
+        result = await session.execute(
+            select(NotificationService).where(NotificationService.service_key == seed.service_key)
+        )
+        existing = result.scalar_one_or_none()
+        if existing is None:
+            session.add(
+                NotificationService(
+                    service_key=seed.service_key,
+                    display_name=seed.display_name,
+                    channel=seed.channel,
+                    webhook_path=seed.webhook_path,
+                    is_active=seed.is_active,
+                    require_blood_report_url=seed.require_blood_report_url,
+                    require_bio_ai_report_url=seed.require_bio_ai_report_url,
+                    require_participant_detail=seed.require_participant_detail,
+                    require_otp=seed.require_otp,
+                )
+            )
+        else:
+            existing.display_name = seed.display_name
+            existing.channel = seed.channel
+            existing.webhook_path = seed.webhook_path
+            existing.is_active = seed.is_active
+            existing.require_blood_report_url = seed.require_blood_report_url
+            existing.require_bio_ai_report_url = seed.require_bio_ai_report_url
+            existing.require_participant_detail = seed.require_participant_detail
+            existing.require_otp = seed.require_otp
 
 
 async def upsert_default_platform_settings(session: AsyncSession) -> None:

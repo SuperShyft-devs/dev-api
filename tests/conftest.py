@@ -89,6 +89,7 @@ from modules.payments.routes import router as payments_router
 from modules.experts.router import router as experts_router, portal_router as experts_portal_router
 from modules.notifications.router import router as notifications_router
 from modules.webhooks.router import router as webhooks_router
+from modules.server_health.router import router as server_health_router
 
 
 def _project_root() -> Path:
@@ -333,6 +334,7 @@ async def fastapi_app(
     app.include_router(experts_router)
     app.include_router(notifications_router)
     app.include_router(webhooks_router)
+    app.include_router(server_health_router)
 
     async def _get_test_db():
         yield test_db_session

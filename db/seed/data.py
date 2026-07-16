@@ -14,6 +14,7 @@ from db.seed.seed_dataclasses import (
     SeedCategory,
     SeedCategoryQuestion,
     SeedEmployee,
+    SeedNotificationService,
     SeedOption,
     SeedPackageCategory,
     SeedQuestion,
@@ -29,6 +30,7 @@ __all__ = [
     "SeedCategoryQuestion",
     "SeedOption",
     "SeedPackageCategory",
+    "SeedNotificationService",
     "DEFAULT_USERS",
     "DEFAULT_EMPLOYEES",
     "DEFAULT_ASSESSMENT_PACKAGES",
@@ -37,6 +39,7 @@ __all__ = [
     "DEFAULT_CATEGORY_QUESTIONS",
     "DEFAULT_OPTIONS",
     "DEFAULT_PACKAGE_CATEGORIES",
+    "DEFAULT_NOTIFICATION_SERVICES",
 ]
 
 DEFAULT_USERS: tuple[SeedUser, ...] = (
@@ -112,3 +115,13 @@ DEFAULT_QUESTIONS: tuple[SeedQuestion, ...] = METSIGHTS_QUESTIONS
 DEFAULT_CATEGORY_QUESTIONS: tuple[SeedCategoryQuestion, ...] = METSIGHTS_CATEGORY_QUESTIONS
 DEFAULT_OPTIONS: tuple[SeedOption, ...] = METSIGHTS_OPTIONS
 DEFAULT_PACKAGE_CATEGORIES: tuple[SeedPackageCategory, ...] = METSIGHTS_PACKAGE_CATEGORIES
+
+DEFAULT_NOTIFICATION_SERVICES: tuple[SeedNotificationService, ...] = (
+    SeedNotificationService(
+        service_key="whatapi-otp",
+        display_name="OTP via WhatsApp",
+        channel="whatsapp",
+        webhook_path="/send-otp-whatsapp-v3",
+        require_otp=True,
+    ),
+)
