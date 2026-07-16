@@ -668,7 +668,7 @@ class EngagementsService:
         )
 
     async def get_engagement_by_code_public(self, db: AsyncSession, *, engagement_code: str):
-        return await self._repository.get_engagement_by_code(db, engagement_code)
+        return await self._repository.get_engagement_with_org_by_code(db, engagement_code)
 
     async def get_engagement_details_for_employee(
         self,

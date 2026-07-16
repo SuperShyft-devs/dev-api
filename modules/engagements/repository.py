@@ -114,7 +114,7 @@ class EngagementsRepository:
         result = await db.execute(select(Engagement).where(Engagement.engagement_id == engagement_id))
         return result.scalar_one_or_none()
 
-    async def get_engagement_by_code(self, db: AsyncSession, engagement_code: str):
+    async def get_engagement_with_org_by_code(self, db: AsyncSession, engagement_code: str):
         query = (
             select(
                 Engagement,
