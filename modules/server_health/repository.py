@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-import aiosqlite
 
 from core.config import settings
 from core.exceptions import AppError
@@ -31,36 +31,20 @@ class ServerHealthRepository:
             )
         return path
 
-    async def _connect(self) -> aiosqlite.Connection:
-        """Open the health DB for reads.
-
-        Uses a normal path open (not URI ``mode=ro``) so WAL-mode databases
-        still work when the process can read the file and adjacent -wal/-shm.
-        ``PRAGMA query_only`` blocks writes from this connection.
-        """
+    def _run_query_sync(
+        self,
+        sql: str,
+        params: tuple[Any, ...] | list[Any] = (),
+    ) -> list[dict[str, Any]]:
         path = self._ensure_db_available()
         try:
-            db = await aiosqlite.connect(path.as_posix())
-            await db.execute("PRAGMA query_only = ON")
-            return db
-        except AppError:
-            raise
-        except Exception as exc:
-            raise AppError(
-                status_code=503,
-                error_code="SERVICE_UNAVAILABLE",
-                message=(
-                    "Server health database could not be opened "
-                    f"at {self._db_path}: {exc}"
-                ),
-            ) from exc
-
-    async def _run_query(self, sql: str, params: tuple[Any, ...] | list[Any] = ()) -> list[Any]:
-        try:
-            async with await self._connect() as db:
-                db.row_factory = aiosqlite.Row
-                cursor = await db.execute(sql, params)
-                return await cursor.fetchall()
+            # Open by path (not URI mode=ro) so WAL DBs remain readable.
+            # query_only blocks accidental writes from this connection.
+            with sqlite3.connect(path.as_posix()) as conn:
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA query_only = ON")
+                cursor = conn.execute(sql, params)
+                return [dict(row) for row in cursor.fetchall()]
         except AppError:
             raise
         except Exception as exc:
@@ -69,6 +53,13 @@ class ServerHealthRepository:
                 error_code="SERVICE_UNAVAILABLE",
                 message=f"Server health database query failed: {exc}",
             ) from exc
+
+    async def _run_query(
+        self,
+        sql: str,
+        params: tuple[Any, ...] | list[Any] = (),
+    ) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(self._run_query_sync, sql, params)
 
     async def get_latest_run(self) -> dict[str, Any] | None:
         rows = await self._run_query(
@@ -81,10 +72,10 @@ class ServerHealthRepository:
         )
         if not rows:
             return None
-        return dict(rows[0])
+        return rows[0]
 
     async def get_checks_for_run(self, run_id: int) -> list[dict[str, Any]]:
-        rows = await self._run_query(
+        return await self._run_query(
             """
             SELECT id, run_id, category, status, message
             FROM health_checks
@@ -93,7 +84,6 @@ class ServerHealthRepository:
             """,
             (run_id,),
         )
-        return [dict(row) for row in rows]
 
     async def list_runs(
         self,
@@ -116,7 +106,7 @@ class ServerHealthRepository:
         where_sql = " AND ".join(clauses)
         params.append(limit)
 
-        rows = await self._run_query(
+        return await self._run_query(
             f"""
             SELECT id, run_at, ok_count, warn_count, crit_count, overall_status
             FROM health_runs
@@ -126,7 +116,6 @@ class ServerHealthRepository:
             """,
             params,
         )
-        return [dict(row) for row in rows]
 
     async def count_runs(
         self,
@@ -152,4 +141,4 @@ class ServerHealthRepository:
         )
         if not rows:
             return 0
-        return int(rows[0][0] if not hasattr(rows[0], "keys") else rows[0]["cnt"])
+        return int(rows[0]["cnt"])
