@@ -76,6 +76,12 @@ class Settings:
     OTP_PHONE_SERVICE_KEY: str = os.getenv("OTP_PHONE_SERVICE_KEY", "whatapi-otp")
     OTP_EMAIL_SERVICE_KEY: str = os.getenv("OTP_EMAIL_SERVICE_KEY", "email-otp")
 
+    # Server health monitoring (read-only SQLite from cron health-check script)
+    HEALTH_CHECK_DB_PATH: str = os.getenv(
+        "HEALTH_CHECK_DB_PATH",
+        "/var/www/health-check-db/health.db",
+    )
+
     # Media upload settings
     MEDIA_ROOT: str = os.getenv("MEDIA_ROOT", "/var/www/backend/media")
     MEDIA_BASE_URL: str = os.getenv("MEDIA_BASE_URL", "http://localhost:8000/media")

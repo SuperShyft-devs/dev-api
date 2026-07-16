@@ -84,3 +84,16 @@ class SeedPackageCategory:
     id: int
     package_id: int
     category_id: int
+
+
+@dataclass(frozen=True)
+class SeedNotificationService:
+    service_key: str
+    display_name: str
+    channel: str
+    webhook_path: str
+    is_active: bool = True
+    require_blood_report_url: bool = False
+    require_bio_ai_report_url: bool = False
+    require_participant_detail: bool = False
+    require_otp: bool = False
