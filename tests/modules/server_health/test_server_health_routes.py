@@ -22,17 +22,17 @@ def _auth_header(user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-async def _seed_health_db(db_path: Path) -> None:
+async def _seed_health_db(db_path: Path, *, with_null_overall: bool = False) -> None:
     async with aiosqlite.connect(db_path) as db:
         await db.execute(
             """
             CREATE TABLE health_runs (
                 id INTEGER PRIMARY KEY,
-                run_at TEXT NOT NULL,
-                ok_count INTEGER NOT NULL,
-                warn_count INTEGER NOT NULL,
-                crit_count INTEGER NOT NULL,
-                overall_status TEXT NOT NULL
+                run_at TEXT,
+                ok_count INTEGER,
+                warn_count INTEGER,
+                crit_count INTEGER,
+                overall_status TEXT
             )
             """
         )
@@ -40,10 +40,10 @@ async def _seed_health_db(db_path: Path) -> None:
             """
             CREATE TABLE health_checks (
                 id INTEGER PRIMARY KEY,
-                run_id INTEGER NOT NULL,
-                category TEXT NOT NULL,
-                status TEXT NOT NULL,
-                message TEXT NOT NULL
+                run_id INTEGER,
+                category TEXT,
+                status TEXT,
+                message TEXT
             )
             """
         )
@@ -57,6 +57,13 @@ async def _seed_health_db(db_path: Path) -> None:
                 (2, "2026-07-16 10:00:00", 9, 0, 0, "HEALTHY"),
             ],
         )
+        if with_null_overall:
+            await db.execute(
+                """
+                INSERT INTO health_runs (id, run_at, ok_count, warn_count, crit_count, overall_status)
+                VALUES (3, '2026-07-16 12:00:00', 5, 2, 1, NULL)
+                """
+            )
         await db.executemany(
             """
             INSERT INTO health_checks (id, run_id, category, status, message)
@@ -166,5 +173,36 @@ async def test_server_health_returns_503_when_db_missing(async_client, test_db_s
     response = await async_client.get("/server-health/current", headers=_auth_header(uid))
     assert response.status_code == 503
     assert "not available" in response.json()["message"].lower()
+
+    fastapi_app.dependency_overrides.pop(get_server_health_service, None)
+
+
+@pytest.mark.asyncio
+async def test_server_health_tolerates_null_overall_status(async_client, test_db_session, fastapi_app, tmp_path):
+    """Production health.db may store NULL overall_status; API must coerce, not 500."""
+    db_path = tmp_path / "health_null.db"
+    await _seed_health_db(db_path, with_null_overall=True)
+    service = ServerHealthService(ServerHealthRepository(str(db_path)))
+    fastapi_app.dependency_overrides[get_server_health_service] = lambda: service
+
+    uid = 92005
+    test_db_session.add(User(user_id=uid, age=30, phone="92005000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=92005, user_id=uid, role="admin", status="active"))
+    await test_db_session.commit()
+
+    current = await async_client.get("/server-health/current", headers=_auth_header(uid))
+    assert current.status_code == 200
+    assert current.json()["data"]["run"]["id"] == 3
+    assert current.json()["data"]["run"]["overall_status"] == "CRITICAL"
+
+    history = await async_client.get(
+        "/server-health/history",
+        headers=_auth_header(uid),
+        params={"limit": 50},
+    )
+    assert history.status_code == 200
+    statuses = {row["id"]: row["overall_status"] for row in history.json()["data"]}
+    assert statuses[3] == "CRITICAL"
 
     fastapi_app.dependency_overrides.pop(get_server_health_service, None)

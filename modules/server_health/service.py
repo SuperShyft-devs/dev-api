@@ -57,11 +57,12 @@ def _group_checks_by_category(check_rows: list[dict[str, Any]]) -> list[HealthCh
     category_order: list[str] = []
 
     for row in check_rows:
-        category = str(row["category"])
+        check = HealthCheckRead.model_validate(row)
+        category = check.category or "UNCATEGORIZED"
         if category not in grouped:
             grouped[category] = []
             category_order.append(category)
-        grouped[category].append(HealthCheckRead.model_validate(row))
+        grouped[category].append(check)
 
     return [
         HealthChecksByCategory(category=category, checks=grouped[category])
