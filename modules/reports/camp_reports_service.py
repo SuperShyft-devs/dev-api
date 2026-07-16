@@ -39,6 +39,7 @@ from modules.reports.camp_report_section_builders import (
     build_positive_wins,
     build_ranking,
     normalize_camp_gender,
+    normalize_questionnaire_answer,
     physical_activity_answer_to_bucket,
     sleeping_hours_answer_to_bucket,
 )
@@ -1300,10 +1301,11 @@ class CampReportsService:
         )
 
         summary: dict[str, dict[str, int]] = {
-            "male": {"enrolled": 0, "responded": 0, "not_responded": 0},
-            "female": {"enrolled": 0, "responded": 0, "not_responded": 0},
+            "male": {"enrolled": 0, "responded": 0, "not_responded": 0, "unmapped": 0},
+            "female": {"enrolled": 0, "responded": 0, "not_responded": 0, "unmapped": 0},
         }
         participants: list[dict[str, Any]] = []
+        unmapped_answer_counts: dict[str, int] = {}
 
         for user_id, first_name, last_name, gender_raw, answer in rows:
             parts = [p for p in (first_name, last_name) if p]
@@ -1325,9 +1327,9 @@ class CampReportsService:
                     "reason": "No questionnaire response found for this question",
                 })
             else:
-                answer_str = str(answer).strip()
+                answer_str = normalize_questionnaire_answer(answer) or str(answer).strip()
                 bucket = bucket_fn(answer_str)
-                if bucket is not None:
+                if bucket is not None and bucket != "unmapped":
                     if gender is not None:
                         summary[gender]["responded"] += 1
                     participants.append({
@@ -1340,23 +1342,147 @@ class CampReportsService:
                     })
                 else:
                     if gender is not None:
-                        summary[gender]["not_responded"] += 1
+                        summary[gender]["unmapped"] += 1
+                        summary[gender]["responded"] += 1
+                    unmapped_answer_counts[answer_str] = unmapped_answer_counts.get(answer_str, 0) + 1
+                    if question_key == "physical_activity_frequency":
+                        reason = (
+                            f"Answer value '{answer_str}' is not a valid Metsights choice "
+                            f"(valid: 1, 2, 3, 5). Counted in chart bucket 'unmapped'."
+                        )
+                    else:
+                        reason = (
+                            f"Answer value '{answer_str}' does not map to a known bucket. "
+                            f"Counted in chart bucket 'unmapped'."
+                        )
                     participants.append({
                         "user_id": user_id,
                         "name": name,
                         "gender": gender,
                         "answer": answer_str,
-                        "bucket": None,
-                        "reason": f"Answer value '{answer_str}' does not map to a known bucket",
+                        "bucket": "unmapped",
+                        "reason": reason,
                     })
 
         total_enrolled = len(rows)
+        total_responded = sum(s["responded"] for s in summary.values())
+        total_unmapped = sum(s["unmapped"] for s in summary.values())
+        total_mapped = total_responded - total_unmapped
+        total_not_responded = sum(s["not_responded"] for s in summary.values())
+
+        highlight_parts: list[str] = []
+        if total_unmapped > 0:
+            answers_txt = ", ".join(
+                f"'{k}'×{v}" for k, v in sorted(unmapped_answer_counts.items(), key=lambda x: -x[1])
+            )
+            highlight_parts.append(
+                f"{total_unmapped} of {total_responded} responders have unrecognized answer values "
+                f"({answers_txt}). They are included in the chart under bucket 'unmapped' so gender "
+                f"totals match questionnaire responders."
+            )
+        if total_not_responded > 0:
+            highlight_parts.append(
+                f"{total_not_responded} of {total_enrolled} enrolled participants have no answer for "
+                f"'{question_key}'. Chart totals are based on responders only "
+                f"(male {summary['male']['responded']}, female {summary['female']['responded']}), "
+                f"not total enrolled (male {summary['male']['enrolled']}, "
+                f"female {summary['female']['enrolled']})."
+            )
+
+        has_mismatch = total_unmapped > 0 or total_not_responded > 0
 
         return {
             "question_key": question_key,
             "total_enrolled": total_enrolled,
+            "total_responded": total_responded,
+            "total_mapped": total_mapped,
+            "total_unmapped": total_unmapped,
+            "total_not_responded": total_not_responded,
             "summary": summary,
+            "unmapped_answer_counts": unmapped_answer_counts,
+            "mismatch": {
+                "has_mismatch": has_mismatch,
+                "highlight": " ".join(highlight_parts) if highlight_parts else None,
+            },
             "participants": participants,
+        }
+
+    async def validate_overall_risk_score(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        department: str | None = None,
+    ) -> dict:
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=context["organization_id"],
+                slug=normalized_department,
+            )
+            department = normalized_department
+
+        rows = await self._repository.list_metabolic_score_status(
+            db,
+            camp_no=camp_no,
+            department=department,
+        )
+
+        with_score: list[dict[str, Any]] = []
+        without_score: list[dict[str, Any]] = []
+        reason_counts: dict[str, int] = {}
+
+        for user_id, first_name, last_name, gender_raw, score, reason in rows:
+            parts = [p for p in (first_name, last_name) if p]
+            name = " ".join(parts) if parts else f"User {user_id}"
+            gender = normalize_camp_gender(gender_raw)
+            entry = {
+                "user_id": user_id,
+                "name": name,
+                "gender": gender,
+                "metabolic_score": score,
+                "reason": reason,
+            }
+            if reason is None:
+                with_score.append(entry)
+            else:
+                without_score.append(entry)
+                reason_counts[reason] = reason_counts.get(reason, 0) + 1
+
+        total_enrolled = len(rows)
+        scored = len(with_score)
+        missing = len(without_score)
+        highlight = (
+            f"Overall Risk Score total_employees={scored} counts ONLY participants with an "
+            f"extractable Bio AI metabolic_score — not all enrolled ({total_enrolled}) and not all "
+            f"questionnaire responders. {missing} enrolled participants are excluded. "
+            f"Top reasons: "
+            + "; ".join(f"{k} ({v})" for k, v in sorted(reason_counts.items(), key=lambda x: -x[1])[:3])
+        )
+
+        return {
+            "total_enrolled": total_enrolled,
+            "with_metabolic_score": scored,
+            "missing_metabolic_score": missing,
+            "reason_counts": reason_counts,
+            "mismatch": {
+                "has_mismatch": missing > 0,
+                "highlight": highlight,
+            },
+            "with_score": with_score,
+            "without_score": without_score,
         }
 
     _BLOOD_INTELLIGENCE_GROUP_KEYS = (
@@ -1574,7 +1700,21 @@ class CampReportsService:
                 camp_no=camp_no,
                 department=department,
             )
-            return build_overall_risk_score(scores)
+            total_enrolled = await self._repository.count_enrolled_users(
+                db,
+                camp_no=camp_no,
+                department=department,
+            )
+            bio_ai_reports = await self._repository.count_bio_ai_reports(
+                db,
+                camp_no=camp_no,
+                department=department,
+            )
+            return build_overall_risk_score(
+                scores,
+                total_enrolled=total_enrolled,
+                bio_ai_reports=bio_ai_reports,
+            )
 
         if section_key == "distribution_by_oxidative_stress":
             scores = await self._repository.list_oxidative_stress_scores(

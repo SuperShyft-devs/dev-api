@@ -182,6 +182,38 @@ async def validate_department_positive_wins(
     return success_response(result)
 
 
+@router.get("/{camp_no}/validate/overall-risk-score")
+async def validate_overall_risk_score(
+    camp_no: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.validate_overall_risk_score(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+    )
+    return success_response(result)
+
+
+@router.get("/{camp_no}/department/{slug}/validate/overall-risk-score")
+async def validate_department_overall_risk_score(
+    camp_no: int,
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.validate_overall_risk_score(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        department=slug,
+    )
+    return success_response(result)
+
+
 @router.get("/{camp_no}/validate/physical-activity-frequency")
 async def validate_physical_activity_frequency(
     camp_no: int,

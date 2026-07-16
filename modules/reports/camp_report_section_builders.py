@@ -14,6 +14,7 @@ PHYSICAL_ACTIVITY_BUCKETS: tuple[str, ...] = (
     "30_60_mins",
     "more_than_60_mins",
     "rarely_or_never",
+    "unmapped",
 )
 _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET: dict[str, str] = {
     "1": "less_than_30mins",
@@ -25,11 +26,15 @@ _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET: dict[str, str] = {
     "more than 60 minutes a day": "more_than_60_mins",
     "rarely or never": "rarely_or_never",
 }
+# Metsights OPTIONS for physical_activity_frequency are 1/2/3/5 only (no 4).
+PHYSICAL_ACTIVITY_VALID_OPTION_VALUES: frozenset[str] = frozenset({"1", "2", "3", "5"})
+
 SLEEPING_HOURS_BUCKETS: tuple[str, ...] = (
     "less_than_5hrs",
     "between_5_7_hrs",
     "between_7_9_hrs",
     "more_than_9hrs",
+    "unmapped",
 )
 _OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET: dict[str, str] = {
     "0": "less_than_5hrs",
@@ -41,6 +46,37 @@ _OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET: dict[str, str] = {
     "between 7 to 9 hours": "between_7_9_hrs",
     "more than 9 hours": "more_than_9hrs",
 }
+SLEEPING_HOURS_VALID_OPTION_VALUES: frozenset[str] = frozenset({"0", "1", "2", "3"})
+
+
+def normalize_questionnaire_answer(answer: object | None) -> str | None:
+    """Extract a comparable scalar string from a stored questionnaire JSON answer."""
+    if answer is None:
+        return None
+    if isinstance(answer, list):
+        if not answer:
+            return None
+        return normalize_questionnaire_answer(answer[0])
+    if isinstance(answer, dict):
+        if "value" in answer:
+            return normalize_questionnaire_answer(answer.get("value"))
+        if "option_value" in answer:
+            return normalize_questionnaire_answer(answer.get("option_value"))
+        return None
+    if isinstance(answer, bool):
+        return None
+    if isinstance(answer, float) and answer.is_integer():
+        return str(int(answer))
+    if isinstance(answer, (int, float)):
+        text = str(answer).strip()
+        return text or None
+    text = str(answer).strip()
+    if not text:
+        return None
+    # JSON string answers sometimes arrive still quoted.
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in {'"', "'"}:
+        text = text[1:-1].strip()
+    return text or None
 
 
 def resolve_user_age(
@@ -217,22 +253,35 @@ def normalize_camp_gender(value: object | None) -> str | None:
 
 
 def physical_activity_answer_to_bucket(answer: object | None) -> str | None:
-    """Map questionnaire option_value or display text to a physical activity bucket key."""
-    if answer is None:
+    """Map questionnaire option_value or display text to a physical activity bucket key.
+
+    Returns ``unmapped`` when an answer exists but is not a known Metsights choice
+    (so chart totals stay equal to questionnaire responders). Returns ``None`` only
+    when there is no answer to count.
+    """
+    normalized = normalize_questionnaire_answer(answer)
+    if normalized is None:
         return None
-    normalized = str(answer).strip().lower()
-    return _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET.get(normalized)
+    mapped = _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET.get(normalized.lower())
+    if mapped is not None:
+        return mapped
+    return "unmapped"
 
 
 def _build_gender_distribution(counts: dict[str, int], buckets: tuple[str, ...]) -> dict:
     total = sum(counts[bucket] for bucket in buckets)
     count = [counts[bucket] for bucket in buckets]
     percent = [_percent(c, total) for c in count]
-    return {
+    mapped_total = total - counts.get("unmapped", 0)
+    payload = {
         "group": list(buckets),
         "count": count,
         "percent": percent,
+        "total_responded": total,
+        "mapped_responded": mapped_total,
+        "unmapped_responded": counts.get("unmapped", 0),
     }
+    return payload
 
 
 def build_distribution_by_physical_activity_frequency(
@@ -261,11 +310,18 @@ def build_distribution_by_physical_activity_frequency(
 
 
 def sleeping_hours_answer_to_bucket(answer: object | None) -> str | None:
-    """Map questionnaire option_value or display text to a sleeping hours bucket key."""
-    if answer is None:
+    """Map questionnaire option_value or display text to a sleeping hours bucket key.
+
+    Returns ``unmapped`` for unrecognized non-empty answers so chart totals match
+    responders. Returns ``None`` only when there is no answer.
+    """
+    normalized = normalize_questionnaire_answer(answer)
+    if normalized is None:
         return None
-    normalized = str(answer).strip().lower()
-    return _OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET.get(normalized)
+    mapped = _OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET.get(normalized.lower())
+    if mapped is not None:
+        return mapped
+    return "unmapped"
 
 
 def build_distribution_by_sleeping_hours(
@@ -293,8 +349,17 @@ def build_distribution_by_sleeping_hours(
     }
 
 
-def build_overall_risk_score(scores: list[float]) -> dict:
-    """Build overall_risk_score section payload from metabolic scores."""
+def build_overall_risk_score(
+    scores: list[float],
+    *,
+    total_enrolled: int | None = None,
+    bio_ai_reports: int | None = None,
+) -> dict:
+    """Build overall_risk_score section payload from metabolic scores.
+
+    ``total_employees`` is the number of participants with an extractable
+    metabolic_score (Bio AI report JSON), not total camp enrollment.
+    """
     counts = {band: 0 for band in METABOLIC_SCORE_BANDS}
     for score in scores:
         counts[metabolic_score_to_band(score)] += 1
@@ -304,12 +369,20 @@ def build_overall_risk_score(scores: list[float]) -> dict:
     percent = [_percent(c, total) for c in count]
     elevated = _percent(counts["increased_risk"] + counts["high_risk"], total)
 
+    enrolled = int(total_enrolled) if total_enrolled is not None else total
+    reports = int(bio_ai_reports) if bio_ai_reports is not None else total
+    missing = max(reports - total, 0)
+
     return {
         "data": {
             "group": list(METABOLIC_SCORE_BANDS),
             "count": count,
             "percent": percent,
             "total_employees": total,
+            "total_with_metabolic_score": total,
+            "total_enrolled": enrolled,
+            "bio_ai_reports": reports,
+            "missing_metabolic_score": missing,
             "elevated_metabolic_score": elevated,
         },
     }

@@ -107,12 +107,20 @@ def test_metabolic_score_to_band_boundaries():
 
 
 def test_build_overall_risk_score():
-    payload = build_overall_risk_score([20.0, 30.0, 50.0, 70.0])
+    payload = build_overall_risk_score(
+        [20.0, 30.0, 50.0, 70.0],
+        total_enrolled=10,
+        bio_ai_reports=6,
+    )
     data = payload["data"]
     assert data["group"] == ["optimal", "low_risk", "increased_risk", "high_risk"]
     assert data["count"] == [1, 1, 1, 1]
     assert data["percent"] == [25.0, 25.0, 25.0, 25.0]
     assert data["total_employees"] == 4
+    assert data["total_with_metabolic_score"] == 4
+    assert data["total_enrolled"] == 10
+    assert data["bio_ai_reports"] == 6
+    assert data["missing_metabolic_score"] == 2
     assert data["elevated_metabolic_score"] == 50.0
 
 
@@ -196,7 +204,7 @@ def test_physical_activity_answer_to_bucket():
     assert physical_activity_answer_to_bucket("2") == "30_60_mins"
     assert physical_activity_answer_to_bucket("3") == "more_than_60_mins"
     assert physical_activity_answer_to_bucket("5") == "rarely_or_never"
-    assert physical_activity_answer_to_bucket("4") is None
+    assert physical_activity_answer_to_bucket("4") == "unmapped"
     assert physical_activity_answer_to_bucket(None) is None
 
 
@@ -218,19 +226,22 @@ def test_build_distribution_by_physical_activity_frequency():
         "30_60_mins",
         "more_than_60_mins",
         "rarely_or_never",
+        "unmapped",
     ]
-    assert male["count"] == [1, 1, 0, 0]
-    assert male["percent"] == [50.0, 50.0, 0.0, 0.0]
-    assert female["count"] == [0, 0, 1, 1]
-    assert female["percent"] == [0.0, 0.0, 50.0, 50.0]
+    assert male["count"] == [1, 1, 0, 0, 1]
+    assert male["percent"] == [33.3, 33.3, 0.0, 0.0, 33.3]
+    assert male["total_responded"] == 3
+    assert male["unmapped_responded"] == 1
+    assert female["count"] == [0, 0, 1, 1, 0]
+    assert female["percent"] == [0.0, 0.0, 50.0, 50.0, 0.0]
 
 
 def test_build_distribution_by_physical_activity_frequency_empty():
     payload = build_distribution_by_physical_activity_frequency([])
     for gender in ("male", "female"):
         data = payload["data"][gender]
-        assert data["count"] == [0, 0, 0, 0]
-        assert data["percent"] == [0.0, 0.0, 0.0, 0.0]
+        assert data["count"] == [0, 0, 0, 0, 0]
+        assert data["percent"] == [0.0, 0.0, 0.0, 0.0, 0.0]
 
 
 def test_risk_score_scaled_to_band_boundaries():
