@@ -18,6 +18,7 @@ from modules.employee.access_control import (
 )
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import format_camp_name, format_department_camp_name
+from modules.engagements.models import Engagement
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.service import get_department_slugs
@@ -36,6 +37,7 @@ from modules.reports.camp_report_section_builders import (
     build_overall_risk_score,
     build_participation_by_age,
     build_positive_wins,
+    build_ranking,
     normalize_camp_gender,
     physical_activity_answer_to_bucket,
     sleeping_hours_answer_to_bucket,
@@ -1627,8 +1629,122 @@ class CampReportsService:
                 department=department,
             )
 
+        if section_key == "ranking":
+            return await self._compute_ranking_payload(
+                db,
+                camp_no=camp_no,
+            )
+
         raise AppError(
             status_code=400,
             error_code="SECTION_NOT_IMPLEMENTED",
             message="Report section is not implemented",
         )
+
+    async def _compute_ranking_payload(self, db: AsyncSession, *, camp_no: int) -> dict:
+        """Compute city + industry ranking for this org's camp and store in report JSON."""
+        from datetime import date as _date
+        from sqlalchemy import select as _select
+
+        # Step 1: get organization and its city/industry from camp context
+        # Find any engagement for this camp_no to get organization_id
+        engagement_result = await db.execute(
+            _select(Engagement.organization_id)
+            .where(Engagement.camp_no == camp_no, Engagement.organization_id.isnot(None))
+            .limit(1)
+        )
+        org_id_row = engagement_result.first()
+
+        org: Organization | None = None
+        if org_id_row:
+            org_result = await db.execute(
+                _select(Organization).where(Organization.organization_id == org_id_row[0])
+            )
+            org = org_result.scalar_one_or_none()
+
+        if org is None or not org.city:
+            return build_ranking({
+                "city": None,
+                "industry_key": None,
+                "industry": None,
+                "avg_metabolic_score": None,
+                "rank_city": None,
+                "total_city": None,
+                "rank_city_industry": None,
+                "total_city_industry": None,
+                "error": "Organization or city not found for this camp",
+            })
+
+        city = (org.city or "").strip()
+        industry_key = org.industry_key
+
+        # Step 2: get industry display name
+        industry_display: str | None = None
+        if industry_key:
+            ind = await self._organizations_repository.get_industry_by_key(db, industry_key)
+            if ind:
+                industry_display = ind.industry
+
+        # Step 3: get this org's avg metabolic score from this camp
+        this_org_scores = await self._repository.list_metabolic_scores(
+            db, camp_no=camp_no, department=None
+        )
+        this_org_avg: float | None = (
+            round(sum(this_org_scores) / len(this_org_scores), 2)
+            if this_org_scores
+            else None
+        )
+
+        # Step 4: get all orgs in same city with a camp this year
+        current_year = _date.today().year
+        all_org_scores = await self._repository.list_org_avg_metabolic_scores_by_city(
+            db, city=city, current_year=current_year
+        )
+
+        if not all_org_scores:
+            return build_ranking({
+                "city": city,
+                "industry_key": industry_key,
+                "industry": industry_display,
+                "avg_metabolic_score": this_org_avg,
+                "rank_city": None,
+                "total_city": 0,
+                "rank_city_industry": None,
+                "total_city_industry": 0,
+            })
+
+        # Step 5: city rank — sort ascending (lower = healthier)
+        sorted_city = sorted(all_org_scores, key=lambda x: x["avg_score"])
+        total_city = len(sorted_city)
+        this_org_id = org.organization_id
+        rank_city: int | None = None
+        for idx, entry in enumerate(sorted_city, start=1):
+            if entry["organization_id"] == this_org_id:
+                rank_city = idx
+                break
+
+        # Step 6: industry rank — filter by same industry_key
+        rank_city_industry: int | None = None
+        total_city_industry: int | None = None
+        if industry_key:
+            industry_peers = [
+                e for e in all_org_scores if e["industry_key"] == industry_key
+            ]
+            sorted_industry = sorted(industry_peers, key=lambda x: x["avg_score"])
+            total_city_industry = len(sorted_industry)
+            for idx, entry in enumerate(sorted_industry, start=1):
+                if entry["organization_id"] == this_org_id:
+                    rank_city_industry = idx
+                    break
+
+        return build_ranking({
+            "city": city,
+            "industry_key": industry_key,
+            "industry": industry_display,
+            "avg_metabolic_score": this_org_avg,
+            "rank_city": rank_city,
+            "total_city": total_city,
+            "rank_city_industry": rank_city_industry,
+            "total_city_industry": total_city_industry,
+        })
+

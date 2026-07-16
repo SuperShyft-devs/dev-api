@@ -8,6 +8,20 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class IndustryItem(BaseModel):
+    id: int
+    industry_key: str
+    industry: str
+
+
+class IndustryCreateRequest(BaseModel):
+    industry: str = Field(min_length=1, max_length=100)
+
+
+class IndustryUpdateRequest(BaseModel):
+    industry: str = Field(min_length=1, max_length=100)
+
+
 class OrganizationDepartment(BaseModel):
     department: str
     slug: str
@@ -31,6 +45,7 @@ class OrganizationCreateRequest(BaseModel):
     contact_person_user_id: Optional[int] = Field(default=None, gt=0)
     bd_employee_id: Optional[int] = Field(default=None, gt=0)
     departments: Optional[list[OrganizationDepartmentInput]] = None
+    industry_key: Optional[str] = Field(default=None, max_length=100)
 
 
 class OrganizationUpdateRequest(BaseModel):
@@ -47,6 +62,7 @@ class OrganizationUpdateRequest(BaseModel):
     contact_person_user_id: Optional[int] = Field(default=None, gt=0)
     bd_employee_id: Optional[int] = Field(default=None, gt=0)
     departments: Optional[list[OrganizationDepartmentInput]] = None
+    industry_key: Optional[str] = Field(default=None, max_length=100)
 
 
 class OrganizationStatusUpdateRequest(BaseModel):
@@ -62,6 +78,8 @@ class OrganizationListItem(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     country: Optional[str] = None
+    industry_key: Optional[str] = None
+    industry: Optional[str] = None
     status: Optional[str] = None
 
 
@@ -76,6 +94,8 @@ class OrganizationDetailsResponse(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     country: Optional[str] = None
+    industry_key: Optional[str] = None
+    industry: Optional[str] = None
 
     contact_person_user_id: Optional[int] = None
 

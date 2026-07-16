@@ -18,11 +18,56 @@ from modules.organizations.schemas import (
     OrganizationCreateRequest,
     OrganizationStatusUpdateRequest,
     OrganizationUpdateRequest,
+    IndustryCreateRequest,
+    IndustryUpdateRequest,
 )
 from modules.organizations.service import OrganizationsService
 
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
+
+@router.get("/industries")
+async def list_industries(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    organizations_service: OrganizationsService = Depends(get_organizations_service),
+):
+    industries = await organizations_service.list_industries(db, employee=employee)
+    return success_response(industries)
+
+@router.post("/industries", status_code=201)
+async def create_industry(
+    payload: IndustryCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    organizations_service: OrganizationsService = Depends(get_organizations_service),
+):
+    industry = await organizations_service.create_industry(db, employee=employee, payload=payload.model_dump())
+    await db.commit()
+    return success_response(industry)
+
+@router.put("/industries/{industry_id}")
+async def update_industry(
+    industry_id: int,
+    payload: IndustryUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    organizations_service: OrganizationsService = Depends(get_organizations_service),
+):
+    industry = await organizations_service.update_industry(db, employee=employee, industry_id=industry_id, payload=payload.model_dump())
+    await db.commit()
+    return success_response(industry)
+
+@router.delete("/industries/{industry_id}")
+async def delete_industry(
+    industry_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    organizations_service: OrganizationsService = Depends(get_organizations_service),
+):
+    await organizations_service.delete_industry(db, employee=employee, industry_id=industry_id)
+    await db.commit()
+    return success_response({"success": True})
 
 
 def _client_ip(request: Request) -> str:
@@ -77,6 +122,7 @@ async def list_organizations(
     search: str | None = None,
     city: str | None = None,
     country: str | None = None,
+    industry_key: str | None = None,
     sort_by: str | None = None,
     sort_dir: str | None = None,
     db: AsyncSession = Depends(get_db),
@@ -97,12 +143,13 @@ async def list_organizations(
         search=search,
         city=city,
         country=country,
+        industry_key=industry_key,
         sort_by=sort_by,
         sort_dir=sort_dir,
     )
 
     data = []
-    for organization in organizations:
+    for organization, industry in organizations:
         data.append(
             {
                 "organization_id": organization.organization_id,
@@ -113,6 +160,8 @@ async def list_organizations(
                 "city": organization.city,
                 "state": organization.state,
                 "country": organization.country,
+                "industry_key": organization.industry_key,
+                "industry": industry,
                 "status": organization.status,
             }
         )
@@ -179,14 +228,14 @@ async def get_organization_details(
     employee: EmployeeContext = Depends(get_current_employee),
     organizations_service: OrganizationsService = Depends(get_organizations_service),
 ):
-    organization = await organizations_service.get_organization_details_for_employee(
+    organization, industry = await organizations_service.get_organization_details_for_employee(
         db,
         employee=employee,
         organization_id=organization_id,
     )
 
     return success_response(
-        organizations_service.organization_to_details_dict(organization)
+        organizations_service.organization_to_details_dict(organization, industry)
     )
 
 

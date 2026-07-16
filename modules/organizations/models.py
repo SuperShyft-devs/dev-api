@@ -12,6 +12,16 @@ from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 from db.base import Base
 
 
+class Industry(Base):
+    """SQLAlchemy model for `industries` table."""
+
+    __tablename__ = "industries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    industry_key = Column(String(100), nullable=False, unique=True)
+    industry = Column(String(100), nullable=False)
+
+
 class Organization(Base):
     """SQLAlchemy model for `organizations` table."""
 
@@ -32,6 +42,7 @@ class Organization(Base):
 
     bd_employee_id = Column(Integer, ForeignKey("employee.employee_id"))
     departments = Column(JSON, nullable=True)
+    industry_key = Column(String(100), ForeignKey("industries.industry_key"), nullable=True)
     status = Column(String)
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
