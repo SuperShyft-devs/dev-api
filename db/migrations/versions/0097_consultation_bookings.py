@@ -56,7 +56,14 @@ def upgrade() -> None:
             sa.Column("consultation_slot", sa.String(20), nullable=True),
             sa.Column("done", sa.Boolean(), nullable=False, server_default="false"),
             sa.Column("meet_link", sa.String(500), nullable=True),
-            sa.Column("consent", JSONB(), nullable=False, server_default=DEFAULT_CONSENT),
+            sa.Column(
+                "consent",
+                JSONB(),
+                nullable=False,
+                server_default=sa.text(
+                    "'{\"bio_ai\": false, \"blood_report\": false, \"questionnaire\": false}'::jsonb"
+                ),
+            ),
             sa.Column(
                 "created_at",
                 sa.DateTime(timezone=True),
@@ -175,7 +182,7 @@ def upgrade() -> None:
                         THEN kv.value->>'meet_link'
                         ELSE NULL
                     END AS meet_link,
-                    :default_consent::jsonb AS consent
+                    '{"bio_ai": false, "blood_report": false, "questionnaire": false}'::jsonb AS consent
                 FROM engagement_participants ep
                 CROSS JOIN LATERAL jsonb_each(ep.consultations::jsonb) AS kv(key, value)
                 WHERE ep.consultations IS NOT NULL
@@ -183,7 +190,6 @@ def upgrade() -> None:
                 ON CONFLICT (engagement_participant_id, expert_type) DO NOTHING
                 """
             ),
-            {"default_consent": DEFAULT_CONSENT},
         )
 
         connection.execute(
