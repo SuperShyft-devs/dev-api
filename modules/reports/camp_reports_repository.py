@@ -1027,3 +1027,116 @@ class CampReportsRepository:
             .where(Engagement.camp_no == camp_no)
         )
         return int(result.scalar_one())
+
+    async def list_org_avg_metabolic_scores_by_city(
+        self,
+        db: AsyncSession,
+        *,
+        city: str,
+        current_year: int,
+    ) -> list[dict]:
+        """For ranking: return avg metabolic score per org for orgs in the given city
+        that have at least one camp that started in current_year.
+
+        Returns a list of dicts:
+          { "organization_id": int, "industry_key": str|None, "avg_score": float, "camp_no": int }
+        """
+        from sqlalchemy import cast, extract, Integer, Float
+
+        # Subquery: for each org in the city, find their latest camp_no in the current year
+        latest_camp_sq = (
+            select(
+                Engagement.organization_id,
+                func.max(Engagement.camp_no).label("latest_camp_no"),
+            )
+            .select_from(Engagement)
+            .join(Organization, Organization.organization_id == Engagement.organization_id)
+            .where(
+                Organization.city.isnot(None),
+                func.lower(func.trim(Organization.city)) == city.strip().lower(),
+                Engagement.camp_no.isnot(None),
+                extract("year", Engagement.start_date) == current_year,
+            )
+            .group_by(Engagement.organization_id)
+        ).subquery()
+
+        # Get all assessment instances for those latest camps
+        ranked_reports_sq = (
+            select(
+                latest_camp_sq.c.organization_id,
+                AssessmentInstance.user_id,
+                IndividualHealthReport.reports,
+                func.row_number()
+                .over(
+                    partition_by=[latest_camp_sq.c.organization_id, AssessmentInstance.user_id],
+                    order_by=IndividualHealthReport.report_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(latest_camp_sq)
+            .join(
+                Engagement,
+                and_(
+                    Engagement.organization_id == latest_camp_sq.c.organization_id,
+                    Engagement.camp_no == latest_camp_sq.c.latest_camp_no,
+                ),
+            )
+            .join(
+                AssessmentInstance,
+                AssessmentInstance.engagement_id == Engagement.engagement_id,
+            )
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .join(
+                IndividualHealthReport,
+                IndividualHealthReport.assessment_instance_id
+                == AssessmentInstance.assessment_instance_id,
+            )
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        ).subquery()
+
+        # Get latest report per user per org (rn == 1)
+        latest_reports_sq = (
+            select(
+                ranked_reports_sq.c.organization_id,
+                ranked_reports_sq.c.reports,
+            )
+            .where(ranked_reports_sq.c.rn == 1)
+        ).subquery()
+
+        result = await db.execute(
+            select(
+                latest_reports_sq.c.organization_id,
+                latest_reports_sq.c.reports,
+                latest_camp_sq.c.latest_camp_no,
+                Organization.industry_key,
+            )
+            .select_from(latest_reports_sq)
+            .join(latest_camp_sq, latest_camp_sq.c.organization_id == latest_reports_sq.c.organization_id)
+            .join(Organization, Organization.organization_id == latest_reports_sq.c.organization_id)
+        )
+
+        # Group scores by org_id in Python, then average
+        org_scores: dict[int, list[float]] = {}
+        org_meta: dict[int, dict] = {}
+        for org_id, reports, camp_no, industry_key in result.all():
+            reports_dict: dict = reports if isinstance(reports, dict) else {}
+            score = extract_metabolic_score(reports_dict)
+            if score is None:
+                continue
+            if org_id not in org_scores:
+                org_scores[org_id] = []
+                org_meta[org_id] = {"camp_no": int(camp_no), "industry_key": industry_key}
+            org_scores[org_id].append(score)
+
+        out = []
+        for org_id, scores in org_scores.items():
+            if not scores:
+                continue
+            avg = round(sum(scores) / len(scores), 2)
+            out.append({
+                "organization_id": org_id,
+                "industry_key": org_meta[org_id]["industry_key"],
+                "avg_score": avg,
+                "camp_no": org_meta[org_id]["camp_no"],
+            })
+        return out

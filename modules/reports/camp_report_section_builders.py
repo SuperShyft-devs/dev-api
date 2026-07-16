@@ -581,4 +581,10 @@ SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "positive_wins": build_positive_wins,
     "company_average_scores": build_company_average_scores,
     "blood_and_lab_intelligence": build_blood_and_lab_intelligence,
+    "ranking": lambda **_: {},  # computed in service via _compute_ranking_payload
 }
+
+
+def build_ranking(data: dict) -> dict:
+    """Wrap ranking data dict into the standard section payload shape."""
+    return {"data": data}

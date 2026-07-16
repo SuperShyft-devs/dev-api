@@ -7,13 +7,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import cast, func, or_, select
+from sqlalchemy import case, cast, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
 from modules.engagements.models import Engagement
-from modules.organizations.models import Organization
+from modules.organizations.models import Industry, Organization
 from modules.reports.models import CampReport
 
 
@@ -40,6 +40,7 @@ class OrganizationsRepository:
         search: str | None = None,
         city: str | None = None,
         country: str | None = None,
+        industry_key: str | None = None,
     ):
         if status is not None:
             query = query.where(Organization.status == status)
@@ -53,6 +54,8 @@ class OrganizationsRepository:
             query = query.where(func.lower(func.trim(Organization.city)) == city.strip().lower())
         if country is not None and country.strip():
             query = query.where(func.lower(func.trim(Organization.country)) == country.strip().lower())
+        if industry_key is not None and industry_key.strip():
+            query = query.where(Organization.industry_key == industry_key.strip())
         if search is not None and search.strip():
             pattern = ilike_pattern(search)
             query = query.where(
@@ -83,6 +86,7 @@ class OrganizationsRepository:
         search: str | None = None,
         city: str | None = None,
         country: str | None = None,
+        industry_key: str | None = None,
     ) -> int:
         query = select(func.count()).select_from(Organization)
         query = self._apply_org_list_filters(
@@ -94,6 +98,7 @@ class OrganizationsRepository:
             search=search,
             city=city,
             country=country,
+            industry_key=industry_key,
         )
 
         result = await db.execute(query)
@@ -112,11 +117,16 @@ class OrganizationsRepository:
         search: str | None = None,
         city: str | None = None,
         country: str | None = None,
+        industry_key: str | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
-    ) -> list[Organization]:
+    ) -> list[tuple]:
+        """Returns list of (Organization, industry_display_name) tuples."""
         offset = (page - 1) * limit
-        query = select(Organization)
+        query = (
+            select(Organization, Industry.industry)
+            .outerjoin(Industry, Industry.industry_key == Organization.industry_key)
+        )
         query = self._apply_org_list_filters(
             query,
             status=status,
@@ -126,6 +136,7 @@ class OrganizationsRepository:
             search=search,
             city=city,
             country=country,
+            industry_key=industry_key,
         )
         query = apply_sort(
             query,
@@ -136,7 +147,7 @@ class OrganizationsRepository:
         )
         query = query.offset(offset).limit(limit)
         result = await db.execute(query)
-        return list(result.scalars().all())
+        return list(result.all())
 
     async def list_distinct_cities_and_countries(self, db: AsyncSession) -> tuple[list[str], list[str]]:
         city_result = await db.execute(
@@ -154,6 +165,34 @@ class OrganizationsRepository:
         cities = [str(v) for v in city_result.scalars().all() if v]
         countries = [str(v) for v in country_result.scalars().all() if v]
         return cities, countries
+
+    async def list_all_industries(self, db: AsyncSession) -> list[Industry]:
+        """Return all industries ordered by display name."""
+        result = await db.execute(
+            select(Industry).order_by(Industry.industry.asc())
+        )
+        return list(result.scalars().all())
+
+    async def get_industry_by_key(self, db: AsyncSession, industry_key: str) -> Industry | None:
+        result = await db.execute(
+            select(Industry).where(Industry.industry_key == industry_key)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_industry_by_id(self, db: AsyncSession, industry_id: int) -> Industry | None:
+        result = await db.execute(
+            select(Industry).where(Industry.id == industry_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def create_industry(self, db: AsyncSession, industry: Industry) -> Industry:
+        db.add(industry)
+        await db.flush()
+        return industry
+
+    async def delete_industry(self, db: AsyncSession, industry: Industry) -> None:
+        await db.delete(industry)
+        await db.flush()
 
     async def create(self, db: AsyncSession, organization: Organization) -> Organization:
         db.add(organization)
@@ -229,7 +268,14 @@ class OrganizationsRepository:
         return list(result.all())
 
     def _department_count_expr(self):
-        return func.coalesce(func.jsonb_array_length(cast(Organization.departments, JSONB)), 0)
+        departments_jsonb = cast(Organization.departments, JSONB)
+        return func.coalesce(
+            case(
+                (func.jsonb_typeof(departments_jsonb) == "array", func.jsonb_array_length(departments_jsonb)),
+                else_=0
+            ),
+            0
+        )
 
     def _camp_report_counts_subquery(self):
         return (

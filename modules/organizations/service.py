@@ -197,6 +197,7 @@ class OrganizationsService:
             contact_person_user_id=contact_person_user_id,
             bd_employee_id=payload.bd_employee_id,
             departments=_normalize_departments(payload.departments),
+            industry_key=payload.industry_key or None,
             status="active",
             created_employee_id=employee.employee_id,
             updated_employee_id=employee.employee_id,
@@ -221,7 +222,7 @@ class OrganizationsService:
         return organization
 
     @staticmethod
-    def organization_to_details_dict(organization: Organization) -> dict:
+    def organization_to_details_dict(organization: Organization, industry: str | None = None) -> dict:
         return {
             "organization_id": organization.organization_id,
             "name": organization.name,
@@ -233,6 +234,8 @@ class OrganizationsService:
             "city": organization.city,
             "state": organization.state,
             "country": organization.country,
+            "industry_key": organization.industry_key,
+            "industry": industry,
             "contact_person_user_id": organization.contact_person_user_id,
             "bd_employee_id": organization.bd_employee_id,
             "departments": organization.departments,
@@ -256,9 +259,10 @@ class OrganizationsService:
         search: str | None = None,
         city: str | None = None,
         country: str | None = None,
+        industry_key: str | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
-    ) -> tuple[list[Organization], int]:
+    ) -> tuple[list[tuple], int]:
         ensure_internal_employee(employee)
 
         status_value = None
@@ -278,6 +282,7 @@ class OrganizationsService:
             search=search,
             city=city,
             country=country,
+            industry_key=industry_key,
             sort_by=sort_by,
             sort_dir=sort_dir,
         )
@@ -289,6 +294,7 @@ class OrganizationsService:
             search=search,
             city=city,
             country=country,
+            industry_key=industry_key,
         )
         return organizations, total
 
@@ -333,10 +339,76 @@ class OrganizationsService:
         )
         return [self.organization_to_details_dict(org) for org in organizations], total
 
+    async def list_industries(self, db, *, employee: EmployeeContext) -> list[dict]:
+        ensure_internal_employee(employee)
+        industries = await self._repository.list_all_industries(db)
+        return [{"id": ind.id, "industry_key": ind.industry_key, "industry": ind.industry} for ind in industries]
+
+    async def create_industry(self, db, *, employee: EmployeeContext, payload: dict) -> dict:
+        ensure_internal_employee(employee)
+        import re
+        
+        industry_name = payload["industry"]
+        # Generate slugified key
+        industry_key = re.sub(r'[^a-z0-9]+', '_', industry_name.lower()).strip('_')
+        
+        # Ensure key is unique
+        existing = await self._repository.get_industry_by_key(db, industry_key)
+        if existing:
+            raise AppError(
+                status_code=409,
+                error_code="INDUSTRY_EXISTS",
+                message=f"Industry '{industry_name}' (key: {industry_key}) already exists.",
+            )
+            
+        from modules.organizations.models import Industry
+        new_ind = Industry(industry=industry_name, industry_key=industry_key)
+        created = await self._repository.create_industry(db, new_ind)
+        return {"id": created.id, "industry_key": created.industry_key, "industry": created.industry}
+
+    async def update_industry(self, db, *, employee: EmployeeContext, industry_id: int, payload: dict) -> dict:
+        ensure_internal_employee(employee)
+        industry = await self._repository.get_industry_by_id(db, industry_id)
+        if not industry:
+            raise AppError(status_code=404, error_code="INDUSTRY_NOT_FOUND", message="Industry not found.")
+            
+        industry.industry = payload["industry"]
+        # Optionally update the key, but it might break existing organizations if they use it.
+        # It's better to keep industry_key unchanged, or only change it if no org uses it.
+        # Let's keep it simple and just update the display name.
+        await db.flush()
+        return {"id": industry.id, "industry_key": industry.industry_key, "industry": industry.industry}
+
+    async def delete_industry(self, db, *, employee: EmployeeContext, industry_id: int) -> None:
+        ensure_internal_employee(employee)
+        industry = await self._repository.get_industry_by_id(db, industry_id)
+        if not industry:
+            raise AppError(status_code=404, error_code="INDUSTRY_NOT_FOUND", message="Industry not found.")
+            
+        # Optional: Check if organizations are using this industry before deleting?
+        # A simple delete for now. The foreign key constraint might throw an error if used, which is good.
+        try:
+            await self._repository.delete_industry(db, industry)
+        except Exception:
+            raise AppError(
+                status_code=409, 
+                error_code="INDUSTRY_IN_USE", 
+                message="Cannot delete industry because it is assigned to one or more organizations."
+            )
+
+
     async def get_organization_filter_options_for_employee(self, db, *, employee: EmployeeContext) -> dict:
         ensure_internal_employee(employee)
         cities, countries = await self._repository.list_distinct_cities_and_countries(db)
-        return {"cities": cities, "countries": countries}
+        industries = await self._repository.list_all_industries(db)
+        return {
+            "cities": cities,
+            "countries": countries,
+            "industries": [
+                {"industry_key": ind.industry_key, "industry": ind.industry}
+                for ind in industries
+            ],
+        }
 
     async def get_organization_details_for_employee(
         self,
@@ -344,7 +416,7 @@ class OrganizationsService:
         *,
         employee: EmployeeContext,
         organization_id: int,
-    ) -> Organization:
+    ) -> tuple[Organization, str | None]:
         organization = await self._repository.get_by_id(db, organization_id)
         if organization is None:
             raise AppError(
@@ -360,7 +432,13 @@ class OrganizationsService:
             repository=self._repository,
         )
 
-        return organization
+        industry: str | None = None
+        if organization.industry_key:
+            ind = await self._repository.get_industry_by_key(db, organization.industry_key)
+            if ind is not None:
+                industry = ind.industry
+
+        return organization, industry
 
     async def update_organization_for_employee(
         self,
@@ -410,6 +488,7 @@ class OrganizationsService:
         organization.city = payload.city
         organization.state = payload.state
         organization.country = payload.country
+        organization.industry_key = payload.industry_key or None
         if is_internal_employee(employee.role):
             contact_person_user_id = await self._validate_contact_person_user_id(
                 db,
