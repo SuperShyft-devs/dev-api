@@ -35,10 +35,13 @@ from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.models import BloodCollectionType, Engagement, EngagementKind, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
+from modules.experts.consultation_bookings_repository import ConsultationBookingsRepository
+from modules.experts.consultations import bookings_to_consultations_map, empty_consent, normalize_consultations_map, normalize_consent
 from modules.engagements.schemas import (
     EngagementCreateRequest,
     EngagementParticipantUpdateRequest,
     EngagementUpdateRequest,
+    ConsultationConsentRequest,
     ResolveHealthiansZoneRequest,
     ResolveHealthiansZoneResponse,
 )
@@ -118,7 +121,7 @@ def _to_metsights_gender(raw: str | None) -> str | None:
     return None
 
 
-def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
+def _participant_enrollment_to_dict(row: tuple, *, consultations: dict[str, Any] | None = None) -> dict[str, Any]:
     (
         engagement_participant_id,
         engagement_id,
@@ -139,7 +142,7 @@ def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
         participants_employee_id,
         participant_department,
         participant_blood_group,
-        consultations,
+        _consultation_booking_ids,
         is_profile_created_on_metsights,
         is_primary_record_id_synced,
         is_fitprint_record_id_synced,
@@ -168,7 +171,7 @@ def _participant_enrollment_to_dict(row: tuple) -> dict[str, Any]:
         "participants_employee_id": participants_employee_id,
         "participant_department": participant_department,
         "participant_blood_group": participant_blood_group,
-        "consultations": consultations,
+        "consultations": consultations or {},
         "is_profile_created_on_metsights": is_profile_created_on_metsights,
         "is_primary_record_id_synced": is_primary_record_id_synced,
         "is_fitprint_record_id_synced": is_fitprint_record_id_synced,
@@ -190,6 +193,7 @@ class EngagementsService:
         metsights_service: MetsightsService | None = None,
         notifications_repository: NotificationsRepository | None = None,
         notifications_service: "NotificationsService | None" = None,
+        consultation_bookings_repository: ConsultationBookingsRepository | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
@@ -204,7 +208,25 @@ class EngagementsService:
         self._assessments_repository = AssessmentsRepository()
         self._questionnaire_repository = QuestionnaireRepository()
         self._reports_repository = ReportsRepository()
+        self._consultation_bookings = consultation_bookings_repository or ConsultationBookingsRepository()
         self._checklists_service = None
+
+    async def _participant_rows_to_dicts(self, db: AsyncSession, rows: list[tuple]) -> list[dict[str, Any]]:
+        all_booking_ids: list[int] = []
+        for row in rows:
+            ids = row[19] or []
+            all_booking_ids.extend(int(i) for i in ids)
+
+        bookings = await self._consultation_bookings.get_by_ids(db, list(dict.fromkeys(all_booking_ids)))
+        bookings_by_id = {booking.consultation_id: booking for booking in bookings}
+
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            ids = row[19] or []
+            participant_bookings = [bookings_by_id[i] for i in ids if i in bookings_by_id]
+            consultations = bookings_to_consultations_map(participant_bookings)
+            result.append(_participant_enrollment_to_dict(row, consultations=consultations))
+        return result
 
     def lazy_checklists_service(self) -> ChecklistsService:
         if self._checklists_service is None:
@@ -1115,12 +1137,13 @@ class EngagementsService:
             participants_employee_id=participants_employee_id,
             participant_department=participant_department,
             participant_blood_group=participant_blood_group,
-            consultations=consultations,
             is_profile_created_on_metsights=is_profile_created_on_metsights,
             is_primary_record_id_synced=is_primary_record_id_synced,
             is_fitprint_record_id_synced=is_fitprint_record_id_synced,
         )
         created = await self._repository.create_participant(db, participant)
+        if consultations:
+            await self._consultation_bookings.sync_from_want_map(db, created, consultations)
         return created
 
     async def resolve_participant_department_for_engagement(
@@ -1195,11 +1218,13 @@ class EngagementsService:
             response["participant_department"] = normalized
 
         if "consultations" in updates:
-            from modules.experts.consultations import normalize_consultations_map
-
             normalized_consultations = normalize_consultations_map(updates["consultations"])
-            participant.consultations = normalized_consultations
-            response["consultations"] = normalized_consultations
+            await self._consultation_bookings.sync_from_want_map(db, participant, normalized_consultations)
+            bookings = await self._consultation_bookings.get_for_participant(
+                db,
+                participant.engagement_participant_id,
+            )
+            response["consultations"] = bookings_to_consultations_map(bookings)
 
         await self._repository.update_participant(db, participant)
 
@@ -1215,6 +1240,56 @@ class EngagementsService:
         )
 
         return response
+
+    async def update_consultation_consent_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+        consultation_id: int,
+        payload: ConsultationConsentRequest,
+    ) -> dict[str, Any]:
+        participant = await self._repository.get_participant_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(
+                status_code=403,
+                error_code="ACCESS_DENIED",
+                message="You are not a participant in this engagement",
+            )
+
+        booking_ids = participant.consultation_booking_ids or []
+        if consultation_id not in booking_ids:
+            raise AppError(
+                status_code=404,
+                error_code="NOT_FOUND",
+                message="Consultation booking not found for this participant",
+            )
+
+        booking = await self._consultation_bookings.get_by_id(db, consultation_id)
+        if booking is None or booking.engagement_participant_id != participant.engagement_participant_id:
+            raise AppError(
+                status_code=404,
+                error_code="NOT_FOUND",
+                message="Consultation booking not found for this participant",
+            )
+
+        merged = empty_consent()
+        merged.update(normalize_consent(booking.consent))
+        updates = payload.model_dump(exclude_unset=True)
+        merged.update({key: bool(value) for key, value in updates.items()})
+        booking.consent = merged
+        await db.flush()
+
+        return {
+            "consultation_id": booking.consultation_id,
+            "engagement_id": engagement_id,
+            "consent": merged,
+        }
 
     async def update_participant_department_for_employee(
         self,
@@ -1296,7 +1371,7 @@ class EngagementsService:
             engagement_id=int(engagement.engagement_id),
         )
 
-        result = [_participant_enrollment_to_dict(row) for row in participants]
+        result = await self._participant_rows_to_dicts(db, participants)
         return result, total
 
     async def list_participants_for_engagement_id(
@@ -1331,7 +1406,7 @@ class EngagementsService:
             engagement_id=engagement_id,
         )
 
-        result = [_participant_enrollment_to_dict(row) for row in participants]
+        result = await self._participant_rows_to_dicts(db, participants)
         return result, total
 
     async def list_participants_for_b2c_engagements(
@@ -1359,7 +1434,7 @@ class EngagementsService:
         # Count total participant enrollment rows
         total = await self._repository.count_participants_for_b2c_engagements(db)
 
-        result = [_participant_enrollment_to_dict(row) for row in participants]
+        result = await self._participant_rows_to_dicts(db, participants)
         return result, total
 
     async def _detach_assessment_instance_references(

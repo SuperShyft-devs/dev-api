@@ -9,7 +9,29 @@ from core.exceptions import AppError
 
 
 def empty_preference(*, want: bool = False) -> dict[str, Any]:
-    return {"want": want, "date": None, "slot": None, "expert_id": None, "done": False}
+    return {
+        "want": want,
+        "date": None,
+        "slot": None,
+        "expert_id": None,
+        "done": False,
+        "meet_link": None,
+        "consent": empty_consent(),
+        "consultation_id": None,
+    }
+
+
+def empty_consent() -> dict[str, bool]:
+    return {"bio_ai": False, "blood_report": False, "questionnaire": False}
+
+
+def normalize_consent(value: Any) -> dict[str, bool]:
+    base = empty_consent()
+    if isinstance(value, dict):
+        for key in base:
+            if key in value:
+                base[key] = bool(value[key])
+    return base
 
 
 def normalize_preference(value: Any) -> dict[str, Any]:
@@ -34,6 +56,9 @@ def normalize_preference(value: Any) -> dict[str, Any]:
             "slot": str(slot_val) if slot_val else None,
             "expert_id": expert_id,
             "done": bool(value.get("done", False)),
+            "meet_link": str(value.get("meet_link")) if value.get("meet_link") else None,
+            "consent": normalize_consent(value.get("consent")),
+            "consultation_id": value.get("consultation_id"),
         }
     return empty_preference(want=False)
 
@@ -103,3 +128,22 @@ def is_upcoming_slot(date_str: str | None, slot_str: str | None, *, now: datetim
         return False
     current = now or datetime.now()
     return when >= current
+
+
+def booking_to_api_preference(booking: Any) -> dict[str, Any]:
+    """Map a ConsultationBooking row to the legacy API preference shape."""
+    date_val = booking.consultation_date.isoformat() if booking.consultation_date else None
+    return {
+        "consultation_id": booking.consultation_id,
+        "want": bool(booking.want),
+        "date": date_val,
+        "slot": booking.consultation_slot,
+        "expert_id": booking.expert_id,
+        "done": bool(booking.done),
+        "meet_link": booking.meet_link,
+        "consent": normalize_consent(booking.consent),
+    }
+
+
+def bookings_to_consultations_map(bookings: list[Any]) -> dict[str, dict[str, Any]]:
+    return {str(booking.expert_type): booking_to_api_preference(booking) for booking in bookings}

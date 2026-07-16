@@ -243,5 +243,11 @@ class EngagementParticipantUpdateRequest(BaseModel):
     blood_collection_time_slot_id: Optional[str] = Field(default=None, max_length=100)
 
 
+class ConsultationConsentRequest(BaseModel):
+    bio_ai: bool = False
+    blood_report: bool = False
+    questionnaire: bool = False
+
+
 # Backward-compatible alias
 EngagementParticipantDepartmentUpdateRequest = EngagementParticipantUpdateRequest

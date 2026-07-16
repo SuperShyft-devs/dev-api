@@ -170,9 +170,6 @@ class SeedParticipant:
     participants_employee_id: str | None = None
     participant_department: str | None = None
     participant_blood_group: str | None = None
-    want_doctor_consultation: bool | None = None
-    want_nutritionist_consultation: bool | None = None
-    want_doctor_and_nutritionist_consultation: bool | None = None
     is_profile_created_on_metsights: bool = False
 
 
@@ -553,9 +550,6 @@ async def _upsert_participants(session: AsyncSession, slots: Iterable[SeedPartic
         row.participants_employee_id = seed.participants_employee_id
         row.participant_department = seed.participant_department
         row.participant_blood_group = seed.participant_blood_group
-        row.want_doctor_consultation = seed.want_doctor_consultation
-        row.want_nutritionist_consultation = seed.want_nutritionist_consultation
-        row.want_doctor_and_nutritionist_consultation = seed.want_doctor_and_nutritionist_consultation
         row.is_profile_created_on_metsights = seed.is_profile_created_on_metsights
 
 

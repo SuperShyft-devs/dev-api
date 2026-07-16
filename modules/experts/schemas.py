@@ -162,11 +162,14 @@ class OverrideCreate(BaseModel):
 
 
 class ConsultationPreferenceSchema(BaseModel):
+    consultation_id: Optional[int] = Field(default=None, gt=0)
     want: bool = False
     date: Optional[str] = None
     slot: Optional[str] = None
     expert_id: Optional[int] = Field(default=None, gt=0)
     done: bool = False
+    meet_link: Optional[str] = None
+    consent: Optional[dict[str, bool]] = None
 
 
 class ConsultationBookRequest(BaseModel):
@@ -191,3 +194,4 @@ class ConsultationDoneRequest(BaseModel):
     engagement_id: int = Field(gt=0)
     expert_type: str = Field(min_length=1, max_length=100)
     expert_id: Optional[int] = Field(default=None, gt=0)
+    meet_link: str = Field(min_length=1, max_length=500)

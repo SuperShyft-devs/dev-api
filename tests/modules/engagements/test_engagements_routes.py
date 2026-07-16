@@ -1409,6 +1409,7 @@ async def _seed_engagement_participant_for_patch(
     from datetime import time
 
     from modules.engagements.models import Engagement, EngagementParticipant
+    from modules.experts.models import ConsultationBooking
     from modules.organizations.models import Organization
 
     await _seed_employee(test_db_session, user_id=employee_user_id, employee_id=employee_id)
@@ -1450,10 +1451,25 @@ async def _seed_engagement_participant_for_patch(
             user_id=user_id,
             engagement_date=date(2026, 2, 1),
             slot_start_time=time(10, 0),
-            want_doctor_consultation=None,
-            want_nutritionist_consultation=False,
-            want_doctor_and_nutritionist_consultation=True,
+            consultation_booking_ids=[87021, 87022],
         )
+    )
+    await test_db_session.flush()
+    test_db_session.add_all(
+        [
+            ConsultationBooking(
+                consultation_id=87021,
+                engagement_participant_id=engagement_id * 10 + 1,
+                expert_type="doctor",
+                want=False,
+            ),
+            ConsultationBooking(
+                consultation_id=87022,
+                engagement_participant_id=engagement_id * 10 + 1,
+                expert_type="nutritionist",
+                want=True,
+            ),
+        ]
     )
     await test_db_session.commit()
 
@@ -1465,25 +1481,21 @@ async def test_patch_participant_consultation_fields(async_client, test_db_sessi
     response = await async_client.patch(
         "/engagements/8702/participants/1031",
         headers=_auth_header(7031),
-        json={"want_doctor_consultation": True},
+        json={"consultations": {"doctor": {"want": True}}},
     )
     assert response.status_code == 200
     data = response.json()["data"]
-    assert data["want_doctor_consultation"] is True
-    assert "want_nutritionist_consultation" not in data
+    assert data["consultations"]["doctor"]["want"] is True
 
     row = (
         await test_db_session.execute(
             text(
-                "SELECT want_doctor_consultation, want_nutritionist_consultation, "
-                "want_doctor_and_nutritionist_consultation "
-                "FROM engagement_participants WHERE engagement_id = 8702 AND user_id = 1031"
+                "SELECT want FROM consultation_bookings "
+                "WHERE engagement_participant_id = 87021 AND expert_type = 'doctor'"
             )
         )
     ).first()
-    assert row.want_doctor_consultation is True
-    assert row.want_nutritionist_consultation is False
-    assert row.want_doctor_and_nutritionist_consultation is True
+    assert row.want is True
 
 
 @pytest.mark.asyncio
@@ -1493,20 +1505,20 @@ async def test_patch_participant_consultation_null(async_client, test_db_session
     response = await async_client.patch(
         "/engagements/8702/participants/1031",
         headers=_auth_header(7031),
-        json={"want_doctor_and_nutritionist_consultation": None},
+        json={"consultations": {"nutritionist": {"want": False}}},
     )
     assert response.status_code == 200
-    assert response.json()["data"]["want_doctor_and_nutritionist_consultation"] is None
+    assert response.json()["data"]["consultations"]["nutritionist"]["want"] is False
 
     row = (
         await test_db_session.execute(
             text(
-                "SELECT want_doctor_and_nutritionist_consultation "
-                "FROM engagement_participants WHERE engagement_id = 8702 AND user_id = 1031"
+                "SELECT want FROM consultation_bookings "
+                "WHERE engagement_participant_id = 87021 AND expert_type = 'nutritionist'"
             )
         )
     ).first()
-    assert row.want_doctor_and_nutritionist_consultation is None
+    assert row.want is False
 
 
 @pytest.mark.asyncio
@@ -1516,23 +1528,97 @@ async def test_patch_participant_partial_update(async_client, test_db_session):
     response = await async_client.patch(
         "/engagements/8702/participants/1031",
         headers=_auth_header(7031),
-        json={"want_nutritionist_consultation": True},
+        json={"consultations": {"nutritionist": {"want": True}}},
     )
     assert response.status_code == 200
-    assert response.json()["data"]["want_nutritionist_consultation"] is True
+    assert response.json()["data"]["consultations"]["nutritionist"]["want"] is True
 
     row = (
         await test_db_session.execute(
             text(
-                "SELECT want_doctor_consultation, want_nutritionist_consultation, "
-                "want_doctor_and_nutritionist_consultation "
-                "FROM engagement_participants WHERE engagement_id = 8702 AND user_id = 1031"
+                "SELECT expert_type, want FROM consultation_bookings "
+                "WHERE engagement_participant_id = 87021 ORDER BY expert_type"
             )
         )
-    ).first()
-    assert row.want_doctor_consultation is None
-    assert row.want_nutritionist_consultation is True
-    assert row.want_doctor_and_nutritionist_consultation is True
+    ).all()
+    assert len(row) == 2
+    assert row[0].expert_type == "doctor"
+    assert row[0].want is False
+    assert row[1].expert_type == "nutritionist"
+    assert row[1].want is True
+
+
+@pytest.mark.asyncio
+async def test_update_consultation_consent_for_participant(async_client, test_db_session):
+    from datetime import time
+
+    from modules.engagements.models import Engagement, EngagementParticipant
+    from modules.experts.models import ConsultationBooking
+
+    user_id = 1035
+    engagement_id = 8705
+    participant_id = 87051
+    consultation_id = 870511
+
+    test_db_session.add(User(user_id=user_id, age=30, phone="1035000000", status="active"))
+    test_db_session.add(User(user_id=1036, age=30, phone="1036000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id,
+            engagement_name="Consent Engagement",
+            engagement_code="CONS8705",
+            engagement_type="bio_ai_with_consultation",
+            consultations={"doctor": True},
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 1),
+            status="running",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=participant_id,
+            engagement_id=engagement_id,
+            user_id=user_id,
+            engagement_date=date(2026, 2, 1),
+            slot_start_time=time(10, 0),
+            consultation_booking_ids=[consultation_id],
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        ConsultationBooking(
+            consultation_id=consultation_id,
+            engagement_participant_id=participant_id,
+            expert_type="doctor",
+            want=True,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        f"/engagements/{engagement_id}/consultation/{consultation_id}/consent",
+        headers=_auth_header(user_id),
+        json={"bio_ai": True, "questionnaire": True},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["consultation_id"] == consultation_id
+    assert data["consent"]["bio_ai"] is True
+    assert data["consent"]["blood_report"] is False
+    assert data["consent"]["questionnaire"] is True
+
+    forbidden = await async_client.post(
+        f"/engagements/{engagement_id}/consultation/{consultation_id}/consent",
+        headers=_auth_header(1036),
+        json={"bio_ai": True},
+    )
+    assert forbidden.status_code == 403
 
 
 @pytest.mark.asyncio

@@ -8,9 +8,11 @@ from typing import Any
 
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.engagements.models import Engagement, EngagementParticipant
+from modules.experts.models import ConsultationBooking
 from modules.organizations.models import Organization
 from modules.questionnaire.models import QuestionnaireDefinition, QuestionnaireResponse
 from modules.reports.camp_report_section_builders import extract_metabolic_age, extract_metabolic_score, extract_oxidative_stress_score, is_high_metabolic_risk, resolve_user_age
@@ -203,10 +205,13 @@ class CampReportsRepository:
                 EngagementParticipant,
                 EngagementParticipant.engagement_id == Engagement.engagement_id,
             )
-            .where(Engagement.camp_no == camp_no)
-            .where(
-                EngagementParticipant.consultations["doctor"]["want"].as_boolean().is_(True)
+            .join(
+                ConsultationBooking,
+                ConsultationBooking.engagement_participant_id == EngagementParticipant.engagement_participant_id,
             )
+            .where(Engagement.camp_no == camp_no)
+            .where(ConsultationBooking.expert_type == "doctor")
+            .where(ConsultationBooking.want.is_(True))
         )
         if department is not None:
             doctor_query = doctor_query.where(EngagementParticipant.participant_department == department)
@@ -220,10 +225,13 @@ class CampReportsRepository:
                 EngagementParticipant,
                 EngagementParticipant.engagement_id == Engagement.engagement_id,
             )
-            .where(Engagement.camp_no == camp_no)
-            .where(
-                EngagementParticipant.consultations["nutritionist"]["want"].as_boolean().is_(True)
+            .join(
+                ConsultationBooking,
+                ConsultationBooking.engagement_participant_id == EngagementParticipant.engagement_participant_id,
             )
+            .where(Engagement.camp_no == camp_no)
+            .where(ConsultationBooking.expert_type == "nutritionist")
+            .where(ConsultationBooking.want.is_(True))
         )
         if department is not None:
             nutritionist_query = nutritionist_query.where(
@@ -232,6 +240,8 @@ class CampReportsRepository:
         nutritionist_result = await db.execute(nutritionist_query)
         nutritionist_consultation = int(nutritionist_result.scalar_one())
 
+        doctor_booking = aliased(ConsultationBooking)
+        nutritionist_booking = aliased(ConsultationBooking)
         both_query = (
             select(func.count(func.distinct(EngagementParticipant.user_id)))
             .select_from(Engagement)
@@ -239,11 +249,23 @@ class CampReportsRepository:
                 EngagementParticipant,
                 EngagementParticipant.engagement_id == Engagement.engagement_id,
             )
-            .where(Engagement.camp_no == camp_no)
-            .where(
-                EngagementParticipant.consultations["doctor"]["want"].as_boolean().is_(True),
-                EngagementParticipant.consultations["nutritionist"]["want"].as_boolean().is_(True),
+            .join(
+                doctor_booking,
+                and_(
+                    doctor_booking.engagement_participant_id == EngagementParticipant.engagement_participant_id,
+                    doctor_booking.expert_type == "doctor",
+                    doctor_booking.want.is_(True),
+                ),
             )
+            .join(
+                nutritionist_booking,
+                and_(
+                    nutritionist_booking.engagement_participant_id == EngagementParticipant.engagement_participant_id,
+                    nutritionist_booking.expert_type == "nutritionist",
+                    nutritionist_booking.want.is_(True),
+                ),
+            )
+            .where(Engagement.camp_no == camp_no)
         )
         if department is not None:
             both_query = both_query.where(EngagementParticipant.participant_department == department)

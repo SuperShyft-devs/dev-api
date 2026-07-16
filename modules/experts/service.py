@@ -14,13 +14,15 @@ from modules.employee.models import Employee, EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.models import Engagement, EngagementParticipant
+from modules.experts.consultation_bookings_repository import ConsultationBookingsRepository
 from modules.experts.consultations import (
+    booking_to_api_preference,
     is_upcoming_slot,
-    normalize_consultations_map,
     normalize_hhmm,
     normalize_preference,
 )
 from modules.experts.models import (
+    ConsultationBooking,
     Expert,
     ExpertAvailabilityModel,
     ExpertAvailabilityOverrideModel,
@@ -59,7 +61,6 @@ from modules.experts.slot_engine import (
 from modules.users.models import User
 from modules.users.repository import UsersRepository
 from sqlalchemy import select
-from sqlalchemy.orm.attributes import flag_modified
 
 
 _ALLOWED_STATUS = {"active", "inactive"}
@@ -472,10 +473,12 @@ class ExpertAvailabilityService:
         experts_repository: ExpertsRepository,
         availability_repository: ExpertAvailabilityRepository,
         override_repository: ExpertAvailabilityOverrideRepository,
+        consultation_bookings_repository: ConsultationBookingsRepository | None = None,
     ):
         self._experts = experts_repository
         self._availability = availability_repository
         self._overrides = override_repository
+        self._consultation_bookings = consultation_bookings_repository or ConsultationBookingsRepository()
 
     async def _get_expert_or_404(self, db, expert_id: int) -> Expert:
         expert = await self._experts.get_by_id(db, expert_id)
@@ -724,12 +727,21 @@ class ExpertAvailabilityService:
         if participant is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Participant not found")
 
-        consultations = normalize_consultations_map(participant.consultations)
-        pref = consultations.get(payload.expert_type) or normalize_preference(None)
-        # Engagement already allows this type; auto-opt-in if participant has not requested yet.
-        if not pref.get("want"):
-            pref["want"] = True
-        if pref.get("expert_id") is not None:
+        booking = await self._consultation_bookings.get_by_participant_and_type(
+            db,
+            participant.engagement_participant_id,
+            payload.expert_type,
+        )
+        if booking is not None and not booking.want:
+            booking = None
+        if booking is None or not booking.want:
+            booking = await self._consultation_bookings.create_or_update_for_type(
+                db,
+                participant,
+                payload.expert_type,
+                want=True,
+            )
+        if booking.expert_id is not None:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_INPUT",
@@ -750,12 +762,9 @@ class ExpertAvailabilityService:
                 message="Selected slot is not available",
             )
 
-        pref["date"] = payload.date.isoformat()
-        pref["slot"] = slot_hhmm
-        # expert_id stays null until confirm
-        consultations[payload.expert_type] = pref
-        participant.consultations = consultations
-        flag_modified(participant, "consultations")
+        booking.consultation_date = payload.date
+        booking.consultation_slot = slot_hhmm
+        db.add(booking)
         db.add(participant)
         await db.flush()
 
@@ -770,38 +779,39 @@ class ExpertAvailabilityService:
     async def list_consultation_requests(self, db, *, employee: EmployeeContext) -> list[dict[str, Any]]:
         ensure_expert_portal_access(employee)
         result = await db.execute(
-            select(EngagementParticipant, Engagement, User)
+            select(ConsultationBooking, EngagementParticipant, Engagement, User)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_participant_id == ConsultationBooking.engagement_participant_id,
+            )
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
             .join(User, User.user_id == EngagementParticipant.user_id)
             .where(Engagement.status.in_(("running", "scheduled")))
             .where(Engagement.organization_id.is_(None))
-            .where(EngagementParticipant.consultations.isnot(None))
-            .order_by(EngagementParticipant.engagement_participant_id.desc())
+            .where(ConsultationBooking.want.is_(True))
+            .where(ConsultationBooking.expert_id.is_(None))
+            .order_by(ConsultationBooking.consultation_id.desc())
         )
         rows = result.all()
         items: list[dict[str, Any]] = []
-        for participant, engagement, user in rows:
-            consultations = normalize_consultations_map(participant.consultations)
-            for expert_type, pref in consultations.items():
-                if not pref.get("want"):
-                    continue
-                if pref.get("expert_id") is not None:
-                    continue
-                items.append(
-                    {
-                        "user_id": user.user_id,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                        "email": user.email,
-                        "phone": user.phone,
-                        "engagement_id": engagement.engagement_id,
-                        "engagement_code": engagement.engagement_code,
-                        "expert_type": expert_type,
-                        "date": pref.get("date"),
-                        "slot": pref.get("slot"),
-                        "engagement_participant_id": participant.engagement_participant_id,
-                    }
-                )
+        for booking, participant, engagement, user in rows:
+            pref = booking_to_api_preference(booking)
+            items.append(
+                {
+                    "consultation_id": booking.consultation_id,
+                    "user_id": user.user_id,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "email": user.email,
+                    "phone": user.phone,
+                    "engagement_id": engagement.engagement_id,
+                    "engagement_code": engagement.engagement_code,
+                    "expert_type": booking.expert_type,
+                    "date": pref.get("date"),
+                    "slot": pref.get("slot"),
+                    "engagement_participant_id": participant.engagement_participant_id,
+                }
+            )
         return items
 
     async def confirm_consultation_request(
@@ -854,22 +864,25 @@ class ExpertAvailabilityService:
         if participant is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Participant not found")
 
-        consultations = normalize_consultations_map(participant.consultations)
-        pref = consultations.get(payload.expert_type) or normalize_preference(None)
-        if not pref.get("want"):
+        booking = await self._consultation_bookings.get_by_participant_and_type(
+            db,
+            participant.engagement_participant_id,
+            payload.expert_type,
+        )
+        if booking is None or not booking.want:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_INPUT",
                 message="Participant did not request this consultation",
             )
-        if pref.get("expert_id") is not None:
+        if booking.expert_id is not None:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_INPUT",
                 message="Consultation already confirmed",
             )
 
-        # Prefer participant date/slot if set; payload must match when set
+        pref = booking_to_api_preference(booking)
         if pref.get("date") and pref["date"] != payload.date.isoformat():
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Date does not match requested slot")
         if pref.get("slot") and normalize_hhmm(pref["slot"]) != slot_hhmm:
@@ -889,13 +902,11 @@ class ExpertAvailabilityService:
                 message="Selected slot is not available for this expert",
             )
 
-        pref["date"] = payload.date.isoformat()
-        pref["slot"] = slot_hhmm
-        pref["expert_id"] = confirming_expert_id
-        pref["done"] = False
-        consultations[payload.expert_type] = pref
-        participant.consultations = consultations
-        flag_modified(participant, "consultations")
+        booking.consultation_date = payload.date
+        booking.consultation_slot = slot_hhmm
+        booking.expert_id = confirming_expert_id
+        booking.done = False
+        db.add(booking)
         db.add(participant)
 
         override = ExpertAvailabilityOverrideModel(
@@ -930,41 +941,42 @@ class ExpertAvailabilityService:
             )
 
         result = await db.execute(
-            select(EngagementParticipant, Engagement, User)
+            select(ConsultationBooking, EngagementParticipant, Engagement, User)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_participant_id == ConsultationBooking.engagement_participant_id,
+            )
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
             .join(User, User.user_id == EngagementParticipant.user_id)
-            .where(EngagementParticipant.consultations.isnot(None))
-            .order_by(EngagementParticipant.engagement_participant_id.desc())
+            .where(ConsultationBooking.want.is_(True))
+            .where(ConsultationBooking.done.is_(False))
+            .where(ConsultationBooking.expert_id == expert.expert_id)
+            .order_by(ConsultationBooking.consultation_date.asc(), ConsultationBooking.consultation_slot.asc())
         )
         rows = result.all()
         items: list[dict[str, Any]] = []
-        for participant, engagement, user in rows:
-            consultations = normalize_consultations_map(participant.consultations)
-            for expert_type, pref in consultations.items():
-                if not pref.get("want"):
-                    continue
-                if pref.get("done"):
-                    continue
-                if pref.get("expert_id") != expert.expert_id:
-                    continue
-                if not is_upcoming_slot(pref.get("date"), pref.get("slot")):
-                    continue
-                items.append(
-                    {
-                        "user_id": user.user_id,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                        "email": user.email,
-                        "phone": user.phone,
-                        "engagement_id": engagement.engagement_id,
-                        "engagement_code": engagement.engagement_code,
-                        "expert_type": expert_type,
-                        "date": pref.get("date"),
-                        "slot": pref.get("slot"),
-                        "expert_id": expert.expert_id,
-                        "engagement_participant_id": participant.engagement_participant_id,
-                    }
-                )
+        for booking, participant, engagement, user in rows:
+            pref = booking_to_api_preference(booking)
+            if not is_upcoming_slot(pref.get("date"), pref.get("slot")):
+                continue
+            items.append(
+                {
+                    "consultation_id": booking.consultation_id,
+                    "user_id": user.user_id,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "email": user.email,
+                    "phone": user.phone,
+                    "engagement_id": engagement.engagement_id,
+                    "engagement_code": engagement.engagement_code,
+                    "expert_type": booking.expert_type,
+                    "date": pref.get("date"),
+                    "slot": pref.get("slot"),
+                    "expert_id": expert.expert_id,
+                    "meet_link": booking.meet_link,
+                    "engagement_participant_id": participant.engagement_participant_id,
+                }
+            )
 
         items.sort(key=lambda x: (x.get("date") or "", x.get("slot") or ""))
         return items
@@ -1008,38 +1020,47 @@ class ExpertAvailabilityService:
         if participant is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Participant not found")
 
-        consultations = normalize_consultations_map(participant.consultations)
-        pref = consultations.get(payload.expert_type) or normalize_preference(None)
-        if not pref.get("want"):
+        meet_link = (payload.meet_link or "").strip()
+        if not meet_link:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="meet_link is required",
+            )
+
+        booking = await self._consultation_bookings.get_by_participant_and_type(
+            db,
+            participant.engagement_participant_id,
+            payload.expert_type,
+        )
+        if booking is None or not booking.want:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_INPUT",
                 message="Participant did not request this consultation",
             )
-        if pref.get("expert_id") is None:
+        if booking.expert_id is None:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_INPUT",
                 message="Consultation is not assigned to an expert yet",
             )
-        if pref.get("expert_id") != acting_expert_id:
+        if booking.expert_id != acting_expert_id:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_INPUT",
                 message="Consultation is assigned to a different expert",
             )
-        if pref.get("done"):
+        if booking.done:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_INPUT",
                 message="Consultation is already marked done",
             )
 
-        pref["done"] = True
-        consultations[payload.expert_type] = pref
-        participant.consultations = consultations
-        flag_modified(participant, "consultations")
-        db.add(participant)
+        booking.meet_link = meet_link
+        booking.done = True
+        db.add(booking)
         await db.flush()
 
         return {

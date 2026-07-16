@@ -11,7 +11,8 @@ from core.security import create_jwt_token
 from sqlalchemy import select
 
 from modules.employee.models import Employee, EmployeeRole
-from modules.experts.models import Expert
+from modules.engagements.models import Engagement, EngagementParticipant
+from modules.experts.models import ConsultationBooking, Expert
 from modules.users.models import User
 
 
@@ -201,3 +202,105 @@ async def test_update_expert_specialization(async_client, test_db_session):
     await test_db_session.refresh(expert)
     assert expert.specialization == "Updated specialization"
     assert expert.expert_type == "nutritionist"
+
+
+@pytest.mark.asyncio
+async def test_mark_consultation_done_requires_meet_link(async_client, test_db_session):
+    from datetime import date, time, timedelta
+
+    expert_user_id = 78530
+    participant_user_id = 78531
+    engagement_id = 7853
+    participant_id = 78531
+    consultation_id = 785301
+
+    expert_user = User(user_id=expert_user_id, age=35, phone="785300000000", status="active")
+    participant_user = User(
+        user_id=participant_user_id,
+        age=30,
+        phone="785310000000",
+        status="active",
+    )
+    test_db_session.add_all([expert_user, participant_user])
+    await test_db_session.flush()
+    test_db_session.add(
+        Employee(employee_id=430, user_id=expert_user_id, role="expert", status="active")
+    )
+    expert = Expert(
+        user_id=expert_user_id,
+        expert_type="doctor",
+        specialization="General medicine",
+        status="active",
+    )
+    test_db_session.add(expert)
+    await test_db_session.flush()
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id,
+            engagement_name="Done Consult Engagement",
+            engagement_code="DONE7853",
+            engagement_type="consultation",
+            consultations={"doctor": True},
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=7),
+            status="running",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=participant_id,
+            engagement_id=engagement_id,
+            user_id=participant_user_id,
+            engagement_date=date.today() + timedelta(days=1),
+            slot_start_time=time(10, 0),
+            consultation_booking_ids=[consultation_id],
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        ConsultationBooking(
+            consultation_id=consultation_id,
+            engagement_participant_id=participant_id,
+            expert_type="doctor",
+            expert_id=expert.expert_id,
+            want=True,
+            consultation_date=date.today() + timedelta(days=1),
+            consultation_slot="10:00",
+            done=False,
+        )
+    )
+    await test_db_session.commit()
+
+    missing_link = await async_client.post(
+        "/experts/portal/consultations/done",
+        headers=_auth_header(expert_user_id),
+        json={
+            "user_id": participant_user_id,
+            "engagement_id": engagement_id,
+            "expert_type": "doctor",
+        },
+    )
+    assert missing_link.status_code == 422
+
+    response = await async_client.post(
+        "/experts/portal/consultations/done",
+        headers=_auth_header(expert_user_id),
+        json={
+            "user_id": participant_user_id,
+            "engagement_id": engagement_id,
+            "expert_type": "doctor",
+            "meet_link": "https://meet.google.com/abc-defg-hij",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["done"] is True
+
+    booking = await test_db_session.get(ConsultationBooking, consultation_id)
+    assert booking is not None
+    assert booking.done is True
+    assert booking.meet_link == "https://meet.google.com/abc-defg-hij"

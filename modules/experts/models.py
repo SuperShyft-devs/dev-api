@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, Time, func
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, Time, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 
 from db.base import Base
@@ -94,3 +94,31 @@ class ExpertAvailabilityOverrideModel(Base):
     buffer_time = Column(Integer, nullable=True)
 
     expert = relationship("Expert", back_populates="availability_overrides")
+
+
+class ConsultationBooking(Base):
+    __tablename__ = "consultation_bookings"
+    __table_args__ = (
+        UniqueConstraint(
+            "engagement_participant_id",
+            "expert_type",
+            name="uq_consultation_bookings_participant_expert_type",
+        ),
+    )
+
+    consultation_id = Column(Integer, primary_key=True, autoincrement=True)
+    engagement_participant_id = Column(
+        Integer,
+        ForeignKey("engagement_participants.engagement_participant_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    expert_type = Column(String(100), nullable=False)
+    expert_id = Column(Integer, ForeignKey("experts.expert_id", ondelete="SET NULL"), nullable=True)
+    want = Column(Boolean, nullable=False, default=False, server_default="false")
+    consultation_date = Column(Date, nullable=True)
+    consultation_slot = Column(String(20), nullable=True)
+    done = Column(Boolean, nullable=False, default=False, server_default="false")
+    meet_link = Column(String(500), nullable=True)
+    consent = Column(JSON, nullable=False, default=lambda: {"bio_ai": False, "blood_report": False, "questionnaire": False})
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

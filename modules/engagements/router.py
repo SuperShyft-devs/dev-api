@@ -21,6 +21,7 @@ from modules.engagements.dependencies import get_engagements_service, get_onboar
 from modules.engagements.onboarding_assistants_service import OnboardingAssistantsService
 from modules.engagements.schemas import (
     AssignParticipantsBatchRequest,
+    ConsultationConsentRequest,
     CreateMetsightsProfilesRequest,
     EngagementCreateRequest,
     EngagementParticipantUpdateRequest,
@@ -503,6 +504,26 @@ async def update_participant(
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.post("/{engagement_id}/consultation/{consultation_id}/consent")
+async def update_consultation_consent(
+    engagement_id: int,
+    consultation_id: int,
+    payload: ConsultationConsentRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    data = await engagements_service.update_consultation_consent_for_user(
+        db,
+        user_id=current_user.user_id,
+        engagement_id=engagement_id,
+        consultation_id=consultation_id,
+        payload=payload,
     )
     await db.commit()
     return success_response(data)

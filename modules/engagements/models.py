@@ -5,6 +5,7 @@ from __future__ import annotations
 import enum
 
 from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, Enum as SAEnum, Float, ForeignKey, Index, Integer, String, Time, UniqueConstraint
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import validates
 from sqlalchemy.sql import func
 from sqlalchemy.types import JSON
@@ -136,7 +137,7 @@ class EngagementParticipant(Base):
     participants_employee_id = Column(String, nullable=True)
     participant_department = Column(String, nullable=True)
     participant_blood_group = Column(String, nullable=True)
-    consultations = Column(JSON, nullable=True)
+    consultation_booking_ids = Column(ARRAY(Integer), nullable=True)
     is_profile_created_on_metsights = Column(Boolean, nullable=False, default=False, server_default="false")
     is_primary_record_id_synced = Column(Boolean, nullable=False, default=False, server_default="false")
     is_fitprint_record_id_synced = Column(Boolean, nullable=False, default=False, server_default="false")

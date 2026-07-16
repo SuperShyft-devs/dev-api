@@ -12,6 +12,7 @@ from core.security import create_jwt_token
 from modules.employee.models import Employee
 from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.models import Engagement, EngagementParticipant
+from modules.experts.models import ConsultationBooking
 from modules.organizations.models import Organization
 from modules.reports.models import CampReport, CampReportSection
 from modules.users.models import User
@@ -856,7 +857,6 @@ async def _seed_kpis_camp_data(
                 engagement_date=start,
                 slot_start_time=time(10, 0),
                 participant_department="sales",
-                want_doctor_consultation=True,
             ),
             EngagementParticipant(
                 engagement_participant_id=94002,
@@ -865,7 +865,6 @@ async def _seed_kpis_camp_data(
                 engagement_date=start,
                 slot_start_time=time(10, 20),
                 participant_department="sales",
-                want_doctor_consultation=False,
             ),
             EngagementParticipant(
                 engagement_participant_id=94003,
@@ -882,10 +881,57 @@ async def _seed_kpis_camp_data(
                 engagement_date=start,
                 slot_start_time=time(11, 20),
                 participant_department="engineering",
-                want_doctor_and_nutritionist_consultation=True,
             ),
         ]
     )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            ConsultationBooking(
+                consultation_id=940001,
+                engagement_participant_id=94001,
+                expert_type="doctor",
+                want=True,
+            ),
+            ConsultationBooking(
+                consultation_id=940002,
+                engagement_participant_id=94002,
+                expert_type="doctor",
+                want=False,
+            ),
+            ConsultationBooking(
+                consultation_id=940003,
+                engagement_participant_id=94004,
+                expert_type="doctor",
+                want=True,
+            ),
+            ConsultationBooking(
+                consultation_id=940004,
+                engagement_participant_id=94004,
+                expert_type="nutritionist",
+                want=True,
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    participants = (
+        await test_db_session.execute(
+            select(EngagementParticipant).where(
+                EngagementParticipant.engagement_participant_id.in_([94001, 94002, 94003, 94004])
+            )
+        )
+    ).scalars().all()
+    booking_ids_by_participant = {
+        94001: [940001],
+        94002: [940002],
+        94004: [940003, 940004],
+    }
+    for participant in participants:
+        ids = booking_ids_by_participant.get(participant.engagement_participant_id)
+        if ids:
+            participant.consultation_booking_ids = ids
     await test_db_session.flush()
 
     test_db_session.add_all(
