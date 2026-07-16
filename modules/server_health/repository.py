@@ -32,40 +32,68 @@ class ServerHealthRepository:
         return path
 
     async def _connect(self) -> aiosqlite.Connection:
+        """Open the health DB for reads.
+
+        Uses a normal path open (not URI ``mode=ro``) so WAL-mode databases
+        still work when the process can read the file and adjacent -wal/-shm.
+        ``PRAGMA query_only`` blocks writes from this connection.
+        """
         path = self._ensure_db_available()
-        uri = f"file:{path.as_posix()}?mode=ro"
-        return await aiosqlite.connect(uri, uri=True)
+        try:
+            db = await aiosqlite.connect(path.as_posix())
+            await db.execute("PRAGMA query_only = ON")
+            return db
+        except AppError:
+            raise
+        except Exception as exc:
+            raise AppError(
+                status_code=503,
+                error_code="SERVICE_UNAVAILABLE",
+                message=(
+                    "Server health database could not be opened "
+                    f"at {self._db_path}: {exc}"
+                ),
+            ) from exc
+
+    async def _run_query(self, sql: str, params: tuple[Any, ...] | list[Any] = ()) -> list[Any]:
+        try:
+            async with await self._connect() as db:
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute(sql, params)
+                return await cursor.fetchall()
+        except AppError:
+            raise
+        except Exception as exc:
+            raise AppError(
+                status_code=503,
+                error_code="SERVICE_UNAVAILABLE",
+                message=f"Server health database query failed: {exc}",
+            ) from exc
 
     async def get_latest_run(self) -> dict[str, Any] | None:
-        async with await self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cursor = await db.execute(
-                """
-                SELECT id, run_at, ok_count, warn_count, crit_count, overall_status
-                FROM health_runs
-                ORDER BY run_at DESC, id DESC
-                LIMIT 1
-                """
-            )
-            row = await cursor.fetchone()
-            if row is None:
-                return None
-            return dict(row)
+        rows = await self._run_query(
+            """
+            SELECT id, run_at, ok_count, warn_count, crit_count, overall_status
+            FROM health_runs
+            ORDER BY run_at DESC, id DESC
+            LIMIT 1
+            """
+        )
+        if not rows:
+            return None
+        return dict(rows[0])
 
     async def get_checks_for_run(self, run_id: int) -> list[dict[str, Any]]:
-        async with await self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cursor = await db.execute(
-                """
-                SELECT id, run_id, category, status, message
-                FROM health_checks
-                WHERE run_id = ?
-                ORDER BY category ASC, id ASC
-                """,
-                (run_id,),
-            )
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+        rows = await self._run_query(
+            """
+            SELECT id, run_id, category, status, message
+            FROM health_checks
+            WHERE run_id = ?
+            ORDER BY category ASC, id ASC
+            """,
+            (run_id,),
+        )
+        return [dict(row) for row in rows]
 
     async def list_runs(
         self,
@@ -88,20 +116,17 @@ class ServerHealthRepository:
         where_sql = " AND ".join(clauses)
         params.append(limit)
 
-        async with await self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cursor = await db.execute(
-                f"""
-                SELECT id, run_at, ok_count, warn_count, crit_count, overall_status
-                FROM health_runs
-                WHERE {where_sql}
-                ORDER BY run_at DESC, id DESC
-                LIMIT ?
-                """,
-                params,
-            )
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+        rows = await self._run_query(
+            f"""
+            SELECT id, run_at, ok_count, warn_count, crit_count, overall_status
+            FROM health_runs
+            WHERE {where_sql}
+            ORDER BY run_at DESC, id DESC
+            LIMIT ?
+            """,
+            params,
+        )
+        return [dict(row) for row in rows]
 
     async def count_runs(
         self,
@@ -121,11 +146,10 @@ class ServerHealthRepository:
             params.append(run_to.strftime("%Y-%m-%d %H:%M:%S"))
 
         where_sql = " AND ".join(clauses)
-
-        async with await self._connect() as db:
-            cursor = await db.execute(
-                f"SELECT COUNT(*) FROM health_runs WHERE {where_sql}",
-                params,
-            )
-            row = await cursor.fetchone()
-            return int(row[0]) if row else 0
+        rows = await self._run_query(
+            f"SELECT COUNT(*) AS cnt FROM health_runs WHERE {where_sql}",
+            params,
+        )
+        if not rows:
+            return 0
+        return int(rows[0][0] if not hasattr(rows[0], "keys") else rows[0]["cnt"])
