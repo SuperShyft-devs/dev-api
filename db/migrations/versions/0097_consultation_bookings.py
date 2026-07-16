@@ -1,7 +1,7 @@
 """Create consultation_bookings table and migrate participant consultations JSON.
 
-Revision ID: 0096_consultation_bookings
-Revises: 0095_participant_consult_done
+Revision ID: 0097_consultation_bookings
+Revises: 0096_industries_and_ranking
 """
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ from sqlalchemy import inspect, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 
 
-revision = "0096_consultation_bookings"
-down_revision = "0095_participant_consult_done"
+revision = "0097_consultation_bookings"
+down_revision = "0096_industries_and_ranking"
 branch_labels = None
 depends_on = None
 
