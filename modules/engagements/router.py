@@ -248,6 +248,22 @@ async def get_engagement_for_user(
     )
 
 
+@router.get("/{engagement_id}/consultation")
+async def get_engagement_consultations_for_user(
+    engagement_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """Return all consultation bookings for the current user in this engagement."""
+    data = await engagements_service.get_consultations_for_user(
+        db,
+        user_id=current_user.user_id,
+        engagement_id=engagement_id,
+    )
+    return success_response(data)
+
+
 @router.get("/{engagement_id}")
 async def get_engagement_details(
     engagement_id: int,

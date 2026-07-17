@@ -21,6 +21,17 @@ _ALLOWED_CONTENT_TYPES = {
 _PDF_CONTENT_TYPE = "application/pdf"
 _PDF_EXTENSION = ".pdf"
 
+_CONSULTATION_ATTACHMENT_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "application/pdf": ".pdf",
+    "application/msword": ".doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "text/plain": ".txt",
+}
+
 
 class UploadsService:
     """Validate and store uploaded media files."""
@@ -51,6 +62,60 @@ class UploadsService:
 
     async def save_blood_parameters_pdf(self, file: UploadFile) -> str:
         return await self._save_pdf(file, folder="blood-parameters", max_bytes=self._pdf_max_bytes)
+
+    async def save_consultation_attachments(self, files: list[UploadFile]) -> list[str]:
+        if not files:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="At least one file is required")
+        urls: list[str] = []
+        for file in files:
+            urls.append(
+                await self._save_consultation_attachment(
+                    file, folder="consultation-attachments", max_bytes=self._pdf_max_bytes
+                )
+            )
+        return urls
+
+    async def _save_consultation_attachment(self, file: UploadFile, *, folder: str, max_bytes: int) -> str:
+        content_type = (file.content_type or "").lower().strip()
+        extension = _CONSULTATION_ATTACHMENT_TYPES.get(content_type)
+        if extension is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Unsupported attachment type; allowed: images, PDF, DOC, DOCX, TXT",
+            )
+
+        payload = await file.read()
+        if not payload:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="File is required")
+        if len(payload) > max_bytes:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="File is too large")
+
+        if content_type == _PDF_CONTENT_TYPE:
+            if not payload.startswith(b"%PDF"):
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="File content does not match declared type",
+                )
+        elif content_type.startswith("image/"):
+            kind = filetype.guess(payload)
+            detected_mime = kind.mime if kind else None
+            if detected_mime != content_type:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="File content does not match declared type",
+                )
+
+        target_dir = self._media_root / folder
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"{uuid4().hex}{extension}"
+        file_path = target_dir / filename
+        file_path.write_bytes(payload)
+
+        return f"{self._media_base_url}/{folder}/{filename}"
 
     async def _save_pdf(self, file: UploadFile, *, folder: str, max_bytes: int) -> str:
         content_type = (file.content_type or "").lower().strip()

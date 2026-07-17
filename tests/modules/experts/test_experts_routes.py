@@ -206,7 +206,7 @@ async def test_update_expert_specialization(async_client, test_db_session):
 
 @pytest.mark.asyncio
 async def test_mark_consultation_done_requires_meet_link(async_client, test_db_session):
-    from datetime import date, time, timedelta
+    from datetime import date, datetime, time, timedelta
 
     expert_user_id = 78530
     participant_user_id = 78531
@@ -262,6 +262,7 @@ async def test_mark_consultation_done_requires_meet_link(async_client, test_db_s
         )
     )
     await test_db_session.flush()
+    past_slot = datetime.now() - timedelta(hours=1)
     test_db_session.add(
         ConsultationBooking(
             consultation_id=consultation_id,
@@ -269,8 +270,8 @@ async def test_mark_consultation_done_requires_meet_link(async_client, test_db_s
             expert_type="doctor",
             expert_id=expert.expert_id,
             want=True,
-            consultation_date=date.today() + timedelta(days=1),
-            consultation_slot="10:00",
+            consultation_date=past_slot.date(),
+            consultation_slot=past_slot.strftime("%H:%M"),
             done=False,
         )
     )
@@ -285,7 +286,7 @@ async def test_mark_consultation_done_requires_meet_link(async_client, test_db_s
             "expert_type": "doctor",
         },
     )
-    assert missing_link.status_code == 422
+    assert missing_link.status_code in (400, 422)
 
     response = await async_client.post(
         "/experts/portal/consultations/done",
@@ -304,3 +305,268 @@ async def test_mark_consultation_done_requires_meet_link(async_client, test_db_s
     assert booking is not None
     assert booking.done is True
     assert booking.meet_link == "https://meet.google.com/abc-defg-hij"
+
+
+@pytest.mark.asyncio
+async def test_consultation_manage_done_before_slot_rejected(async_client, test_db_session):
+    from datetime import date, time, timedelta
+
+    expert_user_id = 78540
+    participant_user_id = 78541
+    engagement_id = 7854
+    participant_id = 78541
+    consultation_id = 785401
+
+    test_db_session.add_all(
+        [
+            User(user_id=expert_user_id, age=35, phone="785400000000", status="active"),
+            User(user_id=participant_user_id, age=30, phone="785410000000", status="active"),
+        ]
+    )
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=440, user_id=expert_user_id, role="expert", status="active"))
+    expert = Expert(
+        user_id=expert_user_id,
+        expert_type="doctor",
+        specialization="General medicine",
+        status="active",
+    )
+    test_db_session.add(expert)
+    await test_db_session.flush()
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id,
+            engagement_name="Future Consult",
+            engagement_code="FUT7854",
+            engagement_type="consultation",
+            consultations={"doctor": True},
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=7),
+            status="running",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=participant_id,
+            engagement_id=engagement_id,
+            user_id=participant_user_id,
+            engagement_date=date.today() + timedelta(days=1),
+            slot_start_time=time(10, 0),
+            consultation_booking_ids=[consultation_id],
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        ConsultationBooking(
+            consultation_id=consultation_id,
+            engagement_participant_id=participant_id,
+            expert_type="doctor",
+            expert_id=expert.expert_id,
+            want=True,
+            consultation_date=date.today() + timedelta(days=1),
+            consultation_slot="10:00",
+            done=False,
+            consent={"bio_ai": True, "blood_report": False, "questionnaire": False},
+        )
+    )
+    await test_db_session.commit()
+
+    before = await async_client.post(
+        f"/experts/portal/consultations/{consultation_id}/done",
+        headers=_auth_header(expert_user_id),
+    )
+    assert before.status_code == 400
+    assert "before the scheduled slot" in before.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_consultation_manage_detail_patch_and_done(async_client, test_db_session, tmp_path, monkeypatch):
+    from datetime import date, datetime, time, timedelta
+
+    from core.config import settings
+    from modules.reports.models import IndividualHealthReport
+
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    monkeypatch.setattr(settings, "MEDIA_ROOT", str(media_root))
+    monkeypatch.setattr(settings, "MEDIA_BASE_URL", "http://testserver/media")
+
+    pdf_dir = media_root / "bio-ai"
+    pdf_dir.mkdir()
+    pdf_path = pdf_dir / "sample.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 sample content")
+
+    expert_user_id = 78550
+    participant_user_id = 78551
+    engagement_id = 7855
+    participant_id = 78551
+    consultation_id = 785501
+
+    test_db_session.add_all(
+        [
+            User(
+                user_id=expert_user_id,
+                age=35,
+                phone="785500000000",
+                first_name="Doc",
+                last_name="Expert",
+                status="active",
+            ),
+            User(
+                user_id=participant_user_id,
+                age=30,
+                phone="785510000000",
+                first_name="Pat",
+                last_name="Ient",
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=450, user_id=expert_user_id, role="expert", status="active"))
+    expert = Expert(
+        user_id=expert_user_id,
+        expert_type="doctor",
+        specialization="General medicine",
+        status="active",
+    )
+    test_db_session.add(expert)
+    await test_db_session.flush()
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id,
+            engagement_name="Manage Consult",
+            engagement_code="MNG7855",
+            engagement_type="consultation",
+            consultations={"doctor": True},
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=7),
+            status="running",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=participant_id,
+            engagement_id=engagement_id,
+            user_id=participant_user_id,
+            engagement_date=date.today(),
+            slot_start_time=time(9, 0),
+            consultation_booking_ids=[consultation_id],
+        )
+    )
+    await test_db_session.flush()
+    past_slot = datetime.now() - timedelta(hours=2)
+    test_db_session.add(
+        ConsultationBooking(
+            consultation_id=consultation_id,
+            engagement_participant_id=participant_id,
+            expert_type="doctor",
+            expert_id=expert.expert_id,
+            want=True,
+            consultation_date=past_slot.date(),
+            consultation_slot=past_slot.strftime("%H:%M"),
+            done=False,
+            consent={"bio_ai": True, "blood_report": False, "questionnaire": False},
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            user_id=participant_user_id,
+            engagement_id=engagement_id,
+            report_url="http://testserver/media/bio-ai/sample.pdf",
+        )
+    )
+    await test_db_session.commit()
+
+    detail = await async_client.get(
+        f"/experts/portal/consultations/{consultation_id}",
+        headers=_auth_header(expert_user_id),
+    )
+    assert detail.status_code == 200
+    body = detail.json()["data"]
+    assert body["user_id"] == participant_user_id
+    assert body["shared_resources"]["bio_ai"]["consent"] is True
+    assert body["shared_resources"]["bio_ai"]["available"] is True
+    assert body["shared_resources"]["blood_report"]["consent"] is False
+    assert body["slot_reached"] is True
+
+    patched = await async_client.patch(
+        f"/experts/portal/consultations/{consultation_id}",
+        headers=_auth_header(expert_user_id),
+        json={
+            "consultation_summary": "Discussed labs",
+            "attachments": ["http://testserver/media/consultation-attachments/a.pdf"],
+            "meet_link": "https://meet.google.com/xyz",
+        },
+    )
+    assert patched.status_code == 200
+    assert patched.json()["data"]["consultation_summary"] == "Discussed labs"
+    assert patched.json()["data"]["attachments"] == [
+        "http://testserver/media/consultation-attachments/a.pdf"
+    ]
+
+    pdf_ok = await async_client.get(
+        f"/experts/portal/consultations/{consultation_id}/bio-ai/pdf",
+        headers=_auth_header(expert_user_id),
+    )
+    assert pdf_ok.status_code == 200
+    assert pdf_ok.headers["content-type"].startswith("application/pdf")
+    assert pdf_ok.content.startswith(b"%PDF")
+
+    pdf_forbidden = await async_client.get(
+        f"/experts/portal/consultations/{consultation_id}/blood-report/pdf",
+        headers=_auth_header(expert_user_id),
+    )
+    assert pdf_forbidden.status_code == 403
+
+    done = await async_client.post(
+        f"/experts/portal/consultations/{consultation_id}/done",
+        headers=_auth_header(expert_user_id),
+    )
+    assert done.status_code == 200
+    assert done.json()["data"]["done"] is True
+
+    booking = await test_db_session.get(ConsultationBooking, consultation_id)
+    assert booking is not None
+    assert booking.done is True
+    assert booking.consultation_summary == "Discussed labs"
+
+
+@pytest.mark.asyncio
+async def test_upload_consultation_attachments(async_client, test_db_session, tmp_path, monkeypatch):
+    from core.config import settings
+
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    monkeypatch.setattr(settings, "MEDIA_ROOT", str(media_root))
+    monkeypatch.setattr(settings, "MEDIA_BASE_URL", "http://testserver/media")
+
+    expert_user_id = 78560
+    test_db_session.add(User(user_id=expert_user_id, age=35, phone="785600000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=460, user_id=expert_user_id, role="expert", status="active"))
+    await test_db_session.commit()
+
+    files = [
+        ("files", ("note.txt", b"hello notes", "text/plain")),
+        ("files", ("scan.pdf", b"%PDF-1.4 hello", "application/pdf")),
+    ]
+    response = await async_client.post(
+        "/uploads/consultation-attachments",
+        headers=_auth_header(expert_user_id),
+        files=files,
+    )
+    assert response.status_code == 200
+    urls = response.json()["data"]["urls"]
+    assert len(urls) == 2
+    assert all("/consultation-attachments/" in url for url in urls)

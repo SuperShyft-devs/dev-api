@@ -1291,6 +1291,54 @@ class EngagementsService:
             "consent": merged,
         }
 
+    async def get_consultations_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        engagement_id: int,
+    ) -> dict[str, Any]:
+        participant = await self._repository.get_participant_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(
+                status_code=403,
+                error_code="ACCESS_DENIED",
+                message="You are not a participant in this engagement",
+            )
+
+        bookings = await self._consultation_bookings.get_for_participant(
+            db,
+            participant.engagement_participant_id,
+        )
+        consultations: list[dict[str, Any]] = []
+        for booking in bookings:
+            date_val = booking.consultation_date.isoformat() if booking.consultation_date else None
+            attachments = booking.attachments
+            if attachments is not None and not isinstance(attachments, list):
+                attachments = list(attachments)
+            consultations.append(
+                {
+                    "consultation_id": booking.consultation_id,
+                    "expert_type": booking.expert_type,
+                    "expert_id": booking.expert_id,
+                    "date": date_val,
+                    "slot": booking.consultation_slot,
+                    "done": bool(booking.done),
+                    "consultation_summary": booking.consultation_summary,
+                    "attachments": attachments,
+                }
+            )
+
+        return {
+            "engagement_id": engagement_id,
+            "user_id": user_id,
+            "consultations": consultations,
+        }
+
     async def update_participant_department_for_employee(
         self,
         db: AsyncSession,

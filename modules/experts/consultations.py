@@ -18,6 +18,8 @@ def empty_preference(*, want: bool = False) -> dict[str, Any]:
         "meet_link": None,
         "consent": empty_consent(),
         "consultation_id": None,
+        "consultation_summary": None,
+        "attachments": None,
     }
 
 
@@ -59,6 +61,16 @@ def normalize_preference(value: Any) -> dict[str, Any]:
             "meet_link": str(value.get("meet_link")) if value.get("meet_link") else None,
             "consent": normalize_consent(value.get("consent")),
             "consultation_id": value.get("consultation_id"),
+            "consultation_summary": (
+                str(value.get("consultation_summary"))
+                if value.get("consultation_summary") is not None
+                else None
+            ),
+            "attachments": (
+                [str(item) for item in value.get("attachments")]
+                if isinstance(value.get("attachments"), list)
+                else None
+            ),
         }
     return empty_preference(want=False)
 
@@ -133,6 +145,9 @@ def is_upcoming_slot(date_str: str | None, slot_str: str | None, *, now: datetim
 def booking_to_api_preference(booking: Any) -> dict[str, Any]:
     """Map a ConsultationBooking row to the legacy API preference shape."""
     date_val = booking.consultation_date.isoformat() if booking.consultation_date else None
+    attachments = booking.attachments
+    if attachments is not None and not isinstance(attachments, list):
+        attachments = list(attachments)
     return {
         "consultation_id": booking.consultation_id,
         "want": bool(booking.want),
@@ -142,6 +157,8 @@ def booking_to_api_preference(booking: Any) -> dict[str, Any]:
         "done": bool(booking.done),
         "meet_link": booking.meet_link,
         "consent": normalize_consent(booking.consent),
+        "consultation_summary": booking.consultation_summary,
+        "attachments": attachments,
     }
 
 

@@ -17,7 +17,9 @@ from modules.engagements.models import Engagement, EngagementParticipant
 from modules.experts.consultation_bookings_repository import ConsultationBookingsRepository
 from modules.experts.consultations import (
     booking_to_api_preference,
+    consultation_datetime,
     is_upcoming_slot,
+    normalize_consent,
     normalize_hhmm,
     normalize_preference,
 )
@@ -42,6 +44,7 @@ from modules.experts.schemas import (
     ConsultationBookRequest,
     ConsultationConfirmRequest,
     ConsultationDoneRequest,
+    ConsultationManageUpdateRequest,
     ExpertCreateRequest,
     ExpertReviewCreateRequest,
     ExpertTagCreateRequest,
@@ -1058,6 +1061,8 @@ class ExpertAvailabilityService:
                 message="Consultation is already marked done",
             )
 
+        self._ensure_slot_reached(booking)
+
         booking.meet_link = meet_link
         booking.done = True
         db.add(booking)
@@ -1070,4 +1075,400 @@ class ExpertAvailabilityService:
             "expert_type": payload.expert_type,
             "expert_id": acting_expert_id,
             "done": True,
+        }
+
+    def _ensure_slot_reached(self, booking: ConsultationBooking, *, now=None) -> None:
+        date_val = booking.consultation_date.isoformat() if booking.consultation_date else None
+        when = consultation_datetime(date_val, booking.consultation_slot)
+        if when is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation slot is not scheduled",
+            )
+        from datetime import datetime
+
+        current = now or datetime.now()
+        if current < when:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation cannot be marked done before the scheduled slot",
+            )
+
+    async def _load_assigned_consultation_context(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        consultation_id: int,
+    ) -> tuple[ConsultationBooking, EngagementParticipant, Engagement, User]:
+        ensure_expert_portal_access(employee)
+        booking = await self._consultation_bookings.get_by_id(db, consultation_id)
+        if booking is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Consultation not found")
+
+        actor_expert = await self._experts.get_by_user_id(db, employee.user_id)
+        if employee.role == EmployeeRole.expert:
+            if actor_expert is None or booking.expert_id != actor_expert.expert_id:
+                raise AppError(
+                    status_code=403,
+                    error_code="FORBIDDEN",
+                    message="Consultation is not assigned to you",
+                )
+        elif booking.expert_id is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation is not assigned to an expert yet",
+            )
+
+        participant = await db.get(EngagementParticipant, booking.engagement_participant_id)
+        if participant is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Participant not found")
+
+        engagement = await db.get(Engagement, participant.engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Engagement not found")
+
+        user = await db.get(User, participant.user_id)
+        if user is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="User not found")
+
+        return booking, participant, engagement, user
+
+    async def get_consultation_manage_detail(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        consultation_id: int,
+    ) -> dict[str, Any]:
+        booking, participant, engagement, user = await self._load_assigned_consultation_context(
+            db, employee=employee, consultation_id=consultation_id
+        )
+        pref = booking_to_api_preference(booking)
+        consent = normalize_consent(booking.consent)
+
+        from modules.reports.models import IndividualHealthReport
+
+        result = await db.execute(
+            select(IndividualHealthReport)
+            .where(IndividualHealthReport.user_id == user.user_id)
+            .where(IndividualHealthReport.engagement_id == engagement.engagement_id)
+        )
+        reports = list(result.scalars().all())
+        has_bio_ai = any(bool((r.report_url or "").strip()) for r in reports)
+        has_blood_report = any(bool((r.diagnostic_report_url or "").strip()) for r in reports)
+
+        from modules.assessments.repository import AssessmentsRepository
+        from modules.questionnaire.repository import QuestionnaireRepository
+
+        assessments_repo = AssessmentsRepository()
+        instances = await assessments_repo.list_instances_for_user_engagement(
+            db, user_id=user.user_id, engagement_id=engagement.engagement_id
+        )
+        has_questionnaire = False
+        q_repo = QuestionnaireRepository()
+        for instance in instances:
+            responses = await q_repo.list_responses_for_instance(
+                db, assessment_instance_id=instance.assessment_instance_id, category_id=None
+            )
+            if responses:
+                has_questionnaire = True
+                break
+
+        date_val = pref.get("date")
+        slot_val = pref.get("slot")
+        slot_reached = False
+        when = consultation_datetime(date_val, slot_val)
+        if when is not None:
+            from datetime import datetime
+
+            slot_reached = datetime.now() >= when
+
+        return {
+            "consultation_id": booking.consultation_id,
+            "user_id": user.user_id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "phone": user.phone,
+            "engagement_id": engagement.engagement_id,
+            "engagement_code": engagement.engagement_code,
+            "engagement_participant_id": participant.engagement_participant_id,
+            "expert_type": booking.expert_type,
+            "expert_id": booking.expert_id,
+            "date": date_val,
+            "slot": slot_val,
+            "done": bool(booking.done),
+            "meet_link": booking.meet_link,
+            "consent": consent,
+            "consultation_summary": booking.consultation_summary,
+            "attachments": list(booking.attachments or []) if booking.attachments is not None else [],
+            "shared_resources": {
+                "bio_ai": {
+                    "consent": bool(consent.get("bio_ai")),
+                    "available": has_bio_ai,
+                },
+                "blood_report": {
+                    "consent": bool(consent.get("blood_report")),
+                    "available": has_blood_report,
+                },
+                "questionnaire": {
+                    "consent": bool(consent.get("questionnaire")),
+                    "available": has_questionnaire,
+                },
+            },
+            "slot_reached": slot_reached,
+        }
+
+    async def update_consultation_manage(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        consultation_id: int,
+        payload: ConsultationManageUpdateRequest,
+    ) -> dict[str, Any]:
+        booking, _participant, _engagement, _user = await self._load_assigned_consultation_context(
+            db, employee=employee, consultation_id=consultation_id
+        )
+        data = payload.model_dump(exclude_unset=True)
+        if "consultation_summary" in data:
+            booking.consultation_summary = data["consultation_summary"]
+        if "attachments" in data:
+            attachments = data["attachments"]
+            booking.attachments = list(attachments) if attachments is not None else None
+        if "meet_link" in data:
+            meet_link = data["meet_link"]
+            booking.meet_link = (meet_link or "").strip() or None
+        db.add(booking)
+        await db.flush()
+        return await self.get_consultation_manage_detail(db, employee=employee, consultation_id=consultation_id)
+
+    async def mark_consultation_done_by_id(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        consultation_id: int,
+    ) -> dict[str, Any]:
+        booking, participant, engagement, user = await self._load_assigned_consultation_context(
+            db, employee=employee, consultation_id=consultation_id
+        )
+        if booking.done:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation is already marked done",
+            )
+        self._ensure_slot_reached(booking)
+        booking.done = True
+        db.add(booking)
+        await db.flush()
+        return {
+            "message": "Consultation marked as done",
+            "consultation_id": booking.consultation_id,
+            "user_id": user.user_id,
+            "engagement_id": engagement.engagement_id,
+            "expert_type": booking.expert_type,
+            "expert_id": booking.expert_id,
+            "done": True,
+        }
+
+    async def _resolve_report_url_for_consultation(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        consultation_id: int,
+        kind: str,
+    ) -> str:
+        booking, participant, engagement, user = await self._load_assigned_consultation_context(
+            db, employee=employee, consultation_id=consultation_id
+        )
+        consent = normalize_consent(booking.consent)
+        if kind == "bio_ai":
+            if not consent.get("bio_ai"):
+                raise AppError(
+                    status_code=403,
+                    error_code="FORBIDDEN",
+                    message="Patient has not consented to share BioAI report",
+                )
+        elif kind == "blood_report":
+            if not consent.get("blood_report"):
+                raise AppError(
+                    status_code=403,
+                    error_code="FORBIDDEN",
+                    message="Patient has not consented to share blood report",
+                )
+        else:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Unknown report kind")
+
+        from modules.reports.models import IndividualHealthReport
+
+        result = await db.execute(
+            select(IndividualHealthReport)
+            .where(IndividualHealthReport.user_id == user.user_id)
+            .where(IndividualHealthReport.engagement_id == engagement.engagement_id)
+            .order_by(IndividualHealthReport.report_id.desc())
+        )
+        reports = list(result.scalars().all())
+        url = None
+        for report in reports:
+            candidate = report.report_url if kind == "bio_ai" else report.diagnostic_report_url
+            if isinstance(candidate, str) and candidate.strip():
+                url = candidate.strip()
+                break
+        if not url:
+            raise AppError(
+                status_code=404,
+                error_code="NOT_FOUND",
+                message="Report PDF is not available",
+            )
+        return url
+
+    async def fetch_consultation_pdf_bytes(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        consultation_id: int,
+        kind: str,
+    ) -> bytes:
+        url = await self._resolve_report_url_for_consultation(
+            db, employee=employee, consultation_id=consultation_id, kind=kind
+        )
+        return await self._fetch_pdf_bytes(url)
+
+    async def _fetch_pdf_bytes(self, url: str) -> bytes:
+        from pathlib import Path
+
+        import httpx
+
+        from core.config import settings
+
+        media_base = settings.MEDIA_BASE_URL.rstrip("/")
+        media_root = Path(settings.MEDIA_ROOT)
+
+        if url.startswith(media_base + "/") or url.startswith("/media/"):
+            relative = url
+            if relative.startswith(media_base + "/"):
+                relative = relative[len(media_base) + 1 :]
+            elif relative.startswith("/media/"):
+                relative = relative[len("/media/") :]
+            file_path = media_root / relative
+            if not file_path.is_file():
+                raise AppError(status_code=404, error_code="NOT_FOUND", message="Report PDF is not available")
+            payload = file_path.read_bytes()
+            if not payload.startswith(b"%PDF"):
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Stored file is not a PDF")
+            return payload
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                payload = response.content
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=502,
+                error_code="UPSTREAM_ERROR",
+                message="Failed to fetch report PDF",
+            ) from exc
+
+        if not payload.startswith(b"%PDF"):
+            raise AppError(status_code=422, error_code="INVALID_STATE", message="Upstream file is not a PDF")
+        return payload
+
+    async def get_consultation_questionnaire(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        consultation_id: int,
+    ) -> dict[str, Any]:
+        booking, participant, engagement, user = await self._load_assigned_consultation_context(
+            db, employee=employee, consultation_id=consultation_id
+        )
+        consent = normalize_consent(booking.consent)
+        if not consent.get("questionnaire"):
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="Patient has not consented to share questionnaire",
+            )
+
+        from modules.assessments.repository import AssessmentsRepository
+        from modules.questionnaire.models import QuestionnaireResponse
+        from modules.questionnaire.repository import QuestionnaireRepository
+        from modules.questionnaire.service import QuestionnaireService
+        from modules.users.repository import UsersRepository
+
+        assessments_repo = AssessmentsRepository()
+        q_repo = QuestionnaireRepository()
+        q_service = QuestionnaireService(repository=q_repo, users_repository=UsersRepository())
+
+        instances = await assessments_repo.list_instances_for_user_engagement(
+            db, user_id=user.user_id, engagement_id=engagement.engagement_id
+        )
+        assessments_out: list[dict[str, Any]] = []
+        for instance in instances:
+            responses = await q_repo.list_responses_for_instance(
+                db, assessment_instance_id=instance.assessment_instance_id, category_id=None
+            )
+            resp_by_cat_q: dict[tuple[int, int], QuestionnaireResponse] = {}
+            for r in responses:
+                resp_by_cat_q[(int(r.category_id), int(r.question_id))] = r
+
+            ordered_category_ids = await assessments_repo.get_assigned_category_ids_for_package_ordered(
+                db, package_id=instance.package_id
+            )
+            categories_out: list[dict[str, Any]] = []
+            for category_id in ordered_category_ids:
+                cat = await q_repo.get_category_by_id(db, category_id)
+                questions = await q_service.list_category_questions_for_user(db, category_id=category_id)
+                questions_out: list[dict[str, Any]] = []
+                for q in questions:
+                    qid = int(q["question_id"])
+                    resp_obj = resp_by_cat_q.get((category_id, qid))
+                    if resp_obj is None:
+                        answer_state = "empty"
+                        answer = None
+                        submitted_at = None
+                    else:
+                        submitted_at = resp_obj.submitted_at.isoformat() if resp_obj.submitted_at else None
+                        answer = resp_obj.answer
+                        answer_state = "submitted" if resp_obj.submitted_at is not None else "draft"
+                    questions_out.append(
+                        {
+                            **q,
+                            "answer": answer,
+                            "submitted_at": submitted_at,
+                            "answer_state": answer_state,
+                        }
+                    )
+                categories_out.append(
+                    {
+                        "category_id": category_id,
+                        "display_name": getattr(cat, "display_name", None) if cat else None,
+                        "category_key": getattr(cat, "category_key", None) if cat else None,
+                        "questions": questions_out,
+                    }
+                )
+            assessments_out.append(
+                {
+                    "assessment_instance_id": instance.assessment_instance_id,
+                    "package_id": instance.package_id,
+                    "status": instance.status,
+                    "categories": categories_out,
+                }
+            )
+
+        return {
+            "consultation_id": booking.consultation_id,
+            "user_id": user.user_id,
+            "engagement_id": engagement.engagement_id,
+            "assessments": assessments_out,
         }

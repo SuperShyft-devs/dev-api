@@ -5,6 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -20,6 +21,7 @@ from modules.experts.schemas import (
     ConsultationBookRequest,
     ConsultationConfirmRequest,
     ConsultationDoneRequest,
+    ConsultationManageUpdateRequest,
     ExpertCreateRequest,
     ExpertReviewCreateRequest,
     ExpertStatusUpdateRequest,
@@ -236,6 +238,95 @@ async def portal_mark_consultation_done(
 ):
     data = await availability_service.mark_consultation_done(db, employee=employee, payload=payload)
     await db.commit()
+    return success_response(data)
+
+
+@portal_router.get("/consultations/{consultation_id}")
+async def portal_get_consultation_manage(
+    consultation_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.get_consultation_manage_detail(
+        db, employee=employee, consultation_id=consultation_id
+    )
+    return success_response(data)
+
+
+@portal_router.patch("/consultations/{consultation_id}")
+async def portal_update_consultation_manage(
+    consultation_id: int,
+    payload: ConsultationManageUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.update_consultation_manage(
+        db, employee=employee, consultation_id=consultation_id, payload=payload
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@portal_router.post("/consultations/{consultation_id}/done")
+async def portal_mark_consultation_done_by_id(
+    consultation_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.mark_consultation_done_by_id(
+        db, employee=employee, consultation_id=consultation_id
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@portal_router.get("/consultations/{consultation_id}/bio-ai/pdf")
+async def portal_consultation_bio_ai_pdf(
+    consultation_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    payload = await availability_service.fetch_consultation_pdf_bytes(
+        db, employee=employee, consultation_id=consultation_id, kind="bio_ai"
+    )
+    return Response(
+        content=payload,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'inline; filename="bio-ai-report.pdf"'},
+    )
+
+
+@portal_router.get("/consultations/{consultation_id}/blood-report/pdf")
+async def portal_consultation_blood_report_pdf(
+    consultation_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    payload = await availability_service.fetch_consultation_pdf_bytes(
+        db, employee=employee, consultation_id=consultation_id, kind="blood_report"
+    )
+    return Response(
+        content=payload,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'inline; filename="blood-report.pdf"'},
+    )
+
+
+@portal_router.get("/consultations/{consultation_id}/questionnaire")
+async def portal_consultation_questionnaire(
+    consultation_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.get_consultation_questionnaire(
+        db, employee=employee, consultation_id=consultation_id
+    )
     return success_response(data)
 
 

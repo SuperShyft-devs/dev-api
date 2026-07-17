@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, UploadFile
 
 from common.responses import success_response
+from modules.employee.access_control import ensure_expert_portal_access
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
 from modules.uploads.service import UploadsService
@@ -55,3 +56,14 @@ async def upload_package_image(
 ):
     url = await uploads_service.save_package_image(file)
     return success_response({"url": url})
+
+
+@router.post("/consultation-attachments")
+async def upload_consultation_attachments(
+    files: list[UploadFile] = File(...),
+    employee: EmployeeContext = Depends(get_current_employee),
+    uploads_service: UploadsService = Depends(get_uploads_service),
+):
+    ensure_expert_portal_access(employee)
+    urls = await uploads_service.save_consultation_attachments(files)
+    return success_response({"urls": urls})

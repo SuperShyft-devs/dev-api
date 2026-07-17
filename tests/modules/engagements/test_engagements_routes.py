@@ -1622,6 +1622,119 @@ async def test_update_consultation_consent_for_participant(async_client, test_db
 
 
 @pytest.mark.asyncio
+async def test_get_engagement_consultations_for_user(async_client, test_db_session):
+    from datetime import time
+
+    from modules.engagements.models import Engagement, EngagementParticipant
+    from modules.experts.models import ConsultationBooking
+
+    user_id = 1037
+    engagement_id = 8706
+    participant_id = 87061
+    consultation_id = 870611
+
+    test_db_session.add(User(user_id=user_id, age=30, phone="1037000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id,
+            engagement_name="User Consultations Engagement",
+            engagement_code="UCON8706",
+            engagement_type="consultation",
+            consultations={"doctor": True, "nutritionist": True},
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 1),
+            status="running",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=participant_id,
+            engagement_id=engagement_id,
+            user_id=user_id,
+            engagement_date=date(2026, 2, 1),
+            slot_start_time=time(10, 0),
+            consultation_booking_ids=[consultation_id, consultation_id + 1],
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add_all(
+        [
+            ConsultationBooking(
+                consultation_id=consultation_id,
+                engagement_participant_id=participant_id,
+                expert_type="doctor",
+                want=True,
+                consultation_date=date(2026, 2, 1),
+                consultation_slot="10:00",
+                consultation_summary="Doctor notes",
+                attachments=["http://example.com/a.pdf"],
+                done=True,
+            ),
+            ConsultationBooking(
+                consultation_id=consultation_id + 1,
+                engagement_participant_id=participant_id,
+                expert_type="nutritionist",
+                want=True,
+                consultation_date=date(2026, 2, 2),
+                consultation_slot="11:30",
+                done=False,
+            ),
+        ]
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        f"/engagements/{engagement_id}/consultation",
+        headers=_auth_header(user_id),
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["engagement_id"] == engagement_id
+    assert data["user_id"] == user_id
+    assert len(data["consultations"]) == 2
+    by_type = {item["expert_type"]: item for item in data["consultations"]}
+    assert by_type["doctor"]["consultation_summary"] == "Doctor notes"
+    assert by_type["doctor"]["attachments"] == ["http://example.com/a.pdf"]
+    assert by_type["doctor"]["date"] == "2026-02-01"
+    assert by_type["doctor"]["slot"] == "10:00"
+    assert by_type["nutritionist"]["consultation_summary"] is None
+    assert by_type["nutritionist"]["done"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_engagement_consultations_forbidden_for_non_participant(async_client, test_db_session):
+    from modules.engagements.models import Engagement
+
+    test_db_session.add(User(user_id=1038, age=30, phone="1038000000", status="active"))
+    test_db_session.add(
+        Engagement(
+            engagement_id=8707,
+            engagement_name="No Access Engagement",
+            engagement_code="NOAC8707",
+            engagement_type="consultation",
+            consultations={"doctor": True},
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 1),
+            status="running",
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        "/engagements/8707/consultation",
+        headers=_auth_header(1038),
+    )
+    assert response.status_code == 403
 async def test_list_engagements_onboarding_assistant_403(async_client, test_db_session):
     await _seed_employee(
         test_db_session, user_id=7040, employee_id=40, role="onboarding_assistant"

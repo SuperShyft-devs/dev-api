@@ -170,6 +170,14 @@ class ConsultationPreferenceSchema(BaseModel):
     done: bool = False
     meet_link: Optional[str] = None
     consent: Optional[dict[str, bool]] = None
+    consultation_summary: Optional[str] = None
+    attachments: Optional[list[str]] = None
+
+
+class ConsultationManageUpdateRequest(BaseModel):
+    consultation_summary: Optional[str] = None
+    attachments: Optional[list[str]] = None
+    meet_link: Optional[str] = Field(default=None, max_length=500)
 
 
 class ConsultationBookRequest(BaseModel):

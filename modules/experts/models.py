@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, Time, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 
 from db.base import Base
@@ -120,5 +121,7 @@ class ConsultationBooking(Base):
     done = Column(Boolean, nullable=False, default=False, server_default="false")
     meet_link = Column(String(500), nullable=True)
     consent = Column(JSON, nullable=False, default=lambda: {"bio_ai": False, "blood_report": False, "questionnaire": False})
+    consultation_summary = Column(Text, nullable=True)
+    attachments = Column(ARRAY(Text), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
