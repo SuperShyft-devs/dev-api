@@ -363,6 +363,30 @@ class AuthService:
             ),
         )
 
+    async def issue_tokens_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+        session_id: int | None = None,
+    ) -> TokenPair:
+        """Issue access + refresh tokens and record AUTH_LOGIN (no OTP required)."""
+        refresh_token = await self._issue_refresh_token_for_user(db, user_id)
+        access_token = self._issue_access_token(user_id)
+        await self._audit_service.log_event(
+            db,
+            action="AUTH_LOGIN",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id,
+            session_id=session_id,
+        )
+        return TokenPair(access_token=access_token, refresh_token=refresh_token)
+
     async def verify_otp(
         self,
         db: AsyncSession,
@@ -411,21 +435,15 @@ class AuthService:
         # Store session_id before deletion for audit log
         session_id_for_audit = session.session_id
 
-        refresh_token = await self._issue_refresh_token_for_user(db, user.user_id)
-
-        access_token = self._issue_access_token(user.user_id)
-
-        # Log the audit event BEFORE deleting the session to avoid FK constraint violation
-        await self._audit_service.log_event(
+        tokens = await self.issue_tokens_for_user(
             db,
-            action="AUTH_LOGIN",
-            endpoint=endpoint,
+            user_id=user.user_id,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=user.user_id,
+            endpoint=endpoint,
             session_id=session_id_for_audit,
         )
-        
+
         # Flush to ensure audit log is inserted before we delete the session
         # Otherwise SQLAlchemy may reorder operations and delete before insert
         await db.flush()
@@ -433,7 +451,7 @@ class AuthService:
         # Delete the OTP session after audit log is created and flushed
         await self._repository.delete_otp_session(db, session.session_id)
 
-        return user.user_id, TokenPair(access_token=access_token, refresh_token=refresh_token)
+        return user.user_id, tokens
 
     async def switch_account(
         self,

@@ -541,3 +541,165 @@ async def test_engagement_onboard_rejects_department_without_organization(async_
     response = await async_client.post("/users/code/B2CDEPT/onboard", json=payload)
     assert response.status_code == 400
     assert response.json()["error_code"] == "INVALID_INPUT"
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_me_returns_tokens_and_logs_in(async_client, test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO organizations (organization_id, name, status, departments) "
+            "VALUES (8101, 'Onboard Me Org', 'active', "
+            "'[{\"department\": \"HR\", \"slug\": \"hr\"}]'::json)"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, "
+            "engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, "
+            "start_date, end_date, status) "
+            "VALUES (3301, 'Camp Me', 'ENGME01', 8101, 'bio_ai', 1, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-01', 'running')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "Me",
+        "last_name": "User",
+        "phone": "7777777771",
+        "email": "onboard_me@example.com",
+        "city": "BLR",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "11:00",
+        "participant_department": "hr",
+        "participant_blood_group": "A+",
+    }
+
+    response = await async_client.post("/users/code/ENGME01/onboard/me", json=payload)
+    assert response.status_code == 200
+
+    data = response.json()["data"]
+    assert "user_id" in data
+    tokens = data["tokens"]
+    assert tokens["token_type"] == "bearer"
+    assert isinstance(tokens["access_token"], str) and tokens["access_token"]
+    assert isinstance(tokens["refresh_token"], str) and tokens["refresh_token"]
+
+    user_id = data["user_id"]
+
+    participant_count = (
+        await test_db_session.execute(
+            text(
+                "SELECT COUNT(DISTINCT user_id) FROM engagement_participants "
+                "WHERE engagement_id = 3301 AND user_id = :uid"
+            ),
+            {"uid": user_id},
+        )
+    ).scalar_one()
+    assert participant_count == 1
+
+    instance_row = (
+        await test_db_session.execute(
+            text(
+                "SELECT user_id, engagement_id, package_id, status FROM assessment_instances "
+                "WHERE engagement_id = 3301 AND user_id = :uid"
+            ),
+            {"uid": user_id},
+        )
+    ).first()
+    assert instance_row is not None
+    assert instance_row.package_id == 1
+    assert (instance_row.status or "").lower() == "active"
+
+    token_count = (
+        await test_db_session.execute(
+            text("SELECT COUNT(*) FROM auth_tokens WHERE user_id = :uid"),
+            {"uid": user_id},
+        )
+    ).scalar_one()
+    assert token_count == 1
+
+    me_response = await async_client.get(
+        "/users/me",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert me_response.status_code == 200
+    assert me_response.json()["data"]["user_id"] == user_id
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_me_invalid_engagement_code_issues_no_tokens(
+    async_client, test_db_session
+):
+    payload = {
+        "age": 30,
+        "first_name": "Bad",
+        "phone": "7777777772",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "11:00",
+        "city": "BLR",
+    }
+
+    response = await async_client.post("/users/code/NOSUCHCODE/onboard/me", json=payload)
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT"
+
+    token_count = (await test_db_session.execute(text("SELECT COUNT(*) FROM auth_tokens"))).scalar_one()
+    assert token_count == 0
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_me_inactive_engagement_issues_no_tokens(
+    async_client, test_db_session
+):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
+            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
+            "status) "
+            "VALUES (3302, 'Camp Done', 'ENGMEINACT', 'bio_ai', 1, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-01', 'completed')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "Inactive",
+        "phone": "7777777773",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "09:00",
+        "city": "Hyd",
+    }
+
+    response = await async_client.post("/users/code/ENGMEINACT/onboard/me", json=payload)
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "INVALID_STATE"
+
+    token_count = (await test_db_session.execute(text("SELECT COUNT(*) FROM auth_tokens"))).scalar_one()
+    assert token_count == 0

@@ -11,6 +11,8 @@ from core.exceptions import AppError
 from core.network import get_client_ip
 from core.rate_limit import limiter
 from db.session import get_db
+from modules.auth.dependencies import get_auth_service
+from modules.auth.service import AuthService
 from modules.users.dependencies import get_participant_journey_service, get_users_service
 from modules.users.participant_journey_service import ParticipantJourneyService
 from modules.employee.dependencies import get_current_employee, get_optional_employee
@@ -80,6 +82,50 @@ async def onboard_user_for_engagement(
     await db.commit()
 
     return success_response(result.model_dump())
+
+
+@router.post("/code/{engagement_code}/onboard/me")
+@limiter.limit("3/minute")
+async def onboard_and_login_user_for_engagement(
+    engagement_code: str,
+    payload: EngagementUserOnboardRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    users_service: UsersService = Depends(get_users_service),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """B2B onboard into an engagement, then issue session tokens (same shape as verify-otp)."""
+    ip_address = get_client_ip(request)
+    user_agent = request.headers.get("User-Agent", "unknown")
+    endpoint = str(request.url.path)
+
+    result = await users_service.onboard_user_for_engagement(
+        db,
+        engagement_code=engagement_code,
+        payload=payload,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        endpoint=endpoint,
+    )
+    tokens = await auth_service.issue_tokens_for_user(
+        db,
+        user_id=result.user_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        endpoint=endpoint,
+    )
+    await db.commit()
+
+    return success_response(
+        {
+            "user_id": result.user_id,
+            "tokens": {
+                "access_token": tokens.access_token,
+                "refresh_token": tokens.refresh_token,
+                "token_type": "bearer",
+            },
+        }
+    )
 
 
 @router.get("/me")
