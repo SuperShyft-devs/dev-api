@@ -357,8 +357,11 @@ def build_overall_risk_score(
 ) -> dict:
     """Build overall_risk_score section payload from metabolic scores.
 
-    ``total_employees`` is the number of participants with an extractable
-    metabolic_score (Bio AI report JSON), not total camp enrollment.
+    Inclusion rule: Bio AI must be generated (non-empty reports JSON). Banding uses
+    extractable ``metabolic_score`` from that JSON. ``total_employees`` is the count of
+    participants with an extractable metabolic_score — not total enrollment and not
+    questionnaire starters. ``bio_ai_reports`` is the count with generated Bio AI JSON
+    (empty report shells are excluded).
     """
     counts = {band: 0 for band in METABOLIC_SCORE_BANDS}
     for score in scores:

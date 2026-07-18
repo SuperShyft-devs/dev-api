@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, case, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -35,6 +35,13 @@ def _coerce_reports_dict(reports: Any) -> dict[str, Any]:
         return parsed if isinstance(parsed, dict) else {}
     return {}
 
+
+def _latest_report_order():
+    """Prefer generated Bio AI JSON over empty report shells, then newest report_id."""
+    return (
+        case((IndividualHealthReport.reports.isnot(None), 0), else_=1),
+        IndividualHealthReport.report_id.desc(),
+    )
 
 @dataclass
 class EnrolledAssessmentContext:
@@ -294,7 +301,7 @@ class CampReportsRepository:
                 func.row_number()
                 .over(
                     partition_by=enrolled.c.user_id,
-                    order_by=IndividualHealthReport.report_id.desc(),
+                    order_by=_latest_report_order(),
                 )
                 .label("rn"),
             )
@@ -366,7 +373,7 @@ class CampReportsRepository:
                 func.row_number()
                 .over(
                     partition_by=enrolled.c.user_id,
-                    order_by=IndividualHealthReport.report_id.desc(),
+                    order_by=_latest_report_order(),
                 )
                 .label("rn"),
             )
@@ -409,16 +416,21 @@ class CampReportsRepository:
         camp_no: int,
         department: str | None = None,
     ) -> int:
-        """Count enrolled users with a latest Pro/Basic individual health report row."""
+        """Count enrolled users whose latest Pro/Basic report has generated Bio AI JSON.
+
+        Empty ``individual_health_report`` shells (``reports`` null/empty) are excluded —
+        those rows are not treated as Bio AI generated.
+        """
         enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
 
         ranked_reports = (
             select(
                 enrolled.c.user_id,
+                IndividualHealthReport.reports,
                 func.row_number()
                 .over(
                     partition_by=enrolled.c.user_id,
-                    order_by=IndividualHealthReport.report_id.desc(),
+                    order_by=_latest_report_order(),
                 )
                 .label("rn"),
             )
@@ -443,10 +455,10 @@ class CampReportsRepository:
             .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
         ).subquery()
 
-        result = await db.execute(
-            select(func.count()).select_from(ranked_reports).where(ranked_reports.c.rn == 1)
+        reports_result = await db.execute(
+            select(ranked_reports.c.reports).where(ranked_reports.c.rn == 1)
         )
-        return int(result.scalar_one())
+        return sum(1 for (reports,) in reports_result.all() if _coerce_reports_dict(reports))
 
     async def count_enrolled_users(
         self,
@@ -458,6 +470,53 @@ class CampReportsRepository:
         enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
         result = await db.execute(select(func.count()).select_from(enrolled))
         return int(result.scalar_one())
+
+    async def count_any_questionnaire_responders_by_gender(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+    ) -> dict[str, int]:
+        """Count enrolled users with at least one questionnaire answer in this camp."""
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+
+        answered = (
+            select(AssessmentInstance.user_id.label("user_id"))
+            .select_from(AssessmentInstance)
+            .join(
+                Engagement,
+                and_(
+                    Engagement.engagement_id == AssessmentInstance.engagement_id,
+                    Engagement.camp_no == camp_no,
+                ),
+            )
+            .join(
+                QuestionnaireResponse,
+                QuestionnaireResponse.assessment_instance_id
+                == AssessmentInstance.assessment_instance_id,
+            )
+            .distinct()
+            .subquery()
+        )
+
+        result = await db.execute(
+            select(enrolled.c.gender)
+            .select_from(enrolled)
+            .join(answered, answered.c.user_id == enrolled.c.user_id)
+        )
+
+        counts = {"male": 0, "female": 0, "total": 0, "other": 0}
+        for (gender_raw,) in result.all():
+            counts["total"] += 1
+            normalized = str(gender_raw).strip().lower() if gender_raw is not None else ""
+            if normalized in _MALE_GENDERS:
+                counts["male"] += 1
+            elif normalized in _FEMALE_GENDERS:
+                counts["female"] += 1
+            else:
+                counts["other"] += 1
+        return counts
 
     async def list_metabolic_score_status(
         self,
@@ -479,7 +538,7 @@ class CampReportsRepository:
                 func.row_number()
                 .over(
                     partition_by=enrolled.c.user_id,
-                    order_by=IndividualHealthReport.report_id.desc(),
+                    order_by=_latest_report_order(),
                 )
                 .label("rn"),
             )
@@ -572,7 +631,7 @@ class CampReportsRepository:
                         last_name,
                         gender,
                         None,
-                        "Bio AI health report row missing or reports JSON is null — metabolic score not generated/synced yet",
+                        "Bio AI not generated — report row missing or reports JSON is null (empty shell excluded from Overall Risk Score)",
                     )
                 )
                 continue
@@ -585,7 +644,7 @@ class CampReportsRepository:
                         last_name,
                         gender,
                         None,
-                        "Bio AI reports JSON is empty — metabolic score not available",
+                        "Bio AI not generated — reports JSON is empty (excluded from Overall Risk Score)",
                     )
                 )
                 continue
@@ -598,7 +657,7 @@ class CampReportsRepository:
                         last_name,
                         gender,
                         None,
-                        "Bio AI report exists but metabolic_score field is missing",
+                        "Bio AI generated but metabolic_score field is missing from reports JSON",
                     )
                 )
             else:
@@ -622,7 +681,7 @@ class CampReportsRepository:
                 func.row_number()
                 .over(
                     partition_by=enrolled.c.user_id,
-                    order_by=IndividualHealthReport.report_id.desc(),
+                    order_by=_latest_report_order(),
                 )
                 .label("rn"),
             )
@@ -675,7 +734,7 @@ class CampReportsRepository:
                 func.row_number()
                 .over(
                     partition_by=enrolled.c.user_id,
-                    order_by=IndividualHealthReport.report_id.desc(),
+                    order_by=_latest_report_order(),
                 )
                 .label("rn"),
             )
@@ -1291,7 +1350,7 @@ class CampReportsRepository:
                 func.row_number()
                 .over(
                     partition_by=[latest_camp_sq.c.organization_id, AssessmentInstance.user_id],
-                    order_by=IndividualHealthReport.report_id.desc(),
+                    order_by=_latest_report_order(),
                 )
                 .label("rn"),
             )

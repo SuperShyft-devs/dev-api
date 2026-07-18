@@ -1249,10 +1249,16 @@ class CampReportsService:
         "physical_activity_frequency": {
             "question_key": "physical_activity_frequency",
             "bucket_fn": staticmethod(physical_activity_answer_to_bucket),
+            "sibling_key": "sleeping_hours",
+            "sibling_label": "Sleeping Hours",
+            "section_label": "Physical activity",
         },
         "sleeping_hours": {
             "question_key": "sleeping_hours",
             "bucket_fn": staticmethod(sleeping_hours_answer_to_bucket),
+            "sibling_key": "physical_activity_frequency",
+            "sibling_label": "Physical activity",
+            "section_label": "Sleeping Hours",
         },
     }
 
@@ -1292,11 +1298,33 @@ class CampReportsService:
                 message=f"Unsupported question_key: {question_key}",
             )
         bucket_fn = config["bucket_fn"]
+        sibling_key = config.get("sibling_key")
+        sibling_label = config.get("sibling_label")
+        section_label = config.get("section_label") or question_key
 
         rows = await self._repository.list_enrolled_users_with_questionnaire_answer(
             db,
             camp_no=camp_no,
             question_key=question_key,
+            department=department,
+        )
+
+        sibling_by_user: dict[int, object | None] = {}
+        sibling_gender_by_user: dict[int, str | None] = {}
+        if sibling_key:
+            sibling_rows = await self._repository.list_enrolled_users_with_questionnaire_answer(
+                db,
+                camp_no=camp_no,
+                question_key=sibling_key,
+                department=department,
+            )
+            for user_id, _fn, _ln, gender_raw, answer in sibling_rows:
+                sibling_by_user[user_id] = answer
+                sibling_gender_by_user[user_id] = gender_raw
+
+        any_questionnaire_summary = await self._count_any_questionnaire_responders(
+            db,
+            camp_no=camp_no,
             department=department,
         )
 
@@ -1306,6 +1334,7 @@ class CampReportsService:
         }
         participants: list[dict[str, Any]] = []
         unmapped_answer_counts: dict[str, int] = {}
+        sibling_xor: list[dict[str, Any]] = []
 
         for user_id, first_name, last_name, gender_raw, answer in rows:
             parts = [p for p in (first_name, last_name) if p]
@@ -1314,6 +1343,26 @@ class CampReportsService:
 
             if gender is not None:
                 summary[gender]["enrolled"] += 1
+
+            sibling_answer = sibling_by_user.get(user_id) if sibling_key else None
+            has_this = answer is not None
+            has_sibling = sibling_answer is not None if sibling_key else False
+
+            if sibling_key and has_this != has_sibling:
+                sibling_xor.append({
+                    "user_id": user_id,
+                    "name": name,
+                    "gender": gender,
+                    "has_this_question": has_this,
+                    "has_sibling_question": has_sibling,
+                    "this_question": question_key,
+                    "sibling_question": sibling_key,
+                    "reason": (
+                        f"Answered {sibling_key} but not {question_key}"
+                        if has_sibling and not has_this
+                        else f"Answered {question_key} but not {sibling_key}"
+                    ),
+                })
 
             if answer is None:
                 if gender is not None:
@@ -1369,27 +1418,77 @@ class CampReportsService:
         total_unmapped = sum(s["unmapped"] for s in summary.values())
         total_mapped = total_responded - total_unmapped
         total_not_responded = sum(s["not_responded"] for s in summary.values())
+        any_q_total = int(any_questionnaire_summary.get("total", 0))
+        any_q_male = int(any_questionnaire_summary.get("male", 0))
+        any_q_female = int(any_questionnaire_summary.get("female", 0))
 
-        highlight_parts: list[str] = []
+        sibling_summary: dict[str, int] | None = None
+        if sibling_key:
+            sibling_male = 0
+            sibling_female = 0
+            for user_id, answer in sibling_by_user.items():
+                if answer is None:
+                    continue
+                g = normalize_camp_gender(sibling_gender_by_user.get(user_id))
+                if g == "male":
+                    sibling_male += 1
+                elif g == "female":
+                    sibling_female += 1
+            sibling_summary = {
+                "male": sibling_male,
+                "female": sibling_female,
+                "total": sibling_male + sibling_female,
+            }
+
+        highlights: list[str] = []
         if total_unmapped > 0:
             answers_txt = ", ".join(
                 f"'{k}'×{v}" for k, v in sorted(unmapped_answer_counts.items(), key=lambda x: -x[1])
             )
-            highlight_parts.append(
+            highlights.append(
                 f"{total_unmapped} of {total_responded} responders have unrecognized answer values "
                 f"({answers_txt}). They are included in the chart under bucket 'unmapped' so gender "
-                f"totals match questionnaire responders."
+                f"totals match questionnaire responders for this question."
             )
-        if total_not_responded > 0:
-            highlight_parts.append(
+        if any_q_total > 0 and total_responded != any_q_total:
+            highlights.append(
+                f"{section_label} chart totals (male {summary['male']['responded']}, "
+                f"female {summary['female']['responded']}, total {total_responded}) count ONLY "
+                f"participants who answered '{question_key}'. This is NOT the same as anyone who "
+                f"started/filled any questionnaire question "
+                f"(male {any_q_male}, female {any_q_female}, total {any_q_total}). "
+                f"{total_not_responded} enrolled participants have no answer for this specific question."
+            )
+        elif total_not_responded > 0:
+            highlights.append(
                 f"{total_not_responded} of {total_enrolled} enrolled participants have no answer for "
                 f"'{question_key}'. Chart totals are based on responders only "
                 f"(male {summary['male']['responded']}, female {summary['female']['responded']}), "
                 f"not total enrolled (male {summary['male']['enrolled']}, "
                 f"female {summary['female']['enrolled']})."
             )
+        if sibling_summary is not None and sibling_label:
+            this_male = summary["male"]["responded"]
+            this_female = summary["female"]["responded"]
+            if (
+                this_male != sibling_summary["male"]
+                or this_female != sibling_summary["female"]
+            ):
+                xor_names = ", ".join(
+                    f"{p['name']} #{p['user_id']} ({p['reason']})"
+                    for p in sibling_xor[:8]
+                )
+                more = f" (+{len(sibling_xor) - 8} more)" if len(sibling_xor) > 8 else ""
+                highlights.append(
+                    f"MISMATCH vs {sibling_label}: {section_label} "
+                    f"male={this_male}/female={this_female} but {sibling_label} "
+                    f"male={sibling_summary['male']}/female={sibling_summary['female']}. "
+                    f"Solid reason: {len(sibling_xor)} participant(s) answered one of these "
+                    f"lifestyle questions but not the other"
+                    + (f" — {xor_names}{more}." if xor_names else ".")
+                )
 
-        has_mismatch = total_unmapped > 0 or total_not_responded > 0
+        has_mismatch = bool(highlights)
 
         return {
             "question_key": question_key,
@@ -1398,14 +1497,40 @@ class CampReportsService:
             "total_mapped": total_mapped,
             "total_unmapped": total_unmapped,
             "total_not_responded": total_not_responded,
+            "any_questionnaire_responders": any_questionnaire_summary,
+            "sibling": (
+                {
+                    "question_key": sibling_key,
+                    "label": sibling_label,
+                    "responded": sibling_summary,
+                    "xor_participants": sibling_xor,
+                }
+                if sibling_key and sibling_summary is not None
+                else None
+            ),
             "summary": summary,
             "unmapped_answer_counts": unmapped_answer_counts,
             "mismatch": {
                 "has_mismatch": has_mismatch,
-                "highlight": " ".join(highlight_parts) if highlight_parts else None,
+                "highlight": " ".join(highlights) if highlights else None,
+                "highlights": highlights,
             },
             "participants": participants,
         }
+
+    async def _count_any_questionnaire_responders(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+    ) -> dict[str, int]:
+        """Count enrolled users with at least one questionnaire_responses row for this camp."""
+        return await self._repository.count_any_questionnaire_responders_by_gender(
+            db,
+            camp_no=camp_no,
+            department=department,
+        )
 
     async def validate_overall_risk_score(
         self,
@@ -1439,6 +1564,16 @@ class CampReportsService:
             camp_no=camp_no,
             department=department,
         )
+        any_q = await self._count_any_questionnaire_responders(
+            db,
+            camp_no=camp_no,
+            department=department,
+        )
+        bio_ai_generated = await self._repository.count_bio_ai_reports(
+            db,
+            camp_no=camp_no,
+            department=department,
+        )
 
         with_score: list[dict[str, Any]] = []
         without_score: list[dict[str, Any]] = []
@@ -1464,27 +1599,57 @@ class CampReportsService:
         total_enrolled = len(rows)
         scored = len(with_score)
         missing = len(without_score)
-        highlight = (
-            f"Overall Risk Score total_employees={scored} counts ONLY participants with an "
-            f"extractable Bio AI metabolic_score — not all enrolled ({total_enrolled}) and not all "
-            f"questionnaire responders. {missing} enrolled participants are excluded. "
-            f"Top reasons: "
-            + "; ".join(f"{k} ({v})" for k, v in sorted(reason_counts.items(), key=lambda x: -x[1])[:3])
+        any_q_total = int(any_q.get("total", 0))
+
+        highlights: list[str] = []
+        highlights.append(
+            f"Overall Risk Score total_employees={scored} includes ONLY participants with a "
+            f"generated Bio AI report (non-empty reports JSON) that contains metabolic_score. "
+            f"Questionnaire completion is NOT required and is NOT used as the inclusion rule. "
+            f"Bio AI generated={bio_ai_generated}; with metabolic_score={scored}; "
+            f"enrolled={total_enrolled}; any-questionnaire starters="
+            f"{any_q_total} (male {any_q.get('male', 0)}, female {any_q.get('female', 0)})."
         )
+        if any_q_total and scored != any_q_total:
+            highlights.append(
+                f"Do not compare this section to questionnaire starters ({any_q_total}). "
+                f"Someone can fill the questionnaire without Bio AI being generated, and "
+                f"Bio AI can exist without every lifestyle question being answered."
+            )
+        if missing > 0:
+            highlights.append(
+                f"{missing} enrolled participants are excluded from total_employees. "
+                f"Top reasons: "
+                + "; ".join(
+                    f"{k} ({v})" for k, v in sorted(reason_counts.items(), key=lambda x: -x[1])[:3]
+                )
+            )
+        if bio_ai_generated != scored:
+            highlights.append(
+                f"Bio AI generated ({bio_ai_generated}) differs from metabolic_score count "
+                f"({scored}) — {abs(bio_ai_generated - scored)} generated report(s) are missing "
+                f"the metabolic_score field."
+            )
+
+        has_mismatch = missing > 0 or scored != total_enrolled or (
+            any_q_total > 0 and scored != any_q_total
+        ) or bio_ai_generated != scored
 
         return {
             "total_enrolled": total_enrolled,
+            "bio_ai_generated": bio_ai_generated,
             "with_metabolic_score": scored,
             "missing_metabolic_score": missing,
+            "any_questionnaire_responders": any_q,
             "reason_counts": reason_counts,
             "mismatch": {
-                "has_mismatch": missing > 0,
-                "highlight": highlight,
+                "has_mismatch": has_mismatch,
+                "highlight": " ".join(highlights),
+                "highlights": highlights,
             },
             "with_score": with_score,
             "without_score": without_score,
         }
-
     _BLOOD_INTELLIGENCE_GROUP_KEYS = (
         "vitamin_profile",
         "diabetes_profile",
