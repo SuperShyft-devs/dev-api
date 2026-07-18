@@ -12,6 +12,7 @@ from modules.employee.access_control import ONBOARDING_ASSISTANT_ASSIGNEE_ROLES
 from modules.employee.models import EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
+from modules.engagements.models import BloodCollectionType, EngagementKind
 from modules.engagements.service import DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
 from modules.audit.service import AuditService
 from modules.notifications.repository import NotificationsRepository
@@ -33,6 +34,10 @@ from modules.platform_settings.schemas import (
 )
 
 _FALLBACK_B2C_ASSESSMENT_PACKAGE_ID = 1
+_FALLBACK_B2C_ENGAGEMENT_TYPE = EngagementKind.bio_ai
+_FALLBACK_B2C_BLOOD_COLLECTION_TYPE: BloodCollectionType | None = None
+_FALLBACK_B2C_CREATE_PROFILE_ON_METSIGHTS = True
+_FALLBACK_B2C_ENROLL_FOR_FITPRINT_FULL = False
 
 
 class PlatformSettingsService:
@@ -53,6 +58,26 @@ class PlatformSettingsService:
         if row is None:
             return _FALLBACK_B2C_ASSESSMENT_PACKAGE_ID, DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
         return row.b2c_default_assessment_package_id, row.b2c_default_diagnostic_package_id
+
+    async def resolve_b2c_onboarding_defaults(self, db: AsyncSession) -> B2cOnboardingDefaultsRead:
+        row = await self._repository.get_by_id(db)
+        if row is None:
+            return B2cOnboardingDefaultsRead(
+                b2c_default_assessment_package_id=_FALLBACK_B2C_ASSESSMENT_PACKAGE_ID,
+                b2c_default_diagnostic_package_id=DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
+                b2c_default_engagement_type=_FALLBACK_B2C_ENGAGEMENT_TYPE,
+                b2c_default_blood_collection_type=_FALLBACK_B2C_BLOOD_COLLECTION_TYPE,
+                b2c_default_create_profile_on_metsights=_FALLBACK_B2C_CREATE_PROFILE_ON_METSIGHTS,
+                b2c_default_enroll_for_fitprint_full=_FALLBACK_B2C_ENROLL_FOR_FITPRINT_FULL,
+            )
+        return B2cOnboardingDefaultsRead(
+            b2c_default_assessment_package_id=row.b2c_default_assessment_package_id,
+            b2c_default_diagnostic_package_id=row.b2c_default_diagnostic_package_id,
+            b2c_default_engagement_type=row.b2c_default_engagement_type,
+            b2c_default_blood_collection_type=row.b2c_default_blood_collection_type,
+            b2c_default_create_profile_on_metsights=bool(row.b2c_default_create_profile_on_metsights),
+            b2c_default_enroll_for_fitprint_full=bool(row.b2c_default_enroll_for_fitprint_full),
+        )
 
     async def ensure_active_b2c_packages(self, db: AsyncSession, assessment_package_id: int, diagnostic_package_id: int) -> None:
         ap = (
@@ -93,11 +118,7 @@ class PlatformSettingsService:
             )
 
     async def get_b2c_onboarding_defaults(self, db: AsyncSession) -> B2cOnboardingDefaultsRead:
-        a_id, d_id = await self.resolve_b2c_default_package_ids(db)
-        return B2cOnboardingDefaultsRead(
-            b2c_default_assessment_package_id=a_id,
-            b2c_default_diagnostic_package_id=d_id,
-        )
+        return await self.resolve_b2c_onboarding_defaults(db)
 
     async def update_b2c_onboarding_defaults(
         self,
@@ -114,10 +135,20 @@ class PlatformSettingsService:
             payload.b2c_default_assessment_package_id,
             payload.b2c_default_diagnostic_package_id,
         )
+        if payload.b2c_default_enroll_for_fitprint_full and not payload.b2c_default_create_profile_on_metsights:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_B2C_ONBOARDING_DEFAULTS",
+                message="FitPrint Full enrollment requires Metsights profile creation",
+            )
         await self._repository.upsert(
             db,
             assessment_package_id=payload.b2c_default_assessment_package_id,
             diagnostic_package_id=payload.b2c_default_diagnostic_package_id,
+            engagement_type=payload.b2c_default_engagement_type,
+            blood_collection_type=payload.b2c_default_blood_collection_type,
+            create_profile_on_metsights=payload.b2c_default_create_profile_on_metsights,
+            enroll_for_fitprint_full=payload.b2c_default_enroll_for_fitprint_full,
             updated_by_user_id=employee.user_id,
         )
 

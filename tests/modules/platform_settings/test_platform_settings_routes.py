@@ -19,6 +19,19 @@ def _auth_header(user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def _b2c_payload(**overrides) -> dict:
+    payload = {
+        "b2c_default_assessment_package_id": 1,
+        "b2c_default_diagnostic_package_id": 1,
+        "b2c_default_engagement_type": "bio_ai",
+        "b2c_default_blood_collection_type": None,
+        "b2c_default_create_profile_on_metsights": True,
+        "b2c_default_enroll_for_fitprint_full": False,
+    }
+    payload.update(overrides)
+    return payload
+
+
 @pytest.mark.asyncio
 async def test_get_b2c_defaults_requires_auth(async_client):
     response = await async_client.get("/platform-settings/b2c-onboarding")
@@ -29,7 +42,7 @@ async def test_get_b2c_defaults_requires_auth(async_client):
 async def test_patch_b2c_defaults_requires_auth(async_client):
     response = await async_client.patch(
         "/platform-settings/b2c-onboarding",
-        json={"b2c_default_assessment_package_id": 1, "b2c_default_diagnostic_package_id": 1},
+        json=_b2c_payload(),
     )
     assert response.status_code == 401
 
@@ -49,6 +62,10 @@ async def test_get_b2c_defaults_fallback_when_no_row(async_client, test_db_sessi
     data = response.json()["data"]
     assert data["b2c_default_assessment_package_id"] == 1
     assert data["b2c_default_diagnostic_package_id"] == 1
+    assert data["b2c_default_engagement_type"] == "bio_ai"
+    assert data["b2c_default_blood_collection_type"] is None
+    assert data["b2c_default_create_profile_on_metsights"] is True
+    assert data["b2c_default_enroll_for_fitprint_full"] is False
 
 
 @pytest.mark.asyncio
@@ -80,12 +97,23 @@ async def test_patch_b2c_defaults_persists_and_get_returns(async_client, test_db
     response = await async_client.patch(
         "/platform-settings/b2c-onboarding",
         headers=_auth_header(uid),
-        json={"b2c_default_assessment_package_id": 2, "b2c_default_diagnostic_package_id": 2},
+        json=_b2c_payload(
+            b2c_default_assessment_package_id=2,
+            b2c_default_diagnostic_package_id=2,
+            b2c_default_engagement_type="blood_test",
+            b2c_default_blood_collection_type="home_collection",
+            b2c_default_create_profile_on_metsights=True,
+            b2c_default_enroll_for_fitprint_full=True,
+        ),
     )
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["b2c_default_assessment_package_id"] == 2
     assert data["b2c_default_diagnostic_package_id"] == 2
+    assert data["b2c_default_engagement_type"] == "blood_test"
+    assert data["b2c_default_blood_collection_type"] == "home_collection"
+    assert data["b2c_default_create_profile_on_metsights"] is True
+    assert data["b2c_default_enroll_for_fitprint_full"] is True
 
     response2 = await async_client.get("/platform-settings/b2c-onboarding", headers=_auth_header(uid))
     assert response2.status_code == 200
@@ -126,9 +154,44 @@ async def test_patch_b2c_defaults_rejects_inactive_package(async_client, test_db
     response = await async_client.patch(
         "/platform-settings/b2c-onboarding",
         headers=_auth_header(uid),
-        json={"b2c_default_assessment_package_id": 99, "b2c_default_diagnostic_package_id": 1},
+        json=_b2c_payload(b2c_default_assessment_package_id=99),
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_patch_b2c_defaults_rejects_fitprint_without_profile_creation(async_client, test_db_session):
+    uid = 9108
+    test_db_session.add(User(user_id=uid, age=30, phone="91080000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9108, user_id=uid, role="admin", status="active"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'P1', 'One', 'active') ON CONFLICT (package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package "
+            "(diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'R1', 'D1', 'p', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/platform-settings/b2c-onboarding",
+        headers=_auth_header(uid),
+        json=_b2c_payload(
+            b2c_default_create_profile_on_metsights=False,
+            b2c_default_enroll_for_fitprint_full=True,
+        ),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "INVALID_B2C_ONBOARDING_DEFAULTS"
 
 
 @pytest.mark.asyncio

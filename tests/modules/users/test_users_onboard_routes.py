@@ -383,11 +383,18 @@ async def test_public_onboard_uses_platform_settings_package_ids(async_client, t
     )
     await test_db_session.execute(
         text(
-            "INSERT INTO platform_settings (settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
-            "VALUES (1, 2, 2) "
+            "INSERT INTO platform_settings "
+            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
+            "b2c_default_engagement_type, b2c_default_blood_collection_type, "
+            "b2c_default_create_profile_on_metsights, b2c_default_enroll_for_fitprint_full) "
+            "VALUES (1, 2, 2, 'blood_test', 'home_collection', false, false) "
             "ON CONFLICT (settings_id) DO UPDATE SET "
             "b2c_default_assessment_package_id = EXCLUDED.b2c_default_assessment_package_id, "
-            "b2c_default_diagnostic_package_id = EXCLUDED.b2c_default_diagnostic_package_id"
+            "b2c_default_diagnostic_package_id = EXCLUDED.b2c_default_diagnostic_package_id, "
+            "b2c_default_engagement_type = EXCLUDED.b2c_default_engagement_type, "
+            "b2c_default_blood_collection_type = EXCLUDED.b2c_default_blood_collection_type, "
+            "b2c_default_create_profile_on_metsights = EXCLUDED.b2c_default_create_profile_on_metsights, "
+            "b2c_default_enroll_for_fitprint_full = EXCLUDED.b2c_default_enroll_for_fitprint_full"
         )
     )
     await test_db_session.commit()
@@ -412,7 +419,9 @@ async def test_public_onboard_uses_platform_settings_package_ids(async_client, t
     engagement_row = (
         await test_db_session.execute(
             text(
-                "SELECT assessment_package_id, diagnostic_package_id FROM engagements WHERE engagement_id = :eid"
+                "SELECT assessment_package_id, diagnostic_package_id, engagement_type, blood_collection_type, "
+                "create_profile_on_metsights, enroll_for_fitprint_full "
+                "FROM engagements WHERE engagement_id = :eid"
             ),
             {"eid": engagement_id},
         )
@@ -420,6 +429,10 @@ async def test_public_onboard_uses_platform_settings_package_ids(async_client, t
 
     assert engagement_row.assessment_package_id == 2
     assert engagement_row.diagnostic_package_id == 2
+    assert getattr(engagement_row.engagement_type, "value", engagement_row.engagement_type) == "blood_test"
+    assert getattr(engagement_row.blood_collection_type, "value", engagement_row.blood_collection_type) == "home_collection"
+    assert engagement_row.create_profile_on_metsights is False
+    assert engagement_row.enroll_for_fitprint_full is False
 
     instance_row = (
         await test_db_session.execute(

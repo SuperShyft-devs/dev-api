@@ -2,9 +2,29 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, Column, DateTime, Enum as SAEnum, ForeignKey, Integer, String, func
 
 from db.base import Base
+from modules.engagements.models import BloodCollectionType, EngagementKind
+
+
+_engagement_kind = SAEnum(
+    EngagementKind,
+    name="engagement_kind",
+    native_enum=True,
+    values_callable=lambda obj: [e.value for e in obj],
+    validate_strings=True,
+    create_type=False,
+)
+
+_blood_collection_type = SAEnum(
+    BloodCollectionType,
+    name="blood_collection_type_enum",
+    native_enum=True,
+    values_callable=lambda obj: [e.value for e in obj],
+    validate_strings=True,
+    create_type=False,
+)
 
 
 class PlatformSettings(Base):
@@ -23,6 +43,15 @@ class PlatformSettings(Base):
         ForeignKey("diagnostic_package.diagnostic_package_id"),
         nullable=False,
     )
+    b2c_default_engagement_type = Column(
+        _engagement_kind,
+        nullable=False,
+        default=EngagementKind.bio_ai,
+        server_default=EngagementKind.bio_ai.value,
+    )
+    b2c_default_blood_collection_type = Column(_blood_collection_type, nullable=True)
+    b2c_default_create_profile_on_metsights = Column(Boolean, nullable=False, default=True, server_default="true")
+    b2c_default_enroll_for_fitprint_full = Column(Boolean, nullable=False, default=False, server_default="false")
     default_onboarding_notification = Column(String(500), nullable=True)
     default_pretest_guidelines_notification = Column(String(500), nullable=True)
     default_questionnaire_reminder_1 = Column(String(500), nullable=True)

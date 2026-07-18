@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from modules.engagements.models import BloodCollectionType, EngagementKind
 from modules.platform_settings.models import PlatformSettings
 
 _PLATFORM_SETTINGS_PK = 1
@@ -54,6 +55,10 @@ class PlatformSettingsRepository:
         *,
         assessment_package_id: int,
         diagnostic_package_id: int,
+        engagement_type: EngagementKind,
+        blood_collection_type: BloodCollectionType | None,
+        create_profile_on_metsights: bool,
+        enroll_for_fitprint_full: bool,
         updated_by_user_id: int | None,
     ) -> PlatformSettings:
         existing = await self.get_by_id(db)
@@ -62,6 +67,10 @@ class PlatformSettingsRepository:
                 settings_id=_PLATFORM_SETTINGS_PK,
                 b2c_default_assessment_package_id=assessment_package_id,
                 b2c_default_diagnostic_package_id=diagnostic_package_id,
+                b2c_default_engagement_type=engagement_type,
+                b2c_default_blood_collection_type=blood_collection_type,
+                b2c_default_create_profile_on_metsights=create_profile_on_metsights,
+                b2c_default_enroll_for_fitprint_full=enroll_for_fitprint_full,
                 updated_by_user_id=updated_by_user_id,
             )
             db.add(row)
@@ -70,6 +79,10 @@ class PlatformSettingsRepository:
 
         existing.b2c_default_assessment_package_id = assessment_package_id
         existing.b2c_default_diagnostic_package_id = diagnostic_package_id
+        existing.b2c_default_engagement_type = engagement_type
+        existing.b2c_default_blood_collection_type = blood_collection_type
+        existing.b2c_default_create_profile_on_metsights = create_profile_on_metsights
+        existing.b2c_default_enroll_for_fitprint_full = enroll_for_fitprint_full
         existing.updated_by_user_id = updated_by_user_id
         await db.flush()
         return existing

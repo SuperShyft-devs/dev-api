@@ -4,15 +4,25 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from modules.engagements.models import BloodCollectionType, EngagementKind
+
 
 class B2cOnboardingDefaultsRead(BaseModel):
     b2c_default_assessment_package_id: int
     b2c_default_diagnostic_package_id: int
+    b2c_default_engagement_type: EngagementKind
+    b2c_default_blood_collection_type: BloodCollectionType | None = None
+    b2c_default_create_profile_on_metsights: bool
+    b2c_default_enroll_for_fitprint_full: bool
 
 
 class B2cOnboardingDefaultsUpdate(BaseModel):
     b2c_default_assessment_package_id: int = Field(..., ge=1)
     b2c_default_diagnostic_package_id: int = Field(..., ge=1)
+    b2c_default_engagement_type: EngagementKind
+    b2c_default_blood_collection_type: BloodCollectionType | None = None
+    b2c_default_create_profile_on_metsights: bool
+    b2c_default_enroll_for_fitprint_full: bool
 
 
 class EngagementNotificationDefaultsRead(BaseModel):
