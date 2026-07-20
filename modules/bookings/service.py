@@ -1034,8 +1034,9 @@ async def get_user_draft_engagements(
     user_id: int,
 ) -> list[dict[str, Any]]:
     """Return draft engagements where user is participant or booker."""
-    query = (
-        select(Engagement)
+    # Distinct IDs only: full-row DISTINCT fails on PG json (consultations).
+    draft_ids = (
+        select(Engagement.engagement_id)
         .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
         .where(
             or_(
@@ -1046,15 +1047,12 @@ async def get_user_draft_engagements(
         .where(Engagement.status == "draft")
         .distinct()
     )
+    query = select(Engagement).where(Engagement.engagement_id.in_(draft_ids))
     result = await db.execute(query)
     engagements = result.scalars().all()
 
     output: list[dict[str, Any]] = []
-    seen: set[int] = set()
     for engagement in engagements:
-        if engagement.engagement_id in seen:
-            continue
-        seen.add(engagement.engagement_id)
         address = (engagement.address or "").strip() or None
         resume_step = "booking_date" if address else "address"
         output.append({
