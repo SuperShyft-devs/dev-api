@@ -43,6 +43,8 @@ class ServerHealthRepository:
             select_cols += ", cpu_pct"
         if "mem_pct" in cols:
             select_cols += ", mem_pct"
+        if "storage_pct" in cols:
+            select_cols += ", storage_pct"
         return select_cols
 
     def _run_query_sync(
