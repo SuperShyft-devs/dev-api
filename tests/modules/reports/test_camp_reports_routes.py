@@ -288,8 +288,33 @@ async def test_delete_camp_reports(async_client, test_db_session):
     )
     assert init_dept.status_code == 201
 
-    delete_overall = await async_client.delete(f"/reports/camps/{camp_no}", headers=headers)
-    assert delete_overall.status_code == 200
+    # DELETE /reports/camps/{camp_no} removes overall + all department reports
+    delete_all = await async_client.delete(f"/reports/camps/{camp_no}", headers=headers)
+    assert delete_all.status_code == 200
+
+    remaining = (
+        await test_db_session.execute(select(CampReport).where(CampReport.camp_no == camp_no))
+    ).scalars().all()
+    assert remaining == []
+
+    # Idempotent second delete should 404 once nothing remains
+    delete_again = await async_client.delete(f"/reports/camps/{camp_no}", headers=headers)
+    assert delete_again.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_department_camp_report(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7407, employee_id=57)
+    camp_no, _ = await _seed_camp(test_db_session, organization_id=9107, engagement_id=9107)
+    headers = _auth_header(7407)
+
+    init_overall = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init_overall.status_code == 201
+    init_dept = await async_client.post(
+        f"/reports/camps/{camp_no}/department/sales/init",
+        headers=headers,
+    )
+    assert init_dept.status_code == 201
 
     delete_dept = await async_client.delete(
         f"/reports/camps/{camp_no}/department/sales",
@@ -300,7 +325,8 @@ async def test_delete_camp_reports(async_client, test_db_session):
     remaining = (
         await test_db_session.execute(select(CampReport).where(CampReport.camp_no == camp_no))
     ).scalars().all()
-    assert remaining == []
+    assert len(remaining) == 1
+    assert remaining[0].department is None
 
 
 @pytest.mark.asyncio

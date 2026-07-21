@@ -276,7 +276,8 @@ class CampReportsService:
     ) -> None:
         ensure_internal_employee(employee)
 
-        deleted = await self._repository.delete_overall(db, camp_no=camp_no)
+        # Delete overall + every department report for this camp_no.
+        deleted = await self._repository.delete_all_for_camp_no(db, camp_no=camp_no)
         if deleted == 0:
             raise AppError(
                 status_code=404,
