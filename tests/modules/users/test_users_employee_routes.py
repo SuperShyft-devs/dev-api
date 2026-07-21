@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from core.config import settings
 from core.security import create_jwt_token
@@ -13,6 +13,7 @@ from modules.assessments.models import AssessmentCategoryProgress, AssessmentIns
 from modules.auth.models import AuthOtpSession, AuthToken
 from modules.employee.models import Employee
 from modules.engagements.models import Engagement, EngagementParticipant, OnboardingAssistantAssignment
+from modules.notifications.models import Notification
 from modules.organizations.models import Organization
 from modules.payments.models import Booking, Order, Payment
 from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireResponse
@@ -25,6 +26,20 @@ from modules.users.models import User, UserPreference
 def _auth_header(user_id: int) -> dict[str, str]:
     token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
     return {"Authorization": f"Bearer {token}"}
+
+
+async def _seed_notification_service(test_db_session, service_key: str = "booking-alert-whatsapp") -> None:
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, "
+            "require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES (:sk, :dn, 'whatsapp', 'booking-alert', true, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
+        ),
+        {"sk": service_key, "dn": service_key},
+    )
+    await test_db_session.commit()
 
 
 @pytest.mark.asyncio
@@ -413,6 +428,79 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
     assert await test_db_session.get(Order, 9971) is None
     assert await test_db_session.get(Payment, 9972) is None
     assert await test_db_session.get(SupportTicket, 9973) is None
+
+
+@pytest.mark.asyncio
+async def test_employee_delete_user_clears_notification_assessment_refs(async_client, test_db_session):
+    """User delete must detach notifications referencing assessment instances (FK)."""
+    actor_user_id = 99013
+    target_user_id = 99054
+    engagement_id = 9804
+    assessment_instance_id = 9954
+    notification_id = 9974
+
+    await _seed_notification_service(test_db_session)
+
+    test_db_session.add(User(age=30, user_id=actor_user_id, phone="9901300000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=19013, user_id=actor_user_id, role="admin", status="active"))
+    test_db_session.add(User(age=31, user_id=target_user_id, phone="9905400000", status="active"))
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id,
+            engagement_code="ENG9804",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=9904,
+            engagement_id=engagement_id,
+            user_id=target_user_id,
+            engagement_date=date(2026, 1, 1),
+            slot_start_time=time(10, 0),
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=assessment_instance_id,
+            user_id=target_user_id,
+            package_id=1,
+            engagement_id=engagement_id,
+            status="assigned",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        Notification(
+            notification_id=notification_id,
+            service_key="booking-alert-whatsapp",
+            status="sent",
+            channel="whatsapp",
+            engagement_id=engagement_id,
+            assessment_instance_id=assessment_instance_id,
+            triggered_by_user_id=actor_user_id,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.delete(
+        f"/users/{target_user_id}?delete_orphan_engagements=true",
+        headers=_auth_header(actor_user_id),
+    )
+    assert response.status_code == 200, response.text
+    assert await test_db_session.get(User, target_user_id) is None
+    assert await test_db_session.get(AssessmentInstance, assessment_instance_id) is None
+    assert await test_db_session.get(Engagement, engagement_id) is None
+
+    notif = await test_db_session.get(Notification, notification_id)
+    assert notif is not None
+    assert notif.assessment_instance_id is None
+    assert notif.engagement_id is None
 
 
 @pytest.mark.asyncio

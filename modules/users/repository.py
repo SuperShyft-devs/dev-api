@@ -23,6 +23,7 @@ from modules.auth.models import AuthOtpSession, AuthToken
 from modules.audit.models import DataAuditLog
 from modules.employee.models import Employee
 from modules.engagements.models import OnboardingAssistantAssignment
+from modules.notifications.models import Notification
 from modules.questionnaire.models import QuestionnaireResponse
 from modules.payments.models import Booking, Order, OrderBooking, Payment
 from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
@@ -516,6 +517,12 @@ class UsersRepository:
         )
 
         if assessment_instance_ids:
+            # Match engagements purge: detach notification FKs before deleting instances.
+            await db.execute(
+                update(Notification)
+                .where(Notification.assessment_instance_id.in_(assessment_instance_ids))
+                .values(assessment_instance_id=None)
+            )
             await db.execute(
                 delete(QuestionnaireResponse).where(
                     QuestionnaireResponse.assessment_instance_id.in_(assessment_instance_ids)
@@ -614,6 +621,11 @@ class UsersRepository:
                 )
                 if orphan_assessment_ids:
                     await db.execute(
+                        update(Notification)
+                        .where(Notification.assessment_instance_id.in_(orphan_assessment_ids))
+                        .values(assessment_instance_id=None)
+                    )
+                    await db.execute(
                         delete(QuestionnaireResponse).where(
                             QuestionnaireResponse.assessment_instance_id.in_(orphan_assessment_ids)
                         )
@@ -633,6 +645,11 @@ class UsersRepository:
                     )
 
                 await db.execute(
+                    update(Notification)
+                    .where(Notification.engagement_id.in_(orphan_engagement_ids))
+                    .values(engagement_id=None)
+                )
+                await db.execute(
                     delete(OnboardingAssistantAssignment).where(
                         OnboardingAssistantAssignment.engagement_id.in_(orphan_engagement_ids)
                     )
@@ -647,6 +664,18 @@ class UsersRepository:
                         remaining = await camp_reports_repo.count_engagements_for_camp_no(db, camp_no=int(camp_no))
                         if remaining == 0:
                             await camp_reports_repo.delete_all_for_camp_no(db, camp_no=int(camp_no))
+
+        # Notifications may reference the user as dispatcher; clear before user row delete.
+        await db.execute(
+            update(Notification)
+            .where(Notification.triggered_by_user_id.in_(user_ids))
+            .values(triggered_by_user_id=None)
+        )
+        await db.execute(
+            update(Organization)
+            .where(Organization.contact_person_user_id.in_(user_ids))
+            .values(contact_person_user_id=None)
+        )
 
         # Employee rows reference users; organizations and onboarding assignments reference employee.
         employee_ids_subq = select(Employee.employee_id).where(Employee.user_id.in_(user_ids))
