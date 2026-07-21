@@ -91,6 +91,7 @@ class Engagement(Base):
     questionnaire_reminder_2 = Column(String, nullable=True)
     blood_report_notification = Column(String, nullable=True)
     bioai_report_notification = Column(String, nullable=True)
+    notify_users_for_consultation = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     healthians_zone_id = Column(String, nullable=True)
     external_camp_id = Column(Integer, nullable=True)

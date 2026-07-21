@@ -46,6 +46,7 @@ class EngagementCreateRequest(BaseModel):
     questionnaire_reminder_2: str | None = Field(default=None, max_length=500)
     blood_report_notification: str | None = Field(default=None, max_length=500)
     bioai_report_notification: str | None = Field(default=None, max_length=500)
+    notify_users_for_consultation: str | None = Field(default=None, max_length=500)
 
 
 class EngagementUpdateRequest(BaseModel):
@@ -83,6 +84,7 @@ class EngagementUpdateRequest(BaseModel):
     questionnaire_reminder_2: str | None = Field(default=None, max_length=500)
     blood_report_notification: str | None = Field(default=None, max_length=500)
     bioai_report_notification: str | None = Field(default=None, max_length=500)
+    notify_users_for_consultation: str | None = Field(default=None, max_length=500)
 
 
 class EngagementStatusUpdateRequest(BaseModel):
@@ -142,6 +144,7 @@ class EngagementListItem(BaseModel):
     questionnaire_reminder_2: str | None = None
     blood_report_notification: str | None = None
     bioai_report_notification: str | None = None
+    notify_users_for_consultation: str | None = None
     readiness: ChecklistReadiness
 
 

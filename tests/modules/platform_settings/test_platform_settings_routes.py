@@ -224,6 +224,53 @@ async def test_patch_engagement_notification_defaults_rejects_overlap(async_clie
 
 
 @pytest.mark.asyncio
+async def test_engagement_notification_defaults_round_trip_consultation(async_client, test_db_session):
+    uid = 9110
+    test_db_session.add(User(user_id=uid, age=30, phone="91100000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9110, user_id=uid, role="admin", status="active"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'P1', 'One', 'active') ON CONFLICT (package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package "
+            "(diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'R1', 'D1', 'p', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, "
+            "require_bio_ai_report_url, require_participant_detail) "
+            "VALUES ('consult-default', 'Consult', 'whatsapp', 'consult-default', true, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
+        )
+    )
+    await test_db_session.commit()
+
+    patch_response = await async_client.patch(
+        "/platform-settings/engagement-notification-defaults",
+        headers=_auth_header(uid),
+        json={"default_notify_users_for_consultation": "consult-default"},
+    )
+    assert patch_response.status_code == 200
+    assert patch_response.json()["data"]["default_notify_users_for_consultation"] == "consult-default"
+
+    get_response = await async_client.get(
+        "/platform-settings/engagement-notification-defaults",
+        headers=_auth_header(uid),
+    )
+    assert get_response.status_code == 200
+    assert get_response.json()["data"]["default_notify_users_for_consultation"] == "consult-default"
+
+
+@pytest.mark.asyncio
 async def test_get_default_onboarding_assistants_requires_auth(async_client):
     response = await async_client.get("/platform-settings/default-onboarding-assistants")
     assert response.status_code == 401

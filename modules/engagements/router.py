@@ -90,6 +90,7 @@ def _engagement_to_dict(
         "questionnaire_reminder_2": engagement.questionnaire_reminder_2,
         "blood_report_notification": engagement.blood_report_notification,
         "bioai_report_notification": engagement.bioai_report_notification,
+        "notify_users_for_consultation": engagement.notify_users_for_consultation,
     }
     if readiness is not None:
         data["readiness"] = readiness.model_dump(mode="json")

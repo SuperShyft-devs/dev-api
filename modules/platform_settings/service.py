@@ -214,6 +214,7 @@ class PlatformSettingsService:
             default_questionnaire_reminder_2=row.default_questionnaire_reminder_2,
             default_blood_report_notification=row.default_blood_report_notification,
             default_bioai_report_notification=row.default_bioai_report_notification,
+            default_notify_users_for_consultation=row.default_notify_users_for_consultation,
         )
 
     async def update_engagement_notification_defaults(
@@ -236,6 +237,9 @@ class PlatformSettingsService:
         qr2 = await self._validate_comma_separated_service_keys(db, payload.default_questionnaire_reminder_2)
         blood = await self._validate_comma_separated_service_keys(db, payload.default_blood_report_notification)
         bioai = await self._validate_comma_separated_service_keys(db, payload.default_bioai_report_notification)
+        consultation = await self._validate_comma_separated_service_keys(
+            db, payload.default_notify_users_for_consultation
+        )
         self._validate_questionnaire_reminders_disjoint(qr1, qr2)
 
         a_id, d_id = await self.resolve_b2c_default_package_ids(db)
@@ -247,6 +251,7 @@ class PlatformSettingsService:
             default_questionnaire_reminder_2=qr2,
             default_blood_report_notification=blood,
             default_bioai_report_notification=bioai,
+            default_notify_users_for_consultation=consultation,
             updated_by_user_id=employee.user_id,
             assessment_package_id=a_id,
             diagnostic_package_id=d_id,

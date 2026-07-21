@@ -7,12 +7,19 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import String, cast, func, or_, select, update
+from sqlalchemy import String, and_, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
-from modules.engagements.models import Engagement, EngagementParticipant, OnboardingAssistantAssignment
+from modules.engagements.models import (
+    BloodCollectionType,
+    Engagement,
+    EngagementKind,
+    EngagementParticipant,
+    OnboardingAssistantAssignment,
+)
 from modules.organizations.models import Organization
+from modules.reports.models import IndividualHealthReport
 
 
 class EngagementsRepository:
@@ -1028,5 +1035,64 @@ class EngagementsRepository:
         result = await db.execute(query)
         return [
             (int(row.user_id), int(row.engagement_id), row.engagement_date, row.questionnaire_reminder_1, row.questionnaire_reminder_2)
+            for row in result.all()
+        ]
+
+    async def list_participants_for_consultation_notification(
+        self,
+        db: AsyncSession,
+    ) -> list[tuple[int, int, str | None]]:
+        """Return (user_id, engagement_id, notify_users_for_consultation) for eligible participants.
+
+        Eligible when engagement is scheduled/running, home collection, BioAI or blood test
+        with consultation, notification keys configured, and the matching report is ready
+        on any individual_health_report row for that participant.
+        """
+        bio_ai_ready = and_(
+            Engagement.engagement_type == EngagementKind.bio_ai_with_consultation,
+            IndividualHealthReport.reports.isnot(None),
+            IndividualHealthReport.report_url.isnot(None),
+        )
+        blood_ready = and_(
+            Engagement.engagement_type == EngagementKind.blood_test_with_consultation,
+            IndividualHealthReport.blood_report_raw.isnot(None),
+            IndividualHealthReport.diagnostic_report_url.isnot(None),
+        )
+        query = (
+            select(
+                EngagementParticipant.user_id,
+                EngagementParticipant.engagement_id,
+                Engagement.notify_users_for_consultation,
+            )
+            .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
+            .join(
+                IndividualHealthReport,
+                and_(
+                    IndividualHealthReport.user_id == EngagementParticipant.user_id,
+                    IndividualHealthReport.engagement_id == EngagementParticipant.engagement_id,
+                ),
+            )
+            .where(self._scheduled_or_running_engagement_status_filter())
+            .where(Engagement.blood_collection_type == BloodCollectionType.home_collection)
+            .where(
+                Engagement.engagement_type.in_(
+                    (
+                        EngagementKind.bio_ai_with_consultation,
+                        EngagementKind.blood_test_with_consultation,
+                    )
+                )
+            )
+            .where(Engagement.notify_users_for_consultation.isnot(None))
+            .where(func.trim(Engagement.notify_users_for_consultation) != "")
+            .where(or_(bio_ai_ready, blood_ready))
+            .distinct()
+            .order_by(
+                EngagementParticipant.engagement_id.asc(),
+                EngagementParticipant.user_id.asc(),
+            )
+        )
+        result = await db.execute(query)
+        return [
+            (int(row.user_id), int(row.engagement_id), row.notify_users_for_consultation)
             for row in result.all()
         ]

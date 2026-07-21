@@ -97,6 +97,7 @@ class PlatformSettingsRepository:
         default_questionnaire_reminder_2: str | None,
         default_blood_report_notification: str | None,
         default_bioai_report_notification: str | None,
+        default_notify_users_for_consultation: str | None,
         updated_by_user_id: int | None,
         assessment_package_id: int,
         diagnostic_package_id: int,
@@ -113,6 +114,7 @@ class PlatformSettingsRepository:
                 default_questionnaire_reminder_2=default_questionnaire_reminder_2,
                 default_blood_report_notification=default_blood_report_notification,
                 default_bioai_report_notification=default_bioai_report_notification,
+                default_notify_users_for_consultation=default_notify_users_for_consultation,
                 updated_by_user_id=updated_by_user_id,
             )
             db.add(row)
@@ -125,6 +127,7 @@ class PlatformSettingsRepository:
         existing.default_questionnaire_reminder_2 = default_questionnaire_reminder_2
         existing.default_blood_report_notification = default_blood_report_notification
         existing.default_bioai_report_notification = default_bioai_report_notification
+        existing.default_notify_users_for_consultation = default_notify_users_for_consultation
         existing.updated_by_user_id = updated_by_user_id
         await db.flush()
         return existing

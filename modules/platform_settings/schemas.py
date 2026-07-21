@@ -32,6 +32,7 @@ class EngagementNotificationDefaultsRead(BaseModel):
     default_questionnaire_reminder_2: str | None = None
     default_blood_report_notification: str | None = None
     default_bioai_report_notification: str | None = None
+    default_notify_users_for_consultation: str | None = None
 
 
 class EngagementNotificationDefaultsUpdate(BaseModel):
@@ -41,6 +42,7 @@ class EngagementNotificationDefaultsUpdate(BaseModel):
     default_questionnaire_reminder_2: str | None = Field(default=None, max_length=500)
     default_blood_report_notification: str | None = Field(default=None, max_length=500)
     default_bioai_report_notification: str | None = Field(default=None, max_length=500)
+    default_notify_users_for_consultation: str | None = Field(default=None, max_length=500)
 
 
 class MetsightsProfilesImportPageRequest(BaseModel):
