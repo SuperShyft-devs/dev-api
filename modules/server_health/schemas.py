@@ -30,6 +30,7 @@ class HealthRunRead(BaseModel):
     overall_status: str = "UNKNOWN"
     cpu_pct: float | None = None
     mem_pct: float | None = None
+    storage_pct: float | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -54,7 +55,7 @@ class HealthRunRead(BaseModel):
         else:
             row["overall_status"] = str(row["overall_status"]).strip().upper()
 
-        for key in ("cpu_pct", "mem_pct"):
+        for key in ("cpu_pct", "mem_pct", "storage_pct"):
             if key in row and row[key] is None:
                 continue
             if key in row and row[key] == "":
@@ -69,7 +70,7 @@ class HealthRunRead(BaseModel):
             return 0
         return int(value)
 
-    @field_validator("cpu_pct", "mem_pct", mode="before")
+    @field_validator("cpu_pct", "mem_pct", "storage_pct", mode="before")
     @classmethod
     def _float_or_none(cls, value: Any) -> float | None:
         if value is None or value == "":
