@@ -26,6 +26,11 @@ async def _seed_admin(test_db_session, *, user_id: int = 7401, employee_id: int 
 
 
 async def _seed_orgs(test_db_session):
+    # contact_person_user_id is an FK to users
+    for user_id in (7410, 7411):
+        test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
+    await test_db_session.flush()
+
     test_db_session.add(
         Organization(
             organization_id=8501,
@@ -86,13 +91,11 @@ async def test_list_my_organizations_admin_returns_all_with_details(async_client
 @pytest.mark.asyncio
 async def test_list_my_organizations_org_manager_own_only(async_client, test_db_session):
     manager_user_id = 7410
-    test_db_session.add(User(user_id=manager_user_id, age=30, phone="7410000000000", status="active"))
-    await test_db_session.flush()
+    await _seed_orgs(test_db_session)
     test_db_session.add(
         Employee(employee_id=62, user_id=manager_user_id, role="organization_manager", status="active")
     )
     await test_db_session.commit()
-    await _seed_orgs(test_db_session)
 
     response = await async_client.get("/organizations/we?page=1&limit=20", headers=_auth_header(manager_user_id))
     assert response.status_code == 200
@@ -109,13 +112,13 @@ async def test_list_my_organizations_org_manager_own_only(async_client, test_db_
 @pytest.mark.asyncio
 async def test_list_my_organizations_org_manager_not_contact_empty(async_client, test_db_session):
     manager_user_id = 7412
+    await _seed_orgs(test_db_session)
     test_db_session.add(User(user_id=manager_user_id, age=30, phone="7412000000000", status="active"))
     await test_db_session.flush()
     test_db_session.add(
         Employee(employee_id=63, user_id=manager_user_id, role="organization_manager", status="active")
     )
     await test_db_session.commit()
-    await _seed_orgs(test_db_session)
 
     response = await async_client.get("/organizations/we", headers=_auth_header(manager_user_id))
     assert response.status_code == 200

@@ -337,7 +337,10 @@ class OrganizationsService:
             contact_person_user_id=contact_person_user_id,
             search=search,
         )
-        return [self.organization_to_details_dict(org) for org in organizations], total
+        return [
+            self.organization_to_details_dict(org, industry)
+            for org, industry in organizations
+        ], total
 
     async def list_industries(self, db, *, employee: EmployeeContext) -> list[dict]:
         ensure_internal_employee(employee)
