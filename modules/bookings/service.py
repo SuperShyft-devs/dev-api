@@ -106,7 +106,7 @@ async def check_service_availability(
             results.append({"user_id": user_id, "status": "error", "message": "Diagnostic provider is not Healthians"})
             continue
 
-        geocoded = await _geocode_for_booking(pincode)
+        geocoded = await _geocode_for_booking(f"{city.strip()} {pincode.strip()}")
         latitude = geocoded.get("latitude")
         longitude = geocoded.get("longitude")
         if latitude is None or longitude is None:

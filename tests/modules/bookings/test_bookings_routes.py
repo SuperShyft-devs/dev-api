@@ -358,7 +358,7 @@ async def test_check_service_availability_creates_engagement_before_healthians(
     assert member["engagement_id"] is not None
     assert member["zone_id"] == "440"
     mock_check.assert_awaited_once()
-    mock_geocode.assert_awaited_once_with("400001", limit=1)
+    mock_geocode.assert_awaited_once_with("Mumbai 400001", limit=1)
 
     eng_row = (
         await test_db_session.execute(
