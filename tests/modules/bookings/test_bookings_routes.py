@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 from datetime import date, time, timedelta
 from unittest.mock import AsyncMock, patch
 
@@ -83,17 +84,26 @@ async def test_book_pay_rejects_duplicate_member_user_id(async_client, test_db_s
 # --- Booking flow API tests (drafts, serviceability, slots, lock) ---
 
 
-async def _seed_healthians_diagnostic_package(test_db_session, *, package_id: int = 1) -> None:
+async def _seed_healthians_diagnostic_package(
+    test_db_session,
+    *,
+    package_id: int = 1,
+    complementary_consultation: dict | None = None,
+) -> None:
     await test_db_session.execute(
         text(
             "INSERT INTO diagnostic_package "
-            "(diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price, external_package_id) "
-            "VALUES (:id, 'REF-H', 'Healthians Package', 'healthians', 'active', 500, 101) "
+            "(diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, price, external_package_id, complementary_consultation) "
+            "VALUES (:id, 'REF-H', 'Healthians Package', 'healthians', 'active', 500, 101, CAST(:cc AS json)) "
             "ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
             "diagnostic_provider = EXCLUDED.diagnostic_provider, "
-            "external_package_id = EXCLUDED.external_package_id, status = EXCLUDED.status"
+            "external_package_id = EXCLUDED.external_package_id, status = EXCLUDED.status, "
+            "complementary_consultation = EXCLUDED.complementary_consultation"
         ),
-        {"id": package_id},
+        {
+            "id": package_id,
+            "cc": json.dumps(complementary_consultation) if complementary_consultation is not None else None,
+        },
     )
     await test_db_session.commit()
 
@@ -1071,3 +1081,153 @@ async def test_book_bio_ai_idempotent_when_already_paid(async_client, test_db_se
     assert second.status_code == 200
     assert second.json()["data"]["members"][0]["status"] == "success"
     assert healthians_mock.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_book_bio_ai_applies_complementary_consultation(
+    async_client, test_db_session, monkeypatch,
+):
+    monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
+    monkeypatch.setattr(settings, "HEALTHIANS_CHECKSUM_KEY", "test-checksum")
+    cc = {"doctor": True, "nutritionist": False}
+    await _seed_healthians_diagnostic_package(test_db_session, complementary_consultation=cc)
+    await _seed_notification_service(test_db_session, service_key="booking-alert-whatsapp")
+    u = User(
+        user_id=940024,
+        age=30,
+        phone="9400240000",
+        status="active",
+        first_name="Comp",
+        last_name="Consult",
+        gender="male",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=940124,
+        user_id=940024,
+        booked_by_user_id=940024,
+        locked=True,
+    )
+
+    with patch(
+        "modules.payments.services._create_razorpay_order_sync",
+        side_effect=_mock_razorpay_order,
+    ):
+        pay_resp = await async_client.post(
+            "/book/pay",
+            headers=_auth_header(940024),
+            json={"members": [{"user_id": 940024, "engagement_id": 940124}]},
+        )
+    razorpay_order_id = pay_resp.json()["data"]["razorpay_order_id"]
+    payment_id = "pay_test_940024"
+    signature = _razorpay_signature(order_id=razorpay_order_id, payment_id=payment_id)
+
+    with patch(
+        "modules.bookings.service.healthians_client.get_access_token",
+        new_callable=AsyncMock,
+        return_value="tok",
+    ), patch(
+        "modules.bookings.service.healthians_client.create_booking_v3",
+        new_callable=AsyncMock,
+        return_value={"status": True, "booking_id": "HI940024", "message": "OK"},
+    ):
+        response = await async_client.post(
+            "/book/bio-ai",
+            headers=_auth_header(940024),
+            json={
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": payment_id,
+                "razorpay_signature": signature,
+            },
+        )
+
+    assert response.status_code == 200
+    eng_row = (
+        await test_db_session.execute(
+            text(
+                "SELECT engagement_type, consultations FROM engagements "
+                "WHERE engagement_id = 940124"
+            )
+        )
+    ).one()
+    assert eng_row.engagement_type == "bio_ai_with_consultation"
+    assert eng_row.consultations == cc
+
+
+@pytest.mark.asyncio
+async def test_book_blood_test_applies_complementary_consultation(
+    async_client, test_db_session, monkeypatch,
+):
+    monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
+    monkeypatch.setattr(settings, "HEALTHIANS_CHECKSUM_KEY", "test-checksum")
+    cc = {"doctor": True}
+    await _seed_healthians_diagnostic_package(test_db_session, complementary_consultation=cc)
+    await _seed_notification_service(test_db_session, service_key="booking-alert-whatsapp")
+    u = User(
+        user_id=940025,
+        age=30,
+        phone="9400250000",
+        status="active",
+        first_name="Blood",
+        last_name="Consult",
+        gender="male",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=940125,
+        user_id=940025,
+        booked_by_user_id=940025,
+        locked=True,
+    )
+
+    with patch(
+        "modules.payments.services._create_razorpay_order_sync",
+        side_effect=_mock_razorpay_order,
+    ):
+        pay_resp = await async_client.post(
+            "/book/pay",
+            headers=_auth_header(940025),
+            json={"members": [{"user_id": 940025, "engagement_id": 940125}]},
+        )
+    razorpay_order_id = pay_resp.json()["data"]["razorpay_order_id"]
+    payment_id = "pay_test_940025"
+    signature = _razorpay_signature(order_id=razorpay_order_id, payment_id=payment_id)
+
+    with patch(
+        "modules.bookings.service.healthians_client.get_access_token",
+        new_callable=AsyncMock,
+        return_value="tok",
+    ), patch(
+        "modules.bookings.service.healthians_client.create_booking_v3",
+        new_callable=AsyncMock,
+        return_value={"status": True, "booking_id": "HI940025", "message": "OK"},
+    ):
+        response = await async_client.post(
+            "/book/blood-test",
+            headers=_auth_header(940025),
+            json={
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": payment_id,
+                "razorpay_signature": signature,
+            },
+        )
+
+    assert response.status_code == 200
+    eng_row = (
+        await test_db_session.execute(
+            text(
+                "SELECT engagement_type, consultations FROM engagements "
+                "WHERE engagement_id = 940125"
+            )
+        )
+    ).one()
+    assert eng_row.engagement_type == "blood_test_with_consultation"
+    assert eng_row.consultations == cc

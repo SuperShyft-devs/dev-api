@@ -82,6 +82,27 @@ def _slim_healthians_slot(slot: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+_WITH_CONSULTATION_KIND = {
+    EngagementKind.bio_ai: EngagementKind.bio_ai_with_consultation,
+    EngagementKind.blood_test: EngagementKind.blood_test_with_consultation,
+}
+
+
+def _apply_complementary_consultation(
+    engagement: Engagement,
+    pkg: DiagnosticPackage,
+    base_kind: EngagementKind | None,
+) -> None:
+    """Set engagement.consultations and engagement_type from package complementary_consultation."""
+    cc = pkg.complementary_consultation
+    has_any = isinstance(cc, dict) and any(v is True for v in cc.values())
+    if has_any and base_kind is not None:
+        engagement.consultations = cc
+        engagement.engagement_type = _WITH_CONSULTATION_KIND.get(base_kind, base_kind)
+    elif base_kind is not None:
+        engagement.engagement_type = base_kind
+
+
 async def check_service_availability(
     db: AsyncSession,
     *,
@@ -799,8 +820,7 @@ async def create_healthians_booking_after_payment(
         booking_id = resp.get("booking_id", "")
         participant.booking_id = str(booking_id)
         participant.barcode = str(booking_id)
-        if engagement_type is not None and engagement.engagement_type is None:
-            engagement.engagement_type = engagement_type
+        _apply_complementary_consultation(engagement, pkg, engagement_type)
         engagement.status = "scheduled"
 
         if engagements_service is not None:
