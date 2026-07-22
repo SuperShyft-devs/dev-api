@@ -156,8 +156,7 @@ async def check_service_availability(
     members = [
         {
             "user_id": m.user_id,
-            "house_flat_no": m.house_flat_no,
-            "building_area": m.building_area,
+            "address_line": m.address_line,
             "landmark": m.landmark,
             "city": m.city,
             "pincode": m.pincode,

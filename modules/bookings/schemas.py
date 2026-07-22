@@ -10,8 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 
 class CheckServiceabilityMember(BaseModel):
     user_id: int = Field(gt=0)
-    house_flat_no: str = Field(min_length=1, max_length=200)
-    building_area: str = Field(min_length=1, max_length=200)
+    address_line: str = Field(min_length=1, max_length=500)
     landmark: Optional[str] = Field(default=None, max_length=200)
     city: str = Field(min_length=1, max_length=100)
     pincode: str = Field(min_length=1, max_length=20)

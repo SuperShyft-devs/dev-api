@@ -44,38 +44,6 @@ async def _get_healthians_token() -> str:
     return await healthians_client.get_access_token()
 
 
-def _build_booking_address(
-    house_flat_no: str,
-    building_area: str,
-    landmark: str | None,
-    city: str,
-    pincode: str,
-) -> str:
-    parts: list[str] = []
-    for value in (house_flat_no, building_area, landmark):
-        text = (value or "").strip()
-        if text:
-            parts.append(text)
-    city_pin = f"{city.strip()} - {pincode.strip()}"
-    parts.append(city_pin)
-    return ", ".join(parts)
-
-
-def _build_geocode_query(
-    building_area: str,
-    landmark: str | None,
-    city: str,
-    pincode: str,
-) -> str:
-    parts: list[str] = []
-    for value in (building_area, landmark):
-        text = (value or "").strip()
-        if text:
-            parts.append(text)
-    parts.append(f"{city.strip()} - {pincode.strip()}")
-    return ", ".join(parts)
-
-
 async def _geocode_for_booking(query: str) -> dict[str, Any]:
     results = await search_places(query, limit=1)
     if not results:
@@ -128,8 +96,7 @@ async def check_service_availability(
     for member in members:
         user_id = member["user_id"]
         diagnostic_package_id = member["diagnostic_package_id"]
-        house_flat_no = member["house_flat_no"]
-        building_area = member["building_area"]
+        address_line = member["address_line"]
         landmark = member.get("landmark")
         city = member["city"]
         pincode = member["pincode"]
@@ -139,8 +106,7 @@ async def check_service_availability(
             results.append({"user_id": user_id, "status": "error", "message": "Diagnostic provider is not Healthians"})
             continue
 
-        geocode_query = _build_geocode_query(building_area, landmark, city, pincode)
-        geocoded = await _geocode_for_booking(geocode_query)
+        geocoded = await _geocode_for_booking(pincode)
         latitude = geocoded.get("latitude")
         longitude = geocoded.get("longitude")
         if latitude is None or longitude is None:
@@ -153,7 +119,7 @@ async def check_service_availability(
             results.append({"user_id": user_id, "status": "error", "message": "User not found"})
             continue
 
-        address = _build_booking_address(house_flat_no, building_area, landmark, city, pincode)
+        address = address_line.strip()
 
         engagement = Engagement(
             engagement_name=f"{(user.first_name or 'user').strip()}-draft",
@@ -166,7 +132,7 @@ async def check_service_availability(
             diagnostic_package_id=diagnostic_package_id,
             city=city,
             address=address,
-            sub_locality=building_area,
+            sub_locality=address,
             landmark=landmark,
             pincode=pincode,
             state=geocoded.get("state"),
