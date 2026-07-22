@@ -622,6 +622,7 @@ async def verify_and_finalize_draft_bookings(
     razorpay_signature: str,
     caller_user_id: int,
     engagement_type: EngagementKind | None = None,
+    engagements_service: EngagementsService | None = None,
 ) -> dict[str, Any]:
     """Verify Razorpay payment and finalize Healthians bookings for draft engagements."""
     payments_service = PaymentsService()
@@ -656,6 +657,7 @@ async def verify_and_finalize_draft_bookings(
         members=members,
         caller_user_id=caller_user_id,
         engagement_type=engagement_type,
+        engagements_service=engagements_service,
     )
 
     return {
@@ -673,6 +675,7 @@ async def create_healthians_booking_after_payment(
     members: list[dict[str, Any]],
     caller_user_id: int,
     engagement_type: EngagementKind | None = None,
+    engagements_service: EngagementsService | None = None,
 ) -> list[dict[str, Any]]:
     """After payment succeeds, create Healthians booking for each member using their drafted engagement."""
     results: list[dict[str, Any]] = []
@@ -833,6 +836,16 @@ async def create_healthians_booking_after_payment(
         if engagement_type is not None and engagement.engagement_type is None:
             engagement.engagement_type = engagement_type
         engagement.status = "scheduled"
+
+        if engagements_service is not None:
+            await engagements_service.apply_b2c_defaults_and_notify_after_booking(
+                db,
+                engagement=engagement,
+                user=user,
+                collection_date=participant.engagement_date,
+                collection_time=participant.slot_start_time,
+            )
+
         await db.flush()
 
         results.append({

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import secrets
 import string
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
@@ -1000,6 +1000,69 @@ class EngagementsService:
         )
 
         return engagement
+
+    async def apply_b2c_defaults_and_notify_after_booking(
+        self,
+        db: AsyncSession,
+        *,
+        engagement: Engagement,
+        user: User,
+        collection_date: date | None,
+        collection_time: time | None = None,
+    ) -> None:
+        """After Healthians /book finalize: dates, platform notification defaults, default OAs, notify.
+
+        start_date = blood collection date; end_date = start_date + 3 days.
+        """
+        if collection_date is not None:
+            engagement.start_date = collection_date
+            engagement.end_date = collection_date + timedelta(days=3)
+            name_part = (user.first_name or "user").strip() or "user"
+            current_name = (engagement.engagement_name or "").strip()
+            if current_name.endswith("-draft"):
+                engagement.engagement_name = f"{name_part}-{collection_date.isoformat()}"
+
+        settings = await self._platform_settings_repository.get_by_id(db)
+        onboarding = settings.default_onboarding_notification if settings else None
+        pretest = settings.default_pretest_guidelines_notification if settings else None
+        qr1 = settings.default_questionnaire_reminder_1 if settings else None
+        qr2 = settings.default_questionnaire_reminder_2 if settings else None
+        blood = settings.default_blood_report_notification if settings else None
+        bioai = settings.default_bioai_report_notification if settings else None
+        consultation = settings.default_notify_users_for_consultation if settings else None
+        onboarding = await self._validate_comma_separated_service_keys(db, onboarding)
+        pretest = await self._validate_comma_separated_service_keys(db, pretest)
+        qr1 = await self._validate_comma_separated_service_keys(db, qr1)
+        qr2 = await self._validate_comma_separated_service_keys(db, qr2)
+        blood = await self._validate_comma_separated_service_keys(db, blood)
+        bioai = await self._validate_comma_separated_service_keys(db, bioai)
+        consultation = await self._validate_comma_separated_service_keys(db, consultation)
+        self._validate_questionnaire_reminders_disjoint(qr1, qr2)
+
+        engagement.onboarding_notification = onboarding
+        engagement.pretest_guidelines_notification = pretest
+        engagement.questionnaire_reminder_1 = qr1
+        engagement.questionnaire_reminder_2 = qr2
+        engagement.blood_report_notification = blood
+        engagement.bioai_report_notification = bioai
+        engagement.notify_users_for_consultation = consultation
+
+        await self._assign_default_onboarding_assistants(
+            db,
+            engagement_id=engagement.engagement_id,
+            organization_id=None,
+        )
+
+        collection_date_str = collection_date.isoformat() if collection_date is not None else None
+        collection_time_str = collection_time.isoformat() if collection_time is not None else None
+        await self.notify_onboarding_assistants_after_enrollment(
+            db,
+            engagement=engagement,
+            user=user,
+            source=engagement.engagement_code or "book-finalize",
+            collection_date=collection_date_str,
+            collection_time=collection_time_str,
+        )
 
     async def _resolve_default_onboarding_assistant_employee_ids(self, db: AsyncSession) -> list[int]:
         return await self._platform_settings_repository.resolve_default_onboarding_assistant_employee_ids(db)

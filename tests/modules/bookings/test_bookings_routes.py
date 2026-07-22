@@ -98,6 +98,59 @@ async def _seed_healthians_diagnostic_package(test_db_session, *, package_id: in
     await test_db_session.commit()
 
 
+async def _seed_notification_service(test_db_session, *, service_key: str) -> None:
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, "
+            "require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES (:sk, :dn, 'whatsapp', 'test-webhook', true, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
+        ),
+        {"sk": service_key, "dn": service_key},
+    )
+    await test_db_session.commit()
+
+
+async def _seed_book_finalize_platform_defaults(
+    test_db_session,
+    *,
+    assistant_employee_ids: str | None = None,
+) -> None:
+    """Platform notification defaults + optional default OA employee ids for /book finalize."""
+    for key in (
+        "booking-alert-whatsapp",
+        "pretest-alert-whatsapp",
+        "qr1-alert-whatsapp",
+        "qr2-alert-whatsapp",
+        "blood-report-alert-whatsapp",
+        "bioai-report-alert-whatsapp",
+        "consultation-alert-whatsapp",
+    ):
+        await _seed_notification_service(test_db_session, service_key=key)
+
+    await test_db_session.execute(text("DELETE FROM platform_settings"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO platform_settings ("
+            "settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
+            "default_onboarding_notification, default_pretest_guidelines_notification, "
+            "default_questionnaire_reminder_1, default_questionnaire_reminder_2, "
+            "default_blood_report_notification, default_bioai_report_notification, "
+            "default_notify_users_for_consultation, default_onboarding_assistant_employee_ids"
+            ") VALUES ("
+            "1, 1, 1, "
+            "'booking-alert-whatsapp', 'pretest-alert-whatsapp', "
+            "'qr1-alert-whatsapp', 'qr2-alert-whatsapp', "
+            "'blood-report-alert-whatsapp', 'bioai-report-alert-whatsapp', "
+            "'consultation-alert-whatsapp', :oa_ids"
+            ")"
+        ),
+        {"oa_ids": assistant_employee_ids},
+    )
+    await test_db_session.commit()
+
+
 async def _seed_draft_engagement(
     test_db_session,
     *,
@@ -689,6 +742,7 @@ async def test_book_bio_ai_verifies_and_finalizes(async_client, test_db_session,
     monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
     monkeypatch.setattr(settings, "HEALTHIANS_CHECKSUM_KEY", "test-checksum")
     await _seed_healthians_diagnostic_package(test_db_session)
+    await _seed_notification_service(test_db_session, service_key="booking-alert-whatsapp")
     u = User(
         user_id=940020,
         age=30,
@@ -752,18 +806,142 @@ async def test_book_bio_ai_verifies_and_finalizes(async_client, test_db_session,
 
     eng_row = (
         await test_db_session.execute(
-            text("SELECT status, engagement_type FROM engagements WHERE engagement_id = 940120")
+            text(
+                "SELECT status, engagement_type, start_date, end_date, engagement_name, "
+                "onboarding_notification FROM engagements WHERE engagement_id = 940120"
+            )
         )
     ).one()
     assert eng_row.status == "scheduled"
     assert eng_row.engagement_type == "bio_ai"
+    assert str(eng_row.start_date) == "2026-07-15"
+    assert str(eng_row.end_date) == "2026-07-18"
+    assert eng_row.engagement_name == "Bio-2026-07-15"
+    assert eng_row.onboarding_notification == "booking-alert-whatsapp"
 
 
 @pytest.mark.asyncio
-async def test_book_blood_test_sets_engagement_type_diagnostic(async_client, test_db_session, monkeypatch):
+async def test_book_bio_ai_applies_defaults_assigns_assistants_and_notifies(
+    async_client, test_db_session, monkeypatch
+):
     monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
     monkeypatch.setattr(settings, "HEALTHIANS_CHECKSUM_KEY", "test-checksum")
     await _seed_healthians_diagnostic_package(test_db_session)
+
+    await test_db_session.execute(
+        text("INSERT INTO users (user_id, age, phone, status) VALUES (940030, 30, '9400300000', 'active')")
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO employee (employee_id, user_id, role, status) "
+            "VALUES (940110, 940030, 'onboarding_assistant', 'active')"
+        )
+    )
+    await _seed_book_finalize_platform_defaults(test_db_session, assistant_employee_ids="940110")
+
+    u = User(
+        user_id=940023,
+        age=30,
+        phone="9400230000",
+        status="active",
+        first_name="Defaults",
+        last_name="User",
+        gender="male",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=940123,
+        user_id=940023,
+        booked_by_user_id=940023,
+        locked=True,
+    )
+
+    with patch(
+        "modules.payments.services._create_razorpay_order_sync",
+        side_effect=_mock_razorpay_order,
+    ):
+        pay_resp = await async_client.post(
+            "/book/pay",
+            headers=_auth_header(940023),
+            json={"members": [{"user_id": 940023, "engagement_id": 940123}]},
+        )
+    razorpay_order_id = pay_resp.json()["data"]["razorpay_order_id"]
+    payment_id = "pay_test_940023"
+    signature = _razorpay_signature(order_id=razorpay_order_id, payment_id=payment_id)
+
+    notify_mock = AsyncMock()
+    with patch(
+        "modules.bookings.service.healthians_client.get_access_token",
+        new_callable=AsyncMock,
+        return_value="tok",
+    ), patch(
+        "modules.bookings.service.healthians_client.create_booking_v3",
+        new_callable=AsyncMock,
+        return_value={"status": True, "booking_id": "HI940023", "message": "OK"},
+    ), patch(
+        "modules.notifications.onboarding_notify.notify_onboarding_assistants_on_enrollment",
+        notify_mock,
+    ):
+        response = await async_client.post(
+            "/book/bio-ai",
+            headers=_auth_header(940023),
+            json={
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": payment_id,
+                "razorpay_signature": signature,
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["members"][0]["status"] == "success"
+
+    eng_row = (
+        await test_db_session.execute(
+            text(
+                "SELECT start_date, end_date, onboarding_notification, pretest_guidelines_notification, "
+                "questionnaire_reminder_1, questionnaire_reminder_2, blood_report_notification, "
+                "bioai_report_notification, notify_users_for_consultation "
+                "FROM engagements WHERE engagement_id = 940123"
+            )
+        )
+    ).one()
+    assert str(eng_row.start_date) == "2026-07-15"
+    assert str(eng_row.end_date) == "2026-07-18"
+    assert eng_row.onboarding_notification == "booking-alert-whatsapp"
+    assert eng_row.pretest_guidelines_notification == "pretest-alert-whatsapp"
+    assert eng_row.questionnaire_reminder_1 == "qr1-alert-whatsapp"
+    assert eng_row.questionnaire_reminder_2 == "qr2-alert-whatsapp"
+    assert eng_row.blood_report_notification == "blood-report-alert-whatsapp"
+    assert eng_row.bioai_report_notification == "bioai-report-alert-whatsapp"
+    assert eng_row.notify_users_for_consultation == "consultation-alert-whatsapp"
+
+    oa_ids = (
+        await test_db_session.execute(
+            text(
+                "SELECT employee_id FROM onboarding_assistant_assignment "
+                "WHERE engagement_id = 940123 ORDER BY employee_id"
+            )
+        )
+    ).scalars().all()
+    assert list(oa_ids) == [940110]
+
+    notify_mock.assert_awaited()
+    notify_kwargs = notify_mock.await_args.kwargs
+    assert notify_kwargs["participant_user_id"] == 940023
+    assert notify_kwargs["participant_details"]["collection_date"] == "2026-07-15"
+    assert notify_kwargs["participant_details"]["collection_time"] == "06:00:00"
+
+
+@pytest.mark.asyncio
+async def test_book_blood_test_sets_engagement_type_blood_test(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
+    monkeypatch.setattr(settings, "HEALTHIANS_CHECKSUM_KEY", "test-checksum")
+    await _seed_healthians_diagnostic_package(test_db_session)
+    await _seed_notification_service(test_db_session, service_key="booking-alert-whatsapp")
     u = User(
         user_id=940021,
         age=30,
@@ -818,12 +996,17 @@ async def test_book_blood_test_sets_engagement_type_diagnostic(async_client, tes
         )
 
     assert response.status_code == 200
-    eng_type = (
+    eng_row = (
         await test_db_session.execute(
-            text("SELECT engagement_type FROM engagements WHERE engagement_id = 940121")
+            text(
+                "SELECT engagement_type, start_date, end_date FROM engagements "
+                "WHERE engagement_id = 940121"
+            )
         )
-    ).scalar_one()
-    assert eng_type == "diagnostic"
+    ).one()
+    assert eng_row.engagement_type == "blood_test"
+    assert str(eng_row.start_date) == "2026-07-15"
+    assert str(eng_row.end_date) == "2026-07-18"
 
 
 @pytest.mark.asyncio
@@ -831,6 +1014,7 @@ async def test_book_bio_ai_idempotent_when_already_paid(async_client, test_db_se
     monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
     monkeypatch.setattr(settings, "HEALTHIANS_CHECKSUM_KEY", "test-checksum")
     await _seed_healthians_diagnostic_package(test_db_session)
+    await _seed_notification_service(test_db_session, service_key="booking-alert-whatsapp")
     u = User(
         user_id=940022,
         age=30,
