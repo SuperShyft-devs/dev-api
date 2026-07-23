@@ -13,6 +13,7 @@ where today >= engagement_date:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import date
 from typing import Any
 
@@ -46,6 +47,8 @@ from modules.reports.models import IndividualHealthReport
 from modules.users.models import User
 
 logger = logging.getLogger(__name__)
+
+ProgressCallback = Callable[[int, int, int, int, int, int], None]
 
 _METSIGHTS_PRO_BASIC_TYPE_CODES = {"1", "2"}
 
@@ -253,7 +256,13 @@ async def load_blood_reports(
     sync_service: MetsightsSyncService,
     as_of: date | None = None,
     dry_run: bool = False,
+    on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
+    """Load blood reports and notify participants.
+
+    ``on_progress(done, total, loaded, notified, skipped, failed)`` is called
+    after each participant is processed so CLI runners can show a live progress bar.
+    """
     today = as_of or date.today()
     participants = await _get_eligible_participants(db, today)
     matched = len(participants)
@@ -263,166 +272,335 @@ async def load_blood_reports(
     failed = 0
     details: list[dict[str, Any]] = []
 
-    for row in participants:
-        (
-            user_id, engagement_id, record_id,
-            first_name, last_name,
-            blood_params, diag_url,
-            blood_report_notification, ihr_id, instance_id,
-            diagnostic_package_id, participant_booking_id, diagnostic_provider,
-            package_code, assessment_type_code,
-        ) = row
+    def _report(done: int) -> None:
+        if on_progress is not None:
+            on_progress(done, matched, loaded, notified, skipped, failed)
 
-        record_id = (record_id or "").strip()
-        package_code = (package_code or "").strip()
-        assessment_type_code = (assessment_type_code or "").strip()
+    _report(0)
 
-        if not record_id:
-            skipped += 1
-            details.append({
-                "user_id": user_id, "engagement_id": engagement_id,
-                "action": "skipped", "reason": "no metsights_record_id",
-            })
-            continue
-
-        if dry_run:
-            complete = _blood_report_data_complete(blood_params, diag_url)
-            dry_run_reasons = [
-                "would_fetch_blood_parameters",
-                "would_refresh_diagnostic_report_url",
-            ]
-            if package_code in _PACKAGE_BLOOD_CATEGORY_KEYS:
-                dry_run_reasons.append("would_draft_blood_questionnaires")
-                try:
-                    report_exists = await metsights_service.is_bioai_report_generated(
-                        record_id=record_id,
-                        assessment_type_code=assessment_type_code,
-                    )
-                    if report_exists:
-                        dry_run_reasons.append("would_skip_metsights_push_report_generated")
-                    else:
-                        dry_run_reasons.append("would_push_blood_to_metsights")
-                except Exception as exc:
-                    dry_run_reasons.append(f"would_skip_metsights_push_check_failed: {exc}")
-            dry_run_reasons.append(
-                "blood_report_complete" if complete else "blood_report_incomplete"
-            )
-            details.append({
-                "user_id": user_id, "engagement_id": engagement_id,
-                "action": "dry_run",
-                "reason": ", ".join(dry_run_reasons),
-            })
-            continue
-
+    for index, row in enumerate(participants, start=1):
         try:
-            blood_parameters = blood_params
-            diagnostic_report_url = diag_url
+            (
+                user_id, engagement_id, record_id,
+                first_name, last_name,
+                blood_params, diag_url,
+                blood_report_notification, ihr_id, instance_id,
+                diagnostic_package_id, participant_booking_id, diagnostic_provider,
+                package_code, assessment_type_code,
+            ) = row
 
-            reference_id = try_participant_booking_id(participant_booking_id, diagnostic_provider)
-            booking_source = HealthiansBookingSource.PARTICIPANT if reference_id else None
+            record_id = (record_id or "").strip()
+            package_code = (package_code or "").strip()
+            assessment_type_code = (assessment_type_code or "").strip()
 
-            if not reference_id:
-                try:
-                    collection_data = await tracked_integration_call(
-                        db,
-                        provider="metsights",
-                        api_url=_metsights_fetch_collections_url(record_id=record_id),
-                        engagement_id=engagement_id,
-                        user_id=user_id,
-                        request_payload={"record_id": record_id},
-                        operation=lambda: metsights_service.get_fetch_collections(record_id=record_id),
-                    )
-                except Exception:
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "fetch-collections not available for this record",
-                    })
-                    continue
-
-                if collection_data is None:
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "fetch-collections not available for this record",
-                    })
-                    continue
-
-                reference_id = booking_id_from_fetch_collections(collection_data)
-                provider_code = provider_code_from_field(collection_data.get("provider"))
-
-                if not reference_id:
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "no booking id from MetSights collections",
-                    })
-                    continue
-
-                if provider_code.lower() != "healthians":
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped",
-                        "reason": f"provider code is '{provider_code or 'unknown'}', not Healthians",
-                    })
-                    continue
-                booking_source = HealthiansBookingSource.METSIGHTS
-
-            access_token = await tracked_integration_call(
-                db,
-                provider="healthians",
-                api_url=_healthians_url("toast4health/getAccessToken"),
-                engagement_id=engagement_id,
-                user_id=user_id,
-                request_payload=None,
-                operation=healthians_client.get_access_token,
-            )
-            if access_token is None:
+            if not record_id:
                 skipped += 1
                 details.append({
                     "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "skipped", "reason": "Healthians authentication failed",
+                    "action": "skipped", "reason": "no metsights_record_id",
                 })
                 continue
 
-            fetched_blood = None
-            blood_loaded_this_run = False
-
-            digital_value = await tracked_integration_call(
-                db,
-                provider="healthians",
-                api_url=_healthians_url("toast4health/getBookingDigitalValue"),
-                engagement_id=engagement_id,
-                user_id=user_id,
-                request_payload={"booking_id": str(reference_id)},
-                operation=lambda: healthians_client.get_booking_digital_value(
-                    access_token, reference_id
-                ),
-                reraise=False,
-            )
-            if digital_value is not None:
-                data_list = digital_value.get("data")
-                if isinstance(data_list, list) and data_list:
-                    matched_entry = _match_customer_by_name(
-                        data_list, first_name or "", last_name or ""
-                    )
-                    if matched_entry:
-                        fetched_blood = matched_entry
-            else:
-                logger.warning(
-                    "Healthians getBookingDigitalValue failed for user=%s booking=%s",
-                    user_id, reference_id,
+            if dry_run:
+                complete = _blood_report_data_complete(blood_params, diag_url)
+                dry_run_reasons = [
+                    "would_fetch_blood_parameters",
+                    "would_refresh_diagnostic_report_url",
+                ]
+                if package_code in _PACKAGE_BLOOD_CATEGORY_KEYS:
+                    dry_run_reasons.append("would_draft_blood_questionnaires")
+                    try:
+                        report_exists = await metsights_service.is_bioai_report_generated(
+                            record_id=record_id,
+                            assessment_type_code=assessment_type_code,
+                        )
+                        if report_exists:
+                            dry_run_reasons.append("would_skip_metsights_push_report_generated")
+                        else:
+                            dry_run_reasons.append("would_push_blood_to_metsights")
+                    except Exception as exc:
+                        dry_run_reasons.append(f"would_skip_metsights_push_check_failed: {exc}")
+                dry_run_reasons.append(
+                    "blood_report_complete" if complete else "blood_report_incomplete"
                 )
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "dry_run",
+                    "reason": ", ".join(dry_run_reasons),
+                })
+                continue
 
-            if fetched_blood is not None:
-                if diagnostic_package_id is None:
+            try:
+                blood_parameters = blood_params
+                diagnostic_report_url = diag_url
+
+                reference_id = try_participant_booking_id(participant_booking_id, diagnostic_provider)
+                booking_source = HealthiansBookingSource.PARTICIPANT if reference_id else None
+
+                if not reference_id:
+                    try:
+                        collection_data = await tracked_integration_call(
+                            db,
+                            provider="metsights",
+                            api_url=_metsights_fetch_collections_url(record_id=record_id),
+                            engagement_id=engagement_id,
+                            user_id=user_id,
+                            request_payload={"record_id": record_id},
+                            operation=lambda: metsights_service.get_fetch_collections(record_id=record_id),
+                        )
+                    except Exception:
+                        skipped += 1
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped", "reason": "fetch-collections not available for this record",
+                        })
+                        continue
+
+                    if collection_data is None:
+                        skipped += 1
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped", "reason": "fetch-collections not available for this record",
+                        })
+                        continue
+
+                    reference_id = booking_id_from_fetch_collections(collection_data)
+                    provider_code = provider_code_from_field(collection_data.get("provider"))
+
+                    if not reference_id:
+                        skipped += 1
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped", "reason": "no booking id from MetSights collections",
+                        })
+                        continue
+
+                    if provider_code.lower() != "healthians":
+                        skipped += 1
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped",
+                            "reason": f"provider code is '{provider_code or 'unknown'}', not Healthians",
+                        })
+                        continue
+                    booking_source = HealthiansBookingSource.METSIGHTS
+
+                access_token = await tracked_integration_call(
+                    db,
+                    provider="healthians",
+                    api_url=_healthians_url("toast4health/getAccessToken"),
+                    engagement_id=engagement_id,
+                    user_id=user_id,
+                    request_payload=None,
+                    operation=healthians_client.get_access_token,
+                )
+                if access_token is None:
+                    skipped += 1
                     details.append({
                         "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped",
-                        "reason": "engagement has no diagnostic package for blood parameters",
+                        "action": "skipped", "reason": "Healthians authentication failed",
                     })
+                    continue
+
+                fetched_blood = None
+                blood_loaded_this_run = False
+
+                digital_value = await tracked_integration_call(
+                    db,
+                    provider="healthians",
+                    api_url=_healthians_url("toast4health/getBookingDigitalValue"),
+                    engagement_id=engagement_id,
+                    user_id=user_id,
+                    request_payload={"booking_id": str(reference_id)},
+                    operation=lambda: healthians_client.get_booking_digital_value(
+                        access_token, reference_id
+                    ),
+                    reraise=False,
+                )
+                if digital_value is not None:
+                    data_list = digital_value.get("data")
+                    if isinstance(data_list, list) and data_list:
+                        matched_entry = _match_customer_by_name(
+                            data_list, first_name or "", last_name or ""
+                        )
+                        if matched_entry:
+                            fetched_blood = matched_entry
                 else:
+                    logger.warning(
+                        "Healthians getBookingDigitalValue failed for user=%s booking=%s",
+                        user_id, reference_id,
+                    )
+
+                if fetched_blood is not None:
+                    if diagnostic_package_id is None:
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped",
+                            "reason": "engagement has no diagnostic package for blood parameters",
+                        })
+                    else:
+                        ihr = await _get_or_create_ihr(
+                            db,
+                            ihr_id=ihr_id,
+                            user_id=user_id,
+                            engagement_id=engagement_id,
+                            instance_id=instance_id,
+                        )
+                        grouped, raw = await _group_provider_blood(
+                            db,
+                            fetched_blood,
+                            diagnostic_package_id=int(diagnostic_package_id),
+                        )
+                        ihr.blood_parameters = grouped
+                        ihr.blood_report_raw = raw
+                        blood_parameters = grouped
+                        blood_loaded_this_run = True
+                        await db.flush()
+                        await db.commit()
+                        loaded += 1
+                        source_label = (
+                            "participant booking_id"
+                            if booking_source == HealthiansBookingSource.PARTICIPANT
+                            else "Metsights reference_id"
+                        )
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "loaded",
+                            "reason": f"blood data fetched from Healthians via {source_label}",
+                        })
+
+                        try:
+                            draft_result = await assessments_service.draft_blood_parameters_from_report(
+                                db,
+                                user_id=user_id,
+                                assessment_instance_id=instance_id,
+                                allow_completed=True,
+                            )
+                            await db.commit()
+                            details.append({
+                                "user_id": user_id, "engagement_id": engagement_id,
+                                "action": "drafted",
+                                "reason": (
+                                    f"drafted {draft_result.get('responses_drafted', 0)} "
+                                    "blood questionnaire responses"
+                                ),
+                            })
+                        except Exception as exc:
+                            await db.rollback()
+                            logger.warning(
+                                "Blood parameter draft failed for user=%s instance=%s: %s",
+                                user_id, instance_id, exc,
+                            )
+                            details.append({
+                                "user_id": user_id, "engagement_id": engagement_id,
+                                "action": "skipped",
+                                "reason": f"blood draft failed: {str(exc)[:120]}",
+                            })
+
+                        if blood_loaded_this_run and package_code in _PACKAGE_BLOOD_CATEGORY_KEYS:
+                            report_exists = await tracked_integration_call(
+                                db,
+                                provider="metsights",
+                                api_url=_metsights_report_url(
+                                    record_id=record_id,
+                                    assessment_type_code=assessment_type_code,
+                                ),
+                                engagement_id=engagement_id,
+                                user_id=user_id,
+                                request_payload={
+                                    "record_id": record_id,
+                                    "assessment_type_code": assessment_type_code,
+                                    "check": "bioai_report_generated",
+                                },
+                                operation=lambda: metsights_service.is_bioai_report_generated(
+                                    record_id=record_id,
+                                    assessment_type_code=assessment_type_code,
+                                ),
+                                reraise=False,
+                            )
+                            if report_exists is None:
+                                logger.warning(
+                                    "BioAI report check failed for user=%s record=%s",
+                                    user_id, record_id,
+                                )
+                                details.append({
+                                    "user_id": user_id, "engagement_id": engagement_id,
+                                    "action": "skipped",
+                                    "reason": "skipped metsights push: report check failed",
+                                })
+                                report_exists = True
+
+                            if report_exists:
+                                details.append({
+                                    "user_id": user_id, "engagement_id": engagement_id,
+                                    "action": "skipped",
+                                    "reason": "skipped metsights push: BioAI report already generated",
+                                })
+                            else:
+                                category_keys = _PACKAGE_BLOOD_CATEGORY_KEYS[package_code]
+                                for category_key in category_keys:
+                                    try:
+                                        push_result = await sync_service._push_category_to_metsights(
+                                            db,
+                                            assessment_instance_id=instance_id,
+                                            user_id=user_id,
+                                            category_key=category_key,
+                                        )
+                                        await db.commit()
+                                        fields_count = len(push_result.get("fields_pushed") or [])
+                                        details.append({
+                                            "user_id": user_id, "engagement_id": engagement_id,
+                                            "action": "pushed",
+                                            "reason": (
+                                                f"pushed {category_key} to Metsights "
+                                                f"({fields_count} fields)"
+                                            ),
+                                        })
+                                    except Exception as exc:
+                                        await db.rollback()
+                                        logger.warning(
+                                            "Metsights blood push failed for user=%s category=%s: %s",
+                                            user_id, category_key, exc,
+                                        )
+                                        details.append({
+                                            "user_id": user_id, "engagement_id": engagement_id,
+                                            "action": "failed",
+                                            "reason": (
+                                                f"metsights push failed for {category_key}: "
+                                                f"{str(exc)[:100]}"
+                                            ),
+                                        })
+
+                fetched_diag_url = None
+                report_data = await tracked_integration_call(
+                    db,
+                    provider="healthians",
+                    api_url=_healthians_url("toast4health/getBookingReport"),
+                    engagement_id=engagement_id,
+                    user_id=user_id,
+                    request_payload={"booking_id": str(reference_id)},
+                    operation=lambda: healthians_client.get_booking_report(
+                        access_token, reference_id
+                    ),
+                    reraise=False,
+                )
+                if report_data is not None:
+                    report_list = report_data.get("data")
+                    if isinstance(report_list, list) and report_list:
+                        matched_report = _match_customer_by_name(
+                            report_list, first_name or "", last_name or ""
+                        )
+                        if matched_report:
+                            fetched_diag_url = (
+                                matched_report.get("report_url") or matched_report.get("url")
+                            )
+                else:
+                    logger.warning(
+                        "Healthians getBookingReport failed for user=%s booking=%s",
+                        user_id, reference_id,
+                    )
+
+                if fetched_diag_url is not None:
                     ihr = await _get_or_create_ihr(
                         db,
                         ihr_id=ihr_id,
@@ -430,18 +608,12 @@ async def load_blood_reports(
                         engagement_id=engagement_id,
                         instance_id=instance_id,
                     )
-                    grouped, raw = await _group_provider_blood(
-                        db,
-                        fetched_blood,
-                        diagnostic_package_id=int(diagnostic_package_id),
-                    )
-                    ihr.blood_parameters = grouped
-                    ihr.blood_report_raw = raw
-                    blood_parameters = grouped
-                    blood_loaded_this_run = True
+                    ihr.diagnostic_report_url = fetched_diag_url
+                    diagnostic_report_url = fetched_diag_url
                     await db.flush()
                     await db.commit()
-                    loaded += 1
+                    if not blood_loaded_this_run:
+                        loaded += 1
                     source_label = (
                         "participant booking_id"
                         if booking_source == HealthiansBookingSource.PARTICIPANT
@@ -450,214 +622,60 @@ async def load_blood_reports(
                     details.append({
                         "user_id": user_id, "engagement_id": engagement_id,
                         "action": "loaded",
-                        "reason": f"blood data fetched from Healthians via {source_label}",
+                        "reason": f"diagnostic_report_url refreshed from Healthians via {source_label}",
                     })
 
-                    try:
-                        draft_result = await assessments_service.draft_blood_parameters_from_report(
-                            db,
-                            user_id=user_id,
-                            assessment_instance_id=instance_id,
-                            allow_completed=True,
+                if not _blood_report_data_complete(blood_parameters, diagnostic_report_url):
+                    skipped += 1
+                    if fetched_blood is None and fetched_diag_url is None:
+                        incomplete_reason = "no data returned from Healthians"
+                    else:
+                        incomplete_reason = (
+                            "blood report data incomplete "
+                            "(missing blood_parameters or diagnostic_report_url)"
                         )
-                        await db.commit()
-                        details.append({
-                            "user_id": user_id, "engagement_id": engagement_id,
-                            "action": "drafted",
-                            "reason": (
-                                f"drafted {draft_result.get('responses_drafted', 0)} "
-                                "blood questionnaire responses"
-                            ),
-                        })
-                    except Exception as exc:
-                        await db.rollback()
-                        logger.warning(
-                            "Blood parameter draft failed for user=%s instance=%s: %s",
-                            user_id, instance_id, exc,
-                        )
-                        details.append({
-                            "user_id": user_id, "engagement_id": engagement_id,
-                            "action": "skipped",
-                            "reason": f"blood draft failed: {str(exc)[:120]}",
-                        })
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped",
+                        "reason": incomplete_reason,
+                    })
+                    continue
 
-                    if blood_loaded_this_run and package_code in _PACKAGE_BLOOD_CATEGORY_KEYS:
-                        report_exists = await tracked_integration_call(
-                            db,
-                            provider="metsights",
-                            api_url=_metsights_report_url(
-                                record_id=record_id,
-                                assessment_type_code=assessment_type_code,
-                            ),
-                            engagement_id=engagement_id,
-                            user_id=user_id,
-                            request_payload={
-                                "record_id": record_id,
-                                "assessment_type_code": assessment_type_code,
-                                "check": "bioai_report_generated",
-                            },
-                            operation=lambda: metsights_service.is_bioai_report_generated(
-                                record_id=record_id,
-                                assessment_type_code=assessment_type_code,
-                            ),
-                            reraise=False,
-                        )
-                        if report_exists is None:
-                            logger.warning(
-                                "BioAI report check failed for user=%s record=%s",
-                                user_id, record_id,
-                            )
-                            details.append({
-                                "user_id": user_id, "engagement_id": engagement_id,
-                                "action": "skipped",
-                                "reason": "skipped metsights push: report check failed",
-                            })
-                            report_exists = True
+                service_keys = [
+                    k.strip() for k in (blood_report_notification or "").split(",") if k.strip()
+                ]
+                if not service_keys:
+                    skipped += 1
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped", "reason": "blood reports ready, no notification keys configured",
+                    })
+                    continue
 
-                        if report_exists:
-                            details.append({
-                                "user_id": user_id, "engagement_id": engagement_id,
-                                "action": "skipped",
-                                "reason": "skipped metsights push: BioAI report already generated",
-                            })
-                        else:
-                            category_keys = _PACKAGE_BLOOD_CATEGORY_KEYS[package_code]
-                            for category_key in category_keys:
-                                try:
-                                    push_result = await sync_service._push_category_to_metsights(
-                                        db,
-                                        assessment_instance_id=instance_id,
-                                        user_id=user_id,
-                                        category_key=category_key,
-                                    )
-                                    await db.commit()
-                                    fields_count = len(push_result.get("fields_pushed") or [])
-                                    details.append({
-                                        "user_id": user_id, "engagement_id": engagement_id,
-                                        "action": "pushed",
-                                        "reason": (
-                                            f"pushed {category_key} to Metsights "
-                                            f"({fields_count} fields)"
-                                        ),
-                                    })
-                                except Exception as exc:
-                                    await db.rollback()
-                                    logger.warning(
-                                        "Metsights blood push failed for user=%s category=%s: %s",
-                                        user_id, category_key, exc,
-                                    )
-                                    details.append({
-                                        "user_id": user_id, "engagement_id": engagement_id,
-                                        "action": "failed",
-                                        "reason": (
-                                            f"metsights push failed for {category_key}: "
-                                            f"{str(exc)[:100]}"
-                                        ),
-                                    })
-
-            fetched_diag_url = None
-            report_data = await tracked_integration_call(
-                db,
-                provider="healthians",
-                api_url=_healthians_url("toast4health/getBookingReport"),
-                engagement_id=engagement_id,
-                user_id=user_id,
-                request_payload={"booking_id": str(reference_id)},
-                operation=lambda: healthians_client.get_booking_report(
-                    access_token, reference_id
-                ),
-                reraise=False,
-            )
-            if report_data is not None:
-                report_list = report_data.get("data")
-                if isinstance(report_list, list) and report_list:
-                    matched_report = _match_customer_by_name(
-                        report_list, first_name or "", last_name or ""
-                    )
-                    if matched_report:
-                        fetched_diag_url = (
-                            matched_report.get("report_url") or matched_report.get("url")
-                        )
-            else:
-                logger.warning(
-                    "Healthians getBookingReport failed for user=%s booking=%s",
-                    user_id, reference_id,
-                )
-
-            if fetched_diag_url is not None:
-                ihr = await _get_or_create_ihr(
+                notified += await _send_report_notifications(
                     db,
-                    ihr_id=ihr_id,
+                    notifications_service=notifications_service,
+                    service_keys=service_keys,
                     user_id=user_id,
                     engagement_id=engagement_id,
-                    instance_id=instance_id,
+                    assessment_instance_id=instance_id,
+                    details=details,
                 )
-                ihr.diagnostic_report_url = fetched_diag_url
-                diagnostic_report_url = fetched_diag_url
-                await db.flush()
                 await db.commit()
-                if not blood_loaded_this_run:
-                    loaded += 1
-                source_label = (
-                    "participant booking_id"
-                    if booking_source == HealthiansBookingSource.PARTICIPANT
-                    else "Metsights reference_id"
+
+            except Exception as exc:
+                await db.rollback()
+                failed += 1
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "failed", "reason": str(exc)[:200],
+                })
+                logger.warning(
+                    "load_blood_reports failed: user=%s engagement=%s: %s",
+                    user_id, engagement_id, exc, exc_info=True,
                 )
-                details.append({
-                    "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "loaded",
-                    "reason": f"diagnostic_report_url refreshed from Healthians via {source_label}",
-                })
-
-            if not _blood_report_data_complete(blood_parameters, diagnostic_report_url):
-                skipped += 1
-                if fetched_blood is None and fetched_diag_url is None:
-                    incomplete_reason = "no data returned from Healthians"
-                else:
-                    incomplete_reason = (
-                        "blood report data incomplete "
-                        "(missing blood_parameters or diagnostic_report_url)"
-                    )
-                details.append({
-                    "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "skipped",
-                    "reason": incomplete_reason,
-                })
-                continue
-
-            service_keys = [
-                k.strip() for k in (blood_report_notification or "").split(",") if k.strip()
-            ]
-            if not service_keys:
-                skipped += 1
-                details.append({
-                    "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "skipped", "reason": "blood reports ready, no notification keys configured",
-                })
-                continue
-
-            notified += await _send_report_notifications(
-                db,
-                notifications_service=notifications_service,
-                service_keys=service_keys,
-                user_id=user_id,
-                engagement_id=engagement_id,
-                assessment_instance_id=instance_id,
-                details=details,
-            )
-            await db.commit()
-
-        except Exception as exc:
-            await db.rollback()
-            failed += 1
-            details.append({
-                "user_id": user_id, "engagement_id": engagement_id,
-                "action": "failed", "reason": str(exc)[:200],
-            })
-            logger.warning(
-                "load_blood_reports failed: user=%s engagement=%s: %s",
-                user_id, engagement_id, exc, exc_info=True,
-            )
+        finally:
+            _report(index)
 
     return {
         "as_of": today.isoformat(),

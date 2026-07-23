@@ -11,6 +11,7 @@ completed and today >= engagement_date:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import date
 from typing import Any
 
@@ -28,6 +29,8 @@ from modules.notifications.service import NotificationsService
 from modules.reports.models import IndividualHealthReport
 
 logger = logging.getLogger(__name__)
+
+ProgressCallback = Callable[[int, int, int, int, int, int], None]
 
 _PRO_BASIC_TYPE_CODES = {"1", "2"}
 
@@ -155,7 +158,13 @@ async def load_bioai_reports(
     notifications_service: NotificationsService,
     as_of: date | None = None,
     dry_run: bool = False,
+    on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
+    """Load BioAI reports and notify participants.
+
+    ``on_progress(done, total, loaded, notified, skipped, failed)`` is called
+    after each participant is processed so CLI runners can show a live progress bar.
+    """
     today = as_of or date.today()
     participants = await _get_eligible_participants(db, today)
     matched = len(participants)
@@ -165,220 +174,229 @@ async def load_bioai_reports(
     failed = 0
     details: list[dict[str, Any]] = []
 
-    for row in participants:
-        (
-            user_id, engagement_id, record_id, type_code,
-            existing_reports, existing_report_url,
-            bioai_notification, ihr_id, instance_id,
-        ) = row
+    def _report(done: int) -> None:
+        if on_progress is not None:
+            on_progress(done, matched, loaded, notified, skipped, failed)
 
-        record_id = (record_id or "").strip()
-        type_code = (type_code or "").strip()
+    _report(0)
 
-        if not record_id:
-            skipped += 1
-            details.append({
-                "user_id": user_id, "engagement_id": engagement_id,
-                "action": "skipped", "reason": "no metsights_record_id",
-            })
-            continue
-
-        if dry_run:
-            complete = _report_data_complete(existing_reports, existing_report_url)
-            details.append({
-                "user_id": user_id, "engagement_id": engagement_id,
-                "action": "dry_run",
-                "reason": "reports_complete" if complete else "reports_incomplete",
-            })
-            continue
-
+    for index, row in enumerate(participants, start=1):
         try:
-            if type_code in _PRO_BASIC_TYPE_CODES:
-                bp_data = await tracked_integration_call(
-                    db,
-                    provider="metsights",
-                    api_url=_metsights_blood_parameters_url(record_id=record_id),
-                    engagement_id=engagement_id,
-                    user_id=user_id,
-                    request_payload={"record_id": record_id},
-                    operation=lambda: metsights_service.get_blood_parameters(record_id=record_id),
-                    reraise=False,
-                )
-                if bp_data is None:
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "could not check blood parameters on MetSights",
-                    })
-                    continue
-                if not bp_data.get("is_complete", False):
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "blood parameters not complete on MetSights",
-                    })
-                    continue
+            (
+                user_id, engagement_id, record_id, type_code,
+                existing_reports, existing_report_url,
+                bioai_notification, ihr_id, instance_id,
+            ) = row
 
-            reports = existing_reports
-            report_url = existing_report_url
+            record_id = (record_id or "").strip()
+            type_code = (type_code or "").strip()
 
-            if not _report_data_complete(reports, report_url):
-                fetched_reports = None
-                fetched_url = None
+            if not record_id:
+                skipped += 1
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "skipped", "reason": "no metsights_record_id",
+                })
+                continue
 
-                if reports is None:
-                    report_data = await tracked_integration_call(
+            if dry_run:
+                complete = _report_data_complete(existing_reports, existing_report_url)
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "dry_run",
+                    "reason": "reports_complete" if complete else "reports_incomplete",
+                })
+                continue
+
+            try:
+                if type_code in _PRO_BASIC_TYPE_CODES:
+                    bp_data = await tracked_integration_call(
                         db,
                         provider="metsights",
-                        api_url=_metsights_report_url(
-                            record_id=record_id,
-                            assessment_type_code=type_code,
-                        ),
+                        api_url=_metsights_blood_parameters_url(record_id=record_id),
                         engagement_id=engagement_id,
                         user_id=user_id,
-                        request_payload={
-                            "record_id": record_id,
-                            "assessment_type_code": type_code,
-                        },
-                        operation=lambda: metsights_service.get_report(
-                            record_id=record_id,
-                            assessment_type_code=type_code,
-                        ),
+                        request_payload={"record_id": record_id},
+                        operation=lambda: metsights_service.get_blood_parameters(record_id=record_id),
                         reraise=False,
                     )
-                    if report_data is not None:
-                        if report_data:
-                            fetched_reports = report_data
-                            if fetched_url is None:
-                                fetched_url = _extract_report_file_url(report_data)
-                    else:
-                        logger.warning(
-                            "MetSights get_report failed for record=%s",
-                            record_id,
-                        )
+                    if bp_data is None:
+                        skipped += 1
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped", "reason": "could not check blood parameters on MetSights",
+                        })
+                        continue
+                    if not bp_data.get("is_complete", False):
+                        skipped += 1
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped", "reason": "blood parameters not complete on MetSights",
+                        })
+                        continue
 
-                if report_url is None:
-                    pdf_data = await tracked_integration_call(
-                        db,
-                        provider="metsights",
-                        api_url=_metsights_report_url(
-                            record_id=record_id,
-                            assessment_type_code=type_code,
-                            pdf=True,
-                        ),
-                        engagement_id=engagement_id,
-                        user_id=user_id,
-                        request_payload={
-                            "record_id": record_id,
-                            "assessment_type_code": type_code,
-                        },
-                        operation=lambda: metsights_service.get_report_pdf(
-                            record_id=record_id,
-                            assessment_type_code=type_code,
-                        ),
-                        reraise=False,
-                    )
-                    if pdf_data is not None:
-                        file_url = pdf_data.get("file") or pdf_data.get("url")
-                        if file_url:
-                            fetched_url = file_url
-                    else:
-                        logger.warning(
-                            "MetSights get_report_pdf failed for record=%s",
-                            record_id,
-                        )
+                reports = existing_reports
+                report_url = existing_report_url
 
-                if fetched_reports is None and fetched_url is None:
-                    skipped += 1
+                if not _report_data_complete(reports, report_url):
+                    fetched_reports = None
+                    fetched_url = None
+
+                    if reports is None:
+                        report_data = await tracked_integration_call(
+                            db,
+                            provider="metsights",
+                            api_url=_metsights_report_url(
+                                record_id=record_id,
+                                assessment_type_code=type_code,
+                            ),
+                            engagement_id=engagement_id,
+                            user_id=user_id,
+                            request_payload={
+                                "record_id": record_id,
+                                "assessment_type_code": type_code,
+                            },
+                            operation=lambda: metsights_service.get_report(
+                                record_id=record_id,
+                                assessment_type_code=type_code,
+                            ),
+                            reraise=False,
+                        )
+                        if report_data is not None:
+                            if report_data:
+                                fetched_reports = report_data
+                                if fetched_url is None:
+                                    fetched_url = _extract_report_file_url(report_data)
+                        else:
+                            logger.warning(
+                                "MetSights get_report failed for record=%s",
+                                record_id,
+                            )
+
+                    if report_url is None:
+                        pdf_data = await tracked_integration_call(
+                            db,
+                            provider="metsights",
+                            api_url=_metsights_report_url(
+                                record_id=record_id,
+                                assessment_type_code=type_code,
+                                pdf=True,
+                            ),
+                            engagement_id=engagement_id,
+                            user_id=user_id,
+                            request_payload={
+                                "record_id": record_id,
+                                "assessment_type_code": type_code,
+                            },
+                            operation=lambda: metsights_service.get_report_pdf(
+                                record_id=record_id,
+                                assessment_type_code=type_code,
+                            ),
+                            reraise=False,
+                        )
+                        if pdf_data is not None:
+                            file_url = pdf_data.get("file") or pdf_data.get("url")
+                            if file_url:
+                                fetched_url = file_url
+                        else:
+                            logger.warning(
+                                "MetSights get_report_pdf failed for record=%s",
+                                record_id,
+                            )
+
+                    if fetched_reports is None and fetched_url is None:
+                        skipped += 1
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped", "reason": "no report data returned from MetSights",
+                        })
+                        continue
+
+                    ihr = None
+                    if ihr_id:
+                        ihr_result = await db.execute(
+                            select(IndividualHealthReport).where(
+                                IndividualHealthReport.report_id == ihr_id
+                            )
+                        )
+                        ihr = ihr_result.scalar_one_or_none()
+
+                    if ihr is None:
+                        ihr = IndividualHealthReport(
+                            user_id=user_id,
+                            engagement_id=engagement_id,
+                            assessment_instance_id=instance_id,
+                        )
+                        db.add(ihr)
+
+                    if fetched_reports is not None:
+                        ihr.reports = fetched_reports
+                        reports = fetched_reports
+                    if fetched_url is not None:
+                        ihr.report_url = fetched_url
+                        report_url = fetched_url
+                    await db.flush()
+                    await db.commit()
+
+                    if not _report_data_complete(reports, report_url):
+                        skipped += 1
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped",
+                            "reason": "report data incomplete (missing reports or report_url)",
+                        })
+                        continue
+
+                    loaded += 1
                     details.append({
                         "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "no report data returned from MetSights",
+                        "action": "loaded", "reason": "BioAI report data fetched from MetSights",
                     })
-                    continue
-
-                ihr = None
-                if ihr_id:
-                    ihr_result = await db.execute(
-                        select(IndividualHealthReport).where(
-                            IndividualHealthReport.report_id == ihr_id
-                        )
-                    )
-                    ihr = ihr_result.scalar_one_or_none()
-
-                if ihr is None:
-                    ihr = IndividualHealthReport(
-                        user_id=user_id,
-                        engagement_id=engagement_id,
-                        assessment_instance_id=instance_id,
-                    )
-                    db.add(ihr)
-
-                if fetched_reports is not None:
-                    ihr.reports = fetched_reports
-                    reports = fetched_reports
-                if fetched_url is not None:
-                    ihr.report_url = fetched_url
-                    report_url = fetched_url
-                await db.flush()
-                await db.commit()
 
                 if not _report_data_complete(reports, report_url):
                     skipped += 1
                     details.append({
                         "user_id": user_id, "engagement_id": engagement_id,
                         "action": "skipped",
-                        "reason": "report data incomplete (missing reports or report_url)",
+                        "reason": "BioAI report data incomplete (missing reports or report_url)",
                     })
                     continue
 
-                loaded += 1
+                service_keys = [
+                    k.strip() for k in (bioai_notification or "").split(",") if k.strip()
+                ]
+                if not service_keys:
+                    skipped += 1
+                    details.append({
+                        "user_id": user_id, "engagement_id": engagement_id,
+                        "action": "skipped", "reason": "reports ready, no notification keys configured",
+                    })
+                    continue
+
+                notified += await _send_report_notifications(
+                    db,
+                    notifications_service=notifications_service,
+                    service_keys=service_keys,
+                    user_id=user_id,
+                    engagement_id=engagement_id,
+                    assessment_instance_id=instance_id,
+                    details=details,
+                )
+                await db.commit()
+
+            except Exception as exc:
+                await db.rollback()
+                failed += 1
                 details.append({
                     "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "loaded", "reason": "BioAI report data fetched from MetSights",
+                    "action": "failed", "reason": str(exc)[:200],
                 })
-
-            if not _report_data_complete(reports, report_url):
-                skipped += 1
-                details.append({
-                    "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "skipped",
-                    "reason": "BioAI report data incomplete (missing reports or report_url)",
-                })
-                continue
-
-            service_keys = [
-                k.strip() for k in (bioai_notification or "").split(",") if k.strip()
-            ]
-            if not service_keys:
-                skipped += 1
-                details.append({
-                    "user_id": user_id, "engagement_id": engagement_id,
-                    "action": "skipped", "reason": "reports ready, no notification keys configured",
-                })
-                continue
-
-            notified += await _send_report_notifications(
-                db,
-                notifications_service=notifications_service,
-                service_keys=service_keys,
-                user_id=user_id,
-                engagement_id=engagement_id,
-                assessment_instance_id=instance_id,
-                details=details,
-            )
-            await db.commit()
-
-        except Exception as exc:
-            await db.rollback()
-            failed += 1
-            details.append({
-                "user_id": user_id, "engagement_id": engagement_id,
-                "action": "failed", "reason": str(exc)[:200],
-            })
-            logger.warning(
-                "load_bioai_reports failed: user=%s engagement=%s: %s",
-                user_id, engagement_id, exc, exc_info=True,
-            )
+                logger.warning(
+                    "load_bioai_reports failed: user=%s engagement=%s: %s",
+                    user_id, engagement_id, exc, exc_info=True,
+                )
+        finally:
+            _report(index)
 
     return {
         "as_of": today.isoformat(),

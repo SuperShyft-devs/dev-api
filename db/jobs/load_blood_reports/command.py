@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from datetime import date
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -27,6 +28,54 @@ from modules.notifications.service import NotificationsService
 from modules.platform_settings.dependencies import get_platform_settings_service_readonly
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.users.repository import UsersRepository
+
+_PROGRESS_BAR_WIDTH = 30
+
+
+def _format_progress(
+    done: int,
+    total: int,
+    loaded: int,
+    notified: int,
+    skipped: int,
+    failed: int,
+) -> str:
+    pct = 100 if total == 0 else int(100 * done / total)
+    filled = _PROGRESS_BAR_WIDTH if total == 0 else int(_PROGRESS_BAR_WIDTH * done / total)
+    bar = "█" * filled + "░" * (_PROGRESS_BAR_WIDTH - filled)
+    return (
+        f"[{bar}] {done}/{total} ({pct}%)  "
+        f"loaded={loaded} notified={notified} skipped={skipped} failed={failed}"
+    )
+
+
+def _make_progress_printer():
+    """Return a progress callback that redraws in-place on a TTY, or logs lines otherwise."""
+    is_tty = sys.stdout.isatty()
+    last_pct = -1
+
+    def on_progress(
+        done: int,
+        total: int,
+        loaded: int,
+        notified: int,
+        skipped: int,
+        failed: int,
+    ) -> None:
+        nonlocal last_pct
+        line = _format_progress(done, total, loaded, notified, skipped, failed)
+        if is_tty:
+            print(f"\r{line}", end="", flush=True)
+            if done >= total:
+                print(flush=True)
+            return
+
+        pct = 100 if total == 0 else int(100 * done / total)
+        if done == 0 or done >= total or pct != last_pct:
+            print(line, flush=True)
+            last_pct = pct
+
+    return on_progress
 
 
 async def run_load(
@@ -62,6 +111,8 @@ async def run_load(
     )
     assessments_service = get_assessments_service()
     notifications_service = NotificationsService(NotificationsRepository())
+    on_progress = _make_progress_printer()
+    print("Loading eligible blood report participants...", flush=True)
 
     async with session_factory() as session:
         result = await load_blood_reports(
@@ -72,6 +123,7 @@ async def run_load(
             sync_service=sync_service,
             as_of=as_of,
             dry_run=dry_run,
+            on_progress=on_progress,
         )
         await session.commit()
 
