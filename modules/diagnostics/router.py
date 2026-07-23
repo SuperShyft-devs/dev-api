@@ -251,6 +251,26 @@ async def update_package_status(
     return success_response(updated.model_dump())
 
 
+@router.post("/diagnostic-packages/{package_id}/duplicate", status_code=201)
+async def duplicate_package(
+    package_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    duplicated = await diagnostics_service.duplicate_package(
+        db,
+        employee=employee,
+        package_id=package_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(duplicated.model_dump())
+
+
 @router.patch("/diagnostic-packages/order")
 async def reorder_packages(
     payload: ReorderPackagesRequest,

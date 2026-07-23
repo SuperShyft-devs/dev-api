@@ -568,6 +568,32 @@ class DiagnosticsService:
         )
         return await self._package_response_with_test_count(db, updated)
 
+    async def duplicate_package(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        package_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> DiagnosticPackageResponse:
+        self._ensure_employee_access(employee)
+        duplicated = await self._repository.duplicate_package(db, package_id=package_id)
+        if duplicated is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
+
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_DUPLICATE_DIAGNOSTIC_PACKAGE",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return await self._package_response_with_test_count(db, duplicated)
+
     async def reorder_packages(
         self,
         db,

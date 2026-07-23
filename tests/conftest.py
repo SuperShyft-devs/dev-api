@@ -91,6 +91,7 @@ from modules.uploads.router import router as uploads_router
 from modules.notifications.router import router as notifications_router
 from modules.webhooks.router import router as webhooks_router
 from modules.server_health.router import router as server_health_router
+from modules.diagnostics.router import router as diagnostics_router
 
 
 def _project_root() -> Path:
@@ -337,6 +338,7 @@ async def fastapi_app(
     app.include_router(notifications_router)
     app.include_router(webhooks_router)
     app.include_router(server_health_router)
+    app.include_router(diagnostics_router)
 
     async def _get_test_db():
         yield test_db_session
