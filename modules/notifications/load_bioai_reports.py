@@ -1,7 +1,7 @@
 """Load BioAI reports from MetSights and send notifications.
 
-For participants in running engagements where the MetSights Basic/Pro assessment is
-completed and today >= engagement_date:
+For participants in running engagements with a MetSights Basic/Pro assessment
+where today >= engagement_date:
 1. Check MetSights blood parameters for is_complete (Pro/Basic only).
 2. If individual_health_report.reports or report_url is null, fetch from MetSights.
 3. When both reports and report_url are present, send notifications using
@@ -65,7 +65,7 @@ async def _get_eligible_participants(
     db: AsyncSession,
     today: date,
 ) -> list[tuple]:
-    """Return participants with complete MetSights Basic/Pro assessments where today >= engagement_date.
+    """Return participants with MetSights Basic/Pro assessments where today >= engagement_date.
 
     FitPrint (type 7) fitness reports are loaded separately — they are not BioAI reports.
     """
@@ -94,7 +94,6 @@ async def _get_eligible_participants(
             == AssessmentInstance.assessment_instance_id,
         )
         .where(Engagement.status.ilike("running"))
-        .where(AssessmentInstance.status == "completed")
         .where(EngagementParticipant.engagement_date <= today)
         .where(AssessmentInstance.metsights_record_id.isnot(None))
         .where(AssessmentInstance.metsights_record_id != "")

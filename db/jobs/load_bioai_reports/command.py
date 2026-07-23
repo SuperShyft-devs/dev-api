@@ -1,7 +1,7 @@
 """Load BioAI reports from MetSights for eligible participants.
 
-Fetches report data and PDF URLs from MetSights for participants with completed
-assessments where today >= engagement_date. Sends notifications via
+Fetches report data and PDF URLs from MetSights for participants in running
+engagements where today >= engagement_date. Sends notifications via
 engagement.bioai_report_notification.
 
 Entrypoint: ``python -m db.jobs.load_bioai_reports --yes``
