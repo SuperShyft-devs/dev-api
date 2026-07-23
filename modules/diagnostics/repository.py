@@ -185,6 +185,107 @@ class DiagnosticsRepository:
         )
         return int(result.rowcount or 0)
 
+    async def duplicate_package(self, db: AsyncSession, *, package_id: int) -> DiagnosticPackage | None:
+        result = await db.execute(
+            select(DiagnosticPackage)
+            .where(DiagnosticPackage.diagnostic_package_id == package_id)
+            .options(
+                selectinload(DiagnosticPackage.reasons),
+                selectinload(DiagnosticPackage.tags),
+                selectinload(DiagnosticPackage.test_group_assignments),
+                selectinload(DiagnosticPackage.samples),
+                selectinload(DiagnosticPackage.preparations),
+                selectinload(DiagnosticPackage.filter_chip_links),
+            )
+        )
+        original = result.unique().scalar_one_or_none()
+        if original is None:
+            return None
+
+        duplicated = DiagnosticPackage(
+            reference_id=original.reference_id,
+            package_name=f"{original.package_name} copy",
+            package_image=original.package_image,
+            diagnostic_provider=original.diagnostic_provider,
+            external_package_id=original.external_package_id,
+            created_by_user_id=original.created_by_user_id,
+            report_duration_hours=original.report_duration_hours,
+            collection_type=original.collection_type,
+            health_areas_covered=original.health_areas_covered,
+            about_text=original.about_text,
+            bookings_count=0,
+            price=original.price,
+            original_price=original.original_price,
+            is_most_popular=original.is_most_popular,
+            complementary_consultation=original.complementary_consultation,
+            gender_suitability=original.gender_suitability,
+            status=original.status,
+            package_for=original.package_for,
+            display_order=original.display_order,
+        )
+        db.add(duplicated)
+        await db.flush()
+
+        for r in original.reasons:
+            db.add(
+                DiagnosticPackageReason(
+                    diagnostic_package_id=duplicated.diagnostic_package_id,
+                    display_order=r.display_order,
+                    reason_text=r.reason_text,
+                )
+            )
+
+        for t in original.tags:
+            db.add(
+                DiagnosticPackageTag(
+                    diagnostic_package_id=duplicated.diagnostic_package_id,
+                    tag_name=t.tag_name,
+                    display_order=t.display_order,
+                )
+            )
+
+        for tg in original.test_group_assignments:
+            db.add(
+                DiagnosticPackageTestGroup(
+                    diagnostic_package_id=duplicated.diagnostic_package_id,
+                    group_id=tg.group_id,
+                    display_order=tg.display_order,
+                )
+            )
+
+        for s in original.samples:
+            db.add(
+                DiagnosticPackageSample(
+                    diagnostic_package_id=duplicated.diagnostic_package_id,
+                    sample_type=s.sample_type,
+                    description=s.description,
+                    display_order=s.display_order,
+                )
+            )
+
+        for p in original.preparations:
+            db.add(
+                DiagnosticPackagePreparation(
+                    diagnostic_package_id=duplicated.diagnostic_package_id,
+                    preparation_title=p.preparation_title,
+                    steps=p.steps,
+                    display_order=p.display_order,
+                )
+            )
+
+        for fcl in original.filter_chip_links:
+            if fcl.diagnostic_package_id is not None:
+                db.add(
+                    DiagnosticPackageFilterChipLink(
+                        diagnostic_package_id=duplicated.diagnostic_package_id,
+                        filter_chip_id=fcl.filter_chip_id,
+                        display_order=fcl.display_order,
+                    )
+                )
+
+        await db.flush()
+        return await self.get_package_by_id(db, package_id=duplicated.diagnostic_package_id)
+
     async def reorder_packages(self, db: AsyncSession, *, package_ids: list[int]) -> None:
         for index, package_id in enumerate(package_ids, start=1):
             await db.execute(
