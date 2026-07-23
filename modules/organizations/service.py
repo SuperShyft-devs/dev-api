@@ -337,10 +337,17 @@ class OrganizationsService:
             contact_person_user_id=contact_person_user_id,
             search=search,
         )
-        return [
-            self.organization_to_details_dict(org, industry)
-            for org, industry in organizations
-        ], total
+        org_ids = [int(org.organization_id) for org, _industry in organizations]
+        cities_by_org = await self._repository.list_distinct_engagement_cities_by_org_ids(
+            db,
+            organization_ids=org_ids,
+        )
+        result = []
+        for org, industry in organizations:
+            item = self.organization_to_details_dict(org, industry)
+            item["camp_cities"] = cities_by_org.get(int(org.organization_id), [])
+            result.append(item)
+        return result, total
 
     async def list_industries(self, db, *, employee: EmployeeContext) -> list[dict]:
         ensure_internal_employee(employee)
@@ -715,3 +722,68 @@ class OrganizationsService:
         )
 
         return self._camp_rows_to_dicts(rows), total
+
+    async def remap_camp_no_for_employee(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        new_camp_no: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        ensure_admin(employee)
+
+        if new_camp_no == camp_no:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="New camp number must be different from the current camp number",
+            )
+
+        source_count = await self._repository.count_engagements_by_camp_no(db, camp_no=camp_no)
+        if source_count == 0:
+            raise AppError(
+                status_code=404,
+                error_code="CAMP_NOT_FOUND",
+                message="Camp does not exist",
+            )
+
+        target_existing_count = await self._repository.count_engagements_by_camp_no(
+            db,
+            camp_no=new_camp_no,
+        )
+        updated = await self._repository.remap_engagement_camp_no(
+            db,
+            from_camp_no=camp_no,
+            to_camp_no=new_camp_no,
+        )
+
+        await self._require_audit_service().log_event(
+            db,
+            action="EMPLOYEE_REMAP_CAMP_NO",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return {
+            "camp_no": camp_no,
+            "new_camp_no": new_camp_no,
+            "updated_engagements": updated,
+            "target_existing_engagements": target_existing_count,
+        }
+
+    async def count_engagements_for_camp_no(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+    ) -> int:
+        ensure_admin(employee)
+        return await self._repository.count_engagements_by_camp_no(db, camp_no=camp_no)

@@ -128,3 +128,7 @@ class CampListItem(BaseModel):
     organization_name: str
     start_date: date
     engagement_count: int
+
+
+class CampRemapRequest(BaseModel):
+    new_camp_no: int = Field(gt=0)

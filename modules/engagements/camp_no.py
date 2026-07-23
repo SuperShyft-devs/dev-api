@@ -29,3 +29,25 @@ def format_department_camp_name(organization_name: str, department_slug: str, st
     slug = (department_slug or "").strip()
     month_word = calendar.month_name[start_date.month]
     return f"{name} {slug} {start_date.day} {month_word} {start_date.year}"
+
+
+def format_city_camp_name(organization_name: str, city: str, start_date: date) -> str:
+    """Human-readable city camp label, e.g. 'Acme Corp Bengaluru 23 June 2026'."""
+    name = (organization_name or "").strip() or "Organization"
+    city_label = (city or "").strip()
+    month_word = calendar.month_name[start_date.month]
+    return f"{name} {city_label} {start_date.day} {month_word} {start_date.year}"
+
+
+def format_city_department_camp_name(
+    organization_name: str,
+    city: str,
+    department_slug: str,
+    start_date: date,
+) -> str:
+    """Human-readable city+department camp label."""
+    name = (organization_name or "").strip() or "Organization"
+    city_label = (city or "").strip()
+    slug = (department_slug or "").strip()
+    month_word = calendar.month_name[start_date.month]
+    return f"{name} {city_label} {slug} {start_date.day} {month_word} {start_date.year}"

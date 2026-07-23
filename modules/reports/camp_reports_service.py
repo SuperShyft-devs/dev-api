@@ -17,7 +17,12 @@ from modules.employee.access_control import (
     ensure_internal_employee,
 )
 from modules.employee.service import EmployeeContext
-from modules.engagements.camp_no import format_camp_name, format_department_camp_name
+from modules.engagements.camp_no import (
+    format_camp_name,
+    format_city_camp_name,
+    format_city_department_camp_name,
+    format_department_camp_name,
+)
 from modules.engagements.models import Engagement
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
@@ -137,6 +142,40 @@ class CampReportsService:
                 message="Department does not exist for this organization",
             )
 
+
+    @staticmethod
+    def _normalize_city(city: str | None) -> str:
+        normalized = (city or "").strip()
+        if not normalized:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        return normalized
+
+    async def _validate_camp_city(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        city: str,
+    ) -> str:
+        normalized = self._normalize_city(city)
+        count = await self._repository.count_engagements_for_camp_city(
+            db,
+            camp_no=camp_no,
+            city=normalized,
+        )
+        if count == 0:
+            raise AppError(
+                status_code=404,
+                error_code="CITY_NOT_FOUND",
+                message="City does not exist for this camp",
+            )
+        # Prefer canonical stored casing from engagements
+        cities = await self._repository.list_distinct_cities_for_camp(db, camp_no=camp_no)
+        for existing in cities:
+            if existing.lower() == normalized.lower():
+                return existing
+        return normalized
+
     async def init_camp_report(
         self,
         db: AsyncSession,
@@ -169,6 +208,7 @@ class CampReportsService:
             report=report_payload,
             camp_no=camp_no,
             department=None,
+            city=None,
             organization_id=context["organization_id"],
         )
         try:
@@ -242,6 +282,7 @@ class CampReportsService:
             report=report_payload,
             camp_no=camp_no,
             department=normalized_slug,
+            city=None,
             organization_id=context["organization_id"],
         )
         try:
@@ -256,6 +297,150 @@ class CampReportsService:
         await self._audit_service.log_event(
             db,
             action="EMPLOYEE_INIT_DEPARTMENT_CAMP_REPORT",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return created
+
+    async def init_city_camp_report(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        city: str,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> CampReport:
+        ensure_internal_employee(employee)
+
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        normalized_city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+
+        existing = await self._repository.get_by_camp_no_and_city(
+            db,
+            camp_no=camp_no,
+            city=normalized_city,
+        )
+        if existing is not None:
+            raise AppError(
+                status_code=409,
+                error_code="CAMP_REPORT_EXISTS",
+                message="Camp report already exists",
+            )
+
+        camp_name = format_city_camp_name(
+            context["organization_name"],
+            normalized_city,
+            context["camp_start_date"],
+        )
+        report_payload = self._build_initial_report(
+            camp_name=camp_name,
+            camp_start_date=context["camp_start_date"],
+            camp_end_date=context["camp_end_date"],
+        )
+
+        row = CampReport(
+            report=report_payload,
+            camp_no=camp_no,
+            department=None,
+            city=normalized_city,
+            organization_id=context["organization_id"],
+        )
+        try:
+            created = await self._repository.create(db, row)
+        except IntegrityError:
+            raise AppError(
+                status_code=409,
+                error_code="CAMP_REPORT_EXISTS",
+                message="Camp report already exists",
+            ) from None
+
+        await self._audit_service.log_event(
+            db,
+            action="EMPLOYEE_INIT_CITY_CAMP_REPORT",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return created
+
+    async def init_city_department_camp_report(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        city: str,
+        slug: str,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> CampReport:
+        ensure_internal_employee(employee)
+
+        normalized_slug = slug.strip()
+        if not normalized_slug:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        normalized_city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+        await self._validate_department_slug(
+            db,
+            organization_id=context["organization_id"],
+            slug=normalized_slug,
+        )
+
+        existing = await self._repository.get_by_camp_no_city_and_department(
+            db,
+            camp_no=camp_no,
+            city=normalized_city,
+            department=normalized_slug,
+        )
+        if existing is not None:
+            raise AppError(
+                status_code=409,
+                error_code="CAMP_REPORT_EXISTS",
+                message="Camp report already exists",
+            )
+
+        camp_name = format_city_department_camp_name(
+            context["organization_name"],
+            normalized_city,
+            normalized_slug,
+            context["camp_start_date"],
+        )
+        report_payload = self._build_initial_report(
+            camp_name=camp_name,
+            camp_start_date=context["camp_start_date"],
+            camp_end_date=context["camp_end_date"],
+        )
+
+        row = CampReport(
+            report=report_payload,
+            camp_no=camp_no,
+            department=normalized_slug,
+            city=normalized_city,
+            organization_id=context["organization_id"],
+        )
+        try:
+            created = await self._repository.create(db, row)
+        except IntegrityError:
+            raise AppError(
+                status_code=409,
+                error_code="CAMP_REPORT_EXISTS",
+                message="Camp report already exists",
+            ) from None
+
+        await self._audit_service.log_event(
+            db,
+            action="EMPLOYEE_INIT_CITY_DEPARTMENT_CAMP_REPORT",
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -354,6 +539,7 @@ class CampReportsService:
             "report_id": row.report_id,
             "camp_no": int(row.camp_no),
             "department": row.department,
+            "city": row.city,
             "organization_id": row.organization_id,
             "report": row.report,
             "created_at": row.created_at.isoformat() if row.created_at else None,
@@ -429,18 +615,38 @@ class CampReportsService:
         *,
         camp_no: int,
         department: str | None,
+        city: str | None = None,
     ) -> CampReport:
-        if department is None:
-            row = await self._repository.get_overall_by_camp_no(db, camp_no=camp_no)
+        if city is None:
+            if department is None:
+                row = await self._repository.get_overall_by_camp_no(db, camp_no=camp_no)
+            else:
+                normalized_department = department.strip()
+                if not normalized_department:
+                    raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+                row = await self._repository.get_by_camp_no_and_department(
+                    db,
+                    camp_no=camp_no,
+                    department=normalized_department,
+                )
         else:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            row = await self._repository.get_by_camp_no_and_department(
-                db,
-                camp_no=camp_no,
-                department=normalized_department,
-            )
+            normalized_city = self._normalize_city(city)
+            if department is None:
+                row = await self._repository.get_by_camp_no_and_city(
+                    db,
+                    camp_no=camp_no,
+                    city=normalized_city,
+                )
+            else:
+                normalized_department = department.strip()
+                if not normalized_department:
+                    raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+                row = await self._repository.get_by_camp_no_city_and_department(
+                    db,
+                    camp_no=camp_no,
+                    city=normalized_city,
+                    department=normalized_department,
+                )
 
         if row is None:
             raise AppError(
@@ -457,6 +663,7 @@ class CampReportsService:
         employee: EmployeeContext,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> dict:
         context = await self._resolve_camp_context(db, camp_no=camp_no)
         await ensure_camp_access(
@@ -477,7 +684,12 @@ class CampReportsService:
             )
             department = normalized_department
 
-        row = await self._get_camp_report_row(db, camp_no=camp_no, department=department)
+        if city is not None:
+            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+
+        row = await self._get_camp_report_row(db, camp_no=camp_no, department=department,
+            city=city,
+        )
         report = row.report or {}
         return dict(report.get("meta") or {})
 
@@ -488,6 +700,7 @@ class CampReportsService:
         employee: EmployeeContext,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[str]:
         context = await self._resolve_camp_context(db, camp_no=camp_no)
         await ensure_camp_access_admin_or_org_manager(
@@ -508,7 +721,12 @@ class CampReportsService:
             )
             department = normalized_department
 
-        row = await self._get_camp_report_row(db, camp_no=camp_no, department=department)
+        if city is not None:
+            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+
+        row = await self._get_camp_report_row(db, camp_no=camp_no, department=department,
+            city=city,
+        )
         report = row.report or {}
         return list(report.keys())
 
@@ -520,6 +738,7 @@ class CampReportsService:
         camp_no: int,
         section: str,
         department: str | None = None,
+        city: str | None = None,
     ) -> dict:
         normalized_section = section.strip()
         if not normalized_section:
@@ -544,6 +763,9 @@ class CampReportsService:
             )
             department = normalized_department
 
+        if city is not None:
+            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+
         section_row = await self._sections_repository.get_by_section_key(
             db,
             section_key=normalized_section,
@@ -555,7 +777,9 @@ class CampReportsService:
                 message="Invalid report section",
             )
 
-        row = await self._get_camp_report_row(db, camp_no=camp_no, department=department)
+        row = await self._get_camp_report_row(db, camp_no=camp_no, department=department,
+            city=city,
+        )
         report = row.report or {}
         if normalized_section not in report:
             raise AppError(
@@ -573,6 +797,7 @@ class CampReportsService:
         camp_no: int,
         section: str,
         department: str | None = None,
+        city: str | None = None,
         ip_address: str,
         user_agent: str,
         endpoint: str,
@@ -589,10 +814,10 @@ class CampReportsService:
             repository=self._organizations_repository,
         )
 
-        if department is None:
-            row = await self._repository.get_overall_by_camp_no(db, camp_no=camp_no)
-            audit_action = "EMPLOYEE_REFRESH_CAMP_REPORT_SECTION"
-        else:
+        if city is not None:
+            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+
+        if department is not None:
             normalized_department = department.strip()
             if not normalized_department:
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
@@ -601,13 +826,33 @@ class CampReportsService:
                 organization_id=context["organization_id"],
                 slug=normalized_department,
             )
+            department = normalized_department
+
+        if city is None and department is None:
+            row = await self._repository.get_overall_by_camp_no(db, camp_no=camp_no)
+            audit_action = "EMPLOYEE_REFRESH_CAMP_REPORT_SECTION"
+        elif city is None and department is not None:
             row = await self._repository.get_by_camp_no_and_department(
                 db,
                 camp_no=camp_no,
-                department=normalized_department,
+                department=department,
             )
-            department = normalized_department
             audit_action = "EMPLOYEE_REFRESH_DEPARTMENT_CAMP_REPORT_SECTION"
+        elif city is not None and department is None:
+            row = await self._repository.get_by_camp_no_and_city(
+                db,
+                camp_no=camp_no,
+                city=city,
+            )
+            audit_action = "EMPLOYEE_REFRESH_CITY_CAMP_REPORT_SECTION"
+        else:
+            row = await self._repository.get_by_camp_no_city_and_department(
+                db,
+                camp_no=camp_no,
+                city=city,
+                department=department,
+            )
+            audit_action = "EMPLOYEE_REFRESH_CITY_DEPARTMENT_CAMP_REPORT_SECTION"
 
         if row is None:
             raise AppError(
@@ -640,6 +885,7 @@ class CampReportsService:
             section_key=normalized_section,
             camp_no=camp_no,
             department=department,
+            city=city,
             camp_start_date=context["camp_start_date"],
             camp_end_date=context["camp_end_date"],
         )
@@ -680,11 +926,13 @@ class CampReportsService:
         *,
         camp_no: int,
         department: str | None,
+        city: str | None = None,
     ) -> dict:
         contexts = await self._repository.list_health_assessment_contexts(
             db,
             camp_no=camp_no,
             department=department,
+            city=city,
         )
         participant_habits: list[list[dict[str, str | None]]] = []
         participant_profiles: list[list[str]] = []
@@ -737,11 +985,13 @@ class CampReportsService:
         *,
         camp_no: int,
         department: str | None,
+        city: str | None = None,
     ) -> dict:
         contexts = await self._repository.list_fitprint_assessment_contexts(
             db,
             camp_no=camp_no,
             department=department,
+            city=city,
         )
 
         participant_scores: list[dict[str, float | None]] = []
@@ -810,6 +1060,7 @@ class CampReportsService:
         employee: EmployeeContext,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> dict:
         context = await self._resolve_camp_context(db, camp_no=camp_no)
         await ensure_camp_access(
@@ -834,12 +1085,14 @@ class CampReportsService:
             db,
             camp_no=camp_no,
             department=department,
+            city=city,
         )
 
         no_fitprint_rows = await self._repository.list_enrolled_users_without_fitprint(
             db,
             camp_no=camp_no,
             department=department,
+            city=city,
         )
 
         user_ids = [ctx.assessment_instance.user_id for ctx in contexts]
@@ -1069,6 +1322,7 @@ class CampReportsService:
         employee: EmployeeContext,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> dict:
         context = await self._resolve_camp_context(db, camp_no=camp_no)
         await ensure_camp_access(
@@ -1093,6 +1347,7 @@ class CampReportsService:
             db,
             camp_no=camp_no,
             department=department,
+            city=city,
         )
 
         user_ids = [ctx.assessment_instance.user_id for ctx in contexts]
@@ -1271,6 +1526,7 @@ class CampReportsService:
         camp_no: int,
         question_key: str,
         department: str | None = None,
+        city: str | None = None,
     ) -> dict:
         context = await self._resolve_camp_context(db, camp_no=camp_no)
         await ensure_camp_access(
@@ -1308,6 +1564,7 @@ class CampReportsService:
             camp_no=camp_no,
             question_key=question_key,
             department=department,
+            city=city,
         )
 
         sibling_by_user: dict[int, object | None] = {}
@@ -1318,6 +1575,7 @@ class CampReportsService:
                 camp_no=camp_no,
                 question_key=sibling_key,
                 department=department,
+            city=city,
             )
             for user_id, _fn, _ln, gender_raw, answer in sibling_rows:
                 sibling_by_user[user_id] = answer
@@ -1327,6 +1585,7 @@ class CampReportsService:
             db,
             camp_no=camp_no,
             department=department,
+            city=city,
         )
 
         summary: dict[str, dict[str, int]] = {
@@ -1525,12 +1784,14 @@ class CampReportsService:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> dict[str, int]:
         """Count enrolled users with at least one questionnaire_responses row for this camp."""
         return await self._repository.count_any_questionnaire_responders_by_gender(
             db,
             camp_no=camp_no,
             department=department,
+            city=city,
         )
 
     async def validate_overall_risk_score(
@@ -1540,6 +1801,7 @@ class CampReportsService:
         employee: EmployeeContext,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> dict:
         context = await self._resolve_camp_context(db, camp_no=camp_no)
         await ensure_camp_access(
@@ -1564,16 +1826,19 @@ class CampReportsService:
             db,
             camp_no=camp_no,
             department=department,
+            city=city,
         )
         any_q = await self._count_any_questionnaire_responders(
             db,
             camp_no=camp_no,
             department=department,
+            city=city,
         )
         bio_ai_generated = await self._repository.count_bio_ai_reports(
             db,
             camp_no=camp_no,
             department=department,
+            city=city,
         )
 
         with_score: list[dict[str, Any]] = []
@@ -1669,11 +1934,13 @@ class CampReportsService:
         *,
         camp_no: int,
         department: str | None,
+        city: str | None = None,
     ) -> dict:
         participants = await self._repository.list_blood_parameters_by_gender(
             db,
             camp_no=camp_no,
             department=department,
+            city=city,
         )
 
         group_tests: list[tuple[str, list]] = []
@@ -1837,6 +2104,7 @@ class CampReportsService:
         section_key: str,
         camp_no: int,
         department: str | None,
+        city: str | None = None,
         camp_start_date: date | None,
         camp_end_date: date | None,
     ) -> dict:
@@ -1848,6 +2116,7 @@ class CampReportsService:
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
             )
             return build_participation_by_age(users, reference_date=participation_reference)
 
@@ -1856,6 +2125,7 @@ class CampReportsService:
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
                 age_reference_date=age_reference,
             )
             return build_kpis(metrics)
@@ -1865,16 +2135,19 @@ class CampReportsService:
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
             )
             total_enrolled = await self._repository.count_enrolled_users(
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
             )
             bio_ai_reports = await self._repository.count_bio_ai_reports(
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
             )
             return build_overall_risk_score(
                 scores,
@@ -1887,6 +2160,7 @@ class CampReportsService:
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
             )
             return build_distribution_by_oxidative_stress(scores)
 
@@ -1895,6 +2169,7 @@ class CampReportsService:
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
             )
             return build_distribution_by_physical_activity_frequency(rows)
 
@@ -1903,6 +2178,7 @@ class CampReportsService:
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
             )
             return build_distribution_by_sleeping_hours(rows)
 
@@ -1911,6 +2187,7 @@ class CampReportsService:
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
             )
             return build_distribution_by_gender_by_metabolic_syndrome(rows)
 
@@ -1919,6 +2196,7 @@ class CampReportsService:
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
             )
 
         if section_key == "company_average_scores":
@@ -1926,6 +2204,7 @@ class CampReportsService:
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
             )
 
         if section_key == "blood_and_lab_intelligence":
@@ -1933,6 +2212,7 @@ class CampReportsService:
                 db,
                 camp_no=camp_no,
                 department=department,
+            city=city,
             )
 
         if section_key == "ranking":

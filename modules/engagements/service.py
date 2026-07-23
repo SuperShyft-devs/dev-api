@@ -751,7 +751,11 @@ class EngagementsService:
         engagement.slot_duration = payload.slot_duration
         engagement.start_date = payload.start_date
         engagement.end_date = payload.end_date
-        engagement.camp_no = compute_camp_no(payload.organization_id, payload.start_date)
+        update_fields = payload.model_dump(exclude_unset=True)
+        if "camp_no" in update_fields:
+            engagement.camp_no = update_fields["camp_no"]
+        else:
+            engagement.camp_no = compute_camp_no(payload.organization_id, payload.start_date)
         engagement.healthians_zone_id = payload.healthians_zone_id
         engagement.external_camp_id = payload.external_camp_id
         engagement.blood_collection_type = payload.blood_collection_type

@@ -118,6 +118,46 @@ async def get_department_camp_report_dashboard(
     return success_response(result)
 
 
+@router.get("/{camp_no}/{city}/dashboard")
+async def get_city_camp_report_dashboard(
+    camp_no: int,
+    city: str,
+    section: str,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.get_camp_report_dashboard(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=section,
+        city=city,
+    )
+    return success_response(result)
+
+
+@router.get("/{camp_no}/{city}/department/{slug}/dashboard")
+async def get_city_department_camp_report_dashboard(
+    camp_no: int,
+    city: str,
+    slug: str,
+    section: str,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.get_camp_report_dashboard(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=section,
+        department=slug,
+        city=city,
+    )
+    return success_response(result)
+
+
 @router.get("/{camp_no}/validate/company-average-scores")
 async def validate_company_average_scores(
     camp_no: int,
@@ -361,6 +401,56 @@ async def refresh_department_camp_report(
     return success_response(result)
 
 
+@router.put("/{camp_no}/{city}/refresh")
+async def refresh_city_camp_report(
+    camp_no: int,
+    city: str,
+    payload: CampReportRefreshRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.refresh_camp_report_section(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
+        city=city,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.put("/{camp_no}/{city}/department/{slug}/refresh")
+async def refresh_city_department_camp_report(
+    camp_no: int,
+    city: str,
+    slug: str,
+    payload: CampReportRefreshRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.refresh_camp_report_section(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
+        department=slug,
+        city=city,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
 @router.post("/{camp_no}/init", status_code=201)
 async def init_camp_report(
     camp_no: int,
@@ -394,6 +484,52 @@ async def init_department_camp_report(
         db,
         employee=employee,
         camp_no=camp_no,
+        slug=slug,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response({"report_id": created.report_id})
+
+
+@router.post("/{camp_no}/{city}/init", status_code=201)
+async def init_city_camp_report(
+    camp_no: int,
+    city: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    created = await service.init_city_camp_report(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        city=city,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response({"report_id": created.report_id})
+
+
+@router.post("/{camp_no}/{city}/department/{slug}/init", status_code=201)
+async def init_city_department_camp_report(
+    camp_no: int,
+    city: str,
+    slug: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    created = await service.init_city_department_camp_report(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        city=city,
         slug=slug,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),

@@ -53,6 +53,7 @@ class CampReport(Base):
     report = Column(JSON)
     camp_no = Column(BigInteger, nullable=False, index=True)
     department = Column(String, nullable=True)
+    city = Column(String, nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.organization_id"), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(

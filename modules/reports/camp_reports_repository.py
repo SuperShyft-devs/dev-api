@@ -58,7 +58,12 @@ class CampReportsRepository:
     """CRUD queries for camp_reports."""
 
     @staticmethod
-    def _enrolled_users_ranked_subquery(*, camp_no: int, department: str | None = None):
+    def _enrolled_users_ranked_subquery(
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ):
         """Distinct enrolled users per camp (latest participant row per user_id)."""
         ranked_rows = (
             select(
@@ -84,6 +89,8 @@ class CampReportsRepository:
         )
         if department is not None:
             ranked_rows = ranked_rows.where(EngagementParticipant.participant_department == department)
+        if city is not None:
+            ranked_rows = ranked_rows.where(func.lower(func.trim(Engagement.city)) == city.lower())
 
         ranked = ranked_rows.subquery()
         return (
@@ -120,6 +127,7 @@ class CampReportsRepository:
             select(CampReport).where(
                 CampReport.camp_no == camp_no,
                 CampReport.department.is_(None),
+                CampReport.city.is_(None),
             )
         )
         return result.scalar_one_or_none()
@@ -135,15 +143,102 @@ class CampReportsRepository:
             select(CampReport).where(
                 CampReport.camp_no == camp_no,
                 CampReport.department == department,
+                CampReport.city.is_(None),
             )
         )
         return result.scalar_one_or_none()
+
+    async def get_by_camp_no_and_city(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        city: str,
+    ) -> CampReport | None:
+        result = await db.execute(
+            select(CampReport).where(
+                CampReport.camp_no == camp_no,
+                CampReport.department.is_(None),
+                func.lower(CampReport.city) == city.lower(),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_camp_no_city_and_department(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        city: str,
+        department: str,
+    ) -> CampReport | None:
+        result = await db.execute(
+            select(CampReport).where(
+                CampReport.camp_no == camp_no,
+                CampReport.department == department,
+                func.lower(CampReport.city) == city.lower(),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def list_distinct_cities_for_camp(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+    ) -> list[str]:
+        result = await db.execute(
+            select(Engagement.city)
+            .where(
+                Engagement.camp_no == camp_no,
+                Engagement.city.isnot(None),
+                func.trim(Engagement.city) != "",
+            )
+            .distinct()
+            .order_by(Engagement.city.asc())
+        )
+        cities: list[str] = []
+        seen: set[str] = set()
+        for (raw,) in result.all():
+            if raw is None:
+                continue
+            trimmed = str(raw).strip()
+            if not trimmed:
+                continue
+            key = trimmed.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            cities.append(trimmed)
+        return cities
+
+    async def count_engagements_for_camp_city(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        city: str,
+    ) -> int:
+        result = await db.execute(
+            select(func.count())
+            .select_from(Engagement)
+            .where(
+                Engagement.camp_no == camp_no,
+                func.lower(func.trim(Engagement.city)) == city.lower(),
+            )
+        )
+        return int(result.scalar_one() or 0)
 
     async def list_by_camp_no(self, db: AsyncSession, *, camp_no: int) -> list[CampReport]:
         result = await db.execute(
             select(CampReport)
             .where(CampReport.camp_no == camp_no)
-            .order_by(CampReport.department.is_(None).desc(), CampReport.department.asc())
+            .order_by(
+                CampReport.city.is_(None).desc(),
+                CampReport.city.asc(),
+                CampReport.department.is_(None).desc(),
+                CampReport.department.asc(),
+            )
         )
         return list(result.scalars().all())
 
@@ -163,9 +258,10 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[tuple[int, date | None, int]]:
         """Return distinct (user_id, date_of_birth, age) enrolled in a camp."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
         query = select(
             enrolled.c.user_id,
             enrolled.c.date_of_birth,
@@ -180,10 +276,11 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
         age_reference_date: date,
     ) -> dict[str, int]:
         """Aggregate KPI counts for a camp (optionally scoped to a department)."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         employees_result = await db.execute(
             select(func.count()).select_from(enrolled)
@@ -235,6 +332,8 @@ class CampReportsRepository:
         )
         if department is not None:
             doctor_query = doctor_query.where(EngagementParticipant.participant_department == department)
+        if city is not None:
+            doctor_query = doctor_query.where(func.lower(func.trim(Engagement.city)) == city.lower())
         doctor_result = await db.execute(doctor_query)
         doctor_consultation = int(doctor_result.scalar_one())
 
@@ -256,6 +355,10 @@ class CampReportsRepository:
         if department is not None:
             nutritionist_query = nutritionist_query.where(
                 EngagementParticipant.participant_department == department
+            )
+        if city is not None:
+            nutritionist_query = nutritionist_query.where(
+                func.lower(func.trim(Engagement.city)) == city.lower()
             )
         nutritionist_result = await db.execute(nutritionist_query)
         nutritionist_consultation = int(nutritionist_result.scalar_one())
@@ -289,6 +392,8 @@ class CampReportsRepository:
         )
         if department is not None:
             both_query = both_query.where(EngagementParticipant.participant_department == department)
+        if city is not None:
+            both_query = both_query.where(func.lower(func.trim(Engagement.city)) == city.lower())
         both_result = await db.execute(both_query)
         doctor_and_nutritionist_consultation = int(both_result.scalar_one())
 
@@ -362,9 +467,10 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[float]:
         """Return metabolic scores for enrolled users with Pro/Basic health reports."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked_reports = (
             select(
@@ -415,13 +521,14 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> int:
         """Count enrolled users whose latest Pro/Basic report has generated Bio AI JSON.
 
         Empty ``individual_health_report`` shells (``reports`` null/empty) are excluded —
         those rows are not treated as Bio AI generated.
         """
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked_reports = (
             select(
@@ -466,8 +573,9 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> int:
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
         result = await db.execute(select(func.count()).select_from(enrolled))
         return int(result.scalar_one())
 
@@ -477,9 +585,10 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> dict[str, int]:
         """Count enrolled users with at least one questionnaire answer in this camp."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         answered = (
             select(AssessmentInstance.user_id.label("user_id"))
@@ -524,12 +633,13 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[tuple[int, str | None, str | None, str | None, float | None, str | None]]:
         """Return (user_id, first_name, last_name, gender, score, reason) for enrolled users.
 
         ``reason`` is None when a metabolic_score is present.
         """
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked_reports = (
             select(
@@ -670,9 +780,10 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[float]:
         """Return oxidative stress scores for enrolled users with Pro/Basic health reports."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked_reports = (
             select(
@@ -723,9 +834,10 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[tuple[str | None, dict[str, Any]]]:
         """Return (gender, reports) for enrolled users with latest Pro/Basic health reports."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked_reports = (
             select(
@@ -771,9 +883,10 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[tuple[str | None, Any]]:
         """Return (gender, blood_parameters) for enrolled users with blood data."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked_reports = (
             select(
@@ -813,9 +926,10 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[tuple[str | None, object | None]]:
         """Return (gender, answer) for enrolled users with physical_activity_frequency responses."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked_instances = (
             select(
@@ -863,9 +977,10 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[tuple[str | None, object | None]]:
         """Return (gender, answer) for enrolled users with sleeping_hours responses."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked_instances = (
             select(
@@ -914,13 +1029,14 @@ class CampReportsRepository:
         camp_no: int,
         question_key: str,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[tuple[int, str | None, str | None, str | None, object | None]]:
         """Return (user_id, first_name, last_name, gender, answer) for ALL enrolled users.
 
         Uses LEFT JOIN so users without a questionnaire response for the given
         question_key still appear with answer=NULL.
         """
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         qr_subquery = (
             select(
@@ -985,6 +1101,7 @@ class CampReportsRepository:
             delete(CampReport).where(
                 CampReport.camp_no == camp_no,
                 CampReport.department.is_(None),
+                CampReport.city.is_(None),
             )
         )
         return int(result.rowcount or 0)
@@ -994,6 +1111,7 @@ class CampReportsRepository:
             delete(CampReport).where(
                 CampReport.camp_no == camp_no,
                 CampReport.department == department,
+                CampReport.city.is_(None),
             )
         )
         return int(result.rowcount or 0)
@@ -1054,9 +1172,10 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[EnrolledAssessmentContext]:
         """Latest assessment + report context per enrolled user in a camp."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked = (
             select(
@@ -1120,9 +1239,10 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[EnrolledAssessmentContext]:
         """Latest FitPrint (type_code '7') assessment context per enrolled user in a camp."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked = (
             select(
@@ -1191,9 +1311,10 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[EnrolledAssessmentContext]:
         """Latest health (type_code '1' or '2') assessment context per enrolled user."""
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked = (
             select(
@@ -1262,12 +1383,13 @@ class CampReportsRepository:
         *,
         camp_no: int,
         department: str | None = None,
+        city: str | None = None,
     ) -> list[tuple[int, str | None, str | None]]:
         """Enrolled camp users who have NO FitPrint (type_code '7') assessment.
 
         Returns list of (user_id, first_name, last_name).
         """
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department)
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         fitprint_users = (
             select(AssessmentInstance.user_id)

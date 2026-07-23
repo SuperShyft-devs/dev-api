@@ -20,6 +20,7 @@ from modules.organizations.schemas import (
     OrganizationUpdateRequest,
     IndustryCreateRequest,
     IndustryUpdateRequest,
+    CampRemapRequest,
 )
 from modules.organizations.service import OrganizationsService
 
@@ -193,6 +194,43 @@ async def list_camps(
         sort_dir=sort_dir,
     )
     return success_response(camps, meta={"page": page, "limit": limit, "total": total})
+
+
+@router.put("/camps/{camp_no}")
+async def remap_camp_no(
+    camp_no: int,
+    payload: CampRemapRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    organizations_service: OrganizationsService = Depends(get_organizations_service),
+):
+    result = await organizations_service.remap_camp_no_for_employee(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        new_camp_no=payload.new_camp_no,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.get("/camps/{camp_no}/engagement-count")
+async def get_camp_engagement_count(
+    camp_no: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    organizations_service: OrganizationsService = Depends(get_organizations_service),
+):
+    total = await organizations_service.count_engagements_for_camp_no(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+    )
+    return success_response({"camp_no": camp_no, "engagement_count": total})
 
 
 @router.get("/we")

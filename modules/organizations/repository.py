@@ -361,3 +361,60 @@ class OrganizationsRepository:
         query = query.offset(offset).limit(limit)
         result = await db.execute(query)
         return list(result.all())
+
+    async def list_distinct_engagement_cities_by_org_ids(
+        self,
+        db: AsyncSession,
+        *,
+        organization_ids: list[int],
+    ) -> dict[int, list[str]]:
+        if not organization_ids:
+            return {}
+        result = await db.execute(
+            select(Engagement.organization_id, Engagement.city)
+            .where(
+                Engagement.organization_id.in_(organization_ids),
+                Engagement.city.isnot(None),
+                func.trim(Engagement.city) != "",
+            )
+            .distinct()
+            .order_by(Engagement.organization_id.asc(), Engagement.city.asc())
+        )
+        cities_by_org: dict[int, list[str]] = {int(oid): [] for oid in organization_ids}
+        seen: dict[int, set[str]] = {int(oid): set() for oid in organization_ids}
+        for org_id, city in result.all():
+            if org_id is None or city is None:
+                continue
+            oid = int(org_id)
+            trimmed = str(city).strip()
+            if not trimmed:
+                continue
+            key = trimmed.lower()
+            if key in seen.get(oid, set()):
+                continue
+            seen.setdefault(oid, set()).add(key)
+            cities_by_org.setdefault(oid, []).append(trimmed)
+        return cities_by_org
+
+    async def count_engagements_by_camp_no(self, db: AsyncSession, *, camp_no: int) -> int:
+        result = await db.execute(
+            select(func.count()).select_from(Engagement).where(Engagement.camp_no == camp_no)
+        )
+        return int(result.scalar_one() or 0)
+
+    async def remap_engagement_camp_no(
+        self,
+        db: AsyncSession,
+        *,
+        from_camp_no: int,
+        to_camp_no: int,
+    ) -> int:
+        result = await db.execute(
+            select(Engagement).where(Engagement.camp_no == from_camp_no)
+        )
+        rows = list(result.scalars().all())
+        for row in rows:
+            row.camp_no = to_camp_no
+        if rows:
+            await db.flush()
+        return len(rows)
