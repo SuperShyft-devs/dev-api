@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from datetime import date
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -24,6 +25,53 @@ from modules.notifications.import_metsights_answers import import_metsights_answ
 from modules.platform_settings.dependencies import get_platform_settings_service_readonly
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.users.repository import UsersRepository
+
+_PROGRESS_BAR_WIDTH = 30
+
+
+def _format_progress(
+    done: int,
+    total: int,
+    imported: int,
+    skipped: int,
+    failed: int,
+) -> str:
+    pct = 100 if total == 0 else int(100 * done / total)
+    filled = _PROGRESS_BAR_WIDTH if total == 0 else int(_PROGRESS_BAR_WIDTH * done / total)
+    bar = "█" * filled + "░" * (_PROGRESS_BAR_WIDTH - filled)
+    return (
+        f"[{bar}] {done}/{total} ({pct}%)  "
+        f"imported={imported} skipped={skipped} failed={failed}"
+    )
+
+
+def _make_progress_printer():
+    """Return a progress callback that redraws in-place on a TTY, or logs lines otherwise."""
+    is_tty = sys.stdout.isatty()
+    last_pct = -1
+
+    def on_progress(
+        done: int,
+        total: int,
+        imported: int,
+        skipped: int,
+        failed: int,
+    ) -> None:
+        nonlocal last_pct
+        line = _format_progress(done, total, imported, skipped, failed)
+        if is_tty:
+            print(f"\r{line}", end="", flush=True)
+            if done >= total:
+                print(flush=True)
+            return
+
+        # Cron / redirected logs: print when percentage advances (or at start/end).
+        pct = 100 if total == 0 else int(100 * done / total)
+        if done == 0 or done >= total or pct != last_pct:
+            print(line, flush=True)
+            last_pct = pct
+
+    return on_progress
 
 
 async def run_import(
@@ -57,6 +105,8 @@ async def run_import(
         platform_settings_service=get_platform_settings_service_readonly(),
         questionnaire_repository=QuestionnaireRepository(),
     )
+    on_progress = _make_progress_printer()
+    print("Loading incomplete assessment instances...", flush=True)
 
     async with session_factory() as session:
         async with session.begin():
@@ -67,6 +117,7 @@ async def run_import(
                 questionnaire_repository=QuestionnaireRepository(),
                 as_of=as_of,
                 dry_run=dry_run,
+                on_progress=on_progress,
             )
 
     await engine.dispose()

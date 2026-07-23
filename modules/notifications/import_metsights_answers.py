@@ -9,6 +9,7 @@ For participants in scheduled or running engagements whose assessment_instance.s
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -107,6 +108,9 @@ async def _check_any_subresource_complete(
     return False
 
 
+ProgressCallback = Callable[[int, int, int, int, int], None]
+
+
 async def import_metsights_answers(
     db: AsyncSession,
     *,
@@ -115,8 +119,13 @@ async def import_metsights_answers(
     questionnaire_repository: QuestionnaireRepository | None = None,
     as_of: date | None = None,
     dry_run: bool = False,
+    on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
-    """Check all incomplete assessment instances and import answers per-category from MetSights."""
+    """Check all incomplete assessment instances and import answers per-category from MetSights.
+
+    ``on_progress(done, total, imported, skipped, failed)`` is called after each
+    instance is processed so CLI runners can show a live progress bar.
+    """
     today = as_of or date.today()
     q_repo = questionnaire_repository or QuestionnaireRepository()
     assessments_repo = AssessmentsRepository()
@@ -128,7 +137,13 @@ async def import_metsights_answers(
     failed = 0
     details: list[dict[str, Any]] = []
 
-    for instance, package, user_id in instances:
+    def _report(done: int) -> None:
+        if on_progress is not None:
+            on_progress(done, matched, imported, skipped, failed)
+
+    _report(0)
+
+    for index, (instance, package, user_id) in enumerate(instances, start=1):
         record_id = (instance.metsights_record_id or "").strip()
         type_code = (package.assessment_type_code or "").strip()
         ai_id = int(instance.assessment_instance_id)
@@ -139,6 +154,7 @@ async def import_metsights_answers(
                 "assessment_instance_id": ai_id, "user_id": user_id,
                 "action": "skipped", "reason": "no metsights_record_id",
             })
+            _report(index)
             continue
 
         try:
@@ -152,6 +168,7 @@ async def import_metsights_answers(
                     "assessment_instance_id": ai_id, "user_id": user_id,
                     "action": "skipped", "reason": "no sub-resource complete on MetSights",
                 })
+                _report(index)
                 continue
 
             metsights_categories = await _get_metsights_categories_for_package(
@@ -165,6 +182,7 @@ async def import_metsights_answers(
                     "assessment_instance_id": ai_id, "user_id": user_id,
                     "action": "skipped", "reason": "no metsights categories assigned to package",
                 })
+                _report(index)
                 continue
 
             if dry_run:
@@ -175,6 +193,7 @@ async def import_metsights_answers(
                     "action": "dry_run",
                     "reason": f"would import categories: {', '.join(cat_keys)}",
                 })
+                _report(index)
                 continue
 
             total_imported = 0
@@ -236,6 +255,8 @@ async def import_metsights_answers(
                 "import_metsights_answers failed: instance=%s user=%s: %s",
                 ai_id, user_id, exc, exc_info=True,
             )
+
+        _report(index)
 
     return {
         "as_of": today.isoformat(),
