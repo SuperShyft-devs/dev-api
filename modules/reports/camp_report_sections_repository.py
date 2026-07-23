@@ -27,6 +27,12 @@ class CampReportSectionsRepository:
         )
         return list(result.scalars().all())
 
+    async def list_all(self, db: AsyncSession) -> list[CampReportSection]:
+        result = await db.execute(
+            select(CampReportSection).order_by(CampReportSection.report_sections.asc())
+        )
+        return list(result.scalars().all())
+
     async def count_sections(self, db: AsyncSession) -> int:
         result = await db.execute(select(func.count()).select_from(CampReportSection))
         return int(result.scalar_one())

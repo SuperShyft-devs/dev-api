@@ -789,62 +789,44 @@ class CampReportsService:
             )
         return dict(report[normalized_section])
 
-    async def refresh_camp_report_section(
+    @staticmethod
+    def _refresh_audit_action(
+        *,
+        department: str | None,
+        city: str | None,
+        cron: bool,
+    ) -> str:
+        prefix = "CRON" if cron else "EMPLOYEE"
+        if city is None and department is None:
+            return f"{prefix}_REFRESH_CAMP_REPORT_SECTION"
+        if city is None and department is not None:
+            return f"{prefix}_REFRESH_DEPARTMENT_CAMP_REPORT_SECTION"
+        if city is not None and department is None:
+            return f"{prefix}_REFRESH_CITY_CAMP_REPORT_SECTION"
+        return f"{prefix}_REFRESH_CITY_DEPARTMENT_CAMP_REPORT_SECTION"
+
+    async def _load_camp_report_row_for_refresh(
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
         camp_no: int,
-        section: str,
-        department: str | None = None,
-        city: str | None = None,
-        ip_address: str,
-        user_agent: str,
-        endpoint: str,
-    ) -> dict:
-        normalized_section = section.strip()
-        if not normalized_section:
-            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-
-        context = await self._resolve_camp_context(db, camp_no=camp_no)
-        await ensure_camp_access(
-            db,
-            employee,
-            context["organization_id"],
-            repository=self._organizations_repository,
-        )
-
-        if city is not None:
-            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
-
-        if department is not None:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            await self._validate_department_slug(
-                db,
-                organization_id=context["organization_id"],
-                slug=normalized_department,
-            )
-            department = normalized_department
-
+        department: str | None,
+        city: str | None,
+    ) -> CampReport:
         if city is None and department is None:
             row = await self._repository.get_overall_by_camp_no(db, camp_no=camp_no)
-            audit_action = "EMPLOYEE_REFRESH_CAMP_REPORT_SECTION"
         elif city is None and department is not None:
             row = await self._repository.get_by_camp_no_and_department(
                 db,
                 camp_no=camp_no,
                 department=department,
             )
-            audit_action = "EMPLOYEE_REFRESH_DEPARTMENT_CAMP_REPORT_SECTION"
         elif city is not None and department is None:
             row = await self._repository.get_by_camp_no_and_city(
                 db,
                 camp_no=camp_no,
                 city=city,
             )
-            audit_action = "EMPLOYEE_REFRESH_CITY_CAMP_REPORT_SECTION"
         else:
             row = await self._repository.get_by_camp_no_city_and_department(
                 db,
@@ -852,14 +834,39 @@ class CampReportsService:
                 city=city,
                 department=department,
             )
-            audit_action = "EMPLOYEE_REFRESH_CITY_DEPARTMENT_CAMP_REPORT_SECTION"
-
         if row is None:
             raise AppError(
                 status_code=404,
                 error_code="CAMP_REPORT_NOT_FOUND",
                 message="Camp report does not exist",
             )
+        return row
+
+    async def _refresh_camp_report_section_core(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        section: str,
+        department: str | None,
+        city: str | None,
+        context: dict,
+        audit_action: str,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+        user_id: int | None = None,
+    ) -> dict:
+        normalized_section = section.strip()
+        if not normalized_section:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        row = await self._load_camp_report_row_for_refresh(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
 
         section_row = await self._sections_repository.get_by_section_key(
             db,
@@ -911,7 +918,7 @@ class CampReportsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=user_id,
             session_id=None,
         )
 
@@ -919,6 +926,88 @@ class CampReportsService:
             "report_id": row.report_id,
             "section": section_payload,
         }
+
+    async def refresh_camp_report_section(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        section: str,
+        department: str | None = None,
+        city: str | None = None,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        if city is not None:
+            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=context["organization_id"],
+                slug=normalized_department,
+            )
+            department = normalized_department
+
+        return await self._refresh_camp_report_section_core(
+            db,
+            camp_no=camp_no,
+            section=section,
+            department=department,
+            city=city,
+            context=context,
+            audit_action=self._refresh_audit_action(
+                department=department,
+                city=city,
+                cron=False,
+            ),
+            ip_address=ip_address,
+            user_agent=user_agent,
+            endpoint=endpoint,
+            user_id=employee.user_id,
+        )
+
+    async def refresh_camp_report_section_for_cron(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        section: str,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> dict:
+        """Refresh one section without employee auth (CLI / cron use)."""
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        return await self._refresh_camp_report_section_core(
+            db,
+            camp_no=camp_no,
+            section=section,
+            department=department,
+            city=city,
+            context=context,
+            audit_action=self._refresh_audit_action(
+                department=department,
+                city=city,
+                cron=True,
+            ),
+            ip_address="cron",
+            user_agent="db.jobs.refresh_camp_reports",
+            endpoint="cron:refresh_camp_reports",
+            user_id=None,
+        )
 
     async def _compute_positive_wins_payload(
         self,

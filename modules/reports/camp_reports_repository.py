@@ -242,6 +242,29 @@ class CampReportsRepository:
         )
         return list(result.scalars().all())
 
+    async def list_all(self, db: AsyncSession) -> list[CampReport]:
+        result = await db.execute(
+            select(CampReport).order_by(
+                CampReport.camp_no.asc(),
+                CampReport.city.is_(None).desc(),
+                CampReport.city.asc(),
+                CampReport.department.is_(None).desc(),
+                CampReport.department.asc(),
+            )
+        )
+        return list(result.scalars().all())
+
+    async def has_running_engagement(self, db: AsyncSession, *, camp_no: int) -> bool:
+        result = await db.execute(
+            select(Engagement.engagement_id)
+            .where(
+                Engagement.camp_no == camp_no,
+                func.lower(func.trim(Engagement.status)) == "running",
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none() is not None
+
     async def create(self, db: AsyncSession, row: CampReport) -> CampReport:
         db.add(row)
         await db.flush()
