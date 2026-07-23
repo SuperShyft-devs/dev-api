@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import sys
+from typing import Any
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -50,10 +50,70 @@ def _format_progress(
     )
 
 
+def _make_event_printer():
+    """Print plan / per-step detail lines (always newline-based so logs stay readable)."""
+
+    def on_event(event: dict[str, Any]) -> None:
+        kind = event.get("event")
+        if kind == "plan":
+            mode = "dry-run" if event.get("dry_run") else "apply"
+            print(
+                f"Plan ({mode}): "
+                f"camps_total={event['camps_total']} "
+                f"camps_running={event['camps_running']} "
+                f"camps_skipped={event['camps_skipped']} "
+                f"sections={event['sections']} "
+                f"work_items={event['work_items']}",
+                flush=True,
+            )
+            section_keys = event.get("section_keys") or []
+            if section_keys:
+                print(f"  sections: {', '.join(section_keys)}", flush=True)
+            for camp in event.get("eligible_camps") or []:
+                scopes = ", ".join(camp.get("scopes") or [])
+                print(
+                    f"  will refresh camp_no={camp['camp_no']} "
+                    f"report_rows={camp['report_rows']} scopes=[{scopes}]",
+                    flush=True,
+                )
+            return
+
+        if kind == "skip_camp":
+            print(
+                f"  skip camp_no={event['camp_no']} "
+                f"report_rows={event.get('report_rows', 0)} "
+                f"reason={event.get('reason')}",
+                flush=True,
+            )
+            return
+
+        if kind == "start":
+            verb = "would refresh" if event.get("dry_run") else "refreshing"
+            print(
+                f"[{event['index']}/{event['total']}] {verb} "
+                f"camp_no={event['camp_no']} report_id={event['report_id']} "
+                f"scope={event['scope']} section={event['section']} ...",
+                flush=True,
+            )
+            return
+
+        if kind == "finish":
+            action = event.get("action") or "done"
+            reason = event.get("reason") or ""
+            suffix = f" reason={reason}" if reason else ""
+            print(
+                f"[{event['index']}/{event['total']}] {action} "
+                f"camp_no={event['camp_no']} report_id={event['report_id']} "
+                f"scope={event['scope']} section={event['section']}{suffix}",
+                flush=True,
+            )
+            return
+
+    return on_event
+
+
 def _make_progress_printer():
-    """Return a progress callback that redraws in-place on a TTY, or logs lines otherwise."""
-    is_tty = sys.stdout.isatty()
-    last_pct = -1
+    """Print a progress bar line after each completed step."""
 
     def on_progress(
         done: int,
@@ -62,18 +122,9 @@ def _make_progress_printer():
         skipped: int,
         failed: int,
     ) -> None:
-        nonlocal last_pct
-        line = _format_progress(done, total, refreshed, skipped, failed)
-        if is_tty:
-            print(f"\r{line}", end="", flush=True)
-            if done >= total:
-                print(flush=True)
-            return
-
-        pct = 100 if total == 0 else int(100 * done / total)
-        if done == 0 or done >= total or pct != last_pct:
-            print(line, flush=True)
-            last_pct = pct
+        # Always use a full line so Healthians / other logger noise cannot
+        # overwrite the mid-line carriage-return progress bar.
+        print(_format_progress(done, total, refreshed, skipped, failed), flush=True)
 
     return on_progress
 
@@ -113,6 +164,7 @@ async def run_refresh(
 
     service = _build_camp_reports_service()
     on_progress = _make_progress_printer()
+    on_event = _make_event_printer()
     print("Refreshing camp report sections...", flush=True)
 
     async with session_factory() as session:
@@ -122,6 +174,7 @@ async def run_refresh(
             dry_run=dry_run,
             camp_no=camp_no,
             on_progress=on_progress,
+            on_event=on_event,
         )
 
     await engine.dispose()
@@ -172,6 +225,9 @@ def main(argv: list[str] | None = None) -> int:
         f"  sections={result['sections']} refreshed={result['refreshed']} "
         f"failed={result['failed']}"
     )
+    section_keys = result.get("section_keys") or []
+    if section_keys:
+        print(f"  section_keys={', '.join(section_keys)}")
     errors = result.get("errors") or []
     if errors:
         print(f"\n  {'CAMP':>12}  {'SCOPE':<28}  {'SECTION':<40}  REASON")

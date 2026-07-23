@@ -426,3 +426,49 @@ async def test_refresh_camp_reports_progress_callback(test_db_session):
     assert progress[0][0] == 0  # done starts at 0
     assert progress[-1][0] == progress[-1][1]  # done == total at end
     assert result["refreshed"] == progress[-1][2]
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_reports_emits_detailed_events(test_db_session):
+    camp_no = await _seed_org_and_engagement(
+        test_db_session,
+        organization_id=9307,
+        engagement_id=9307,
+        status="running",
+        engagement_code="CRONEVT1",
+    )
+    await _seed_report(test_db_session, camp_no=camp_no, organization_id=9307)
+    await _ensure_section(
+        test_db_session,
+        report_sections=9309,
+        section_key="participation_by_age",
+        section="Participation by Age",
+        description="Enrollment distribution across age groups",
+    )
+
+    service = _service()
+    service.refresh_camp_report_section_for_cron = AsyncMock(
+        return_value={"report_id": 1, "section": {}}
+    )
+    events: list[dict] = []
+    await refresh_camp_reports(
+        test_db_session,
+        service=service,
+        dry_run=False,
+        camp_no=camp_no,
+        on_event=events.append,
+    )
+
+    kinds = [e["event"] for e in events]
+    assert "plan" in kinds
+    assert "start" in kinds
+    assert "finish" in kinds
+    plan = next(e for e in events if e["event"] == "plan")
+    assert plan["camps_running"] == 1
+    assert "participation_by_age" in plan["section_keys"]
+    start = next(e for e in events if e["event"] == "start")
+    assert start["camp_no"] == camp_no
+    assert start["scope"] == "overall"
+    assert start["section"] == "participation_by_age" or start["section"] in SECTION_BUILDERS
+    finish = next(e for e in events if e["event"] == "finish")
+    assert finish["action"] == "refreshed"

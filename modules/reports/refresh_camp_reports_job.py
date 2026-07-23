@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 # on_progress(done, total, refreshed, skipped, failed)
 ProgressCallback = Callable[[int, int, int, int, int], None]
+# on_event({event, ...}) — plan / skip_camp / start / finish
+EventCallback = Callable[[dict[str, Any]], None]
 
 
 def _scope_label(*, department: str | None, city: str | None) -> str:
@@ -50,6 +52,7 @@ async def refresh_camp_reports(
     dry_run: bool = False,
     camp_no: int | None = None,
     on_progress: ProgressCallback | None = None,
+    on_event: EventCallback | None = None,
 ) -> dict[str, Any]:
     """Refresh every implemented section for every camp_reports row on running camps.
 
@@ -78,6 +81,7 @@ async def refresh_camp_reports(
     camps_total = len(by_camp)
     camps_running = 0
     camps_skipped = 0
+    skipped_camp_nos: list[int] = []
 
     eligible: list[tuple[int, list[CampReport]]] = []
     for camp, rows in sorted(by_camp.items()):
@@ -86,6 +90,16 @@ async def refresh_camp_reports(
             eligible.append((camp, rows))
         else:
             camps_skipped += 1
+            skipped_camp_nos.append(camp)
+            if on_event is not None:
+                on_event(
+                    {
+                        "event": "skip_camp",
+                        "camp_no": camp,
+                        "report_rows": len(rows),
+                        "reason": "no running engagement",
+                    }
+                )
 
     total = sum(len(rows) * len(section_keys) for _, rows in eligible)
     done = 0
@@ -95,11 +109,36 @@ async def refresh_camp_reports(
     errors: list[dict[str, Any]] = []
     details: list[dict[str, Any]] = []
 
-    def _emit() -> None:
+    def _emit_progress() -> None:
         if on_progress is not None:
             on_progress(done, total, refreshed, skipped, failed)
 
-    _emit()
+    if on_event is not None:
+        on_event(
+            {
+                "event": "plan",
+                "dry_run": dry_run,
+                "camps_total": camps_total,
+                "camps_running": camps_running,
+                "camps_skipped": camps_skipped,
+                "skipped_camp_nos": skipped_camp_nos,
+                "sections": len(section_keys),
+                "section_keys": list(section_keys),
+                "work_items": total,
+                "eligible_camps": [
+                    {
+                        "camp_no": camp,
+                        "report_rows": len(rows),
+                        "scopes": [
+                            _scope_label(department=r.department, city=r.city) for r in rows
+                        ],
+                    }
+                    for camp, rows in eligible
+                ],
+            }
+        )
+
+    _emit_progress()
 
     if not section_keys:
         return {
@@ -108,6 +147,7 @@ async def refresh_camp_reports(
             "camps_running": camps_running,
             "camps_skipped": camps_skipped,
             "sections": 0,
+            "section_keys": [],
             "refreshed": 0,
             "skipped": 0,
             "failed": 0,
@@ -119,20 +159,43 @@ async def refresh_camp_reports(
         for row in rows:
             scope = _scope_label(department=row.department, city=row.city)
             for section_key in section_keys:
-                if dry_run:
-                    refreshed += 1
-                    done += 1
-                    details.append(
+                step_index = done + 1
+                if on_event is not None:
+                    on_event(
                         {
+                            "event": "start",
+                            "index": step_index,
+                            "total": total,
                             "camp_no": camp,
                             "report_id": row.report_id,
                             "scope": scope,
                             "section": section_key,
-                            "action": "would_refresh",
-                            "reason": "",
+                            "dry_run": dry_run,
                         }
                     )
-                    _emit()
+
+                if dry_run:
+                    refreshed += 1
+                    done += 1
+                    detail = {
+                        "camp_no": camp,
+                        "report_id": row.report_id,
+                        "scope": scope,
+                        "section": section_key,
+                        "action": "would_refresh",
+                        "reason": "",
+                    }
+                    details.append(detail)
+                    if on_event is not None:
+                        on_event(
+                            {
+                                "event": "finish",
+                                "index": step_index,
+                                "total": total,
+                                **detail,
+                            }
+                        )
+                    _emit_progress()
                     continue
 
                 try:
@@ -145,16 +208,24 @@ async def refresh_camp_reports(
                     )
                     await db.commit()
                     refreshed += 1
-                    details.append(
-                        {
-                            "camp_no": camp,
-                            "report_id": row.report_id,
-                            "scope": scope,
-                            "section": section_key,
-                            "action": "refreshed",
-                            "reason": "",
-                        }
-                    )
+                    detail = {
+                        "camp_no": camp,
+                        "report_id": row.report_id,
+                        "scope": scope,
+                        "section": section_key,
+                        "action": "refreshed",
+                        "reason": "",
+                    }
+                    details.append(detail)
+                    if on_event is not None:
+                        on_event(
+                            {
+                                "event": "finish",
+                                "index": step_index,
+                                "total": total,
+                                **detail,
+                            }
+                        )
                 except Exception as exc:
                     await db.rollback()
                     failed += 1
@@ -174,14 +245,22 @@ async def refresh_camp_reports(
                         "reason": reason,
                     }
                     errors.append(error_entry)
-                    details.append(
-                        {
-                            **error_entry,
-                            "action": "failed",
-                        }
-                    )
+                    detail = {
+                        **error_entry,
+                        "action": "failed",
+                    }
+                    details.append(detail)
+                    if on_event is not None:
+                        on_event(
+                            {
+                                "event": "finish",
+                                "index": step_index,
+                                "total": total,
+                                **detail,
+                            }
+                        )
                 done += 1
-                _emit()
+                _emit_progress()
 
     return {
         "dry_run": dry_run,
@@ -189,6 +268,7 @@ async def refresh_camp_reports(
         "camps_running": camps_running,
         "camps_skipped": camps_skipped,
         "sections": len(section_keys),
+        "section_keys": list(section_keys),
         "refreshed": refreshed,
         "skipped": skipped,
         "failed": failed,
