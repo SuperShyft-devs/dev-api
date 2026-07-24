@@ -344,6 +344,80 @@ async def list_camp_participants(
     return success_response(participants, meta={"page": page, "limit": limit, "total": total})
 
 
+@router.get("/{camp_no}/department/{slug}/participants")
+async def list_department_camp_participants(
+    camp_no: int,
+    slug: str,
+    page: int = 1,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    if page < 1 or limit < 1 or limit > 100:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    participants, total = await service.list_camp_participants(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        page=page,
+        limit=limit,
+        department=slug,
+    )
+    return success_response(participants, meta={"page": page, "limit": limit, "total": total})
+
+
+@router.get("/{camp_no}/{city}/participants")
+async def list_city_camp_participants(
+    camp_no: int,
+    city: str,
+    page: int = 1,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    if page < 1 or limit < 1 or limit > 100:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    participants, total = await service.list_camp_participants(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        page=page,
+        limit=limit,
+        city=city,
+    )
+    return success_response(participants, meta={"page": page, "limit": limit, "total": total})
+
+
+@router.get("/{camp_no}/{city}/department/{slug}/participants")
+async def list_city_department_camp_participants(
+    camp_no: int,
+    city: str,
+    slug: str,
+    page: int = 1,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    if page < 1 or limit < 1 or limit > 100:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    participants, total = await service.list_camp_participants(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        page=page,
+        limit=limit,
+        department=slug,
+        city=city,
+    )
+    return success_response(participants, meta={"page": page, "limit": limit, "total": total})
+
+
 @router.get("/{camp_no}")
 async def list_camp_reports(
     camp_no: int,

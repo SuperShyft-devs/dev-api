@@ -1158,8 +1158,10 @@ class CampReportsRepository:
         camp_no: int,
         page: int,
         limit: int,
+        department: str | None = None,
+        city: str | None = None,
     ) -> list[tuple]:
-        """Fetch all engagement participant enrollment rows for a camp."""
+        """Fetch engagement participant enrollment rows for a camp (optionally scoped)."""
         offset = (page - 1) * limit
 
         query = (
@@ -1181,7 +1183,14 @@ class CampReportsRepository:
             )
             .join(User, User.user_id == EngagementParticipant.user_id)
             .where(Engagement.camp_no == camp_no)
-            .order_by(EngagementParticipant.engagement_participant_id.asc())
+        )
+        if department is not None:
+            query = query.where(EngagementParticipant.participant_department == department)
+        if city is not None:
+            query = query.where(func.lower(func.trim(Engagement.city)) == city.lower())
+
+        query = (
+            query.order_by(EngagementParticipant.engagement_participant_id.asc())
             .offset(offset)
             .limit(limit)
         )
@@ -1441,9 +1450,16 @@ class CampReportsRepository:
         result = await db.execute(query)
         return [(int(r[0]), r[1], r[2]) for r in result.all()]
 
-    async def count_participants_by_camp_no(self, db: AsyncSession, *, camp_no: int) -> int:
-        """Count all engagement participant enrollment rows for a camp."""
-        result = await db.execute(
+    async def count_participants_by_camp_no(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> int:
+        """Count engagement participant enrollment rows for a camp (optionally scoped)."""
+        query = (
             select(func.count())
             .select_from(Engagement)
             .join(
@@ -1452,6 +1468,12 @@ class CampReportsRepository:
             )
             .where(Engagement.camp_no == camp_no)
         )
+        if department is not None:
+            query = query.where(EngagementParticipant.participant_department == department)
+        if city is not None:
+            query = query.where(func.lower(func.trim(Engagement.city)) == city.lower())
+
+        result = await db.execute(query)
         return int(result.scalar_one())
 
     async def list_org_avg_metabolic_scores_by_city(

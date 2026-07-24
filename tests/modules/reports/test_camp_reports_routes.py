@@ -2029,6 +2029,228 @@ async def test_list_camp_participants_camp_not_found(async_client, test_db_sessi
     assert response.json()["error_code"] == "CAMP_NOT_FOUND"
 
 
+async def _seed_multi_city_camp_participants(
+    test_db_session,
+    *,
+    organization_id: int = 9701,
+    engagement_id: int = 9701,
+):
+    """Camp with BLR + MUM engagements and mixed department enrollments."""
+    camp_no, _ = await _seed_camp(
+        test_db_session,
+        organization_id=organization_id,
+        engagement_id=engagement_id,
+    )
+    start = date(2026, 6, 23)
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id + 1,
+            engagement_name="Camp Engagement MUM",
+            organization_id=organization_id,
+            camp_no=camp_no,
+            engagement_code="CAMPMUM1",
+            engagement_type="bio_ai",
+            assessment_package_id=None,
+            diagnostic_package_id=None,
+            city="MUM",
+            slot_duration=20,
+            start_date=start,
+            end_date=date(2026, 6, 25),
+            status="running",
+        )
+    )
+    test_db_session.add_all(
+        [
+            User(user_id=97001, age=25, phone="970010000000", status="active"),
+            User(user_id=97002, age=30, phone="970020000000", status="active"),
+            User(user_id=97003, age=35, phone="970030000000", status="active"),
+            User(user_id=97004, age=40, phone="970040000000", status="active"),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            EngagementParticipant(
+                engagement_participant_id=97001,
+                engagement_id=engagement_id,
+                user_id=97001,
+                engagement_date=start,
+                slot_start_time=time(9, 0),
+                participant_department="sales",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=97002,
+                engagement_id=engagement_id,
+                user_id=97002,
+                engagement_date=start,
+                slot_start_time=time(9, 20),
+                participant_department="engineering",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=97003,
+                engagement_id=engagement_id + 1,
+                user_id=97003,
+                engagement_date=start,
+                slot_start_time=time(10, 0),
+                participant_department="sales",
+            ),
+            EngagementParticipant(
+                engagement_participant_id=97004,
+                engagement_id=engagement_id + 1,
+                user_id=97004,
+                engagement_date=start,
+                slot_start_time=time(10, 20),
+                participant_department="engineering",
+            ),
+            # Duplicate enrollment in BLR sales (same user twice)
+            EngagementParticipant(
+                engagement_participant_id=97005,
+                engagement_id=engagement_id,
+                user_id=97001,
+                engagement_date=start,
+                slot_start_time=time(11, 0),
+                participant_department="sales",
+            ),
+        ]
+    )
+    await test_db_session.commit()
+    return camp_no
+
+
+@pytest.mark.asyncio
+async def test_list_department_camp_participants_filters_by_slug(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7910, employee_id=220)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9702,
+        engagement_id=9702,
+    )
+    headers = _auth_header(7910)
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/department/sales/participants",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["meta"]["total"] == 3
+    assert len(body["data"]) == 3
+    assert all(row["participant_department"] == "sales" for row in body["data"])
+    assert [row["user_id"] for row in body["data"]].count(92001) == 2
+
+
+@pytest.mark.asyncio
+async def test_list_department_camp_participants_unknown_slug_404(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7911, employee_id=221)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9703,
+        engagement_id=9703,
+    )
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/department/marketing/participants",
+        headers=_auth_header(7911),
+    )
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "DEPARTMENT_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_list_city_camp_participants_filters_by_city(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7912, employee_id=222)
+    camp_no = await _seed_multi_city_camp_participants(
+        test_db_session,
+        organization_id=9704,
+        engagement_id=9704,
+    )
+    headers = _auth_header(7912)
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/MUM/participants",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["meta"]["total"] == 2
+    assert {row["user_id"] for row in body["data"]} == {97003, 97004}
+
+
+@pytest.mark.asyncio
+async def test_list_city_camp_participants_unknown_city_404(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7913, employee_id=223)
+    camp_no = await _seed_multi_city_camp_participants(
+        test_db_session,
+        organization_id=9705,
+        engagement_id=9705,
+    )
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/DEL/participants",
+        headers=_auth_header(7913),
+    )
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "CITY_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_list_city_department_camp_participants(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7914, employee_id=224)
+    camp_no = await _seed_multi_city_camp_participants(
+        test_db_session,
+        organization_id=9706,
+        engagement_id=9706,
+    )
+    headers = _auth_header(7914)
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/BLR/department/sales/participants",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["meta"]["total"] == 2
+    assert all(row["participant_department"] == "sales" for row in body["data"])
+    assert [row["user_id"] for row in body["data"]].count(97001) == 2
+
+
+@pytest.mark.asyncio
+async def test_list_city_department_camp_participants_zero_matches(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7915, employee_id=225)
+    camp_no, _ = await _seed_camp(
+        test_db_session,
+        organization_id=9708,
+        engagement_id=9708,
+    )
+    start = date(2026, 6, 23)
+    test_db_session.add(
+        User(user_id=97010, age=28, phone="970100000000", status="active")
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=97010,
+            engagement_id=9708,
+            user_id=97010,
+            engagement_date=start,
+            slot_start_time=time(9, 0),
+            participant_department="sales",
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        f"/reports/camps/{camp_no}/BLR/department/engineering/participants",
+        headers=_auth_header(7915),
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["meta"]["total"] == 0
+    assert body["data"] == []
+
+
 async def _seed_physical_activity_section(test_db_session, *, report_sections: int = 300):
     existing = (
         await test_db_session.execute(

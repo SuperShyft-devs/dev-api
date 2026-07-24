@@ -591,6 +591,8 @@ class CampReportsService:
         camp_no: int,
         page: int,
         limit: int,
+        department: str | None = None,
+        city: str | None = None,
     ) -> tuple[list[dict], int]:
         context = await self._resolve_camp_context(db, camp_no=camp_no)
         await ensure_camp_access(
@@ -600,13 +602,34 @@ class CampReportsService:
             repository=self._organizations_repository,
         )
 
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=context["organization_id"],
+                slug=normalized_department,
+            )
+            department = normalized_department
+
+        if city is not None:
+            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+
         rows = await self._repository.list_participants_by_camp_no(
             db,
             camp_no=camp_no,
             page=page,
             limit=limit,
+            department=department,
+            city=city,
         )
-        total = await self._repository.count_participants_by_camp_no(db, camp_no=camp_no)
+        total = await self._repository.count_participants_by_camp_no(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
         return [self._camp_participant_to_dict(row) for row in rows], total
 
     async def _get_camp_report_row(
