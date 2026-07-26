@@ -1449,6 +1449,46 @@ class CampReportsRepository:
             for ai, pkg, eng, ihr, gender in result.all()
         ]
 
+    async def count_health_assessment_contexts(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> int:
+        """Count enrolled users with a health (type_code '1' or '2') assessment in a camp."""
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
+
+        ranked = (
+            select(
+                AssessmentInstance.assessment_instance_id.label("assessment_instance_id"),
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=AssessmentInstance.assessment_instance_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(
+                AssessmentInstance,
+                and_(
+                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
+                    AssessmentInstance.user_id == enrolled.c.user_id,
+                ),
+            )
+            .join(
+                AssessmentPackage,
+                AssessmentPackage.package_id == AssessmentInstance.package_id,
+            )
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        ).subquery()
+
+        query = select(func.count()).select_from(ranked).where(ranked.c.rn == 1)
+        result = await db.execute(query)
+        return int(result.scalar_one())
+
     async def list_enrolled_users_without_fitprint(
         self,
         db: AsyncSession,

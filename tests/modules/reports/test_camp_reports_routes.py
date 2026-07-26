@@ -3857,6 +3857,44 @@ async def test_estimate_camp_report_bulk_all_allowed_false(
 
 
 @pytest.mark.asyncio
+async def test_estimate_positive_wins_uses_health_assessment_count(
+    async_client, test_db_session, monkeypatch
+):
+    """positive_wins scales with health assessments, not FitPrint (which may be 0)."""
+    await _seed_employee(test_db_session, user_id=7906, employee_id=906)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9506,
+        engagement_id=9506,
+    )
+    headers = _auth_header(7906)
+
+    from modules.reports.camp_reports_repository import CampReportsRepository
+
+    async def fake_health_count(self, db, *, camp_no, department=None, city=None):
+        return 200
+
+    monkeypatch.setattr(
+        CampReportsRepository,
+        "count_health_assessment_contexts",
+        fake_health_count,
+    )
+
+    response = await async_client.post(
+        f"/reports/camps/{camp_no}/estimate",
+        headers=headers,
+        json={"operations": [{"section": "positive_wins", "action": "refresh"}]},
+    )
+    assert response.status_code == 200
+    op = response.json()["data"]["operations"][0]
+    assert op["section"] == "positive_wins"
+    assert op["unit_count"] == 200
+    # ceil(5 + 0.35*200) = ceil(75) = 75 — would be 5s if FitPrint(0) were used
+    assert op["estimated_seconds"] == 75
+    assert op["allowed"] is True
+
+
+@pytest.mark.asyncio
 async def test_estimate_camp_report_invalid_action(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7905, employee_id=905)
     camp_no = await _seed_refresh_camp_with_participants(

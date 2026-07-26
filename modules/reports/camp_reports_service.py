@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 from datetime import date, datetime, timezone
 from typing import Any
@@ -50,15 +51,18 @@ from modules.reports.camp_report_section_builders import (
     physical_activity_answer_to_bucket,
     sleeping_hours_answer_to_bucket,
 )
+from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.assessments.repository import AssessmentsRepository
 from modules.diagnostics.repository import DiagnosticsRepository
 from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
-from modules.reports.camp_reports_repository import CampReportsRepository
-from modules.reports.models import CampReport
+from modules.reports.camp_reports_repository import CampReportsRepository, EnrolledAssessmentContext
+from modules.reports.models import CampReport, IndividualHealthReport
 from modules.reports.service import BLOOD_DATA_UNAVAILABLE_ERROR_CODES, ReportsService
 from modules.users.models import User
+from db.session import AsyncSessionLocal
 
-# (base_seconds, per_unit_seconds, unit_kind) where unit_kind is "participants" or "fitprint"
+# (base_seconds, per_unit_seconds, unit_kind)
+# unit_kind: "participants" | "fitprint" | "health"
 _SECTION_ESTIMATE_COSTS: dict[str, tuple[float, float, str]] = {
     "participation_by_age": (2.0, 0.01, "participants"),
     "kpis": (2.0, 0.01, "participants"),
@@ -69,19 +73,23 @@ _SECTION_ESTIMATE_COSTS: dict[str, tuple[float, float, str]] = {
     "distribution_by_gender_by_metabolic_syndrome": (3.0, 0.02, "participants"),
     "blood_and_lab_intelligence": (5.0, 0.05, "participants"),
     "ranking": (5.0, 0.03, "participants"),
-    "positive_wins": (5.0, 0.5, "fitprint"),
+    # Loops health assessments (type 1/2); per-unit reflects concurrent worker wall time
+    "positive_wins": (5.0, 0.35, "health"),
     "company_average_scores": (5.0, 2.5, "fitprint"),
 }
 
 _VALIDATE_ESTIMATE_COSTS: dict[str, tuple[float, float, str]] = {
     "company_average_scores": (5.0, 2.5, "fitprint"),
-    "positive_wins": (5.0, 0.5, "fitprint"),
+    "positive_wins": (5.0, 0.35, "health"),
     "overall_risk_score": (3.0, 0.02, "participants"),
     "distribution_by_physical_activity_frequency": (2.0, 0.02, "participants"),
     "distribution_by_sleeping_hours": (2.0, 0.02, "participants"),
 }
 
 _DEFAULT_ESTIMATE_COST: tuple[float, float, str] = (3.0, 0.02, "participants")
+
+# Concurrent workers for positive_wins refresh (bounded by DB pool).
+_POSITIVE_WINS_CONCURRENCY = 4
 
 
 class CampReportsService:
@@ -1059,6 +1067,15 @@ class CampReportsService:
                         department=department,
                     )
                 unit_count = count_cache[fitprint_key]
+            elif unit_kind == "health":
+                health_key = ("health", department)
+                if health_key not in count_cache:
+                    count_cache[health_key] = await self._repository.count_health_assessment_contexts(
+                        db,
+                        camp_no=camp_no,
+                        department=department,
+                    )
+                unit_count = count_cache[health_key]
             else:
                 unit_count = participant_count
 
@@ -1166,6 +1183,77 @@ class CampReportsService:
             user_id=None,
         )
 
+    async def _positive_wins_for_context(
+        self,
+        db: AsyncSession,
+        *,
+        ctx: EnrolledAssessmentContext,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, str | None]], list[str]]:
+        """Compute low-risk / habits / profiles for one health assessment context."""
+        low_risk_items = await self._reports_service.compute_low_risk_for_instance(
+            db,
+            assessment_instance=ctx.assessment_instance,
+            package=ctx.package,
+            individual_report=ctx.individual_report,
+        )
+        low_risk = [
+            {
+                "code": item.code,
+                "name": item.name,
+                "risk_status": item.risk_status,
+                "risk_score_scaled": item.risk_score_scaled,
+            }
+            for item in low_risk_items
+        ]
+        try:
+            habits, profiles = await self._reports_service.compute_healthy_habits_and_profiles_for_instance(
+                db,
+                assessment_instance=ctx.assessment_instance,
+                package=ctx.package,
+                engagement=ctx.engagement,
+                individual_report=ctx.individual_report,
+                user_gender=ctx.user_gender,
+            )
+        except AppError as exc:
+            if exc.error_code not in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
+                raise
+            habits, profiles = [], []
+        return (
+            low_risk,
+            [{"habit_key": h.habit_key, "habit_label": h.habit_label} for h in habits],
+            profiles,
+        )
+
+    async def _positive_wins_for_context_isolated(
+        self,
+        *,
+        assessment_instance_id: int,
+        user_gender: str | None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, str | None]], list[str]]:
+        """Run one participant's positive_wins work on a dedicated DB session."""
+        async with AsyncSessionLocal() as session:
+            ai = await session.get(AssessmentInstance, assessment_instance_id)
+            if ai is None:
+                return [], [], []
+            package = await session.get(AssessmentPackage, ai.package_id) if ai.package_id else None
+            engagement = await session.get(Engagement, ai.engagement_id) if ai.engagement_id else None
+            ihr_result = await session.execute(
+                select(IndividualHealthReport).where(
+                    IndividualHealthReport.assessment_instance_id == assessment_instance_id
+                )
+            )
+            individual_report = ihr_result.scalar_one_or_none()
+            ctx = EnrolledAssessmentContext(
+                assessment_instance=ai,
+                package=package,
+                engagement=engagement,
+                individual_report=individual_report,
+                user_gender=user_gender,
+            )
+            result = await self._positive_wins_for_context(session, ctx=ctx)
+            await session.commit()
+            return result
+
     async def _compute_positive_wins_payload(
         self,
         db: AsyncSession,
@@ -1180,43 +1268,59 @@ class CampReportsService:
             department=department,
             city=city,
         )
-        participant_habits: list[list[dict[str, str | None]]] = []
-        participant_profiles: list[list[str]] = []
-        participant_low_risk: list[list[dict[str, Any]]] = []
-        for ctx in contexts:
-            low_risk_items = await self._reports_service.compute_low_risk_for_instance(
-                db,
-                assessment_instance=ctx.assessment_instance,
-                package=ctx.package,
-                individual_report=ctx.individual_report,
+        if not contexts:
+            return build_positive_wins(
+                low_risk=[],
+                healthy_habits=[],
+                healthy_profiles=[],
             )
-            participant_low_risk.append(
-                [
-                    {
-                        "code": item.code,
-                        "name": item.name,
-                        "risk_status": item.risk_status,
-                        "risk_score_scaled": item.risk_score_scaled,
-                    }
-                    for item in low_risk_items
-                ]
+
+        # Small camps: keep work on the request session (avoids pool churn).
+        if len(contexts) <= _POSITIVE_WINS_CONCURRENCY:
+            participant_habits: list[list[dict[str, str | None]]] = []
+            participant_profiles: list[list[str]] = []
+            participant_low_risk: list[list[dict[str, Any]]] = []
+            for ctx in contexts:
+                low_risk, habits, profiles = await self._positive_wins_for_context(db, ctx=ctx)
+                participant_low_risk.append(low_risk)
+                participant_habits.append(habits)
+                participant_profiles.append(profiles)
+            return build_positive_wins(
+                low_risk=aggregate_top_low_risk(participant_low_risk),
+                healthy_habits=aggregate_top_healthy_habits(participant_habits),
+                healthy_profiles=aggregate_top_healthy_profiles(participant_profiles),
             )
-            try:
-                habits, profiles = await self._reports_service.compute_healthy_habits_and_profiles_for_instance(
-                    db,
-                    assessment_instance=ctx.assessment_instance,
-                    package=ctx.package,
-                    engagement=ctx.engagement,
-                    individual_report=ctx.individual_report,
+
+        semaphore = asyncio.Semaphore(_POSITIVE_WINS_CONCURRENCY)
+
+        async def run_one(
+            ctx: EnrolledAssessmentContext,
+        ) -> tuple[list[dict[str, Any]], list[dict[str, str | None]], list[str]]:
+            async with semaphore:
+                return await self._positive_wins_for_context_isolated(
+                    assessment_instance_id=int(ctx.assessment_instance.assessment_instance_id),
                     user_gender=ctx.user_gender,
                 )
-            except AppError as exc:
-                if exc.error_code not in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
-                    raise
-                habits, profiles = [], []
-            participant_habits.append(
-                [{"habit_key": h.habit_key, "habit_label": h.habit_label} for h in habits]
-            )
+
+        results = await asyncio.gather(
+            *[run_one(ctx) for ctx in contexts],
+            return_exceptions=True,
+        )
+
+        participant_habits = []
+        participant_profiles = []
+        participant_low_risk = []
+        for result in results:
+            if isinstance(result, BaseException):
+                if isinstance(result, AppError) and result.error_code in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
+                    participant_low_risk.append([])
+                    participant_habits.append([])
+                    participant_profiles.append([])
+                    continue
+                raise result
+            low_risk, habits, profiles = result
+            participant_low_risk.append(low_risk)
+            participant_habits.append(habits)
             participant_profiles.append(profiles)
 
         return build_positive_wins(
