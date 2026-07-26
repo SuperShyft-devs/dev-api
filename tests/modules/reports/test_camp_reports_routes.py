@@ -3889,8 +3889,8 @@ async def test_estimate_positive_wins_uses_health_assessment_count(
     op = response.json()["data"]["operations"][0]
     assert op["section"] == "positive_wins"
     assert op["unit_count"] == 200
-    # ceil(5 + 0.35*200) = ceil(75) = 75 — would be 5s if FitPrint(0) were used
-    assert op["estimated_seconds"] == 75
+    # ceil(5 + 0.08*200) = ceil(21) = 21 — would be 5s if FitPrint(0) were used
+    assert op["estimated_seconds"] == 21
     assert op["allowed"] is True
 
 

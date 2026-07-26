@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -17,6 +18,29 @@ from modules.reports.blood_parameters_schemas import (
     booking_id_from_fetch_collections,
     provider_code_from_field,
 )
+
+# Skip re-calling Healthians for booking IDs that recently returned Invalid Booking ID.
+_invalid_booking_ids: dict[str, float] = {}
+_INVALID_BOOKING_TTL_SECONDS = 30 * 60
+
+
+def remember_invalid_healthians_booking_id(booking_id: str) -> None:
+    bid = (booking_id or "").strip()
+    if bid:
+        _invalid_booking_ids[bid] = time.monotonic()
+
+
+def is_known_invalid_healthians_booking_id(booking_id: str) -> bool:
+    bid = (booking_id or "").strip()
+    if not bid:
+        return False
+    seen_at = _invalid_booking_ids.get(bid)
+    if seen_at is None:
+        return False
+    if (time.monotonic() - seen_at) > _INVALID_BOOKING_TTL_SECONDS:
+        _invalid_booking_ids.pop(bid, None)
+        return False
+    return True
 
 
 class HealthiansBookingSource(str, Enum):

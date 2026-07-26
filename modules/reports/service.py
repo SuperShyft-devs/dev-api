@@ -31,6 +31,8 @@ from modules.reports.blood_parameters_questionnaire_reader import BloodParameter
 from modules.reports.blood_parameters_schemas import has_usable_provider_blood_parameters
 from modules.reports.healthians_booking_resolver import (
     HealthiansBookingSource,
+    is_known_invalid_healthians_booking_id,
+    remember_invalid_healthians_booking_id,
     resolve_healthians_booking_id,
 )
 from db.seed.blood_parameters_registry import (
@@ -357,6 +359,13 @@ class ReportsService:
         )
         booking_id = resolved.booking_id
 
+        if is_known_invalid_healthians_booking_id(booking_id):
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Healthians booking id previously returned Invalid Booking ID",
+            )
+
         try:
             access_token = await self._healthians_get_access_token()
         except Exception as exc:
@@ -371,6 +380,9 @@ class ReportsService:
             result = await self._healthians_get_booking_digital_value(access_token, booking_id)
         except Exception as exc:
             logger.error("Healthians getBookingDigitalValue failed: %s", exc)
+            message = str(exc)
+            if "Invalid Booking ID" in message:
+                remember_invalid_healthians_booking_id(booking_id)
             raise AppError(
                 status_code=503,
                 error_code="EXTERNAL_SERVICE_UNAVAILABLE",
@@ -950,6 +962,7 @@ class ReportsService:
         package: AssessmentPackage,
         individual_report: IndividualHealthReport | None,
         cache_on_fetch: bool = True,
+        allow_remote_fetch: bool = True,
     ) -> dict[str, Any]:
         """Return Metsights report JSON for an assessment, optionally persisting a fetch."""
         if individual_report is not None and individual_report.reports is not None:
@@ -962,6 +975,9 @@ class ReportsService:
                 and self._reports_match_assessment_type(report_data, package.assessment_type_code)
             ):
                 return report_data
+
+        if not allow_remote_fetch:
+            return {}
 
         record_id = (assessment_instance.metsights_record_id or "").strip()
         if not record_id:
@@ -1000,6 +1016,7 @@ class ReportsService:
         assessment_instance: AssessmentInstance,
         package: AssessmentPackage | None,
         individual_report: IndividualHealthReport | None,
+        allow_remote_fetch: bool = True,
     ) -> list[DiseaseOverview]:
         """Overview-style low_risk diseases for one assessment; empty when unavailable."""
         if package is None:
@@ -1013,6 +1030,7 @@ class ReportsService:
                 package=package,
                 individual_report=individual_report,
                 cache_on_fetch=True,
+                allow_remote_fetch=allow_remote_fetch,
             )
         except AppError as exc:
             logger.debug(
@@ -1033,6 +1051,7 @@ class ReportsService:
         user_last_name: str = "",
         user_gender: str | None = None,
         diagnostic_package_id: int,
+        allow_provider_fetch: bool = True,
     ) -> list[BloodParameterGroupInReportResponse]:
         if has_usable_provider_blood_parameters(individual_report.blood_parameters):
             return await self._blood_read_service.build_from_canonical_or_legacy_provider(
@@ -1043,9 +1062,13 @@ class ReportsService:
             )
 
         record_id = (assessment_instance.metsights_record_id or "").strip()
-        if record_id and (
-            self._healthians_get_access_token is not None
-            and self._healthians_get_booking_digital_value is not None
+        if (
+            allow_provider_fetch
+            and record_id
+            and (
+                self._healthians_get_access_token is not None
+                and self._healthians_get_booking_digital_value is not None
+            )
         ):
             try:
                 raw_customer = await self._fetch_blood_parameters_from_provider(
@@ -1103,6 +1126,7 @@ class ReportsService:
         engagement: Engagement | None,
         individual_report: IndividualHealthReport | None,
         user_gender: str | None,
+        allow_provider_fetch: bool = True,
     ) -> tuple[list[HealthyHabitItem], list[str]]:
         """Healthy habits and profiles for one assessment (overview positive_wins subset)."""
         healthy_profiles: list[str] = []
@@ -1117,7 +1141,10 @@ class ReportsService:
                     normalized_gender = None
                 user_first_name = ""
                 user_last_name = ""
-                if not has_usable_provider_blood_parameters(individual_report.blood_parameters):
+                if (
+                    allow_provider_fetch
+                    and not has_usable_provider_blood_parameters(individual_report.blood_parameters)
+                ):
                     user_row = await db.get(User, assessment_instance.user_id)
                     if user_row is not None:
                         user_first_name = user_row.first_name or ""
@@ -1130,6 +1157,7 @@ class ReportsService:
                     user_last_name=user_last_name,
                     user_gender=normalized_gender,
                     diagnostic_package_id=int(engagement.diagnostic_package_id),
+                    allow_provider_fetch=allow_provider_fetch,
                 )
                 healthy_profiles = self._top_healthy_profile_group_names(groups)
             except AppError as exc:

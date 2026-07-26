@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 
 import httpx
 
@@ -13,11 +14,23 @@ from modules.diagnostics.healthians.checksum import generate_checksum
 logger = logging.getLogger(__name__)
 
 _cached_token: str | None = None
+_cached_token_at: float = 0.0
+_TOKEN_TTL_SECONDS = 4 * 60  # Healthians tokens are short-lived; refresh before expiry.
+
+
+def clear_access_token_cache() -> None:
+    """Drop the in-process Healthians token cache (e.g. after auth failures)."""
+    global _cached_token, _cached_token_at
+    _cached_token = None
+    _cached_token_at = 0.0
 
 
 async def get_access_token() -> str:
-    """Authenticate with Healthians and return an access token."""
-    global _cached_token
+    """Authenticate with Healthians and return an access token (cached in-process)."""
+    global _cached_token, _cached_token_at
+
+    if _cached_token and (time.monotonic() - _cached_token_at) < _TOKEN_TTL_SECONDS:
+        return _cached_token
 
     url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/getAccessToken"
     async with httpx.AsyncClient(timeout=15) as client:
@@ -44,6 +57,7 @@ async def get_access_token() -> str:
     if not data.get("success"):
         raise RuntimeError(f"Healthians auth failed: {data}")
     _cached_token = data["access_token"]
+    _cached_token_at = time.monotonic()
     return _cached_token
 
 

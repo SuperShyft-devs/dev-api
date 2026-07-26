@@ -54,6 +54,34 @@ class EnrolledAssessmentContext:
     user_gender: str | None
 
 
+def _dedupe_enrolled_assessment_contexts(
+    rows: list[tuple],
+) -> list[EnrolledAssessmentContext]:
+    """Collapse duplicate IHR outer-join rows; prefer a row that has blood_parameters."""
+    by_id: dict[int, EnrolledAssessmentContext] = {}
+    for ai, pkg, eng, ihr, gender in rows:
+        aid = int(ai.assessment_instance_id)
+        ctx = EnrolledAssessmentContext(
+            assessment_instance=ai,
+            package=pkg,
+            engagement=eng,
+            individual_report=ihr,
+            user_gender=gender,
+        )
+        existing = by_id.get(aid)
+        if existing is None:
+            by_id[aid] = ctx
+            continue
+        existing_has_blood = (
+            existing.individual_report is not None
+            and existing.individual_report.blood_parameters is not None
+        )
+        new_has_blood = ihr is not None and ihr.blood_parameters is not None
+        if new_has_blood and not existing_has_blood:
+            by_id[aid] = ctx
+    return list(by_id.values())
+
+
 class CampReportsRepository:
     """CRUD queries for camp_reports."""
 
@@ -1254,16 +1282,7 @@ class CampReportsRepository:
         )
 
         result = await db.execute(query)
-        return [
-            EnrolledAssessmentContext(
-                assessment_instance=ai,
-                package=pkg,
-                engagement=eng,
-                individual_report=ihr,
-                user_gender=gender,
-            )
-            for ai, pkg, eng, ihr, gender in result.all()
-        ]
+        return _dedupe_enrolled_assessment_contexts(list(result.all()))
 
     async def list_fitprint_assessment_contexts(
         self,
@@ -1326,16 +1345,7 @@ class CampReportsRepository:
         )
 
         result = await db.execute(query)
-        return [
-            EnrolledAssessmentContext(
-                assessment_instance=ai,
-                package=pkg,
-                engagement=eng,
-                individual_report=ihr,
-                user_gender=gender,
-            )
-            for ai, pkg, eng, ihr, gender in result.all()
-        ]
+        return _dedupe_enrolled_assessment_contexts(list(result.all()))
 
     async def count_fitprint_assessment_contexts(
         self,
@@ -1438,16 +1448,7 @@ class CampReportsRepository:
         )
 
         result = await db.execute(query)
-        return [
-            EnrolledAssessmentContext(
-                assessment_instance=ai,
-                package=pkg,
-                engagement=eng,
-                individual_report=ihr,
-                user_gender=gender,
-            )
-            for ai, pkg, eng, ihr, gender in result.all()
-        ]
+        return _dedupe_enrolled_assessment_contexts(list(result.all()))
 
     async def count_health_assessment_contexts(
         self,

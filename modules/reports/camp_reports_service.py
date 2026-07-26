@@ -73,14 +73,14 @@ _SECTION_ESTIMATE_COSTS: dict[str, tuple[float, float, str]] = {
     "distribution_by_gender_by_metabolic_syndrome": (3.0, 0.02, "participants"),
     "blood_and_lab_intelligence": (5.0, 0.05, "participants"),
     "ranking": (5.0, 0.03, "participants"),
-    # Loops health assessments (type 1/2); per-unit reflects concurrent worker wall time
-    "positive_wins": (5.0, 0.35, "health"),
+    # Loops health assessments (type 1/2); cache-only camp refresh is mostly DB work
+    "positive_wins": (5.0, 0.08, "health"),
     "company_average_scores": (5.0, 2.5, "fitprint"),
 }
 
 _VALIDATE_ESTIMATE_COSTS: dict[str, tuple[float, float, str]] = {
     "company_average_scores": (5.0, 2.5, "fitprint"),
-    "positive_wins": (5.0, 0.35, "health"),
+    "positive_wins": (5.0, 0.08, "health"),
     "overall_risk_score": (3.0, 0.02, "participants"),
     "distribution_by_physical_activity_frequency": (2.0, 0.02, "participants"),
     "distribution_by_sleeping_hours": (2.0, 0.02, "participants"),
@@ -1189,12 +1189,32 @@ class CampReportsService:
         *,
         ctx: EnrolledAssessmentContext,
     ) -> tuple[list[dict[str, Any]], list[dict[str, str | None]], list[str]]:
-        """Compute low-risk / habits / profiles for one health assessment context."""
+        """Compute low-risk / habits / profiles for one health assessment context.
+
+        Camp report refresh uses cached DB data only — no live Metsights/Healthians
+        fan-out per participant (those calls belong on single-user overview/load).
+        """
+        individual_report = ctx.individual_report
+        # Blood may live on a different IHR row for the same engagement.
+        if individual_report is None or individual_report.blood_parameters is None:
+            blood_report = await self._reports_service._get_blood_individual_report(
+                db,
+                user_id=int(ctx.assessment_instance.user_id),
+                engagement_id=int(ctx.assessment_instance.engagement_id),
+                assessment_instance_id=int(ctx.assessment_instance.assessment_instance_id),
+            )
+            if blood_report is not None:
+                if individual_report is None:
+                    individual_report = blood_report
+                elif individual_report.blood_parameters is None:
+                    individual_report.blood_parameters = blood_report.blood_parameters
+
         low_risk_items = await self._reports_service.compute_low_risk_for_instance(
             db,
             assessment_instance=ctx.assessment_instance,
             package=ctx.package,
-            individual_report=ctx.individual_report,
+            individual_report=individual_report,
+            allow_remote_fetch=False,
         )
         low_risk = [
             {
@@ -1211,8 +1231,9 @@ class CampReportsService:
                 assessment_instance=ctx.assessment_instance,
                 package=ctx.package,
                 engagement=ctx.engagement,
-                individual_report=ctx.individual_report,
+                individual_report=individual_report,
                 user_gender=ctx.user_gender,
+                allow_provider_fetch=False,
             )
         except AppError as exc:
             if exc.error_code not in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
