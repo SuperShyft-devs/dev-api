@@ -2340,12 +2340,14 @@ class CampReportsService:
         )
 
     async def _compute_ranking_payload(self, db: AsyncSession, *, camp_no: int) -> dict:
-        """Compute city + industry ranking for this org's camp and store in report JSON."""
+        """Compute per-city camp ranking and return the ranking section payload."""
         from datetime import date as _date
         from sqlalchemy import select as _select
 
-        # Step 1: get organization and its city/industry from camp context
-        # Find any engagement for this camp_no to get organization_id
+        cities = await self._repository.list_distinct_cities_for_camp(db, camp_no=camp_no)
+        if not cities:
+            return build_ranking({})
+
         engagement_result = await db.execute(
             _select(Engagement.organization_id)
             .where(Engagement.camp_no == camp_no, Engagement.organization_id.isnot(None))
@@ -2360,89 +2362,70 @@ class CampReportsService:
             )
             org = org_result.scalar_one_or_none()
 
-        if org is None or not org.city:
-            return build_ranking({
-                "city": None,
-                "industry_key": None,
-                "industry": None,
-                "avg_metabolic_score": None,
-                "rank_city": None,
-                "total_city": None,
-                "rank_city_industry": None,
-                "total_city_industry": None,
-                "error": "Organization or city not found for this camp",
-            })
+        industry_key = org.industry_key if org is not None else None
+        organization_id = org.organization_id if org is not None else None
 
-        city = (org.city or "").strip()
-        industry_key = org.industry_key
+        data: dict[str, dict[str, int | None]] = {}
+        for city in cities:
+            year = await self._repository.get_camp_city_year(db, camp_no=camp_no, city=city)
+            if year is None:
+                year = _date.today().year
 
-        # Step 2: get industry display name
-        industry_display: str | None = None
-        if industry_key:
-            ind = await self._organizations_repository.get_industry_by_key(db, industry_key)
-            if ind:
-                industry_display = ind.industry
+            this_scores = await self._repository.list_metabolic_scores(
+                db,
+                camp_no=camp_no,
+                department=None,
+                city=city,
+            )
+            this_avg: float | None = (
+                round(sum(this_scores) / len(this_scores), 2) if this_scores else None
+            )
 
-        # Step 3: get this org's avg metabolic score from this camp
-        this_org_scores = await self._repository.list_metabolic_scores(
-            db, camp_no=camp_no, department=None
-        )
-        this_org_avg: float | None = (
-            round(sum(this_org_scores) / len(this_org_scores), 2)
-            if this_org_scores
-            else None
-        )
+            peers = await self._repository.list_camp_avg_metabolic_scores_by_city(
+                db,
+                city=city,
+                year=year,
+            )
 
-        # Step 4: get all orgs in same city with a camp this year
-        current_year = _date.today().year
-        all_org_scores = await self._repository.list_org_avg_metabolic_scores_by_city(
-            db, city=city, current_year=current_year
-        )
+            if (
+                this_avg is not None
+                and organization_id is not None
+                and not any(p["camp_no"] == camp_no for p in peers)
+            ):
+                peers = [
+                    *peers,
+                    {
+                        "camp_no": camp_no,
+                        "organization_id": organization_id,
+                        "industry_key": industry_key,
+                        "avg_score": this_avg,
+                    },
+                ]
 
-        if not all_org_scores:
-            return build_ranking({
-                "city": city,
-                "industry_key": industry_key,
-                "industry": industry_display,
-                "avg_metabolic_score": this_org_avg,
-                "rank_city": None,
-                "total_city": 0,
-                "rank_city_industry": None,
-                "total_city_industry": 0,
-            })
+            rank: int | None = None
+            industry_rank: int | None = None
 
-        # Step 5: city rank — sort ascending (lower = healthier)
-        sorted_city = sorted(all_org_scores, key=lambda x: x["avg_score"])
-        total_city = len(sorted_city)
-        this_org_id = org.organization_id
-        rank_city: int | None = None
-        for idx, entry in enumerate(sorted_city, start=1):
-            if entry["organization_id"] == this_org_id:
-                rank_city = idx
-                break
+            if peers:
+                sorted_city = sorted(peers, key=lambda x: x["avg_score"])
+                for idx, entry in enumerate(sorted_city, start=1):
+                    if entry["camp_no"] == camp_no:
+                        rank = idx
+                        break
 
-        # Step 6: industry rank — filter by same industry_key
-        rank_city_industry: int | None = None
-        total_city_industry: int | None = None
-        if industry_key:
-            industry_peers = [
-                e for e in all_org_scores if e["industry_key"] == industry_key
-            ]
-            sorted_industry = sorted(industry_peers, key=lambda x: x["avg_score"])
-            total_city_industry = len(sorted_industry)
-            for idx, entry in enumerate(sorted_industry, start=1):
-                if entry["organization_id"] == this_org_id:
-                    rank_city_industry = idx
-                    break
+                if industry_key:
+                    industry_peers = [
+                        e for e in peers if e.get("industry_key") == industry_key
+                    ]
+                    sorted_industry = sorted(industry_peers, key=lambda x: x["avg_score"])
+                    for idx, entry in enumerate(sorted_industry, start=1):
+                        if entry["camp_no"] == camp_no:
+                            industry_rank = idx
+                            break
 
-        return build_ranking({
-            "city": city,
-            "industry_key": industry_key,
-            "industry": industry_display,
-            "avg_metabolic_score": this_org_avg,
-            "rank_city": rank_city,
-            "total_city": total_city,
-            "rank_city_industry": rank_city_industry,
-            "total_city_industry": total_city_industry,
-        })
+            data[city] = {
+                "rank": rank,
+                "industry_rank": industry_rank,
+            }
+
+        return build_ranking(data)
 

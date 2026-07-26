@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from sqlalchemy import and_, case, delete, func, or_, select
+from sqlalchemy import and_, case, delete, extract, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -1476,115 +1476,92 @@ class CampReportsRepository:
         result = await db.execute(query)
         return int(result.scalar_one())
 
-    async def list_org_avg_metabolic_scores_by_city(
+    async def get_camp_city_year(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        city: str,
+    ) -> int | None:
+        """Return the earliest engagement start year for this camp in the given city."""
+        result = await db.execute(
+            select(func.min(extract("year", Engagement.start_date)))
+            .where(
+                Engagement.camp_no == camp_no,
+                Engagement.start_date.isnot(None),
+                Engagement.city.isnot(None),
+                func.lower(func.trim(Engagement.city)) == city.strip().lower(),
+            )
+        )
+        year = result.scalar_one_or_none()
+        return int(year) if year is not None else None
+
+    async def list_camp_avg_metabolic_scores_by_city(
         self,
         db: AsyncSession,
         *,
         city: str,
-        current_year: int,
+        year: int,
     ) -> list[dict]:
-        """For ranking: return avg metabolic score per org for orgs in the given city
-        that have at least one camp that started in current_year.
+        """For ranking: avg metabolic score per camp held in ``city`` in ``year``.
+
+        A camp is a peer if it has ≥1 engagement with matching ``engagement.city``
+        (case-insensitive) and ``extract(year, start_date) == year``.
+
+        Scores use city-scoped participants (same as ``list_metabolic_scores`` with city).
 
         Returns a list of dicts:
-          { "organization_id": int, "industry_key": str|None, "avg_score": float, "camp_no": int }
+          { "camp_no": int, "organization_id": int, "industry_key": str|None, "avg_score": float }
         """
-        from sqlalchemy import cast, extract, Integer, Float
-
-        # Subquery: for each org in the city, find their latest camp_no in the current year
-        latest_camp_sq = (
+        city_norm = city.strip().lower()
+        peer_result = await db.execute(
             select(
-                Engagement.organization_id,
-                func.max(Engagement.camp_no).label("latest_camp_no"),
+                Engagement.camp_no,
+                func.min(Engagement.organization_id).label("organization_id"),
             )
-            .select_from(Engagement)
-            .join(Organization, Organization.organization_id == Engagement.organization_id)
             .where(
-                Organization.city.isnot(None),
-                func.lower(func.trim(Organization.city)) == city.strip().lower(),
                 Engagement.camp_no.isnot(None),
-                extract("year", Engagement.start_date) == current_year,
+                Engagement.city.isnot(None),
+                func.lower(func.trim(Engagement.city)) == city_norm,
+                extract("year", Engagement.start_date) == year,
             )
-            .group_by(Engagement.organization_id)
-        ).subquery()
-
-        # Get all assessment instances for those latest camps
-        ranked_reports_sq = (
-            select(
-                latest_camp_sq.c.organization_id,
-                AssessmentInstance.user_id,
-                IndividualHealthReport.reports,
-                func.row_number()
-                .over(
-                    partition_by=[latest_camp_sq.c.organization_id, AssessmentInstance.user_id],
-                    order_by=_latest_report_order(),
-                )
-                .label("rn"),
-            )
-            .select_from(latest_camp_sq)
-            .join(
-                Engagement,
-                and_(
-                    Engagement.organization_id == latest_camp_sq.c.organization_id,
-                    Engagement.camp_no == latest_camp_sq.c.latest_camp_no,
-                ),
-            )
-            .join(
-                AssessmentInstance,
-                AssessmentInstance.engagement_id == Engagement.engagement_id,
-            )
-            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
-            .join(
-                IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id
-                == AssessmentInstance.assessment_instance_id,
-            )
-            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
-        ).subquery()
-
-        # Get latest report per user per org (rn == 1)
-        latest_reports_sq = (
-            select(
-                ranked_reports_sq.c.organization_id,
-                ranked_reports_sq.c.reports,
-            )
-            .where(ranked_reports_sq.c.rn == 1)
-        ).subquery()
-
-        result = await db.execute(
-            select(
-                latest_reports_sq.c.organization_id,
-                latest_reports_sq.c.reports,
-                latest_camp_sq.c.latest_camp_no,
-                Organization.industry_key,
-            )
-            .select_from(latest_reports_sq)
-            .join(latest_camp_sq, latest_camp_sq.c.organization_id == latest_reports_sq.c.organization_id)
-            .join(Organization, Organization.organization_id == latest_reports_sq.c.organization_id)
+            .group_by(Engagement.camp_no)
         )
+        peer_rows = peer_result.all()
+        if not peer_rows:
+            return []
 
-        # Group scores by org_id in Python, then average
-        org_scores: dict[int, list[float]] = {}
-        org_meta: dict[int, dict] = {}
-        for org_id, reports, camp_no, industry_key in result.all():
-            reports_dict: dict = reports if isinstance(reports, dict) else {}
-            score = extract_metabolic_score(reports_dict)
-            if score is None:
+        org_ids = {int(org_id) for _, org_id in peer_rows if org_id is not None}
+        org_industry: dict[int, str | None] = {}
+        if org_ids:
+            org_result = await db.execute(
+                select(Organization.organization_id, Organization.industry_key).where(
+                    Organization.organization_id.in_(org_ids)
+                )
+            )
+            org_industry = {int(oid): ik for oid, ik in org_result.all()}
+
+        city_key = city.strip()
+        out: list[dict] = []
+        for camp_no_val, org_id in peer_rows:
+            if camp_no_val is None or org_id is None:
                 continue
-            if org_id not in org_scores:
-                org_scores[org_id] = []
-                org_meta[org_id] = {"camp_no": int(camp_no), "industry_key": industry_key}
-            org_scores[org_id].append(score)
-
-        out = []
-        for org_id, scores in org_scores.items():
+            camp_no_int = int(camp_no_val)
+            org_id_int = int(org_id)
+            scores = await self.list_metabolic_scores(
+                db,
+                camp_no=camp_no_int,
+                department=None,
+                city=city_key,
+            )
             if not scores:
                 continue
-            avg = round(sum(scores) / len(scores), 2)
-            out.append({
-                "organization_id": org_id,
-                "industry_key": org_meta[org_id]["industry_key"],
-                "avg_score": avg,
-                "camp_no": org_meta[org_id]["camp_no"],
-            })
+            out.append(
+                {
+                    "camp_no": camp_no_int,
+                    "organization_id": org_id_int,
+                    "industry_key": org_industry.get(org_id_int),
+                    "avg_score": round(sum(scores) / len(scores), 2),
+                }
+            )
         return out
