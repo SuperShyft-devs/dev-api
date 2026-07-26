@@ -214,6 +214,33 @@ class CampReportRefreshRequest(BaseModel):
     section: str = Field(min_length=1, max_length=200)
 
 
+class CampReportEstimateOperationRequest(BaseModel):
+    section: str = Field(min_length=1, max_length=200)
+    action: str = Field(min_length=1, max_length=50)
+    department: str | None = None
+
+
+class CampReportEstimateRequest(BaseModel):
+    operations: list[CampReportEstimateOperationRequest] = Field(min_length=1)
+
+
+class CampReportEstimateOperationResult(BaseModel):
+    section: str
+    action: str
+    department: str | None = None
+    participant_count: int
+    unit_count: int
+    estimated_seconds: int
+    allowed: bool
+
+
+class CampReportEstimateResponse(BaseModel):
+    timeout_seconds: int
+    operations: list[CampReportEstimateOperationResult]
+    total_estimated_seconds: int
+    all_allowed: bool
+
+
 class CampParticipantResponse(BaseModel):
     engagement_participant_id: int
     engagement_id: int

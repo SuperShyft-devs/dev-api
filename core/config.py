@@ -104,6 +104,11 @@ class Settings:
     NUTRITION_API_KEY: str = os.getenv("NUTRITION_API_KEY", "metsights-secret-2024")
     NUTRITION_API_TIMEOUT_SECONDS: int = int(os.getenv("NUTRITION_API_TIMEOUT_SECONDS", "15"))
 
+    # Align with admin axios timeout for camp report refresh/validate gating
+    CAMP_REPORT_CLIENT_TIMEOUT_SECONDS: int = int(
+        os.getenv("CAMP_REPORT_CLIENT_TIMEOUT_SECONDS", "120")
+    )
+
     # Separate HMAC secrets (fall back to JWT_SECRET_KEY if not set)
     OTP_HMAC_SECRET: str = os.getenv("OTP_HMAC_SECRET", "")
     REFRESH_TOKEN_SECRET: str = os.getenv("REFRESH_TOKEN_SECRET", "")

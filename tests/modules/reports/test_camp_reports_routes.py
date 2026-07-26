@@ -3727,3 +3727,150 @@ async def test_refresh_camp_report_company_average_scores_empty_camp(async_clien
 
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
+
+@pytest.mark.asyncio
+async def test_estimate_camp_report_requires_auth(async_client):
+    response = await async_client.post(
+        "/reports/camps/123/estimate",
+        json={"operations": [{"section": "kpis", "action": "refresh"}]},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_estimate_camp_report_fast_section_under_timeout(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7901, employee_id=901)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9501,
+        engagement_id=9501,
+    )
+    headers = _auth_header(7901)
+
+    response = await async_client.post(
+        f"/reports/camps/{camp_no}/estimate",
+        headers=headers,
+        json={"operations": [{"section": "kpis", "action": "refresh", "department": None}]},
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["timeout_seconds"] == 120
+    assert payload["all_allowed"] is True
+    assert len(payload["operations"]) == 1
+    op = payload["operations"][0]
+    assert op["section"] == "kpis"
+    assert op["action"] == "refresh"
+    assert op["department"] is None
+    assert op["participant_count"] == 4
+    assert op["unit_count"] == 4
+    assert op["estimated_seconds"] == 3  # ceil(2 + 0.01*4)
+    assert op["allowed"] is True
+    assert payload["total_estimated_seconds"] == 3
+
+
+@pytest.mark.asyncio
+async def test_estimate_camp_report_department_scope(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7902, employee_id=902)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9502,
+        engagement_id=9502,
+    )
+    headers = _auth_header(7902)
+
+    response = await async_client.post(
+        f"/reports/camps/{camp_no}/estimate",
+        headers=headers,
+        json={"operations": [{"section": "kpis", "action": "refresh", "department": "sales"}]},
+    )
+    assert response.status_code == 200
+    op = response.json()["data"]["operations"][0]
+    assert op["department"] == "sales"
+    assert op["participant_count"] == 3
+    assert op["unit_count"] == 3
+
+
+@pytest.mark.asyncio
+async def test_estimate_camp_report_blocks_when_over_timeout(
+    async_client, test_db_session, monkeypatch
+):
+    await _seed_employee(test_db_session, user_id=7903, employee_id=903)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9503,
+        engagement_id=9503,
+    )
+    headers = _auth_header(7903)
+    monkeypatch.setattr(settings, "CAMP_REPORT_CLIENT_TIMEOUT_SECONDS", 2)
+
+    response = await async_client.post(
+        f"/reports/camps/{camp_no}/estimate",
+        headers=headers,
+        json={"operations": [{"section": "kpis", "action": "refresh"}]},
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["timeout_seconds"] == 2
+    op = payload["operations"][0]
+    assert op["estimated_seconds"] == 3
+    assert op["allowed"] is False
+    assert payload["all_allowed"] is False
+
+
+@pytest.mark.asyncio
+async def test_estimate_camp_report_bulk_all_allowed_false(
+    async_client, test_db_session, monkeypatch
+):
+    await _seed_employee(test_db_session, user_id=7904, employee_id=904)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9504,
+        engagement_id=9504,
+    )
+    headers = _auth_header(7904)
+    # company_average_scores with 0 fitprint contexts => ceil(5)=5; timeout 4 blocks it
+    monkeypatch.setattr(settings, "CAMP_REPORT_CLIENT_TIMEOUT_SECONDS", 4)
+
+    response = await async_client.post(
+        f"/reports/camps/{camp_no}/estimate",
+        headers=headers,
+        json={
+            "operations": [
+                {"section": "kpis", "action": "refresh"},
+                {"section": "company_average_scores", "action": "validate"},
+            ]
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert len(payload["operations"]) == 2
+    assert payload["operations"][0]["section"] == "kpis"
+    assert payload["operations"][0]["allowed"] is True
+    assert payload["operations"][1]["section"] == "company_average_scores"
+    assert payload["operations"][1]["action"] == "validate"
+    assert payload["operations"][1]["estimated_seconds"] == 5
+    assert payload["operations"][1]["allowed"] is False
+    assert payload["all_allowed"] is False
+    assert payload["total_estimated_seconds"] == (
+        payload["operations"][0]["estimated_seconds"] + payload["operations"][1]["estimated_seconds"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_estimate_camp_report_invalid_action(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7905, employee_id=905)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9505,
+        engagement_id=9505,
+    )
+    headers = _auth_header(7905)
+
+    response = await async_client.post(
+        f"/reports/camps/{camp_no}/estimate",
+        headers=headers,
+        json={"operations": [{"section": "kpis", "action": "delete"}]},
+    )
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT"
+

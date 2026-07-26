@@ -12,7 +12,7 @@ from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
 from modules.reports.camp_reports_service import CampReportsService
 from modules.reports.dependencies import get_camp_reports_service
-from modules.reports.schemas import CampReportRefreshRequest
+from modules.reports.schemas import CampReportEstimateRequest, CampReportRefreshRequest
 
 router = APIRouter(prefix="/reports/camps", tags=["reports"])
 
@@ -427,6 +427,23 @@ async def list_camp_reports(
 ):
     rows = await service.list_camp_reports(db, employee=employee, camp_no=camp_no)
     return success_response(rows)
+
+
+@router.post("/{camp_no}/estimate")
+async def estimate_camp_report_operations(
+    camp_no: int,
+    payload: CampReportEstimateRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.estimate_camp_report_operations(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        operations=[op.model_dump() for op in payload.operations],
+    )
+    return success_response(result)
 
 
 @router.put("/{camp_no}/refresh")

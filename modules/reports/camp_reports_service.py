@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -9,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.employee.access_control import (
@@ -55,6 +57,31 @@ from modules.reports.camp_reports_repository import CampReportsRepository
 from modules.reports.models import CampReport
 from modules.reports.service import BLOOD_DATA_UNAVAILABLE_ERROR_CODES, ReportsService
 from modules.users.models import User
+
+# (base_seconds, per_unit_seconds, unit_kind) where unit_kind is "participants" or "fitprint"
+_SECTION_ESTIMATE_COSTS: dict[str, tuple[float, float, str]] = {
+    "participation_by_age": (2.0, 0.01, "participants"),
+    "kpis": (2.0, 0.01, "participants"),
+    "overall_risk_score": (3.0, 0.02, "participants"),
+    "distribution_by_physical_activity_frequency": (2.0, 0.02, "participants"),
+    "distribution_by_sleeping_hours": (2.0, 0.02, "participants"),
+    "distribution_by_oxidative_stress": (3.0, 0.02, "participants"),
+    "distribution_by_gender_by_metabolic_syndrome": (3.0, 0.02, "participants"),
+    "blood_and_lab_intelligence": (5.0, 0.05, "participants"),
+    "ranking": (5.0, 0.03, "participants"),
+    "positive_wins": (5.0, 0.5, "fitprint"),
+    "company_average_scores": (5.0, 2.5, "fitprint"),
+}
+
+_VALIDATE_ESTIMATE_COSTS: dict[str, tuple[float, float, str]] = {
+    "company_average_scores": (5.0, 2.5, "fitprint"),
+    "positive_wins": (5.0, 0.5, "fitprint"),
+    "overall_risk_score": (3.0, 0.02, "participants"),
+    "distribution_by_physical_activity_frequency": (2.0, 0.02, "participants"),
+    "distribution_by_sleeping_hours": (2.0, 0.02, "participants"),
+}
+
+_DEFAULT_ESTIMATE_COST: tuple[float, float, str] = (3.0, 0.02, "participants")
 
 
 class CampReportsService:
@@ -948,6 +975,113 @@ class CampReportsService:
         return {
             "report_id": row.report_id,
             "section": section_payload,
+        }
+
+    @staticmethod
+    def _resolve_estimate_cost(section: str, action: str) -> tuple[float, float, str]:
+        normalized_section = section.strip()
+        normalized_action = action.strip().lower()
+        if normalized_action == "validate":
+            return _VALIDATE_ESTIMATE_COSTS.get(normalized_section, _DEFAULT_ESTIMATE_COST)
+        if normalized_action == "refresh":
+            return _SECTION_ESTIMATE_COSTS.get(normalized_section, _DEFAULT_ESTIMATE_COST)
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message="action must be 'refresh' or 'validate'",
+        )
+
+    async def estimate_camp_report_operations(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        operations: list[dict[str, Any]],
+    ) -> dict:
+        ensure_internal_employee(employee)
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        timeout_seconds = settings.CAMP_REPORT_CLIENT_TIMEOUT_SECONDS
+        count_cache: dict[tuple[str, str | None], int] = {}
+        results: list[dict[str, Any]] = []
+
+        for op in operations:
+            section = str(op.get("section") or "").strip()
+            action = str(op.get("action") or "").strip().lower()
+            department_raw = op.get("department")
+            department: str | None = None
+            if department_raw is not None:
+                normalized_department = str(department_raw).strip()
+                if not normalized_department:
+                    raise AppError(
+                        status_code=400,
+                        error_code="INVALID_INPUT",
+                        message="Invalid request",
+                    )
+                await self._validate_department_slug(
+                    db,
+                    organization_id=context["organization_id"],
+                    slug=normalized_department,
+                )
+                department = normalized_department
+
+            if not section:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="section is required",
+                )
+
+            base, per_unit, unit_kind = self._resolve_estimate_cost(section, action)
+
+            participant_key = ("participants", department)
+            if participant_key not in count_cache:
+                count_cache[participant_key] = await self._repository.count_participants_by_camp_no(
+                    db,
+                    camp_no=camp_no,
+                    department=department,
+                )
+            participant_count = count_cache[participant_key]
+
+            if unit_kind == "fitprint":
+                fitprint_key = ("fitprint", department)
+                if fitprint_key not in count_cache:
+                    count_cache[fitprint_key] = await self._repository.count_fitprint_assessment_contexts(
+                        db,
+                        camp_no=camp_no,
+                        department=department,
+                    )
+                unit_count = count_cache[fitprint_key]
+            else:
+                unit_count = participant_count
+
+            estimated_seconds = max(1, math.ceil(base + per_unit * unit_count))
+            allowed = estimated_seconds <= timeout_seconds
+            results.append(
+                {
+                    "section": section,
+                    "action": action,
+                    "department": department,
+                    "participant_count": participant_count,
+                    "unit_count": unit_count,
+                    "estimated_seconds": estimated_seconds,
+                    "allowed": allowed,
+                }
+            )
+
+        total_estimated_seconds = sum(item["estimated_seconds"] for item in results)
+        return {
+            "timeout_seconds": timeout_seconds,
+            "operations": results,
+            "total_estimated_seconds": total_estimated_seconds,
+            "all_allowed": all(item["allowed"] for item in results),
         }
 
     async def refresh_camp_report_section(
