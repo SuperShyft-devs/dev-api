@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from sqlalchemy import and_, case, delete, extract, func, or_, select
+from sqlalchemy import and_, case, delete, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
 
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.engagements.models import Engagement, EngagementParticipant
-from modules.experts.models import ConsultationBooking
+from modules.experts.models import ConsultationBooking, ExpertTypeModel
 from modules.organizations.models import Organization
 from modules.questionnaire.models import QuestionnaireDefinition, QuestionnaireResponse
 from modules.reports.camp_report_section_builders import extract_metabolic_age, extract_metabolic_score, extract_oxidative_stress_score, is_high_metabolic_risk, resolve_user_age
@@ -303,6 +303,18 @@ class CampReportsRepository:
         await db.flush()
         return row
 
+    async def update_report_and_bts(
+        self,
+        db: AsyncSession,
+        row: CampReport,
+        report: dict,
+        report_bts: dict,
+    ) -> CampReport:
+        row.report = report
+        row.report_bts = report_bts
+        await db.flush()
+        return row
+
     async def list_distinct_enrolled_users(
         self,
         db: AsyncSession,
@@ -321,6 +333,166 @@ class CampReportsRepository:
         result = await db.execute(query)
         return [(int(r[0]), r[1], int(r[2])) for r in result.all()]
 
+    async def list_kpi_blood_candidates(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> list[tuple[int, bool, str | None]]:
+        """Distinct enrolled users: (user_id, has_booking_id, metsights_record_id_or_none).
+
+        ``has_booking_id`` is True if ANY engagement_participant in the camp for that user
+        has ``booking_id`` not null. ``metsights_record_id`` comes from the latest Basic/Pro
+        (type 1/2) assessment instance for that user's enrolled engagement.
+        """
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
+
+        booking_users = (
+            select(EngagementParticipant.user_id.label("user_id"))
+            .select_from(Engagement)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_id == Engagement.engagement_id,
+            )
+            .where(
+                Engagement.camp_no == camp_no,
+                EngagementParticipant.booking_id.isnot(None),
+            )
+            .distinct()
+            .subquery()
+        )
+
+        ranked_assessments = (
+            select(
+                enrolled.c.user_id,
+                AssessmentInstance.metsights_record_id,
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=AssessmentInstance.assessment_instance_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(
+                AssessmentInstance,
+                and_(
+                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
+                    AssessmentInstance.user_id == enrolled.c.user_id,
+                ),
+            )
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        ).subquery()
+
+        latest_assessment = (
+            select(
+                ranked_assessments.c.user_id,
+                ranked_assessments.c.metsights_record_id,
+            )
+            .where(ranked_assessments.c.rn == 1)
+            .subquery()
+        )
+
+        result = await db.execute(
+            select(
+                enrolled.c.user_id,
+                booking_users.c.user_id.label("booking_user_id"),
+                latest_assessment.c.metsights_record_id,
+            )
+            .select_from(enrolled)
+            .outerjoin(booking_users, booking_users.c.user_id == enrolled.c.user_id)
+            .outerjoin(latest_assessment, latest_assessment.c.user_id == enrolled.c.user_id)
+        )
+
+        rows: list[tuple[int, bool, str | None]] = []
+        for user_id, booking_user_id, metsights_record_id in result.all():
+            record_id = str(metsights_record_id).strip() if metsights_record_id else None
+            if record_id == "":
+                record_id = None
+            rows.append((int(user_id), booking_user_id is not None, record_id))
+        return rows
+
+    async def compute_consultation_counts(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> dict[str, int]:
+        """Count distinct users wanting each expert type and every combination (size >= 2).
+
+        Keys are expert ``type_key`` values (and sorted ``_``-joined combinations).
+        A user counts for a combination when they have ``want=True`` for every type in it.
+        """
+        expert_types_result = await db.execute(
+            select(ExpertTypeModel.type_key).order_by(ExpertTypeModel.type_key.asc())
+        )
+        type_keys = [str(row[0]).strip() for row in expert_types_result.all() if row[0]]
+        type_keys = [key for key in type_keys if key]
+
+        counts: dict[str, int] = {key: 0 for key in type_keys}
+        for size in range(2, len(type_keys) + 1):
+            for combo in itertools.combinations(type_keys, size):
+                counts["_".join(combo)] = 0
+
+        if not type_keys:
+            return counts
+
+        want_query = (
+            select(
+                EngagementParticipant.user_id,
+                ConsultationBooking.expert_type,
+            )
+            .select_from(Engagement)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_id == Engagement.engagement_id,
+            )
+            .join(
+                ConsultationBooking,
+                ConsultationBooking.engagement_participant_id
+                == EngagementParticipant.engagement_participant_id,
+            )
+            .where(
+                Engagement.camp_no == camp_no,
+                ConsultationBooking.want.is_(True),
+            )
+        )
+        if department is not None:
+            want_query = want_query.where(
+                EngagementParticipant.participant_department == department
+            )
+        if city is not None:
+            want_query = want_query.where(
+                func.lower(func.trim(Engagement.city)) == city.lower()
+            )
+
+        want_result = await db.execute(want_query)
+        user_types: dict[int, set[str]] = {}
+        known_types = set(type_keys)
+        for user_id, expert_type in want_result.all():
+            if expert_type is None:
+                continue
+            key = str(expert_type).strip()
+            if key not in known_types:
+                continue
+            user_types.setdefault(int(user_id), set()).add(key)
+
+        for types in user_types.values():
+            for key in type_keys:
+                if key in types:
+                    counts[key] += 1
+            for size in range(2, len(type_keys) + 1):
+                for combo in itertools.combinations(type_keys, size):
+                    if set(combo).issubset(types):
+                        counts["_".join(combo)] += 1
+
+        return counts
+
     async def compute_kpi_metrics(
         self,
         db: AsyncSession,
@@ -329,8 +501,14 @@ class CampReportsRepository:
         department: str | None = None,
         city: str | None = None,
         age_reference_date: date,
-    ) -> dict[str, int]:
-        """Aggregate KPI counts for a camp (optionally scoped to a department)."""
+        blood_tested_user_ids: set[int],
+        blood_details: dict[str, int],
+    ) -> dict:
+        """Aggregate KPI counts for a camp (optionally scoped to a department).
+
+        Blood totals come from the service (booking_id + Metsights collection checks).
+        Consultation counts include all expert types and combinations.
+        """
         enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         employees_result = await db.execute(
@@ -352,101 +530,17 @@ class CampReportsRepository:
         )
         female_enrolled = int(female_result.scalar_one())
 
-        blood_result = await db.execute(
-            select(func.count(func.distinct(enrolled.c.user_id)))
-            .select_from(enrolled)
-            .join(
-                IndividualHealthReport,
-                and_(
-                    IndividualHealthReport.engagement_id == enrolled.c.engagement_id,
-                    IndividualHealthReport.user_id == enrolled.c.user_id,
-                ),
-            )
-            .where(IndividualHealthReport.blood_parameters.isnot(None))
+        consultations = await self.compute_consultation_counts(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
         )
-        total_blood_test = int(blood_result.scalar_one())
-
-        doctor_query = (
-            select(func.count(func.distinct(EngagementParticipant.user_id)))
-            .select_from(Engagement)
-            .join(
-                EngagementParticipant,
-                EngagementParticipant.engagement_id == Engagement.engagement_id,
-            )
-            .join(
-                ConsultationBooking,
-                ConsultationBooking.engagement_participant_id == EngagementParticipant.engagement_participant_id,
-            )
-            .where(Engagement.camp_no == camp_no)
-            .where(ConsultationBooking.expert_type == "doctor")
-            .where(ConsultationBooking.want.is_(True))
+        doctor_consultation = int(consultations.get("doctor", 0))
+        nutritionist_consultation = int(consultations.get("nutritionist", 0))
+        doctor_and_nutritionist_consultation = int(
+            consultations.get("doctor_nutritionist", 0)
         )
-        if department is not None:
-            doctor_query = doctor_query.where(EngagementParticipant.participant_department == department)
-        if city is not None:
-            doctor_query = doctor_query.where(func.lower(func.trim(Engagement.city)) == city.lower())
-        doctor_result = await db.execute(doctor_query)
-        doctor_consultation = int(doctor_result.scalar_one())
-
-        nutritionist_query = (
-            select(func.count(func.distinct(EngagementParticipant.user_id)))
-            .select_from(Engagement)
-            .join(
-                EngagementParticipant,
-                EngagementParticipant.engagement_id == Engagement.engagement_id,
-            )
-            .join(
-                ConsultationBooking,
-                ConsultationBooking.engagement_participant_id == EngagementParticipant.engagement_participant_id,
-            )
-            .where(Engagement.camp_no == camp_no)
-            .where(ConsultationBooking.expert_type == "nutritionist")
-            .where(ConsultationBooking.want.is_(True))
-        )
-        if department is not None:
-            nutritionist_query = nutritionist_query.where(
-                EngagementParticipant.participant_department == department
-            )
-        if city is not None:
-            nutritionist_query = nutritionist_query.where(
-                func.lower(func.trim(Engagement.city)) == city.lower()
-            )
-        nutritionist_result = await db.execute(nutritionist_query)
-        nutritionist_consultation = int(nutritionist_result.scalar_one())
-
-        doctor_booking = aliased(ConsultationBooking)
-        nutritionist_booking = aliased(ConsultationBooking)
-        both_query = (
-            select(func.count(func.distinct(EngagementParticipant.user_id)))
-            .select_from(Engagement)
-            .join(
-                EngagementParticipant,
-                EngagementParticipant.engagement_id == Engagement.engagement_id,
-            )
-            .join(
-                doctor_booking,
-                and_(
-                    doctor_booking.engagement_participant_id == EngagementParticipant.engagement_participant_id,
-                    doctor_booking.expert_type == "doctor",
-                    doctor_booking.want.is_(True),
-                ),
-            )
-            .join(
-                nutritionist_booking,
-                and_(
-                    nutritionist_booking.engagement_participant_id == EngagementParticipant.engagement_participant_id,
-                    nutritionist_booking.expert_type == "nutritionist",
-                    nutritionist_booking.want.is_(True),
-                ),
-            )
-            .where(Engagement.camp_no == camp_no)
-        )
-        if department is not None:
-            both_query = both_query.where(EngagementParticipant.participant_department == department)
-        if city is not None:
-            both_query = both_query.where(func.lower(func.trim(Engagement.city)) == city.lower())
-        both_result = await db.execute(both_query)
-        doctor_and_nutritionist_consultation = int(both_result.scalar_one())
 
         ranked_reports = (
             select(
@@ -505,11 +599,13 @@ class CampReportsRepository:
             "employees_enrolled": employees_enrolled,
             "male_enrolled": male_enrolled,
             "female_enrolled": female_enrolled,
-            "total_blood_test": total_blood_test,
+            "total_blood_test": len(blood_tested_user_ids),
+            "consultations": consultations,
             "doctor_consultation": doctor_consultation,
             "nutritionist_consultation": nutritionist_consultation,
             "doctor_and_nutritionist_consultation": doctor_and_nutritionist_consultation,
             "high_risk_group": high_risk_group,
+            "blood_details": dict(blood_details),
         }
 
     async def list_metabolic_scores(

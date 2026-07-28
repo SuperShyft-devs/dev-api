@@ -197,6 +197,7 @@ def build_kpis(metrics: dict) -> dict:
     """Build kpis section payload from aggregated metrics."""
     enrolled = int(metrics["employees_enrolled"])
     blood = int(metrics["total_blood_test"])
+    consultations = metrics.get("consultations") or {}
     return {
         "data": {
             "employees_enrolled": enrolled,
@@ -204,6 +205,7 @@ def build_kpis(metrics: dict) -> dict:
             "female_enrolled": int(metrics["female_enrolled"]),
             "total_blood_test": blood,
             "blood_test_percent": round(blood / enrolled * 100) if enrolled else 0,
+            "consultations": {str(k): int(v) for k, v in dict(consultations).items()},
             "doctor_consultation": int(metrics["doctor_consultation"]),
             "nutritionist_consultation": int(metrics["nutritionist_consultation"]),
             "doctor_and_nutritionist_consultation": int(

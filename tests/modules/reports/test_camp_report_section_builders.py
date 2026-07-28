@@ -51,6 +51,11 @@ def test_build_kpis_percent():
             "male_enrolled": 2,
             "female_enrolled": 2,
             "total_blood_test": 3,
+            "consultations": {
+                "doctor": 2,
+                "nutritionist": 1,
+                "doctor_nutritionist": 1,
+            },
             "doctor_consultation": 2,
             "nutritionist_consultation": 1,
             "doctor_and_nutritionist_consultation": 1,
@@ -58,6 +63,8 @@ def test_build_kpis_percent():
         }
     )
     assert payload["data"]["blood_test_percent"] == 75
+    assert payload["data"]["consultations"]["doctor"] == 2
+    assert payload["data"]["consultations"]["doctor_nutritionist"] == 1
 
 
 def test_build_kpis_percent_zero_enrolled():
@@ -67,6 +74,7 @@ def test_build_kpis_percent_zero_enrolled():
             "male_enrolled": 0,
             "female_enrolled": 0,
             "total_blood_test": 0,
+            "consultations": {},
             "doctor_consultation": 0,
             "nutritionist_consultation": 0,
             "doctor_and_nutritionist_consultation": 0,
@@ -74,6 +82,7 @@ def test_build_kpis_percent_zero_enrolled():
         }
     )
     assert payload["data"]["blood_test_percent"] == 0
+    assert payload["data"]["consultations"] == {}
 
 
 def test_build_participation_by_age_total_inside_data():

@@ -815,10 +815,24 @@ async def _seed_kpis_camp_data(
     engagement_id: int = 9401,
 ):
     from modules.assessments.models import AssessmentInstance, AssessmentPackage
+    from modules.experts.models import ExpertTypeModel
     from modules.reports.models import IndividualHealthReport
 
     camp_no, _ = await _seed_camp(test_db_session, organization_id=organization_id, engagement_id=engagement_id)
     start = date(2026, 6, 23)
+
+    existing_types = (
+        await test_db_session.execute(select(ExpertTypeModel.type_key))
+    ).scalars().all()
+    existing_type_keys = {str(k) for k in existing_types}
+    to_add = []
+    if "doctor" not in existing_type_keys:
+        to_add.append(ExpertTypeModel(type_key="doctor", type="Doctor"))
+    if "nutritionist" not in existing_type_keys:
+        to_add.append(ExpertTypeModel(type_key="nutritionist", type="Nutritionist"))
+    if to_add:
+        test_db_session.add_all(to_add)
+        await test_db_session.flush()
 
     test_db_session.add_all(
         [
@@ -883,6 +897,7 @@ async def _seed_kpis_camp_data(
                 engagement_date=start,
                 slot_start_time=time(10, 0),
                 participant_department="sales",
+                booking_id="BK-94001",
             ),
             EngagementParticipant(
                 engagement_participant_id=94002,
@@ -891,6 +906,7 @@ async def _seed_kpis_camp_data(
                 engagement_date=start,
                 slot_start_time=time(10, 20),
                 participant_department="sales",
+                booking_id="BK-94002",
             ),
             EngagementParticipant(
                 engagement_participant_id=94003,
@@ -907,6 +923,7 @@ async def _seed_kpis_camp_data(
                 engagement_date=start,
                 slot_start_time=time(11, 20),
                 participant_department="engineering",
+                booking_id="BK-94004",
             ),
         ]
     )
@@ -1057,12 +1074,21 @@ async def test_refresh_camp_report_kpis(async_client, test_db_session):
     assert data["doctor_consultation"] == 2
     assert data["nutritionist_consultation"] == 1
     assert data["doctor_and_nutritionist_consultation"] == 1
+    assert data["consultations"]["doctor"] == 2
+    assert data["consultations"]["nutritionist"] == 1
+    assert data["consultations"]["doctor_nutritionist"] == 1
     assert data["high_risk_group"] == 2
+
+    assert "report_bts" in payload
+    assert payload["report_bts"]["status"] == "ok"
+    assert payload["report_bts"]["expected"]["employees_enrolled"] == 4
 
     row = (
         await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
     ).scalar_one()
     assert row.report["kpis"]["data"]["employees_enrolled"] == 4
+    assert row.report_bts is not None
+    assert row.report_bts["kpis"]["status"] == "ok"
 
 
 @pytest.mark.asyncio
@@ -3762,10 +3788,76 @@ async def test_estimate_camp_report_fast_section_under_timeout(async_client, tes
     assert op["action"] == "refresh"
     assert op["department"] is None
     assert op["participant_count"] == 4
-    assert op["unit_count"] == 4
-    assert op["estimated_seconds"] == 3  # ceil(2 + 0.01*4)
+    assert op["unit_count"] == 0  # no Metsights checks needed (no record ids without booking)
+    assert op["estimated_seconds"] == 3  # ceil(3 + 0.35*0)
     assert op["allowed"] is True
     assert payload["total_estimated_seconds"] == 3
+
+
+@pytest.mark.asyncio
+async def test_estimate_validate_matches_refresh_cost(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7910, employee_id=910)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9510,
+        engagement_id=9510,
+    )
+    headers = _auth_header(7910)
+
+    response = await async_client.post(
+        f"/reports/camps/{camp_no}/estimate",
+        headers=headers,
+        json={
+            "operations": [
+                {"section": "kpis", "action": "refresh"},
+                {"section": "kpis", "action": "validate"},
+            ]
+        },
+    )
+    assert response.status_code == 200
+    ops = response.json()["data"]["operations"]
+    assert ops[0]["estimated_seconds"] == ops[1]["estimated_seconds"]
+    assert ops[0]["unit_count"] == ops[1]["unit_count"]
+
+
+@pytest.mark.asyncio
+async def test_validate_routes_removed(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7911, employee_id=911)
+    headers = _auth_header(7911)
+    response = await async_client.get(
+        "/reports/camps/123/validate/company-average-scores",
+        headers=headers,
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_refresh_non_kpi_writes_bts_stub(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7912, employee_id=912)
+    await _seed_participation_section(test_db_session, report_sections=95120)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9512,
+        engagement_id=9512,
+    )
+    headers = _auth_header(7912)
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert response.status_code == 200
+    bts = response.json()["data"]["report_bts"]
+    assert bts["status"] == "not_implemented"
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.report_bts["participation_by_age"]["status"] == "not_implemented"
 
 
 @pytest.mark.asyncio
@@ -3787,7 +3879,7 @@ async def test_estimate_camp_report_department_scope(async_client, test_db_sessi
     op = response.json()["data"]["operations"][0]
     assert op["department"] == "sales"
     assert op["participant_count"] == 3
-    assert op["unit_count"] == 3
+    assert op["unit_count"] == 0  # kpi_metsights: no record ids needing fetch-collections
 
 
 @pytest.mark.asyncio

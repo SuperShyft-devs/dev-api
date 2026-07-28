@@ -53,6 +53,7 @@ class CampReport(Base):
 
     report_id = Column(Integer, primary_key=True)
     report = Column(JSON)
+    report_bts = Column(JSON, nullable=True)
     camp_no = Column(BigInteger, nullable=False, index=True)
     department = Column(String, nullable=True)
     city = Column(String, nullable=True)

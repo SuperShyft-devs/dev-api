@@ -46,11 +46,8 @@ from modules.reports.camp_report_section_builders import (
     build_participation_by_age,
     build_positive_wins,
     build_ranking,
-    normalize_camp_gender,
-    normalize_questionnaire_answer,
-    physical_activity_answer_to_bucket,
-    sleeping_hours_answer_to_bucket,
 )
+from modules.reports.camp_report_bts import build_kpis_bts, build_not_implemented_bts
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.assessments.repository import AssessmentsRepository
 from modules.diagnostics.repository import DiagnosticsRepository
@@ -58,14 +55,14 @@ from modules.reports.camp_report_sections_repository import CampReportSectionsRe
 from modules.reports.camp_reports_repository import CampReportsRepository, EnrolledAssessmentContext
 from modules.reports.models import CampReport, IndividualHealthReport
 from modules.reports.service import BLOOD_DATA_UNAVAILABLE_ERROR_CODES, ReportsService
-from modules.users.models import User
 from db.session import AsyncSessionLocal
 
 # (base_seconds, per_unit_seconds, unit_kind)
-# unit_kind: "participants" | "fitprint" | "health"
+# unit_kind: "participants" | "fitprint" | "health" | "kpi_metsights"
 _SECTION_ESTIMATE_COSTS: dict[str, tuple[float, float, str]] = {
     "participation_by_age": (2.0, 0.01, "participants"),
-    "kpis": (2.0, 0.01, "participants"),
+    # KPI refresh may call Metsights fetch-collections per enrolled user without booking_id
+    "kpis": (3.0, 0.35, "kpi_metsights"),
     "overall_risk_score": (3.0, 0.02, "participants"),
     "distribution_by_physical_activity_frequency": (2.0, 0.02, "participants"),
     "distribution_by_sleeping_hours": (2.0, 0.02, "participants"),
@@ -78,18 +75,11 @@ _SECTION_ESTIMATE_COSTS: dict[str, tuple[float, float, str]] = {
     "company_average_scores": (5.0, 2.5, "fitprint"),
 }
 
-_VALIDATE_ESTIMATE_COSTS: dict[str, tuple[float, float, str]] = {
-    "company_average_scores": (5.0, 2.5, "fitprint"),
-    "positive_wins": (5.0, 0.08, "health"),
-    "overall_risk_score": (3.0, 0.02, "participants"),
-    "distribution_by_physical_activity_frequency": (2.0, 0.02, "participants"),
-    "distribution_by_sleeping_hours": (2.0, 0.02, "participants"),
-}
-
 _DEFAULT_ESTIMATE_COST: tuple[float, float, str] = (3.0, 0.02, "participants")
 
-# Concurrent workers for positive_wins refresh (bounded by DB pool).
+# Concurrent workers for positive_wins refresh / KPI Metsights checks (bounded by DB pool).
 _POSITIVE_WINS_CONCURRENCY = 4
+_KPI_BLOOD_METSIGHTS_CONCURRENCY = 4
 
 
 class CampReportsService:
@@ -577,6 +567,7 @@ class CampReportsService:
             "city": row.city,
             "organization_id": row.organization_id,
             "report": row.report,
+            "report_bts": row.report_bts,
             "created_at": row.created_at.isoformat() if row.created_at else None,
             "updated_at": row.updated_at.isoformat() if row.updated_at else None,
         }
@@ -945,19 +936,35 @@ class CampReportsService:
                 message="Report section is not implemented",
             )
 
-        built_payload = await self._build_section_payload(
-            db,
-            section_key=normalized_section,
-            camp_no=camp_no,
-            department=department,
-            city=city,
-            camp_start_date=context["camp_start_date"],
-            camp_end_date=context["camp_end_date"],
-        )
-
+        checked_at = datetime.now(timezone.utc).isoformat()
         report = dict(row.report or {})
+        previous_section = report.get(normalized_section)
+        previous_data = None
+        if isinstance(previous_section, dict) and isinstance(previous_section.get("data"), dict):
+            previous_data = previous_section.get("data")
+
+        kpi_metrics: dict[str, Any] | None = None
+        if normalized_section == "kpis":
+            built_payload, kpi_metrics = await self._build_kpis_payload_with_metrics(
+                db,
+                camp_no=camp_no,
+                department=department,
+                city=city,
+                age_reference_date=context["camp_end_date"] or date.today(),
+            )
+        else:
+            built_payload = await self._build_section_payload(
+                db,
+                section_key=normalized_section,
+                camp_no=camp_no,
+                department=department,
+                city=city,
+                camp_start_date=context["camp_start_date"],
+                camp_end_date=context["camp_end_date"],
+            )
+
         meta = dict(report.get("meta") or {})
-        meta["refreshed_at"] = datetime.now(timezone.utc).isoformat()
+        meta["refreshed_at"] = checked_at
         meta["summary_available"] = True
         report["meta"] = meta
 
@@ -968,7 +975,20 @@ class CampReportsService:
         }
         report[normalized_section] = section_payload
 
-        await self._repository.update_report(db, row, report)
+        report_bts = dict(row.report_bts or {})
+        if normalized_section == "kpis":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            blood_details = dict((kpi_metrics or {}).get("blood_details") or {})
+            report_bts[normalized_section] = build_kpis_bts(
+                expected_data=expected_data,
+                stored_data=previous_data,
+                blood_details=blood_details,
+                checked_at=checked_at,
+            )
+        else:
+            report_bts[normalized_section] = build_not_implemented_bts(checked_at=checked_at)
+
+        await self._repository.update_report_and_bts(db, row, report, report_bts)
 
         await self._audit_service.log_event(
             db,
@@ -983,21 +1003,21 @@ class CampReportsService:
         return {
             "report_id": row.report_id,
             "section": section_payload,
+            "report_bts": report_bts.get(normalized_section),
         }
 
     @staticmethod
     def _resolve_estimate_cost(section: str, action: str) -> tuple[float, float, str]:
         normalized_section = section.strip()
         normalized_action = action.strip().lower()
-        if normalized_action == "validate":
-            return _VALIDATE_ESTIMATE_COSTS.get(normalized_section, _DEFAULT_ESTIMATE_COST)
-        if normalized_action == "refresh":
-            return _SECTION_ESTIMATE_COSTS.get(normalized_section, _DEFAULT_ESTIMATE_COST)
-        raise AppError(
-            status_code=400,
-            error_code="INVALID_INPUT",
-            message="action must be 'refresh' or 'validate'",
-        )
+        if normalized_action not in {"validate", "refresh"}:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="action must be 'refresh' or 'validate'",
+            )
+        # Validate now refreshes the section and writes report_bts — same cost as refresh.
+        return _SECTION_ESTIMATE_COSTS.get(normalized_section, _DEFAULT_ESTIMATE_COST)
 
     async def estimate_camp_report_operations(
         self,
@@ -1076,6 +1096,20 @@ class CampReportsService:
                         department=department,
                     )
                 unit_count = count_cache[health_key]
+            elif unit_kind == "kpi_metsights":
+                metsights_key = ("kpi_metsights", department)
+                if metsights_key not in count_cache:
+                    candidates = await self._repository.list_kpi_blood_candidates(
+                        db,
+                        camp_no=camp_no,
+                        department=department,
+                    )
+                    count_cache[metsights_key] = sum(
+                        1
+                        for _uid, has_booking_id, record_id in candidates
+                        if (not has_booking_id) and record_id
+                    )
+                unit_count = count_cache[metsights_key]
             else:
                 unit_count = participant_count
 
@@ -1424,869 +1458,6 @@ class CampReportsService:
 
         return build_company_average_scores(participant_scores)
 
-    async def validate_company_average_scores(
-        self,
-        db: AsyncSession,
-        *,
-        employee: EmployeeContext,
-        camp_no: int,
-        department: str | None = None,
-        city: str | None = None,
-    ) -> dict:
-        context = await self._resolve_camp_context(db, camp_no=camp_no)
-        await ensure_camp_access(
-            db,
-            employee,
-            context["organization_id"],
-            repository=self._organizations_repository,
-        )
-
-        if department is not None:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            await self._validate_department_slug(
-                db,
-                organization_id=context["organization_id"],
-                slug=normalized_department,
-            )
-            department = normalized_department
-
-        contexts = await self._repository.list_fitprint_assessment_contexts(
-            db,
-            camp_no=camp_no,
-            department=department,
-            city=city,
-        )
-
-        no_fitprint_rows = await self._repository.list_enrolled_users_without_fitprint(
-            db,
-            camp_no=camp_no,
-            department=department,
-            city=city,
-        )
-
-        user_ids = [ctx.assessment_instance.user_id for ctx in contexts]
-        user_names: dict[int, str] = {}
-        if user_ids:
-            rows = await db.execute(
-                select(User.user_id, User.first_name, User.last_name).where(
-                    User.user_id.in_(user_ids)
-                )
-            )
-            for uid, first, last in rows.all():
-                parts = [p for p in (first, last) if p]
-                user_names[int(uid)] = " ".join(parts) if parts else f"User {uid}"
-
-        nutrition_question_keys = self._reports_service._NUTRITION_API_QUESTION_KEYS
-
-        total_participants = len(contexts)
-        valid_counts: dict[str, int] = {"nutrition": 0, "fitness": 0, "lifestyle": 0}
-        totals: dict[str, float] = {"nutrition": 0.0, "fitness": 0.0, "lifestyle": 0.0}
-        participants_detail: dict[str, list[dict[str, Any]]] = {
-            "nutrition": [], "fitness": [], "lifestyle": [],
-        }
-
-        for ctx in contexts:
-            uid = ctx.assessment_instance.user_id
-            name = user_names.get(uid, f"User {uid}")
-
-            try:
-                report_dict = await self._reports_service._resolve_report_dict_for_instance(
-                    db,
-                    assessment_instance=ctx.assessment_instance,
-                    package=ctx.package,
-                    individual_report=ctx.individual_report,
-                )
-            except AppError as exc:
-                detail = f"Metsights service returned: {exc.message}"
-                for key in ("nutrition", "fitness", "lifestyle"):
-                    participants_detail[key].append({
-                        "user_id": uid, "name": name,
-                        "score": None, "reason": "FitPrint report not available",
-                        "detail": detail,
-                    })
-                continue
-            except Exception as exc:
-                detail = str(exc) or "An unexpected error occurred while resolving the FitPrint report"
-                for key in ("nutrition", "fitness", "lifestyle"):
-                    participants_detail[key].append({
-                        "user_id": uid, "name": name,
-                        "score": None, "reason": "FitPrint report not available",
-                        "detail": detail,
-                    })
-                continue
-
-            record_id = (ctx.assessment_instance.metsights_record_id or "").strip()
-            report_empty = not report_dict
-
-            if report_empty and not record_id:
-                for key in ("nutrition", "fitness", "lifestyle"):
-                    participants_detail[key].append({
-                        "user_id": uid, "name": name,
-                        "score": None, "reason": "FitPrint report not available",
-                        "detail": "FitPrint assessment not completed yet (no Metsights record ID)",
-                    })
-                continue
-
-            if report_empty:
-                for key in ("nutrition", "fitness", "lifestyle"):
-                    participants_detail[key].append({
-                        "user_id": uid, "name": name,
-                        "score": None, "reason": "FitPrint report not available",
-                        "detail": "Metsights returned an empty report for this participant",
-                    })
-                continue
-
-            fitness_spec = report_dict.get("fitness_specification") or {}
-            activity_spec = report_dict.get("activity_specification") or {}
-
-            raw_lifestyle = fitness_spec.get("score") if isinstance(fitness_spec, dict) else None
-            lifestyle_score = float(raw_lifestyle) if isinstance(raw_lifestyle, (int, float)) else None
-            if lifestyle_score is not None:
-                valid_counts["lifestyle"] += 1
-                totals["lifestyle"] += lifestyle_score
-                participants_detail["lifestyle"].append({
-                    "user_id": uid, "name": name,
-                    "score": lifestyle_score, "reason": None, "detail": None,
-                })
-            else:
-                participants_detail["lifestyle"].append({
-                    "user_id": uid, "name": name,
-                    "score": None, "reason": "Lifestyle score missing in FitPrint report",
-                    "detail": "The Metsights FitPrint report was retrieved but does not contain a fitness_specification score. The participant may not have completed the fitness assessment.",
-                })
-
-            raw_fitness = activity_spec.get("score") if isinstance(activity_spec, dict) else None
-            fitness_score = float(raw_fitness) if isinstance(raw_fitness, (int, float)) else None
-            if fitness_score is not None:
-                valid_counts["fitness"] += 1
-                totals["fitness"] += fitness_score
-                participants_detail["fitness"].append({
-                    "user_id": uid, "name": name,
-                    "score": fitness_score, "reason": None, "detail": None,
-                })
-            else:
-                participants_detail["fitness"].append({
-                    "user_id": uid, "name": name,
-                    "score": None, "reason": "Fitness score missing in FitPrint report",
-                    "detail": "The Metsights FitPrint report was retrieved but does not contain an activity_specification score. The participant may not have completed the fitness assessment.",
-                })
-
-            all_instances = await self._assessments_repository.list_instances_for_user_engagement(
-                db,
-                user_id=uid,
-                engagement_id=ctx.assessment_instance.engagement_id,
-            )
-            source_ids = [inst.assessment_instance_id for inst in all_instances]
-
-            nutrition_score: float | None = None
-            nutrition_detail: dict[str, Any] = {"user_id": uid, "name": name}
-
-            if not source_ids:
-                nutrition_detail.update({
-                    "score": None,
-                    "reason": "No assessment instances found",
-                    "detail": "No assessments (questionnaire or other) found for this participant's engagement — nutrition questions cannot be loaded",
-                })
-            else:
-                try:
-                    lookup, key_to_qid = await self._reports_service._build_questionnaire_lookup(
-                        db,
-                        source_assessment_instance_ids=source_ids,
-                    )
-
-                    answered_keys = [k for k in nutrition_question_keys if lookup.get(k) is not None]
-                    missing_keys = [k for k in nutrition_question_keys if lookup.get(k) is None]
-
-                    if not answered_keys:
-                        nutrition_detail.update({
-                            "score": None,
-                            "reason": "Nutrition questionnaire not filled",
-                            "detail": f"Participant has not answered any of the {len(nutrition_question_keys)} nutrition-related questions required for score calculation",
-                            "missing_questions": missing_keys,
-                        })
-                    else:
-                        option_reverse_map = await self._reports_service._build_option_reverse_map(db, key_to_qid)
-                        nutrition_payload = self._reports_service._build_nutrition_api_payload(
-                            lookup, user_gender=ctx.user_gender, option_reverse_map=option_reverse_map,
-                        )
-                        nutrition_response = await self._reports_service._call_nutrition_api(
-                            db,
-                            nutrition_payload,
-                            user_id=ctx.assessment_instance.user_id,
-                            engagement_id=ctx.assessment_instance.engagement_id,
-                        )
-                        raw_nutrition = nutrition_response.get("nutrition_score")
-                        nutrition_score = float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
-
-                        if nutrition_score is not None:
-                            nutrition_detail.update({"score": nutrition_score, "reason": None, "detail": None})
-                            if missing_keys:
-                                nutrition_detail["missing_questions"] = missing_keys
-                        else:
-                            detail_parts = ["The nutrition API processed the request but did not return a numeric score"]
-                            if missing_keys:
-                                detail_parts.append(f"{len(missing_keys)} of {len(nutrition_question_keys)} questions were not answered, which may have affected the result")
-                            nutrition_detail.update({
-                                "score": None,
-                                "reason": "Nutrition API returned no score",
-                                "detail": ". ".join(detail_parts),
-                            })
-                            if missing_keys:
-                                nutrition_detail["missing_questions"] = missing_keys
-                except AppError as exc:
-                    if exc.error_code == "INVALID_INPUT":
-                        detail = exc.message or "The nutrition API rejected the request payload"
-                        for qkey, qval in nutrition_payload.items():
-                            val_str = str(qval) if not isinstance(qval, list) else str(qval)
-                            if val_str in detail:
-                                detail = f"[{qkey}] {detail}"
-                                break
-                    elif exc.error_code == "EXTERNAL_SERVICE_UNAVAILABLE":
-                        detail = "The nutrition scoring service is currently unavailable"
-                    else:
-                        detail = exc.message or str(exc)
-                    nutrition_detail.update({
-                        "score": None,
-                        "reason": "Nutrition API call failed",
-                        "detail": detail,
-                    })
-                except Exception as exc:
-                    nutrition_detail.update({
-                        "score": None,
-                        "reason": "Nutrition API call failed",
-                        "detail": str(exc) or "An unexpected error occurred while calling the nutrition API",
-                    })
-
-            if nutrition_score is not None:
-                valid_counts["nutrition"] += 1
-                totals["nutrition"] += nutrition_score
-
-            participants_detail["nutrition"].append(nutrition_detail)
-
-        result: dict[str, Any] = {}
-        for key in ("nutrition", "fitness", "lifestyle"):
-            vc = valid_counts[key]
-            avg = round(totals[key] / vc) if vc > 0 else 0
-            result[key] = {
-                "score": avg,
-                "valid_count": vc,
-                "total_participants": total_participants,
-                "participants": participants_detail[key],
-            }
-
-        result["no_fitprint_assigned"] = [
-            {
-                "user_id": uid,
-                "name": " ".join(p for p in (first, last) if p) or f"User {uid}",
-            }
-            for uid, first, last in no_fitprint_rows
-        ]
-
-        return result
-
-    async def validate_positive_wins(
-        self,
-        db: AsyncSession,
-        *,
-        employee: EmployeeContext,
-        camp_no: int,
-        department: str | None = None,
-        city: str | None = None,
-    ) -> dict:
-        context = await self._resolve_camp_context(db, camp_no=camp_no)
-        await ensure_camp_access(
-            db,
-            employee,
-            context["organization_id"],
-            repository=self._organizations_repository,
-        )
-
-        if department is not None:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            await self._validate_department_slug(
-                db,
-                organization_id=context["organization_id"],
-                slug=normalized_department,
-            )
-            department = normalized_department
-
-        contexts = await self._repository.list_health_assessment_contexts(
-            db,
-            camp_no=camp_no,
-            department=department,
-            city=city,
-        )
-
-        user_ids = [ctx.assessment_instance.user_id for ctx in contexts]
-        user_names: dict[int, str] = {}
-        if user_ids:
-            rows = await db.execute(
-                select(User.user_id, User.first_name, User.last_name).where(
-                    User.user_id.in_(user_ids)
-                )
-            )
-            for uid, first, last in rows.all():
-                parts = [p for p in (first, last) if p]
-                user_names[int(uid)] = " ".join(parts) if parts else f"User {uid}"
-
-        participants_low_risk: list[dict[str, Any]] = []
-        participants_habits: list[dict[str, Any]] = []
-        participants_profiles: list[dict[str, Any]] = []
-
-        agg_low_risk: list[list[dict[str, Any]]] = []
-        agg_habits: list[list[dict[str, str | None]]] = []
-        agg_profiles: list[list[str]] = []
-
-        for ctx in contexts:
-            uid = ctx.assessment_instance.user_id
-            name = user_names.get(uid, f"User {uid}")
-
-            # --- low_risk ---
-            lr_entry: dict[str, Any] = {"user_id": uid, "name": name}
-            if ctx.package is None:
-                lr_entry.update({"items": None, "reason": "No assessment package", "detail": None})
-                agg_low_risk.append([])
-            else:
-                try:
-                    report_dict = await self._reports_service._resolve_report_dict_for_instance(
-                        db,
-                        assessment_instance=ctx.assessment_instance,
-                        package=ctx.package,
-                        individual_report=ctx.individual_report,
-                    )
-                except AppError as exc:
-                    lr_entry.update({"items": None, "reason": "Metsights report unavailable", "detail": exc.message})
-                    agg_low_risk.append([])
-                    participants_low_risk.append(lr_entry)
-
-                    # habits & profiles also fail when metsights is down for this participant
-                    participants_habits.append({"user_id": uid, "name": name, "items": None, "reason": "Metsights report unavailable", "detail": exc.message})
-                    agg_habits.append([])
-                    participants_profiles.append({"user_id": uid, "name": name, "items": None, "reason": "Metsights report unavailable", "detail": exc.message})
-                    agg_profiles.append([])
-                    continue
-                except Exception as exc:
-                    detail = str(exc) or "Unexpected error resolving report"
-                    lr_entry.update({"items": None, "reason": "Report resolution failed", "detail": detail})
-                    agg_low_risk.append([])
-                    participants_low_risk.append(lr_entry)
-
-                    participants_habits.append({"user_id": uid, "name": name, "items": None, "reason": "Report resolution failed", "detail": detail})
-                    agg_habits.append([])
-                    participants_profiles.append({"user_id": uid, "name": name, "items": None, "reason": "Report resolution failed", "detail": detail})
-                    agg_profiles.append([])
-                    continue
-                else:
-                    low_risk_items = self._reports_service._top_low_risk_from_report_dict(report_dict)
-                    if low_risk_items:
-                        items_dicts = [{"code": i.code, "name": i.name, "risk_status": i.risk_status, "risk_score_scaled": i.risk_score_scaled} for i in low_risk_items]
-                        lr_entry.update({"items": [i.name for i in low_risk_items], "reason": None, "detail": None})
-                        agg_low_risk.append(items_dicts)
-                    else:
-                        lr_entry.update({"items": None, "reason": "No low-risk diseases found in report", "detail": None})
-                        agg_low_risk.append([])
-            participants_low_risk.append(lr_entry)
-
-            # --- healthy_habits ---
-            hh_entry: dict[str, Any] = {"user_id": uid, "name": name}
-            if self._reports_service._healthy_habits_service is None:
-                hh_entry.update({"items": None, "reason": "Healthy habits service not configured", "detail": None})
-                agg_habits.append([])
-            elif ctx.package is None:
-                hh_entry.update({"items": None, "reason": "No assessment package", "detail": None})
-                agg_habits.append([])
-            else:
-                try:
-                    computed = await self._reports_service._healthy_habits_service.top_habits_for_assessment(
-                        db,
-                        assessment_instance_id=int(ctx.assessment_instance.assessment_instance_id),
-                        package_id=int(ctx.assessment_instance.package_id),
-                        limit=3,
-                    )
-                except Exception as exc:
-                    hh_entry.update({"items": None, "reason": "Healthy habits computation failed", "detail": str(exc) or "Unexpected error"})
-                    agg_habits.append([])
-                else:
-                    if computed:
-                        habit_dicts = [{"habit_key": h.habit_key, "habit_label": h.habit_label} for h in computed]
-                        hh_entry.update({"items": [h.habit_label for h in computed], "reason": None, "detail": None})
-                        agg_habits.append(habit_dicts)
-                    else:
-                        hh_entry.update({"items": None, "reason": "No habit rules matched participant answers", "detail": None})
-                        agg_habits.append([])
-            participants_habits.append(hh_entry)
-
-            # --- healthy_profiles ---
-            hp_entry: dict[str, Any] = {"user_id": uid, "name": name}
-            if ctx.engagement is None or ctx.engagement.diagnostic_package_id is None:
-                hp_entry.update({"items": None, "reason": "No diagnostic package assigned", "detail": None})
-                agg_profiles.append([])
-            elif ctx.individual_report is None:
-                hp_entry.update({"items": None, "reason": "No individual health report", "detail": None})
-                agg_profiles.append([])
-            else:
-                try:
-                    _, profiles = await self._reports_service.compute_healthy_habits_and_profiles_for_instance(
-                        db,
-                        assessment_instance=ctx.assessment_instance,
-                        package=ctx.package,
-                        engagement=ctx.engagement,
-                        individual_report=ctx.individual_report,
-                        user_gender=ctx.user_gender,
-                    )
-                except AppError as exc:
-                    if exc.error_code in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
-                        hp_entry.update({"items": None, "reason": "Blood data unavailable", "detail": exc.error_code})
-                    else:
-                        hp_entry.update({"items": None, "reason": "Blood data fetch failed", "detail": exc.message})
-                    agg_profiles.append([])
-                except Exception as exc:
-                    hp_entry.update({"items": None, "reason": "Healthy profiles computation failed", "detail": str(exc) or "Unexpected error"})
-                    agg_profiles.append([])
-                else:
-                    if profiles:
-                        hp_entry.update({"items": profiles, "reason": None, "detail": None})
-                        agg_profiles.append(profiles)
-                    else:
-                        hp_entry.update({"items": None, "reason": "No test groups with in-range parameters", "detail": None})
-                        agg_profiles.append([])
-            participants_profiles.append(hp_entry)
-
-        return {
-            "total_participants": len(contexts),
-            "low_risk": {
-                "aggregated": aggregate_top_low_risk(agg_low_risk),
-                "participants": participants_low_risk,
-            },
-            "healthy_habits": {
-                "aggregated": aggregate_top_healthy_habits(agg_habits),
-                "participants": participants_habits,
-            },
-            "healthy_profiles": {
-                "aggregated": aggregate_top_healthy_profiles(agg_profiles),
-                "participants": participants_profiles,
-            },
-        }
-
-    _QUESTIONNAIRE_SECTION_CONFIG: dict[str, dict[str, Any]] = {
-        "physical_activity_frequency": {
-            "question_key": "physical_activity_frequency",
-            "bucket_fn": staticmethod(physical_activity_answer_to_bucket),
-            "sibling_key": "sleeping_hours",
-            "sibling_label": "Sleeping Hours",
-            "section_label": "Physical activity",
-        },
-        "sleeping_hours": {
-            "question_key": "sleeping_hours",
-            "bucket_fn": staticmethod(sleeping_hours_answer_to_bucket),
-            "sibling_key": "physical_activity_frequency",
-            "sibling_label": "Physical activity",
-            "section_label": "Sleeping Hours",
-        },
-    }
-
-    async def validate_questionnaire_distribution(
-        self,
-        db: AsyncSession,
-        *,
-        employee: EmployeeContext,
-        camp_no: int,
-        question_key: str,
-        department: str | None = None,
-        city: str | None = None,
-    ) -> dict:
-        context = await self._resolve_camp_context(db, camp_no=camp_no)
-        await ensure_camp_access(
-            db,
-            employee,
-            context["organization_id"],
-            repository=self._organizations_repository,
-        )
-
-        if department is not None:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            await self._validate_department_slug(
-                db,
-                organization_id=context["organization_id"],
-                slug=normalized_department,
-            )
-            department = normalized_department
-
-        config = self._QUESTIONNAIRE_SECTION_CONFIG.get(question_key)
-        if config is None:
-            raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message=f"Unsupported question_key: {question_key}",
-            )
-        bucket_fn = config["bucket_fn"]
-        sibling_key = config.get("sibling_key")
-        sibling_label = config.get("sibling_label")
-        section_label = config.get("section_label") or question_key
-
-        rows = await self._repository.list_enrolled_users_with_questionnaire_answer(
-            db,
-            camp_no=camp_no,
-            question_key=question_key,
-            department=department,
-            city=city,
-        )
-
-        sibling_by_user: dict[int, object | None] = {}
-        sibling_gender_by_user: dict[int, str | None] = {}
-        if sibling_key:
-            sibling_rows = await self._repository.list_enrolled_users_with_questionnaire_answer(
-                db,
-                camp_no=camp_no,
-                question_key=sibling_key,
-                department=department,
-            city=city,
-            )
-            for user_id, _fn, _ln, gender_raw, answer in sibling_rows:
-                sibling_by_user[user_id] = answer
-                sibling_gender_by_user[user_id] = gender_raw
-
-        any_questionnaire_summary = await self._count_any_questionnaire_responders(
-            db,
-            camp_no=camp_no,
-            department=department,
-            city=city,
-        )
-
-        summary: dict[str, dict[str, int]] = {
-            "male": {"enrolled": 0, "responded": 0, "not_responded": 0, "unmapped": 0},
-            "female": {"enrolled": 0, "responded": 0, "not_responded": 0, "unmapped": 0},
-        }
-        participants: list[dict[str, Any]] = []
-        unmapped_answer_counts: dict[str, int] = {}
-        sibling_xor: list[dict[str, Any]] = []
-
-        for user_id, first_name, last_name, gender_raw, answer in rows:
-            parts = [p for p in (first_name, last_name) if p]
-            name = " ".join(parts) if parts else f"User {user_id}"
-            gender = normalize_camp_gender(gender_raw)
-
-            if gender is not None:
-                summary[gender]["enrolled"] += 1
-
-            sibling_answer = sibling_by_user.get(user_id) if sibling_key else None
-            has_this = answer is not None
-            has_sibling = sibling_answer is not None if sibling_key else False
-
-            if sibling_key and has_this != has_sibling:
-                sibling_xor.append({
-                    "user_id": user_id,
-                    "name": name,
-                    "gender": gender,
-                    "has_this_question": has_this,
-                    "has_sibling_question": has_sibling,
-                    "this_question": question_key,
-                    "sibling_question": sibling_key,
-                    "reason": (
-                        f"Answered {sibling_key} but not {question_key}"
-                        if has_sibling and not has_this
-                        else f"Answered {question_key} but not {sibling_key}"
-                    ),
-                })
-
-            if answer is None:
-                if gender is not None:
-                    summary[gender]["not_responded"] += 1
-                participants.append({
-                    "user_id": user_id,
-                    "name": name,
-                    "gender": gender,
-                    "answer": None,
-                    "bucket": None,
-                    "reason": "No questionnaire response found for this question",
-                })
-            else:
-                answer_str = normalize_questionnaire_answer(answer) or str(answer).strip()
-                bucket = bucket_fn(answer_str)
-                if bucket is not None and bucket != "unmapped":
-                    if gender is not None:
-                        summary[gender]["responded"] += 1
-                    participants.append({
-                        "user_id": user_id,
-                        "name": name,
-                        "gender": gender,
-                        "answer": answer_str,
-                        "bucket": bucket,
-                        "reason": None,
-                    })
-                else:
-                    if gender is not None:
-                        summary[gender]["unmapped"] += 1
-                        summary[gender]["responded"] += 1
-                    unmapped_answer_counts[answer_str] = unmapped_answer_counts.get(answer_str, 0) + 1
-                    if question_key == "physical_activity_frequency":
-                        reason = (
-                            f"Answer value '{answer_str}' is not a valid Metsights choice "
-                            f"(valid: 1, 2, 3, 5). Counted in chart bucket 'unmapped'."
-                        )
-                    else:
-                        reason = (
-                            f"Answer value '{answer_str}' does not map to a known bucket. "
-                            f"Counted in chart bucket 'unmapped'."
-                        )
-                    participants.append({
-                        "user_id": user_id,
-                        "name": name,
-                        "gender": gender,
-                        "answer": answer_str,
-                        "bucket": "unmapped",
-                        "reason": reason,
-                    })
-
-        total_enrolled = len(rows)
-        total_responded = sum(s["responded"] for s in summary.values())
-        total_unmapped = sum(s["unmapped"] for s in summary.values())
-        total_mapped = total_responded - total_unmapped
-        total_not_responded = sum(s["not_responded"] for s in summary.values())
-        any_q_total = int(any_questionnaire_summary.get("total", 0))
-        any_q_male = int(any_questionnaire_summary.get("male", 0))
-        any_q_female = int(any_questionnaire_summary.get("female", 0))
-
-        sibling_summary: dict[str, int] | None = None
-        if sibling_key:
-            sibling_male = 0
-            sibling_female = 0
-            for user_id, answer in sibling_by_user.items():
-                if answer is None:
-                    continue
-                g = normalize_camp_gender(sibling_gender_by_user.get(user_id))
-                if g == "male":
-                    sibling_male += 1
-                elif g == "female":
-                    sibling_female += 1
-            sibling_summary = {
-                "male": sibling_male,
-                "female": sibling_female,
-                "total": sibling_male + sibling_female,
-            }
-
-        highlights: list[str] = []
-        if total_unmapped > 0:
-            answers_txt = ", ".join(
-                f"'{k}'×{v}" for k, v in sorted(unmapped_answer_counts.items(), key=lambda x: -x[1])
-            )
-            highlights.append(
-                f"{total_unmapped} of {total_responded} responders have unrecognized answer values "
-                f"({answers_txt}). They are included in the chart under bucket 'unmapped' so gender "
-                f"totals match questionnaire responders for this question."
-            )
-        if any_q_total > 0 and total_responded != any_q_total:
-            highlights.append(
-                f"{section_label} chart totals (male {summary['male']['responded']}, "
-                f"female {summary['female']['responded']}, total {total_responded}) count ONLY "
-                f"participants who answered '{question_key}'. This is NOT the same as anyone who "
-                f"started/filled any questionnaire question "
-                f"(male {any_q_male}, female {any_q_female}, total {any_q_total}). "
-                f"{total_not_responded} enrolled participants have no answer for this specific question."
-            )
-        elif total_not_responded > 0:
-            highlights.append(
-                f"{total_not_responded} of {total_enrolled} enrolled participants have no answer for "
-                f"'{question_key}'. Chart totals are based on responders only "
-                f"(male {summary['male']['responded']}, female {summary['female']['responded']}), "
-                f"not total enrolled (male {summary['male']['enrolled']}, "
-                f"female {summary['female']['enrolled']})."
-            )
-        if sibling_summary is not None and sibling_label:
-            this_male = summary["male"]["responded"]
-            this_female = summary["female"]["responded"]
-            if (
-                this_male != sibling_summary["male"]
-                or this_female != sibling_summary["female"]
-            ):
-                xor_names = ", ".join(
-                    f"{p['name']} #{p['user_id']} ({p['reason']})"
-                    for p in sibling_xor[:8]
-                )
-                more = f" (+{len(sibling_xor) - 8} more)" if len(sibling_xor) > 8 else ""
-                highlights.append(
-                    f"MISMATCH vs {sibling_label}: {section_label} "
-                    f"male={this_male}/female={this_female} but {sibling_label} "
-                    f"male={sibling_summary['male']}/female={sibling_summary['female']}. "
-                    f"Solid reason: {len(sibling_xor)} participant(s) answered one of these "
-                    f"lifestyle questions but not the other"
-                    + (f" — {xor_names}{more}." if xor_names else ".")
-                )
-
-        has_mismatch = bool(highlights)
-
-        return {
-            "question_key": question_key,
-            "total_enrolled": total_enrolled,
-            "total_responded": total_responded,
-            "total_mapped": total_mapped,
-            "total_unmapped": total_unmapped,
-            "total_not_responded": total_not_responded,
-            "any_questionnaire_responders": any_questionnaire_summary,
-            "sibling": (
-                {
-                    "question_key": sibling_key,
-                    "label": sibling_label,
-                    "responded": sibling_summary,
-                    "xor_participants": sibling_xor,
-                }
-                if sibling_key and sibling_summary is not None
-                else None
-            ),
-            "summary": summary,
-            "unmapped_answer_counts": unmapped_answer_counts,
-            "mismatch": {
-                "has_mismatch": has_mismatch,
-                "highlight": " ".join(highlights) if highlights else None,
-                "highlights": highlights,
-            },
-            "participants": participants,
-        }
-
-    async def _count_any_questionnaire_responders(
-        self,
-        db: AsyncSession,
-        *,
-        camp_no: int,
-        department: str | None = None,
-        city: str | None = None,
-    ) -> dict[str, int]:
-        """Count enrolled users with at least one questionnaire_responses row for this camp."""
-        return await self._repository.count_any_questionnaire_responders_by_gender(
-            db,
-            camp_no=camp_no,
-            department=department,
-            city=city,
-        )
-
-    async def validate_overall_risk_score(
-        self,
-        db: AsyncSession,
-        *,
-        employee: EmployeeContext,
-        camp_no: int,
-        department: str | None = None,
-        city: str | None = None,
-    ) -> dict:
-        context = await self._resolve_camp_context(db, camp_no=camp_no)
-        await ensure_camp_access(
-            db,
-            employee,
-            context["organization_id"],
-            repository=self._organizations_repository,
-        )
-
-        if department is not None:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            await self._validate_department_slug(
-                db,
-                organization_id=context["organization_id"],
-                slug=normalized_department,
-            )
-            department = normalized_department
-
-        rows = await self._repository.list_metabolic_score_status(
-            db,
-            camp_no=camp_no,
-            department=department,
-            city=city,
-        )
-        any_q = await self._count_any_questionnaire_responders(
-            db,
-            camp_no=camp_no,
-            department=department,
-            city=city,
-        )
-        bio_ai_generated = await self._repository.count_bio_ai_reports(
-            db,
-            camp_no=camp_no,
-            department=department,
-            city=city,
-        )
-
-        with_score: list[dict[str, Any]] = []
-        without_score: list[dict[str, Any]] = []
-        reason_counts: dict[str, int] = {}
-
-        for user_id, first_name, last_name, gender_raw, score, reason in rows:
-            parts = [p for p in (first_name, last_name) if p]
-            name = " ".join(parts) if parts else f"User {user_id}"
-            gender = normalize_camp_gender(gender_raw)
-            entry = {
-                "user_id": user_id,
-                "name": name,
-                "gender": gender,
-                "metabolic_score": score,
-                "reason": reason,
-            }
-            if reason is None:
-                with_score.append(entry)
-            else:
-                without_score.append(entry)
-                reason_counts[reason] = reason_counts.get(reason, 0) + 1
-
-        total_enrolled = len(rows)
-        scored = len(with_score)
-        missing = len(without_score)
-        any_q_total = int(any_q.get("total", 0))
-
-        highlights: list[str] = []
-        highlights.append(
-            f"Overall Risk Score total_employees={scored} includes ONLY participants with a "
-            f"generated Bio AI report (non-empty reports JSON) that contains metabolic_score. "
-            f"Questionnaire completion is NOT required and is NOT used as the inclusion rule. "
-            f"Bio AI generated={bio_ai_generated}; with metabolic_score={scored}; "
-            f"enrolled={total_enrolled}; any-questionnaire starters="
-            f"{any_q_total} (male {any_q.get('male', 0)}, female {any_q.get('female', 0)})."
-        )
-        if any_q_total and scored != any_q_total:
-            highlights.append(
-                f"Do not compare this section to questionnaire starters ({any_q_total}). "
-                f"Someone can fill the questionnaire without Bio AI being generated, and "
-                f"Bio AI can exist without every lifestyle question being answered."
-            )
-        if missing > 0:
-            highlights.append(
-                f"{missing} enrolled participants are excluded from total_employees. "
-                f"Top reasons: "
-                + "; ".join(
-                    f"{k} ({v})" for k, v in sorted(reason_counts.items(), key=lambda x: -x[1])[:3]
-                )
-            )
-        if bio_ai_generated != scored:
-            highlights.append(
-                f"Bio AI generated ({bio_ai_generated}) differs from metabolic_score count "
-                f"({scored}) — {abs(bio_ai_generated - scored)} generated report(s) are missing "
-                f"the metabolic_score field."
-            )
-
-        has_mismatch = missing > 0 or scored != total_enrolled or (
-            any_q_total > 0 and scored != any_q_total
-        ) or bio_ai_generated != scored
-
-        return {
-            "total_enrolled": total_enrolled,
-            "bio_ai_generated": bio_ai_generated,
-            "with_metabolic_score": scored,
-            "missing_metabolic_score": missing,
-            "any_questionnaire_responders": any_q,
-            "reason_counts": reason_counts,
-            "mismatch": {
-                "has_mismatch": has_mismatch,
-                "highlight": " ".join(highlights),
-                "highlights": highlights,
-            },
-            "with_score": with_score,
-            "without_score": without_score,
-        }
     _BLOOD_INTELLIGENCE_GROUP_KEYS = (
         "vitamin_profile",
         "diabetes_profile",
@@ -2468,6 +1639,104 @@ class CampReportsService:
 
         return value, lower_range, higher_range
 
+    async def _check_metsights_sample_collection(self, *, record_id: str) -> str:
+        """Return collected | missing | failed for a Metsights fetch-collections check."""
+        try:
+            await self._reports_service._metsights_service.get_fetch_collections(record_id=record_id)
+            return "collected"
+        except AppError as exc:
+            if exc.error_code == "BLOOD_SAMPLE_NOT_COLLECTED":
+                return "missing"
+            return "failed"
+        except Exception:
+            return "failed"
+
+    async def _resolve_kpi_blood_tested_users(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None,
+    ) -> tuple[set[int], dict[str, int]]:
+        candidates = await self._repository.list_kpi_blood_candidates(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        blood_tested: set[int] = set()
+        with_booking_id = 0
+        no_record_id = 0
+        to_check: list[tuple[int, str]] = []
+        for user_id, has_booking_id, record_id in candidates:
+            if has_booking_id:
+                blood_tested.add(user_id)
+                with_booking_id += 1
+                continue
+            if not record_id:
+                no_record_id += 1
+                continue
+            to_check.append((user_id, record_id))
+
+        with_metsights_collection = 0
+        missing_collection = 0
+        check_failed = 0
+
+        if to_check:
+            semaphore = asyncio.Semaphore(_KPI_BLOOD_METSIGHTS_CONCURRENCY)
+
+            async def _one(uid: int, rid: str) -> tuple[int, str]:
+                async with semaphore:
+                    status = await self._check_metsights_sample_collection(record_id=rid)
+                    return uid, status
+
+            results = await asyncio.gather(*[_one(uid, rid) for uid, rid in to_check])
+            for uid, status in results:
+                if status == "collected":
+                    blood_tested.add(uid)
+                    with_metsights_collection += 1
+                elif status == "missing":
+                    missing_collection += 1
+                else:
+                    check_failed += 1
+
+        blood_details = {
+            "with_booking_id": with_booking_id,
+            "with_metsights_collection": with_metsights_collection,
+            "missing_collection": missing_collection,
+            "no_record_id": no_record_id,
+            "check_failed": check_failed,
+            "users_needing_metsights_check": len(to_check),
+        }
+        return blood_tested, blood_details
+
+    async def _build_kpis_payload_with_metrics(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None,
+        age_reference_date: date,
+    ) -> tuple[dict, dict]:
+        blood_tested_user_ids, blood_details = await self._resolve_kpi_blood_tested_users(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        metrics = await self._repository.compute_kpi_metrics(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+            age_reference_date=age_reference_date,
+            blood_tested_user_ids=blood_tested_user_ids,
+            blood_details=blood_details,
+        )
+        return build_kpis(metrics), metrics
+
     async def _build_section_payload(
         self,
         db: AsyncSession,
@@ -2492,14 +1761,14 @@ class CampReportsService:
             return build_participation_by_age(users, reference_date=participation_reference)
 
         if section_key == "kpis":
-            metrics = await self._repository.compute_kpi_metrics(
+            payload, _metrics = await self._build_kpis_payload_with_metrics(
                 db,
                 camp_no=camp_no,
                 department=department,
-            city=city,
+                city=city,
                 age_reference_date=age_reference,
             )
-            return build_kpis(metrics)
+            return payload
 
         if section_key == "overall_risk_score":
             scores = await self._repository.list_metabolic_scores(
