@@ -61,6 +61,44 @@ def test_build_kpis_bts_mismatch_reason():
     )
     assert bts["status"] == "mismatch"
     assert bts["fields"]["employees_enrolled"]["match"] is False
-    assert "counted 10" in bts["fields"]["employees_enrolled"]["reason"]
+    assert "counted again we got 10" in bts["fields"]["employees_enrolled"]["reason"]
     assert bts["fields"]["total_blood_test"]["match"] is False
-    assert "booking id" in bts["fields"]["total_blood_test"]["reason"].lower()
+    assert "lab booking" in bts["fields"]["total_blood_test"]["reason"].lower()
+
+
+def test_build_kpis_bts_consultations_fallback_to_legacy_fields():
+    """Older reports without consultations{} should not false-flag when legacy counts match."""
+    expected = {
+        "employees_enrolled": 140,
+        "male_enrolled": 91,
+        "female_enrolled": 49,
+        "total_blood_test": 132,
+        "blood_test_percent": 94,
+        "consultations": {"doctor": 86, "nutritionist": 0, "doctor_nutritionist": 0},
+        "doctor_consultation": 86,
+        "nutritionist_consultation": 0,
+        "doctor_and_nutritionist_consultation": 0,
+        "high_risk_group": 27,
+    }
+    stored_legacy = {
+        "employees_enrolled": 140,
+        "male_enrolled": 91,
+        "female_enrolled": 49,
+        "total_blood_test": 132,
+        "blood_test_percent": 94,
+        "doctor_consultation": 86,
+        "nutritionist_consultation": 0,
+        "doctor_and_nutritionist_consultation": 0,
+        "high_risk_group": 27,
+    }
+    bts = build_kpis_bts(
+        expected_data=expected,
+        stored_data=stored_legacy,
+        blood_details={"with_booking_id": 100, "with_metsights_collection": 32},
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["fields"]["consultations.doctor"]["match"] is True
+    assert bts["fields"]["consultations.doctor"]["stored"] == 86
+    assert bts["fields"]["consultations.nutritionist"]["match"] is True
+    assert bts["fields"]["consultations.doctor_nutritionist"]["match"] is True

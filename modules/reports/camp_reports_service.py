@@ -979,9 +979,12 @@ class CampReportsService:
         if normalized_section == "kpis":
             expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
             blood_details = dict((kpi_metrics or {}).get("blood_details") or {})
+            # Compare recomputed values to what was already saved (before this refresh).
+            # build_kpis_bts falls back to legacy doctor/nutritionist fields when the
+            # older report shape has no consultations{} yet — avoids false mismatches.
             report_bts[normalized_section] = build_kpis_bts(
                 expected_data=expected_data,
-                stored_data=previous_data,
+                stored_data=previous_data if previous_data is not None else expected_data,
                 blood_details=blood_details,
                 checked_at=checked_at,
             )
