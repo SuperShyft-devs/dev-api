@@ -35,6 +35,10 @@ from modules.reports.healthians_booking_resolver import (
     remember_invalid_healthians_booking_id,
     resolve_healthians_booking_id,
 )
+from modules.reports.healthians_report_fields import (
+    customer_display_name,
+    parse_booking_report_entry,
+)
 from db.seed.blood_parameters_registry import (
     ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
     BLOOD_PARAMETER_CATEGORY_KEY,
@@ -317,7 +321,7 @@ class ReportsService:
         for entry in data_list:
             if not isinstance(entry, dict):
                 continue
-            customer_name = str(entry.get("customer_name") or "").strip().lower()
+            customer_name = customer_display_name(entry).lower()
             if not customer_name:
                 continue
             if customer_name == target_full:
@@ -704,6 +708,8 @@ class ReportsService:
             metsights_service=self._metsights_service,
         )
 
+        full_report: bool | None = None
+        verified_at = None
         if resolved.source == HealthiansBookingSource.PARTICIPANT:
             if self._healthians_get_access_token is None or self._healthians_get_booking_report is None:
                 raise AppError(
@@ -745,14 +751,13 @@ class ReportsService:
                     error_code="INVALID_STATE",
                     message="Diagnostic report PDF is not available for this record",
                 )
-            report_url = matched_report.get("report_url") or matched_report.get("url")
-            if not isinstance(report_url, str) or not report_url.strip():
+            report_url, full_report, verified_at = parse_booking_report_entry(matched_report)
+            if report_url is None:
                 raise AppError(
                     status_code=422,
                     error_code="INVALID_STATE",
                     message="Diagnostic report PDF is not available for this record",
                 )
-            report_url = report_url.strip()
         else:
             collection_data = resolved.collection_data or {}
             file_url = collection_data.get("file")
@@ -774,10 +779,16 @@ class ReportsService:
                 reports=None,
                 blood_parameters=None,
                 diagnostic_report_url=report_url,
+                blood_parameters_full_report=full_report,
+                blood_parameters_verified_at=verified_at,
             )
             await self._repository.create_individual_report(db, target)
         else:
             target.diagnostic_report_url = report_url
+            if full_report is not None:
+                target.blood_parameters_full_report = full_report
+            if verified_at is not None:
+                target.blood_parameters_verified_at = verified_at
             await self._repository.update_individual_report(db, target)
 
         await self._require_audit_service().log_event(

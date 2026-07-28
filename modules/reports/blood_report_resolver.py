@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -15,6 +16,10 @@ from modules.metsights.service import MetsightsService
 from modules.reports.healthians_booking_resolver import (
     HealthiansBookingSource,
     resolve_healthians_booking_id,
+)
+from modules.reports.healthians_report_fields import (
+    customer_display_name,
+    parse_booking_report_entry,
 )
 from modules.reports.models import IndividualHealthReport
 from modules.reports.repository import ReportsRepository
@@ -39,7 +44,7 @@ def _match_customer_by_name(
     for entry in data_list:
         if not isinstance(entry, dict):
             continue
-        customer_name = str(entry.get("customer_name") or "").strip().lower()
+        customer_name = customer_display_name(entry).lower()
         if not customer_name:
             continue
         if customer_name == target_full:
@@ -55,12 +60,12 @@ def _match_customer_by_name(
     return data_list[0] if data_list else None
 
 
-def _extract_report_url_from_healthians_payload(
+def _extract_report_fields_from_healthians_payload(
     report_data: dict[str, Any],
     *,
     first_name: str,
     last_name: str,
-) -> str:
+) -> tuple[str, bool | None, datetime | None]:
     report_list = report_data.get("data")
     if not isinstance(report_list, list) or not report_list:
         raise AppError(
@@ -75,17 +80,17 @@ def _extract_report_url_from_healthians_payload(
             error_code="INVALID_STATE",
             message="Diagnostic report PDF is not available for this record",
         )
-    raw_url = matched_report.get("report_url") or matched_report.get("url")
-    if not isinstance(raw_url, str) or not raw_url.strip():
+    report_url, full_report, verified_at = parse_booking_report_entry(matched_report)
+    if report_url is None:
         raise AppError(
             status_code=422,
             error_code="INVALID_STATE",
             message="Diagnostic report PDF is not available for this record",
         )
-    return raw_url.strip()
+    return report_url, full_report, verified_at
 
 
-async def _fetch_healthians_report_url(
+async def _fetch_healthians_report_fields(
     db: AsyncSession,
     *,
     booking_id: str,
@@ -93,7 +98,7 @@ async def _fetch_healthians_report_url(
     user_id: int,
     first_name: str,
     last_name: str,
-) -> str:
+) -> tuple[str, bool | None, datetime | None]:
     sync_log = await log_healthians_call(
         db,
         engagement_id=engagement_id,
@@ -131,7 +136,7 @@ async def _fetch_healthians_report_url(
             error_code="INVALID_STATE",
             message="Diagnostic report PDF is not available for this record",
         )
-    return _extract_report_url_from_healthians_payload(
+    return _extract_report_fields_from_healthians_payload(
         report_data,
         first_name=first_name,
         last_name=last_name,
@@ -192,8 +197,10 @@ async def resolve_blood_report_url(
     )
 
     report_url: str | None = None
+    full_report: bool | None = None
+    verified_at = None
     if resolved.source == HealthiansBookingSource.PARTICIPANT:
-        report_url = await _fetch_healthians_report_url(
+        report_url, full_report, verified_at = await _fetch_healthians_report_fields(
             db,
             booking_id=resolved.booking_id,
             engagement_id=engagement_id,
@@ -207,7 +214,7 @@ async def resolve_blood_report_url(
         if isinstance(file_url, str) and file_url.strip():
             report_url = file_url.strip()
         else:
-            report_url = await _fetch_healthians_report_url(
+            report_url, full_report, verified_at = await _fetch_healthians_report_fields(
                 db,
                 booking_id=resolved.booking_id,
                 engagement_id=engagement_id,
@@ -223,10 +230,16 @@ async def resolve_blood_report_url(
             engagement_id=engagement_id,
             assessment_instance_id=assessment_instance_id,
             diagnostic_report_url=report_url,
+            blood_parameters_full_report=full_report,
+            blood_parameters_verified_at=verified_at,
         )
         await repo.create_individual_report(db, target)
     else:
         target.diagnostic_report_url = report_url
+        if full_report is not None:
+            target.blood_parameters_full_report = full_report
+        if verified_at is not None:
+            target.blood_parameters_verified_at = verified_at
         if target.assessment_instance_id is None:
             target.assessment_instance_id = assessment_instance_id
         await repo.update_individual_report(db, target)

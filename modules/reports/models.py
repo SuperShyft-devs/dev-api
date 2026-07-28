@@ -5,7 +5,7 @@ Schema must match `instructions/db-schema.txt`.
 
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Index, Integer, String, Text, func, text
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.types import JSON
 
 from db.base import Base
@@ -41,6 +41,8 @@ class IndividualHealthReport(Base):
     blood_report_raw = Column(JSON, nullable=True)
     report_url = Column(Text, nullable=True)
     diagnostic_report_url = Column(Text, nullable=True)
+    blood_parameters_full_report = Column(Boolean, nullable=True)
+    blood_parameters_verified_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
