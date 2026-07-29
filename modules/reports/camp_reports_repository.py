@@ -99,6 +99,8 @@ class CampReportsRepository:
                 User.date_of_birth,
                 User.age,
                 User.gender,
+                User.first_name,
+                User.last_name,
                 Engagement.engagement_id,
                 func.row_number()
                 .over(
@@ -127,6 +129,8 @@ class CampReportsRepository:
                 ranked.c.date_of_birth,
                 ranked.c.age,
                 ranked.c.gender,
+                ranked.c.first_name,
+                ranked.c.last_name,
                 ranked.c.engagement_id,
             )
             .where(ranked.c.rn == 1)
@@ -332,6 +336,65 @@ class CampReportsRepository:
         )
         result = await db.execute(query)
         return [(int(r[0]), r[1], int(r[2])) for r in result.all()]
+
+    async def list_distinct_enrolled_users_for_age_bts(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> list[tuple[int, date | None, int, str | None, str | None, int]]:
+        """Return distinct enrolled users with name + engagement for age BTS roster.
+
+        Each row: (user_id, date_of_birth, age, first_name, last_name, engagement_id).
+        """
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
+        query = select(
+            enrolled.c.user_id,
+            enrolled.c.date_of_birth,
+            enrolled.c.age,
+            enrolled.c.first_name,
+            enrolled.c.last_name,
+            enrolled.c.engagement_id,
+        )
+        result = await db.execute(query)
+        return [
+            (int(r[0]), r[1], int(r[2]), r[3], r[4], int(r[5]))
+            for r in result.all()
+        ]
+
+    async def count_engagements_for_camp_scope(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> int:
+        """Count engagements in scope for age BTS method stats.
+
+        When department is set, counts engagements that have at least one
+        participant in that department (and city, if set).
+        """
+        if department is None and city is None:
+            return await self.count_engagements_for_camp_no(db, camp_no=camp_no)
+
+        query = (
+            select(func.count(func.distinct(Engagement.engagement_id)))
+            .select_from(Engagement)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_id == Engagement.engagement_id,
+            )
+            .where(Engagement.camp_no == camp_no)
+        )
+        if department is not None:
+            query = query.where(EngagementParticipant.participant_department == department)
+        if city is not None:
+            query = query.where(func.lower(func.trim(Engagement.city)) == city.lower())
+        result = await db.execute(query)
+        return int(result.scalar_one())
 
     async def list_kpi_blood_candidates(
         self,

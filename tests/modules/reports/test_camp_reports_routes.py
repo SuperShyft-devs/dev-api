@@ -3832,7 +3832,7 @@ async def test_validate_routes_removed(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
-async def test_refresh_non_kpi_writes_bts_stub(async_client, test_db_session):
+async def test_refresh_participation_by_age_writes_real_bts(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7912, employee_id=912)
     await _seed_participation_section(test_db_session, report_sections=95120)
     camp_no = await _seed_refresh_camp_with_participants(
@@ -3852,12 +3852,52 @@ async def test_refresh_non_kpi_writes_bts_stub(async_client, test_db_session):
     )
     assert response.status_code == 200
     bts = response.json()["data"]["report_bts"]
+    assert bts["status"] == "ok"
+    assert "age_groups" in bts["details"]
+    assert "method" in bts["details"]
+    assert bts["details"]["method"]["distinct_people"] == bts["expected"]["total_enrolled"]
+    assert set(bts["details"]["age_groups"].keys()) == {
+        "18–25",
+        "26–35",
+        "36–45",
+        "46–55",
+        "55+",
+    }
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.report_bts["participation_by_age"]["status"] == "ok"
+    assert "age_groups" in row.report_bts["participation_by_age"]["details"]
+
+
+@pytest.mark.asyncio
+async def test_refresh_non_kpi_writes_bts_stub(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7913, employee_id=913)
+    await _seed_overall_risk_score_section(test_db_session, report_sections=95130)
+    camp_no = await _seed_overall_risk_score_camp_data(
+        test_db_session,
+        organization_id=9513,
+        engagement_id=9513,
+    )
+    headers = _auth_header(7913)
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "overall_risk_score"},
+    )
+    assert response.status_code == 200
+    bts = response.json()["data"]["report_bts"]
     assert bts["status"] == "not_implemented"
 
     row = (
         await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
     ).scalar_one()
-    assert row.report_bts["participation_by_age"]["status"] == "not_implemented"
+    assert row.report_bts["overall_risk_score"]["status"] == "not_implemented"
 
 
 @pytest.mark.asyncio

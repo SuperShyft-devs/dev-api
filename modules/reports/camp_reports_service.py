@@ -43,11 +43,15 @@ from modules.reports.camp_report_section_builders import (
     build_distribution_by_sleeping_hours,
     build_kpis,
     build_overall_risk_score,
-    build_participation_by_age,
+    build_participation_by_age_details,
     build_positive_wins,
     build_ranking,
 )
-from modules.reports.camp_report_bts import build_kpis_bts, build_not_implemented_bts
+from modules.reports.camp_report_bts import (
+    build_kpis_bts,
+    build_not_implemented_bts,
+    build_participation_by_age_bts,
+)
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.assessments.repository import AssessmentsRepository
 from modules.diagnostics.repository import DiagnosticsRepository
@@ -944,6 +948,7 @@ class CampReportsService:
             previous_data = previous_section.get("data")
 
         kpi_metrics: dict[str, Any] | None = None
+        age_bts_details: dict[str, Any] | None = None
         if normalized_section == "kpis":
             built_payload, kpi_metrics = await self._build_kpis_payload_with_metrics(
                 db,
@@ -951,6 +956,14 @@ class CampReportsService:
                 department=department,
                 city=city,
                 age_reference_date=context["camp_end_date"] or date.today(),
+            )
+        elif normalized_section == "participation_by_age":
+            built_payload, age_bts_details = await self._build_participation_by_age_with_details(
+                db,
+                camp_no=camp_no,
+                department=department,
+                city=city,
+                camp_start_date=context["camp_start_date"],
             )
         else:
             built_payload = await self._build_section_payload(
@@ -986,6 +999,14 @@ class CampReportsService:
                 expected_data=expected_data,
                 stored_data=previous_data if previous_data is not None else expected_data,
                 blood_details=blood_details,
+                checked_at=checked_at,
+            )
+        elif normalized_section == "participation_by_age":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            report_bts[normalized_section] = build_participation_by_age_bts(
+                expected_data=expected_data,
+                stored_data=previous_data if previous_data is not None else expected_data,
+                details=age_bts_details or {},
                 checked_at=checked_at,
             )
         else:
@@ -1740,6 +1761,55 @@ class CampReportsService:
         )
         return build_kpis(metrics), metrics
 
+    @staticmethod
+    def _age_participation_scope_label(*, department: str | None, city: str | None) -> str:
+        if city and department:
+            return f"City: {city} · Department: {department}"
+        if city:
+            return f"City: {city}"
+        if department:
+            return f"Department: {department}"
+        return "Whole camp"
+
+    async def _build_participation_by_age_with_details(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None,
+        camp_start_date: date | None,
+    ) -> tuple[dict, dict]:
+        participation_reference = camp_start_date or date.today()
+        users = await self._repository.list_distinct_enrolled_users_for_age_bts(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        engagement_count = await self._repository.count_engagements_for_camp_scope(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        participant_rows = await self._repository.count_participants_by_camp_no(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        return build_participation_by_age_details(
+            users,
+            reference_date=participation_reference,
+            engagement_count=engagement_count,
+            participant_rows=participant_rows,
+            scope_label=self._age_participation_scope_label(
+                department=department,
+                city=city,
+            ),
+        )
+
     async def _build_section_payload(
         self,
         db: AsyncSession,
@@ -1751,17 +1821,17 @@ class CampReportsService:
         camp_start_date: date | None,
         camp_end_date: date | None,
     ) -> dict:
-        participation_reference = camp_start_date or date.today()
         age_reference = camp_end_date or date.today()
 
         if section_key == "participation_by_age":
-            users = await self._repository.list_distinct_enrolled_users(
+            payload, _details = await self._build_participation_by_age_with_details(
                 db,
                 camp_no=camp_no,
                 department=department,
-            city=city,
+                city=city,
+                camp_start_date=camp_start_date,
             )
-            return build_participation_by_age(users, reference_date=participation_reference)
+            return payload
 
         if section_key == "kpis":
             payload, _metrics = await self._build_kpis_payload_with_metrics(

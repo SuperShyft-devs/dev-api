@@ -242,6 +242,131 @@ def build_participation_by_age(
     }
 
 
+def _display_person_name(first_name: str | None, last_name: str | None) -> str:
+    parts = [p.strip() for p in (first_name or "", last_name or "") if p and str(p).strip()]
+    return " ".join(parts) if parts else "Unknown"
+
+
+def build_participation_by_age_details(
+    users: list[tuple[int, date | None, int, str | None, str | None, int]],
+    *,
+    reference_date: date,
+    engagement_count: int,
+    participant_rows: int,
+    scope_label: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build section data + BTS details from the age roster in one pass.
+
+    ``users`` rows: (user_id, date_of_birth, age, first_name, last_name, engagement_id).
+    Returns ``(section_payload, details)`` where section_payload matches
+    ``build_participation_by_age`` shape (``{"data": ...}``).
+    """
+    total = len(users)
+    groups: dict[str, dict[str, Any]] = {
+        group: {"count": 0, "people": []} for group in AGE_GROUPS
+    }
+    age_from_dob = 0
+    age_from_profile = 0
+    under_18_count = 0
+
+    for user_id, dob, stored_age, first_name, last_name, engagement_id in users:
+        age = resolve_user_age(
+            date_of_birth=dob,
+            stored_age=stored_age,
+            reference_date=reference_date,
+        )
+        if dob is not None:
+            age_source = "date_of_birth"
+            age_from_dob += 1
+        else:
+            age_source = "profile_age"
+            age_from_profile += 1
+        if age < 18:
+            under_18_count += 1
+
+        bucket = age_to_bucket(age)
+        groups[bucket]["count"] += 1
+        groups[bucket]["people"].append(
+            {
+                "user_id": int(user_id),
+                "name": _display_person_name(first_name, last_name),
+                "age_used": int(age),
+                "age_source": age_source,
+                "date_of_birth": dob.isoformat() if dob is not None else None,
+                "profile_age": int(stored_age),
+                "engagement_id": int(engagement_id),
+            }
+        )
+
+    enrolled = [int(groups[group]["count"]) for group in AGE_GROUPS]
+    percent = [_percent(count, total) for count in enrolled]
+
+    for group in AGE_GROUPS:
+        groups[group]["people"].sort(key=lambda p: (p["name"].lower(), p["user_id"]))
+
+    notes: list[str] = []
+    if under_18_count == 1:
+        notes.append(
+            "1 person is under 18. They are included in the 18–25 group "
+            "because of how age groups are set up."
+        )
+    elif under_18_count > 1:
+        notes.append(
+            f"{under_18_count} people are under 18. They are included in the 18–25 group "
+            "because of how age groups are set up."
+        )
+    if age_from_profile == 1:
+        notes.append(
+            "1 person had no date of birth on file, so we used the age saved on their profile."
+        )
+    elif age_from_profile > 1:
+        notes.append(
+            f"{age_from_profile} people had no date of birth on file, "
+            "so we used the age saved on their profile."
+        )
+    if participant_rows > total:
+        duplicates = participant_rows - total
+        if duplicates == 1:
+            notes.append(
+                "1 enrollment was for a person already counted once — "
+                "each person is only counted once even if they joined more than one session."
+            )
+        else:
+            notes.append(
+                f"{duplicates} enrollments were for people already counted once — "
+                "each person is only counted once even if they joined more than one session."
+            )
+
+    details: dict[str, Any] = {
+        "method": {
+            "reference_date": reference_date.isoformat(),
+            "reference_date_label": "Camp start date",
+            "counting_rule": (
+                "Each person is counted once, even if they joined more than one session in this camp."
+            ),
+            "engagement_count": int(engagement_count),
+            "participant_rows": int(participant_rows),
+            "distinct_people": total,
+            "age_from_date_of_birth": age_from_dob,
+            "age_from_profile": age_from_profile,
+            "under_18_count": under_18_count,
+            "scope_label": scope_label,
+        },
+        "age_groups": groups,
+        "notes": notes,
+    }
+
+    section_payload = {
+        "data": {
+            "age_group": list(AGE_GROUPS),
+            "enrolled": enrolled,
+            "percent": percent,
+            "total_enrolled": total,
+        },
+    }
+    return section_payload, details
+
+
 def normalize_camp_gender(value: object | None) -> str | None:
     """Map user gender to male/female using the same values as camp KPI aggregation."""
     if value is None:
