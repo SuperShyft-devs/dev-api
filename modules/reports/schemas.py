@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -212,6 +214,13 @@ class CampReportSectionUpdateRequest(BaseModel):
 
 class CampReportRefreshRequest(BaseModel):
     section: str = Field(min_length=1, max_length=200)
+
+
+class CampReportSectionPayloadUpdateRequest(BaseModel):
+    """Manually overwrite a stored camp report section JSON blob."""
+
+    section: str = Field(min_length=1, max_length=200)
+    payload: dict[str, Any]
 
 
 class CampReportEstimateOperationRequest(BaseModel):

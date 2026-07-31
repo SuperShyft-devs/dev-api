@@ -12,7 +12,11 @@ from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
 from modules.reports.camp_reports_service import CampReportsService
 from modules.reports.dependencies import get_camp_reports_service
-from modules.reports.schemas import CampReportEstimateRequest, CampReportRefreshRequest
+from modules.reports.schemas import (
+    CampReportEstimateRequest,
+    CampReportRefreshRequest,
+    CampReportSectionPayloadUpdateRequest,
+)
 
 router = APIRouter(prefix="/reports/camps", tags=["reports"])
 
@@ -115,6 +119,106 @@ async def get_department_camp_report_dashboard(
         section=section,
         department=slug,
     )
+    return success_response(result)
+
+
+@router.put("/{camp_no}/dashboard")
+async def update_camp_report_dashboard_section(
+    camp_no: int,
+    payload: CampReportSectionPayloadUpdateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.update_camp_report_section_payload(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
+        payload=payload.payload,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.put("/{camp_no}/department/{slug}/dashboard")
+async def update_department_camp_report_dashboard_section(
+    camp_no: int,
+    slug: str,
+    payload: CampReportSectionPayloadUpdateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.update_camp_report_section_payload(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
+        payload=payload.payload,
+        department=slug,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.put("/{camp_no}/{city}/dashboard")
+async def update_city_camp_report_dashboard_section(
+    camp_no: int,
+    city: str,
+    payload: CampReportSectionPayloadUpdateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.update_camp_report_section_payload(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
+        payload=payload.payload,
+        city=city,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.put("/{camp_no}/{city}/department/{slug}/dashboard")
+async def update_city_department_camp_report_dashboard_section(
+    camp_no: int,
+    city: str,
+    slug: str,
+    payload: CampReportSectionPayloadUpdateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.update_camp_report_section_payload(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
+        payload=payload.payload,
+        department=slug,
+        city=city,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
     return success_response(result)
 
 

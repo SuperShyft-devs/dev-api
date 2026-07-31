@@ -619,6 +619,58 @@ async def test_get_camp_report_dashboard_after_refresh(async_client, test_db_ses
 
 
 @pytest.mark.asyncio
+async def test_update_camp_report_dashboard_section_payload(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7610, employee_id=80)
+    await _seed_participation_section(test_db_session, report_sections=23)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9310,
+        engagement_id=9310,
+    )
+    headers = _auth_header(7610)
+
+    init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init.status_code == 201
+    report_id = init.json()["data"]["report_id"]
+
+    refresh = await async_client.put(
+        f"/reports/camps/{camp_no}/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert refresh.status_code == 200
+
+    edited = {
+        "data": {"total_enrolled": 99, "age_group": ["18-30"], "enrolled": [99], "percent": [100]},
+        "name": "Participation by Age",
+        "description": "manually edited",
+    }
+    update = await async_client.put(
+        f"/reports/camps/{camp_no}/dashboard",
+        headers=headers,
+        json={"section": "participation_by_age", "payload": edited},
+    )
+    assert update.status_code == 200
+    assert update.json()["data"]["report_id"] == report_id
+    assert update.json()["data"]["section"]["data"]["total_enrolled"] == 99
+    assert update.json()["data"]["section"]["description"] == "manually edited"
+
+    dashboard = await async_client.get(
+        f"/reports/camps/{camp_no}/dashboard",
+        headers=headers,
+        params={"section": "participation_by_age"},
+    )
+    assert dashboard.status_code == 200
+    assert dashboard.json()["data"]["data"]["total_enrolled"] == 99
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.report["participation_by_age"]["data"]["total_enrolled"] == 99
+    assert row.report["participation_by_age"]["description"] == "manually edited"
+
+
+@pytest.mark.asyncio
 async def test_get_camp_report_dashboard_section_not_found(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7604, employee_id=74)
     await _seed_participation_section(test_db_session, report_sections=22)

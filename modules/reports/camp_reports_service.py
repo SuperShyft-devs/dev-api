@@ -842,6 +842,107 @@ class CampReportsService:
             )
         return dict(report[normalized_section])
 
+    async def update_camp_report_section_payload(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        section: str,
+        payload: dict[str, Any],
+        department: str | None = None,
+        city: str | None = None,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        """Replace ``report[section]`` with the given JSON object (manual admin edit)."""
+        ensure_internal_employee(employee)
+
+        normalized_section = section.strip()
+        if not normalized_section:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        if not isinstance(payload, dict):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="payload must be a JSON object",
+            )
+
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=context["organization_id"],
+                slug=normalized_department,
+            )
+            department = normalized_department
+
+        if city is not None:
+            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+
+        section_row = await self._sections_repository.get_by_section_key(
+            db,
+            section_key=normalized_section,
+        )
+        if section_row is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_SECTION",
+                message="Invalid report section",
+            )
+
+        row = await self._load_camp_report_row_for_refresh(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+
+        report = dict(row.report or {})
+        section_payload = dict(payload)
+        report[normalized_section] = section_payload
+        await self._repository.update_report(db, row, report)
+
+        await self._audit_service.log_event(
+            db,
+            action=self._update_section_audit_action(department=department, city=city),
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return {
+            "report_id": row.report_id,
+            "section": section_payload,
+        }
+
+    @staticmethod
+    def _update_section_audit_action(
+        *,
+        department: str | None,
+        city: str | None,
+    ) -> str:
+        if city is None and department is None:
+            return "EMPLOYEE_UPDATE_CAMP_REPORT_SECTION"
+        if city is None and department is not None:
+            return "EMPLOYEE_UPDATE_DEPARTMENT_CAMP_REPORT_SECTION"
+        if city is not None and department is None:
+            return "EMPLOYEE_UPDATE_CITY_CAMP_REPORT_SECTION"
+        return "EMPLOYEE_UPDATE_CITY_DEPARTMENT_CAMP_REPORT_SECTION"
+
     @staticmethod
     def _refresh_audit_action(
         *,
