@@ -261,14 +261,18 @@ async def test_refresh_ranking_multi_city_peer_and_industry_ranks(async_client, 
     # Bangalore peers by avg: 30, 32, 40(subject), 50 → rank 3
     # Manufacturing among those: 30, 32, 40 → industry_rank 3
     assert data["Bangalore"]["rank"] == 3
+    assert data["Bangalore"]["total_camps"] == 4
     assert data["Bangalore"]["industry_rank"] == 3
+    assert data["Bangalore"]["total_industry_camps"] == 3
 
     # If scores were wrongly blended (25), Bangalore rank would be 1 (25 < 30 < 32 < 50)
     assert data["Bangalore"]["rank"] != 1
 
     # Pune peers: 5, 10(subject) → rank 2; same industry → industry_rank 2
     assert data["Pune"]["rank"] == 2
+    assert data["Pune"]["total_camps"] == 2
     assert data["Pune"]["industry_rank"] == 2
+    assert data["Pune"]["total_industry_camps"] == 2
 
     row = (
         await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
@@ -277,7 +281,9 @@ async def test_refresh_ranking_multi_city_peer_and_industry_ranks(async_client, 
     assert stored["name"] == ranking_section.section
     assert stored["description"] == ranking_section.description
     assert stored["data"]["Bangalore"]["rank"] == 3
+    assert stored["data"]["Bangalore"]["total_camps"] == 4
     assert stored["data"]["Pune"]["rank"] == 2
+    assert stored["data"]["Pune"]["total_camps"] == 2
 
 
 @pytest.mark.asyncio
@@ -333,7 +339,9 @@ async def test_refresh_ranking_updates_existing_section(async_client, test_db_se
     assert ranking["description"] == ranking_section.description
     assert "Mumbai" in ranking["data"]
     assert ranking["data"]["Mumbai"]["rank"] == 1
+    assert ranking["data"]["Mumbai"]["total_camps"] == 1
     assert ranking["data"]["Mumbai"]["industry_rank"] == 1
+    assert ranking["data"]["Mumbai"]["total_industry_camps"] == 1
     assert "rank_city" not in ranking["data"]
 
 
@@ -371,4 +379,6 @@ async def test_refresh_department_ranking_stores_same_multi_city_shape(async_cli
     section = response.json()["data"]["section"]
     assert section["name"] == "Ranking"
     assert section["data"]["Chennai"]["rank"] == 1
+    assert section["data"]["Chennai"]["total_camps"] == 1
     assert section["data"]["Chennai"]["industry_rank"] == 1
+    assert section["data"]["Chennai"]["total_industry_camps"] == 1

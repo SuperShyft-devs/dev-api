@@ -2005,6 +2005,8 @@ class CampReportsService:
 
             rank: int | None = None
             industry_rank: int | None = None
+            total_camps = len(peers)
+            total_industry_camps = 0
 
             if peers:
                 sorted_city = sorted(peers, key=lambda x: x["avg_score"])
@@ -2017,6 +2019,7 @@ class CampReportsService:
                     industry_peers = [
                         e for e in peers if e.get("industry_key") == industry_key
                     ]
+                    total_industry_camps = len(industry_peers)
                     sorted_industry = sorted(industry_peers, key=lambda x: x["avg_score"])
                     for idx, entry in enumerate(sorted_industry, start=1):
                         if entry["camp_no"] == camp_no:
@@ -2025,7 +2028,9 @@ class CampReportsService:
 
             data[city] = {
                 "rank": rank,
+                "total_camps": total_camps,
                 "industry_rank": industry_rank,
+                "total_industry_camps": total_industry_camps,
             }
 
         return build_ranking(data)
