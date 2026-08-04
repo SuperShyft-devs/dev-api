@@ -1727,39 +1727,52 @@ class UsersService:
         """B2C onboarding.
 
         Creates a new engagement for this user.
+        When ``payload.user_id`` is set, loads that user and skips personal-field create/patch.
         """
 
-        email = str(payload.email) if payload.email is not None else None
+        onboarded_by_user_id = payload.user_id is not None
 
-        patch_data = {
-            "first_name": payload.first_name,
-            "last_name": payload.last_name,
-            "age": payload.age,
-            "email": email,
-            "date_of_birth": payload.dob,
-            "gender": payload.gender,
-            "address": payload.address,
-            "pin_code": payload.pincode,
-            "city": payload.city,
-            "state": payload.state,
-            "country": payload.country,
-        }
+        if onboarded_by_user_id:
+            user = await self._repository.get_user_by_id(db, int(payload.user_id))
+            if user is None:
+                raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+            if not user.is_participant:
+                user.is_participant = True
+                db.add(user)
+                await db.flush()
+            created = False
+        else:
+            email = str(payload.email) if payload.email is not None else None
 
-        create_data = {
-            **patch_data,
-            "phone": payload.phone,
-            "referred_by": None,
-            "is_participant": True,
-            "status": "active",
-        }
+            patch_data = {
+                "first_name": payload.first_name,
+                "last_name": payload.last_name,
+                "age": payload.age,
+                "email": email,
+                "date_of_birth": payload.dob,
+                "gender": payload.gender,
+                "address": payload.address,
+                "pin_code": payload.pincode,
+                "city": payload.city,
+                "state": payload.state,
+                "country": payload.country,
+            }
 
-        user, created = await self._get_or_create_user_for_onboarding(
-            db,
-            phone=payload.phone,
-            email=email,
-            patch_data={**patch_data, "is_participant": True},
-            create_data=create_data,
-        )
+            create_data = {
+                **patch_data,
+                "phone": payload.phone,
+                "referred_by": None,
+                "is_participant": True,
+                "status": "active",
+            }
+
+            user, created = await self._get_or_create_user_for_onboarding(
+                db,
+                phone=str(payload.phone),
+                email=email,
+                patch_data={**patch_data, "is_participant": True},
+                create_data=create_data,
+            )
 
         if self._engagements_service is None:
             raise RuntimeError("Engagements service is required")
@@ -1781,22 +1794,35 @@ class UsersService:
             db, diagnostic_package_id, payload.engagement_type,
         )
 
+        if onboarded_by_user_id:
+            engagement_city = user.city
+            engagement_address = user.address
+            engagement_pincode = user.pin_code
+            engagement_state = user.state
+            engagement_country = user.country
+        else:
+            engagement_city = payload.city or user.city
+            engagement_address = payload.address
+            engagement_pincode = payload.pincode
+            engagement_state = getattr(payload, "state", None)
+            engagement_country = getattr(payload, "country", None)
+
         engagement = await self._engagements_service.create_b2c_engagement(
             db,
             user_first_name=user.first_name,
             engagement_date=payload.blood_collection_date,
-            city=payload.city or user.city,
+            city=engagement_city,
             assessment_package_id=assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
             engagement_type=payload.engagement_type,
             blood_collection_type=onboarding_defaults.blood_collection_type,
             consultations=resolved_consultations,
-            address=payload.address,
+            address=engagement_address,
             sub_locality=getattr(payload, "sub_locality", None),
             landmark=getattr(payload, "landmark", None),
-            pincode=payload.pincode,
-            state=getattr(payload, "state", None),
-            country=getattr(payload, "country", None),
+            pincode=engagement_pincode,
+            state=engagement_state,
+            country=engagement_country,
             latitude=getattr(payload, "latitude", None),
             longitude=getattr(payload, "longitude", None),
             create_profile_on_metsights=onboarding_defaults.create_profile_on_metsights,
@@ -1933,13 +1959,23 @@ class UsersService:
             session_id=None,
         )
 
-        await self._notify_onboarding_assistants(
-            db,
-            engagement=engagement,
-            participant_user_id=int(user.user_id),
-            payload=payload,
-            source="public",
-        )
+        if onboarded_by_user_id:
+            await self._notify_onboarding_assistants_for_user(
+                db,
+                engagement=engagement,
+                user=user,
+                source="public",
+                collection_date=str(payload.blood_collection_date),
+                collection_time=str(payload.blood_collection_time_slot),
+            )
+        else:
+            await self._notify_onboarding_assistants(
+                db,
+                engagement=engagement,
+                participant_user_id=int(user.user_id),
+                payload=payload,
+                source="public",
+            )
 
         mid = (assessment_instance.metsights_record_id or "").strip() or None
         return UserOnboardResponse(

@@ -31,6 +31,101 @@ async def test_public_onboard_requires_blood_fields(async_client, test_db_sessio
 
 
 @pytest.mark.asyncio
+async def test_public_onboard_requires_phone_and_age_without_user_id(async_client, test_db_session):
+    payload = {
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "10:00",
+        "engagement_type": "bio_ai",
+    }
+    response = await async_client.post("/users/public/onboard", json=payload)
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT"
+
+
+@pytest.mark.asyncio
+async def test_public_onboard_by_user_id_skips_personal_fields(async_client, test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, first_name, last_name, age, phone, email, city, address, pin_code, "
+            "state, country, is_participant, status) "
+            "VALUES (2101, 'Existing', 'User', 35, '9988776655', 'exist@example.com', 'Pune', "
+            "'12 Main', '411001', 'MH', 'IN', false, 'active')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "user_id": 2101,
+        "engagement_type": "bio_ai",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "10:00",
+        "participant_blood_group": "B+",
+    }
+    response = await async_client.post("/users/public/onboard", json=payload)
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["user_id"] == 2101
+    assert data["created"] is False
+    assert data["is_participant"] is True
+    assert data["engagement_id"] is not None
+
+    user_row = (
+        await test_db_session.execute(
+            text("SELECT is_participant, first_name, city FROM users WHERE user_id = 2101")
+        )
+    ).first()
+    assert user_row.is_participant is True
+    assert user_row.first_name == "Existing"
+
+    engagement_row = (
+        await test_db_session.execute(
+            text("SELECT city, address FROM engagements WHERE engagement_id = :eid"),
+            {"eid": data["engagement_id"]},
+        )
+    ).first()
+    assert engagement_row.city == "Pune"
+    assert engagement_row.address == "12 Main"
+
+
+@pytest.mark.asyncio
+async def test_public_onboard_by_unknown_user_id_returns_404(async_client, test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "user_id": 999999,
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "10:00",
+    }
+    response = await async_client.post("/users/public/onboard", json=payload)
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "USER_NOT_FOUND"
+
+
+@pytest.mark.asyncio
 async def test_public_onboard_updates_only_missing_fields(async_client, test_db_session):
     # Seed active assessment package used by B2C onboarding.
     await test_db_session.execute(

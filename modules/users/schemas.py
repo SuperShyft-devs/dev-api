@@ -233,13 +233,20 @@ class BookBloodTestBatchRequest(BaseModel):
 
 
 class PublicUserOnboardRequest(BaseModel):
-    """Payload for B2C onboarding."""
+    """Payload for B2C onboarding.
 
-    age: int
+    When ``user_id`` is provided, personal profile fields are optional and ignored;
+    the existing user is loaded from the database. Without ``user_id``, ``age`` and
+    ``phone`` remain required (create / get-or-create by phone).
+    """
+
+    user_id: Optional[int] = Field(default=None, ge=1)
+
+    age: Optional[int] = None
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
     email: Optional[EmailStr] = None
-    phone: str = Field(min_length=5, max_length=30)
+    phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
     gender: Optional[str] = Field(default=None, max_length=30)
     dob: Optional[date] = None
     address: Optional[str] = Field(default=None, max_length=500)
@@ -264,6 +271,18 @@ class PublicUserOnboardRequest(BaseModel):
     consultations: Optional[dict[str, Any]] = None
 
     @model_validator(mode="after")
+    def require_personal_fields_without_user_id(self):
+        if self.user_id is not None:
+            return self
+        if self.phone is None or not str(self.phone).strip():
+            raise ValueError("phone is required when user_id is not provided")
+        if self.age is None:
+            raise ValueError("age is required when user_id is not provided")
+        if self.age < 1 or self.age > 120:
+            raise ValueError("Age must be between 1 and 120")
+        return self
+
+    @model_validator(mode="after")
     def normalize_consultations(self):
         from modules.experts.consultations import empty_preference, normalize_consultations_map
 
@@ -279,12 +298,6 @@ class PublicUserOnboardRequest(BaseModel):
         else:
             self.consultations = normalize_consultations_map(self.consultations)
         return self
-
-    @validator("age")
-    def age_must_be_valid(cls, v):
-        if v < 1 or v > 120:
-            raise ValueError("Age must be between 1 and 120")
-        return v
 
 
 class EngagementUserOnboardRequest(BaseModel):
