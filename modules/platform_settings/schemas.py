@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from modules.engagements.models import BloodCollectionType, EngagementKind
+from modules.engagements.models import BloodCollectionType
 
 
 class B2cOnboardingTypeDefaults(BaseModel):
@@ -16,11 +16,15 @@ class B2cOnboardingTypeDefaults(BaseModel):
 
 
 class B2cOnboardingDefaultsRead(BaseModel):
-    defaults_by_engagement_type: dict[EngagementKind, B2cOnboardingTypeDefaults]
+    """Keyed by engagement_types.code (active rows)."""
+
+    defaults_by_engagement_type: dict[str, B2cOnboardingTypeDefaults]
 
 
 class B2cOnboardingDefaultsUpdate(BaseModel):
-    defaults_by_engagement_type: dict[EngagementKind, B2cOnboardingTypeDefaults]
+    """Keyed by engagement_types.code (must be active)."""
+
+    defaults_by_engagement_type: dict[str, B2cOnboardingTypeDefaults]
 
 
 class EngagementNotificationDefaultsRead(BaseModel):

@@ -88,7 +88,9 @@ async def test_get_b2c_defaults_fallback_when_no_row(async_client, test_db_sessi
     assert response.status_code == 200
     data = response.json()["data"]
     by_type = data["defaults_by_engagement_type"]
-    assert set(by_type.keys()) == {k.value for k in EngagementKind}
+    assert set(by_type.keys()) >= {k.value for k in EngagementKind}
+    for kind in EngagementKind:
+        assert kind.value in by_type
     bio = by_type["bio_ai"]
     assert bio["assessment_package_id"] == 1
     assert bio["diagnostic_package_id"] == 1
@@ -409,3 +411,55 @@ async def test_patch_support_query_notification_rejects_inactive_service(async_c
         json={"default_support_query_notification": "support-inactive"},
     )
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_b2c_defaults_include_custom_engagement_type(async_client, test_db_session):
+    uid = 9111
+    test_db_session.add(User(user_id=uid, age=30, phone="91110000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9111, user_id=uid, role="admin", status="active"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagement_types (code, display_name, is_active) "
+            "VALUES ('vifc', 'Aurae - Face Scan', true) "
+            "ON CONFLICT (code) DO UPDATE SET display_name = EXCLUDED.display_name, is_active = true"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES "
+            "(1, 'P1', 'One', 'active') "
+            "ON CONFLICT (package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'R1', 'D1', 'p', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get("/platform-settings/b2c-onboarding", headers=_auth_header(uid))
+    assert response.status_code == 200
+    by_type = response.json()["data"]["defaults_by_engagement_type"]
+    assert "vifc" in by_type
+
+    payload = _b2c_payload()
+    payload["defaults_by_engagement_type"]["vifc"] = {
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "blood_collection_type": None,
+        "create_profile_on_metsights": False,
+        "enroll_for_fitprint_full": False,
+    }
+
+    patch = await async_client.patch(
+        "/platform-settings/b2c-onboarding",
+        headers=_auth_header(uid),
+        json=payload,
+    )
+    assert patch.status_code == 200
+    assert patch.json()["data"]["defaults_by_engagement_type"]["vifc"]["create_profile_on_metsights"] is False

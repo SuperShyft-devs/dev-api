@@ -109,27 +109,51 @@ class PlatformSettingsService:
             enroll_for_fitprint_full=bool(row.b2c_default_enroll_for_fitprint_full),
         )
 
-    def _build_defaults_map(self, row) -> dict[EngagementKind, B2cOnboardingTypeDefaults]:
+    async def _list_active_engagement_type_codes(self, db: AsyncSession) -> list[str]:
+        from modules.engagements.models import EngagementType
+
+        result = await db.execute(
+            select(EngagementType.code)
+            .where(EngagementType.is_active.is_(True))
+            .order_by(EngagementType.id.asc())
+        )
+        codes = [str(code) for code in result.scalars().all()]
+        if codes:
+            return codes
+        # Fallback if engagement_types has not been seeded yet.
+        return [kind.value for kind in EngagementKind]
+
+    async def _build_defaults_map(
+        self,
+        db: AsyncSession,
+        row,
+    ) -> dict[str, B2cOnboardingTypeDefaults]:
         fallback = _fallback_type_defaults()
         legacy = self._legacy_flat_as_type_defaults(row) if row is not None else fallback
         raw_map = getattr(row, "b2c_onboarding_by_engagement_type", None) if row is not None else None
-        result: dict[EngagementKind, B2cOnboardingTypeDefaults] = {}
-        for kind in EngagementKind:
+        result: dict[str, B2cOnboardingTypeDefaults] = {}
+        for code in await self._list_active_engagement_type_codes(db):
             parsed = None
             if isinstance(raw_map, dict):
-                parsed = _parse_type_defaults(raw_map.get(kind.value))
-            result[kind] = parsed or legacy
+                parsed = _parse_type_defaults(raw_map.get(code))
+            result[code] = parsed or legacy
         return result
 
     def _resolve_type_defaults_from_map(
         self,
-        defaults_map: dict[EngagementKind, B2cOnboardingTypeDefaults],
-        engagement_type: EngagementKind,
+        defaults_map: dict[str, B2cOnboardingTypeDefaults],
+        engagement_type_code: str,
+        *,
+        raw_map: dict | None = None,
     ) -> B2cOnboardingTypeDefaults:
-        if engagement_type in defaults_map:
-            return defaults_map[engagement_type]
-        if EngagementKind.bio_ai in defaults_map:
-            return defaults_map[EngagementKind.bio_ai]
+        if engagement_type_code in defaults_map:
+            return defaults_map[engagement_type_code]
+        if isinstance(raw_map, dict):
+            parsed = _parse_type_defaults(raw_map.get(engagement_type_code))
+            if parsed is not None:
+                return parsed
+        if "bio_ai" in defaults_map:
+            return defaults_map["bio_ai"]
         return _fallback_type_defaults()
 
     async def resolve_b2c_default_package_ids(self, db: AsyncSession) -> tuple[int, int]:
@@ -141,14 +165,14 @@ class PlatformSettingsService:
         db: AsyncSession,
         engagement_type: EngagementKind | str = EngagementKind.bio_ai,
     ) -> B2cOnboardingTypeDefaults:
-        if isinstance(engagement_type, str):
-            try:
-                engagement_type = EngagementKind(engagement_type.strip())
-            except ValueError:
-                engagement_type = EngagementKind.bio_ai
+        if isinstance(engagement_type, EngagementKind):
+            code = engagement_type.value
+        else:
+            code = (engagement_type or "").strip() or EngagementKind.bio_ai.value
         row = await self._repository.get_by_id(db)
-        defaults_map = self._build_defaults_map(row)
-        return self._resolve_type_defaults_from_map(defaults_map, engagement_type)
+        defaults_map = await self._build_defaults_map(db, row)
+        raw_map = getattr(row, "b2c_onboarding_by_engagement_type", None) if row is not None else None
+        return self._resolve_type_defaults_from_map(defaults_map, code, raw_map=raw_map)
 
     async def ensure_active_b2c_packages(self, db: AsyncSession, assessment_package_id: int, diagnostic_package_id: int) -> None:
         ap = (
@@ -190,7 +214,7 @@ class PlatformSettingsService:
 
     async def get_b2c_onboarding_defaults(self, db: AsyncSession) -> B2cOnboardingDefaultsRead:
         row = await self._repository.get_by_id(db)
-        return B2cOnboardingDefaultsRead(defaults_by_engagement_type=self._build_defaults_map(row))
+        return B2cOnboardingDefaultsRead(defaults_by_engagement_type=await self._build_defaults_map(db, row))
 
     async def update_b2c_onboarding_defaults(
         self,
@@ -202,7 +226,7 @@ class PlatformSettingsService:
         user_agent: str,
         endpoint: str,
     ) -> B2cOnboardingDefaultsRead:
-        provided = dict(payload.defaults_by_engagement_type)
+        provided = {str(code).strip(): entry for code, entry in payload.defaults_by_engagement_type.items()}
         if not provided:
             raise AppError(
                 status_code=422,
@@ -210,13 +234,26 @@ class PlatformSettingsService:
                 message="defaults_by_engagement_type must include at least one engagement type",
             )
 
-        # Ensure every known EngagementKind is present after save (fill missing from existing / fallback).
-        existing_map = self._build_defaults_map(await self._repository.get_by_id(db))
-        complete: dict[EngagementKind, B2cOnboardingTypeDefaults] = {}
-        for kind in EngagementKind:
-            complete[kind] = provided.get(kind) or existing_map.get(kind) or _fallback_type_defaults()
+        active_codes = await self._list_active_engagement_type_codes(db)
+        active_set = set(active_codes)
+        unknown = sorted(code for code in provided if code not in active_set)
+        if unknown:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_ENGAGEMENT_TYPE",
+                message=(
+                    "defaults_by_engagement_type keys must be active engagement_types.code; "
+                    f"unknown or inactive: {', '.join(unknown)}"
+                ),
+            )
 
-        for kind, entry in complete.items():
+        existing_row = await self._repository.get_by_id(db)
+        existing_map = await self._build_defaults_map(db, existing_row)
+        complete: dict[str, B2cOnboardingTypeDefaults] = {}
+        for code in active_codes:
+            complete[code] = provided.get(code) or existing_map.get(code) or _fallback_type_defaults()
+
+        for code, entry in complete.items():
             await self.ensure_active_b2c_packages(db, entry.assessment_package_id, entry.diagnostic_package_id)
             if entry.enroll_for_fitprint_full and not entry.create_profile_on_metsights:
                 raise AppError(
@@ -224,12 +261,20 @@ class PlatformSettingsService:
                     error_code="INVALID_B2C_ONBOARDING_DEFAULTS",
                     message=(
                         f"FitPrint Full enrollment requires Metsights profile creation "
-                        f"(engagement_type={kind.value})"
+                        f"(engagement_type={code})"
                     ),
                 )
 
-        serialized = {kind.value: _type_defaults_to_dict(entry) for kind, entry in complete.items()}
-        bio_ai = complete[EngagementKind.bio_ai]
+        serialized = {code: _type_defaults_to_dict(entry) for code, entry in complete.items()}
+        # Preserve configs for inactive codes so reactivating a type keeps settings.
+        existing_raw = getattr(existing_row, "b2c_onboarding_by_engagement_type", None) if existing_row else None
+        if isinstance(existing_raw, dict):
+            for code, raw_entry in existing_raw.items():
+                key = str(code)
+                if key not in serialized and isinstance(raw_entry, dict):
+                    serialized[key] = raw_entry
+
+        bio_ai = complete.get("bio_ai") or next(iter(complete.values()))
         await self._repository.upsert_b2c_onboarding_by_engagement_type(
             db,
             defaults_by_engagement_type=serialized,
