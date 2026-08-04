@@ -7,7 +7,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, model_validator, validator
 
-from modules.engagements.models import EngagementKind
+from modules.engagements.models import EngagementKind  # kept for backward compat in B2C schema
 
 _ALLOWED_DIET_PREFERENCES = {"veg", "non_veg", "vegan", "jain", "eggetarian", "keto"}
 _ALLOWED_ALLERGIES = {"peanuts", "dairy", "eggs", "fish", "soy", "wheat", "sesame", "mustard", "corn", "other"}

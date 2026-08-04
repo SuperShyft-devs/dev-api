@@ -37,6 +37,9 @@ from modules.bookings.router import router as bookings_router
 from modules.experts.router import router as experts_router, portal_router as experts_portal_router, expert_types_router
 from modules.admin_temp.router import router as admin_temp_router
 from modules.notifications.router import router as notifications_router
+from modules.engagement_types.router import router as engagement_types_router
+from modules.notification_events.router import router as notification_events_router
+from modules.engagement_notifications.router import router as engagement_notifications_router
 from modules.webhooks.router import router as webhooks_router
 from modules.audit.router import router as audit_router
 from modules.geocoding.router import router as geocode_router
@@ -123,6 +126,9 @@ app.include_router(experts_router)
 app.include_router(expert_types_router)
 app.include_router(admin_temp_router)
 app.include_router(notifications_router)
+app.include_router(engagement_types_router)
+app.include_router(notification_events_router)
+app.include_router(engagement_notifications_router)
 app.include_router(webhooks_router)
 app.include_router(audit_router)
 app.include_router(geocode_router)

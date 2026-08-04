@@ -151,10 +151,9 @@ async def dispatch_questionnaire_reminders(
     details: list[dict[str, Any]] = []
 
     if dry_run:
-        for user_id, engagement_id, engagement_date, qr1, qr2 in participants:
-            reminder_type = "reminder_1" if engagement_date == tomorrow else "reminder_2"
-            raw_key = qr1 if engagement_date == tomorrow else qr2
-            keys = [k.strip() for k in (raw_key or "").split(",") if k.strip()]
+        for user_id, engagement_id, engagement_date, qr_before_services, qr_after_services in participants:
+            reminder_type = "reminder_before" if engagement_date == tomorrow else "reminder_after"
+            keys = qr_before_services if engagement_date == tomorrow else qr_after_services
             details.append({
                 "user_id": user_id,
                 "engagement_id": engagement_id,
@@ -176,13 +175,13 @@ async def dispatch_questionnaire_reminders(
             "details": details,
         }
 
-    for user_id, engagement_id, engagement_date, qr1, qr2 in participants:
-        reminder_type = "reminder_1" if engagement_date == tomorrow else "reminder_2"
+    for user_id, engagement_id, engagement_date, qr_before_services, qr_after_services in participants:
+        reminder_type = "reminder_before" if engagement_date == tomorrow else "reminder_after"
 
         if engagement_date == tomorrow:
-            raw_service_keys = qr1
+            service_keys = list(qr_before_services or [])
         elif engagement_date == yesterday:
-            raw_service_keys = qr2
+            service_keys = list(qr_after_services or [])
         else:
             skipped += 1
             details.append({
@@ -192,8 +191,6 @@ async def dispatch_questionnaire_reminders(
                 "reason": f"engagement_date {engagement_date} is neither tomorrow nor yesterday",
             })
             continue
-
-        service_keys = [k.strip() for k in (raw_service_keys or "").split(",") if k.strip()]
         if not service_keys:
             skipped += 1
             details.append({

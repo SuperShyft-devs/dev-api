@@ -49,14 +49,13 @@ async def dispatch_pretest_reminders(
     details: list[dict[str, Any]] = []
 
     if dry_run:
-        for user_id, engagement_id, raw_keys in participants:
-            keys = [k.strip() for k in (raw_keys or "").split(",") if k.strip()]
+        for user_id, engagement_id, service_keys in participants:
             details.append({
                 "user_id": user_id,
                 "engagement_id": engagement_id,
-                "service_key": ",".join(keys) if keys else None,
+                "service_key": ",".join(service_keys) if service_keys else None,
                 "action": "dry_run",
-                "reason": "no notification keys configured" if not keys else "would dispatch",
+                "reason": "no notification keys configured" if not service_keys else "would dispatch",
             })
         return {
             "as_of": (as_of or datetime.now(_IST).date()).isoformat(),
@@ -69,8 +68,7 @@ async def dispatch_pretest_reminders(
             "details": details,
         }
 
-    for user_id, engagement_id, raw_keys in participants:
-        service_keys = [k.strip() for k in (raw_keys or "").split(",") if k.strip()]
+    for user_id, engagement_id, service_keys in participants:
         if not service_keys:
             skipped += 1
             details.append({

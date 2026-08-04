@@ -35,7 +35,7 @@ from modules.audit.models import IntegrationSyncLog
 from modules.audit.repository import AuditRepository
 from modules.diagnostics.models import DiagnosticPackage
 from modules.assessments.service import AssessmentsService
-from modules.engagements.models import EngagementKind
+from modules.engagements.models import EngagementType
 from modules.engagements.service import EngagementsService
 from modules.metsights.service import MetsightsService
 from modules.metsights.strategies import apply_pull_strategy, apply_push_strategy
@@ -883,6 +883,9 @@ class MetsightsSyncService:
                     default_diag = 1
                 default_diag = await _resolve_active_diagnostic_package_id(db, default_diag)
                 await self._platform.ensure_active_b2c_packages(db, ap_id, default_diag)
+                from sqlalchemy import select as _sel
+                _et_result = await db.execute(_sel(EngagementType.id).where(EngagementType.code == "bio_ai"))
+                _bio_ai_id = _et_result.scalar_one_or_none()
                 engagement = await self._engagements.create_b2c_engagement(
                     db,
                     user_first_name=user.first_name,
@@ -890,7 +893,7 @@ class MetsightsSyncService:
                     city=user.city,
                     assessment_package_id=ap_id,
                     diagnostic_package_id=default_diag,
-                    engagement_type=EngagementKind.bio_ai,
+                    engagement_type=_bio_ai_id,
                     address=user.address,
                     pincode=user.pin_code,
                     state=getattr(user, "state", None),

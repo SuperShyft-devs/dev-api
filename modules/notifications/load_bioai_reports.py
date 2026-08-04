@@ -5,7 +5,7 @@ where today >= engagement_date:
 1. Check MetSights blood parameters for is_complete (Pro/Basic only).
 2. If individual_health_report.reports or report_url is null, fetch from MetSights.
 3. When both reports and report_url are present, send notifications using
-   engagement.bioai_report_notification (skipping services already sent).
+   engagement_notifications for bioai_report_ready event (skipping services already sent).
 """
 
 from __future__ import annotations
@@ -69,6 +69,18 @@ async def _get_eligible_participants(
 
     FitPrint (type 7) fitness reports are loaded separately — they are not BioAI reports.
     """
+    from modules.engagements.models import AutoNotificationEvent, EngagementNotification
+
+    en_sub = (
+        select(
+            EngagementNotification.engagement_id,
+            EngagementNotification.notification_services,
+        )
+        .join(AutoNotificationEvent, AutoNotificationEvent.id == EngagementNotification.notification_event_id)
+        .where(AutoNotificationEvent.event_code == "bioai_report_ready")
+        .subquery("en_bioai")
+    )
+
     query = (
         select(
             EngagementParticipant.user_id,
@@ -77,7 +89,7 @@ async def _get_eligible_participants(
             AssessmentPackage.assessment_type_code,
             IndividualHealthReport.reports,
             IndividualHealthReport.report_url,
-            Engagement.bioai_report_notification,
+            en_sub.c.notification_services.label("bioai_report_services"),
             IndividualHealthReport.report_id,
             AssessmentInstance.assessment_instance_id,
         )
@@ -92,6 +104,10 @@ async def _get_eligible_participants(
             IndividualHealthReport,
             IndividualHealthReport.assessment_instance_id
             == AssessmentInstance.assessment_instance_id,
+        )
+        .outerjoin(
+            en_sub,
+            en_sub.c.engagement_id == Engagement.engagement_id,
         )
         .where(Engagement.status.ilike("running"))
         .where(EngagementParticipant.engagement_date <= today)
@@ -184,7 +200,7 @@ async def load_bioai_reports(
             (
                 user_id, engagement_id, record_id, type_code,
                 existing_reports, existing_report_url,
-                bioai_notification, ihr_id, instance_id,
+                bioai_report_services, ihr_id, instance_id,
             ) = row
 
             record_id = (record_id or "").strip()
@@ -361,9 +377,7 @@ async def load_bioai_reports(
                     })
                     continue
 
-                service_keys = [
-                    k.strip() for k in (bioai_notification or "").split(",") if k.strip()
-                ]
+                service_keys = list(bioai_report_services or [])
                 if not service_keys:
                     skipped += 1
                     details.append({

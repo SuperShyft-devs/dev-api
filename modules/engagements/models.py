@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, Enum as SAEnum, Float, ForeignKey, Index, Integer, String, Time, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, Enum as SAEnum, Float, ForeignKey, Index, Integer, String, Text, Time, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import validates
 from sqlalchemy.sql import func
@@ -66,7 +66,7 @@ class Engagement(Base):
     organization_id = Column(Integer, ForeignKey("organizations.organization_id"), nullable=True)
     camp_no = Column(BigInteger, nullable=True)
     engagement_code = Column(String, nullable=False)
-    engagement_type = Column(_engagement_kind, nullable=True)
+    engagement_type = Column(Integer, ForeignKey("engagement_types.id"), nullable=True)
     consultations = Column(JSON, nullable=True)
     assessment_package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=True)
     diagnostic_package_id = Column(Integer, ForeignKey("diagnostic_package.diagnostic_package_id"), nullable=True)
@@ -85,13 +85,6 @@ class Engagement(Base):
     status = Column(String)
     create_profile_on_metsights = Column(Boolean, nullable=False, default=False, server_default="false")
     enroll_for_fitprint_full = Column(Boolean, nullable=False, default=False, server_default="false")
-    onboarding_notification = Column(String(500), nullable=True)
-    pretest_guidelines_notification = Column(String, nullable=True)
-    questionnaire_reminder_1 = Column(String, nullable=True)
-    questionnaire_reminder_2 = Column(String, nullable=True)
-    blood_report_notification = Column(String, nullable=True)
-    bioai_report_notification = Column(String, nullable=True)
-    notify_users_for_consultation = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     healthians_zone_id = Column(String, nullable=True)
     external_camp_id = Column(Integer, nullable=True)
@@ -151,3 +144,54 @@ class EngagementParticipant(Base):
         if self.booked_by_user_id is None and user_id is not None:
             self.booked_by_user_id = user_id
         return user_id
+
+
+class EngagementType(Base):
+    """SQLAlchemy model for `engagement_types` table."""
+
+    __tablename__ = "engagement_types"
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String, unique=True, nullable=False)
+    display_name = Column(String, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+
+
+class AutoNotificationEvent(Base):
+    """SQLAlchemy model for `auto_notification_events` table."""
+
+    __tablename__ = "auto_notification_events"
+
+    id = Column(Integer, primary_key=True)
+    engagement_type_ids = Column(ARRAY(Integer), nullable=False)
+    event_code = Column(String, unique=True, nullable=False)
+    display_name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+
+
+class EngagementNotification(Base):
+    """SQLAlchemy model for `engagement_notifications` table."""
+
+    __tablename__ = "engagement_notifications"
+    __table_args__ = (
+        UniqueConstraint("engagement_id", "notification_event_id", name="uq_engagement_notification_event"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    engagement_id = Column(Integer, ForeignKey("engagements.engagement_id"), nullable=False)
+    notification_event_id = Column(Integer, ForeignKey("auto_notification_events.id"), nullable=False)
+    notification_services = Column(ARRAY(String), nullable=False)
+
+
+class EngagementNotificationDefault(Base):
+    """SQLAlchemy model for `engagement_notification_defaults` table."""
+
+    __tablename__ = "engagement_notification_defaults"
+    __table_args__ = (
+        UniqueConstraint("engagement_type_id", "notification_event_id", name="uq_notification_default_type_event"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    engagement_type_id = Column(Integer, ForeignKey("engagement_types.id"), nullable=False)
+    notification_event_id = Column(Integer, ForeignKey("auto_notification_events.id"), nullable=False)
+    notification_services = Column(ARRAY(String), nullable=False)

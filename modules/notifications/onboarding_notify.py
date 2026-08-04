@@ -6,6 +6,7 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from modules.engagement_notifications.repository import EngagementNotificationsRepository
 from modules.engagements.repository import EngagementsRepository
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.schemas import DispatchRequest
@@ -60,10 +61,6 @@ def _with_participant_user_id(
     return {**participant_details, "participant_user_id": str(participant_user_id)}
 
 
-def _parse_service_keys(raw: str | None) -> list[str]:
-    return [k.strip() for k in (raw or "").split(",") if k.strip()]
-
-
 async def notify_onboarding_assistants_on_enrollment(
     db: AsyncSession,
     *,
@@ -75,7 +72,10 @@ async def notify_onboarding_assistants_on_enrollment(
     participant_details: dict[str, str] | None,
 ) -> None:
     """Dispatch each configured onboarding notification service to admin-role assistants."""
-    service_keys = _parse_service_keys(getattr(engagement, "onboarding_notification", None))
+    en_repo = EngagementNotificationsRepository()
+    service_keys = await en_repo.get_services_for_engagement_event(
+        db, engagement_id=int(engagement.engagement_id), event_code="onboarding"
+    )
     if not service_keys:
         return
 

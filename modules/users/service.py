@@ -78,28 +78,39 @@ def _integrity_error_reason(exc: IntegrityError) -> str:
 _diagnostics_repo = DiagnosticsRepository()
 
 
+async def _resolve_engagement_type_id(db: AsyncSession, code: str) -> int | None:
+    from modules.engagements.models import EngagementType
+    from sqlalchemy import select as _select
+    result = await db.execute(_select(EngagementType.id).where(EngagementType.code == code))
+    return result.scalar_one_or_none()
+
+
+_WITH_CONSULTATION_CODE_MAP = {
+    "bio_ai": "bio_ai_with_consultation",
+    "blood_test": "blood_test_with_consultation",
+}
+
+
 async def _resolve_consultation_from_pkg(
     db: AsyncSession,
     diagnostic_package_id: int | None,
-    base_kind: EngagementKind,
-) -> tuple[EngagementKind, dict[str, bool] | None]:
+    base_type_code: str,
+) -> tuple[int | None, dict[str, bool] | None]:
+    base_type_id = await _resolve_engagement_type_id(db, base_type_code)
     if diagnostic_package_id is None:
-        return base_kind, None
+        return base_type_id, None
     pkg = await _diagnostics_repo.get_package_by_id_basic(db, package_id=diagnostic_package_id)
     if pkg is None:
-        return base_kind, None
+        return base_type_id, None
     cc = pkg.complementary_consultation
     if not cc or not isinstance(cc, dict):
-        return base_kind, None
+        return base_type_id, None
     has_any = any(v is True for v in cc.values())
     if not has_any:
-        return base_kind, None
-    with_consultation_map = {
-        EngagementKind.bio_ai: EngagementKind.bio_ai_with_consultation,
-        EngagementKind.blood_test: EngagementKind.blood_test_with_consultation,
-    }
-    new_kind = with_consultation_map.get(base_kind, base_kind)
-    return new_kind, cc
+        return base_type_id, None
+    new_code = _WITH_CONSULTATION_CODE_MAP.get(base_type_code, base_type_code)
+    new_type_id = await _resolve_engagement_type_id(db, new_code)
+    return new_type_id or base_type_id, cc
 
 
 def _validate_requested_consultations(
@@ -865,8 +876,8 @@ class UsersService:
         await self._platform_settings_service.ensure_active_b2c_packages(db, assessment_package_id, diagnostic_package_id)
 
         eng_city = (meta.get("city") or "").strip() or user.city
-        resolved_kind, resolved_consultations = await _resolve_consultation_from_pkg(
-            db, diagnostic_package_id, EngagementKind.bio_ai,
+        resolved_type_id, resolved_consultations = await _resolve_consultation_from_pkg(
+            db, diagnostic_package_id, "bio_ai",
         )
         engagement = await self._engagements_service.create_b2c_engagement(
             db,
@@ -875,7 +886,7 @@ class UsersService:
             city=eng_city,
             assessment_package_id=assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
-            engagement_type=resolved_kind,
+            engagement_type=resolved_type_id,
             consultations=resolved_consultations,
             address=meta.get("address"),
             sub_locality=meta.get("sub_locality"),
@@ -1047,8 +1058,8 @@ class UsersService:
         diagnostic_package_id = meta.get("diagnostic_package_id") or booking.entity_id
         await self._platform_settings_service.ensure_active_diagnostic_package(db, diagnostic_package_id)
 
-        resolved_kind, resolved_consultations = await _resolve_consultation_from_pkg(
-            db, diagnostic_package_id, EngagementKind.blood_test,
+        resolved_type_id, resolved_consultations = await _resolve_consultation_from_pkg(
+            db, diagnostic_package_id, "blood_test",
         )
         engagement = await self._engagements_service.create_b2c_engagement(
             db,
@@ -1057,7 +1068,7 @@ class UsersService:
             city=meta.get("city") or user.city,
             assessment_package_id=None,
             diagnostic_package_id=diagnostic_package_id,
-            engagement_type=resolved_kind,
+            engagement_type=resolved_type_id,
             consultations=resolved_consultations,
             address=meta.get("address"),
             sub_locality=meta.get("sub_locality"),
@@ -2715,6 +2726,7 @@ class UsersService:
                 await self._platform_settings_service.ensure_active_b2c_packages(db, ap_id, diag_id)
 
                 engagement_date = _parse_iso_date(row.get("date"))
+                bio_ai_type_id = await _resolve_engagement_type_id(db, "bio_ai")
                 engagement = await self._engagements_service.create_b2c_engagement(
                     db,
                     user_first_name=user.first_name,
@@ -2722,7 +2734,7 @@ class UsersService:
                     city=user.city,
                     assessment_package_id=ap_id,
                     diagnostic_package_id=diag_id,
-                    engagement_type=EngagementKind.bio_ai,
+                    engagement_type=bio_ai_type_id,
                     address=user.address,
                     pincode=user.pin_code,
                     state=getattr(user, "state", None),
@@ -3110,6 +3122,7 @@ class UsersService:
                     start_date = _parse_iso_date(row.get("created_at") or row.get("date"))
                     end_date = _parse_iso_date(row.get("updated_at") or row.get("date") or row.get("created_at"))
 
+                    bio_ai_type_id = await _resolve_engagement_type_id(db, "bio_ai")
                     engagement = await self._engagements_service.create_b2c_engagement(
                         db,
                         user_first_name=user.first_name,
@@ -3117,7 +3130,7 @@ class UsersService:
                         city=user.city,
                         assessment_package_id=ap_id,
                         diagnostic_package_id=diag_id,
-                        engagement_type=EngagementKind.bio_ai,
+                        engagement_type=bio_ai_type_id,
                         blood_collection_type=BloodCollectionType.home_collection,
                         consultations=consultations,
                         address=user.address,

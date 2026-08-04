@@ -15,7 +15,7 @@ from core.exceptions import AppError
 from modules.diagnostics.healthians import client as healthians_client
 from modules.diagnostics.healthians.sync_log import log_healthians_call
 from modules.diagnostics.models import DiagnosticPackage
-from modules.engagements.models import BloodCollectionType, Engagement, EngagementKind, EngagementParticipant
+from modules.engagements.models import BloodCollectionType, Engagement, EngagementKind, EngagementParticipant, EngagementType
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService, _generate_engagement_code
 from modules.geocoding.client import search_places
@@ -82,25 +82,44 @@ def _slim_healthians_slot(slot: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-_WITH_CONSULTATION_KIND = {
-    EngagementKind.bio_ai: EngagementKind.bio_ai_with_consultation,
-    EngagementKind.blood_test: EngagementKind.blood_test_with_consultation,
+_WITH_CONSULTATION_CODE = {
+    "bio_ai": "bio_ai_with_consultation",
+    "blood_test": "blood_test_with_consultation",
 }
 
 
-def _apply_complementary_consultation(
+async def _resolve_engagement_type_id(db, code: str) -> int | None:
+    """Resolve an engagement type code to its integer ID."""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(EngagementType.id).where(EngagementType.code == code)
+    )
+    return result.scalar_one_or_none()
+
+
+async def _apply_complementary_consultation(
+    db,
     engagement: Engagement,
     pkg: DiagnosticPackage,
-    base_kind: EngagementKind | None,
+    base_type_id: int | None,
 ) -> None:
     """Set engagement.consultations and engagement_type from package complementary_consultation."""
     cc = pkg.complementary_consultation
     has_any = isinstance(cc, dict) and any(v is True for v in cc.values())
-    if has_any and base_kind is not None:
+    if has_any and base_type_id is not None:
         engagement.consultations = cc
-        engagement.engagement_type = _WITH_CONSULTATION_KIND.get(base_kind, base_kind)
-    elif base_kind is not None:
-        engagement.engagement_type = base_kind
+        base_type = await db.execute(
+            select(EngagementType).where(EngagementType.id == base_type_id)
+        )
+        base_obj = base_type.scalar_one_or_none()
+        if base_obj and base_obj.code in _WITH_CONSULTATION_CODE:
+            new_code = _WITH_CONSULTATION_CODE[base_obj.code]
+            new_id = await _resolve_engagement_type_id(db, new_code)
+            engagement.engagement_type = new_id or base_type_id
+        else:
+            engagement.engagement_type = base_type_id
+    elif base_type_id is not None:
+        engagement.engagement_type = base_type_id
 
 
 async def check_service_availability(
@@ -608,7 +627,7 @@ async def verify_and_finalize_draft_bookings(
     razorpay_order_id: str,
     razorpay_signature: str,
     caller_user_id: int,
-    engagement_type: EngagementKind | None = None,
+    engagement_type_code: str | None = None,
     engagements_service: EngagementsService | None = None,
 ) -> dict[str, Any]:
     """Verify Razorpay payment and finalize Healthians bookings for draft engagements."""
@@ -643,7 +662,7 @@ async def verify_and_finalize_draft_bookings(
         db,
         members=members,
         caller_user_id=caller_user_id,
-        engagement_type=engagement_type,
+        engagement_type_code=engagement_type_code,
         engagements_service=engagements_service,
     )
 
@@ -661,7 +680,7 @@ async def create_healthians_booking_after_payment(
     *,
     members: list[dict[str, Any]],
     caller_user_id: int,
-    engagement_type: EngagementKind | None = None,
+    engagement_type_code: str | None = None,
     engagements_service: EngagementsService | None = None,
 ) -> list[dict[str, Any]]:
     """After payment succeeds, create Healthians booking for each member using their drafted engagement."""
@@ -820,7 +839,8 @@ async def create_healthians_booking_after_payment(
         booking_id = resp.get("booking_id", "")
         participant.booking_id = str(booking_id)
         participant.barcode = str(booking_id)
-        _apply_complementary_consultation(engagement, pkg, engagement_type)
+        base_type_id = await _resolve_engagement_type_id(db, engagement_type_code) if engagement_type_code else None
+        await _apply_complementary_consultation(db, engagement, pkg, base_type_id)
         engagement.status = "scheduled"
 
         if engagements_service is not None:

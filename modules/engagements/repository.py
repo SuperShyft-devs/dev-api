@@ -12,10 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
 from modules.engagements.models import (
+    AutoNotificationEvent,
     BloodCollectionType,
     Engagement,
-    EngagementKind,
+    EngagementNotification,
     EngagementParticipant,
+    EngagementType,
     OnboardingAssistantAssignment,
 )
 from modules.organizations.models import Organization
@@ -64,8 +66,17 @@ class EngagementsRepository:
         if on_date is not None:
             query = query.where(Engagement.start_date <= on_date).where(Engagement.end_date >= on_date)
         if engagement_type is not None and engagement_type.strip():
-            type_text = func.lower(func.trim(cast(Engagement.engagement_type, String)))
-            query = query.where(type_text == engagement_type.strip().lower())
+            et_val = engagement_type.strip()
+            if et_val.isdigit():
+                query = query.where(Engagement.engagement_type == int(et_val))
+            else:
+                query = query.where(
+                    Engagement.engagement_type.in_(
+                        select(EngagementType.id).where(
+                            func.lower(EngagementType.code) == et_val.lower()
+                        )
+                    )
+                )
         if search is not None and search.strip():
             pattern = ilike_pattern(search)
             query = query.where(
@@ -214,12 +225,12 @@ class EngagementsRepository:
         return list(result.scalars().all())
 
     async def list_distinct_engagement_types_and_cities(self, db: AsyncSession) -> tuple[list[str], list[str]]:
-        engagement_type_text = cast(Engagement.engagement_type, String)
         type_result = await db.execute(
-            select(func.distinct(func.trim(engagement_type_text)))
+            select(func.distinct(EngagementType.code))
+            .select_from(Engagement)
+            .join(EngagementType, EngagementType.id == Engagement.engagement_type)
             .where(Engagement.engagement_type.isnot(None))
-            .where(func.trim(engagement_type_text) != "")
-            .order_by(func.trim(engagement_type_text).asc())
+            .order_by(EngagementType.code.asc())
         )
         city_result = await db.execute(
             select(func.distinct(func.trim(Engagement.city)))
@@ -993,17 +1004,26 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         collection_date: date,
-    ) -> list[tuple[int, int, str | None]]:
-        """Return (user_id, engagement_id, pretest_guidelines_notification) for scheduled or running engagements with collection on collection_date."""
+    ) -> list[tuple[int, int, list[str]]]:
+        """Return (user_id, engagement_id, service_keys) for scheduled or running engagements with collection on collection_date."""
         query = (
             select(
                 EngagementParticipant.user_id,
                 EngagementParticipant.engagement_id,
-                Engagement.pretest_guidelines_notification,
+                EngagementNotification.notification_services,
             )
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
+            .join(
+                EngagementNotification,
+                EngagementNotification.engagement_id == Engagement.engagement_id,
+            )
+            .join(
+                AutoNotificationEvent,
+                AutoNotificationEvent.id == EngagementNotification.notification_event_id,
+            )
             .where(self._scheduled_or_running_engagement_status_filter())
             .where(EngagementParticipant.engagement_date == collection_date)
+            .where(AutoNotificationEvent.event_code == "pretest_guidelines")
             .distinct()
             .order_by(
                 EngagementParticipant.engagement_id.asc(),
@@ -1012,7 +1032,7 @@ class EngagementsRepository:
         )
         result = await db.execute(query)
         return [
-            (int(row.user_id), int(row.engagement_id), row.pretest_guidelines_notification)
+            (int(row.user_id), int(row.engagement_id), list(row.notification_services or []))
             for row in result.all()
         ]
 
@@ -1021,18 +1041,48 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         target_dates: list[date],
-    ) -> list[tuple[int, int, date, str | None, str | None]]:
-        """Return (user_id, engagement_id, engagement_date, questionnaire_reminder_1, questionnaire_reminder_2)
+    ) -> list[tuple[int, int, date, list[str], list[str]]]:
+        """Return (user_id, engagement_id, engagement_date, reminder_before_services, reminder_after_services)
         for scheduled or running engagements with participants whose engagement_date is in *target_dates*."""
+        from modules.engagements.models import AutoNotificationEvent, EngagementNotification
+
+        en_before = select(
+            EngagementNotification.engagement_id,
+            EngagementNotification.notification_services,
+        ).join(
+            AutoNotificationEvent,
+            AutoNotificationEvent.id == EngagementNotification.notification_event_id,
+        ).where(
+            AutoNotificationEvent.event_code == "questionnaire_reminder_before"
+        ).subquery("en_before")
+
+        en_after = select(
+            EngagementNotification.engagement_id,
+            EngagementNotification.notification_services,
+        ).join(
+            AutoNotificationEvent,
+            AutoNotificationEvent.id == EngagementNotification.notification_event_id,
+        ).where(
+            AutoNotificationEvent.event_code == "questionnaire_reminder_after"
+        ).subquery("en_after")
+
         query = (
             select(
                 EngagementParticipant.user_id,
                 EngagementParticipant.engagement_id,
                 EngagementParticipant.engagement_date,
-                Engagement.questionnaire_reminder_1,
-                Engagement.questionnaire_reminder_2,
+                en_before.c.notification_services.label("qr_before_services"),
+                en_after.c.notification_services.label("qr_after_services"),
             )
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
+            .outerjoin(
+                en_before,
+                en_before.c.engagement_id == Engagement.engagement_id,
+            )
+            .outerjoin(
+                en_after,
+                en_after.c.engagement_id == Engagement.engagement_id,
+            )
             .where(self._scheduled_or_running_engagement_status_filter())
             .where(EngagementParticipant.engagement_date.in_(target_dates))
             .distinct()
@@ -1043,27 +1093,38 @@ class EngagementsRepository:
         )
         result = await db.execute(query)
         return [
-            (int(row.user_id), int(row.engagement_id), row.engagement_date, row.questionnaire_reminder_1, row.questionnaire_reminder_2)
+            (
+                int(row.user_id),
+                int(row.engagement_id),
+                row.engagement_date,
+                list(row.qr_before_services or []),
+                list(row.qr_after_services or []),
+            )
             for row in result.all()
         ]
 
     async def list_participants_for_consultation_notification(
         self,
         db: AsyncSession,
-    ) -> list[tuple[int, int, str | None]]:
-        """Return (user_id, engagement_id, notify_users_for_consultation) for eligible participants.
+    ) -> list[tuple[int, int, list[str]]]:
+        """Return (user_id, engagement_id, service_keys) for eligible participants.
 
-        Eligible when engagement is scheduled/running, home collection, BioAI or blood test
-        with consultation, notification keys configured, and the matching report is ready
-        on any individual_health_report row for that participant.
+        Eligible when engagement is scheduled/running, home collection, has consultation_ready
+        notification configured, and the matching report is ready on any individual_health_report
+        row for that participant.
         """
+        from modules.engagements.models import AutoNotificationEvent, EngagementNotification, EngagementType
+
+        bio_ai_type = select(EngagementType.id).where(EngagementType.code == "bio_ai_with_consultation").scalar_subquery()
+        blood_type = select(EngagementType.id).where(EngagementType.code == "blood_test_with_consultation").scalar_subquery()
+
         bio_ai_ready = and_(
-            Engagement.engagement_type == EngagementKind.bio_ai_with_consultation,
+            Engagement.engagement_type == bio_ai_type,
             IndividualHealthReport.reports.isnot(None),
             IndividualHealthReport.report_url.isnot(None),
         )
         blood_ready = and_(
-            Engagement.engagement_type == EngagementKind.blood_test_with_consultation,
+            Engagement.engagement_type == blood_type,
             IndividualHealthReport.blood_report_raw.isnot(None),
             IndividualHealthReport.diagnostic_report_url.isnot(None),
         )
@@ -1071,9 +1132,17 @@ class EngagementsRepository:
             select(
                 EngagementParticipant.user_id,
                 EngagementParticipant.engagement_id,
-                Engagement.notify_users_for_consultation,
+                EngagementNotification.notification_services,
             )
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
+            .join(
+                EngagementNotification,
+                EngagementNotification.engagement_id == Engagement.engagement_id,
+            )
+            .join(
+                AutoNotificationEvent,
+                AutoNotificationEvent.id == EngagementNotification.notification_event_id,
+            )
             .join(
                 IndividualHealthReport,
                 and_(
@@ -1083,16 +1152,8 @@ class EngagementsRepository:
             )
             .where(self._scheduled_or_running_engagement_status_filter())
             .where(Engagement.blood_collection_type == BloodCollectionType.home_collection)
-            .where(
-                Engagement.engagement_type.in_(
-                    (
-                        EngagementKind.bio_ai_with_consultation,
-                        EngagementKind.blood_test_with_consultation,
-                    )
-                )
-            )
-            .where(Engagement.notify_users_for_consultation.isnot(None))
-            .where(func.trim(Engagement.notify_users_for_consultation) != "")
+            .where(Engagement.engagement_type.in_([bio_ai_type, blood_type]))
+            .where(AutoNotificationEvent.event_code == "consultation_ready")
             .where(or_(bio_ai_ready, blood_ready))
             .distinct()
             .order_by(
@@ -1102,6 +1163,6 @@ class EngagementsRepository:
         )
         result = await db.execute(query)
         return [
-            (int(row.user_id), int(row.engagement_id), row.notify_users_for_consultation)
+            (int(row.user_id), int(row.engagement_id), list(row.notification_services or []))
             for row in result.all()
         ]

@@ -52,6 +52,7 @@ def _engagement_to_dict(
     *,
     readiness=None,
     participant_count: int | None = None,
+    notifications: list[dict] | None = None,
 ) -> dict:
     data = {
         "engagement_id": engagement.engagement_id,
@@ -60,7 +61,7 @@ def _engagement_to_dict(
         "organization_id": engagement.organization_id,
         "camp_no": engagement.camp_no,
         "engagement_code": engagement.engagement_code,
-        "engagement_type": engagement.engagement_type.value if engagement.engagement_type else None,
+        "engagement_type": engagement.engagement_type,
         "consultations": engagement.consultations,
         "assessment_package_id": engagement.assessment_package_id,
         "diagnostic_package_id": engagement.diagnostic_package_id,
@@ -84,13 +85,7 @@ def _engagement_to_dict(
         "blood_collection_type": engagement.blood_collection_type.value if engagement.blood_collection_type else None,
         "create_profile_on_metsights": engagement.create_profile_on_metsights,
         "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
-        "onboarding_notification": engagement.onboarding_notification,
-        "pretest_guidelines_notification": engagement.pretest_guidelines_notification,
-        "questionnaire_reminder_1": engagement.questionnaire_reminder_1,
-        "questionnaire_reminder_2": engagement.questionnaire_reminder_2,
-        "blood_report_notification": engagement.blood_report_notification,
-        "bioai_report_notification": engagement.bioai_report_notification,
-        "notify_users_for_consultation": engagement.notify_users_for_consultation,
+        "notifications": notifications or [],
     }
     if readiness is not None:
         data["readiness"] = readiness.model_dump(mode="json")

@@ -9,8 +9,8 @@ where today >= engagement_date:
 3. After a successful blood load, draft blood-parameter questionnaire responses.
 4. Push blood parameters to Metsights when BioAI report is not yet generated.
 5. Notifications only when full_report is true, and only when both blood fields
-   are present, using engagement.blood_report_notification (skipping services
-   already sent).
+   are present, using engagement_notifications for blood_report_ready event
+   (skipping services already sent).
 """
 
 from __future__ import annotations
@@ -134,11 +134,23 @@ async def _get_eligible_participants(
 
     Returns tuples of:
     (user_id, engagement_id, record_id, first_name, last_name,
-     blood_parameters, diagnostic_report_url, blood_report_notification, ihr_id, instance_id,
+     blood_parameters, diagnostic_report_url, blood_report_services, ihr_id, instance_id,
      diagnostic_package_id, participant_booking_id, diagnostic_provider,
      package_code, assessment_type_code, blood_parameters_full_report,
      blood_parameters_verified_at)
     """
+    from modules.engagements.models import AutoNotificationEvent, EngagementNotification
+
+    en_sub = (
+        select(
+            EngagementNotification.engagement_id,
+            EngagementNotification.notification_services,
+        )
+        .join(AutoNotificationEvent, AutoNotificationEvent.id == EngagementNotification.notification_event_id)
+        .where(AutoNotificationEvent.event_code == "blood_report_ready")
+        .subquery("en_blood")
+    )
+
     query = (
         select(
             EngagementParticipant.user_id,
@@ -148,7 +160,7 @@ async def _get_eligible_participants(
             User.last_name,
             IndividualHealthReport.blood_parameters,
             IndividualHealthReport.diagnostic_report_url,
-            Engagement.blood_report_notification,
+            en_sub.c.notification_services.label("blood_report_services"),
             IndividualHealthReport.report_id,
             AssessmentInstance.assessment_instance_id,
             Engagement.diagnostic_package_id,
@@ -175,6 +187,10 @@ async def _get_eligible_participants(
             IndividualHealthReport,
             IndividualHealthReport.assessment_instance_id
             == AssessmentInstance.assessment_instance_id,
+        )
+        .outerjoin(
+            en_sub,
+            en_sub.c.engagement_id == Engagement.engagement_id,
         )
         .where(Engagement.status.ilike("running"))
         .where(EngagementParticipant.engagement_date <= today)
@@ -295,7 +311,7 @@ async def load_blood_reports(
                 user_id, engagement_id, record_id,
                 first_name, last_name,
                 blood_params, diag_url,
-                blood_report_notification, ihr_id, instance_id,
+                blood_report_services, ihr_id, instance_id,
                 diagnostic_package_id, participant_booking_id, diagnostic_provider,
                 package_code, assessment_type_code,
                 stored_full_report, stored_verified_at,
@@ -700,9 +716,7 @@ async def load_blood_reports(
                     })
                     continue
 
-                service_keys = [
-                    k.strip() for k in (blood_report_notification or "").split(",") if k.strip()
-                ]
+                service_keys = list(blood_report_services or [])
                 if not service_keys:
                     skipped += 1
                     details.append({

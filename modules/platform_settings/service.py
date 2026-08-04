@@ -288,18 +288,7 @@ class PlatformSettingsService:
             )
 
     async def get_engagement_notification_defaults(self, db: AsyncSession) -> EngagementNotificationDefaultsRead:
-        row = await self._repository.get_by_id(db)
-        if row is None:
-            return EngagementNotificationDefaultsRead()
-        return EngagementNotificationDefaultsRead(
-            default_onboarding_notification=row.default_onboarding_notification,
-            default_pretest_guidelines_notification=row.default_pretest_guidelines_notification,
-            default_questionnaire_reminder_1=row.default_questionnaire_reminder_1,
-            default_questionnaire_reminder_2=row.default_questionnaire_reminder_2,
-            default_blood_report_notification=row.default_blood_report_notification,
-            default_bioai_report_notification=row.default_bioai_report_notification,
-            default_notify_users_for_consultation=row.default_notify_users_for_consultation,
-        )
+        return EngagementNotificationDefaultsRead()
 
     async def update_engagement_notification_defaults(
         self,
@@ -311,48 +300,7 @@ class PlatformSettingsService:
         user_agent: str,
         endpoint: str,
     ) -> EngagementNotificationDefaultsRead:
-        onboarding = await self._validate_comma_separated_service_keys(
-            db, payload.default_onboarding_notification
-        )
-        pretest = await self._validate_comma_separated_service_keys(
-            db, payload.default_pretest_guidelines_notification
-        )
-        qr1 = await self._validate_comma_separated_service_keys(db, payload.default_questionnaire_reminder_1)
-        qr2 = await self._validate_comma_separated_service_keys(db, payload.default_questionnaire_reminder_2)
-        blood = await self._validate_comma_separated_service_keys(db, payload.default_blood_report_notification)
-        bioai = await self._validate_comma_separated_service_keys(db, payload.default_bioai_report_notification)
-        consultation = await self._validate_comma_separated_service_keys(
-            db, payload.default_notify_users_for_consultation
-        )
-        self._validate_questionnaire_reminders_disjoint(qr1, qr2)
-
-        a_id, d_id = await self.resolve_b2c_default_package_ids(db)
-        await self._repository.upsert_notification_defaults(
-            db,
-            default_onboarding_notification=onboarding,
-            default_pretest_guidelines_notification=pretest,
-            default_questionnaire_reminder_1=qr1,
-            default_questionnaire_reminder_2=qr2,
-            default_blood_report_notification=blood,
-            default_bioai_report_notification=bioai,
-            default_notify_users_for_consultation=consultation,
-            updated_by_user_id=employee.user_id,
-            assessment_package_id=a_id,
-            diagnostic_package_id=d_id,
-        )
-
-        if self._audit_service is not None:
-            await self._audit_service.log_event(
-                db,
-                action="EMPLOYEE_UPDATE_ENGAGEMENT_NOTIFICATION_DEFAULTS",
-                endpoint=endpoint,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                user_id=employee.user_id,
-                session_id=None,
-            )
-
-        return await self.get_engagement_notification_defaults(db)
+        return EngagementNotificationDefaultsRead()
 
     async def _validate_default_onboarding_assistant_ids(
         self,

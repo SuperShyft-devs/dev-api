@@ -8,7 +8,14 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 from modules.checklists.schemas import ChecklistReadiness
-from modules.engagements.models import BloodCollectionType, EngagementKind, EngagementStatus
+from modules.engagements.models import BloodCollectionType, EngagementStatus
+
+
+class EngagementNotificationInput(BaseModel):
+    """A single notification event config for create/update."""
+
+    notification_event_id: int
+    notification_services: list[str] = Field(default_factory=list)
 
 
 class EngagementCreateRequest(BaseModel):
@@ -18,7 +25,7 @@ class EngagementCreateRequest(BaseModel):
     metsights_engagement_id: Optional[str] = Field(default=None, max_length=200)
     organization_id: int = Field(gt=0)
     camp_no: Optional[int] = None
-    engagement_type: EngagementKind
+    engagement_type: int = Field(gt=0)
     consultations: Optional[dict[str, bool]] = None
     engagement_code: Optional[str] = Field(default=None, max_length=50)
     assessment_package_id: Optional[int] = Field(default=None, gt=0)
@@ -40,13 +47,7 @@ class EngagementCreateRequest(BaseModel):
     blood_collection_type: Optional[BloodCollectionType] = None
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
-    onboarding_notification: str | None = Field(default=None, max_length=500)
-    pretest_guidelines_notification: str | None = Field(default=None, max_length=500)
-    questionnaire_reminder_1: str | None = Field(default=None, max_length=500)
-    questionnaire_reminder_2: str | None = Field(default=None, max_length=500)
-    blood_report_notification: str | None = Field(default=None, max_length=500)
-    bioai_report_notification: str | None = Field(default=None, max_length=500)
-    notify_users_for_consultation: str | None = Field(default=None, max_length=500)
+    notifications: list[EngagementNotificationInput] | None = None
 
 
 class EngagementUpdateRequest(BaseModel):
@@ -56,7 +57,7 @@ class EngagementUpdateRequest(BaseModel):
     engagement_code: str = Field(min_length=1, max_length=50)
     organization_id: Optional[int] = Field(default=None, gt=0)
     camp_no: Optional[int] = None
-    engagement_type: EngagementKind
+    engagement_type: int = Field(gt=0)
     consultations: Optional[dict[str, bool]] = None
     assessment_package_id: Optional[int] = Field(default=None, gt=0)
     diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
@@ -78,13 +79,7 @@ class EngagementUpdateRequest(BaseModel):
     metsights_engagement_id: Optional[str] = Field(default=None, max_length=200)
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
-    onboarding_notification: str | None = Field(default=None, max_length=500)
-    pretest_guidelines_notification: str | None = Field(default=None, max_length=500)
-    questionnaire_reminder_1: str | None = Field(default=None, max_length=500)
-    questionnaire_reminder_2: str | None = Field(default=None, max_length=500)
-    blood_report_notification: str | None = Field(default=None, max_length=500)
-    bioai_report_notification: str | None = Field(default=None, max_length=500)
-    notify_users_for_consultation: str | None = Field(default=None, max_length=500)
+    notifications: list[EngagementNotificationInput] | None = None
 
 
 class EngagementStatusUpdateRequest(BaseModel):
@@ -108,13 +103,20 @@ class ResolveHealthiansZoneResponse(BaseModel):
     message: str
 
 
+class EngagementNotificationOutput(BaseModel):
+    notification_event_id: int
+    event_code: str | None = None
+    event_display_name: str | None = None
+    notification_services: list[str] = Field(default_factory=list)
+
+
 class EngagementListItem(BaseModel):
     engagement_id: int
     engagement_name: Optional[str] = None
     organization_id: Optional[int] = None
     camp_no: Optional[int] = None
     engagement_code: str
-    engagement_type: Optional[str] = None
+    engagement_type: Optional[int] = None
     consultations: Optional[dict[str, bool]] = None
     assessment_package_id: Optional[int] = None
     diagnostic_package_id: Optional[int] = None
@@ -138,13 +140,7 @@ class EngagementListItem(BaseModel):
     blood_collection_type: Optional[str] = None
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
-    onboarding_notification: str | None = None
-    pretest_guidelines_notification: str | None = None
-    questionnaire_reminder_1: str | None = None
-    questionnaire_reminder_2: str | None = None
-    blood_report_notification: str | None = None
-    bioai_report_notification: str | None = None
-    notify_users_for_consultation: str | None = None
+    notifications: list[EngagementNotificationOutput] = Field(default_factory=list)
     readiness: ChecklistReadiness
 
 

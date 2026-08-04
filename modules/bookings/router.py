@@ -19,7 +19,6 @@ from modules.bookings.schemas import (
 )
 from modules.bookings import service as booking_service
 from modules.engagements.dependencies import get_engagements_repository, get_engagements_service
-from modules.engagements.models import EngagementKind
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService
 
@@ -58,7 +57,7 @@ async def book_bio_ai_batch(
         razorpay_order_id=payload.razorpay_order_id,
         razorpay_signature=payload.razorpay_signature,
         caller_user_id=current_user.user_id,
-        engagement_type=EngagementKind.bio_ai,
+        engagement_type_code="bio_ai",
         engagements_service=engagements_service,
     )
     await db.commit()
@@ -80,7 +79,7 @@ async def book_blood_test_batch(
         razorpay_order_id=payload.razorpay_order_id,
         razorpay_signature=payload.razorpay_signature,
         caller_user_id=current_user.user_id,
-        engagement_type=EngagementKind.blood_test,
+        engagement_type_code="blood_test",
         engagements_service=engagements_service,
     )
     await db.commit()

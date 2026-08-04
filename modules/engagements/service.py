@@ -33,7 +33,7 @@ from modules.employee.models import EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import compute_camp_no
-from modules.engagements.models import BloodCollectionType, Engagement, EngagementKind, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
+from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
 from modules.experts.consultation_bookings_repository import ConsultationBookingsRepository
 from modules.experts.consultations import bookings_to_consultations_map, empty_consent, normalize_consultations_map, normalize_consent
@@ -291,49 +291,6 @@ class EngagementsService:
                 ),
             )
 
-    async def _resolve_create_notification_fields(
-        self,
-        db: AsyncSession,
-        payload: EngagementCreateRequest,
-    ) -> tuple[str | None, str | None, str | None, str | None, str | None, str | None, str | None]:
-        settings = await self._platform_settings_repository.get_by_id(db)
-        onboarding_raw = payload.onboarding_notification
-        if onboarding_raw is None and settings is not None:
-            onboarding_raw = settings.default_onboarding_notification
-
-        pretest_raw = payload.pretest_guidelines_notification
-        if pretest_raw is None and settings is not None:
-            pretest_raw = settings.default_pretest_guidelines_notification
-
-        qr1_raw = payload.questionnaire_reminder_1
-        if qr1_raw is None and settings is not None:
-            qr1_raw = settings.default_questionnaire_reminder_1
-
-        qr2_raw = payload.questionnaire_reminder_2
-        if qr2_raw is None and settings is not None:
-            qr2_raw = settings.default_questionnaire_reminder_2
-
-        blood_raw = payload.blood_report_notification
-        if blood_raw is None and settings is not None:
-            blood_raw = settings.default_blood_report_notification
-
-        bioai_raw = payload.bioai_report_notification
-        if bioai_raw is None and settings is not None:
-            bioai_raw = settings.default_bioai_report_notification
-
-        consultation_raw = payload.notify_users_for_consultation
-        if consultation_raw is None and settings is not None:
-            consultation_raw = settings.default_notify_users_for_consultation
-
-        onboarding = await self._validate_comma_separated_service_keys(db, onboarding_raw)
-        pretest = await self._validate_comma_separated_service_keys(db, pretest_raw)
-        qr1 = await self._validate_comma_separated_service_keys(db, qr1_raw)
-        qr2 = await self._validate_comma_separated_service_keys(db, qr2_raw)
-        blood = await self._validate_comma_separated_service_keys(db, blood_raw)
-        bioai = await self._validate_comma_separated_service_keys(db, bioai_raw)
-        consultation = await self._validate_comma_separated_service_keys(db, consultation_raw)
-        self._validate_questionnaire_reminders_disjoint(qr1, qr2)
-        return onboarding, pretest, qr1, qr2, blood, bioai, consultation
 
     async def count_participants_for_engagement(self, db: AsyncSession, *, engagement_id: int) -> int:
         return await self._repository.count_distinct_participants_for_engagement(
@@ -428,10 +385,6 @@ class EngagementsService:
             else:
                 raise AppError(status_code=500, error_code="INTERNAL_ERROR", message="An unexpected error occurred")
 
-        onboarding, pretest_notif, qr1, qr2, blood_notif, bioai_notif, consultation_notif = (
-            await self._resolve_create_notification_fields(db, payload)
-        )
-
         initial_status = "running" if payload.start_date <= date.today() else "scheduled"
 
         engagement = Engagement(
@@ -462,16 +415,19 @@ class EngagementsService:
             blood_collection_type=payload.blood_collection_type,
             create_profile_on_metsights=payload.create_profile_on_metsights,
             enroll_for_fitprint_full=payload.enroll_for_fitprint_full,
-            onboarding_notification=onboarding,
-            pretest_guidelines_notification=pretest_notif,
-            questionnaire_reminder_1=qr1,
-            questionnaire_reminder_2=qr2,
-            blood_report_notification=blood_notif,
-            bioai_report_notification=bioai_notif,
-            notify_users_for_consultation=consultation_notif,
         )
 
         engagement = await self._repository.create_engagement(db, engagement)
+
+        from modules.engagement_notifications.repository import EngagementNotificationsRepository
+        en_repo = EngagementNotificationsRepository()
+        if payload.notifications is not None:
+            items = [{"notification_event_id": n.notification_event_id, "notification_services": n.notification_services} for n in payload.notifications]
+            await en_repo.upsert_for_engagement(db, engagement.engagement_id, items)
+        else:
+            await en_repo.populate_from_defaults(
+                db, engagement_id=engagement.engagement_id, engagement_type_id=payload.engagement_type
+            )
 
         audit = self._require_audit_service()
         await audit.log_event(
@@ -762,36 +718,14 @@ class EngagementsService:
         engagement.metsights_engagement_id = payload.metsights_engagement_id
         engagement.create_profile_on_metsights = payload.create_profile_on_metsights
         engagement.enroll_for_fitprint_full = payload.enroll_for_fitprint_full
-        onboarding_raw = payload.onboarding_notification
-        if onboarding_raw is None:
-            onboarding_raw = engagement.onboarding_notification
-        engagement.onboarding_notification = await self._validate_comma_separated_service_keys(
-            db, onboarding_raw
-        )
-        engagement.pretest_guidelines_notification = await self._validate_comma_separated_service_keys(
-            db, payload.pretest_guidelines_notification
-        )
-        engagement.questionnaire_reminder_1 = await self._validate_comma_separated_service_keys(
-            db, payload.questionnaire_reminder_1
-        )
-        engagement.questionnaire_reminder_2 = await self._validate_comma_separated_service_keys(
-            db, payload.questionnaire_reminder_2
-        )
-        self._validate_questionnaire_reminders_disjoint(
-            engagement.questionnaire_reminder_1,
-            engagement.questionnaire_reminder_2,
-        )
-        engagement.blood_report_notification = await self._validate_comma_separated_service_keys(
-            db, payload.blood_report_notification
-        )
-        engagement.bioai_report_notification = await self._validate_comma_separated_service_keys(
-            db, payload.bioai_report_notification
-        )
-        engagement.notify_users_for_consultation = await self._validate_comma_separated_service_keys(
-            db, payload.notify_users_for_consultation
-        )
 
         engagement = await self._repository.update_engagement(db, engagement)
+
+        if payload.notifications is not None:
+            from modules.engagement_notifications.repository import EngagementNotificationsRepository
+            en_repo = EngagementNotificationsRepository()
+            items = [{"notification_event_id": n.notification_event_id, "notification_services": n.notification_services} for n in payload.notifications]
+            await en_repo.upsert_for_engagement(db, engagement.engagement_id, items)
 
         audit = self._require_audit_service()
         await audit.log_event(
@@ -904,7 +838,7 @@ class EngagementsService:
         city: str | None,
         assessment_package_id: int | None,
         diagnostic_package_id: int | None = None,
-        engagement_type: EngagementKind = EngagementKind.bio_ai,
+        engagement_type: int | None = None,
         blood_collection_type: BloodCollectionType | None = None,
         consultations: dict | None = None,
         address: str | None = None,
@@ -944,23 +878,6 @@ class EngagementsService:
             longitude=longitude,
         )
 
-        settings = await self._platform_settings_repository.get_by_id(db)
-        onboarding = settings.default_onboarding_notification if settings else None
-        pretest = settings.default_pretest_guidelines_notification if settings else None
-        qr1 = settings.default_questionnaire_reminder_1 if settings else None
-        qr2 = settings.default_questionnaire_reminder_2 if settings else None
-        blood = settings.default_blood_report_notification if settings else None
-        bioai = settings.default_bioai_report_notification if settings else None
-        consultation = settings.default_notify_users_for_consultation if settings else None
-        onboarding = await self._validate_comma_separated_service_keys(db, onboarding)
-        pretest = await self._validate_comma_separated_service_keys(db, pretest)
-        qr1 = await self._validate_comma_separated_service_keys(db, qr1)
-        qr2 = await self._validate_comma_separated_service_keys(db, qr2)
-        blood = await self._validate_comma_separated_service_keys(db, blood)
-        bioai = await self._validate_comma_separated_service_keys(db, bioai)
-        consultation = await self._validate_comma_separated_service_keys(db, consultation)
-        self._validate_questionnaire_reminders_disjoint(qr1, qr2)
-
         engagement = Engagement(
             engagement_name=engagement_name,
             metsights_engagement_id=None,
@@ -987,15 +904,15 @@ class EngagementsService:
             status="scheduled",
             create_profile_on_metsights=create_profile_on_metsights,
             enroll_for_fitprint_full=enroll_for_fitprint_full,
-            onboarding_notification=onboarding,
-            pretest_guidelines_notification=pretest,
-            questionnaire_reminder_1=qr1,
-            questionnaire_reminder_2=qr2,
-            blood_report_notification=blood,
-            bioai_report_notification=bioai,
-            notify_users_for_consultation=consultation,
         )
         engagement = await self._repository.create_engagement(db, engagement)
+
+        from modules.engagement_notifications.repository import EngagementNotificationsRepository
+        en_repo = EngagementNotificationsRepository()
+        if engagement_type:
+            await en_repo.populate_from_defaults(
+                db, engagement_id=engagement.engagement_id, engagement_type_id=engagement_type
+            )
 
         await self._assign_default_onboarding_assistants(
             db,
@@ -1026,30 +943,12 @@ class EngagementsService:
             if current_name.endswith("-draft"):
                 engagement.engagement_name = f"{name_part}-{collection_date.isoformat()}"
 
-        settings = await self._platform_settings_repository.get_by_id(db)
-        onboarding = settings.default_onboarding_notification if settings else None
-        pretest = settings.default_pretest_guidelines_notification if settings else None
-        qr1 = settings.default_questionnaire_reminder_1 if settings else None
-        qr2 = settings.default_questionnaire_reminder_2 if settings else None
-        blood = settings.default_blood_report_notification if settings else None
-        bioai = settings.default_bioai_report_notification if settings else None
-        consultation = settings.default_notify_users_for_consultation if settings else None
-        onboarding = await self._validate_comma_separated_service_keys(db, onboarding)
-        pretest = await self._validate_comma_separated_service_keys(db, pretest)
-        qr1 = await self._validate_comma_separated_service_keys(db, qr1)
-        qr2 = await self._validate_comma_separated_service_keys(db, qr2)
-        blood = await self._validate_comma_separated_service_keys(db, blood)
-        bioai = await self._validate_comma_separated_service_keys(db, bioai)
-        consultation = await self._validate_comma_separated_service_keys(db, consultation)
-        self._validate_questionnaire_reminders_disjoint(qr1, qr2)
-
-        engagement.onboarding_notification = onboarding
-        engagement.pretest_guidelines_notification = pretest
-        engagement.questionnaire_reminder_1 = qr1
-        engagement.questionnaire_reminder_2 = qr2
-        engagement.blood_report_notification = blood
-        engagement.bioai_report_notification = bioai
-        engagement.notify_users_for_consultation = consultation
+        from modules.engagement_notifications.repository import EngagementNotificationsRepository
+        en_repo = EngagementNotificationsRepository()
+        if engagement.engagement_type:
+            await en_repo.populate_from_defaults(
+                db, engagement_id=engagement.engagement_id, engagement_type_id=engagement.engagement_type
+            )
 
         await self._assign_default_onboarding_assistants(
             db,
