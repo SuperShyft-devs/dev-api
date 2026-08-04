@@ -16,8 +16,6 @@ from modules.platform_settings.schemas import (
     B2cOnboardingDefaultsUpdate,
     DefaultOnboardingAssistantsRead,
     DefaultOnboardingAssistantsUpdate,
-    EngagementNotificationDefaultsRead,
-    EngagementNotificationDefaultsUpdate,
     EngagementsSyncImportPageRequest,
     MetsightsProfilesImportPageRequest,
     SupportQueryNotificationRead,
@@ -69,35 +67,8 @@ async def patch_b2c_onboarding_defaults(
     return success_response(data.model_dump(mode="json"))
 
 
-@router.get("/engagement-notification-defaults")
-async def get_engagement_notification_defaults(
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    service: PlatformSettingsService = Depends(get_platform_settings_service),
-):
-    _ = employee
-    data = await service.get_engagement_notification_defaults(db)
-    return success_response(data.model_dump())
-
-
-@router.patch("/engagement-notification-defaults")
-async def patch_engagement_notification_defaults(
-    payload: EngagementNotificationDefaultsUpdate,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    service: PlatformSettingsService = Depends(get_platform_settings_service),
-):
-    data: EngagementNotificationDefaultsRead = await service.update_engagement_notification_defaults(
-        db,
-        employee=employee,
-        payload=payload,
-        ip_address=_client_ip(request),
-        user_agent=request.headers.get("User-Agent", "unknown"),
-        endpoint=str(request.url.path),
-    )
-    await db.commit()
-    return success_response(data.model_dump())
+# Engagement notification defaults are served by modules.engagement_notifications.router
+# at GET/PUT /platform-settings/engagement-notification-defaults (per engagement_type_id).
 
 
 @router.get("/default-onboarding-assistants")

@@ -21,7 +21,7 @@ class NotificationEventsRepository:
         query = select(AutoNotificationEvent).order_by(AutoNotificationEvent.id.asc())
         if engagement_type_id is not None:
             query = query.where(
-                AutoNotificationEvent.engagement_type_ids.any(engagement_type_id)
+                AutoNotificationEvent.engagement_type_ids.contains([engagement_type_id])
             )
         result = await db.execute(query)
         return list(result.scalars().all())
