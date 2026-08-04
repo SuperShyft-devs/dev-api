@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections.abc import Callable, Coroutine
 from datetime import date, datetime, timezone
 from typing import Any
@@ -1608,6 +1609,47 @@ class ReportsService:
         "sickness_frequency",
     ]
 
+    async def _persist_nutrition_sync_log(
+        self,
+        *,
+        engagement_id: int | None,
+        user_id: int | None,
+        payload: dict[str, Any],
+        status: str,
+        response_payload: dict[str, Any] | None = None,
+        error_message: str | None = None,
+        sync_log_id: int | None = None,
+    ) -> int:
+        """Write nutrition sync log on its own session so failures still persist after request rollback."""
+        audit_repo = AuditRepository()
+        async with self._session_factory() as audit_db:
+            if sync_log_id is None:
+                sync_log = await audit_repo.create_sync_log(
+                    audit_db,
+                    IntegrationSyncLog(
+                        engagement_id=engagement_id,
+                        user_id=user_id,
+                        provider="nutrition_api",
+                        api_endpoint_url=settings.NUTRITION_API_URL,
+                        request_payload=payload,
+                        status=status,
+                        response_payload=response_payload,
+                        error_message=error_message,
+                    ),
+                )
+                await audit_db.commit()
+                return int(sync_log.sync_log_id)
+
+            await audit_repo.update_sync_log_status(
+                audit_db,
+                sync_log_id=sync_log_id,
+                status=status,
+                response_payload=response_payload,
+                error_message=error_message,
+            )
+            await audit_db.commit()
+            return sync_log_id
+
     async def _call_nutrition_api(
         self,
         db: AsyncSession,
@@ -1616,17 +1658,13 @@ class ReportsService:
         user_id: int | None = None,
         engagement_id: int | None = None,
     ) -> dict[str, Any]:
-        audit_repo = AuditRepository()
-        sync_log = await audit_repo.create_sync_log(
-            db,
-            IntegrationSyncLog(
-                engagement_id=engagement_id,
-                user_id=user_id,
-                provider="nutrition_api",
-                api_endpoint_url=settings.NUTRITION_API_URL,
-                request_payload=payload,
-                status="pending",
-            ),
+        # `db` is unused for logging on purpose: request rollback must not erase sync logs.
+        _ = db
+        sync_log_id = await self._persist_nutrition_sync_log(
+            engagement_id=engagement_id,
+            user_id=user_id,
+            payload=payload,
+            status="pending",
         )
 
         try:
@@ -1639,11 +1677,13 @@ class ReportsService:
                 response.raise_for_status()
                 data = response.json()
                 response_payload = data if isinstance(data, dict) else {}
-                await audit_repo.update_sync_log_status(
-                    db,
-                    sync_log_id=sync_log.sync_log_id,
+                await self._persist_nutrition_sync_log(
+                    engagement_id=engagement_id,
+                    user_id=user_id,
+                    payload=payload,
                     status="success",
                     response_payload=response_payload,
+                    sync_log_id=sync_log_id,
                 )
                 return response_payload
         except httpx.HTTPStatusError as exc:
@@ -1663,22 +1703,31 @@ class ReportsService:
                 except Exception:
                     detail = None
                 error_message = detail or "Nutrition API rejected request payload"
-                await audit_repo.update_sync_log_status(
-                    db,
-                    sync_log_id=sync_log.sync_log_id,
+                # Annotate which payload field likely caused the rejection.
+                for qkey, qval in payload.items():
+                    if str(qval) and str(qval) in error_message:
+                        error_message = f"[{qkey}] {error_message}"
+                        break
+                await self._persist_nutrition_sync_log(
+                    engagement_id=engagement_id,
+                    user_id=user_id,
+                    payload=payload,
                     status="failed",
                     error_message=error_message,
+                    sync_log_id=sync_log_id,
                 )
                 raise AppError(
                     status_code=400,
                     error_code="INVALID_INPUT",
                     message=error_message,
                 ) from exc
-            await audit_repo.update_sync_log_status(
-                db,
-                sync_log_id=sync_log.sync_log_id,
+            await self._persist_nutrition_sync_log(
+                engagement_id=engagement_id,
+                user_id=user_id,
+                payload=payload,
                 status="failed",
                 error_message=error_message,
+                sync_log_id=sync_log_id,
             )
             raise AppError(
                 status_code=503,
@@ -1686,11 +1735,13 @@ class ReportsService:
                 message="Nutrition API request failed",
             ) from exc
         except httpx.HTTPError as exc:
-            await audit_repo.update_sync_log_status(
-                db,
-                sync_log_id=sync_log.sync_log_id,
+            await self._persist_nutrition_sync_log(
+                engagement_id=engagement_id,
+                user_id=user_id,
+                payload=payload,
                 status="failed",
                 error_message=str(exc),
+                sync_log_id=sync_log_id,
             )
             raise AppError(
                 status_code=503,
@@ -1776,12 +1827,62 @@ class ReportsService:
             return "ft/in"
         return value.strip() or None
 
+    @staticmethod
+    def _normalize_choice_label(value: str) -> str:
+        text = (value or "").strip().lower()
+        text = text.replace("–", "-").replace("—", "-")
+        return re.sub(r"\s+", " ", text)
+
+    @staticmethod
+    def _choice_fingerprint(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", ReportsService._normalize_choice_label(value))
+
+    @staticmethod
+    def _resolve_nutrition_choice_value(raw: Any, key_map: dict[str, str]) -> str:
+        """Map stored questionnaire answers (codes or labels) to Nutrition option_value codes.
+
+        Live option display names may drift from imported Metsights labels
+        (e.g. stored ``Moderate-intensity`` vs option ``Moderate``).
+        """
+        if raw is None:
+            return ""
+        text = str(raw).strip()
+        if not text:
+            return text
+        if text in key_map:
+            return key_map[text]
+
+        fingerprint = ReportsService._choice_fingerprint(text)
+        if fingerprint and fingerprint in key_map:
+            return key_map[fingerprint]
+
+        normalized = ReportsService._normalize_choice_label(text)
+        best: str | None = None
+        best_score = -1
+        for key, option_value in key_map.items():
+            key_fp = ReportsService._choice_fingerprint(key)
+            if not key_fp:
+                continue
+            if fingerprint and (key_fp in fingerprint or fingerprint in key_fp):
+                score = min(len(key_fp), len(fingerprint))
+                if score > best_score:
+                    best = option_value
+                    best_score = score
+                    continue
+            key_norm = ReportsService._normalize_choice_label(key)
+            if key_norm and (key_norm in normalized or normalized in key_norm):
+                score = min(len(key_norm), len(normalized))
+                if score > best_score:
+                    best = option_value
+                    best_score = score
+        return best if best is not None else text
+
     async def _build_option_reverse_map(
         self,
         db: AsyncSession,
         key_to_question_id: dict[str, int],
     ) -> dict[str, dict[str, str]]:
-        """Build {question_key: {display_name: option_value}} for answer resolution."""
+        """Build {question_key: {label_or_code_or_fingerprint: option_value}} for answer resolution."""
         if self._questionnaire_repository is None or not key_to_question_id:
             return {}
 
@@ -1795,9 +1896,15 @@ class ReportsService:
             qkey = qid_to_key.get(int(opt.question_id))
             if qkey is None:
                 continue
-            if qkey not in reverse_map:
-                reverse_map[qkey] = {}
-            reverse_map[qkey][opt.display_name] = opt.option_value
+            bucket = reverse_map.setdefault(qkey, {})
+            option_value = str(opt.option_value)
+            display_name = str(opt.display_name) if opt.display_name is not None else ""
+            bucket[option_value] = option_value
+            if display_name:
+                bucket[display_name] = option_value
+                fingerprint = self._choice_fingerprint(display_name)
+                if fingerprint:
+                    bucket[fingerprint] = option_value
         return reverse_map
 
     def _build_nutrition_api_payload(self, lookup: dict[str, Any], *, user_gender: str | None = None, option_reverse_map: dict[str, dict[str, str]] | None = None) -> dict[str, Any]:
@@ -1808,9 +1915,9 @@ class ReportsService:
                 continue
             key_map = (option_reverse_map or {}).get(key, {})
             if isinstance(val, list):
-                payload[key] = [key_map.get(str(v), str(v)) for v in val]
+                payload[key] = [self._resolve_nutrition_choice_value(v, key_map) for v in val]
             else:
-                payload[key] = key_map.get(str(val), str(val))
+                payload[key] = self._resolve_nutrition_choice_value(val, key_map)
 
         # New nutrition API contract requires these identity/anthropometry fields.
         resolved_gender = self._normalize_gender(lookup.get("gender")) or self._normalize_gender(user_gender)

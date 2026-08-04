@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 import httpx
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from core.config import settings
 from core.exceptions import AppError
@@ -49,7 +50,7 @@ async def _seed_engagement(test_db_session, *, engagement_id: int):
     await test_db_session.commit()
 
 
-def _build_reports_service() -> ReportsService:
+def _build_reports_service(session_factory=None) -> ReportsService:
     return ReportsService(
         repository=ReportsRepository(),
         assessments_repository=AssessmentsRepository(),
@@ -57,6 +58,7 @@ def _build_reports_service() -> ReportsService:
         diagnostics_service=None,  # type: ignore[arg-type]
         audit_service=AuditService(AuditRepository()),
         questionnaire_repository=QuestionnaireRepository(),
+        session_factory=session_factory,
     )
 
 
@@ -102,7 +104,7 @@ def _fake_httpx_client_client_error():
             response = httpx.Response(
                 400,
                 request=request,
-                json={"detail": "invalid payload"},
+                json={"detail": "invalid literal for int() with base 10: 'Moderate-intensity'"},
             )
             raise httpx.HTTPStatusError("bad request", request=request, response=response)
 
@@ -111,7 +113,7 @@ def _fake_httpx_client_client_error():
 
 @pytest.mark.asyncio
 async def test_call_nutrition_api_creates_integration_sync_log_on_success(
-    test_db_session, monkeypatch
+    test_db_session, test_engine, monkeypatch
 ):
     await _seed_user(test_db_session, user_id=8801)
     await _seed_engagement(test_db_session, engagement_id=9901)
@@ -121,7 +123,8 @@ async def test_call_nutrition_api_creates_integration_sync_log_on_success(
         _fake_httpx_client_success(nutrition_score=82),
     )
 
-    service = _build_reports_service()
+    session_factory = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
+    service = _build_reports_service(session_factory=session_factory)
     response = await service._call_nutrition_api(
         test_db_session,
         payload,
@@ -129,7 +132,6 @@ async def test_call_nutrition_api_creates_integration_sync_log_on_success(
         engagement_id=9901,
     )
     assert response == {"nutrition_score": 82}
-    await test_db_session.commit()
 
     result = await test_db_session.execute(
         text(
@@ -151,18 +153,20 @@ async def test_call_nutrition_api_creates_integration_sync_log_on_success(
 
 
 @pytest.mark.asyncio
-async def test_call_nutrition_api_creates_integration_sync_log_on_failure(
-    test_db_session, monkeypatch
+async def test_call_nutrition_api_creates_integration_sync_log_on_failure_without_route_commit(
+    test_db_session, test_engine, monkeypatch
 ):
+    """Failed nutrition calls must persist sync logs even when the request session rolls back."""
     await _seed_user(test_db_session, user_id=8802)
     await _seed_engagement(test_db_session, engagement_id=9902)
-    payload = {"diet_preference": "invalid"}
+    payload = {"exercise_level": "Moderate-intensity"}
     monkeypatch.setattr(
         "modules.reports.service.httpx.AsyncClient",
         _fake_httpx_client_client_error(),
     )
 
-    service = _build_reports_service()
+    session_factory = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
+    service = _build_reports_service(session_factory=session_factory)
     with pytest.raises(AppError) as exc_info:
         await service._call_nutrition_api(
             test_db_session,
@@ -171,17 +175,78 @@ async def test_call_nutrition_api_creates_integration_sync_log_on_failure(
             engagement_id=9902,
         )
     assert exc_info.value.error_code == "INVALID_INPUT"
-    await test_db_session.commit()
+    assert "[exercise_level]" in exc_info.value.message
+
+    # Simulate route rollback of the request session (do NOT commit test_db_session).
+    await test_db_session.rollback()
 
     result = await test_db_session.execute(
         text(
             "SELECT status, error_message, response_payload, request_payload "
             "FROM integration_sync_logs WHERE provider = 'nutrition_api' "
+            "AND user_id = 8802 "
             "ORDER BY sync_log_id DESC LIMIT 1"
         )
     )
     row = result.mappings().one()
     assert row["status"] == "failed"
-    assert row["error_message"] == "invalid payload"
+    assert "Moderate-intensity" in (row["error_message"] or "")
     assert row["response_payload"] is None
     assert row["request_payload"] == payload
+
+
+def test_resolve_nutrition_choice_maps_label_variants_to_option_value():
+    key_map = {
+        "0": "0",
+        "1": "1",
+        "2": "2",
+        "Low": "0",
+        "Moderate": "1",
+        "High": "2",
+        "low": "0",
+        "moderate": "1",
+        "high": "2",
+    }
+
+    assert ReportsService._resolve_nutrition_choice_value("1", key_map) == "1"
+    assert ReportsService._resolve_nutrition_choice_value("Moderate", key_map) == "1"
+    assert ReportsService._resolve_nutrition_choice_value("Moderate-intensity", key_map) == "1"
+    assert ReportsService._resolve_nutrition_choice_value("Low-intensity", key_map) == "0"
+    assert ReportsService._resolve_nutrition_choice_value("High-intensity", key_map) == "2"
+
+
+def test_build_nutrition_api_payload_remaps_legacy_intensity_labels():
+    service = _build_reports_service()
+    reverse_map = {
+        "exercise_level": {
+            "0": "0",
+            "1": "1",
+            "2": "2",
+            "Low": "0",
+            "Moderate": "1",
+            "High": "2",
+            "low": "0",
+            "moderate": "1",
+            "high": "2",
+        },
+        "food_groups": {
+            "3": "3",
+            "Fresh vegetables": "3",
+            "freshvegetables": "3",
+        },
+    }
+    lookup = {
+        "exercise_level": "Moderate-intensity",
+        "food_groups": ["Fresh vegetables"],
+        "height": {"value": 175.0, "unit": "cm"},
+    }
+    payload = service._build_nutrition_api_payload(
+        lookup,
+        user_gender="female",
+        option_reverse_map=reverse_map,
+    )
+    assert payload["exercise_level"] == "1"
+    assert payload["food_groups"] == ["3"]
+    assert payload["height"] == 175
+    assert payload["height_unit"] == "cm"
+    assert payload["gender"] == "female"
