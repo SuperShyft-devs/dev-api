@@ -3139,7 +3139,7 @@ class UsersService:
                         slot_start_time=default_slot,
                         is_profile_created_on_metsights=True,
                         is_primary_record_id_synced=True,
-                        is_fitprint_record_id_synced=True,
+                        is_fitprint_record_id_synced=False,
                         booked_by_user_id=int(user.user_id),
                     )
 
