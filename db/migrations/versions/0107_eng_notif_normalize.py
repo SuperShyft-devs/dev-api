@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0107_engagement_notifications_restructure"
+revision = "0107_eng_notif_normalize"
 down_revision = "0106_b2c_by_engagement_type"
 branch_labels = None
 depends_on = None
