@@ -1639,6 +1639,242 @@ class QuestionnaireService:
             user_id=user_id,
         )
 
+    async def apply_onboard_questionnaire(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        assessment_instance_id: int,
+        questionnaire: dict[str, list[dict]],
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> None:
+        """Soft-save onboard questionnaire answers by category_key.
+
+        Unknown category keys (not on the assessment package) and question_ids that
+        do not belong to the category (or fail soft gates) are skipped. After
+        saving, category progress is synced; if every package category is complete,
+        the assessment instance is marked completed.
+        """
+        from modules.assessments.repository import AssessmentsRepository
+        from modules.questionnaire.models import QuestionnaireResponse
+
+        if not questionnaire:
+            return
+
+        assessments_repo = AssessmentsRepository()
+        row = await assessments_repo.get_instance_for_user(
+            db,
+            assessment_instance_id=assessment_instance_id,
+            user_id=user_id,
+        )
+        if row is None:
+            raise AppError(
+                status_code=404,
+                error_code="ASSESSMENT_NOT_FOUND",
+                message="Assessment does not exist",
+            )
+        instance, _package = row
+
+        current_status = (instance.status or "").lower()
+        if current_status == "completed":
+            return
+        if current_status != "active":
+            return
+
+        package_links = await assessments_repo.list_package_categories(
+            db, package_id=int(instance.package_id)
+        )
+        package_categories_by_key: dict[str, int] = {}
+        package_category_ids: list[int] = []
+        for link in package_links:
+            cid = int(link.category_id)
+            package_category_ids.append(cid)
+            category = await self._repository.get_category_by_id(db, category_id=cid)
+            if category is None:
+                continue
+            key = (category.category_key or "").strip()
+            if key:
+                package_categories_by_key[key] = cid
+
+        # Prefetch all existing responses once for cross-category visibility.
+        all_existing_responses = await self._repository.list_responses_for_instance(
+            db,
+            assessment_instance_id=instance.assessment_instance_id,
+        )
+        all_existing_qids = [int(r.question_id) for r in all_existing_responses]
+        all_qdefs_map = (
+            await self._repository.get_definitions_by_ids(db, question_ids=all_existing_qids)
+            if all_existing_qids
+            else {}
+        )
+        full_answers_by_key_for_vis: dict[str, object] = {}
+        for r in all_existing_responses:
+            qdef = all_qdefs_map.get(int(r.question_id))
+            if qdef is None:
+                continue
+            qkey = _normalize_text(qdef.question_key)
+            if qkey and r.answer is not None:
+                full_answers_by_key_for_vis[qkey] = r.answer
+
+        preferences = self._build_preferences_map(
+            await self._users_repository.get_preferences(db, user_id=user_id)
+        )
+
+        any_saved = False
+        for category_key, responses in questionnaire.items():
+            key = (category_key or "").strip()
+            if not key:
+                continue
+            category_id = package_categories_by_key.get(key)
+            if category_id is None:
+                continue
+            if not responses:
+                continue
+
+            category_question_rows = await self._repository.list_questions_by_category(
+                db, category_id=category_id
+            )
+            valid_question_ids = {int(row.question_id) for row in category_question_rows}
+            category_questions = await self._list_active_questions_for_category(
+                db, category_id=category_id
+            )
+            active_question_ids = {int(row["question_id"]) for row in category_questions}
+            questions_by_id = {int(row["question_id"]): row for row in category_questions}
+
+            # Incoming answers override stored ones for visibility within this pass.
+            for response_item in responses:
+                try:
+                    qid = int(response_item["question_id"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                qdef = questions_by_id.get(qid)
+                if qdef is None:
+                    continue
+                qkey = _normalize_text(qdef.get("question_key"))
+                if qkey:
+                    full_answers_by_key_for_vis[qkey] = response_item.get("answer")
+
+            existing_responses = [
+                r for r in all_existing_responses if int(r.category_id) == int(category_id)
+            ]
+            answers_for_visibility: dict[int, object] = {
+                int(row.question_id): row.answer for row in existing_responses
+            }
+            for response_item in responses:
+                try:
+                    qid = int(response_item["question_id"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                answers_for_visibility[qid] = response_item.get("answer")
+
+            visible_questions = self._compute_visibility_state(
+                questions=category_questions,
+                answers_by_question_id=answers_for_visibility,
+                preferences=preferences,
+                extra_answers_by_key=full_answers_by_key_for_vis,
+            )
+
+            accepted: list[dict] = []
+            for response_item in responses:
+                try:
+                    question_id = int(response_item["question_id"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if question_id not in valid_question_ids:
+                    continue
+                if question_id not in active_question_ids:
+                    continue
+                if not visible_questions.get(question_id, False):
+                    continue
+                question_def = questions_by_id.get(question_id)
+                if question_def is None:
+                    continue
+                if question_def.get("is_read_only"):
+                    continue
+                answer = response_item.get("answer")
+                if not self._try_validate_answer_by_type(question=question_def, answer=answer):
+                    continue
+                accepted.append({"question_id": question_id, "answer": answer})
+
+            for response_item in accepted:
+                question_id = response_item["question_id"]
+                answer = response_item["answer"]
+                existing = await self._repository.get_response_by_instance_and_question(
+                    db,
+                    assessment_instance_id=instance.assessment_instance_id,
+                    category_id=category_id,
+                    question_id=question_id,
+                )
+                if existing is not None:
+                    existing.answer = answer
+                    existing.submitted_at = None
+                    await self._repository.update_response(db, existing)
+                else:
+                    new_response = QuestionnaireResponse(
+                        assessment_instance_id=instance.assessment_instance_id,
+                        question_id=question_id,
+                        category_id=category_id,
+                        answer=answer,
+                        submitted_at=None,
+                    )
+                    await self._repository.create_response(db, new_response)
+                    all_existing_responses.append(new_response)
+                any_saved = True
+
+            await self._sync_category_progress_after_responses(
+                db,
+                instance=instance,
+                category_id=category_id,
+                user_id=user_id,
+            )
+
+        if any_saved:
+            audit = self._require_audit_service()
+            await audit.log_event(
+                db,
+                action="USER_PUBLIC_ONBOARD_QUESTIONNAIRE",
+                endpoint=endpoint,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                user_id=user_id,
+                session_id=None,
+            )
+
+        if not package_category_ids:
+            return
+
+        for category_id in package_category_ids:
+            if not await self.is_category_complete(
+                db,
+                assessment_instance_id=int(instance.assessment_instance_id),
+                category_id=category_id,
+                user_id=user_id,
+            ):
+                return
+
+        now = datetime.now(timezone.utc)
+        responses = await self._repository.list_responses_for_instance(
+            db,
+            assessment_instance_id=instance.assessment_instance_id,
+        )
+        for response in responses:
+            response.submitted_at = now
+            await self._repository.update_response(db, response)
+
+        instance.status = "completed"
+        instance.completed_at = now
+        await assessments_repo.update_instance(db, instance)
+
+    def _try_validate_answer_by_type(self, *, question: dict, answer: object) -> bool:
+        """Return True when answer passes type validation; never raises."""
+        try:
+            self._validate_answer_by_type(question=question, answer=answer)
+            return True
+        except AppError:
+            return False
+
     def _serialize_healthy_habit_rule(self, row: QuestionnaireHealthyHabitRule) -> dict:
         scale_min = row.scale_min
         scale_max = row.scale_max

@@ -7,8 +7,16 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, model_validator, validator
 
+from modules.questionnaire.schemas import ResponseItem
+
 _ALLOWED_DIET_PREFERENCES = {"veg", "non_veg", "vegan", "jain", "eggetarian", "keto"}
 _ALLOWED_ALLERGIES = {"peanuts", "dairy", "eggs", "fish", "soy", "wheat", "sesame", "mustard", "corn", "other"}
+
+
+class OnboardCategoryQuestionnaire(BaseModel):
+    """Per-category answers embedded in public onboard (same shape as PUT responses)."""
+
+    responses: list[ResponseItem] = Field(default_factory=list, max_length=500)
 
 
 class UserProfileResponse(BaseModel):
@@ -269,6 +277,9 @@ class PublicUserOnboardRequest(BaseModel):
     want_doctor_and_nutritionist_consultation: Optional[bool] = None
     # New field: { expert_type: { want, date, slot, expert_id } }
     consultations: Optional[dict[str, Any]] = None
+
+    # Optional: category_key -> { responses: [{ question_id, answer }, ...] }
+    questionnaire: Optional[dict[str, OnboardCategoryQuestionnaire]] = None
 
     @model_validator(mode="after")
     def require_personal_fields_without_user_id(self):

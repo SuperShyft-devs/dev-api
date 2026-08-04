@@ -31,6 +31,7 @@ def get_users_service() -> UsersService:
         metsights_service=get_metsights_service(),
         payments_service=PaymentsService(),
         notifications_service=get_notifications_service(),
+        questionnaire_service=get_questionnaire_user_service(),
     )
 
 

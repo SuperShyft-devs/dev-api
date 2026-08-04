@@ -190,6 +190,7 @@ class UsersService:
         metsights_service: MetsightsService | None = None,
         payments_service=None,
         notifications_service=None,
+        questionnaire_service=None,
     ):
         self._repository = repository
         self._audit_service = audit_service
@@ -199,6 +200,7 @@ class UsersService:
         self._metsights_service = metsights_service
         self._payments_service = payments_service
         self._notifications_service = notifications_service
+        self._questionnaire_service = questionnaire_service
 
     async def get_existing_user_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
         return await self._repository.get_user_by_phone(db, phone)
@@ -1905,6 +1907,30 @@ class UsersService:
             user_agent=user_agent,
             endpoint=endpoint,
         )
+
+        if payload.questionnaire and self._questionnaire_service is not None:
+            questionnaire_payload: dict[str, list[dict]] = {}
+            for category_key, category_payload in payload.questionnaire.items():
+                questionnaire_payload[category_key] = [
+                    {"question_id": item.question_id, "answer": item.normalized_answer()}
+                    for item in category_payload.responses
+                ]
+            if any(questionnaire_payload.values()):
+                await self._questionnaire_service.apply_onboard_questionnaire(
+                    db,
+                    user_id=int(user.user_id),
+                    assessment_instance_id=int(assessment_instance.assessment_instance_id),
+                    questionnaire=questionnaire_payload,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    endpoint=endpoint,
+                )
+                # Re-load in case status was auto-completed.
+                refreshed = await self._assessments_service.get_instance_by_id(
+                    db, assessment_instance_id=int(assessment_instance.assessment_instance_id)
+                )
+                if refreshed is not None:
+                    assessment_instance = refreshed
 
         if engagement.create_profile_on_metsights:
             await self._ensure_metsights_profile_id(db, user=user)
