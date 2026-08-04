@@ -169,7 +169,7 @@ async def test_engagements_sync_import_page_creates_engagement_and_skips_fitprin
     assert eng[0].blood_collection_type == "home_collection"
     assert eng[0].status == "completed"
     assert eng[0].is_primary_record_id_synced is True
-    assert eng[0].is_fitprint_record_id_synced is True
+    assert eng[0].is_fitprint_record_id_synced is False
 
     # Second pass should skip already-imported record
     response2 = await async_client.post(
