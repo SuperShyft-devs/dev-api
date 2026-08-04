@@ -354,10 +354,8 @@ def upgrade() -> None:
     op.drop_column("engagements", "engagement_type")
     op.alter_column("engagements", "engagement_type_id", new_column_name="engagement_type")
 
-    # ------------------------------------------------------------------
-    # 14. Drop the enum type
-    # ------------------------------------------------------------------
-    sa.Enum(name="engagement_kind").drop(op.get_bind(), checkfirst=True)
+    # NOTE: Do NOT drop the engagement_kind enum type here.
+    # platform_settings.b2c_default_engagement_type still depends on it.
 
 
 def downgrade() -> None:
