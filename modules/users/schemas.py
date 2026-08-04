@@ -256,8 +256,9 @@ class PublicUserOnboardRequest(BaseModel):
     # Must match an active row in engagement_types.code (validated in service).
     engagement_type: str = Field(default="bio_ai", min_length=1, max_length=100)
 
-    blood_collection_date: date
-    blood_collection_time_slot: str = Field(min_length=1, max_length=20)
+    # Optional only when engagement_type is "vifc"; required for all other types.
+    blood_collection_date: Optional[date] = None
+    blood_collection_time_slot: Optional[str] = Field(default=None, min_length=1, max_length=20)
 
     participants_employee_id: Optional[str] = Field(default=None, max_length=100)
     participant_department: Optional[str] = Field(default=None, max_length=100)
@@ -279,6 +280,18 @@ class PublicUserOnboardRequest(BaseModel):
             raise ValueError("age is required when user_id is not provided")
         if self.age < 1 or self.age > 120:
             raise ValueError("Age must be between 1 and 120")
+        return self
+
+    @model_validator(mode="after")
+    def require_blood_fields_unless_vifc(self):
+        if (self.engagement_type or "").strip().lower() == "vifc":
+            return self
+        if self.blood_collection_date is None:
+            raise ValueError("blood_collection_date is required")
+        slot = (self.blood_collection_time_slot or "").strip()
+        if not slot:
+            raise ValueError("blood_collection_time_slot is required")
+        self.blood_collection_time_slot = slot
         return self
 
     @model_validator(mode="after")

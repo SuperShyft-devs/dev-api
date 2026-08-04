@@ -31,6 +31,57 @@ async def test_public_onboard_requires_blood_fields(async_client, test_db_sessio
 
 
 @pytest.mark.asyncio
+async def test_public_onboard_vifc_allows_missing_blood_fields(async_client, test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagement_types (code, display_name, is_active) "
+            "VALUES ('vifc', 'Aurae - Face Scan', true) "
+            "ON CONFLICT (code) DO UPDATE SET display_name = EXCLUDED.display_name, is_active = true"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 22,
+        "first_name": "Vifc",
+        "last_name": "User",
+        "email": "vifc.user@example.com",
+        "phone": "8762830757",
+        "gender": "male",
+        "city": "Mumbai",
+        "engagement_type": "vifc",
+    }
+
+    response = await async_client.post("/users/public/onboard", json=payload)
+    assert response.status_code == 200
+    data = response.json()["data"]
+
+    participant_row = (
+        await test_db_session.execute(
+            text(
+                "SELECT engagement_date, slot_start_time "
+                "FROM engagement_participants WHERE engagement_participant_id = :epid"
+            ),
+            {"epid": data["engagement_participant_id"]},
+        )
+    ).first()
+    assert participant_row.engagement_date is None
+    assert participant_row.slot_start_time is None
+
+
+@pytest.mark.asyncio
 async def test_public_onboard_requires_phone_and_age_without_user_id(async_client, test_db_session):
     payload = {
         "blood_collection_date": "2026-02-01",

@@ -1683,8 +1683,8 @@ class UsersService:
             "gender": str(payload.gender or ""),
             "address": str(payload.address or ""),
             "pincode": str(payload.pincode or ""),
-            "collection_date": str(payload.blood_collection_date),
-            "collection_time": str(payload.blood_collection_time_slot),
+            "collection_date": str(payload.blood_collection_date or ""),
+            "collection_time": str(payload.blood_collection_time_slot or ""),
             "engagement": source,
             "participant_user_id": str(participant_user_id),
         }
@@ -1850,7 +1850,7 @@ class UsersService:
         engagement = await self._engagements_service.create_b2c_engagement(
             db,
             user_first_name=user.first_name,
-            engagement_date=payload.blood_collection_date,
+            engagement_date=payload.blood_collection_date or date.today(),
             city=engagement_city,
             assessment_package_id=assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
@@ -1874,7 +1874,11 @@ class UsersService:
             engagement.consultations,
         )
 
-        slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
+        slot_start = (
+            self._parse_time_slot(payload.blood_collection_time_slot)
+            if payload.blood_collection_time_slot
+            else None
+        )
         time_slot = await self._engagements_service.enroll_user_in_engagement(
             db,
             engagement=engagement,
@@ -2005,8 +2009,8 @@ class UsersService:
                 engagement=engagement,
                 user=user,
                 source="public",
-                collection_date=str(payload.blood_collection_date),
-                collection_time=str(payload.blood_collection_time_slot),
+                collection_date=str(payload.blood_collection_date or ""),
+                collection_time=str(payload.blood_collection_time_slot or ""),
             )
         else:
             await self._notify_onboarding_assistants(
