@@ -7,8 +7,6 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, model_validator, validator
 
-from modules.engagements.models import EngagementKind  # kept for backward compat in B2C schema
-
 _ALLOWED_DIET_PREFERENCES = {"veg", "non_veg", "vegan", "jain", "eggetarian", "keto"}
 _ALLOWED_ALLERGIES = {"peanuts", "dairy", "eggs", "fish", "soy", "wheat", "sesame", "mustard", "corn", "other"}
 
@@ -255,7 +253,8 @@ class PublicUserOnboardRequest(BaseModel):
     state: Optional[str] = Field(default=None, max_length=100)
     country: Optional[str] = Field(default=None, max_length=100)
 
-    engagement_type: EngagementKind = EngagementKind.bio_ai
+    # Must match an active row in engagement_types.code (validated in service).
+    engagement_type: str = Field(default="bio_ai", min_length=1, max_length=100)
 
     blood_collection_date: date
     blood_collection_time_slot: str = Field(min_length=1, max_length=20)

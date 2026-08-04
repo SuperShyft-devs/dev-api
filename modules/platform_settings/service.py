@@ -139,8 +139,13 @@ class PlatformSettingsService:
     async def resolve_b2c_onboarding_defaults(
         self,
         db: AsyncSession,
-        engagement_type: EngagementKind = EngagementKind.bio_ai,
+        engagement_type: EngagementKind | str = EngagementKind.bio_ai,
     ) -> B2cOnboardingTypeDefaults:
+        if isinstance(engagement_type, str):
+            try:
+                engagement_type = EngagementKind(engagement_type.strip())
+            except ValueError:
+                engagement_type = EngagementKind.bio_ai
         row = await self._repository.get_by_id(db)
         defaults_map = self._build_defaults_map(row)
         return self._resolve_type_defaults_from_map(defaults_map, engagement_type)

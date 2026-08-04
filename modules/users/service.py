@@ -85,6 +85,31 @@ async def _resolve_engagement_type_id(db: AsyncSession, code: str) -> int | None
     return result.scalar_one_or_none()
 
 
+async def _require_active_engagement_type_code(db: AsyncSession, code: str):
+    """Resolve an active engagement_types row by code, or raise 422."""
+    from modules.engagements.models import EngagementType
+    from sqlalchemy import select as _select
+
+    normalized = (code or "").strip()
+    if not normalized:
+        raise AppError(
+            status_code=422,
+            error_code="INVALID_ENGAGEMENT_TYPE",
+            message="engagement_type is required and must match engagement_types.code",
+        )
+    result = await db.execute(
+        _select(EngagementType).where(EngagementType.code == normalized)
+    )
+    row = result.scalar_one_or_none()
+    if row is None or not row.is_active:
+        raise AppError(
+            status_code=422,
+            error_code="INVALID_ENGAGEMENT_TYPE",
+            message=f"engagement_type must be an active engagement_types.code; got '{normalized}'",
+        )
+    return row
+
+
 _WITH_CONSULTATION_CODE_MAP = {
     "bio_ai": "bio_ai_with_consultation",
     "blood_test": "blood_test_with_consultation",
@@ -1791,8 +1816,11 @@ class UsersService:
         if self._platform_settings_service is None:
             raise RuntimeError("Platform settings service is required")
 
+        engagement_type_code = payload.engagement_type.strip()
+        await _require_active_engagement_type_code(db, engagement_type_code)
+
         onboarding_defaults = await self._platform_settings_service.resolve_b2c_onboarding_defaults(
-            db, payload.engagement_type
+            db, engagement_type_code
         )
         assessment_package_id = onboarding_defaults.assessment_package_id
         diagnostic_package_id = onboarding_defaults.diagnostic_package_id
@@ -1802,8 +1830,8 @@ class UsersService:
 
         # Create a new engagement for this user.
         # B2C engagements auto-assign default onboarding assistants from platform settings.
-        _, resolved_consultations = await _resolve_consultation_from_pkg(
-            db, diagnostic_package_id, payload.engagement_type,
+        resolved_type_id, resolved_consultations = await _resolve_consultation_from_pkg(
+            db, diagnostic_package_id, engagement_type_code,
         )
 
         if onboarded_by_user_id:
@@ -1826,7 +1854,7 @@ class UsersService:
             city=engagement_city,
             assessment_package_id=assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
-            engagement_type=payload.engagement_type,
+            engagement_type=resolved_type_id,
             blood_collection_type=onboarding_defaults.blood_collection_type,
             consultations=resolved_consultations,
             address=engagement_address,

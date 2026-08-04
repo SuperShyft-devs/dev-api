@@ -567,7 +567,12 @@ async def test_public_onboard_uses_platform_settings_package_ids(async_client, t
 
     assert engagement_row.assessment_package_id == 2
     assert engagement_row.diagnostic_package_id == 2
-    assert getattr(engagement_row.engagement_type, "value", engagement_row.engagement_type) == "bio_ai"
+    bio_ai_type_id = (
+        await test_db_session.execute(
+            text("SELECT id FROM engagement_types WHERE code = 'bio_ai'")
+        )
+    ).scalar_one()
+    assert engagement_row.engagement_type == bio_ai_type_id
     assert getattr(engagement_row.blood_collection_type, "value", engagement_row.blood_collection_type) == "home_collection"
     assert engagement_row.create_profile_on_metsights is False
     assert engagement_row.enroll_for_fitprint_full is False
@@ -682,9 +687,83 @@ async def test_public_onboard_uses_engagement_type_and_its_defaults(async_client
 
     assert engagement_row.assessment_package_id == 2
     assert engagement_row.diagnostic_package_id == 2
-    assert getattr(engagement_row.engagement_type, "value", engagement_row.engagement_type) == "blood_test"
+    blood_test_type_id = (
+        await test_db_session.execute(
+            text("SELECT id FROM engagement_types WHERE code = 'blood_test'")
+        )
+    ).scalar_one()
+    assert engagement_row.engagement_type == blood_test_type_id
     assert getattr(engagement_row.blood_collection_type, "value", engagement_row.blood_collection_type) == "camp_collection"
     assert engagement_row.create_profile_on_metsights is False
+
+
+@pytest.mark.asyncio
+async def test_public_onboard_rejects_unknown_engagement_type(async_client, test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "Bad",
+        "phone": "4444444499",
+        "city": "Pune",
+        "engagement_type": "not_a_real_type",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "10:00",
+    }
+
+    response = await async_client.post("/users/public/onboard", json=payload)
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "INVALID_ENGAGEMENT_TYPE"
+
+
+@pytest.mark.asyncio
+async def test_public_onboard_rejects_inactive_engagement_type(async_client, test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagement_types (code, display_name, is_active) "
+            "VALUES ('inactive_onboard_type', 'Inactive', false) "
+            "ON CONFLICT (code) DO UPDATE SET is_active = false"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "Inactive",
+        "phone": "4444444488",
+        "city": "Pune",
+        "engagement_type": "inactive_onboard_type",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "10:00",
+    }
+
+    response = await async_client.post("/users/public/onboard", json=payload)
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "INVALID_ENGAGEMENT_TYPE"
 
 
 @pytest.mark.asyncio
