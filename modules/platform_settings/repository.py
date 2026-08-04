@@ -60,6 +60,7 @@ class PlatformSettingsRepository:
         create_profile_on_metsights: bool,
         enroll_for_fitprint_full: bool,
         updated_by_user_id: int | None,
+        b2c_onboarding_by_engagement_type: dict | None = None,
     ) -> PlatformSettings:
         existing = await self.get_by_id(db)
         if existing is None:
@@ -71,6 +72,7 @@ class PlatformSettingsRepository:
                 b2c_default_blood_collection_type=blood_collection_type,
                 b2c_default_create_profile_on_metsights=create_profile_on_metsights,
                 b2c_default_enroll_for_fitprint_full=enroll_for_fitprint_full,
+                b2c_onboarding_by_engagement_type=b2c_onboarding_by_engagement_type,
                 updated_by_user_id=updated_by_user_id,
             )
             db.add(row)
@@ -83,9 +85,36 @@ class PlatformSettingsRepository:
         existing.b2c_default_blood_collection_type = blood_collection_type
         existing.b2c_default_create_profile_on_metsights = create_profile_on_metsights
         existing.b2c_default_enroll_for_fitprint_full = enroll_for_fitprint_full
+        if b2c_onboarding_by_engagement_type is not None:
+            existing.b2c_onboarding_by_engagement_type = b2c_onboarding_by_engagement_type
         existing.updated_by_user_id = updated_by_user_id
         await db.flush()
         return existing
+
+    async def upsert_b2c_onboarding_by_engagement_type(
+        self,
+        db: AsyncSession,
+        *,
+        defaults_by_engagement_type: dict,
+        assessment_package_id: int,
+        diagnostic_package_id: int,
+        blood_collection_type: BloodCollectionType | None,
+        create_profile_on_metsights: bool,
+        enroll_for_fitprint_full: bool,
+        updated_by_user_id: int | None,
+    ) -> PlatformSettings:
+        """Persist the per-type map and mirror bio_ai onto legacy flat columns."""
+        return await self.upsert(
+            db,
+            assessment_package_id=assessment_package_id,
+            diagnostic_package_id=diagnostic_package_id,
+            engagement_type=EngagementKind.bio_ai,
+            blood_collection_type=blood_collection_type,
+            create_profile_on_metsights=create_profile_on_metsights,
+            enroll_for_fitprint_full=enroll_for_fitprint_full,
+            updated_by_user_id=updated_by_user_id,
+            b2c_onboarding_by_engagement_type=defaults_by_engagement_type,
+        )
 
     async def upsert_notification_defaults(
         self,

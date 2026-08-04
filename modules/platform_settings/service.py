@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +26,7 @@ from modules.platform_settings.repository import (
 from modules.platform_settings.schemas import (
     B2cOnboardingDefaultsRead,
     B2cOnboardingDefaultsUpdate,
+    B2cOnboardingTypeDefaults,
     DefaultOnboardingAssistantItem,
     DefaultOnboardingAssistantsRead,
     DefaultOnboardingAssistantsUpdate,
@@ -34,10 +37,48 @@ from modules.platform_settings.schemas import (
 )
 
 _FALLBACK_B2C_ASSESSMENT_PACKAGE_ID = 1
-_FALLBACK_B2C_ENGAGEMENT_TYPE = EngagementKind.bio_ai
 _FALLBACK_B2C_BLOOD_COLLECTION_TYPE: BloodCollectionType | None = None
 _FALLBACK_B2C_CREATE_PROFILE_ON_METSIGHTS = True
 _FALLBACK_B2C_ENROLL_FOR_FITPRINT_FULL = False
+
+
+def _fallback_type_defaults() -> B2cOnboardingTypeDefaults:
+    return B2cOnboardingTypeDefaults(
+        assessment_package_id=_FALLBACK_B2C_ASSESSMENT_PACKAGE_ID,
+        diagnostic_package_id=DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
+        blood_collection_type=_FALLBACK_B2C_BLOOD_COLLECTION_TYPE,
+        create_profile_on_metsights=_FALLBACK_B2C_CREATE_PROFILE_ON_METSIGHTS,
+        enroll_for_fitprint_full=_FALLBACK_B2C_ENROLL_FOR_FITPRINT_FULL,
+    )
+
+
+def _parse_type_defaults(raw: Any) -> B2cOnboardingTypeDefaults | None:
+    if not isinstance(raw, dict):
+        return None
+    try:
+        blood = raw.get("blood_collection_type")
+        if blood is not None and not isinstance(blood, BloodCollectionType):
+            blood = BloodCollectionType(blood)
+        return B2cOnboardingTypeDefaults(
+            assessment_package_id=int(raw["assessment_package_id"]),
+            diagnostic_package_id=int(raw["diagnostic_package_id"]),
+            blood_collection_type=blood,
+            create_profile_on_metsights=bool(raw.get("create_profile_on_metsights", True)),
+            enroll_for_fitprint_full=bool(raw.get("enroll_for_fitprint_full", False)),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _type_defaults_to_dict(defaults: B2cOnboardingTypeDefaults) -> dict[str, Any]:
+    blood = defaults.blood_collection_type
+    return {
+        "assessment_package_id": defaults.assessment_package_id,
+        "diagnostic_package_id": defaults.diagnostic_package_id,
+        "blood_collection_type": blood.value if isinstance(blood, BloodCollectionType) else blood,
+        "create_profile_on_metsights": defaults.create_profile_on_metsights,
+        "enroll_for_fitprint_full": defaults.enroll_for_fitprint_full,
+    }
 
 
 class PlatformSettingsService:
@@ -53,31 +94,56 @@ class PlatformSettingsService:
         self._notifications_repository = notifications_repository or NotificationsRepository()
         self._employee_repository = employee_repository or EmployeeRepository()
 
-    async def resolve_b2c_default_package_ids(self, db: AsyncSession) -> tuple[int, int]:
-        row = await self._repository.get_by_id(db)
-        if row is None:
-            return _FALLBACK_B2C_ASSESSMENT_PACKAGE_ID, DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
-        return row.b2c_default_assessment_package_id, row.b2c_default_diagnostic_package_id
-
-    async def resolve_b2c_onboarding_defaults(self, db: AsyncSession) -> B2cOnboardingDefaultsRead:
-        row = await self._repository.get_by_id(db)
-        if row is None:
-            return B2cOnboardingDefaultsRead(
-                b2c_default_assessment_package_id=_FALLBACK_B2C_ASSESSMENT_PACKAGE_ID,
-                b2c_default_diagnostic_package_id=DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
-                b2c_default_engagement_type=_FALLBACK_B2C_ENGAGEMENT_TYPE,
-                b2c_default_blood_collection_type=_FALLBACK_B2C_BLOOD_COLLECTION_TYPE,
-                b2c_default_create_profile_on_metsights=_FALLBACK_B2C_CREATE_PROFILE_ON_METSIGHTS,
-                b2c_default_enroll_for_fitprint_full=_FALLBACK_B2C_ENROLL_FOR_FITPRINT_FULL,
-            )
-        return B2cOnboardingDefaultsRead(
-            b2c_default_assessment_package_id=row.b2c_default_assessment_package_id,
-            b2c_default_diagnostic_package_id=row.b2c_default_diagnostic_package_id,
-            b2c_default_engagement_type=row.b2c_default_engagement_type,
-            b2c_default_blood_collection_type=row.b2c_default_blood_collection_type,
-            b2c_default_create_profile_on_metsights=bool(row.b2c_default_create_profile_on_metsights),
-            b2c_default_enroll_for_fitprint_full=bool(row.b2c_default_enroll_for_fitprint_full),
+    def _legacy_flat_as_type_defaults(self, row) -> B2cOnboardingTypeDefaults:
+        blood = row.b2c_default_blood_collection_type
+        if blood is not None and not isinstance(blood, BloodCollectionType):
+            try:
+                blood = BloodCollectionType(blood)
+            except ValueError:
+                blood = None
+        return B2cOnboardingTypeDefaults(
+            assessment_package_id=int(row.b2c_default_assessment_package_id),
+            diagnostic_package_id=int(row.b2c_default_diagnostic_package_id),
+            blood_collection_type=blood,
+            create_profile_on_metsights=bool(row.b2c_default_create_profile_on_metsights),
+            enroll_for_fitprint_full=bool(row.b2c_default_enroll_for_fitprint_full),
         )
+
+    def _build_defaults_map(self, row) -> dict[EngagementKind, B2cOnboardingTypeDefaults]:
+        fallback = _fallback_type_defaults()
+        legacy = self._legacy_flat_as_type_defaults(row) if row is not None else fallback
+        raw_map = getattr(row, "b2c_onboarding_by_engagement_type", None) if row is not None else None
+        result: dict[EngagementKind, B2cOnboardingTypeDefaults] = {}
+        for kind in EngagementKind:
+            parsed = None
+            if isinstance(raw_map, dict):
+                parsed = _parse_type_defaults(raw_map.get(kind.value))
+            result[kind] = parsed or legacy
+        return result
+
+    def _resolve_type_defaults_from_map(
+        self,
+        defaults_map: dict[EngagementKind, B2cOnboardingTypeDefaults],
+        engagement_type: EngagementKind,
+    ) -> B2cOnboardingTypeDefaults:
+        if engagement_type in defaults_map:
+            return defaults_map[engagement_type]
+        if EngagementKind.bio_ai in defaults_map:
+            return defaults_map[EngagementKind.bio_ai]
+        return _fallback_type_defaults()
+
+    async def resolve_b2c_default_package_ids(self, db: AsyncSession) -> tuple[int, int]:
+        defaults = await self.resolve_b2c_onboarding_defaults(db, EngagementKind.bio_ai)
+        return defaults.assessment_package_id, defaults.diagnostic_package_id
+
+    async def resolve_b2c_onboarding_defaults(
+        self,
+        db: AsyncSession,
+        engagement_type: EngagementKind = EngagementKind.bio_ai,
+    ) -> B2cOnboardingTypeDefaults:
+        row = await self._repository.get_by_id(db)
+        defaults_map = self._build_defaults_map(row)
+        return self._resolve_type_defaults_from_map(defaults_map, engagement_type)
 
     async def ensure_active_b2c_packages(self, db: AsyncSession, assessment_package_id: int, diagnostic_package_id: int) -> None:
         ap = (
@@ -118,7 +184,8 @@ class PlatformSettingsService:
             )
 
     async def get_b2c_onboarding_defaults(self, db: AsyncSession) -> B2cOnboardingDefaultsRead:
-        return await self.resolve_b2c_onboarding_defaults(db)
+        row = await self._repository.get_by_id(db)
+        return B2cOnboardingDefaultsRead(defaults_by_engagement_type=self._build_defaults_map(row))
 
     async def update_b2c_onboarding_defaults(
         self,
@@ -130,25 +197,42 @@ class PlatformSettingsService:
         user_agent: str,
         endpoint: str,
     ) -> B2cOnboardingDefaultsRead:
-        await self.ensure_active_b2c_packages(
-            db,
-            payload.b2c_default_assessment_package_id,
-            payload.b2c_default_diagnostic_package_id,
-        )
-        if payload.b2c_default_enroll_for_fitprint_full and not payload.b2c_default_create_profile_on_metsights:
+        provided = dict(payload.defaults_by_engagement_type)
+        if not provided:
             raise AppError(
                 status_code=422,
                 error_code="INVALID_B2C_ONBOARDING_DEFAULTS",
-                message="FitPrint Full enrollment requires Metsights profile creation",
+                message="defaults_by_engagement_type must include at least one engagement type",
             )
-        await self._repository.upsert(
+
+        # Ensure every known EngagementKind is present after save (fill missing from existing / fallback).
+        existing_map = self._build_defaults_map(await self._repository.get_by_id(db))
+        complete: dict[EngagementKind, B2cOnboardingTypeDefaults] = {}
+        for kind in EngagementKind:
+            complete[kind] = provided.get(kind) or existing_map.get(kind) or _fallback_type_defaults()
+
+        for kind, entry in complete.items():
+            await self.ensure_active_b2c_packages(db, entry.assessment_package_id, entry.diagnostic_package_id)
+            if entry.enroll_for_fitprint_full and not entry.create_profile_on_metsights:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_B2C_ONBOARDING_DEFAULTS",
+                    message=(
+                        f"FitPrint Full enrollment requires Metsights profile creation "
+                        f"(engagement_type={kind.value})"
+                    ),
+                )
+
+        serialized = {kind.value: _type_defaults_to_dict(entry) for kind, entry in complete.items()}
+        bio_ai = complete[EngagementKind.bio_ai]
+        await self._repository.upsert_b2c_onboarding_by_engagement_type(
             db,
-            assessment_package_id=payload.b2c_default_assessment_package_id,
-            diagnostic_package_id=payload.b2c_default_diagnostic_package_id,
-            engagement_type=payload.b2c_default_engagement_type,
-            blood_collection_type=payload.b2c_default_blood_collection_type,
-            create_profile_on_metsights=payload.b2c_default_create_profile_on_metsights,
-            enroll_for_fitprint_full=payload.b2c_default_enroll_for_fitprint_full,
+            defaults_by_engagement_type=serialized,
+            assessment_package_id=bio_ai.assessment_package_id,
+            diagnostic_package_id=bio_ai.diagnostic_package_id,
+            blood_collection_type=bio_ai.blood_collection_type,
+            create_profile_on_metsights=bio_ai.create_profile_on_metsights,
+            enroll_for_fitprint_full=bio_ai.enroll_for_fitprint_full,
             updated_by_user_id=employee.user_id,
         )
 

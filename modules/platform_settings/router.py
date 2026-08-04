@@ -45,7 +45,7 @@ async def get_b2c_onboarding_defaults(
     service: PlatformSettingsService = Depends(get_platform_settings_service),
 ):
     data = await service.get_b2c_onboarding_defaults(db)
-    return success_response(data.model_dump())
+    return success_response(data.model_dump(mode="json"))
 
 
 @router.patch("/b2c-onboarding")
@@ -65,7 +65,7 @@ async def patch_b2c_onboarding_defaults(
         endpoint=str(request.url.path),
     )
     await db.commit()
-    return success_response(data.model_dump())
+    return success_response(data.model_dump(mode="json"))
 
 
 @router.get("/engagement-notification-defaults")

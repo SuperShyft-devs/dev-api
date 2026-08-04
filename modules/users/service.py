@@ -1766,9 +1766,11 @@ class UsersService:
         if self._platform_settings_service is None:
             raise RuntimeError("Platform settings service is required")
 
-        onboarding_defaults = await self._platform_settings_service.resolve_b2c_onboarding_defaults(db)
-        assessment_package_id = onboarding_defaults.b2c_default_assessment_package_id
-        diagnostic_package_id = onboarding_defaults.b2c_default_diagnostic_package_id
+        onboarding_defaults = await self._platform_settings_service.resolve_b2c_onboarding_defaults(
+            db, payload.engagement_type
+        )
+        assessment_package_id = onboarding_defaults.assessment_package_id
+        diagnostic_package_id = onboarding_defaults.diagnostic_package_id
         await self._platform_settings_service.ensure_active_b2c_packages(
             db, assessment_package_id, diagnostic_package_id
         )
@@ -1776,7 +1778,7 @@ class UsersService:
         # Create a new engagement for this user.
         # B2C engagements auto-assign default onboarding assistants from platform settings.
         _, resolved_consultations = await _resolve_consultation_from_pkg(
-            db, diagnostic_package_id, onboarding_defaults.b2c_default_engagement_type,
+            db, diagnostic_package_id, payload.engagement_type,
         )
 
         engagement = await self._engagements_service.create_b2c_engagement(
@@ -1786,8 +1788,8 @@ class UsersService:
             city=payload.city or user.city,
             assessment_package_id=assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
-            engagement_type=onboarding_defaults.b2c_default_engagement_type,
-            blood_collection_type=onboarding_defaults.b2c_default_blood_collection_type,
+            engagement_type=payload.engagement_type,
+            blood_collection_type=onboarding_defaults.blood_collection_type,
             consultations=resolved_consultations,
             address=payload.address,
             sub_locality=getattr(payload, "sub_locality", None),
@@ -1797,8 +1799,8 @@ class UsersService:
             country=getattr(payload, "country", None),
             latitude=getattr(payload, "latitude", None),
             longitude=getattr(payload, "longitude", None),
-            create_profile_on_metsights=onboarding_defaults.b2c_default_create_profile_on_metsights,
-            enroll_for_fitprint_full=onboarding_defaults.b2c_default_enroll_for_fitprint_full,
+            create_profile_on_metsights=onboarding_defaults.create_profile_on_metsights,
+            enroll_for_fitprint_full=onboarding_defaults.enroll_for_fitprint_full,
         )
 
         consultations = _validate_requested_consultations(

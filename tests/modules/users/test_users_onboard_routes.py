@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 
 import pytest
@@ -381,21 +382,63 @@ async def test_public_onboard_uses_platform_settings_package_ids(async_client, t
             "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, status = EXCLUDED.status"
         )
     )
+    # Per-type map: bio_ai uses packages 2/2 (used when engagement_type omitted).
+    by_type = {
+        "bio_ai": {
+            "assessment_package_id": 2,
+            "diagnostic_package_id": 2,
+            "blood_collection_type": "home_collection",
+            "create_profile_on_metsights": False,
+            "enroll_for_fitprint_full": False,
+        },
+        "blood_test": {
+            "assessment_package_id": 1,
+            "diagnostic_package_id": 1,
+            "blood_collection_type": None,
+            "create_profile_on_metsights": True,
+            "enroll_for_fitprint_full": False,
+        },
+        "consultation": {
+            "assessment_package_id": 1,
+            "diagnostic_package_id": 1,
+            "blood_collection_type": None,
+            "create_profile_on_metsights": True,
+            "enroll_for_fitprint_full": False,
+        },
+        "blood_test_with_consultation": {
+            "assessment_package_id": 1,
+            "diagnostic_package_id": 1,
+            "blood_collection_type": None,
+            "create_profile_on_metsights": True,
+            "enroll_for_fitprint_full": False,
+        },
+        "bio_ai_with_consultation": {
+            "assessment_package_id": 1,
+            "diagnostic_package_id": 1,
+            "blood_collection_type": None,
+            "create_profile_on_metsights": True,
+            "enroll_for_fitprint_full": False,
+        },
+    }
+
     await test_db_session.execute(
         text(
             "INSERT INTO platform_settings "
             "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
             "b2c_default_engagement_type, b2c_default_blood_collection_type, "
-            "b2c_default_create_profile_on_metsights, b2c_default_enroll_for_fitprint_full) "
-            "VALUES (1, 2, 2, 'blood_test', 'home_collection', false, false) "
+            "b2c_default_create_profile_on_metsights, b2c_default_enroll_for_fitprint_full, "
+            "b2c_onboarding_by_engagement_type) "
+            "VALUES (1, 2, 2, 'bio_ai', 'home_collection', false, false, CAST(:by_type AS jsonb)) "
             "ON CONFLICT (settings_id) DO UPDATE SET "
             "b2c_default_assessment_package_id = EXCLUDED.b2c_default_assessment_package_id, "
             "b2c_default_diagnostic_package_id = EXCLUDED.b2c_default_diagnostic_package_id, "
             "b2c_default_engagement_type = EXCLUDED.b2c_default_engagement_type, "
             "b2c_default_blood_collection_type = EXCLUDED.b2c_default_blood_collection_type, "
             "b2c_default_create_profile_on_metsights = EXCLUDED.b2c_default_create_profile_on_metsights, "
-            "b2c_default_enroll_for_fitprint_full = EXCLUDED.b2c_default_enroll_for_fitprint_full"
-        )
+            "b2c_default_enroll_for_fitprint_full = EXCLUDED.b2c_default_enroll_for_fitprint_full, "
+            "b2c_onboarding_by_engagement_type = EXCLUDED.b2c_onboarding_by_engagement_type"
+        ),
+        {"by_type": json.dumps(by_type)},
     )
     await test_db_session.commit()
 
@@ -429,7 +472,7 @@ async def test_public_onboard_uses_platform_settings_package_ids(async_client, t
 
     assert engagement_row.assessment_package_id == 2
     assert engagement_row.diagnostic_package_id == 2
-    assert getattr(engagement_row.engagement_type, "value", engagement_row.engagement_type) == "blood_test"
+    assert getattr(engagement_row.engagement_type, "value", engagement_row.engagement_type) == "bio_ai"
     assert getattr(engagement_row.blood_collection_type, "value", engagement_row.blood_collection_type) == "home_collection"
     assert engagement_row.create_profile_on_metsights is False
     assert engagement_row.enroll_for_fitprint_full is False
@@ -443,6 +486,110 @@ async def test_public_onboard_uses_platform_settings_package_ids(async_client, t
         )
     ).first()
     assert instance_row.package_id == 2
+
+
+@pytest.mark.asyncio
+async def test_public_onboard_uses_engagement_type_and_its_defaults(async_client, test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES "
+            "(1, 'PK1', 'Package 1', 'active'), (2, 'PK2', 'Package 2', 'active') "
+            "ON CONFLICT (package_id) DO UPDATE SET "
+            "package_code = EXCLUDED.package_code, display_name = EXCLUDED.display_name, status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) VALUES "
+            "(1, 'REF1', 'Diag 1', 'active'), (2, 'REF2', 'Diag 2', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET "
+            "reference_id = EXCLUDED.reference_id, package_name = EXCLUDED.package_name, status = EXCLUDED.status"
+        )
+    )
+    by_type = {
+        "bio_ai": {
+            "assessment_package_id": 1,
+            "diagnostic_package_id": 1,
+            "blood_collection_type": None,
+            "create_profile_on_metsights": True,
+            "enroll_for_fitprint_full": False,
+        },
+        "blood_test": {
+            "assessment_package_id": 2,
+            "diagnostic_package_id": 2,
+            "blood_collection_type": "camp_collection",
+            "create_profile_on_metsights": False,
+            "enroll_for_fitprint_full": False,
+        },
+        "consultation": {
+            "assessment_package_id": 1,
+            "diagnostic_package_id": 1,
+            "blood_collection_type": None,
+            "create_profile_on_metsights": True,
+            "enroll_for_fitprint_full": False,
+        },
+        "blood_test_with_consultation": {
+            "assessment_package_id": 1,
+            "diagnostic_package_id": 1,
+            "blood_collection_type": None,
+            "create_profile_on_metsights": True,
+            "enroll_for_fitprint_full": False,
+        },
+        "bio_ai_with_consultation": {
+            "assessment_package_id": 1,
+            "diagnostic_package_id": 1,
+            "blood_collection_type": None,
+            "create_profile_on_metsights": True,
+            "enroll_for_fitprint_full": False,
+        },
+    }
+    await test_db_session.execute(
+        text(
+            "INSERT INTO platform_settings "
+            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
+            "b2c_onboarding_by_engagement_type) "
+            "VALUES (1, 1, 1, CAST(:by_type AS jsonb)) "
+            "ON CONFLICT (settings_id) DO UPDATE SET "
+            "b2c_default_assessment_package_id = EXCLUDED.b2c_default_assessment_package_id, "
+            "b2c_default_diagnostic_package_id = EXCLUDED.b2c_default_diagnostic_package_id, "
+            "b2c_onboarding_by_engagement_type = EXCLUDED.b2c_onboarding_by_engagement_type"
+        ),
+        {"by_type": json.dumps(by_type)},
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "Blood",
+        "last_name": "Test",
+        "email": "blood_type@example.com",
+        "phone": "4444444455",
+        "city": "Chennai",
+        "engagement_type": "blood_test",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "10:00",
+    }
+
+    response = await async_client.post("/users/public/onboard", json=payload)
+    assert response.status_code == 200
+    data = response.json()["data"]
+
+    engagement_row = (
+        await test_db_session.execute(
+            text(
+                "SELECT assessment_package_id, diagnostic_package_id, engagement_type, blood_collection_type, "
+                "create_profile_on_metsights "
+                "FROM engagements WHERE engagement_id = :eid"
+            ),
+            {"eid": data["engagement_id"]},
+        )
+    ).first()
+
+    assert engagement_row.assessment_package_id == 2
+    assert engagement_row.diagnostic_package_id == 2
+    assert getattr(engagement_row.engagement_type, "value", engagement_row.engagement_type) == "blood_test"
+    assert getattr(engagement_row.blood_collection_type, "value", engagement_row.blood_collection_type) == "camp_collection"
+    assert engagement_row.create_profile_on_metsights is False
 
 
 @pytest.mark.asyncio

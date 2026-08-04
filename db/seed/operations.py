@@ -15,6 +15,7 @@ from modules.questionnaire.models import (
     QuestionnaireOption,
 )
 from modules.platform_settings.models import PlatformSettings
+from modules.engagements.models import EngagementKind
 from modules.users.models import User
 
 from db.seed.seed_dataclasses import (
@@ -444,11 +445,20 @@ async def upsert_default_platform_settings(session: AsyncSession) -> None:
     existing = await session.get(PlatformSettings, 1)
     if existing is not None:
         return
+    type_defaults = {
+        "assessment_package_id": DEFAULT_B2C_ASSESSMENT_PACKAGE_ID,
+        "diagnostic_package_id": DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
+        "blood_collection_type": None,
+        "create_profile_on_metsights": True,
+        "enroll_for_fitprint_full": False,
+    }
+    by_type = {kind.value: dict(type_defaults) for kind in EngagementKind}
     session.add(
         PlatformSettings(
             settings_id=1,
             b2c_default_assessment_package_id=DEFAULT_B2C_ASSESSMENT_PACKAGE_ID,
             b2c_default_diagnostic_package_id=DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID,
+            b2c_onboarding_by_engagement_type=by_type,
             updated_by_user_id=None,
         )
     )

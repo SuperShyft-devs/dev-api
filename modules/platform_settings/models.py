@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Boolean, Column, DateTime, Enum as SAEnum, ForeignKey, Integer, String, func
+from sqlalchemy.dialects.postgresql import JSONB
 
 from db.base import Base
 from modules.engagements.models import BloodCollectionType, EngagementKind
@@ -52,6 +53,7 @@ class PlatformSettings(Base):
     b2c_default_blood_collection_type = Column(_blood_collection_type, nullable=True)
     b2c_default_create_profile_on_metsights = Column(Boolean, nullable=False, default=True, server_default="true")
     b2c_default_enroll_for_fitprint_full = Column(Boolean, nullable=False, default=False, server_default="false")
+    b2c_onboarding_by_engagement_type = Column(JSONB, nullable=True)
     default_onboarding_notification = Column(String(500), nullable=True)
     default_pretest_guidelines_notification = Column(String(500), nullable=True)
     default_questionnaire_reminder_1 = Column(String(500), nullable=True)

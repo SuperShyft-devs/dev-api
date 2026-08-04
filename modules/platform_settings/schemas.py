@@ -7,22 +7,20 @@ from pydantic import BaseModel, Field
 from modules.engagements.models import BloodCollectionType, EngagementKind
 
 
+class B2cOnboardingTypeDefaults(BaseModel):
+    assessment_package_id: int = Field(..., ge=1)
+    diagnostic_package_id: int = Field(..., ge=1)
+    blood_collection_type: BloodCollectionType | None = None
+    create_profile_on_metsights: bool
+    enroll_for_fitprint_full: bool
+
+
 class B2cOnboardingDefaultsRead(BaseModel):
-    b2c_default_assessment_package_id: int
-    b2c_default_diagnostic_package_id: int
-    b2c_default_engagement_type: EngagementKind
-    b2c_default_blood_collection_type: BloodCollectionType | None = None
-    b2c_default_create_profile_on_metsights: bool
-    b2c_default_enroll_for_fitprint_full: bool
+    defaults_by_engagement_type: dict[EngagementKind, B2cOnboardingTypeDefaults]
 
 
 class B2cOnboardingDefaultsUpdate(BaseModel):
-    b2c_default_assessment_package_id: int = Field(..., ge=1)
-    b2c_default_diagnostic_package_id: int = Field(..., ge=1)
-    b2c_default_engagement_type: EngagementKind
-    b2c_default_blood_collection_type: BloodCollectionType | None = None
-    b2c_default_create_profile_on_metsights: bool
-    b2c_default_enroll_for_fitprint_full: bool
+    defaults_by_engagement_type: dict[EngagementKind, B2cOnboardingTypeDefaults]
 
 
 class EngagementNotificationDefaultsRead(BaseModel):

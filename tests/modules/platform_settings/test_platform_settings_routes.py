@@ -11,6 +11,7 @@ from sqlalchemy import text
 from core.config import settings
 from core.security import create_jwt_token
 from modules.employee.models import Employee
+from modules.engagements.models import EngagementKind
 from modules.users.models import User
 
 
@@ -19,17 +20,43 @@ def _auth_header(user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _b2c_payload(**overrides) -> dict:
+def _type_defaults(**overrides) -> dict:
     payload = {
-        "b2c_default_assessment_package_id": 1,
-        "b2c_default_diagnostic_package_id": 1,
-        "b2c_default_engagement_type": "bio_ai",
-        "b2c_default_blood_collection_type": None,
-        "b2c_default_create_profile_on_metsights": True,
-        "b2c_default_enroll_for_fitprint_full": False,
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "blood_collection_type": None,
+        "create_profile_on_metsights": True,
+        "enroll_for_fitprint_full": False,
     }
     payload.update(overrides)
     return payload
+
+
+def _b2c_payload(**per_type_overrides) -> dict:
+    """Build a full defaults_by_engagement_type map.
+
+    per_type_overrides: mapping of engagement_type value -> field overrides for that type,
+    or flat field overrides applied to all types when keys look like type-default fields.
+    """
+    base = _type_defaults()
+    by_type: dict[str, dict] = {}
+    flat_keys = {
+        "assessment_package_id",
+        "diagnostic_package_id",
+        "blood_collection_type",
+        "create_profile_on_metsights",
+        "enroll_for_fitprint_full",
+    }
+    flat_overrides = {k: v for k, v in per_type_overrides.items() if k in flat_keys}
+    typed_overrides = {k: v for k, v in per_type_overrides.items() if k not in flat_keys}
+
+    for kind in EngagementKind:
+        entry = dict(base)
+        entry.update(flat_overrides)
+        if kind.value in typed_overrides and isinstance(typed_overrides[kind.value], dict):
+            entry.update(typed_overrides[kind.value])
+        by_type[kind.value] = entry
+    return {"defaults_by_engagement_type": by_type}
 
 
 @pytest.mark.asyncio
@@ -60,12 +87,14 @@ async def test_get_b2c_defaults_fallback_when_no_row(async_client, test_db_sessi
     response = await async_client.get("/platform-settings/b2c-onboarding", headers=_auth_header(uid))
     assert response.status_code == 200
     data = response.json()["data"]
-    assert data["b2c_default_assessment_package_id"] == 1
-    assert data["b2c_default_diagnostic_package_id"] == 1
-    assert data["b2c_default_engagement_type"] == "bio_ai"
-    assert data["b2c_default_blood_collection_type"] is None
-    assert data["b2c_default_create_profile_on_metsights"] is True
-    assert data["b2c_default_enroll_for_fitprint_full"] is False
+    by_type = data["defaults_by_engagement_type"]
+    assert set(by_type.keys()) == {k.value for k in EngagementKind}
+    bio = by_type["bio_ai"]
+    assert bio["assessment_package_id"] == 1
+    assert bio["diagnostic_package_id"] == 1
+    assert bio["blood_collection_type"] is None
+    assert bio["create_profile_on_metsights"] is True
+    assert bio["enroll_for_fitprint_full"] is False
 
 
 @pytest.mark.asyncio
@@ -98,22 +127,25 @@ async def test_patch_b2c_defaults_persists_and_get_returns(async_client, test_db
         "/platform-settings/b2c-onboarding",
         headers=_auth_header(uid),
         json=_b2c_payload(
-            b2c_default_assessment_package_id=2,
-            b2c_default_diagnostic_package_id=2,
-            b2c_default_engagement_type="blood_test",
-            b2c_default_blood_collection_type="home_collection",
-            b2c_default_create_profile_on_metsights=True,
-            b2c_default_enroll_for_fitprint_full=True,
+            blood_test={
+                "assessment_package_id": 2,
+                "diagnostic_package_id": 2,
+                "blood_collection_type": "home_collection",
+                "create_profile_on_metsights": True,
+                "enroll_for_fitprint_full": True,
+            }
         ),
     )
     assert response.status_code == 200
     data = response.json()["data"]
-    assert data["b2c_default_assessment_package_id"] == 2
-    assert data["b2c_default_diagnostic_package_id"] == 2
-    assert data["b2c_default_engagement_type"] == "blood_test"
-    assert data["b2c_default_blood_collection_type"] == "home_collection"
-    assert data["b2c_default_create_profile_on_metsights"] is True
-    assert data["b2c_default_enroll_for_fitprint_full"] is True
+    blood = data["defaults_by_engagement_type"]["blood_test"]
+    assert blood["assessment_package_id"] == 2
+    assert blood["diagnostic_package_id"] == 2
+    assert blood["blood_collection_type"] == "home_collection"
+    assert blood["create_profile_on_metsights"] is True
+    assert blood["enroll_for_fitprint_full"] is True
+    # Other types still present with base defaults
+    assert data["defaults_by_engagement_type"]["bio_ai"]["assessment_package_id"] == 1
 
     response2 = await async_client.get("/platform-settings/b2c-onboarding", headers=_auth_header(uid))
     assert response2.status_code == 200
@@ -154,7 +186,7 @@ async def test_patch_b2c_defaults_rejects_inactive_package(async_client, test_db
     response = await async_client.patch(
         "/platform-settings/b2c-onboarding",
         headers=_auth_header(uid),
-        json=_b2c_payload(b2c_default_assessment_package_id=99),
+        json=_b2c_payload(assessment_package_id=99),
     )
     assert response.status_code == 422
 
@@ -185,8 +217,8 @@ async def test_patch_b2c_defaults_rejects_fitprint_without_profile_creation(asyn
         "/platform-settings/b2c-onboarding",
         headers=_auth_header(uid),
         json=_b2c_payload(
-            b2c_default_create_profile_on_metsights=False,
-            b2c_default_enroll_for_fitprint_full=True,
+            create_profile_on_metsights=False,
+            enroll_for_fitprint_full=True,
         ),
     )
 
