@@ -55,6 +55,15 @@ class MetsightsProfilesStatsRead(BaseModel):
     estimated_not_imported: int
 
 
+class EngagementsSyncImportPageRequest(BaseModel):
+    page: int = Field(..., ge=1)
+
+
+class EngagementsSyncStatsRead(BaseModel):
+    users_with_metsights_profile_id: int
+    b2c_engagements_total: int
+
+
 class DefaultOnboardingAssistantItem(BaseModel):
     employee_id: int
     user_id: int

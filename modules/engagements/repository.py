@@ -163,6 +163,15 @@ class EngagementsRepository:
         result = await db.execute(query)
         return int(result.scalar_one())
 
+    async def count_engagements_with_null_organization(self, db: AsyncSession) -> int:
+        query = (
+            select(func.count())
+            .select_from(Engagement)
+            .where(Engagement.organization_id.is_(None))
+        )
+        result = await db.execute(query)
+        return int(result.scalar_one())
+
     async def list_engagements(
         self,
         db: AsyncSession,

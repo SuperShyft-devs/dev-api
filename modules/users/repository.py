@@ -128,6 +128,25 @@ class UsersRepository:
         result = await db.execute(query)
         return int(result.scalar_one())
 
+    async def list_users_with_metsights_profile_id(
+        self,
+        db: AsyncSession,
+        *,
+        page: int,
+        limit: int,
+    ) -> list[User]:
+        offset = (page - 1) * limit
+        query = (
+            select(User)
+            .where(User.metsights_profile_id.isnot(None))
+            .where(User.metsights_profile_id != "")
+            .order_by(User.user_id.asc())
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
     async def get_users_by_metsights_profile_ids(
         self, db: AsyncSession, metsights_profile_ids: list[str]
     ) -> dict[str, User]:

@@ -18,6 +18,7 @@ from modules.platform_settings.schemas import (
     DefaultOnboardingAssistantsUpdate,
     EngagementNotificationDefaultsRead,
     EngagementNotificationDefaultsUpdate,
+    EngagementsSyncImportPageRequest,
     MetsightsProfilesImportPageRequest,
     SupportQueryNotificationRead,
     SupportQueryNotificationUpdate,
@@ -183,5 +184,37 @@ async def import_metsights_profiles_page(
 ):
     _ = employee
     result = await users_service.import_metsights_profiles_page(db, page=payload.page)
+    await db.commit()
+    return success_response(result)
+
+
+@router.get("/engagements-sync/stats")
+async def get_engagements_sync_stats(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    users_service: UsersService = Depends(get_users_service),
+):
+    _ = employee
+    data = await users_service.get_engagements_sync_stats(db)
+    return success_response(data)
+
+
+@router.post("/engagements-sync/import-page")
+@limiter.limit("300/minute")
+async def import_engagements_sync_page(
+    payload: EngagementsSyncImportPageRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    users_service: UsersService = Depends(get_users_service),
+):
+    _ = employee
+    result = await users_service.import_engagements_sync_page(
+        db,
+        page=payload.page,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
     await db.commit()
     return success_response(result)

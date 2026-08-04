@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 import logging
 import random
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
@@ -32,7 +32,8 @@ from modules.metsights.sync_service import (
 from modules.platform_settings.service import PlatformSettingsService
 from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
-from modules.engagements.models import EngagementKind
+from modules.engagements.models import BloodCollectionType, EngagementKind
+from modules.engagements.repository import EngagementsRepository
 from modules.diagnostics.repository import DiagnosticsRepository
 from common.phone import phone_lookup_candidates as _phone_lookup_candidates
 from modules.users.schemas import (
@@ -2952,6 +2953,248 @@ class UsersService:
             "metsights_previous": ms_page.previous,
             "created": created,
             "linked": linked,
+            "skipped": skipped,
+            "failed": failed,
+            "failures": failures,
+            "skipped_items": skipped_items,
+        }
+
+    async def get_engagements_sync_stats(self, db: AsyncSession) -> dict[str, int]:
+        """Counts for Settings Engagements sync cards."""
+
+        users_with = await self._repository.count_users_with_metsights_profile_id(db)
+        b2c_total = await EngagementsRepository().count_engagements_with_null_organization(db)
+        return {
+            "users_with_metsights_profile_id": users_with,
+            "b2c_engagements_total": b2c_total,
+        }
+
+    async def import_engagements_sync_page(
+        self,
+        db: AsyncSession,
+        *,
+        page: int,
+        ip_address: str = "unknown",
+        user_agent: str = "unknown",
+        endpoint: str = "/platform-settings/engagements-sync/import-page",
+    ) -> dict[str, Any]:
+        """Page local users with Metsights profiles; create B2C engagements from non-FitPrint records."""
+
+        if self._metsights_service is None:
+            raise RuntimeError("Metsights service is required")
+        if self._engagements_service is None or self._assessments_service is None:
+            raise RuntimeError("Engagements and assessments services are required")
+        if self._platform_settings_service is None:
+            raise RuntimeError("Platform settings service is required")
+
+        _PEAK_DIAG_MALE = 17
+        _PEAK_DIAG_FEMALE = 24
+        _PAGE_SIZE = 10
+        default_slot = time(10, 0)
+        today = date.today()
+
+        users_total = await self._repository.count_users_with_metsights_profile_id(db)
+        users = await self._repository.list_users_with_metsights_profile_id(
+            db, page=page, limit=_PAGE_SIZE
+        )
+
+        created = 0
+        skipped = 0
+        failed = 0
+        failures: list[dict[str, str]] = []
+        skipped_items: list[dict[str, str]] = []
+        max_detail_items = 20
+
+        for user in users:
+            profile_id = (user.metsights_profile_id or "").strip()
+            if not profile_id:
+                skipped += 1
+                continue
+
+            try:
+                raw_records = await self._metsights_service.list_profile_records(profile_id=profile_id)
+            except AppError as exc:
+                failed += 1
+                if len(failures) < max_detail_items:
+                    failures.append(
+                        {
+                            "metsights_profile_id": profile_id,
+                            "reason": exc.message or "Failed to list Metsights records",
+                        }
+                    )
+                continue
+            except Exception as exc:
+                failed += 1
+                if len(failures) < max_detail_items:
+                    failures.append({"metsights_profile_id": profile_id, "reason": str(exc)})
+                continue
+
+            rows = self._metsights_records_list_payload(raw_records)
+            rows.sort(
+                key=lambda r: (
+                    _parse_iso_date(r.get("date")),
+                    str(r.get("updated_at") or r.get("created_at") or ""),
+                    str(r.get("id") or ""),
+                )
+            )
+
+            for row in rows:
+                mrid = str(row.get("id") or "").strip()
+                if not mrid:
+                    skipped += 1
+                    if len(skipped_items) < max_detail_items:
+                        skipped_items.append(
+                            {"metsights_profile_id": profile_id, "reason": "missing record id"}
+                        )
+                    continue
+
+                existing_inst = await self._assessments_service.get_instance_by_metsights_record_id(
+                    db, metsights_record_id=mrid
+                )
+                if existing_inst is not None:
+                    skipped += 1
+                    if len(skipped_items) < max_detail_items:
+                        skipped_items.append(
+                            {
+                                "metsights_profile_id": profile_id,
+                                "reason": f"already imported — record {mrid}",
+                            }
+                        )
+                    continue
+
+                type_code = _normalize_metsights_type_code(row)
+                if type_code == "7":
+                    skipped += 1
+                    if len(skipped_items) < max_detail_items:
+                        skipped_items.append(
+                            {"metsights_profile_id": profile_id, "reason": f"fitprint — record {mrid}"}
+                        )
+                    continue
+                if not type_code:
+                    skipped += 1
+                    if len(skipped_items) < max_detail_items:
+                        skipped_items.append(
+                            {
+                                "metsights_profile_id": profile_id,
+                                "reason": f"unknown assessment type — record {mrid}",
+                            }
+                        )
+                    continue
+
+                package = await self._assessments_service.get_package_by_assessment_type_code(
+                    db,
+                    assessment_type_code=type_code,
+                )
+                if package is None:
+                    skipped += 1
+                    if len(skipped_items) < max_detail_items:
+                        skipped_items.append(
+                            {
+                                "metsights_profile_id": profile_id,
+                                "reason": f"no active package for type {type_code} — record {mrid}",
+                            }
+                        )
+                    continue
+
+                try:
+                    diag_pref = _PEAK_DIAG_FEMALE if self._is_female_gender(user.gender) else _PEAK_DIAG_MALE
+                    diag_id = await _resolve_active_diagnostic_package_id(db, diag_pref)
+                    ap_id = int(package.package_id)
+                    await self._platform_settings_service.ensure_active_b2c_packages(db, ap_id, diag_id)
+
+                    pkg = await _diagnostics_repo.get_package_by_id_basic(db, package_id=diag_id)
+                    consultations: dict | None = None
+                    if pkg is not None and isinstance(pkg.complementary_consultation, dict):
+                        consultations = pkg.complementary_consultation
+
+                    start_date = _parse_iso_date(row.get("created_at") or row.get("date"))
+                    end_date = _parse_iso_date(row.get("updated_at") or row.get("date") or row.get("created_at"))
+
+                    engagement = await self._engagements_service.create_b2c_engagement(
+                        db,
+                        user_first_name=user.first_name,
+                        engagement_date=start_date,
+                        city=user.city,
+                        assessment_package_id=ap_id,
+                        diagnostic_package_id=diag_id,
+                        engagement_type=EngagementKind.bio_ai,
+                        blood_collection_type=BloodCollectionType.home_collection,
+                        consultations=consultations,
+                        address=user.address,
+                        pincode=user.pin_code,
+                        state=getattr(user, "state", None),
+                        country=getattr(user, "country", None),
+                        create_profile_on_metsights=True,
+                        enroll_for_fitprint_full=False,
+                    )
+                    engagement.start_date = start_date
+                    engagement.end_date = end_date
+                    await db.flush()
+
+                    await self._engagements_service.enroll_user_in_engagement(
+                        db,
+                        engagement=engagement,
+                        user_id=user.user_id,
+                        engagement_date=start_date,
+                        slot_start_time=default_slot,
+                        is_profile_created_on_metsights=True,
+                        is_primary_record_id_synced=True,
+                        is_fitprint_record_id_synced=True,
+                        booked_by_user_id=int(user.user_id),
+                    )
+
+                    assigned_at = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+                    completed_flag = bool(row.get("is_complete")) or end_date < today
+                    instance = await self._assessments_service.create_instance_for_metsights_record(
+                        db,
+                        user_id=user.user_id,
+                        engagement_id=engagement.engagement_id,
+                        package_id=ap_id,
+                        metsights_record_id=mrid,
+                        metsights_is_complete=completed_flag,
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        endpoint=endpoint,
+                        assigned_at=assigned_at,
+                    )
+                    if completed_flag:
+                        instance.completed_at = datetime.combine(end_date, time.min, tzinfo=timezone.utc)
+                        await db.flush()
+
+                    if end_date < today:
+                        engagement.status = "completed"
+                        await db.flush()
+
+                    created += 1
+                except AppError as exc:
+                    failed += 1
+                    if len(failures) < max_detail_items:
+                        failures.append(
+                            {
+                                "metsights_profile_id": profile_id,
+                                "reason": exc.message or f"Failed to import record {mrid}",
+                            }
+                        )
+                except Exception as exc:
+                    logger.exception("engagements sync failed for record %s", mrid)
+                    failed += 1
+                    if len(failures) < max_detail_items:
+                        failures.append(
+                            {
+                                "metsights_profile_id": profile_id,
+                                "reason": str(exc),
+                            }
+                        )
+
+        next_page: int | None = page + 1 if (page * _PAGE_SIZE) < users_total else None
+
+        return {
+            "page": page,
+            "page_size": _PAGE_SIZE,
+            "users_total": users_total,
+            "users_on_page": len(users),
+            "next_page": next_page,
+            "created": created,
             "skipped": skipped,
             "failed": failed,
             "failures": failures,

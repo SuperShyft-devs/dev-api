@@ -5,6 +5,8 @@ __pycache__/
 
 # C extensions
 *.so
+.env 
+supershyft_db_2026-07-28_07-10-57.sql
 
 # Distribution / packaging
 .Python
