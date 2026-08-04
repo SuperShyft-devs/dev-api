@@ -463,3 +463,44 @@ async def test_b2c_defaults_include_custom_engagement_type(async_client, test_db
     )
     assert patch.status_code == 200
     assert patch.json()["data"]["defaults_by_engagement_type"]["vifc"]["create_profile_on_metsights"] is False
+
+
+@pytest.mark.asyncio
+async def test_b2c_defaults_allow_null_diagnostic_package(async_client, test_db_session):
+    uid = 9112
+    test_db_session.add(User(user_id=uid, age=30, phone="91120000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9112, user_id=uid, role="admin", status="active"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES "
+            "(1, 'P1', 'One', 'active') "
+            "ON CONFLICT (package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'R1', 'D1', 'p', 'active') "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = _b2c_payload(
+        consultation={
+            "assessment_package_id": 1,
+            "diagnostic_package_id": None,
+            "blood_collection_type": None,
+            "create_profile_on_metsights": True,
+            "enroll_for_fitprint_full": False,
+        }
+    )
+    response = await async_client.patch(
+        "/platform-settings/b2c-onboarding",
+        headers=_auth_header(uid),
+        json=payload,
+    )
+    assert response.status_code == 200
+    consultation = response.json()["data"]["defaults_by_engagement_type"]["consultation"]
+    assert consultation["diagnostic_package_id"] is None

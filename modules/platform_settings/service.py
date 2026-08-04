@@ -59,9 +59,11 @@ def _parse_type_defaults(raw: Any) -> B2cOnboardingTypeDefaults | None:
         blood = raw.get("blood_collection_type")
         if blood is not None and not isinstance(blood, BloodCollectionType):
             blood = BloodCollectionType(blood)
+        raw_diag = raw.get("diagnostic_package_id")
+        diagnostic_package_id = None if raw_diag is None else int(raw_diag)
         return B2cOnboardingTypeDefaults(
             assessment_package_id=int(raw["assessment_package_id"]),
-            diagnostic_package_id=int(raw["diagnostic_package_id"]),
+            diagnostic_package_id=diagnostic_package_id,
             blood_collection_type=blood,
             create_profile_on_metsights=bool(raw.get("create_profile_on_metsights", True)),
             enroll_for_fitprint_full=bool(raw.get("enroll_for_fitprint_full", False)),
@@ -158,7 +160,8 @@ class PlatformSettingsService:
 
     async def resolve_b2c_default_package_ids(self, db: AsyncSession) -> tuple[int, int]:
         defaults = await self.resolve_b2c_onboarding_defaults(db, EngagementKind.bio_ai)
-        return defaults.assessment_package_id, defaults.diagnostic_package_id
+        diagnostic_id = defaults.diagnostic_package_id or DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
+        return defaults.assessment_package_id, diagnostic_id
 
     async def resolve_b2c_onboarding_defaults(
         self,
@@ -174,7 +177,12 @@ class PlatformSettingsService:
         raw_map = getattr(row, "b2c_onboarding_by_engagement_type", None) if row is not None else None
         return self._resolve_type_defaults_from_map(defaults_map, code, raw_map=raw_map)
 
-    async def ensure_active_b2c_packages(self, db: AsyncSession, assessment_package_id: int, diagnostic_package_id: int) -> None:
+    async def ensure_active_b2c_packages(
+        self,
+        db: AsyncSession,
+        assessment_package_id: int,
+        diagnostic_package_id: int | None,
+    ) -> None:
         ap = (
             await db.execute(select(AssessmentPackage).where(AssessmentPackage.package_id == assessment_package_id).limit(1))
         ).scalar_one_or_none()
@@ -184,6 +192,9 @@ class PlatformSettingsService:
                 error_code="INVALID_B2C_ASSESSMENT_PACKAGE",
                 message="Assessment package is missing or not active",
             )
+
+        if diagnostic_package_id is None:
+            return
 
         dp = (
             await db.execute(
@@ -275,11 +286,13 @@ class PlatformSettingsService:
                     serialized[key] = raw_entry
 
         bio_ai = complete.get("bio_ai") or next(iter(complete.values()))
+        # Legacy flat column is NOT NULL; keep a concrete fallback when bio_ai has no diagnostic.
+        mirrored_diagnostic_id = bio_ai.diagnostic_package_id or DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
         await self._repository.upsert_b2c_onboarding_by_engagement_type(
             db,
             defaults_by_engagement_type=serialized,
             assessment_package_id=bio_ai.assessment_package_id,
-            diagnostic_package_id=bio_ai.diagnostic_package_id,
+            diagnostic_package_id=mirrored_diagnostic_id,
             blood_collection_type=bio_ai.blood_collection_type,
             create_profile_on_metsights=bio_ai.create_profile_on_metsights,
             enroll_for_fitprint_full=bio_ai.enroll_for_fitprint_full,

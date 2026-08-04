@@ -9,7 +9,7 @@ from modules.engagements.models import BloodCollectionType
 
 class B2cOnboardingTypeDefaults(BaseModel):
     assessment_package_id: int = Field(..., ge=1)
-    diagnostic_package_id: int = Field(..., ge=1)
+    diagnostic_package_id: int | None = Field(default=None, ge=1)
     blood_collection_type: BloodCollectionType | None = None
     create_profile_on_metsights: bool
     enroll_for_fitprint_full: bool
