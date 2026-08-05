@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -124,13 +125,20 @@ class AuraeService:
                 message="User email, phone, first_name, and last_name are required for face scan",
             )
 
-        dob = user.date_of_birth.isoformat() if user.date_of_birth is not None else None
-        if not dob:
-            raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message="User date of birth is required for face scan",
-            )
+        if user.date_of_birth is not None:
+            dob = user.date_of_birth.isoformat()
+        else:
+            try:
+                age = int(user.age)
+            except (TypeError, ValueError):
+                age = 0
+            if age <= 0:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="User date of birth or valid age is required for face scan",
+                )
+            dob = date(date.today().year - age, 1, 1).isoformat()
 
         org_code = (settings.AURAE_ORG_CODE or "").strip()
         onboard_payload: dict[str, Any] = {

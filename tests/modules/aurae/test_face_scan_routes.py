@@ -23,17 +23,24 @@ def _auth_header(user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-async def _seed_vifc_user(test_db_session, *, user_id: int, phone: str | None = None):
+async def _seed_vifc_user(
+    test_db_session,
+    *,
+    user_id: int,
+    phone: str | None = None,
+    age: int = 30,
+    date_of_birth: date | None = date(1995, 5, 15),
+):
     test_db_session.add(
         User(
             user_id=user_id,
-            age=30,
+            age=age,
             phone=phone or f"{user_id}000000000"[:15],
             email=f"user{user_id}@example.com",
             first_name="Face",
             last_name="Scan",
             gender="male",
-            date_of_birth=date(1995, 5, 15),
+            date_of_birth=date_of_birth,
             status="active",
             is_participant=True,
         )
@@ -204,7 +211,12 @@ async def test_start_face_scan_calls_aurae_and_logs(async_client, test_db_sessio
     await _ensure_test_engagement(test_db_session)
     _configure_aurae(monkeypatch)
     uid = 88107
-    await _seed_vifc_user(test_db_session, user_id=uid)
+    await _seed_vifc_user(
+        test_db_session,
+        user_id=uid,
+        age=30,
+        date_of_birth=None,
+    )
     pkg_id = await _seed_vifc_package(test_db_session, package_id=8817)
 
     aid = 8818
@@ -256,6 +268,7 @@ async def test_start_face_scan_calls_aurae_and_logs(async_client, test_db_sessio
     assert body["waist"] == 32
     assert body["gender"] == "male"
     assert body["org_code"] == "ORG123"
+    assert body["dob"] == f"{date.today().year - 30}-01-01"
 
     link_row = (
         await test_db_session.execute(
