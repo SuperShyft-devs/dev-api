@@ -149,6 +149,12 @@ class AuraeService:
         }
 
         engagement_id = int(instance.engagement_id)
+        participant_id = int(participant.engagement_participant_id)
+
+        # Release any open transaction / row locks before outbound HTTP.
+        # Holding idle-in-transaction locks on engagement_participants blocks
+        # DDL (e.g. alembic ADD COLUMN) and other writers.
+        await db.commit()
 
         async def _get_token() -> str:
             return await aurae_client.get_token()
@@ -161,7 +167,7 @@ class AuraeService:
             user_id=user_id,
             request_payload={"org_code": org_code},
             operation=_get_token,
-            persist=False,
+            persist=True,
         )
         if not token:
             raise AppError(
@@ -181,7 +187,7 @@ class AuraeService:
             user_id=user_id,
             request_payload=onboard_payload,
             operation=_onboard,
-            persist=False,
+            persist=True,
         )
         if not onboard_result or not isinstance(onboard_result, dict):
             raise AppError(
@@ -198,6 +204,17 @@ class AuraeService:
                 message="Aurae onboard response did not include a link",
             )
 
+        participant = await self._engagements_repo.get_participant_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(
+                status_code=400,
+                error_code="PARTICIPANT_NOT_FOUND",
+                message=f"Engagement participant {participant_id} not found after Aurae onboard",
+            )
         participant.face_scan_link = link
         await self._engagements_repo.update_participant(db, participant)
 
