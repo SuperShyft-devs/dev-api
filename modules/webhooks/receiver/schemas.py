@@ -15,3 +15,15 @@ class HealthiansWebhookPayload(BaseModel):
     type: str
     booking_id: str
     data: dict[str, Any] = Field(default_factory=dict)
+
+
+class AuraeWebhookPayload(BaseModel):
+    """Aurae VIFC Results or Report webhook body."""
+
+    model_config = ConfigDict(extra="allow")
+
+    api_customer_id: str = ""
+    data: dict[str, Any] | None = None
+    reports: dict[str, list[Any]] | None = None
+    orgCode: str | None = None
+    requested_components: list[str] | None = None

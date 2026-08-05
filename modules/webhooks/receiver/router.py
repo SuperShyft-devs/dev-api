@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
 from db.session import get_db
 from modules.webhooks.dependencies import get_webhooks_receiver_service
-from modules.webhooks.receiver.schemas import HealthiansWebhookPayload
+from modules.webhooks.receiver.schemas import AuraeWebhookPayload, HealthiansWebhookPayload
 from modules.webhooks.receiver.service import WebhooksReceiverService
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -25,6 +25,24 @@ async def healthians_webhook(
         db,
         payload=payload,
         api_endpoint_url=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.post("/aurae")
+async def aurae_webhook(
+    payload: AuraeWebhookPayload,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    service: WebhooksReceiverService = Depends(get_webhooks_receiver_service),
+    x_api_key: str | None = Header(None, alias="x-api-key"),
+):
+    result = await service.handle_aurae_webhook(
+        db,
+        payload=payload,
+        api_endpoint_url=str(request.url.path),
+        api_key=x_api_key,
     )
     await db.commit()
     return success_response(result)

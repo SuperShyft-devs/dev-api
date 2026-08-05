@@ -128,6 +128,8 @@ class Settings:
     AURAE_API_KEY: str = os.getenv("AURAE_API_KEY", "")
     AURAE_ORG_CODE: str = os.getenv("AURAE_ORG_CODE", "")
     AURAE_TIMEOUT_SECONDS: int = int(os.getenv("AURAE_TIMEOUT_SECONDS", "15"))
+    # Inbound webhook auth (x-api-key). Falls back to AURAE_API_KEY when unset.
+    AURAE_WEBHOOK_API_KEY: str = os.getenv("AURAE_WEBHOOK_API_KEY", "")
 
     # Notification service (n8n webhooks)
     NOTIFICATION_SERVICE_BASE_URL: str = os.getenv("NOTIFICATION_SERVICE_BASE_URL", "https://n8n.supershyft.com")
