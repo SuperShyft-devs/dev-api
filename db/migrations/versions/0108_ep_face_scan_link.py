@@ -2,13 +2,16 @@
 
 Revision ID: 0108_ep_face_scan_link
 Revises: 0107_eng_notif_normalize
+
+Uses a single ADD COLUMN IF NOT EXISTS with a short lock_timeout so deploy
+fails fast on lock contention instead of hanging (common when API/cron still
+holds locks on engagement_participants).
 """
 
 from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy import inspect
 
 
 revision = "0108_ep_face_scan_link"
@@ -17,18 +20,16 @@ branch_labels = None
 depends_on = None
 
 
-def _column_exists(table: str, column: str) -> bool:
-    bind = op.get_bind()
-    inspector = inspect(bind)
-    return any(c["name"] == column for c in inspector.get_columns(table))
-
-
 def upgrade() -> None:
-    if not _column_exists("engagement_participants", "face_scan_link"):
-        op.add_column(
-            "engagement_participants",
-            sa.Column("face_scan_link", sa.String(), nullable=True),
+    # Fail fast if another session holds AccessExclusiveLock on the table
+    # (running API workers / long queries). Nullable ADD COLUMN itself is cheap.
+    op.execute(sa.text("SET LOCAL lock_timeout = '15s'"))
+    op.execute(
+        sa.text(
+            "ALTER TABLE engagement_participants "
+            "ADD COLUMN IF NOT EXISTS face_scan_link VARCHAR"
         )
+    )
 
 
 def downgrade() -> None:
