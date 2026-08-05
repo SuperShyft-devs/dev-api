@@ -475,6 +475,68 @@ async def test_engagement_onboard_prefers_payload_referred_by(async_client, test
 
 
 @pytest.mark.asyncio
+async def test_engagement_onboard_overwrites_existing_address_fields(async_client, test_db_session):
+    """B2B onboard overwrites address/city/state/country/pincode even when already set."""
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
+            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
+            "VALUES (3301, 'Camp-Addr', 'ENGADDR', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, first_name, age, phone, email, status, address, pin_code, city, state, country) "
+            "VALUES (2101, 'Existing', 30, '7777777777', 'addr@example.com', 'active', "
+            "'Old Street', '110001', 'Delhi', 'DL', 'India')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "Existing",
+        "phone": "7777777777",
+        "email": "addr@example.com",
+        "address": "New Street 42",
+        "pincode": "560001",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "11:00",
+    }
+
+    response = await async_client.post("/users/code/ENGADDR/onboard", json=payload)
+    assert response.status_code == 200
+
+    row = (
+        await test_db_session.execute(
+            text(
+                "SELECT address, pin_code, city, state, country FROM users WHERE user_id = 2101"
+            )
+        )
+    ).first()
+    assert row.address == "New Street 42"
+    assert row.pin_code == "560001"
+    assert row.city == "Bengaluru"
+    assert row.state == "KA"
+    assert row.country == "IN"
+
+
+@pytest.mark.asyncio
 async def test_engagement_onboard_requires_active_engagement(async_client, test_db_session):
     await test_db_session.execute(
         text(

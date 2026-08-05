@@ -2252,6 +2252,23 @@ class UsersService:
             create_data=create_data,
         )
 
+        # Address fields: always overwrite when provided (even if already set).
+        location_update = {
+            key: value
+            for key, value in {
+                "address": payload.address,
+                "pin_code": payload.pincode,
+                "city": payload.city,
+                "state": payload.state,
+                "country": payload.country,
+            }.items()
+            if value is not None
+        }
+        if location_update:
+            updated = await self._repository.update_user_partial(db, user.user_id, location_update)
+            if updated is not None:
+                user = updated
+
         slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
         validated_department = await self._engagements_service.resolve_participant_department_for_engagement(
             db,
