@@ -396,10 +396,11 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
         # Restore B2C defaults (matches db.seed); tests that customize settings delete/replace this row.
         await test_db_session.execute(
             text(
-                "INSERT INTO platform_settings (settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, default_onboarding_notification) "
-                "VALUES (1, 1, 6, 'booking-alert-whatsapp')"
+                "INSERT INTO platform_settings (settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
+                "VALUES (1, 1, 6)"
             )
         )
+    await test_db_session.execute(text("DELETE FROM engagement_notifications"))
     await test_db_session.execute(text("DELETE FROM engagements"))
     if _use_isolated_test_db:
         # Tests insert ad-hoc assessment_packages; seed keeps MET_BASIC / MET_PRO / FitPrint as ids 1–3.

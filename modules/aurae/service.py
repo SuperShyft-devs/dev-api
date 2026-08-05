@@ -72,7 +72,7 @@ class AuraeService:
             )
 
         instance, package = row
-        self._validate_vifc_package(instance=instance, package=package)
+        self._validate_vifc_package(package=package)
 
         if instance.engagement_id is None:
             raise AppError(
@@ -221,7 +221,11 @@ class AuraeService:
         return {"link": link}
 
     @staticmethod
-    def _validate_vifc_package(*, instance, package) -> None:
+    def _validate_vifc_package(*, package) -> None:
+        # Only the package is validated. The instance status is deliberately not
+        # checked: submitting the VIFC questionnaire completes the assessment's
+        # only category, so by the time a scan is requested the instance is
+        # normally already "completed".
         if package is None:
             raise AppError(
                 status_code=400,
@@ -231,7 +235,6 @@ class AuraeService:
         package_code = (getattr(package, "package_code", None) or "").strip().lower()
         type_code = (getattr(package, "assessment_type_code", None) or "").strip().lower()
         package_status = (getattr(package, "status", None) or "").strip().lower()
-        instance_status = (getattr(instance, "status", None) or "").strip().lower()
 
         if package_code != _VIFC:
             raise AppError(
@@ -250,12 +253,6 @@ class AuraeService:
                 status_code=400,
                 error_code="INVALID_INPUT",
                 message="Assessment package must be Active",
-            )
-        if instance_status != "active":
-            raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message="Assessment instance must be Active",
             )
 
     async def _resolve_anthropometry(

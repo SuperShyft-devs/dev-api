@@ -132,6 +132,8 @@ async def test_start_face_scan_rejects_non_vifc_package(async_client, test_db_se
             status="active",
         )
     )
+    await test_db_session.commit()
+
     aid = 8814
     test_db_session.add(
         AssessmentInstance(
@@ -298,7 +300,7 @@ async def test_vifc_quick_start_returns_link(async_client, test_db_session, monk
     await test_db_session.execute(
         text(
             "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
-            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = 'active'"
         )
     )
     await test_db_session.execute(
@@ -334,7 +336,7 @@ async def test_vifc_quick_start_returns_link(async_client, test_db_session, monk
             "b2c_default_engagement_type, b2c_default_blood_collection_type, "
             "b2c_default_create_profile_on_metsights, b2c_default_enroll_for_fitprint_full, "
             "b2c_onboarding_by_engagement_type) "
-            "VALUES (1, :pid, 1, 'vifc', NULL, false, false, CAST(:by_type AS jsonb)) "
+            "VALUES (1, :pid, 1, 'bio_ai', NULL, false, false, CAST(:by_type AS jsonb)) "
             "ON CONFLICT (settings_id) DO UPDATE SET "
             "b2c_default_assessment_package_id = EXCLUDED.b2c_default_assessment_package_id, "
             "b2c_default_diagnostic_package_id = EXCLUDED.b2c_default_diagnostic_package_id, "
@@ -413,7 +415,7 @@ async def test_vifc_quick_start_by_user_id(async_client, test_db_session, monkey
     await test_db_session.execute(
         text(
             "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
-            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO UPDATE SET status = 'active'"
         )
     )
     await test_db_session.execute(
@@ -449,7 +451,7 @@ async def test_vifc_quick_start_by_user_id(async_client, test_db_session, monkey
             "b2c_default_engagement_type, b2c_default_blood_collection_type, "
             "b2c_default_create_profile_on_metsights, b2c_default_enroll_for_fitprint_full, "
             "b2c_onboarding_by_engagement_type) "
-            "VALUES (1, :pid, 1, 'vifc', NULL, false, false, CAST(:by_type AS jsonb)) "
+            "VALUES (1, :pid, 1, 'bio_ai', NULL, false, false, CAST(:by_type AS jsonb)) "
             "ON CONFLICT (settings_id) DO UPDATE SET "
             "b2c_onboarding_by_engagement_type = EXCLUDED.b2c_onboarding_by_engagement_type, "
             "b2c_default_assessment_package_id = EXCLUDED.b2c_default_assessment_package_id, "

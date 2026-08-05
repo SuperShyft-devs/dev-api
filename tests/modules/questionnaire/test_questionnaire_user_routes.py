@@ -87,11 +87,20 @@ async def _ensure_test_engagement(test_db_session, *, engagement_id: int = 1):
             )
             test_db_session.add(test_diag)
         
+        # engagements.engagement_type is an FK to engagement_types.id, not a string code.
+        from modules.engagements.models import EngagementType
+
+        engagement_type_id = (
+            await test_db_session.execute(
+                select(EngagementType.id).where(EngagementType.code == "bio_ai").limit(1)
+            )
+        ).scalar_one_or_none()
+
         engagement = Engagement(
             engagement_id=engagement_id,
             engagement_name="Test Engagement",
             engagement_code="TEST001",
-            engagement_type="bio_ai",
+            engagement_type=engagement_type_id,
             assessment_package_id=1,
             diagnostic_package_id=1,
             slot_duration=20,

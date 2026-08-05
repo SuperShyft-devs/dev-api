@@ -22,8 +22,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance
 from modules.assessments.repository import AssessmentsRepository
 from modules.employee.models import Employee
-from modules.engagements.constants import DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY
-from modules.engagements.models import Engagement, EngagementKind, EngagementParticipant
+from modules.engagement_notifications.repository import EngagementNotificationsRepository
+from modules.engagements.models import (
+    Engagement,
+    EngagementKind,
+    EngagementParticipant,
+    EngagementType,
+)
 from modules.engagements.repository import EngagementsRepository
 from modules.platform_settings.models import PlatformSettings
 from modules.users.models import User
@@ -238,16 +243,26 @@ async def _unique_engagement_code(session: AsyncSession, er: EngagementsReposito
     raise RuntimeError("Could not allocate unique engagement_code")
 
 
+async def _bio_ai_engagement_type_id(session: AsyncSession) -> int | None:
+    """`engagements.engagement_type` is an FK to engagement_types.id, not the legacy enum."""
+    return (
+        await session.execute(
+            select(EngagementType.id).where(EngagementType.code == EngagementKind.bio_ai.value).limit(1)
+        )
+    ).scalar_one_or_none()
+
+
 async def _profile_seed_engagement_exists(
     session: AsyncSession, *, user_id: int, engagement_name: str
 ) -> bool:
+    type_id = await _bio_ai_engagement_type_id(session)
     q = (
         select(Engagement.engagement_id)
         .join(EngagementParticipant, EngagementParticipant.engagement_id == Engagement.engagement_id)
         .where(EngagementParticipant.user_id == user_id)
         .where(Engagement.engagement_name == engagement_name)
         .where(Engagement.organization_id.is_(None))
-        .where(Engagement.engagement_type == EngagementKind.bio_ai)
+        .where(Engagement.engagement_type == type_id)
         .limit(1)
     )
     return (await session.execute(q)).scalar_one_or_none() is not None
@@ -353,12 +368,13 @@ async def _seed_one_engagement_per_user(
     ar = AssessmentsRepository()
     code = await _unique_engagement_code(session, er)
 
+    engagement_type_id = await _bio_ai_engagement_type_id(session)
     engagement = Engagement(
         engagement_name=engagement_name,
         metsights_engagement_id=None,
         organization_id=None,
         engagement_code=code,
-        engagement_type=EngagementKind.bio_ai,
+        engagement_type=engagement_type_id,
         assessment_package_id=primary_pid,
         diagnostic_package_id=diagnostic_package_id,
         city=(user.city or "").strip() or "",
@@ -368,10 +384,16 @@ async def _seed_one_engagement_per_user(
         start_date=slot_date,
         end_date=slot_date,
         status="running",
-        onboarding_notification=DEFAULT_ENGAGEMENT_NOTIFICATION_SERVICE_KEY,
     )
     await er.create_engagement(session, engagement)
     eid = int(engagement.engagement_id)
+
+    if engagement_type_id is not None:
+        await EngagementNotificationsRepository().populate_from_defaults(
+            session,
+            engagement_id=eid,
+            engagement_type_id=int(engagement_type_id),
+        )
 
     participant = EngagementParticipant(
         engagement_id=eid,

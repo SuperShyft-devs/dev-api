@@ -33,5 +33,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Downgrades are intentionally disabled."""
-    raise NotImplementedError("Downgrade is not supported")
+    op.execute(sa.text("SET LOCAL lock_timeout = '15s'"))
+    op.execute(
+        sa.text(
+            "ALTER TABLE engagement_participants DROP COLUMN IF EXISTS face_scan_link"
+        )
+    )
