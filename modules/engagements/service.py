@@ -688,11 +688,15 @@ class EngagementsService:
                 message="Engagement code already exists",
             )
 
+        update_fields = payload.model_dump(exclude_unset=True)
+
         engagement.engagement_name = payload.engagement_name
         engagement.engagement_code = code
         engagement.organization_id = payload.organization_id
         engagement.engagement_type = payload.engagement_type
-        engagement.consultations = payload.consultations
+        # Callers that never send the key keep whatever is already configured.
+        if "consultations" in update_fields:
+            engagement.consultations = payload.consultations
         engagement.assessment_package_id = payload.assessment_package_id
         engagement.diagnostic_package_id = payload.diagnostic_package_id
         engagement.city = payload.city
@@ -707,7 +711,6 @@ class EngagementsService:
         engagement.slot_duration = payload.slot_duration
         engagement.start_date = payload.start_date
         engagement.end_date = payload.end_date
-        update_fields = payload.model_dump(exclude_unset=True)
         if "camp_no" in update_fields:
             engagement.camp_no = update_fields["camp_no"]
         else:
