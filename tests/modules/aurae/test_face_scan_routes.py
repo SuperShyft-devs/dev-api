@@ -381,8 +381,8 @@ async def test_vifc_quick_start_returns_link(async_client, test_db_session, monk
     response = await async_client.post("/users/public/vifc/quick-start", json=payload)
     assert response.status_code == 200, response.text
     data = response.json()["data"]
-    assert data["link"] == "https://integration.auraehealth.com?token=quick"
-    assert data["face_scan_link"] == data["link"]
+    assert "link" not in data
+    assert data["face_scan_link"] == "https://integration.auraehealth.com?token=quick"
     assert data["assessment_instance_id"] is not None
     assert data["engagement_participant_id"] is not None
 
@@ -500,4 +500,5 @@ async def test_vifc_quick_start_by_user_id(async_client, test_db_session, monkey
     data = response.json()["data"]
     assert data["user_id"] == 88250
     assert data["created"] is False
-    assert data["link"] == "https://integration.auraehealth.com?token=byuid"
+    assert "link" not in data
+    assert data["face_scan_link"] == "https://integration.auraehealth.com?token=byuid"

@@ -2123,7 +2123,6 @@ class UsersService:
             engagement_participant_id=onboard.engagement_participant_id,
             assessment_instance_id=onboard.assessment_instance_id,
             metsights_record_id=onboard.metsights_record_id,
-            link=link,
             face_scan_link=link,
         )
 

@@ -439,7 +439,6 @@ class VifcQuickStartResponse(BaseModel):
     engagement_participant_id: Optional[int] = None
     assessment_instance_id: Optional[int] = None
     metsights_record_id: Optional[str] = None
-    link: str
     face_scan_link: str
 
 
