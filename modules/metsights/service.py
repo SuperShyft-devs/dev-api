@@ -624,6 +624,20 @@ class MetsightsService:
                 return {str(k) for k in detail.keys()}
             return set()
 
+        def _is_already_exists_conflict(exc: httpx.HTTPStatusError) -> bool:
+            """True when Metsights signals the sub-resource row already exists."""
+            if exc.response.status_code == 409:
+                return True
+            if exc.response.status_code != 400:
+                return False
+            try:
+                err = exc.response.json()
+            except Exception:
+                err = None
+            detail = err.get("detail") if isinstance(err, dict) else None
+            text = str(detail if detail is not None else exc.response.text).lower()
+            return "already exist" in text
+
         def _raise_validation(exc: httpx.HTTPStatusError, *, payload: dict[str, Any] | None = None) -> None:
             try:
                 error_body = exc.response.json()
@@ -651,7 +665,14 @@ class MetsightsService:
                 try:
                     return await self._client.post_record_resource(record_id=rid, resource=res, data=data)
                 except httpx.HTTPStatusError as exc_post:
-                    if exc_post.response.status_code == 409:
+                    # Metsights often returns 400 "… already exists …" instead of 409 when GET
+                    # is 404/405 but the row was created earlier.
+                    if exc_post.response.status_code == 409 or _is_already_exists_conflict(exc_post):
+                        logger.info(
+                            "Metsights POST /records/%s/%s/ reported existing resource — falling back to PATCH",
+                            rid,
+                            res,
+                        )
                         return await self._client.patch_record_resource(record_id=rid, resource=res, data=data)
                     raise
             return await self._client.patch_record_resource(record_id=rid, resource=res, data=data)

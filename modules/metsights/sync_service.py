@@ -352,6 +352,51 @@ def _pick_metsights_payload_for_bases(merged: dict[str, Any], bases: frozenset[s
     return out
 
 
+def _validate_measurement_ranges(payload: dict[str, Any]) -> None:
+    """Reject absurd anthropometry values before calling Metsights."""
+    weight = payload.get("weight")
+    if weight is not None:
+        try:
+            w = float(weight)
+        except (TypeError, ValueError):
+            w = None
+        unit = str(payload.get("weight_unit") or "0").strip()
+        if w is not None:
+            if unit in {"0", "kg"} and (w < 20 or w > 300):
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_INPUT",
+                    message=f"Weight {w} kg is out of range (expected 20–300 kg)",
+                )
+            if unit in {"1", "lb", "lbs"} and (w < 44 or w > 660):
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_INPUT",
+                    message=f"Weight {w} lb is out of range (expected 44–660 lb)",
+                )
+
+    height = payload.get("height")
+    if height is not None:
+        try:
+            h = float(height)
+        except (TypeError, ValueError):
+            h = None
+        unit = str(payload.get("height_unit") or "0").strip()
+        if h is not None:
+            if unit in {"0", "cm"} and (h < 50 or h > 250):
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_INPUT",
+                    message=f"Height {h} cm is out of range (expected 50–250 cm)",
+                )
+            if unit in {"2", "ft/in", "ft", "feet"} and (h < 1.5 or h > 8.5):
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_INPUT",
+                    message=f"Height {h} ft/in is out of range",
+                )
+
+
 class _FieldMeta:
     """Metadata for a single Metsights OPTIONS field."""
     __slots__ = ("valid_choices", "required", "label_to_value")
@@ -1899,6 +1944,7 @@ class MetsightsSyncService:
             field_meta = await self._fetch_field_metadata_for_resource(mrid, api_path, cache=None)
             if field_meta:
                 metsights_payload = _validate_payload_against_options(metsights_payload, field_meta)
+            _validate_measurement_ranges(metsights_payload)
             metsights_payload["is_complete"] = True
             await self._metsights.upsert_record_subresource(record_id=mrid, resource=api_path, body=metsights_payload)
             await audit_repo.update_sync_log_status(

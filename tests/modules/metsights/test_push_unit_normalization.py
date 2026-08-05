@@ -77,3 +77,20 @@ def test_validate_payload_does_not_blindly_remap_labels_to_zero():
     }
     cleaned = _validate_payload_against_options({"diet_preference": "Non-Vegetarian"}, meta)
     assert "diet_preference" not in cleaned
+
+
+def test_validate_measurement_ranges_rejects_tiny_weight():
+    from modules.metsights.sync_service import _validate_measurement_ranges
+    from core.exceptions import AppError
+    import pytest
+
+    with pytest.raises(AppError) as ei:
+        _validate_measurement_ranges({"weight": 5.0, "weight_unit": "0"})
+    assert ei.value.error_code == "INVALID_INPUT"
+    assert "20" in ei.value.message
+
+
+def test_validate_measurement_ranges_allows_normal_weight():
+    from modules.metsights.sync_service import _validate_measurement_ranges
+
+    _validate_measurement_ranges({"weight": 70.0, "weight_unit": "0", "height": 185.0, "height_unit": "0"})
