@@ -393,6 +393,56 @@ class UserOnboardResponse(BaseModel):
     metsights_record_id: Optional[str] = None
 
 
+class VifcQuickStartRequest(BaseModel):
+    """Public VIFC quick-start: onboard with engagement_type=vifc then start face scan.
+
+    When ``user_id`` is provided, personal profile fields are optional and ignored.
+    Without ``user_id``, ``age`` and ``phone`` remain required.
+    """
+
+    user_id: Optional[int] = Field(default=None, ge=1)
+
+    age: Optional[int] = None
+    first_name: Optional[str] = Field(default=None, max_length=100)
+    last_name: Optional[str] = Field(default=None, max_length=100)
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
+    gender: Optional[str] = Field(default=None, max_length=30)
+    dob: Optional[date] = None
+    address: Optional[str] = Field(default=None, max_length=500)
+    pincode: Optional[str] = Field(default=None, max_length=20)
+    city: Optional[str] = Field(default=None, max_length=100)
+    state: Optional[str] = Field(default=None, max_length=100)
+    country: Optional[str] = Field(default=None, max_length=100)
+
+    questionnaire: Optional[dict[str, OnboardCategoryQuestionnaire]] = None
+
+    @model_validator(mode="after")
+    def require_personal_fields_without_user_id(self):
+        if self.user_id is not None:
+            return self
+        if self.phone is None or not str(self.phone).strip():
+            raise ValueError("phone is required when user_id is not provided")
+        if self.age is None:
+            raise ValueError("age is required when user_id is not provided")
+        if self.age < 1 or self.age > 120:
+            raise ValueError("Age must be between 1 and 120")
+        return self
+
+
+class VifcQuickStartResponse(BaseModel):
+    user_id: int
+    created: bool
+    is_participant: bool
+    engagement_id: Optional[int] = None
+    engagement_code: Optional[str] = None
+    engagement_participant_id: Optional[int] = None
+    assessment_instance_id: Optional[int] = None
+    metsights_record_id: Optional[str] = None
+    link: str
+    face_scan_link: str
+
+
 class BookingPaymentResponse(BaseModel):
     """Returned by POST /book/bio-ai and POST /book/blood-test after creating bookings + Razorpay order."""
 

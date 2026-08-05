@@ -138,6 +138,7 @@ class EngagementParticipant(Base):
     barcode = Column(String, nullable=True)
     booking_id = Column(String, nullable=True)
     blood_collection_time_slot_id = Column(String, nullable=True)
+    face_scan_link = Column(String, nullable=True)
 
     @validates("user_id")
     def _default_booked_by_user_id(self, _key: str, user_id: int) -> int:

@@ -52,6 +52,8 @@ from modules.users.schemas import (
     UserPreferencesUpdate,
     UpdateMyProfileRequest,
     UserOnboardResponse,
+    VifcQuickStartRequest,
+    VifcQuickStartResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -191,6 +193,7 @@ class UsersService:
         payments_service=None,
         notifications_service=None,
         questionnaire_service=None,
+        aurae_service=None,
     ):
         self._repository = repository
         self._audit_service = audit_service
@@ -201,6 +204,7 @@ class UsersService:
         self._payments_service = payments_service
         self._notifications_service = notifications_service
         self._questionnaire_service = questionnaire_service
+        self._aurae_service = aurae_service
 
     async def get_existing_user_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
         return await self._repository.get_user_by_phone(db, phone)
@@ -2057,6 +2061,70 @@ class UsersService:
             engagement_participant_id=time_slot.engagement_participant_id,
             assessment_instance_id=int(assessment_instance.assessment_instance_id),
             metsights_record_id=mid,
+        )
+
+    async def public_vifc_quick_start(
+        self,
+        db: AsyncSession,
+        *,
+        payload: VifcQuickStartRequest,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> VifcQuickStartResponse:
+        """B2C VIFC onboard followed by Aurae face-scan start."""
+
+        if self._aurae_service is None:
+            raise RuntimeError("Aurae service is required")
+
+        onboard_payload = PublicUserOnboardRequest(
+            user_id=payload.user_id,
+            age=payload.age,
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+            email=payload.email,
+            phone=payload.phone,
+            gender=payload.gender,
+            dob=payload.dob,
+            address=payload.address,
+            pincode=payload.pincode,
+            city=payload.city,
+            state=payload.state,
+            country=payload.country,
+            engagement_type="vifc",
+            questionnaire=payload.questionnaire,
+        )
+        onboard = await self.public_onboard_user(
+            db,
+            payload=onboard_payload,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            endpoint=endpoint,
+        )
+        if onboard.assessment_instance_id is None:
+            raise AppError(
+                status_code=500,
+                error_code="INTERNAL_ERROR",
+                message="VIFC onboard did not create an assessment instance",
+            )
+
+        face = await self._aurae_service.start_face_scan(
+            db,
+            assessment_instance_id=int(onboard.assessment_instance_id),
+            user_id=int(onboard.user_id),
+        )
+        link = face["link"]
+        return VifcQuickStartResponse(
+            user_id=onboard.user_id,
+            created=onboard.created,
+            is_participant=onboard.is_participant,
+            engagement_id=onboard.engagement_id,
+            engagement_code=onboard.engagement_code,
+            engagement_participant_id=onboard.engagement_participant_id,
+            assessment_instance_id=onboard.assessment_instance_id,
+            metsights_record_id=onboard.metsights_record_id,
+            link=link,
+            face_scan_link=link,
         )
 
     async def book_bio_ai_for_user_without_payment(

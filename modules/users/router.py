@@ -35,6 +35,7 @@ from modules.users.schemas import (
     UserPreferencesUpdate,
     UpdateMetsightsProfileIdRequest,
     UpdateMyProfileRequest,
+    VifcQuickStartRequest,
 )
 from modules.users.service import UsersService
 
@@ -51,6 +52,26 @@ async def public_onboard_user(
     users_service: UsersService = Depends(get_users_service),
 ):
     result = await users_service.public_onboard_user(
+        db,
+        payload=payload,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+
+    return success_response(result.model_dump())
+
+
+@router.post("/public/vifc/quick-start")
+@limiter.limit("3/minute")
+async def public_vifc_quick_start(
+    payload: VifcQuickStartRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    users_service: UsersService = Depends(get_users_service),
+):
+    result = await users_service.public_vifc_quick_start(
         db,
         payload=payload,
         ip_address=get_client_ip(request),

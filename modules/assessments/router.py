@@ -13,6 +13,8 @@ from modules.assessments.dependencies import (
     get_assessment_package_categories_service,
     get_assessments_service,
 )
+from modules.aurae.dependencies import get_aurae_service
+from modules.aurae.service import AuraeService
 from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
 from modules.assessments.schemas import (
     AssessmentStatusUpdateRequest,
@@ -299,3 +301,21 @@ async def set_assessment_metsights_record_id(
             "completed_at": updated.completed_at,
         }
     )
+
+
+@router.post("/{assessment_instance_id}/start-face-scan")
+async def start_face_scan(
+    assessment_instance_id: int,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    aurae_service: AuraeService = Depends(get_aurae_service),
+):
+    """Obtain (or reuse) the Aurae VIFC face-scan link for this assessment."""
+
+    data = await aurae_service.start_face_scan(
+        db,
+        assessment_instance_id=assessment_instance_id,
+        user_id=user.user_id,
+    )
+    await db.commit()
+    return success_response(data)

@@ -6,6 +6,7 @@ from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
 from modules.assessments.dependencies import get_assessments_service
 from modules.assessments.repository import AssessmentsRepository
+from modules.aurae.dependencies import get_aurae_service
 from modules.engagements.dependencies import get_engagements_service
 from modules.metsights.dependencies import get_metsights_service
 from modules.notifications.dependencies import get_notifications_service
@@ -32,6 +33,7 @@ def get_users_service() -> UsersService:
         payments_service=PaymentsService(),
         notifications_service=get_notifications_service(),
         questionnaire_service=get_questionnaire_user_service(),
+        aurae_service=get_aurae_service(),
     )
 
 

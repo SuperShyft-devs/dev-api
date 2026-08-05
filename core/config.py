@@ -123,6 +123,12 @@ class Settings:
         os.getenv("HEALTHIANS_WEBHOOK_FORWARD_TIMEOUT_SECONDS", "15")
     )
 
+    # Aurae Face Scan (VIFC) partner API
+    AURAE_BASE_URL: str = os.getenv("AURAE_BASE_URL", "")
+    AURAE_API_KEY: str = os.getenv("AURAE_API_KEY", "")
+    AURAE_ORG_CODE: str = os.getenv("AURAE_ORG_CODE", "")
+    AURAE_TIMEOUT_SECONDS: int = int(os.getenv("AURAE_TIMEOUT_SECONDS", "15"))
+
     # Notification service (n8n webhooks)
     NOTIFICATION_SERVICE_BASE_URL: str = os.getenv("NOTIFICATION_SERVICE_BASE_URL", "https://n8n.supershyft.com")
     NOTIFICATION_SERVICE_TIMEOUT_SECONDS: int = int(os.getenv("NOTIFICATION_SERVICE_TIMEOUT_SECONDS", "15"))
