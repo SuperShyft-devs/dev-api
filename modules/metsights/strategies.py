@@ -16,6 +16,41 @@ logger = logging.getLogger(__name__)
 # Push strategies: local answer -> Metsights API payload fields
 # ---------------------------------------------------------------------------
 
+# Display labels / aliases clients may store instead of Metsights unit codes.
+_UNIT_LABEL_TO_CODE: dict[str, str] = {
+    "0": "0",
+    "1": "1",
+    "2": "2",
+    "cm": "0",
+    "kg": "0",
+    "%": "0",
+    "percent": "0",
+    "percentage": "0",
+    "lb": "1",
+    "lbs": "1",
+    "pound": "1",
+    "pounds": "1",
+    "in": "1",
+    "inch": "1",
+    "inches": "1",
+    "ft/in": "2",
+    "ft": "2",
+    "feet": "2",
+    "ftin": "2",
+}
+
+
+def normalize_metsights_unit_code(unit: str | None) -> str | None:
+    """Map stored unit labels (``kg``, ``ft/in``, ``in``) to Metsights codes (``0``/``1``/``2``)."""
+    if unit is None:
+        return None
+    raw = str(unit).strip()
+    if not raw:
+        return None
+    mapped = _UNIT_LABEL_TO_CODE.get(raw) or _UNIT_LABEL_TO_CODE.get(raw.lower())
+    return mapped if mapped is not None else raw
+
+
 def push_scale_emit(key: str, answer: Any, params: dict) -> dict[str, Any]:
     """Scale answer ``{value, unit}`` -> ``{key: value, key_unit: unit}``."""
     if not isinstance(answer, dict):
@@ -28,7 +63,10 @@ def push_scale_emit(key: str, answer: Any, params: dict) -> dict[str, Any]:
         val = float(raw_val)
     except (TypeError, ValueError):
         return {}
-    return {key: val, f"{key}_unit": str(unit_raw).strip()}
+    unit = normalize_metsights_unit_code(str(unit_raw).strip())
+    if unit is None:
+        return {}
+    return {key: val, f"{key}_unit": unit}
 
 
 def push_scale_emit_unitless(key: str, answer: Any, params: dict) -> dict[str, Any]:

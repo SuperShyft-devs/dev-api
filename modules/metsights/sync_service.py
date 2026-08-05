@@ -354,11 +354,48 @@ def _pick_metsights_payload_for_bases(merged: dict[str, Any], bases: frozenset[s
 
 class _FieldMeta:
     """Metadata for a single Metsights OPTIONS field."""
-    __slots__ = ("valid_choices", "required")
+    __slots__ = ("valid_choices", "required", "label_to_value")
 
-    def __init__(self, valid_choices: set[str], required: bool):
+    def __init__(
+        self,
+        valid_choices: set[str],
+        required: bool,
+        label_to_value: dict[str, str] | None = None,
+    ):
         self.valid_choices = valid_choices
         self.required = required
+        self.label_to_value = label_to_value or {}
+
+
+def _choice_label_keys(label: str) -> list[str]:
+    """Normalized lookup keys for an OPTIONS choice label."""
+    keys: list[str] = []
+    nl = _normalize_label(label)
+    if nl:
+        keys.append(nl)
+    fp = _label_fingerprint(label)
+    if fp and fp not in keys:
+        keys.append(fp)
+    return keys
+
+
+def _resolve_choice_value(raw: str, meta: _FieldMeta) -> str | None:
+    """Resolve a stored answer (code or display label) to a Metsights choice code."""
+    sv = (raw or "").strip()
+    if not sv:
+        return None
+    if sv in meta.valid_choices:
+        return sv
+    for key in _choice_label_keys(sv):
+        hit = meta.label_to_value.get(key)
+        if hit is not None:
+            return hit
+    from modules.metsights.strategies import normalize_metsights_unit_code
+
+    unit_code = normalize_metsights_unit_code(sv)
+    if unit_code is not None and unit_code in meta.valid_choices:
+        return unit_code
+    return None
 
 
 def _extract_field_metadata_from_options(options_envelope: dict[str, Any]) -> dict[str, _FieldMeta]:
@@ -384,20 +421,31 @@ def _extract_field_metadata_from_options(options_envelope: dict[str, Any]) -> di
             if not isinstance(choices, list):
                 continue
             valid: set[str] = set()
+            label_map: dict[str, str] = {}
             for c in choices:
                 if isinstance(c, dict):
                     v = c.get("value")
-                    if v is not None:
-                        valid.add(str(v).strip())
+                    if v is None:
+                        continue
+                    code = str(v).strip()
+                    if not code:
+                        continue
+                    valid.add(code)
+                    lab = c.get("label") or c.get("display_name") or c.get("name")
+                    if lab is not None and str(lab).strip():
+                        for key in _choice_label_keys(str(lab)):
+                            label_map.setdefault(key, code)
                 else:
                     valid.add(str(c).strip())
             if valid:
                 required = bool(field_info.get("required", False))
                 if field_key not in result:
-                    result[field_key] = _FieldMeta(valid, required)
+                    result[field_key] = _FieldMeta(valid, required, label_map)
                 else:
                     result[field_key].valid_choices |= valid
                     result[field_key].required = result[field_key].required or required
+                    for k, v in label_map.items():
+                        result[field_key].label_to_value.setdefault(k, v)
     return result
 
 
@@ -407,9 +455,9 @@ def _validate_payload_against_options(
 ) -> dict[str, Any]:
     """Remove or remap fields whose values are not in valid Metsights choices.
 
-    For **required** fields with invalid values, the closest numeric choice is
-    substituted so the POST does not fail on a missing required field.
-    For optional fields, invalid values are silently dropped.
+    Prefers resolving display labels via OPTIONS choice labels. Numeric codes that
+    are slightly off may fall back to the closest valid choice for required fields.
+    Unmapped non-numeric labels are dropped (never blindly rewritten to ``\"0\"``).
     """
     cleaned: dict[str, Any] = {}
     for key, value in payload.items():
@@ -417,11 +465,22 @@ def _validate_payload_against_options(
             continue
         meta = field_meta.get(key)
         if meta is None:
-            cleaned[key] = value
+            # Still normalize known unit labels on ``*_unit`` fields.
+            if key.endswith("_unit") and not isinstance(value, (list, dict, bool)):
+                from modules.metsights.strategies import normalize_metsights_unit_code
+
+                unit_code = normalize_metsights_unit_code(str(value))
+                cleaned[key] = unit_code if unit_code is not None else value
+            else:
+                cleaned[key] = value
             continue
         allowed = meta.valid_choices
         if isinstance(value, list):
-            filtered = [v for v in value if str(v).strip() in allowed]
+            filtered: list[Any] = []
+            for item in value:
+                resolved = _resolve_choice_value(str(item).strip(), meta)
+                if resolved is not None:
+                    filtered.append(resolved)
             cleaned[key] = filtered
         elif isinstance(value, bool):
             bool_str = "true" if value else "false"
@@ -429,22 +488,21 @@ def _validate_payload_against_options(
                 cleaned[key] = bool_str
             elif str(value) in allowed:
                 cleaned[key] = value
-            elif meta.required:
-                fallback = sorted(allowed)[0]
-                logger.warning("Remapping required field %s: bool %r -> %r", key, value, fallback)
-                cleaned[key] = fallback
             else:
-                logger.warning("Skipping optional field %s: bool value %r not in valid choices", key, value)
+                logger.warning("Skipping field %s: bool value %r not in valid choices", key, value)
         else:
             sv = str(value).strip()
-            if sv in allowed:
-                cleaned[key] = value
-            elif meta.required:
+            resolved = _resolve_choice_value(sv, meta)
+            if resolved is not None:
+                if resolved != sv:
+                    logger.info("Resolved field %s label %r -> %r", key, sv, resolved)
+                cleaned[key] = resolved
+            elif meta.required and sv.isdigit():
                 fallback = _find_closest_choice(sv, allowed)
                 logger.warning("Remapping required field %s: %r -> %r (closest valid)", key, sv, fallback)
                 cleaned[key] = fallback
             else:
-                logger.warning("Skipping optional field %s: value %r not in valid choices %s", key, sv, allowed)
+                logger.warning("Skipping field %s: value %r not in valid choices %s", key, sv, allowed)
     return cleaned
 
 
@@ -1846,12 +1904,17 @@ class MetsightsSyncService:
             await audit_repo.update_sync_log_status(
                 db, sync_log_id=sync_log.sync_log_id, status="success", response_payload={"pushed": True},
             )
+        except AppError as exc:
+            await audit_repo.update_sync_log_status(
+                db, sync_log_id=sync_log.sync_log_id, status="failed", error_message=str(exc.message),
+            )
+            raise
         except Exception as exc:
             await audit_repo.update_sync_log_status(
                 db, sync_log_id=sync_log.sync_log_id, status="failed", error_message=str(exc),
             )
             raise AppError(
-                status_code=502,
+                status_code=503,
                 error_code="METSIGHTS_PUSH_FAILED",
                 message=f"Failed to push to Metsights: {exc}",
             ) from exc
@@ -2012,12 +2075,17 @@ class MetsightsSyncService:
                         metsights_payload = {}
                 else:
                     metsights_payload = {}
+        except AppError as exc:
+            await audit_repo.update_sync_log_status(
+                db, sync_log_id=sync_log.sync_log_id, status="failed", error_message=str(exc.message),
+            )
+            raise
         except Exception as exc:
             await audit_repo.update_sync_log_status(
                 db, sync_log_id=sync_log.sync_log_id, status="failed", error_message=str(exc),
             )
             raise AppError(
-                status_code=502,
+                status_code=503,
                 error_code="METSIGHTS_PULL_FAILED",
                 message=f"Failed to fetch from Metsights: {exc}",
             ) from exc

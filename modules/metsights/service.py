@@ -586,7 +586,7 @@ class MetsightsService:
         ``diet-lifestyle-parameters``, or ``fitness-parameters`` (create with POST first).
 
         On a 400 with field-level validation errors, the offending fields are stripped
-        and the request is retried once with the remaining valid fields.
+        and the request is retried (iteratively) with the remaining valid fields.
         """
 
         rid = (record_id or "").strip()
@@ -610,63 +610,69 @@ class MetsightsService:
                 return set()
             detail = err.get("detail") if isinstance(err, dict) else None
             if isinstance(detail, dict):
-                return set(detail.keys())
+                return {str(k) for k in detail.keys()}
             return set()
 
-        async def _try_send(data: dict[str, Any], *, is_retry: bool = False) -> dict[str, Any]:
+        def _raise_validation(exc: httpx.HTTPStatusError) -> None:
+            try:
+                error_body = exc.response.json()
+            except Exception:
+                error_body = exc.response.text
+            raise AppError(
+                status_code=422,
+                error_code="METSIGHTS_VALIDATION_ERROR",
+                message=f"Metsights rejected data for {res}: {error_body}",
+            ) from exc
+
+        async def _send_once(data: dict[str, Any]) -> dict[str, Any]:
             if existing is None:
                 try:
                     return await self._client.post_record_resource(record_id=rid, resource=res, data=data)
                 except httpx.HTTPStatusError as exc_post:
                     if exc_post.response.status_code == 409:
                         return await self._client.patch_record_resource(record_id=rid, resource=res, data=data)
-                    if exc_post.response.status_code == 400:
-                        bad = _extract_bad_fields(exc_post)
-                        if bad and not is_retry:
-                            logger.warning(
-                                "Metsights POST /records/%s/%s/ rejected fields %s — retrying without them. payload: %s",
-                                rid, res, bad, data,
-                            )
-                            cleaned = {k: v for k, v in data.items() if k not in bad}
-                            if cleaned:
-                                try:
-                                    return await _try_send(cleaned, is_retry=True)
-                                except (httpx.HTTPStatusError, AppError) as retry_exc:
-                                    logger.warning(
-                                        "Metsights POST /records/%s/%s/ retry also failed: %s",
-                                        rid, res, retry_exc,
-                                    )
-                                    raise
-                        try:
-                            error_body = exc_post.response.json()
-                        except Exception:
-                            error_body = exc_post.response.text
-                        raise AppError(
-                            status_code=422,
-                            error_code="METSIGHTS_VALIDATION_ERROR",
-                            message=f"Metsights rejected data for {res}: {error_body}",
-                        ) from exc_post
-                    else:
-                        self._raise_metsights_record_http(exc_post)
-            else:
-                try:
-                    return await self._client.patch_record_resource(record_id=rid, resource=res, data=data)
-                except httpx.HTTPStatusError as exc_patch:
-                    if exc_patch.response.status_code == 400 and not is_retry:
-                        bad = _extract_bad_fields(exc_patch)
-                        if bad:
-                            logger.warning(
-                                "Metsights PATCH /records/%s/%s/ rejected fields %s — retrying without them.",
-                                rid, res, bad,
-                            )
-                            cleaned = {k: v for k, v in data.items() if k not in bad}
-                            if cleaned:
-                                return await _try_send(cleaned, is_retry=True)
                     raise
+            return await self._client.patch_record_resource(record_id=rid, resource=res, data=data)
+
+        async def _try_send(data: dict[str, Any]) -> dict[str, Any]:
+            current = dict(data)
+            stripped: set[str] = set()
+            # Bound retries so a pathological Metsights response cannot loop forever.
+            for _attempt in range(8):
+                try:
+                    return await _send_once(current)
+                except httpx.HTTPStatusError as exc:
+                    if exc.response.status_code != 400:
+                        self._raise_metsights_record_http(exc)
+                    bad = _extract_bad_fields(exc) - stripped
+                    # Always drop paired unit fields when a measurement is rejected.
+                    for field in list(bad):
+                        bad.add(f"{field}_unit")
+                    bad = {f for f in bad if f in current and f != "is_complete"}
+                    if not bad:
+                        _raise_validation(exc)
+                    logger.warning(
+                        "Metsights %s /records/%s/%s/ rejected fields %s — retrying without them.",
+                        "POST" if existing is None else "PATCH",
+                        rid,
+                        res,
+                        bad,
+                    )
+                    stripped |= bad
+                    current = {k: v for k, v in current.items() if k not in bad}
+                    if not any(k != "is_complete" for k in current):
+                        _raise_validation(exc)
+            raise AppError(
+                status_code=422,
+                error_code="METSIGHTS_VALIDATION_ERROR",
+                message=f"Metsights rejected data for {res} after repeated field stripping",
+            )
 
         try:
             payload = await _try_send(body)
             return _parse_payload(payload)
+        except AppError:
+            raise
         except httpx.HTTPStatusError as exc:
             self._raise_metsights_record_http(exc)
         except httpx.HTTPError as exc:
