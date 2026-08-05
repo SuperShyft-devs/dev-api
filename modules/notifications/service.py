@@ -222,20 +222,20 @@ class NotificationsService:
                         ihr = await self._repo.get_health_report_for_instance(
                             db, assessment_instance_id=instance.assessment_instance_id
                         )
-                    type_code = await self._repo.get_assessment_type_code_for_instance(
-                        db, assessment_instance_id=instance.assessment_instance_id
-                    )
-                    if (type_code or "") not in ("1", "2"):
-                        raise AppError(
-                            status_code=400,
-                            error_code="INVALID_INPUT",
-                            message=(
-                                f"BioAI reports are only available for MetSights Basic/Pro assessments; "
-                                f"assessment_instance_id={instance.assessment_instance_id} is type {type_code!r}"
-                            ),
-                        )
                     bio_url = (ihr.report_url if ihr else None) or None
                     if not (bio_url and str(bio_url).strip()):
+                        type_code = await self._repo.get_assessment_type_code_for_instance(
+                            db, assessment_instance_id=instance.assessment_instance_id
+                        )
+                        if (type_code or "") not in ("1", "2"):
+                            raise AppError(
+                                status_code=400,
+                                error_code="INVALID_INPUT",
+                                message=(
+                                    f"BioAI reports require MetSights Basic/Pro or a pre-stored report URL; "
+                                    f"assessment_instance_id={instance.assessment_instance_id} is type {type_code!r}"
+                                ),
+                            )
                         try:
                             bio_url = await resolve_bio_ai_report_url(
                                 db,

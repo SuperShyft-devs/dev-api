@@ -753,10 +753,10 @@ async def _seed_fitprint_package(test_db_session, *, package_id: int = 2):
 
 
 @pytest.mark.asyncio
-async def test_dispatch_rejects_bioai_service_for_fitprint_instance(
+async def test_dispatch_rejects_bioai_service_for_fitprint_without_report_url(
     async_client, test_db_session, monkeypatch
 ):
-    """FitPrint assessments must not be sent through BioAI notification services."""
+    """FitPrint assessments without a pre-stored report_url must be rejected for BioAI services."""
     await _seed_employee(test_db_session, user_id=9701, employee_id=971)
     await _seed_metsights_basic_package(test_db_session, package_id=1)
     await _seed_fitprint_package(test_db_session, package_id=2)
@@ -770,40 +770,12 @@ async def test_dispatch_rejects_bioai_service_for_fitprint_instance(
 
     test_db_session.add(
         AssessmentInstance(
-            assessment_instance_id=9703,
-            user_id=9702,
-            package_id=1,
-            engagement_id=9701,
-            status="active",
-            metsights_record_id="BASIC-RECORD",
-        )
-    )
-    test_db_session.add(
-        AssessmentInstance(
             assessment_instance_id=9704,
             user_id=9702,
             package_id=2,
             engagement_id=9701,
             status="completed",
             metsights_record_id="FITPRINT-RECORD",
-        )
-    )
-    test_db_session.add(
-        IndividualHealthReport(
-            report_id=9703,
-            user_id=9702,
-            engagement_id=9701,
-            assessment_instance_id=9703,
-            report_url="https://example.com/bio-ai/basic",
-        )
-    )
-    test_db_session.add(
-        IndividualHealthReport(
-            report_id=9704,
-            user_id=9702,
-            engagement_id=9701,
-            assessment_instance_id=9704,
-            report_url="https://example.com/bio-ai/fitprint",
         )
     )
     service_key = "bio_ai_fitprint_test"
@@ -818,31 +790,6 @@ async def test_dispatch_rejects_bioai_service_for_fitprint_instance(
     )
     await test_db_session.commit()
 
-    webhook_calls: list[dict] = []
-
-    class _FakeResponse:
-        def raise_for_status(self):
-            return None
-
-        def json(self):
-            return {"message": "ok"}
-
-    class _FakeClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        async def post(self, url, json=None):
-            webhook_calls.append({"url": url, "json": json})
-            return _FakeResponse()
-
-    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
-
     response = await async_client.post(
         "/notifications/dispatch",
         headers=_auth_header(9701),
@@ -854,7 +801,7 @@ async def test_dispatch_rejects_bioai_service_for_fitprint_instance(
         },
     )
     assert response.status_code == 400, response.text
-    assert "BioAI reports are only available" in response.text
+    assert "report" in response.text.lower()
 
 
 @pytest.mark.asyncio
@@ -1494,3 +1441,153 @@ async def test_callback_rejects_update_when_already_sent(async_client, test_db_s
     )
     assert response.status_code == 400
     assert "status" in response.json()["message"].lower()
+
+
+async def _seed_vifc_package(test_db_session, *, package_id: int = 3):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, assessment_type_code, status) "
+            "VALUES (:pid, 'vifc', 'Aurae Face Scan', 'vifc', 'active') "
+            "ON CONFLICT (package_id) DO UPDATE SET assessment_type_code = EXCLUDED.assessment_type_code"
+        ),
+        {"pid": package_id},
+    )
+    await test_db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_vifc_with_pre_stored_report_url_succeeds(
+    async_client, test_db_session, monkeypatch
+):
+    """VIFC assessment with a pre-stored report_url should work for require_bio_ai_report_url services."""
+    await _seed_employee(test_db_session, user_id=9801, employee_id=981)
+    await _seed_vifc_package(test_db_session, package_id=3)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9801, engagement_code="ENG-NOTIF-9801")
+
+    test_db_session.add(User(user_id=9802, age=30, phone="9802000000", status="active"))
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9803,
+            user_id=9802,
+            package_id=3,
+            engagement_id=9801,
+            status="active",
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=9803,
+            user_id=9802,
+            engagement_id=9801,
+            assessment_instance_id=9803,
+            report_url="https://reportsauraehealth.s3.ap-south-1.amazonaws.com/auraeaireports/vifc-test.pdf",
+        )
+    )
+    service_key = "bio_ai_vifc_dispatch_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'VIFC BioAI Report', 'whatsapp', 'vifc-report', true, false, true, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_bio_ai_report_url = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_auth_header(9801),
+        json={
+            "service_key": service_key,
+            "user_ids": [9802],
+            "engagement_id": 9801,
+            "assessment_instance_id": 9803,
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert webhook_calls
+    member = webhook_calls[0]["json"]["members"][0]
+    assert member["bio_ai_report_url"] == (
+        "https://reportsauraehealth.s3.ap-south-1.amazonaws.com/auraeaireports/vifc-test.pdf"
+    )
+
+
+@pytest.mark.asyncio
+async def test_dispatch_vifc_without_report_url_returns_400(
+    async_client, test_db_session, monkeypatch
+):
+    """VIFC assessment without a stored report_url must be rejected for BioAI services."""
+    await _seed_employee(test_db_session, user_id=9811, employee_id=982)
+    await _seed_vifc_package(test_db_session, package_id=3)
+    await _seed_diagnostic_package(test_db_session)
+    await _seed_engagement(test_db_session, engagement_id=9811, engagement_code="ENG-NOTIF-9811")
+
+    test_db_session.add(User(user_id=9812, age=30, phone="9812000000", status="active"))
+    await test_db_session.flush()
+
+    from modules.assessments.models import AssessmentInstance
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=9813,
+            user_id=9812,
+            package_id=3,
+            engagement_id=9811,
+            status="active",
+        )
+    )
+    service_key = "bio_ai_vifc_no_url_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'VIFC No URL', 'whatsapp', 'vifc-no-url', true, false, true, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_bio_ai_report_url = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_auth_header(9811),
+        json={
+            "service_key": service_key,
+            "user_ids": [9812],
+            "engagement_id": 9811,
+            "assessment_instance_id": 9813,
+        },
+    )
+    assert response.status_code == 400, response.text
+    assert "report" in response.text.lower()

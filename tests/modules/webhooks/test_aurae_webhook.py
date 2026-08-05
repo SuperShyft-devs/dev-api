@@ -362,3 +362,205 @@ async def test_empty_payload_returns_422(async_client, test_db_session, monkeypa
     )
     assert response.status_code == 422, response.text
     assert response.json()["error_code"] == "INVALID_INPUT"
+
+
+async def _seed_report_ready_event_and_service(
+    test_db_session, *, engagement_id: int, service_key: str = "vifc_report_test"
+):
+    """Create a report_ready auto_notification_event and link it to the engagement."""
+    from modules.engagements.models import AutoNotificationEvent, EngagementNotification
+
+    event = (
+        await test_db_session.execute(
+            select(AutoNotificationEvent).where(AutoNotificationEvent.event_code == "report_ready")
+        )
+    ).scalar_one_or_none()
+    if event is None:
+        event = AutoNotificationEvent(
+            event_code="report_ready",
+            display_name="Report Ready",
+            engagement_type_ids=[],
+        )
+        test_db_session.add(event)
+        await test_db_session.flush()
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, "
+            "require_blood_report_url, require_bio_ai_report_url, require_participant_detail, require_otp) "
+            "VALUES (:sk, 'VIFC Report Test', 'whatsapp', 'vifc-report', true, false, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
+        ),
+        {"sk": service_key},
+    )
+
+    test_db_session.add(
+        EngagementNotification(
+            engagement_id=engagement_id,
+            notification_event_id=event.id,
+            notification_services=[service_key],
+        )
+    )
+    await test_db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_report_webhook_triggers_report_ready_notifications(
+    async_client, test_db_session, monkeypatch
+):
+    _configure_webhook_auth(monkeypatch)
+    await _ensure_test_engagement(test_db_session)
+
+    uid = 99151
+    aid = 99152
+    service_key = "vifc_report_notif_test"
+    pkg_id = await _seed_vifc_package(test_db_session, package_id=9915)
+    await _seed_vifc_user(test_db_session, user_id=uid)
+    await _seed_vifc_instance(
+        test_db_session,
+        assessment_instance_id=aid,
+        user_id=uid,
+        package_id=pkg_id,
+    )
+    await _seed_report_ready_event_and_service(
+        test_db_session, engagement_id=1, service_key=service_key
+    )
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        status_code = 200
+        text = "ok"
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    payload = _report_payload(api_customer_id=str(aid))
+    response = await async_client.post("/webhooks/aurae", json=payload, headers=_auth_headers())
+    assert response.status_code == 200, response.text
+
+    body = response.json()["data"]
+    assert body["event"] == "report"
+    assert "notifications" in body
+    assert len(body["notifications"]) == 1
+    assert body["notifications"][0]["service_key"] == service_key
+    assert body["notifications"][0]["action"] == "dispatched"
+    assert body["notifications"][0]["notification_id"] is not None
+
+    assert len(webhook_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_report_webhook_works_without_notification_config(
+    async_client, test_db_session, monkeypatch
+):
+    _configure_webhook_auth(monkeypatch)
+    await _ensure_test_engagement(test_db_session)
+
+    uid = 99161
+    aid = 99162
+    pkg_id = await _seed_vifc_package(test_db_session, package_id=9916)
+    await _seed_vifc_user(test_db_session, user_id=uid)
+    await _seed_vifc_instance(
+        test_db_session,
+        assessment_instance_id=aid,
+        user_id=uid,
+        package_id=pkg_id,
+    )
+
+    payload = _report_payload(api_customer_id=str(aid))
+    response = await async_client.post("/webhooks/aurae", json=payload, headers=_auth_headers())
+    assert response.status_code == 200, response.text
+
+    body = response.json()["data"]
+    assert body["event"] == "report"
+    assert "notifications" not in body
+
+    ihr = (
+        await test_db_session.execute(
+            select(IndividualHealthReport).where(
+                IndividualHealthReport.assessment_instance_id == aid
+            )
+        )
+    ).scalar_one()
+    assert ihr.report_url == _REPORT_URL
+
+
+@pytest.mark.asyncio
+async def test_results_webhook_does_not_trigger_notifications(
+    async_client, test_db_session, monkeypatch
+):
+    _configure_webhook_auth(monkeypatch)
+    await _ensure_test_engagement(test_db_session)
+
+    uid = 99171
+    aid = 99172
+    service_key = "vifc_results_no_notif"
+    pkg_id = await _seed_vifc_package(test_db_session, package_id=9917)
+    await _seed_vifc_user(test_db_session, user_id=uid)
+    await _seed_vifc_instance(
+        test_db_session,
+        assessment_instance_id=aid,
+        user_id=uid,
+        package_id=pkg_id,
+    )
+    await _seed_report_ready_event_and_service(
+        test_db_session, engagement_id=1, service_key=service_key
+    )
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        status_code = 200
+        text = "ok"
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    payload = _results_payload(api_customer_id=str(aid))
+    response = await async_client.post("/webhooks/aurae", json=payload, headers=_auth_headers())
+    assert response.status_code == 200, response.text
+
+    body = response.json()["data"]
+    assert body["event"] == "results"
+    assert "notifications" not in body
+    assert len(webhook_calls) == 0
