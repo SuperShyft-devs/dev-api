@@ -1907,6 +1907,10 @@ class ReportsService:
                     bucket[fingerprint] = option_value
         return reverse_map
 
+    # diet_preference values for which red_meat_frequency is hidden (visibility_rules)
+    # and should default to "5" (Rarely or never) when missing.
+    _VEGETARIAN_DIET_PREFERENCE_VALUES = frozenset({"0", "3", "4", "5"})
+
     def _build_nutrition_api_payload(self, lookup: dict[str, Any], *, user_gender: str | None = None, option_reverse_map: dict[str, dict[str, str]] | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {}
         for key in self._NUTRITION_API_QUESTION_KEYS:
@@ -1918,6 +1922,13 @@ class ReportsService:
                 payload[key] = [self._resolve_nutrition_choice_value(v, key_map) for v in val]
             else:
                 payload[key] = self._resolve_nutrition_choice_value(val, key_map)
+
+        # red_meat_frequency is hidden for vegetarian/Jain/pescatarian/flexitarian users
+        # but the nutrition API requires it — default to "5" (Rarely or never).
+        if "red_meat_frequency" not in payload:
+            diet_pref = str(payload.get("diet_preference") or "").strip()
+            if diet_pref in self._VEGETARIAN_DIET_PREFERENCE_VALUES:
+                payload["red_meat_frequency"] = "5"
 
         # New nutrition API contract requires these identity/anthropometry fields.
         resolved_gender = self._normalize_gender(lookup.get("gender")) or self._normalize_gender(user_gender)
