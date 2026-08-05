@@ -585,8 +585,10 @@ class MetsightsService:
         Metsights returns 404 on PATCH if no row exists yet for ``physical-measurement``, ``vitals``,
         ``diet-lifestyle-parameters``, or ``fitness-parameters`` (create with POST first).
 
-        On a 400 with field-level validation errors, the offending fields are stripped
-        and the request is retried (iteratively) with the remaining valid fields.
+        On a 400 with field-level validation errors for *optional* / non-critical fields,
+        those fields are stripped and the request is retried. Critical measurement fields
+        (height/weight/waist/hip/body_fat) are never stripped — their rejection is returned
+        as ``METSIGHTS_VALIDATION_ERROR`` so the client can fix the answer.
         """
 
         rid = (record_id or "").strip()
@@ -596,6 +598,15 @@ class MetsightsService:
         self._require_api_key()
 
         existing = await self.get_record_subresource_or_none(record_id=rid, resource=res)
+        critical_fields = frozenset(
+            {
+                "height",
+                "weight",
+                "waist_circumference",
+                "hip_circumference",
+                "body_fat",
+            }
+        )
 
         def _parse_payload(payload: dict[str, Any]) -> dict[str, Any]:
             envelope = MetsightsEnvelope.model_validate(payload)
@@ -613,15 +624,26 @@ class MetsightsService:
                 return {str(k) for k in detail.keys()}
             return set()
 
-        def _raise_validation(exc: httpx.HTTPStatusError) -> None:
+        def _raise_validation(exc: httpx.HTTPStatusError, *, payload: dict[str, Any] | None = None) -> None:
             try:
                 error_body = exc.response.json()
             except Exception:
                 error_body = exc.response.text
+            hint = ""
+            if isinstance(payload, dict):
+                bad = _extract_bad_fields(exc)
+                samples = []
+                for field in sorted(bad):
+                    if field.endswith("_unit"):
+                        continue
+                    if field in payload:
+                        samples.append(f"{field}={payload.get(field)!r} (unit={payload.get(f'{field}_unit')!r})")
+                if samples:
+                    hint = " Rejected values: " + "; ".join(samples) + "."
             raise AppError(
                 status_code=422,
                 error_code="METSIGHTS_VALIDATION_ERROR",
-                message=f"Metsights rejected data for {res}: {error_body}",
+                message=f"Metsights rejected data for {res}: {error_body}.{hint}",
             ) from exc
 
         async def _send_once(data: dict[str, Any]) -> dict[str, Any]:
@@ -645,12 +667,14 @@ class MetsightsService:
                     if exc.response.status_code != 400:
                         self._raise_metsights_record_http(exc)
                     bad = _extract_bad_fields(exc) - stripped
-                    # Always drop paired unit fields when a measurement is rejected.
+                    # Never strip core anthropometry — surface the real validation error.
+                    if bad & critical_fields:
+                        _raise_validation(exc, payload=current)
                     for field in list(bad):
                         bad.add(f"{field}_unit")
                     bad = {f for f in bad if f in current and f != "is_complete"}
                     if not bad:
-                        _raise_validation(exc)
+                        _raise_validation(exc, payload=current)
                     logger.warning(
                         "Metsights %s /records/%s/%s/ rejected fields %s — retrying without them.",
                         "POST" if existing is None else "PATCH",
@@ -661,7 +685,7 @@ class MetsightsService:
                     stripped |= bad
                     current = {k: v for k, v in current.items() if k not in bad}
                     if not any(k != "is_complete" for k in current):
-                        _raise_validation(exc)
+                        _raise_validation(exc, payload=data)
             raise AppError(
                 status_code=422,
                 error_code="METSIGHTS_VALIDATION_ERROR",
