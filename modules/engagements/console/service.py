@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+import re
+from datetime import date, time
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,10 +27,13 @@ from modules.assessments.repository import AssessmentsRepository
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import _participant_enrollment_to_dict
+from modules.geocoding.client import search_places
 from modules.metsights.sync_service import MetsightsSyncService
 from modules.questionnaire.service import QuestionnaireService
 from modules.users.models import User
 from modules.users.repository import UsersRepository
+
+logger = logging.getLogger(__name__)
 
 
 def _to_healthians_gender(raw: str | None) -> str | None:
@@ -186,6 +194,7 @@ class ConsoleService:
             "end_date": engagement.end_date,
             "status": engagement.status,
             "participant_count": participant_count,
+            "blood_collection_type": engagement.blood_collection_type.value if engagement.blood_collection_type else None,
         }
 
     async def list_console_engagements(
@@ -790,3 +799,468 @@ class ConsoleService:
             category_key=category,
             category_of=category_of,
         )
+
+    # ── Home-collection booking flow ──────────────────────────────────────
+
+    async def _load_healthians_package_for_engagement(
+        self,
+        db: AsyncSession,
+        engagement: Engagement,
+    ) -> DiagnosticPackage:
+        if engagement.diagnostic_package_id is None:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Engagement has no diagnostic package configured",
+            )
+        pkg = (
+            await db.execute(
+                select(DiagnosticPackage).where(
+                    DiagnosticPackage.diagnostic_package_id == engagement.diagnostic_package_id
+                )
+            )
+        ).scalar_one_or_none()
+        if pkg is None:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message="Diagnostic package does not exist",
+            )
+        if (pkg.diagnostic_provider or "").strip().lower() != "healthians":
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_DIAGNOSTIC_PROVIDER",
+                message="Diagnostic provider is not Healthians",
+            )
+        return pkg
+
+    @staticmethod
+    def _parse_slot_time(slot_str: str) -> time:
+        text = (slot_str or "").strip()
+        if not text:
+            raise ValueError("Empty slot time")
+        meridiem_match = re.search(r"\b(AM|PM)\b", text, re.IGNORECASE)
+        meridiem = meridiem_match.group(1).upper() if meridiem_match else None
+        time_part = re.sub(r"\s*(AM|PM)\s*", "", text, flags=re.IGNORECASE).strip()
+        segments = time_part.split(":")
+        if len(segments) < 2:
+            raise ValueError(f"Invalid slot time format: {slot_str}")
+        hour = int(segments[0])
+        minute = int(segments[1])
+        if meridiem == "PM" and hour != 12:
+            hour += 12
+        elif meridiem == "AM" and hour == 12:
+            hour = 0
+        return time(hour, minute)
+
+    async def check_home_collection_service_availability(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        address_line: str,
+        landmark: str | None,
+        city: str,
+        pincode: str,
+    ) -> dict:
+        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+        ensure_engagement_running(engagement)
+
+        participant = await self._repository.get_participant_for_user_engagement(
+            db, user_id=user_id, engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant is not enrolled in this engagement")
+        if participant.booking_id:
+            raise AppError(status_code=409, error_code="BOOKING_ALREADY_EXISTS", message="A booking already exists for this participant")
+
+        pkg = await self._load_healthians_package_for_engagement(db, engagement)
+
+        results = await search_places(f"{city.strip()} {pincode.strip()}", limit=1)
+        geocoded = results[0] if results else {}
+        latitude = geocoded.get("latitude")
+        longitude = geocoded.get("longitude")
+        if latitude is None or longitude is None:
+            raise AppError(status_code=422, error_code="GEOCODE_FAILED", message="Could not geocode address")
+
+        participant.address = address_line.strip()
+        participant.sub_locality = address_line.strip()
+        participant.landmark = landmark.strip() if landmark else None
+        participant.pincode = pincode.strip()
+        participant.city = city.strip()
+        participant.state = geocoded.get("state")
+        participant.country = geocoded.get("country")
+        participant.latitude = latitude
+        participant.longitude = longitude
+        await db.flush()
+
+        lat = str(latitude)
+        lng = str(longitude)
+        zipcode = pincode.strip()
+        access_token = await healthians_client.get_access_token()
+
+        serviceability_url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/checkServiceabilityByLocation_v2"
+        serviceability_payload = {"lat": lat, "long": lng, "zipcode": zipcode, "is_ppmc_booking": 0}
+
+        try:
+            resp = await healthians_client.check_serviceability_by_location_v2(
+                access_token, lat=lat, long=lng, zipcode=zipcode, is_ppmc_booking=0,
+            )
+        except Exception as exc:
+            logger.exception("Healthians serviceability check failed for user %s", user_id)
+            await log_healthians_call(
+                db, engagement_id=engagement_id, user_id=user_id, provider="healthians",
+                api_url=serviceability_url, request_payload=serviceability_payload,
+                status="failed", error_message=str(exc),
+            )
+            raise AppError(status_code=502, error_code="HEALTHIANS_SERVICEABILITY_FAILED", message=str(exc)) from exc
+
+        await log_healthians_call(
+            db, engagement_id=engagement_id, user_id=user_id, provider="healthians",
+            api_url=serviceability_url, request_payload=serviceability_payload,
+            response_payload=resp, status="success" if resp.get("status") else "failed",
+        )
+
+        if not resp.get("status"):
+            raise AppError(
+                status_code=422,
+                error_code="LOCATION_NOT_SERVICEABLE",
+                message=resp.get("message") or "This location is not serviceable.",
+            )
+
+        zone_id = (resp.get("data") or {}).get("zone_id")
+        participant.healthians_zone_id = str(zone_id) if zone_id else None
+        await db.flush()
+
+        return {
+            "status": "serviceable",
+            "message": resp.get("message", "Serviceable"),
+            "zone_id": zone_id,
+            "engagement_id": engagement_id,
+            "user_id": user_id,
+        }
+
+    async def get_home_collection_available_slots(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        blood_collection_date: date,
+    ) -> dict:
+        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+        ensure_engagement_running(engagement)
+
+        participant = await self._repository.get_participant_for_user_engagement(
+            db, user_id=user_id, engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant is not enrolled in this engagement")
+
+        if participant.latitude is None or participant.longitude is None or not (participant.pincode or "").strip():
+            raise AppError(status_code=422, error_code="MISSING_LOCATION", message="Service availability has not been checked yet")
+
+        pkg = await self._load_healthians_package_for_engagement(db, engagement)
+
+        user_result = await db.execute(select(User).where(User.user_id == user_id))
+        user = user_result.scalar_one_or_none()
+        has_female = 1 if user and (user.gender or "").strip().lower().startswith("f") else 0
+
+        amount = float(pkg.original_price) if pkg.original_price else 0
+        external_package_id = pkg.external_package_id or 0
+
+        payload: dict[str, Any] = {
+            "slot_date": blood_collection_date.isoformat(),
+            "zone_id": str(participant.healthians_zone_id or ""),
+            "lat": str(participant.latitude or ""),
+            "long": str(participant.longitude or ""),
+            "zipcode": participant.pincode or "",
+            "get_ppmc_slots": 0,
+            "has_female_patient": has_female,
+            "amount": amount,
+            "package": [{"deal_id": [f"package_{external_package_id}"]}],
+        }
+
+        access_token = await healthians_client.get_access_token()
+        api_url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/getSlotsByLocation"
+
+        try:
+            resp = await healthians_client.get_slots_by_location(access_token, payload)
+        except Exception as exc:
+            logger.exception("Healthians getSlotsByLocation failed for user %s", user_id)
+            await log_healthians_call(
+                db, engagement_id=engagement_id, user_id=user_id, provider="healthians",
+                api_url=api_url, request_payload=payload,
+                status="failed", error_message=str(exc),
+            )
+            raise AppError(status_code=502, error_code="HEALTHIANS_SLOTS_FAILED", message=str(exc)) from exc
+
+        await log_healthians_call(
+            db, engagement_id=engagement_id, user_id=user_id, provider="healthians",
+            api_url=api_url, request_payload=payload,
+            response_payload=resp, status="success" if resp.get("status") else "failed",
+        )
+
+        if not resp.get("status"):
+            raise AppError(
+                status_code=422,
+                error_code="SLOTS_FETCH_FAILED",
+                message=resp.get("message", "Failed to fetch slots"),
+            )
+
+        raw_slots = resp.get("data", []) or []
+        slim_slots = [
+            {
+                "end_time": s.get("end_time"),
+                "slot_date": s.get("slot_date"),
+                "slot_time": s.get("slot_time"),
+                "stm_id": s.get("stm_id"),
+            }
+            for s in raw_slots
+            if isinstance(s, dict)
+        ]
+
+        return {
+            "status": "success",
+            "slots": slim_slots,
+            "engagement_id": engagement_id,
+            "user_id": user_id,
+        }
+
+    async def lock_home_collection_slot(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+        blood_collection_date: date,
+        blood_collection_time_slot_id: str,
+        blood_collection_time_slot: str,
+    ) -> dict:
+        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+        ensure_engagement_running(engagement)
+
+        participant = await self._repository.get_participant_for_user_engagement(
+            db, user_id=user_id, engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant is not enrolled in this engagement")
+
+        pkg = await self._load_healthians_package_for_engagement(db, engagement)
+
+        vendor_billing_user_id = str(participant.booked_by_user_id)
+        access_token = await healthians_client.get_access_token()
+        api_url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/freezeSlot_v1"
+        req_payload = {"slot_id": blood_collection_time_slot_id, "vendor_billing_user_id": vendor_billing_user_id}
+
+        try:
+            resp = await healthians_client.freeze_slot_v1(
+                access_token,
+                slot_id=blood_collection_time_slot_id,
+                vendor_billing_user_id=vendor_billing_user_id,
+            )
+        except Exception as exc:
+            logger.exception("Healthians freezeSlot_v1 failed for user %s", user_id)
+            await log_healthians_call(
+                db, engagement_id=engagement_id, user_id=user_id, provider="healthians",
+                api_url=api_url, request_payload=req_payload,
+                status="failed", error_message=str(exc),
+            )
+            raise AppError(status_code=502, error_code="HEALTHIANS_LOCK_FAILED", message=str(exc)) from exc
+
+        await log_healthians_call(
+            db, engagement_id=engagement_id, user_id=user_id, provider="healthians",
+            api_url=api_url, request_payload=req_payload,
+            response_payload=resp,
+            status="success" if resp.get("status") and resp.get("resCode") == "RES0001" else "failed",
+        )
+
+        if not resp.get("status") or resp.get("resCode") != "RES0001":
+            raise AppError(
+                status_code=422,
+                error_code="SLOT_LOCK_FAILED",
+                message=resp.get("message", "Slot not available"),
+            )
+
+        try:
+            slot_start_time = self._parse_slot_time(blood_collection_time_slot)
+        except ValueError as exc:
+            raise AppError(status_code=422, error_code="INVALID_SLOT_TIME", message=str(exc)) from exc
+
+        participant.blood_collection_time_slot_id = blood_collection_time_slot_id
+        participant.engagement_date = blood_collection_date
+        participant.slot_start_time = slot_start_time
+        await db.flush()
+
+        return {
+            "status": "success",
+            "message": resp.get("message", "Slot locked"),
+            "slot_id": (resp.get("data") or {}).get("slot_id", blood_collection_time_slot_id),
+            "freeze_time": (resp.get("data") or {}).get("freeze_time"),
+            "engagement_id": engagement_id,
+            "user_id": user_id,
+        }
+
+    async def book_home_collection(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_id: int,
+    ) -> dict:
+        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+        ensure_engagement_running(engagement)
+
+        participant = await self._repository.get_participant_for_user_engagement(
+            db, user_id=user_id, engagement_id=engagement_id,
+        )
+        if participant is None:
+            raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant is not enrolled in this engagement")
+        if participant.booking_id:
+            raise AppError(status_code=409, error_code="BOOKING_ALREADY_EXISTS", message="A booking already exists for this participant")
+        if not participant.blood_collection_time_slot_id:
+            raise AppError(status_code=422, error_code="SLOT_NOT_LOCKED", message="Blood collection slot is not locked")
+
+        pkg = await self._load_healthians_package_for_engagement(db, engagement)
+
+        if not settings.HEALTHIANS_CHECKSUM_KEY:
+            raise AppError(status_code=500, error_code="CONFIG_ERROR", message="Healthians checksum key is not configured")
+
+        user = await self._users_repository.get_user_by_id(db, user_id=user_id)
+        if user is None:
+            raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
+
+        first_name = (user.first_name or "").strip()
+        last_name = (user.last_name or "").strip()
+        phone = (user.phone or "").strip()
+        gender = _to_healthians_gender(user.gender)
+        dob = _format_healthians_dob(user)
+        if not first_name or not last_name or not phone or gender is None or (user.age is None and dob is None):
+            raise AppError(
+                status_code=422,
+                error_code="INCOMPLETE_PARTICIPANT_PROFILE",
+                message="Participant profile is missing required fields (name, phone, gender, age or date of birth)",
+            )
+
+        customer_name = f"{first_name} {last_name}".strip().upper()
+        relation = (user.relationship or "self").strip() or "self"
+        vendor_billing_user_id = str(participant.booked_by_user_id)
+        external_package_id = pkg.external_package_id or 0
+        slot_id = participant.blood_collection_time_slot_id or ""
+
+        booking_payload: dict[str, Any] = {
+            "customer": [{
+                "customer_id": str(user_id),
+                "customer_name": customer_name,
+                "relation": relation,
+                "age": user.age,
+                "dob": dob or "",
+                "gender": gender,
+                "contact_number": phone,
+                "email": (user.email or "").strip(),
+            }],
+            "slot": {"slot_id": slot_id},
+            "package": [{"deal_id": [f"package_{external_package_id}"]}],
+            "customer_calling_number": phone,
+            "billing_cust_name": customer_name,
+            "gender": gender,
+            "mobile": phone,
+            "email": (user.email or "").strip(),
+            "sub_locality": (participant.sub_locality or "").strip(),
+            "latitude": str(participant.latitude or ""),
+            "longitude": str(participant.longitude or ""),
+            "address": (participant.address or "").strip(),
+            "zipcode": (participant.pincode or "").strip(),
+            "landmark": (participant.landmark or "").strip(),
+            "hard_copy": 0,
+            "vendor_billing_user_id": vendor_billing_user_id,
+            "payment_option": "prepaid",
+            "discounted_price": 0,
+            "zone_id": int(participant.healthians_zone_id) if participant.healthians_zone_id else 0,
+            "is_ppmc_booking": 0,
+        }
+
+        access_token = await healthians_client.get_access_token()
+        booking_url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/createBooking_v3"
+        booking_log = await log_healthians_call(
+            db, engagement_id=engagement_id, user_id=user_id, provider="healthians",
+            api_url=booking_url, request_payload=booking_payload, status="pending",
+        )
+
+        try:
+            booking_response = await healthians_client.create_booking_v3(
+                access_token, booking_payload, checksum_key=settings.HEALTHIANS_CHECKSUM_KEY,
+            )
+            if not booking_response.get("status"):
+                await finalize_healthians_sync_log(
+                    db, sync_log_id=booking_log.sync_log_id,
+                    status="failed", response_payload=booking_response,
+                    error_message=booking_response.get("message"),
+                )
+                raise AppError(
+                    status_code=422,
+                    error_code="HEALTHIANS_BOOKING_FAILED",
+                    message=booking_response.get("message") or "Healthians booking failed",
+                )
+
+            healthians_booking_id = booking_response.get("booking_id")
+            if not healthians_booking_id:
+                await finalize_healthians_sync_log(
+                    db, sync_log_id=booking_log.sync_log_id,
+                    status="failed", response_payload=booking_response,
+                    error_message="Missing booking_id in Healthians response",
+                )
+                raise AppError(
+                    status_code=502,
+                    error_code="HEALTHIANS_BOOKING_FAILED",
+                    message="Healthians response did not include booking_id",
+                )
+
+            await finalize_healthians_sync_log(
+                db, sync_log_id=booking_log.sync_log_id,
+                status="success", response_payload=booking_response,
+            )
+        except AppError:
+            raise
+        except Exception as exc:
+            await finalize_healthians_sync_log(
+                db, sync_log_id=booking_log.sync_log_id,
+                status="failed", error_message=str(exc),
+            )
+            raise AppError(status_code=502, error_code="HEALTHIANS_BOOKING_FAILED", message=str(exc)) from exc
+
+        participant.booking_id = str(healthians_booking_id)
+        await db.flush()
+
+        return {
+            "status": booking_response.get("status"),
+            "message": booking_response.get("message"),
+            "lead_id": booking_response.get("lead_id"),
+            "booking_id": str(healthians_booking_id),
+            "resCode": booking_response.get("resCode"),
+            "tatDetail": booking_response.get("tatDetail"),
+            "engagement_participant_id": participant.engagement_participant_id,
+            "user_id": user_id,
+            "engagement_id": engagement_id,
+        }

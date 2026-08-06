@@ -139,6 +139,16 @@ class EngagementParticipant(Base):
     booking_id = Column(String, nullable=True)
     blood_collection_time_slot_id = Column(String, nullable=True)
     face_scan_link = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    sub_locality = Column(String, nullable=True)
+    landmark = Column(String, nullable=True)
+    pincode = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    state = Column(String, nullable=True)
+    country = Column(String, nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    healthians_zone_id = Column(String, nullable=True)
 
     @validates("user_id")
     def _default_booked_by_user_id(self, _key: str, user_id: int) -> int:

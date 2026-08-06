@@ -11,7 +11,12 @@ from db.session import get_db
 from modules.assessments.schemas import AssessmentSubmitRequest
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
-from modules.engagements.console.schemas import ConsoleParticipantBookRequest
+from modules.engagements.console.schemas import (
+    ConsoleParticipantBookRequest,
+    HomeCollectionAvailableSlotsRequest,
+    HomeCollectionCheckServiceabilityRequest,
+    HomeCollectionLockRequest,
+)
 from modules.engagements.console.service import ConsoleService
 from modules.engagements.dependencies import get_console_service
 from modules.questionnaire.schemas import QuestionnaireResponsesUpsertRequest
@@ -234,6 +239,92 @@ async def submit_console_participant_assessment(
         assessment_instance_id=assessment_instance_id,
         category=body.category,
         category_of=body.category_of,
+    )
+    await db.commit()
+    return success_response(data)
+
+
+# ── Home-collection booking endpoints ─────────────────────────────────────
+
+
+@router.post("/{engagement_id}/console/participants/{user_id}/book-home-collection/check-service-availability")
+async def check_home_collection_service_availability(
+    engagement_id: int,
+    user_id: int,
+    payload: HomeCollectionCheckServiceabilityRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    console_service: ConsoleService = Depends(get_console_service),
+):
+    data = await console_service.check_home_collection_service_availability(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        user_id=user_id,
+        address_line=payload.address_line,
+        landmark=payload.landmark,
+        city=payload.city,
+        pincode=payload.pincode,
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.post("/{engagement_id}/console/participants/{user_id}/book-home-collection/available-slots")
+async def get_home_collection_available_slots(
+    engagement_id: int,
+    user_id: int,
+    payload: HomeCollectionAvailableSlotsRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    console_service: ConsoleService = Depends(get_console_service),
+):
+    data = await console_service.get_home_collection_available_slots(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        user_id=user_id,
+        blood_collection_date=payload.blood_collection_date,
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.post("/{engagement_id}/console/participants/{user_id}/book-home-collection/lock")
+async def lock_home_collection_slot(
+    engagement_id: int,
+    user_id: int,
+    payload: HomeCollectionLockRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    console_service: ConsoleService = Depends(get_console_service),
+):
+    data = await console_service.lock_home_collection_slot(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        user_id=user_id,
+        blood_collection_date=payload.blood_collection_date,
+        blood_collection_time_slot_id=payload.blood_collection_time_slot_id,
+        blood_collection_time_slot=payload.blood_collection_time_slot,
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.post("/{engagement_id}/console/participants/{user_id}/book-home-collection/book")
+async def book_home_collection(
+    engagement_id: int,
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    console_service: ConsoleService = Depends(get_console_service),
+):
+    data = await console_service.book_home_collection(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        user_id=user_id,
     )
     await db.commit()
     return success_response(data)
