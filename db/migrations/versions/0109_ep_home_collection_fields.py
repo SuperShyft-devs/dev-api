@@ -34,7 +34,7 @@ _COLUMNS = [
 
 
 def upgrade() -> None:
-    op.execute(sa.text("SET LOCAL lock_timeout = '15s'"))
+    op.execute(sa.text("SET LOCAL lock_timeout = '60s'"))
     for col_name, col_type in _COLUMNS:
         op.execute(
             sa.text(
