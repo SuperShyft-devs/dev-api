@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.masking import mask_email, mask_phone
 from core.config import settings
 from core.exceptions import AppError
 from modules.diagnostics.healthians import client as healthians_client
@@ -34,6 +35,37 @@ from modules.users.models import User
 from modules.users.repository import UsersRepository
 
 logger = logging.getLogger(__name__)
+
+_CONSOLE_PARTICIPANT_FIELDS = (
+    "engagement_participant_id",
+    "engagement_id",
+    "user_id",
+    "first_name",
+    "last_name",
+    "phone",
+    "email",
+    "age",
+    "address",
+    "pin_code",
+    "city",
+    "slot_start_time",
+    "engagement_date",
+    "participants_employee_id",
+    "participant_department",
+    "participant_blood_group",
+    "consultations",
+    "barcode",
+    "booking_id",
+)
+
+
+def _console_participant_to_dict(row: tuple) -> dict[str, Any]:
+    """Slim + PII-masked participant payload for console list only."""
+    full = _participant_enrollment_to_dict(row)
+    slim = {key: full.get(key) for key in _CONSOLE_PARTICIPANT_FIELDS}
+    slim["phone"] = mask_phone(slim.get("phone"))
+    slim["email"] = mask_email(slim.get("email"))
+    return slim
 
 
 def _to_healthians_gender(raw: str | None) -> str | None:
@@ -288,7 +320,7 @@ class ConsoleService:
             engagement_id=engagement_id,
         )
 
-        result = [_participant_enrollment_to_dict(row) for row in participants]
+        result = [_console_participant_to_dict(row) for row in participants]
         return result, total
 
     async def book_participant(
