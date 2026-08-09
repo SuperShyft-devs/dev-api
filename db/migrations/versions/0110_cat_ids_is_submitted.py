@@ -116,12 +116,74 @@ def upgrade() -> None:
             ),
         )
 
-    # ── 4. engagement_participants: unique constraint on (engagement_id, user_id) ──
-    # NOTE: The backfill script must dedup BEFORE this migration runs,
-    # or run the dedup SQL inline here.  We attempt to add the constraint
-    # and let it fail loudly if duplicates still exist so the operator
-    # knows to run the backfill first.
+    # ── 4. engagement_participants: dedup then unique (engagement_id, user_id) ──
+    # Deploy runs migrations before the backfill job, so dedup must happen here.
     if not _constraint_exists(connection, "uq_engagement_participants_engagement_user"):
+        # Keep the row with the most consultation bookings; ties → highest id.
+        # Re-point bookings from duplicates onto the kept row, then delete dups.
+        connection.execute(
+            text(
+                """
+                WITH ranked AS (
+                    SELECT
+                        ep.engagement_participant_id,
+                        ep.engagement_id,
+                        ep.user_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ep.engagement_id, ep.user_id
+                            ORDER BY (
+                                SELECT COUNT(*)
+                                FROM consultation_bookings cb
+                                WHERE cb.engagement_participant_id = ep.engagement_participant_id
+                            ) DESC,
+                            ep.engagement_participant_id DESC
+                        ) AS rn
+                    FROM engagement_participants ep
+                ),
+                keepers AS (
+                    SELECT engagement_participant_id AS keep_id, engagement_id, user_id
+                    FROM ranked
+                    WHERE rn = 1
+                ),
+                dupes AS (
+                    SELECT r.engagement_participant_id AS del_id, k.keep_id
+                    FROM ranked r
+                    JOIN keepers k
+                      ON k.engagement_id = r.engagement_id
+                     AND k.user_id = r.user_id
+                    WHERE r.rn > 1
+                )
+                UPDATE consultation_bookings cb
+                SET engagement_participant_id = d.keep_id
+                FROM dupes d
+                WHERE cb.engagement_participant_id = d.del_id
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                WITH ranked AS (
+                    SELECT
+                        ep.engagement_participant_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ep.engagement_id, ep.user_id
+                            ORDER BY (
+                                SELECT COUNT(*)
+                                FROM consultation_bookings cb
+                                WHERE cb.engagement_participant_id = ep.engagement_participant_id
+                            ) DESC,
+                            ep.engagement_participant_id DESC
+                        ) AS rn
+                    FROM engagement_participants ep
+                )
+                DELETE FROM engagement_participants ep
+                USING ranked r
+                WHERE ep.engagement_participant_id = r.engagement_participant_id
+                  AND r.rn > 1
+                """
+            )
+        )
         op.create_unique_constraint(
             "uq_engagement_participants_engagement_user",
             "engagement_participants",
