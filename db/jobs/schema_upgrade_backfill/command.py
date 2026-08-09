@@ -686,9 +686,19 @@ async def _step3_dedup_engagement_participants(db: AsyncSession, *, dry_run: boo
         keep_id = max(ep_ids, key=lambda x: (scores.get(x, 0), x))
         delete_ids = [x for x in ep_ids if x != keep_id]
 
-        # Re-point consultation bookings from deleted rows to kept row
+        # Re-point consultation bookings from deleted rows to kept row.
+        # Skip / drop bookings that would collide on (participant, expert_type).
         for del_id in delete_ids:
             if not dry_run:
+                await db.execute(text("""
+                    DELETE FROM consultation_bookings cb
+                    WHERE cb.engagement_participant_id = :del_id
+                      AND EXISTS (
+                          SELECT 1 FROM consultation_bookings keep_cb
+                          WHERE keep_cb.engagement_participant_id = :keep_id
+                            AND keep_cb.expert_type = cb.expert_type
+                      )
+                """), {"keep_id": keep_id, "del_id": del_id})
                 await db.execute(text("""
                     UPDATE consultation_bookings
                     SET engagement_participant_id = :keep_id

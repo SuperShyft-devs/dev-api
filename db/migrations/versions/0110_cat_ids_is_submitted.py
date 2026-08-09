@@ -120,7 +120,52 @@ def upgrade() -> None:
     # Deploy runs migrations before the backfill job, so dedup must happen here.
     if not _constraint_exists(connection, "uq_engagement_participants_engagement_user"):
         # Keep the row with the most consultation bookings; ties → highest id.
-        # Re-point bookings from duplicates onto the kept row, then delete dups.
+        # consultation_bookings has UNIQUE (engagement_participant_id, expert_type),
+        # so drop colliding bookings on duplicate rows before re-pointing.
+        connection.execute(
+            text(
+                """
+                WITH ranked AS (
+                    SELECT
+                        ep.engagement_participant_id,
+                        ep.engagement_id,
+                        ep.user_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ep.engagement_id, ep.user_id
+                            ORDER BY (
+                                SELECT COUNT(*)
+                                FROM consultation_bookings cb
+                                WHERE cb.engagement_participant_id = ep.engagement_participant_id
+                            ) DESC,
+                            ep.engagement_participant_id DESC
+                        ) AS rn
+                    FROM engagement_participants ep
+                ),
+                keepers AS (
+                    SELECT engagement_participant_id AS keep_id, engagement_id, user_id
+                    FROM ranked
+                    WHERE rn = 1
+                ),
+                dupes AS (
+                    SELECT r.engagement_participant_id AS del_id, k.keep_id
+                    FROM ranked r
+                    JOIN keepers k
+                      ON k.engagement_id = r.engagement_id
+                     AND k.user_id = r.user_id
+                    WHERE r.rn > 1
+                )
+                DELETE FROM consultation_bookings cb
+                USING dupes d
+                WHERE cb.engagement_participant_id = d.del_id
+                  AND EXISTS (
+                      SELECT 1
+                      FROM consultation_bookings keep_cb
+                      WHERE keep_cb.engagement_participant_id = d.keep_id
+                        AND keep_cb.expert_type = cb.expert_type
+                  )
+                """
+            )
+        )
         connection.execute(
             text(
                 """
