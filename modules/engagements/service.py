@@ -1209,6 +1209,16 @@ class EngagementsService:
             )
             response["consultations"] = bookings_to_consultations_map(bookings)
 
+        if "booking_id" in updates:
+            raw_booking_id = updates["booking_id"]
+            if raw_booking_id is None:
+                normalized_booking_id = None
+            else:
+                stripped = str(raw_booking_id).strip()
+                normalized_booking_id = stripped or None
+            participant.booking_id = normalized_booking_id
+            response["booking_id"] = normalized_booking_id
+
         await self._repository.update_participant(db, participant)
 
         audit = self._require_audit_service()
