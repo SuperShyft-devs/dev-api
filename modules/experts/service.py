@@ -1418,9 +1418,14 @@ class ExpertAvailabilityService:
             responses = await q_repo.list_responses_for_instance(
                 db, assessment_instance_id=instance.assessment_instance_id, category_id=None
             )
-            resp_by_cat_q: dict[tuple[int, int], QuestionnaireResponse] = {}
+            resp_by_qid: dict[int, QuestionnaireResponse] = {}
             for r in responses:
-                resp_by_cat_q[(int(r.category_id), int(r.question_id))] = r
+                resp_by_qid[int(r.question_id)] = r
+
+            progress_rows = await assessments_repo.list_category_progress_for_instance(
+                db, assessment_instance_id=instance.assessment_instance_id
+            )
+            cat_progress_map = {int(p.category_id): p for p in progress_rows}
 
             ordered_category_ids = await assessments_repo.get_assigned_category_ids_for_package_ordered(
                 db, package_id=instance.package_id
@@ -1428,24 +1433,23 @@ class ExpertAvailabilityService:
             categories_out: list[dict[str, Any]] = []
             for category_id in ordered_category_ids:
                 cat = await q_repo.get_category_by_id(db, category_id)
+                cat_pr = cat_progress_map.get(category_id)
+                cat_is_submitted = bool(cat_pr.is_submitted) if cat_pr else False
                 questions = await q_service.list_category_questions_for_user(db, category_id=category_id)
                 questions_out: list[dict[str, Any]] = []
                 for q in questions:
                     qid = int(q["question_id"])
-                    resp_obj = resp_by_cat_q.get((category_id, qid))
+                    resp_obj = resp_by_qid.get(qid)
                     if resp_obj is None:
                         answer_state = "empty"
                         answer = None
-                        submitted_at = None
                     else:
-                        submitted_at = resp_obj.submitted_at.isoformat() if resp_obj.submitted_at else None
                         answer = resp_obj.answer
-                        answer_state = "submitted" if resp_obj.submitted_at is not None else "draft"
+                        answer_state = "submitted" if cat_is_submitted else "draft"
                     questions_out.append(
                         {
                             **q,
                             "answer": answer,
-                            "submitted_at": submitted_at,
                             "answer_state": answer_state,
                         }
                     )

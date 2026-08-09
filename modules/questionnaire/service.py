@@ -533,7 +533,7 @@ class QuestionnaireService:
         category_answers_by_question_id: dict[int, object] = {
             int(r.question_id): r.answer
             for r in all_responses
-            if int(r.category_id) == int(category_id)
+            if int(category_id) in (r.category_ids or [])
         }
         preferences = self._build_preferences_map(
             await self._users_repository.get_preferences(db, user_id=user_id)
@@ -1592,6 +1592,12 @@ class QuestionnaireService:
                 answer=response_item["answer"],
             )
 
+        # Resolve category_ids for all incoming questions in one batch
+        incoming_qids = [int(r["question_id"]) for r in responses]
+        category_ids_map = await self._repository.resolve_category_ids_for_questions_bulk(
+            db, question_ids=incoming_qids, package_id=int(instance.package_id),
+        )
+
         # Upsert responses
         for response_item in responses:
             question_id = response_item["question_id"]
@@ -1600,23 +1606,21 @@ class QuestionnaireService:
             existing = await self._repository.get_response_by_instance_and_question(
                 db,
                 assessment_instance_id=instance.assessment_instance_id,
-                category_id=category_id,
                 question_id=question_id,
             )
 
+            resolved_ids = category_ids_map.get(int(question_id), [category_id])
+
             if existing is not None:
-                # Update existing response (draft mode)
                 existing.answer = answer
-                existing.submitted_at = None  # Draft responses don't have submission time
+                existing.category_ids = resolved_ids
                 await self._repository.update_response(db, existing)
             else:
-                # Create new response
                 new_response = QuestionnaireResponse(
                     assessment_instance_id=instance.assessment_instance_id,
                     question_id=question_id,
-                    category_id=category_id,
+                    category_ids=resolved_ids,
                     answer=answer,
-                    submitted_at=None,
                 )
                 await self._repository.create_response(db, new_response)
 
@@ -1638,6 +1642,35 @@ class QuestionnaireService:
             category_id=category_id,
             user_id=user_id,
         )
+        # Cross-category sync: questions may belong to multiple categories.
+        # Check completion of other package categories that share the same questions.
+        await self._sync_cross_category_progress(
+            db, instance=instance, category_id=category_id, user_id=user_id,
+        )
+
+    async def _sync_cross_category_progress(
+        self,
+        db: AsyncSession,
+        *,
+        instance,
+        category_id: int,
+        user_id: int,
+    ) -> None:
+        """After updating one category, re-check all other package categories
+        that may share questions with the updated category."""
+        from modules.assessments.repository import AssessmentsRepository
+
+        assessments_repo = AssessmentsRepository()
+        package_links = await assessments_repo.list_package_categories(
+            db, package_id=int(instance.package_id),
+        )
+        for link in package_links:
+            cid = int(link.category_id)
+            if cid == int(category_id):
+                continue
+            await self._sync_category_progress_after_responses(
+                db, instance=instance, category_id=cid, user_id=user_id,
+            )
 
     async def apply_onboard_questionnaire(
         self,
@@ -1757,7 +1790,7 @@ class QuestionnaireService:
                     full_answers_by_key_for_vis[qkey] = response_item.get("answer")
 
             existing_responses = [
-                r for r in all_existing_responses if int(r.category_id) == int(category_id)
+                r for r in all_existing_responses if int(category_id) in (r.category_ids or [])
             ]
             answers_for_visibility: dict[int, object] = {
                 int(row.question_id): row.answer for row in existing_responses
@@ -1798,26 +1831,30 @@ class QuestionnaireService:
                     continue
                 accepted.append({"question_id": question_id, "answer": answer})
 
+            accepted_qids = [int(r["question_id"]) for r in accepted]
+            onboard_cat_ids_map = await self._repository.resolve_category_ids_for_questions_bulk(
+                db, question_ids=accepted_qids, package_id=int(instance.package_id),
+            ) if accepted_qids else {}
+
             for response_item in accepted:
                 question_id = response_item["question_id"]
                 answer = response_item["answer"]
+                resolved_ids = onboard_cat_ids_map.get(int(question_id), [category_id])
                 existing = await self._repository.get_response_by_instance_and_question(
                     db,
                     assessment_instance_id=instance.assessment_instance_id,
-                    category_id=category_id,
                     question_id=question_id,
                 )
                 if existing is not None:
                     existing.answer = answer
-                    existing.submitted_at = None
+                    existing.category_ids = resolved_ids
                     await self._repository.update_response(db, existing)
                 else:
                     new_response = QuestionnaireResponse(
                         assessment_instance_id=instance.assessment_instance_id,
                         question_id=question_id,
-                        category_id=category_id,
+                        category_ids=resolved_ids,
                         answer=answer,
-                        submitted_at=None,
                     )
                     await self._repository.create_response(db, new_response)
                     all_existing_responses.append(new_response)
@@ -1855,14 +1892,6 @@ class QuestionnaireService:
                 return
 
         now = datetime.now(timezone.utc)
-        responses = await self._repository.list_responses_for_instance(
-            db,
-            assessment_instance_id=instance.assessment_instance_id,
-        )
-        for response in responses:
-            response.submitted_at = now
-            await self._repository.update_response(db, response)
-
         instance.status = "completed"
         instance.completed_at = now
         await assessments_repo.update_instance(db, instance)

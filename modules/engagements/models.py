@@ -115,6 +115,7 @@ class EngagementParticipant(Base):
 
     __tablename__ = "engagement_participants"
     __table_args__ = (
+        UniqueConstraint("engagement_id", "user_id", name="uq_engagement_participants_engagement_user"),
         Index("ix_ep_engagement_id_user_id", "engagement_id", "user_id"),
         Index("ix_ep_user_id", "user_id"),
         Index("ix_ep_booked_by_user_id", "booked_by_user_id"),

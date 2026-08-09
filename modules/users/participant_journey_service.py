@@ -81,19 +81,28 @@ class ParticipantJourneyService:
                 assessment_instance_id=instance.assessment_instance_id,
                 category_id=None,
             )
-            draft_count = sum(1 for r in responses if r.submitted_at is None)
-            submitted_count = sum(1 for r in responses if r.submitted_at is not None)
-            categories_touched = len({int(r.category_id) for r in responses})
+            response_count = len(responses)
+            cat_ids_touched: set[int] = set()
+            for r in responses:
+                for cid in (r.category_ids or []):
+                    cat_ids_touched.add(cid)
+            categories_touched = len(cat_ids_touched)
 
             category_progress: list[dict] = []
             for pr in progress_rows:
                 cat = await self._questionnaire_repository.get_category_by_id(db, int(pr.category_id))
+                has_resp = await self._assessments_repository.count_responses_by_category_for_instance(
+                    db, assessment_instance_id=instance.assessment_instance_id, category_id=int(pr.category_id),
+                ) > 0
                 category_progress.append(
                     {
                         "category_id": int(pr.category_id),
                         "display_name": getattr(cat, "display_name", None) if cat else None,
                         "category_key": getattr(cat, "category_key", None) if cat else None,
+                        "category_of": getattr(cat, "category_of", None) if cat else None,
                         "status": pr.status,
+                        "is_submitted": bool(pr.is_submitted),
+                        "has_responses": has_resp,
                         "completed_at": _dt_iso(pr.completed_at),
                     }
                 )
@@ -127,9 +136,7 @@ class ParticipantJourneyService:
                     "has_fitprint_report_url": has_fitprint,
                     "category_progress": category_progress,
                     "questionnaire": {
-                        "response_count": len(responses),
-                        "draft_count": draft_count,
-                        "submitted_count": submitted_count,
+                        "response_count": response_count,
                         "categories_touched": categories_touched,
                     },
                 }
@@ -169,9 +176,9 @@ class ParticipantJourneyService:
             assessment_instance_id=assessment_instance_id,
             category_id=None,
         )
-        resp_by_cat_q: dict[tuple[int, int], QuestionnaireResponse] = {}
+        resp_by_qid: dict[int, QuestionnaireResponse] = {}
         for r in responses:
-            resp_by_cat_q[(int(r.category_id), int(r.question_id))] = r
+            resp_by_qid[int(r.question_id)] = r
 
         progress_rows = await self._assessments_repository.list_category_progress_for_instance(
             db, assessment_instance_id=assessment_instance_id
@@ -179,12 +186,18 @@ class ParticipantJourneyService:
         category_progress: list[dict] = []
         for pr in progress_rows:
             cat = await self._questionnaire_repository.get_category_by_id(db, int(pr.category_id))
+            has_resp = await self._assessments_repository.count_responses_by_category_for_instance(
+                db, assessment_instance_id=assessment_instance_id, category_id=int(pr.category_id),
+            ) > 0
             category_progress.append(
                 {
                     "category_id": int(pr.category_id),
                     "display_name": getattr(cat, "display_name", None) if cat else None,
                     "category_key": getattr(cat, "category_key", None) if cat else None,
+                    "category_of": getattr(cat, "category_of", None) if cat else None,
                     "status": pr.status,
+                    "is_submitted": bool(pr.is_submitted),
+                    "has_responses": has_resp,
                     "completed_at": _dt_iso(pr.completed_at),
                 }
             )
@@ -199,23 +212,24 @@ class ParticipantJourneyService:
             questions = await self._questionnaire_service.list_category_questions_for_user(
                 db, category_id=category_id
             )
+            # Determine category-level is_submitted from progress
+            cat_progress_map = {int(pr.category_id): pr for pr in progress_rows}
+            cat_pr = cat_progress_map.get(category_id)
+            cat_is_submitted = bool(cat_pr.is_submitted) if cat_pr else False
+
             questions_out: list[dict] = []
             for q in questions:
                 qid = int(q["question_id"])
-                key = (category_id, qid)
-                resp_obj = resp_by_cat_q.get(key)
+                resp_obj = resp_by_qid.get(qid)
                 if resp_obj is None:
                     answer_state = "empty"
                     answer = None
-                    submitted_at = None
                 else:
-                    submitted_at = _dt_iso(resp_obj.submitted_at)
                     answer = resp_obj.answer
-                    answer_state = "submitted" if resp_obj.submitted_at is not None else "draft"
+                    answer_state = "submitted" if cat_is_submitted else "draft"
 
                 payload = {**q}
                 payload["answer"] = answer
-                payload["submitted_at"] = submitted_at
                 payload["answer_state"] = answer_state
                 questions_out.append(payload)
 

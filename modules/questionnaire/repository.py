@@ -377,16 +377,17 @@ class QuestionnaireRepository:
         db: AsyncSession,
         *,
         assessment_instance_id: int,
-        category_id: int,
         question_id: int,
+        category_id: int | None = None,
     ) -> QuestionnaireResponse | None:
-        result = await db.execute(
+        query = (
             select(QuestionnaireResponse)
             .where(QuestionnaireResponse.assessment_instance_id == assessment_instance_id)
-            .where(QuestionnaireResponse.category_id == category_id)
             .where(QuestionnaireResponse.question_id == question_id)
-            .limit(1)
         )
+        if category_id is not None:
+            query = query.where(QuestionnaireResponse.category_ids.any(category_id))
+        result = await db.execute(query.limit(1))
         return result.scalars().first()
 
     async def get_response_by_instance_and_question_id(
@@ -417,7 +418,7 @@ class QuestionnaireRepository:
             .order_by(QuestionnaireResponse.question_id.asc())
         )
         if category_id is not None:
-            query = query.where(QuestionnaireResponse.category_id == category_id)
+            query = query.where(QuestionnaireResponse.category_ids.any(category_id))
         result = await db.execute(query)
         return list(result.scalars().all())
 
@@ -481,6 +482,57 @@ class QuestionnaireRepository:
             .distinct()
         )
         return [int(qid) for qid in result.scalars().all()]
+
+    async def resolve_category_ids_for_question(
+        self,
+        db: AsyncSession,
+        *,
+        question_id: int,
+        package_id: int,
+    ) -> list[int]:
+        """Return all category_ids a question belongs to within a given package."""
+        result = await db.execute(
+            select(QuestionnaireCategoryQuestion.category_id)
+            .join(
+                AssessmentPackageCategory,
+                AssessmentPackageCategory.category_id == QuestionnaireCategoryQuestion.category_id,
+            )
+            .where(QuestionnaireCategoryQuestion.question_id == question_id)
+            .where(AssessmentPackageCategory.package_id == package_id)
+            .order_by(QuestionnaireCategoryQuestion.category_id.asc())
+        )
+        return [int(cid) for cid in result.scalars().all()]
+
+    async def resolve_category_ids_for_questions_bulk(
+        self,
+        db: AsyncSession,
+        *,
+        question_ids: list[int],
+        package_id: int,
+    ) -> dict[int, list[int]]:
+        """Return mapping of question_id -> list[category_id] for a package."""
+        if not question_ids:
+            return {}
+        result = await db.execute(
+            select(
+                QuestionnaireCategoryQuestion.question_id,
+                QuestionnaireCategoryQuestion.category_id,
+            )
+            .join(
+                AssessmentPackageCategory,
+                AssessmentPackageCategory.category_id == QuestionnaireCategoryQuestion.category_id,
+            )
+            .where(QuestionnaireCategoryQuestion.question_id.in_(question_ids))
+            .where(AssessmentPackageCategory.package_id == package_id)
+            .order_by(
+                QuestionnaireCategoryQuestion.question_id.asc(),
+                QuestionnaireCategoryQuestion.category_id.asc(),
+            )
+        )
+        mapping: dict[int, list[int]] = {}
+        for qid, cid in result.all():
+            mapping.setdefault(int(qid), []).append(int(cid))
+        return mapping
 
     async def list_healthy_habit_rules_for_question(
         self,

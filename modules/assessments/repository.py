@@ -15,7 +15,7 @@ from modules.assessments.models import (
     AssessmentPackageCategory,
 )
 from modules.engagements.models import Engagement
-from modules.questionnaire.models import QuestionnaireCategoryQuestion
+from modules.questionnaire.models import QuestionnaireCategoryQuestion, QuestionnaireResponse
 
 
 class AssessmentsRepository:
@@ -554,3 +554,19 @@ class AssessmentsRepository:
         db.add(row)
         await db.flush()
         return row
+
+    async def count_responses_by_category_for_instance(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        category_id: int,
+    ) -> int:
+        """Count responses for a given instance whose category_ids contain the given category."""
+        result = await db.execute(
+            select(func.count())
+            .select_from(QuestionnaireResponse)
+            .where(QuestionnaireResponse.assessment_instance_id == assessment_instance_id)
+            .where(QuestionnaireResponse.category_ids.any(category_id))
+        )
+        return int(result.scalar_one())

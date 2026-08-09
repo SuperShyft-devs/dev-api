@@ -1110,6 +1110,12 @@ class EngagementsService:
         if (engagement.status or "").lower() not in ("scheduled", "running", "draft"):
             raise AppError(status_code=422, error_code="INVALID_STATE", message="Engagement is not accepting enrollments")
 
+        existing_participant = await self._repository.get_participant_for_user_engagement(
+            db, user_id=user_id, engagement_id=int(engagement.engagement_id),
+        )
+        if existing_participant is not None:
+            raise AppError(status_code=409, error_code="ALREADY_ENROLLED", message="User is already enrolled in this engagement")
+
         booked_by = booked_by_user_id if booked_by_user_id is not None else user_id
         participant = EngagementParticipant(
             engagement_id=engagement.engagement_id,
@@ -1815,14 +1821,8 @@ class EngagementsService:
     ) -> dict:
         """Return per-participant questionnaire completion status for an engagement.
 
-        Groups by user (participant) — a user may have multiple assessment instances
-        (one per package). The participant's overall state is the "best" across instances:
-          submitted > drafted > not_started
-
-        The questionnaire lifecycle per assessment instance is:
-        - NOT STARTED: no questionnaire_responses rows exist
-        - DRAFTED (filled): responses exist with submitted_at = NULL (user saved progress)
-        - SUBMITTED: assessment instance status = "completed" (all responses got submitted_at set)
+        Summary cards: filled / partially_filled / not_started (sum = total enrolled).
+        Per-participant: 4 metsights category columns with status/is_submitted/has_responses/assigned.
         """
         ensure_admin(employee)
 
@@ -1834,9 +1834,22 @@ class EngagementsService:
                 message="Engagement does not exist",
             )
 
-        from modules.assessments.models import AssessmentInstance, AssessmentPackage
+        from modules.assessments.models import (
+            AssessmentCategoryProgress,
+            AssessmentInstance,
+            AssessmentPackage,
+            AssessmentPackageCategory,
+        )
+        from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireResponse
         from modules.users.models import User
-        from sqlalchemy import select
+        from sqlalchemy import select, func
+
+        _METSIGHTS_CATEGORY_KEYS = [
+            "physical-measurement",
+            "diet-lifestyle-parameters",
+            "vitals",
+            "fitness-parameters",
+        ]
 
         instances_query = (
             select(
@@ -1844,16 +1857,12 @@ class EngagementsService:
                 AssessmentInstance.user_id,
                 AssessmentInstance.status,
                 AssessmentInstance.package_id,
-                AssessmentInstance.completed_at,
                 User.first_name,
                 User.last_name,
                 User.phone,
                 User.email,
-                AssessmentPackage.package_code,
-                AssessmentPackage.display_name.label("package_display_name"),
             )
             .join(User, User.user_id == AssessmentInstance.user_id)
-            .outerjoin(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .where(AssessmentInstance.engagement_id == engagement_id)
             .order_by(User.first_name.asc(), User.last_name.asc(), AssessmentInstance.assessment_instance_id.asc())
         )
@@ -1861,24 +1870,154 @@ class EngagementsService:
         instance_rows = result.all()
 
         if not instance_rows:
-            return {"summary": {"drafted": 0, "submitted": 0, "not_started": 0}, "participants": []}
+            return {
+                "summary": {"filled": 0, "partially_filled": 0, "not_started": 0},
+                "participants": [],
+            }
 
         instance_ids = [row.assessment_instance_id for row in instance_rows]
-        responses = await self._questionnaire_repository.list_responses_for_instances(
-            db, assessment_instance_ids=instance_ids
+
+        # Get all category progress rows for these instances
+        progress_query = (
+            select(
+                AssessmentCategoryProgress.assessment_instance_id,
+                AssessmentCategoryProgress.category_id,
+                AssessmentCategoryProgress.status,
+                AssessmentCategoryProgress.is_submitted,
+                QuestionnaireCategory.category_key,
+                QuestionnaireCategory.category_of,
+            )
+            .join(QuestionnaireCategory, QuestionnaireCategory.category_id == AssessmentCategoryProgress.category_id)
+            .where(AssessmentCategoryProgress.assessment_instance_id.in_(instance_ids))
         )
+        progress_result = await db.execute(progress_query)
+        progress_rows = progress_result.all()
 
-        response_counts: dict[int, int] = {}
-        for resp in responses:
-            inst_id = int(resp.assessment_instance_id)
-            response_counts[inst_id] = response_counts.get(inst_id, 0) + 1
+        # Build progress map: instance_id -> {category_key -> {status, is_submitted}}
+        progress_map: dict[int, dict[str, dict]] = {}
+        for p in progress_rows:
+            iid = int(p.assessment_instance_id)
+            ck = p.category_key
+            if ck is None:
+                continue
+            progress_map.setdefault(iid, {})[ck] = {
+                "status": p.status,
+                "is_submitted": bool(p.is_submitted),
+            }
 
-        # Group instances by user_id to determine per-participant state
+        # Count responses per instance per category for has_responses
+        resp_count_query = (
+            select(
+                QuestionnaireResponse.assessment_instance_id,
+                func.count(QuestionnaireResponse.response_id),
+            )
+            .where(QuestionnaireResponse.assessment_instance_id.in_(instance_ids))
+            .group_by(QuestionnaireResponse.assessment_instance_id)
+        )
+        resp_result = await db.execute(resp_count_query)
+        resp_counts: dict[int, int] = {int(r[0]): int(r[1]) for r in resp_result.all()}
+
+        # Determine which metsights categories each package has
+        package_ids = list({int(r.package_id) for r in instance_rows})
+        pkg_cat_query = (
+            select(
+                AssessmentPackageCategory.package_id,
+                QuestionnaireCategory.category_key,
+            )
+            .join(QuestionnaireCategory, QuestionnaireCategory.category_id == AssessmentPackageCategory.category_id)
+            .where(AssessmentPackageCategory.package_id.in_(package_ids))
+            .where(QuestionnaireCategory.category_of == "metsights")
+        )
+        pkg_cat_result = await db.execute(pkg_cat_query)
+        pkg_categories: dict[int, set[str]] = {}
+        for pc in pkg_cat_result.all():
+            pkg_categories.setdefault(int(pc.package_id), set()).add(pc.category_key)
+
+        # Also get per-category response counts using category_ids array overlap
+        cat_resp_map: dict[int, dict[str, bool]] = {}  # instance_id -> category_key -> has_responses
+        for iid in instance_ids:
+            cat_resp_map[int(iid)] = {}
+
+        # Query category_id for each metsights category key
+        cat_key_to_id: dict[str, int] = {}
+        for ck in _METSIGHTS_CATEGORY_KEYS:
+            cat_row = await db.execute(
+                select(QuestionnaireCategory.category_id)
+                .where(QuestionnaireCategory.category_key == ck)
+                .where(QuestionnaireCategory.category_of == "metsights")
+                .limit(1)
+            )
+            cid = cat_row.scalar_one_or_none()
+            if cid is not None:
+                cat_key_to_id[ck] = int(cid)
+
+        # Check if responses exist per category per instance
+        for ck, cid in cat_key_to_id.items():
+            has_resp_query = (
+                select(
+                    QuestionnaireResponse.assessment_instance_id,
+                    func.count(QuestionnaireResponse.response_id),
+                )
+                .where(QuestionnaireResponse.assessment_instance_id.in_(instance_ids))
+                .where(QuestionnaireResponse.category_ids.any(cid))
+                .group_by(QuestionnaireResponse.assessment_instance_id)
+            )
+            has_resp_result = await db.execute(has_resp_query)
+            for r in has_resp_result.all():
+                cat_resp_map.setdefault(int(r[0]), {})[ck] = int(r[1]) > 0
+
+        # Unanswered required questions per instance/category (for partial hover tooltips)
+        from modules.questionnaire.models import QuestionnaireCategoryQuestion, QuestionnaireDefinition
+
+        unanswered_map: dict[int, dict[str, list[dict]]] = {}
+        for ck, cid in cat_key_to_id.items():
+            unanswered_query = (
+                select(
+                    AssessmentInstance.assessment_instance_id,
+                    QuestionnaireDefinition.question_id,
+                    QuestionnaireDefinition.question_text,
+                )
+                .select_from(AssessmentInstance)
+                .join(
+                    AssessmentPackageCategory,
+                    AssessmentPackageCategory.package_id == AssessmentInstance.package_id,
+                )
+                .join(
+                    QuestionnaireCategoryQuestion,
+                    QuestionnaireCategoryQuestion.category_id == AssessmentPackageCategory.category_id,
+                )
+                .join(
+                    QuestionnaireDefinition,
+                    QuestionnaireDefinition.question_id == QuestionnaireCategoryQuestion.question_id,
+                )
+                .outerjoin(
+                    QuestionnaireResponse,
+                    (QuestionnaireResponse.assessment_instance_id == AssessmentInstance.assessment_instance_id)
+                    & (QuestionnaireResponse.question_id == QuestionnaireDefinition.question_id)
+                    & (QuestionnaireResponse.category_ids.any(cid)),
+                )
+                .where(AssessmentInstance.assessment_instance_id.in_(instance_ids))
+                .where(AssessmentPackageCategory.category_id == cid)
+                .where(QuestionnaireDefinition.is_required.is_(True))
+                .where(QuestionnaireResponse.response_id.is_(None))
+                .order_by(AssessmentInstance.assessment_instance_id.asc(), QuestionnaireDefinition.question_id.asc())
+            )
+            unanswered_result = await db.execute(unanswered_query)
+            for r in unanswered_result.all():
+                unanswered_map.setdefault(int(r.assessment_instance_id), {}).setdefault(ck, []).append(
+                    {
+                        "question_id": int(r.question_id),
+                        "question_text": r.question_text,
+                    }
+                )
+
+        # Group by user
         user_data: dict[int, dict] = {}
         for row in instance_rows:
             uid = int(row.user_id)
-            resp_count = response_counts.get(row.assessment_instance_id, 0)
-            is_completed = (row.status or "").lower() == "completed"
+            iid = int(row.assessment_instance_id)
+            pid = int(row.package_id)
+            assigned_cats = pkg_categories.get(pid, set())
 
             if uid not in user_data:
                 user_data[uid] = {
@@ -1887,45 +2026,88 @@ class EngagementsService:
                     "last_name": row.last_name,
                     "phone": row.phone,
                     "email": row.email,
-                    "has_submitted": False,
-                    "has_drafted": False,
-                    "total_responses": 0,
-                    "packages": [],
+                    "categories": {},
+                    "has_any_responses": False,
+                    "all_assigned_complete": True,
+                    "assigned_cats": set(),
                 }
 
             entry = user_data[uid]
-            entry["total_responses"] += resp_count
-            entry["packages"].append({
-                "package_code": row.package_code,
-                "package_display_name": row.package_display_name,
-                "questionnaire_state": (
-                    "submitted" if is_completed
-                    else "drafted" if resp_count > 0
-                    else "not_started"
-                ),
-                "responses_count": resp_count,
-            })
+            entry["assigned_cats"].update(assigned_cats)
+            total_resp = resp_counts.get(iid, 0)
+            if total_resp > 0:
+                entry["has_any_responses"] = True
 
-            if is_completed:
-                entry["has_submitted"] = True
-            elif resp_count > 0:
-                entry["has_drafted"] = True
+            inst_progress = progress_map.get(iid, {})
+
+            for ck in _METSIGHTS_CATEGORY_KEYS:
+                assigned = ck in assigned_cats
+                prog = inst_progress.get(ck, {})
+                has_resp = cat_resp_map.get(iid, {}).get(ck, False)
+                cat_status = prog.get("status", "incomplete")
+                cat_submitted = prog.get("is_submitted", False)
+                unanswered = unanswered_map.get(iid, {}).get(ck, []) if assigned else []
+
+                # Infer complete from required-question coverage when progress row is missing/stale
+                if assigned and cat_status != "complete" and has_resp and not unanswered:
+                    cat_status = "complete"
+
+                existing = entry["categories"].get(ck)
+                if existing is None or (assigned and not existing.get("assigned")):
+                    entry["categories"][ck] = {
+                        "status": cat_status,
+                        "is_submitted": cat_submitted,
+                        "has_responses": has_resp,
+                        "assigned": assigned,
+                        "unanswered_required": unanswered if cat_status != "complete" else [],
+                    }
+                elif assigned:
+                    # Merge: take best status
+                    if cat_status == "complete":
+                        existing["status"] = "complete"
+                        existing["unanswered_required"] = []
+                    if cat_submitted:
+                        existing["is_submitted"] = True
+                    if has_resp:
+                        existing["has_responses"] = True
+                    if unanswered and existing.get("status") != "complete":
+                        prev = existing.get("unanswered_required") or unanswered
+                        if len(unanswered) <= len(prev):
+                            existing["unanswered_required"] = unanswered
+
+                if assigned and cat_status != "complete":
+                    entry["all_assigned_complete"] = False
 
         participants: list[dict] = []
-        summary_drafted = 0
-        summary_submitted = 0
+        summary_filled = 0
+        summary_partial = 0
         summary_not_started = 0
 
         for entry in user_data.values():
-            if entry["has_submitted"]:
-                state = "submitted"
-                summary_submitted += 1
-            elif entry["has_drafted"]:
-                state = "drafted"
-                summary_drafted += 1
-            else:
-                state = "not_started"
+            assigned_cats = entry["assigned_cats"]
+            if not assigned_cats:
                 summary_not_started += 1
+                state = "not_started"
+            elif entry["all_assigned_complete"]:
+                summary_filled += 1
+                state = "filled"
+            elif entry["has_any_responses"]:
+                summary_partial += 1
+                state = "partially_filled"
+            else:
+                summary_not_started += 1
+                state = "not_started"
+
+            # Fill default for unset categories
+            cats_output = {}
+            for ck in _METSIGHTS_CATEGORY_KEYS:
+                cats_output[ck] = entry["categories"].get(ck, {
+                    "status": "incomplete",
+                    "is_submitted": False,
+                    "has_responses": False,
+                    "assigned": ck in assigned_cats,
+                    "unanswered_required": [],
+                })
 
             participants.append({
                 "user_id": entry["user_id"],
@@ -1934,14 +2116,13 @@ class EngagementsService:
                 "phone": entry["phone"],
                 "email": entry["email"],
                 "questionnaire_state": state,
-                "total_responses": entry["total_responses"],
-                "packages": entry["packages"],
+                "categories": cats_output,
             })
 
         return {
             "summary": {
-                "drafted": summary_drafted,
-                "submitted": summary_submitted,
+                "filled": summary_filled,
+                "partially_filled": summary_partial,
                 "not_started": summary_not_started,
             },
             "participants": participants,

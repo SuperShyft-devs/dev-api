@@ -5,7 +5,7 @@ Schema must match `instructions/db-schema.txt`.
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, text
 
 from db.base import Base
 
@@ -70,4 +70,5 @@ class AssessmentCategoryProgress(Base):
     )
     category_id = Column(Integer, ForeignKey("questionnaire_categories.category_id"), nullable=False)
     status = Column(String, nullable=False)
+    is_submitted = Column(Boolean, nullable=False, server_default=text("false"))
     completed_at = Column(DateTime(timezone=True), nullable=True)

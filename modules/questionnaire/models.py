@@ -6,6 +6,7 @@ This module owns the `questionnaire_definitions` table.
 from __future__ import annotations
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.types import JSON
 
 from db.base import Base
@@ -74,7 +75,7 @@ class QuestionnaireResponse(Base):
     __tablename__ = "questionnaire_responses"
     __table_args__ = (
         Index("ix_qr_assessment_instance_id", "assessment_instance_id"),
-        Index("ix_questionnaire_responses_category_id", "category_id"),
+        Index("ix_qr_category_ids_gin", "category_ids", postgresql_using="gin"),
     )
 
     response_id = Column(Integer, primary_key=True)
@@ -88,13 +89,12 @@ class QuestionnaireResponse(Base):
         ForeignKey("questionnaire_definitions.question_id"),
         nullable=False,
     )
-    category_id = Column(
-        Integer,
-        ForeignKey("questionnaire_categories.category_id"),
+    category_ids = Column(
+        ARRAY(Integer),
         nullable=False,
+        server_default="{}",
     )
     answer = Column(JSON)
-    submitted_at = Column(DateTime(timezone=True))
 
 
 class QuestionnaireHealthyHabitRule(Base):

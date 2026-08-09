@@ -219,6 +219,12 @@ class MetsightsService:
                     error_code="EXTERNAL_SERVICE_UNAVAILABLE",
                     message="Metsights authorization failed",
                 ) from exc
+            if status_code == 429:
+                raise AppError(
+                    status_code=429,
+                    error_code="METSIGHTS_RATE_LIMITED",
+                    message="Metsights rate limit exceeded",
+                ) from exc
             raise AppError(
                 status_code=503,
                 error_code="EXTERNAL_SERVICE_UNAVAILABLE",
@@ -239,11 +245,18 @@ class MetsightsService:
 
         Some Metsights deployments return ``404`` (no payload) or ``405`` (GET not exposed on that path);
         both are treated as no data so import can continue with other resources.
+
+        Known 405-on-GET resources are skipped without calling the API — callers should fall back to
+        nested fields on ``GET /records/:id/`` (see sync_service ``_RESOURCE_TO_DETAIL_FIELD``).
         """
 
         rid = (record_id or "").strip()
         res = (resource or "").strip().strip("/")
         if not rid or not res:
+            return None
+        # Docs claim GET works for these, but production MetSights returns 405 Method Not Allowed.
+        # Avoid noisy failed calls; import paths already fall back to record detail.
+        if res in {"vitals", "fitness-parameters", "advanced-blood-parameters"}:
             return None
         self._require_api_key()
         try:

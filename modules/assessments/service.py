@@ -477,13 +477,6 @@ class AssessmentsService:
             )
 
         now = datetime.now(timezone.utc)
-        responses = await self._questionnaire.list_responses_for_instance(
-            db,
-            assessment_instance_id=assessment_instance_id,
-        )
-        for response in responses:
-            response.submitted_at = now
-            await self._questionnaire.update_response(db, response)
 
         package_categories = await self._repository.list_package_categories(db, package_id=instance.package_id)
         for link in package_categories:
@@ -497,11 +490,13 @@ class AssessmentsService:
                     assessment_instance_id=assessment_instance_id,
                     category_id=link.category_id,
                     status="complete",
+                    is_submitted=True,
                     completed_at=now,
                 )
                 await self._repository.create_category_progress(db, progress)
             else:
                 progress.status = "complete"
+                progress.is_submitted = True
                 progress.completed_at = now
                 await self._repository.update_category_progress(db, progress)
 
@@ -688,6 +683,14 @@ class AssessmentsService:
                         continue
                     answer = {"value": value, "unit": option_value}
 
+                resolved_cat_ids = await self._questionnaire.resolve_category_ids_for_question(
+                    db,
+                    question_id=int(question.question_id),
+                    package_id=int(instance.package_id),
+                )
+                if not resolved_cat_ids:
+                    resolved_cat_ids = [int(category.category_id)]
+
                 existing = await self._questionnaire.get_response_by_instance_and_question_id(
                     db,
                     assessment_instance_id=int(instance.assessment_instance_id),
@@ -695,8 +698,7 @@ class AssessmentsService:
                 )
                 if existing is not None:
                     existing.answer = answer
-                    existing.category_id = int(category.category_id)
-                    existing.submitted_at = None
+                    existing.category_ids = resolved_cat_ids
                     await self._questionnaire.update_response(db, existing)
                 else:
                     await self._questionnaire.create_response(
@@ -704,9 +706,8 @@ class AssessmentsService:
                         QuestionnaireResponse(
                             assessment_instance_id=int(instance.assessment_instance_id),
                             question_id=int(question.question_id),
-                            category_id=int(category.category_id),
+                            category_ids=resolved_cat_ids,
                             answer=answer,
-                            submitted_at=None,
                         ),
                     )
                 drafted += 1

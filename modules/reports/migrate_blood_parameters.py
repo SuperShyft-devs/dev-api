@@ -17,7 +17,7 @@ Run via::
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+
 from typing import Any
 
 from sqlalchemy import or_, select
@@ -281,7 +281,6 @@ async def _migrate_metsights_flat_to_questionnaire(
     """Return ``(unmapped_keys, migrated_response_count)``."""
     unmapped: list[str] = []
     migrated_count = 0
-    now = datetime.now(timezone.utc)
 
     if row.assessment_instance_id is None:
         return unmapped, migrated_count
@@ -333,15 +332,13 @@ async def _migrate_metsights_flat_to_questionnaire(
                 QuestionnaireResponse(
                     assessment_instance_id=row.assessment_instance_id,
                     question_id=definition.question_id,
-                    category_id=category_id,
+                    category_ids=[category_id],
                     answer=answer,
-                    submitted_at=now,
                 )
             )
         else:
             response.answer = answer
-            response.category_id = category_id
-            response.submitted_at = now
+            response.category_ids = [category_id]
             db.add(response)
 
     if migrated_count > 0 and not dry_run and clear_blood_fields:

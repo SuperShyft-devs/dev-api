@@ -232,7 +232,9 @@ async def import_metsights_answers(
                 )
                 if progress is None or (progress.status or "").strip().lower() != "complete":
                     all_categories_complete = False
-                    break
+                elif progress is not None and not progress.is_submitted:
+                    progress.is_submitted = True
+                    await assessments_repo.update_category_progress(db, progress)
 
             if all_categories_complete and (instance.status or "").strip().lower() != "completed":
                 instance.status = "completed"
