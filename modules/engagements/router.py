@@ -27,6 +27,7 @@ from modules.engagements.schemas import (
     EngagementParticipantUpdateRequest,
     EngagementStatusUpdateRequest,
     EngagementUpdateRequest,
+    MoveParticipantRequest,
     OnboardingAssistantsAddRequest,
     ResolveHealthiansZoneRequest,
 )
@@ -489,6 +490,30 @@ async def remove_participant_from_engagement(
         employee=employee,
         engagement_id=engagement_id,
         user_id=user_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.post("/{engagement_id}/participants/{user_id}/move")
+async def move_participant_to_engagement(
+    engagement_id: int,
+    user_id: int,
+    payload: MoveParticipantRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    data = await engagements_service.move_participant_to_engagement_for_employee(
+        db,
+        employee=employee,
+        source_engagement_id=engagement_id,
+        user_id=user_id,
+        target_engagement_id=payload.target_engagement_id,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),

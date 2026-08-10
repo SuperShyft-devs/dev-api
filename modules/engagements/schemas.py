@@ -243,6 +243,10 @@ class EngagementParticipantUpdateRequest(BaseModel):
     booking_id: Optional[str] = Field(default=None, max_length=100)
 
 
+class MoveParticipantRequest(BaseModel):
+    target_engagement_id: int
+
+
 class ConsultationConsentRequest(BaseModel):
     bio_ai: bool = False
     blood_report: bool = False

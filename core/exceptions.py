@@ -43,11 +43,45 @@ def _map_status_to_error_code(status_code: int) -> str:
     return mapping.get(status_code, "INTERNAL_ERROR")
 
 
+def _request_label(request: Request) -> str:
+    return f"{request.method} {request.url.path}"
+
+
+def _log_error(
+    *,
+    request: Request,
+    status_code: int,
+    error_type: str,
+    error_code: str,
+    message: str,
+    exc: BaseException | None = None,
+) -> None:
+    """Print status code and error type details to the terminal."""
+    line = (
+        f"API error | status={status_code} | type={error_type} | "
+        f"code={error_code} | {_request_label(request)} | {message}"
+    )
+    if status_code >= 500:
+        logger.error(line, exc_info=exc)
+    elif status_code >= 400:
+        logger.warning(line)
+    else:
+        logger.info(line)
+
+
 def add_exception_handlers(app: FastAPI) -> None:
     """Register global exception handlers."""
 
     @app.exception_handler(AppError)
-    async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
+    async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+        _log_error(
+            request=request,
+            status_code=exc.status_code,
+            error_type="AppError",
+            error_code=exc.error_code,
+            message=exc.message,
+            exc=exc,
+        )
         return JSONResponse(
             status_code=exc.status_code,
             content={
@@ -58,10 +92,17 @@ def add_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(
-        _: Request,
+        request: Request,
         exc: RequestValidationError,
     ) -> JSONResponse:
-        logger.warning("Validation error: %s", exc.errors())
+        _log_error(
+            request=request,
+            status_code=400,
+            error_type="RequestValidationError",
+            error_code="INVALID_INPUT",
+            message=str(exc.errors()),
+            exc=exc,
+        )
         return JSONResponse(
             status_code=400,
             content={
@@ -72,11 +113,19 @@ def add_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error_handler(
-        _: Request,
+        request: Request,
         exc: StarletteHTTPException,
     ) -> JSONResponse:
         error_code = _map_status_to_error_code(exc.status_code)
         message = exc.detail if isinstance(exc.detail, str) else "Request failed"
+        _log_error(
+            request=request,
+            status_code=exc.status_code,
+            error_type="HTTPException",
+            error_code=error_code,
+            message=message,
+            exc=exc,
+        )
         return JSONResponse(
             status_code=exc.status_code,
             content={
@@ -86,7 +135,15 @@ def add_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(Exception)
-    async def unhandled_error_handler(_: Request, __: Exception) -> JSONResponse:
+    async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+        _log_error(
+            request=request,
+            status_code=500,
+            error_type=type(exc).__name__,
+            error_code="INTERNAL_ERROR",
+            message=str(exc) or "An unexpected error occurred",
+            exc=exc,
+        )
         return JSONResponse(
             status_code=500,
             content={

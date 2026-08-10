@@ -76,6 +76,55 @@ def _normalize_status(value: str | None) -> str:
     return (value or "").strip().lower()
 
 
+def _engagement_consultations_fingerprint(raw: Any) -> dict[str, bool]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, bool] = {}
+    for key, value in raw.items():
+        if isinstance(value, dict):
+            out[str(key)] = bool(value.get("want"))
+        else:
+            out[str(key)] = bool(value)
+    return out
+
+
+def _blood_collection_type_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, BloodCollectionType):
+        return value.value
+    if hasattr(value, "value"):
+        return str(value.value)
+    return str(value)
+
+
+def _participant_move_mismatch_reasons(source: Engagement, target: Engagement) -> list[str]:
+    mismatches: list[str] = []
+    if bool(source.create_profile_on_metsights) != bool(target.create_profile_on_metsights):
+        mismatches.append("Create Profile on Metsights")
+    if source.assessment_package_id != target.assessment_package_id:
+        mismatches.append("Assessment package")
+    if source.diagnostic_package_id != target.diagnostic_package_id:
+        mismatches.append("diagnostic_package_id")
+    if source.engagement_type != target.engagement_type:
+        mismatches.append("Engagement Type")
+    if _blood_collection_type_value(source.blood_collection_type) != _blood_collection_type_value(
+        target.blood_collection_type
+    ):
+        mismatches.append("Blood Collection Type")
+    if _engagement_consultations_fingerprint(source.consultations) != _engagement_consultations_fingerprint(
+        target.consultations
+    ):
+        mismatches.append("Consultations")
+    if bool(source.enroll_for_fitprint_full) != bool(target.enroll_for_fitprint_full):
+        mismatches.append("Enroll for FitPrint Full")
+    return mismatches
+
+
+def _cannot_move_participant_message(reason: str) -> str:
+    return f"Cannot move this participant. {reason}"
+
+
 def _parse_status_filter(status: str | None) -> list[str] | None:
     if status is None:
         return None
@@ -1741,6 +1790,143 @@ class EngagementsService:
             "engagement_id": engagement_id,
             "user_id": user_id,
             **purge,
+        }
+
+    async def move_participant_to_engagement_for_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        source_engagement_id: int,
+        user_id: int,
+        target_engagement_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        ensure_admin(employee)
+
+        if int(source_engagement_id) == int(target_engagement_id):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=_cannot_move_participant_message(
+                    "Source and target engagement are the same."
+                ),
+            )
+
+        source = await self._repository.get_engagement_by_id(db, source_engagement_id)
+        if source is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        target = await self._repository.get_engagement_by_id(db, target_engagement_id)
+        if target is None:
+            raise AppError(status_code=404, error_code="ENGAGEMENT_NOT_FOUND", message="Engagement does not exist")
+
+        mismatch_reasons = _participant_move_mismatch_reasons(source, target)
+        if mismatch_reasons:
+            raise AppError(
+                status_code=400,
+                error_code="INCOMPATIBLE_ENGAGEMENT",
+                message=_cannot_move_participant_message(
+                    "These settings do not match: " + ", ".join(mismatch_reasons) + "."
+                ),
+            )
+
+        participant_exists = await self._repository.has_participant_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=source_engagement_id,
+        )
+        if not participant_exists:
+            raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant does not exist")
+
+        already_on_target = await self._repository.has_participant_for_user_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=target_engagement_id,
+        )
+        if already_on_target:
+            raise AppError(
+                status_code=409,
+                error_code="ALREADY_ENROLLED",
+                message=_cannot_move_participant_message(
+                    "This participant is already enrolled in the target engagement."
+                ),
+            )
+
+        from sqlalchemy import cast, or_, update
+
+        from modules.assessments.models import AssessmentInstance
+        from modules.audit.models import IntegrationSyncLog
+        from modules.notifications.models import Notification
+        from modules.reports.models import IndividualHealthReport
+
+        # Update only engagement_id via SQL so we do not SELECT columns that may
+        # not exist yet on older DBs (e.g. home-collection address fields).
+        move_result = await db.execute(
+            update(EngagementParticipant)
+            .where(EngagementParticipant.user_id == user_id)
+            .where(EngagementParticipant.engagement_id == source_engagement_id)
+            .values(engagement_id=target_engagement_id)
+        )
+        if int(move_result.rowcount or 0) < 1:
+            raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant does not exist")
+
+        await db.execute(
+            update(AssessmentInstance)
+            .where(AssessmentInstance.user_id == user_id)
+            .where(AssessmentInstance.engagement_id == source_engagement_id)
+            .values(engagement_id=target_engagement_id)
+        )
+        await db.execute(
+            update(IndividualHealthReport)
+            .where(IndividualHealthReport.user_id == user_id)
+            .where(IndividualHealthReport.engagement_id == source_engagement_id)
+            .values(engagement_id=target_engagement_id)
+        )
+        await db.execute(
+            update(IntegrationSyncLog)
+            .where(IntegrationSyncLog.user_id == user_id)
+            .where(IntegrationSyncLog.engagement_id == source_engagement_id)
+            .values(engagement_id=target_engagement_id)
+        )
+
+        from sqlalchemy.dialects.postgresql import JSONB
+
+        await db.execute(
+            update(Notification)
+            .where(Notification.engagement_id == source_engagement_id)
+            .where(
+                or_(
+                    Notification.triggered_by_user_id == user_id,
+                    cast(Notification.user, JSONB).contains({"user_ids": [user_id]}),
+                )
+            )
+            .values(engagement_id=target_engagement_id)
+        )
+
+        remaining = await self._repository.count_distinct_participants_for_engagement(
+            db,
+            engagement_id=source_engagement_id,
+        )
+
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="EMPLOYEE_MOVE_ENGAGEMENT_PARTICIPANT",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return {
+            "source_engagement_id": source_engagement_id,
+            "target_engagement_id": target_engagement_id,
+            "user_id": user_id,
+            "source_remaining_participant_count": int(remaining),
         }
 
     async def remove_all_participants_from_engagement_for_employee(
