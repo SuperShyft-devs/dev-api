@@ -758,6 +758,7 @@ class ConsoleService:
             user_id=user_id,
             assessment_instance_id=assessment_instance_id,
             category_id=category_id,
+            question_filter="all",
         )
 
     async def upsert_participant_questionnaire_responses(
