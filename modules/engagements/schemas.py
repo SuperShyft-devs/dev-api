@@ -247,6 +247,11 @@ class MoveParticipantRequest(BaseModel):
     target_engagement_id: int
 
 
+class MoveParticipantsBatchRequest(BaseModel):
+    target_engagement_id: int
+    user_ids: list[int] = Field(min_length=1)
+
+
 class ConsultationConsentRequest(BaseModel):
     bio_ai: bool = False
     blood_report: bool = False

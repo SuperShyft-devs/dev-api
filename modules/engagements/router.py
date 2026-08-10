@@ -28,6 +28,7 @@ from modules.engagements.schemas import (
     EngagementStatusUpdateRequest,
     EngagementUpdateRequest,
     MoveParticipantRequest,
+    MoveParticipantsBatchRequest,
     OnboardingAssistantsAddRequest,
     ResolveHealthiansZoneRequest,
 )
@@ -498,6 +499,29 @@ async def remove_participant_from_engagement(
     return success_response(data)
 
 
+@router.post("/{engagement_id}/participants/move")
+async def move_participants_to_engagement(
+    engagement_id: int,
+    payload: MoveParticipantsBatchRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    data = await engagements_service.move_participants_to_engagement_for_employee(
+        db,
+        employee=employee,
+        source_engagement_id=engagement_id,
+        user_ids=payload.user_ids,
+        target_engagement_id=payload.target_engagement_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
 @router.post("/{engagement_id}/participants/{user_id}/move")
 async def move_participant_to_engagement(
     engagement_id: int,
@@ -508,11 +532,11 @@ async def move_participant_to_engagement(
     employee: EmployeeContext = Depends(get_current_employee),
     engagements_service: EngagementsService = Depends(get_engagements_service),
 ):
-    data = await engagements_service.move_participant_to_engagement_for_employee(
+    data = await engagements_service.move_participants_to_engagement_for_employee(
         db,
         employee=employee,
         source_engagement_id=engagement_id,
-        user_id=user_id,
+        user_ids=[user_id],
         target_engagement_id=payload.target_engagement_id,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),

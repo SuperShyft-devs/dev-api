@@ -1792,19 +1792,27 @@ class EngagementsService:
             **purge,
         }
 
-    async def move_participant_to_engagement_for_employee(
+    async def move_participants_to_engagement_for_employee(
         self,
         db: AsyncSession,
         *,
         employee: EmployeeContext,
         source_engagement_id: int,
-        user_id: int,
+        user_ids: list[int],
         target_engagement_id: int,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> dict:
         ensure_admin(employee)
+
+        normalized_user_ids = sorted({int(user_id) for user_id in user_ids})
+        if not normalized_user_ids:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=_cannot_move_participant_message("Select at least one participant."),
+            )
 
         if int(source_engagement_id) == int(target_engagement_id):
             raise AppError(
@@ -1833,25 +1841,43 @@ class EngagementsService:
                 ),
             )
 
-        participant_exists = await self._repository.has_participant_for_user_engagement(
-            db,
-            user_id=user_id,
-            engagement_id=source_engagement_id,
-        )
-        if not participant_exists:
-            raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant does not exist")
+        missing_on_source: list[int] = []
+        already_on_target: list[int] = []
+        for user_id in normalized_user_ids:
+            on_source = await self._repository.has_participant_for_user_engagement(
+                db,
+                user_id=user_id,
+                engagement_id=source_engagement_id,
+            )
+            if not on_source:
+                missing_on_source.append(user_id)
+                continue
+            on_target = await self._repository.has_participant_for_user_engagement(
+                db,
+                user_id=user_id,
+                engagement_id=target_engagement_id,
+            )
+            if on_target:
+                already_on_target.append(user_id)
 
-        already_on_target = await self._repository.has_participant_for_user_engagement(
-            db,
-            user_id=user_id,
-            engagement_id=target_engagement_id,
-        )
+        if missing_on_source:
+            raise AppError(
+                status_code=404,
+                error_code="PARTICIPANT_NOT_FOUND",
+                message=_cannot_move_participant_message(
+                    "These participants are not in the source engagement: "
+                    + ", ".join(str(uid) for uid in missing_on_source)
+                    + "."
+                ),
+            )
         if already_on_target:
             raise AppError(
                 status_code=409,
                 error_code="ALREADY_ENROLLED",
                 message=_cannot_move_participant_message(
-                    "This participant is already enrolled in the target engagement."
+                    "These participants are already enrolled in the target engagement: "
+                    + ", ".join(str(uid) for uid in already_on_target)
+                    + "."
                 ),
             )
 
@@ -1866,41 +1892,45 @@ class EngagementsService:
         # not exist yet on older DBs (e.g. home-collection address fields).
         move_result = await db.execute(
             update(EngagementParticipant)
-            .where(EngagementParticipant.user_id == user_id)
+            .where(EngagementParticipant.user_id.in_(normalized_user_ids))
             .where(EngagementParticipant.engagement_id == source_engagement_id)
             .values(engagement_id=target_engagement_id)
         )
-        if int(move_result.rowcount or 0) < 1:
+        if int(move_result.rowcount or 0) < len(normalized_user_ids):
             raise AppError(status_code=404, error_code="PARTICIPANT_NOT_FOUND", message="Participant does not exist")
 
         await db.execute(
             update(AssessmentInstance)
-            .where(AssessmentInstance.user_id == user_id)
+            .where(AssessmentInstance.user_id.in_(normalized_user_ids))
             .where(AssessmentInstance.engagement_id == source_engagement_id)
             .values(engagement_id=target_engagement_id)
         )
         await db.execute(
             update(IndividualHealthReport)
-            .where(IndividualHealthReport.user_id == user_id)
+            .where(IndividualHealthReport.user_id.in_(normalized_user_ids))
             .where(IndividualHealthReport.engagement_id == source_engagement_id)
             .values(engagement_id=target_engagement_id)
         )
         await db.execute(
             update(IntegrationSyncLog)
-            .where(IntegrationSyncLog.user_id == user_id)
+            .where(IntegrationSyncLog.user_id.in_(normalized_user_ids))
             .where(IntegrationSyncLog.engagement_id == source_engagement_id)
             .values(engagement_id=target_engagement_id)
         )
 
         from sqlalchemy.dialects.postgresql import JSONB
 
+        notification_user_filters = [
+            cast(Notification.user, JSONB).contains({"user_ids": [user_id]})
+            for user_id in normalized_user_ids
+        ]
         await db.execute(
             update(Notification)
             .where(Notification.engagement_id == source_engagement_id)
             .where(
                 or_(
-                    Notification.triggered_by_user_id == user_id,
-                    cast(Notification.user, JSONB).contains({"user_ids": [user_id]}),
+                    Notification.triggered_by_user_id.in_(normalized_user_ids),
+                    *notification_user_filters,
                 )
             )
             .values(engagement_id=target_engagement_id)
@@ -1914,7 +1944,7 @@ class EngagementsService:
         audit = self._require_audit_service()
         await audit.log_event(
             db,
-            action="EMPLOYEE_MOVE_ENGAGEMENT_PARTICIPANT",
+            action="EMPLOYEE_MOVE_ENGAGEMENT_PARTICIPANTS",
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -1925,9 +1955,33 @@ class EngagementsService:
         return {
             "source_engagement_id": source_engagement_id,
             "target_engagement_id": target_engagement_id,
-            "user_id": user_id,
+            "user_ids": normalized_user_ids,
+            "moved_count": len(normalized_user_ids),
             "source_remaining_participant_count": int(remaining),
         }
+
+    async def move_participant_to_engagement_for_employee(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        source_engagement_id: int,
+        user_id: int,
+        target_engagement_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        return await self.move_participants_to_engagement_for_employee(
+            db,
+            employee=employee,
+            source_engagement_id=source_engagement_id,
+            user_ids=[user_id],
+            target_engagement_id=target_engagement_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            endpoint=endpoint,
+        )
 
     async def remove_all_participants_from_engagement_for_employee(
         self,
