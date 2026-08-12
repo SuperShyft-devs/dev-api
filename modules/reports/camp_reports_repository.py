@@ -11,17 +11,45 @@ from typing import Any
 from sqlalchemy import and_, case, delete, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.assessments.models import AssessmentInstance, AssessmentPackage
+from modules.assessments.models import (
+    AssessmentCategoryProgress,
+    AssessmentInstance,
+    AssessmentPackage,
+    AssessmentPackageCategory,
+)
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.experts.models import ConsultationBooking, ExpertTypeModel
 from modules.organizations.models import Organization
-from modules.questionnaire.models import QuestionnaireDefinition, QuestionnaireResponse
-from modules.reports.camp_report_section_builders import extract_metabolic_age, extract_metabolic_score, extract_oxidative_stress_score, is_high_metabolic_risk, resolve_user_age
+from modules.questionnaire.models import (
+    QuestionnaireCategory,
+    QuestionnaireCategoryQuestion,
+    QuestionnaireDefinition,
+    QuestionnaireResponse,
+)
+from modules.reports.camp_report_section_builders import (
+    extract_metabolic_age,
+    extract_metabolic_score,
+    extract_oxidative_stress_score,
+    metabolic_age_gap,
+    metabolic_risk_bucket,
+    resolve_user_age,
+)
 from modules.reports.models import CampReport, IndividualHealthReport
 from modules.users.models import User
 
 _MALE_GENDERS = ("male", "m", "1")
 _FEMALE_GENDERS = ("female", "f", "2")
+_METSIGHTS_CATEGORY_KEYS = (
+    "physical-measurement",
+    "diet-lifestyle-parameters",
+    "vitals",
+    "fitness-parameters",
+)
+
+
+def _person_name(first_name: str | None, last_name: str | None) -> str:
+    parts = [p.strip() for p in (first_name or "", last_name or "") if p and str(p).strip()]
+    return " ".join(parts) if parts else "Unknown"
 
 
 def _coerce_reports_dict(reports: Any) -> dict[str, Any]:
@@ -572,11 +600,11 @@ class CampReportsRepository:
         Blood totals come from the service (booking_id + Metsights collection checks).
         Consultation counts include all expert types and combinations.
         """
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
-
-        employees_result = await db.execute(
-            select(func.count()).select_from(enrolled)
+        enrolled = self._enrolled_users_ranked_subquery(
+            camp_no=camp_no, department=department, city=city
         )
+
+        employees_result = await db.execute(select(func.count()).select_from(enrolled))
         employees_enrolled = int(employees_result.scalar_one())
 
         male_result = await db.execute(
@@ -610,7 +638,12 @@ class CampReportsRepository:
                 enrolled.c.user_id,
                 enrolled.c.date_of_birth,
                 enrolled.c.age,
+                enrolled.c.first_name,
+                enrolled.c.last_name,
                 IndividualHealthReport.reports,
+                IndividualHealthReport.blood_parameters,
+                IndividualHealthReport.diagnostic_report_url,
+                AssessmentInstance.assessment_instance_id,
                 func.row_number()
                 .over(
                     partition_by=enrolled.c.user_id,
@@ -621,9 +654,13 @@ class CampReportsRepository:
             .select_from(enrolled)
             .join(
                 AssessmentInstance,
+                AssessmentInstance.user_id == enrolled.c.user_id,
+            )
+            .join(
+                Engagement,
                 and_(
-                    AssessmentInstance.engagement_id == enrolled.c.engagement_id,
-                    AssessmentInstance.user_id == enrolled.c.user_id,
+                    Engagement.engagement_id == AssessmentInstance.engagement_id,
+                    Engagement.camp_no == camp_no,
                 ),
             )
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
@@ -640,23 +677,193 @@ class CampReportsRepository:
                 ranked_reports.c.user_id,
                 ranked_reports.c.date_of_birth,
                 ranked_reports.c.age,
+                ranked_reports.c.first_name,
+                ranked_reports.c.last_name,
                 ranked_reports.c.reports,
+                ranked_reports.c.blood_parameters,
+                ranked_reports.c.diagnostic_report_url,
+                ranked_reports.c.assessment_instance_id,
             ).where(ranked_reports.c.rn == 1)
         )
+
+        enrolled_roster_result = await db.execute(
+            select(
+                enrolled.c.user_id,
+                enrolled.c.date_of_birth,
+                enrolled.c.age,
+                enrolled.c.first_name,
+                enrolled.c.last_name,
+            )
+        )
+        enrolled_roster = {
+            int(uid): {
+                "date_of_birth": dob,
+                "age": int(stored_age),
+                "first_name": first_name,
+                "last_name": last_name,
+            }
+            for uid, dob, stored_age, first_name, last_name in enrolled_roster_result.all()
+        }
+
+        bio_ai_report_generated = 0
         high_risk_group = 0
-        for _user_id, dob, stored_age, reports in reports_result.all():
-            reports_dict: dict[str, Any] = reports if isinstance(reports, dict) else {}
-            metabolic_age = extract_metabolic_age(reports_dict)
+        caution_risk_group = 0
+        good_risk_group = 0
+        risk_people: list[dict[str, Any]] = []
+        bio_ai_user_ids: set[int] = set()
+        report_info_by_user: dict[int, dict[str, Any]] = {}
+
+        for (
+            user_id,
+            dob,
+            stored_age,
+            first_name,
+            last_name,
+            reports,
+            blood_parameters,
+            diagnostic_report_url,
+            assessment_instance_id,
+        ) in reports_result.all():
+            uid = int(user_id)
+            reports_dict = _coerce_reports_dict(reports)
+            has_bio_ai = bool(reports_dict)
             chronological_age = resolve_user_age(
                 date_of_birth=dob,
                 stored_age=int(stored_age),
                 reference_date=age_reference_date,
             )
-            if is_high_metabolic_risk(
+            report_info_by_user[uid] = {
+                "name": _person_name(first_name, last_name),
+                "has_bio_ai": has_bio_ai,
+                "has_assessment": assessment_instance_id is not None,
+                "has_blood_parameters": blood_parameters is not None,
+                "has_diagnostic_report_url": bool(
+                    str(diagnostic_report_url).strip() if diagnostic_report_url else ""
+                ),
+                "actual_age": chronological_age,
+            }
+            if not has_bio_ai:
+                continue
+
+            bio_ai_report_generated += 1
+            bio_ai_user_ids.add(uid)
+            metabolic_age = extract_metabolic_age(reports_dict)
+            gap = metabolic_age_gap(
                 metabolic_age=metabolic_age,
                 chronological_age=chronological_age,
-            ):
+            )
+            bucket = metabolic_risk_bucket(
+                metabolic_age=metabolic_age,
+                chronological_age=chronological_age,
+            )
+            if bucket == "high":
                 high_risk_group += 1
+            elif bucket == "caution":
+                caution_risk_group += 1
+            else:
+                good_risk_group += 1
+            risk_people.append(
+                {
+                    "user_id": uid,
+                    "name": _person_name(first_name, last_name),
+                    "actual_age": chronological_age,
+                    "metabolic_age": metabolic_age,
+                    "gap_years": round(gap, 2),
+                    "risk_group": bucket,
+                }
+            )
+
+        for uid, info in enrolled_roster.items():
+            if uid in report_info_by_user:
+                continue
+            report_info_by_user[uid] = {
+                "name": _person_name(info["first_name"], info["last_name"]),
+                "has_bio_ai": False,
+                "has_assessment": False,
+                "has_blood_parameters": False,
+                "has_diagnostic_report_url": False,
+                "actual_age": resolve_user_age(
+                    date_of_birth=info["date_of_birth"],
+                    stored_age=info["age"],
+                    reference_date=age_reference_date,
+                ),
+            }
+
+        questionnaire = await self._compute_kpi_questionnaire_status(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+            enrolled_user_ids=set(enrolled_roster.keys()),
+        )
+        questionnaire_completed = int(questionnaire["questionnaire_completed"])
+        filled_user_ids: set[int] = set(questionnaire["filled_user_ids"])
+        unanswered_by_user: dict[int, list[str]] = questionnaire["unanswered_by_user"]
+
+        bio_ai_mismatch_people: list[dict[str, Any]] = []
+        mismatch_user_ids = filled_user_ids.symmetric_difference(bio_ai_user_ids)
+        for uid in sorted(mismatch_user_ids):
+            info = report_info_by_user.get(uid) or {
+                "name": "Unknown",
+                "has_bio_ai": uid in bio_ai_user_ids,
+                "has_assessment": False,
+                "has_blood_parameters": False,
+                "has_diagnostic_report_url": False,
+            }
+            q_filled = uid in filled_user_ids
+            has_bio = uid in bio_ai_user_ids
+            reasons: list[str] = []
+            if q_filled and not has_bio:
+                if not info.get("has_assessment"):
+                    reasons.append(
+                        "This person finished the questionnaire, but we could not find "
+                        "their Metsights Pro/Basic health assessment for this camp."
+                    )
+                elif not info.get("has_bio_ai"):
+                    if not info.get("has_blood_parameters") and not info.get(
+                        "has_diagnostic_report_url"
+                    ):
+                        reasons.append(
+                            "Questionnaire is complete, but the blood report is not "
+                            "available yet, so the Bio AI health report could not be generated."
+                        )
+                    else:
+                        reasons.append(
+                            "Questionnaire is complete, but the Bio AI health report "
+                            "has not been generated yet (the report file is empty)."
+                        )
+            elif has_bio and not q_filled:
+                missing_questions = unanswered_by_user.get(uid) or []
+                if missing_questions:
+                    preview = "; ".join(missing_questions[:8])
+                    more = len(missing_questions) - 8
+                    extra = f" (+{more} more)" if more > 0 else ""
+                    reasons.append(
+                        "Bio AI report is ready, but the questionnaire is not fully "
+                        f"filled. Missing required question(s): {preview}{extra}."
+                    )
+                else:
+                    reasons.append(
+                        "Bio AI report is ready, but the questionnaire is not marked "
+                        "as fully completed yet."
+                    )
+            if not reasons:
+                reasons.append(
+                    "Questionnaire completed and Bio AI report counts do not match "
+                    "for this person."
+                )
+            bio_ai_mismatch_people.append(
+                {
+                    "user_id": uid,
+                    "name": info.get("name") or "Unknown",
+                    "questionnaire_completed": q_filled,
+                    "bio_ai_report_generated": has_bio,
+                    "reasons": reasons,
+                }
+            )
+
+        risk_people.sort(key=lambda p: (p.get("name") or "", p.get("user_id") or 0))
+        bio_ai_mismatch_people.sort(key=lambda p: (p.get("name") or "", p.get("user_id") or 0))
 
         return {
             "employees_enrolled": employees_enrolled,
@@ -667,8 +874,372 @@ class CampReportsRepository:
             "doctor_consultation": doctor_consultation,
             "nutritionist_consultation": nutritionist_consultation,
             "doctor_and_nutritionist_consultation": doctor_and_nutritionist_consultation,
+            "questionnaire_completed": questionnaire_completed,
+            "bio_ai_report_generated": bio_ai_report_generated,
             "high_risk_group": high_risk_group,
+            "caution_risk_group": caution_risk_group,
+            "good_risk_group": good_risk_group,
             "blood_details": dict(blood_details),
+            "kpi_bts_details": {
+                "risk_groups": {
+                    "people": risk_people,
+                    "counts": {
+                        "high": high_risk_group,
+                        "caution": caution_risk_group,
+                        "good": good_risk_group,
+                        "bio_ai_report_generated": bio_ai_report_generated,
+                    },
+                },
+                "questionnaire": {
+                    "completed": questionnaire_completed,
+                    "by_engagement": questionnaire["by_engagement"],
+                    "sum_filled_cards": questionnaire["sum_filled_cards"],
+                },
+                "bio_ai_mismatch": {
+                    "questionnaire_completed": questionnaire_completed,
+                    "bio_ai_report_generated": bio_ai_report_generated,
+                    "people": bio_ai_mismatch_people,
+                },
+            },
+        }
+
+    async def _compute_kpi_questionnaire_status(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None,
+        enrolled_user_ids: set[int],
+    ) -> dict[str, Any]:
+        """Camp-scoped questionnaire filled status mirroring Operations tab cards.
+
+        Uses the same Metsights category completion rules as
+        ``get_questionnaire_status_for_engagement``, restricted to enrolled users
+        in scope and primary packages (assessment_type_code 1/2).
+        """
+        empty = {
+            "questionnaire_completed": 0,
+            "filled_user_ids": set(),
+            "unanswered_by_user": {},
+            "by_engagement": [],
+            "sum_filled_cards": 0,
+        }
+        if not enrolled_user_ids:
+            return empty
+
+        engagement_query = select(
+            Engagement.engagement_id,
+            Engagement.engagement_name,
+        ).where(Engagement.camp_no == camp_no)
+        if city is not None:
+            engagement_query = engagement_query.where(
+                func.lower(func.trim(Engagement.city)) == city.lower()
+            )
+        engagement_rows = (await db.execute(engagement_query)).all()
+        if not engagement_rows:
+            return empty
+
+        engagement_ids = [int(r[0]) for r in engagement_rows]
+        engagement_names = {int(r[0]): (r[1] or f"Engagement {r[0]}") for r in engagement_rows}
+
+        # Participants in scope for each engagement (department filter when set).
+        participant_query = (
+            select(
+                EngagementParticipant.engagement_id,
+                EngagementParticipant.user_id,
+            )
+            .where(EngagementParticipant.engagement_id.in_(engagement_ids))
+            .where(EngagementParticipant.user_id.in_(enrolled_user_ids))
+        )
+        if department is not None:
+            participant_query = participant_query.where(
+                EngagementParticipant.participant_department == department
+            )
+        participants_by_eng: dict[int, set[int]] = {eid: set() for eid in engagement_ids}
+        for eid, uid in (await db.execute(participant_query)).all():
+            participants_by_eng.setdefault(int(eid), set()).add(int(uid))
+
+        instances_query = (
+            select(
+                AssessmentInstance.assessment_instance_id,
+                AssessmentInstance.user_id,
+                AssessmentInstance.package_id,
+                AssessmentInstance.engagement_id,
+            )
+            .join(
+                AssessmentPackage,
+                AssessmentPackage.package_id == AssessmentInstance.package_id,
+            )
+            .where(AssessmentInstance.engagement_id.in_(engagement_ids))
+            .where(AssessmentInstance.user_id.in_(enrolled_user_ids))
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        )
+        instance_rows = (await db.execute(instances_query)).all()
+        if not instance_rows:
+            by_engagement = []
+            for eid in engagement_ids:
+                scoped = participants_by_eng.get(eid) or set()
+                by_engagement.append(
+                    {
+                        "engagement_id": eid,
+                        "engagement_name": engagement_names.get(eid),
+                        "filled": 0,
+                        "partially_filled": 0,
+                        "not_started": len(scoped),
+                        "enrolled": len(scoped),
+                    }
+                )
+            return {
+                "questionnaire_completed": 0,
+                "filled_user_ids": set(),
+                "unanswered_by_user": {},
+                "by_engagement": by_engagement,
+                "sum_filled_cards": 0,
+            }
+
+        instance_ids = [int(r[0]) for r in instance_rows]
+        package_ids = list({int(r[2]) for r in instance_rows})
+
+        progress_query = (
+            select(
+                AssessmentCategoryProgress.assessment_instance_id,
+                AssessmentCategoryProgress.category_id,
+                AssessmentCategoryProgress.status,
+                AssessmentCategoryProgress.is_submitted,
+                QuestionnaireCategory.category_key,
+            )
+            .join(
+                QuestionnaireCategory,
+                QuestionnaireCategory.category_id == AssessmentCategoryProgress.category_id,
+            )
+            .where(AssessmentCategoryProgress.assessment_instance_id.in_(instance_ids))
+        )
+        progress_map: dict[int, dict[str, dict]] = {}
+        for p in (await db.execute(progress_query)).all():
+            ck = p.category_key
+            if ck is None:
+                continue
+            progress_map.setdefault(int(p.assessment_instance_id), {})[ck] = {
+                "status": p.status,
+                "is_submitted": bool(p.is_submitted),
+            }
+
+        resp_count_query = (
+            select(
+                QuestionnaireResponse.assessment_instance_id,
+                func.count(QuestionnaireResponse.response_id),
+            )
+            .where(QuestionnaireResponse.assessment_instance_id.in_(instance_ids))
+            .group_by(QuestionnaireResponse.assessment_instance_id)
+        )
+        resp_counts = {
+            int(r[0]): int(r[1]) for r in (await db.execute(resp_count_query)).all()
+        }
+
+        pkg_cat_query = (
+            select(
+                AssessmentPackageCategory.package_id,
+                QuestionnaireCategory.category_key,
+            )
+            .join(
+                QuestionnaireCategory,
+                QuestionnaireCategory.category_id == AssessmentPackageCategory.category_id,
+            )
+            .where(AssessmentPackageCategory.package_id.in_(package_ids))
+            .where(QuestionnaireCategory.category_of == "metsights")
+        )
+        pkg_categories: dict[int, set[str]] = {}
+        for pc in (await db.execute(pkg_cat_query)).all():
+            pkg_categories.setdefault(int(pc.package_id), set()).add(pc.category_key)
+
+        cat_key_to_id: dict[str, int] = {}
+        for ck in _METSIGHTS_CATEGORY_KEYS:
+            cat_row = await db.execute(
+                select(QuestionnaireCategory.category_id)
+                .where(QuestionnaireCategory.category_key == ck)
+                .where(QuestionnaireCategory.category_of == "metsights")
+                .limit(1)
+            )
+            cid = cat_row.scalar_one_or_none()
+            if cid is not None:
+                cat_key_to_id[ck] = int(cid)
+
+        cat_resp_map: dict[int, dict[str, bool]] = {iid: {} for iid in instance_ids}
+        for ck, cid in cat_key_to_id.items():
+            has_resp_query = (
+                select(
+                    QuestionnaireResponse.assessment_instance_id,
+                    func.count(QuestionnaireResponse.response_id),
+                )
+                .where(QuestionnaireResponse.assessment_instance_id.in_(instance_ids))
+                .where(QuestionnaireResponse.category_ids.any(cid))
+                .group_by(QuestionnaireResponse.assessment_instance_id)
+            )
+            for r in (await db.execute(has_resp_query)).all():
+                cat_resp_map.setdefault(int(r[0]), {})[ck] = int(r[1]) > 0
+
+        unanswered_map: dict[int, dict[str, list[dict]]] = {}
+        for ck, cid in cat_key_to_id.items():
+            unanswered_query = (
+                select(
+                    AssessmentInstance.assessment_instance_id,
+                    QuestionnaireDefinition.question_id,
+                    QuestionnaireDefinition.question_text,
+                )
+                .select_from(AssessmentInstance)
+                .join(
+                    AssessmentPackageCategory,
+                    AssessmentPackageCategory.package_id == AssessmentInstance.package_id,
+                )
+                .join(
+                    QuestionnaireCategoryQuestion,
+                    QuestionnaireCategoryQuestion.category_id
+                    == AssessmentPackageCategory.category_id,
+                )
+                .join(
+                    QuestionnaireDefinition,
+                    QuestionnaireDefinition.question_id
+                    == QuestionnaireCategoryQuestion.question_id,
+                )
+                .outerjoin(
+                    QuestionnaireResponse,
+                    (QuestionnaireResponse.assessment_instance_id
+                     == AssessmentInstance.assessment_instance_id)
+                    & (QuestionnaireResponse.question_id == QuestionnaireDefinition.question_id)
+                    & (QuestionnaireResponse.category_ids.any(cid)),
+                )
+                .where(AssessmentInstance.assessment_instance_id.in_(instance_ids))
+                .where(AssessmentPackageCategory.category_id == cid)
+                .where(QuestionnaireDefinition.is_required.is_(True))
+                .where(QuestionnaireResponse.response_id.is_(None))
+                .order_by(
+                    AssessmentInstance.assessment_instance_id.asc(),
+                    QuestionnaireDefinition.question_id.asc(),
+                )
+            )
+            for r in (await db.execute(unanswered_query)).all():
+                unanswered_map.setdefault(int(r.assessment_instance_id), {}).setdefault(
+                    ck, []
+                ).append(
+                    {
+                        "question_id": int(r.question_id),
+                        "question_text": r.question_text,
+                    }
+                )
+
+        # Per engagement + unique user rollup
+        user_global: dict[int, dict[str, Any]] = {}
+        by_engagement: list[dict[str, Any]] = []
+        sum_filled_cards = 0
+
+        instances_by_eng: dict[int, list[tuple]] = {eid: [] for eid in engagement_ids}
+        for row in instance_rows:
+            instances_by_eng.setdefault(int(row[3]), []).append(row)
+
+        for eid in engagement_ids:
+            scoped_users = participants_by_eng.get(eid) or set()
+            user_data: dict[int, dict[str, Any]] = {}
+            for row in instances_by_eng.get(eid) or []:
+                iid = int(row[0])
+                uid = int(row[1])
+                pid = int(row[2])
+                if uid not in scoped_users:
+                    continue
+                assigned_cats = pkg_categories.get(pid, set())
+                entry = user_data.setdefault(
+                    uid,
+                    {
+                        "assigned_cats": set(),
+                        "has_any_responses": False,
+                        "all_assigned_complete": True,
+                        "unanswered_questions": [],
+                    },
+                )
+                entry["assigned_cats"].update(assigned_cats)
+                if resp_counts.get(iid, 0) > 0:
+                    entry["has_any_responses"] = True
+                inst_progress = progress_map.get(iid, {})
+                for ck in _METSIGHTS_CATEGORY_KEYS:
+                    if ck not in assigned_cats:
+                        continue
+                    prog = inst_progress.get(ck, {})
+                    has_resp = cat_resp_map.get(iid, {}).get(ck, False)
+                    cat_status = prog.get("status", "incomplete")
+                    unanswered = unanswered_map.get(iid, {}).get(ck, [])
+                    if cat_status != "complete" and has_resp and not unanswered:
+                        cat_status = "complete"
+                    if cat_status != "complete":
+                        entry["all_assigned_complete"] = False
+                        for q in unanswered:
+                            text = str(q.get("question_text") or "").strip()
+                            if text and text not in entry["unanswered_questions"]:
+                                entry["unanswered_questions"].append(text)
+            # Users enrolled in engagement but without a primary assessment instance
+            for uid in scoped_users:
+                if uid not in user_data:
+                    user_data[uid] = {
+                        "assigned_cats": set(),
+                        "has_any_responses": False,
+                        "all_assigned_complete": True,
+                        "unanswered_questions": [],
+                    }
+
+            filled = partial = not_started = 0
+            for uid, entry in user_data.items():
+                assigned = entry["assigned_cats"]
+                if not assigned:
+                    state = "not_started"
+                    not_started += 1
+                elif entry["all_assigned_complete"]:
+                    state = "filled"
+                    filled += 1
+                elif entry["has_any_responses"]:
+                    state = "partially_filled"
+                    partial += 1
+                else:
+                    state = "not_started"
+                    not_started += 1
+
+                global_entry = user_global.setdefault(
+                    uid,
+                    {
+                        "filled": False,
+                        "unanswered_questions": [],
+                    },
+                )
+                if state == "filled":
+                    global_entry["filled"] = True
+                for text in entry["unanswered_questions"]:
+                    if text not in global_entry["unanswered_questions"]:
+                        global_entry["unanswered_questions"].append(text)
+
+            sum_filled_cards += filled
+            by_engagement.append(
+                {
+                    "engagement_id": eid,
+                    "engagement_name": engagement_names.get(eid),
+                    "filled": filled,
+                    "partially_filled": partial,
+                    "not_started": not_started,
+                    "enrolled": len(scoped_users),
+                }
+            )
+
+        filled_user_ids = {
+            uid for uid, entry in user_global.items() if entry.get("filled")
+        }
+        unanswered_by_user = {
+            uid: list(entry.get("unanswered_questions") or [])
+            for uid, entry in user_global.items()
+            if entry.get("unanswered_questions")
+        }
+        return {
+            "questionnaire_completed": len(filled_user_ids),
+            "filled_user_ids": filled_user_ids,
+            "unanswered_by_user": unanswered_by_user,
+            "by_engagement": by_engagement,
+            "sum_filled_cards": sum_filled_cards,
         }
 
     async def list_metabolic_scores(

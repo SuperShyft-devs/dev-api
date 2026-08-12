@@ -1129,11 +1129,23 @@ async def test_refresh_camp_report_kpis(async_client, test_db_session):
     assert data["consultations"]["doctor"] == 2
     assert data["consultations"]["nutritionist"] == 1
     assert data["consultations"]["doctor_nutritionist"] == 1
+    assert data["bio_ai_report_generated"] == 3
     assert data["high_risk_group"] == 2
+    assert data["caution_risk_group"] == 1
+    assert data["good_risk_group"] == 0
+    assert data["questionnaire_completed"] == 0
+    assert (
+        data["high_risk_group"]
+        + data["caution_risk_group"]
+        + data["good_risk_group"]
+        == data["bio_ai_report_generated"]
+    )
 
     assert "report_bts" in payload
     assert payload["report_bts"]["status"] == "ok"
     assert payload["report_bts"]["expected"]["employees_enrolled"] == 4
+    assert "risk_groups" in payload["report_bts"]["details"]
+    assert len(payload["report_bts"]["details"]["risk_groups"]["people"]) == 3
 
     row = (
         await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
@@ -1171,7 +1183,10 @@ async def test_refresh_department_camp_report_kpis(async_client, test_db_session
     assert data["doctor_consultation"] == 1
     assert data["nutritionist_consultation"] == 0
     assert data["doctor_and_nutritionist_consultation"] == 0
+    assert data["bio_ai_report_generated"] == 2
     assert data["high_risk_group"] == 1
+    assert data["caution_risk_group"] == 1
+    assert data["good_risk_group"] == 0
 
 
 @pytest.mark.asyncio

@@ -27,16 +27,26 @@ def test_build_kpis_bts_first_validation_ok():
         "doctor_consultation": 3,
         "nutritionist_consultation": 2,
         "doctor_and_nutritionist_consultation": 1,
+        "questionnaire_completed": 7,
+        "bio_ai_report_generated": 7,
         "high_risk_group": 1,
+        "caution_risk_group": 2,
+        "good_risk_group": 4,
     }
     bts = build_kpis_bts(
         expected_data=expected,
         stored_data=None,
         blood_details={"with_booking_id": 5, "with_metsights_collection": 3},
         checked_at="t",
+        kpi_details={
+            "risk_groups": {"people": [], "counts": {"high": 1, "caution": 2, "good": 4}},
+            "questionnaire": {"completed": 7, "by_engagement": [], "sum_filled_cards": 7},
+            "bio_ai_mismatch": {"people": []},
+        },
     )
     assert bts["status"] == "ok"
     assert bts["stored"] is None
+    assert "risk_groups" in bts["details"]
 
 
 def test_build_kpis_bts_mismatch_reason():
@@ -50,7 +60,11 @@ def test_build_kpis_bts_mismatch_reason():
         "doctor_consultation": 3,
         "nutritionist_consultation": 0,
         "doctor_and_nutritionist_consultation": 0,
+        "questionnaire_completed": 8,
+        "bio_ai_report_generated": 7,
         "high_risk_group": 1,
+        "caution_risk_group": 2,
+        "good_risk_group": 4,
     }
     stored = {**expected, "employees_enrolled": 9, "total_blood_test": 5}
     bts = build_kpis_bts(
@@ -65,12 +79,35 @@ def test_build_kpis_bts_mismatch_reason():
             "users_needing_metsights_check": 5,
         },
         checked_at="t",
+        kpi_details={
+            "questionnaire": {
+                "completed": 8,
+                "sum_filled_cards": 8,
+                "by_engagement": [{"engagement_id": 1, "engagement_name": "Session A", "filled": 8}],
+            },
+            "bio_ai_mismatch": {
+                "questionnaire_completed": 8,
+                "bio_ai_report_generated": 7,
+                "people": [
+                    {
+                        "user_id": 1,
+                        "name": "Alex Lee",
+                        "questionnaire_completed": True,
+                        "bio_ai_report_generated": False,
+                        "reasons": ["Blood report is not available yet."],
+                    }
+                ],
+            },
+            "risk_groups": {"people": []},
+        },
     )
     assert bts["status"] == "mismatch"
     assert bts["fields"]["employees_enrolled"]["match"] is False
     assert "counted again we got 10" in bts["fields"]["employees_enrolled"]["reason"]
     assert bts["fields"]["total_blood_test"]["match"] is False
     assert "lab booking" in bts["fields"]["total_blood_test"]["reason"].lower()
+    assert bts["fields"]["risk_groups_sum"]["match"] is True
+    assert bts["details"]["bio_ai_mismatch"]["people"][0]["name"] == "Alex Lee"
 
 
 def test_build_kpis_bts_consultations_fallback_to_legacy_fields():
@@ -85,7 +122,11 @@ def test_build_kpis_bts_consultations_fallback_to_legacy_fields():
         "doctor_consultation": 86,
         "nutritionist_consultation": 0,
         "doctor_and_nutritionist_consultation": 0,
+        "questionnaire_completed": 40,
+        "bio_ai_report_generated": 81,
         "high_risk_group": 27,
+        "caution_risk_group": 8,
+        "good_risk_group": 46,
     }
     stored_legacy = {
         "employees_enrolled": 140,
@@ -104,11 +145,44 @@ def test_build_kpis_bts_consultations_fallback_to_legacy_fields():
         blood_details={"with_booking_id": 100, "with_metsights_collection": 32},
         checked_at="t",
     )
-    assert bts["status"] == "ok"
+    assert bts["status"] == "mismatch"
     assert bts["fields"]["consultations.doctor"]["match"] is True
     assert bts["fields"]["consultations.doctor"]["stored"] == 86
     assert bts["fields"]["consultations.nutritionist"]["match"] is True
     assert bts["fields"]["consultations.doctor_nutritionist"]["match"] is True
+    assert bts["fields"]["questionnaire_completed"]["match"] is False
+    assert bts["fields"]["bio_ai_report_generated"]["match"] is False
+    assert bts["fields"]["caution_risk_group"]["match"] is False
+    assert bts["fields"]["good_risk_group"]["match"] is False
+    assert bts["fields"]["risk_groups_sum"]["match"] is True
+
+
+def test_build_kpis_bts_risk_sum_integrity():
+    expected = {
+        "employees_enrolled": 3,
+        "male_enrolled": 2,
+        "female_enrolled": 1,
+        "total_blood_test": 3,
+        "blood_test_percent": 100,
+        "consultations": {},
+        "doctor_consultation": 0,
+        "nutritionist_consultation": 0,
+        "doctor_and_nutritionist_consultation": 0,
+        "questionnaire_completed": 3,
+        "bio_ai_report_generated": 3,
+        "high_risk_group": 1,
+        "caution_risk_group": 1,
+        "good_risk_group": 0,
+    }
+    bts = build_kpis_bts(
+        expected_data=expected,
+        stored_data=expected,
+        blood_details={},
+        checked_at="t",
+    )
+    assert bts["fields"]["risk_groups_sum"]["match"] is False
+    assert "add up" in (bts["fields"]["risk_groups_sum"]["reason"] or "").lower()
+    assert bts["status"] == "mismatch"
 
 
 def _age_expected_and_details():

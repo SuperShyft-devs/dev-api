@@ -186,11 +186,39 @@ def oxidative_stress_to_band(score: float) -> str:
     return "very_high"
 
 
+def metabolic_age_gap(*, metabolic_age: float | None, chronological_age: int) -> float:
+    """Years by which metabolic age exceeds chronological age (missing MA → gap 0)."""
+    effective_metabolic = metabolic_age if metabolic_age is not None else float(chronological_age)
+    return float(effective_metabolic) - float(chronological_age)
+
+
+def metabolic_risk_bucket(*, metabolic_age: float | None, chronological_age: int) -> str:
+    """Classify Bio AI participants by metabolic-age gap.
+
+    - high: gap >= 3
+    - caution: 0 < gap < 3
+    - good: gap <= 0 (includes missing metabolic_age)
+    """
+    gap_years = metabolic_age_gap(
+        metabolic_age=metabolic_age,
+        chronological_age=chronological_age,
+    )
+    if gap_years >= 3:
+        return "high"
+    if gap_years > 0:
+        return "caution"
+    return "good"
+
+
 def is_high_metabolic_risk(*, metabolic_age: float | None, chronological_age: int) -> bool:
     """True when metabolic age gap is at least 3 years."""
-    effective_metabolic = metabolic_age if metabolic_age is not None else float(chronological_age)
-    gap_years = effective_metabolic - chronological_age
-    return gap_years >= 3
+    return (
+        metabolic_risk_bucket(
+            metabolic_age=metabolic_age,
+            chronological_age=chronological_age,
+        )
+        == "high"
+    )
 
 
 def build_kpis(metrics: dict) -> dict:
@@ -211,7 +239,11 @@ def build_kpis(metrics: dict) -> dict:
             "doctor_and_nutritionist_consultation": int(
                 metrics["doctor_and_nutritionist_consultation"]
             ),
+            "questionnaire_completed": int(metrics.get("questionnaire_completed") or 0),
+            "bio_ai_report_generated": int(metrics.get("bio_ai_report_generated") or 0),
             "high_risk_group": int(metrics["high_risk_group"]),
+            "caution_risk_group": int(metrics.get("caution_risk_group") or 0),
+            "good_risk_group": int(metrics.get("good_risk_group") or 0),
         },
     }
 

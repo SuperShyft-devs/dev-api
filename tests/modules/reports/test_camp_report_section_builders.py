@@ -18,6 +18,7 @@ from modules.reports.camp_report_section_builders import (
     extract_oxidative_stress_score,
     is_high_metabolic_risk,
     match_dashboard_disease_code,
+    metabolic_risk_bucket,
     metabolic_score_to_band,
     normalize_camp_gender,
     oxidative_stress_to_band,
@@ -44,6 +45,15 @@ def test_is_high_metabolic_risk_boundary():
     assert is_high_metabolic_risk(metabolic_age=None, chronological_age=30) is False
 
 
+def test_metabolic_risk_bucket_boundaries():
+    assert metabolic_risk_bucket(metabolic_age=33.0, chronological_age=30) == "high"
+    assert metabolic_risk_bucket(metabolic_age=32.9, chronological_age=30) == "caution"
+    assert metabolic_risk_bucket(metabolic_age=30.1, chronological_age=30) == "caution"
+    assert metabolic_risk_bucket(metabolic_age=30.0, chronological_age=30) == "good"
+    assert metabolic_risk_bucket(metabolic_age=29.0, chronological_age=30) == "good"
+    assert metabolic_risk_bucket(metabolic_age=None, chronological_age=30) == "good"
+
+
 def test_build_kpis_percent():
     payload = build_kpis(
         {
@@ -59,12 +69,20 @@ def test_build_kpis_percent():
             "doctor_consultation": 2,
             "nutritionist_consultation": 1,
             "doctor_and_nutritionist_consultation": 1,
+            "questionnaire_completed": 3,
+            "bio_ai_report_generated": 3,
             "high_risk_group": 1,
+            "caution_risk_group": 1,
+            "good_risk_group": 1,
         }
     )
     assert payload["data"]["blood_test_percent"] == 75
     assert payload["data"]["consultations"]["doctor"] == 2
     assert payload["data"]["consultations"]["doctor_nutritionist"] == 1
+    assert payload["data"]["questionnaire_completed"] == 3
+    assert payload["data"]["bio_ai_report_generated"] == 3
+    assert payload["data"]["caution_risk_group"] == 1
+    assert payload["data"]["good_risk_group"] == 1
 
 
 def test_build_kpis_percent_zero_enrolled():
@@ -78,11 +96,16 @@ def test_build_kpis_percent_zero_enrolled():
             "doctor_consultation": 0,
             "nutritionist_consultation": 0,
             "doctor_and_nutritionist_consultation": 0,
+            "questionnaire_completed": 0,
+            "bio_ai_report_generated": 0,
             "high_risk_group": 0,
+            "caution_risk_group": 0,
+            "good_risk_group": 0,
         }
     )
     assert payload["data"]["blood_test_percent"] == 0
     assert payload["data"]["consultations"] == {}
+    assert payload["data"]["bio_ai_report_generated"] == 0
 
 
 def test_build_participation_by_age_total_inside_data():

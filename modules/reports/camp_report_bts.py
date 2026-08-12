@@ -133,6 +133,130 @@ def _high_risk_reason(expected: int, stored: int | None) -> str:
     )
 
 
+def _caution_risk_reason(expected: int, stored: int | None) -> str:
+    if stored is None:
+        return (
+            f"The saved report did not show a caution-risk count. "
+            f"We found {expected} people in the caution group."
+        )
+    return (
+        f"The saved report says {stored} people are in caution, but we found {expected}. "
+        f"Someone is in caution when their body age is a little older than their actual age "
+        f"(more than 0 years older, but less than 3)."
+    )
+
+
+def _good_risk_reason(expected: int, stored: int | None) -> str:
+    if stored is None:
+        return (
+            f"The saved report did not show a good-risk count. "
+            f"We found {expected} people in the good group."
+        )
+    return (
+        f"The saved report says {stored} people are in the good group, but we found {expected}. "
+        f"Someone is in the good group when their body age is the same as or younger than "
+        f"their actual age."
+    )
+
+
+def _questionnaire_reason(
+    expected: int,
+    stored: int | None,
+    questionnaire_details: dict[str, Any] | None,
+) -> str:
+    details = dict(questionnaire_details or {})
+    by_engagement = details.get("by_engagement") if isinstance(details.get("by_engagement"), list) else []
+    sum_cards = _int_or_none(details.get("sum_filled_cards"))
+    parts: list[str] = []
+    if stored is None:
+        parts.append(
+            f"The saved report did not show how many people completed the questionnaire. "
+            f"We counted {expected}."
+        )
+    else:
+        parts.append(
+            f"The saved report says {stored} people completed the questionnaire, "
+            f"but we counted {expected}."
+        )
+    parts.append(
+        " We count a person when every required question in their Metsights Pro/Basic "
+        "health assessment categories is filled (same as the “Questionnaire Filled” card "
+        "in Operations)."
+    )
+    if by_engagement:
+        bits = []
+        for row in by_engagement:
+            if not isinstance(row, dict):
+                continue
+            name = row.get("engagement_name") or f"Session {row.get('engagement_id')}"
+            filled = _int_or_none(row.get("filled")) or 0
+            bits.append(f"{name}: {filled}")
+        if bits:
+            parts.append(" Per session — " + "; ".join(bits) + ".")
+        if sum_cards is not None:
+            parts.append(f" Sum of session cards: {sum_cards}.")
+    return "".join(parts)
+
+
+def _bio_ai_reason(
+    expected: int,
+    stored: int | None,
+    mismatch_details: dict[str, Any] | None,
+) -> str:
+    details = dict(mismatch_details or {})
+    people = details.get("people") if isinstance(details.get("people"), list) else []
+    q_done = _int_or_none(details.get("questionnaire_completed"))
+    if stored is None:
+        head = (
+            f"The saved report did not show how many Bio AI reports were generated. "
+            f"We found {expected}."
+        )
+    else:
+        head = (
+            f"The saved report says {stored} Bio AI reports were generated, "
+            f"but we found {expected}."
+        )
+    detail = (
+        " We count a person when their Metsights Pro/Basic health report has been generated "
+        "(the report content is not empty)."
+    )
+    if q_done is not None and q_done != expected:
+        detail += (
+            f" This usually lines up with questionnaire completed ({q_done}), "
+            f"but right now it does not."
+        )
+    if people:
+        sample = []
+        for person in people[:5]:
+            if not isinstance(person, dict):
+                continue
+            name = person.get("name") or "Someone"
+            reasons = person.get("reasons") if isinstance(person.get("reasons"), list) else []
+            reason_text = reasons[0] if reasons else "Needs a closer look."
+            sample.append(f"{name}: {reason_text}")
+        if sample:
+            more = len(people) - len(sample)
+            extra = f" (+{more} more people — see the list below.)" if more > 0 else ""
+            detail += " Examples — " + " | ".join(sample) + extra
+    return head + detail
+
+
+def _risk_sum_reason(
+    *,
+    high: int,
+    caution: int,
+    good: int,
+    bio_ai: int,
+) -> str:
+    total = high + caution + good
+    return (
+        f"High ({high}) + caution ({caution}) + good ({good}) = {total}, "
+        f"but Bio AI reports generated is {bio_ai}. "
+        f"These three risk groups should add up to the Bio AI count. "
+        f"Refresh this section, or check the participant list below."
+    )
+
+
 def _percent_reason(expected: int, stored: int | None) -> str:
     if stored is None:
         return (
@@ -151,6 +275,7 @@ def build_kpis_bts(
     stored_data: dict[str, Any] | None,
     blood_details: dict[str, int] | None,
     checked_at: str,
+    kpi_details: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compare KPI report data to freshly computed expected values.
 
@@ -159,22 +284,44 @@ def build_kpis_bts(
     """
     stored = stored_data if isinstance(stored_data, dict) else {}
     details = dict(blood_details or {})
+    kpi_details_payload = dict(kpi_details or {})
+    questionnaire_details = (
+        kpi_details_payload.get("questionnaire")
+        if isinstance(kpi_details_payload.get("questionnaire"), dict)
+        else {}
+    )
+    bio_ai_mismatch = (
+        kpi_details_payload.get("bio_ai_mismatch")
+        if isinstance(kpi_details_payload.get("bio_ai_mismatch"), dict)
+        else {}
+    )
+    risk_groups = (
+        kpi_details_payload.get("risk_groups")
+        if isinstance(kpi_details_payload.get("risk_groups"), dict)
+        else {}
+    )
     fields: dict[str, Any] = {}
+
+    details_out: dict[str, Any] = {
+        "blood": details,
+        "consultations": {},
+        "questionnaire": questionnaire_details,
+        "bio_ai_mismatch": bio_ai_mismatch,
+        "risk_groups": risk_groups,
+    }
 
     if not stored:
         expected_consultations = expected_data.get("consultations") or {}
         if not isinstance(expected_consultations, dict):
             expected_consultations = {}
+        details_out["consultations"] = expected_consultations
         return {
             "status": "ok",
             "checked_at": checked_at,
             "expected": expected_data,
             "stored": None,
             "fields": {},
-            "details": {
-                "blood": details,
-                "consultations": expected_consultations,
-            },
+            "details": details_out,
             "message": (
                 "This is the first check for KPIs. "
                 "We saved the latest numbers into the report."
@@ -186,6 +333,10 @@ def build_kpis_bts(
         ("male_enrolled", "men enrolled", _enrolled_reason),
         ("female_enrolled", "women enrolled", _enrolled_reason),
         ("high_risk_group", "high-risk people", None),
+        ("caution_risk_group", "caution-risk people", None),
+        ("good_risk_group", "good-risk people", None),
+        ("questionnaire_completed", "questionnaire completed", None),
+        ("bio_ai_report_generated", "Bio AI reports generated", None),
         ("doctor_consultation", "doctor consultations", None),
         ("nutritionist_consultation", "nutritionist consultations", None),
         (
@@ -203,6 +354,22 @@ def build_kpis_bts(
             reason = _percent_reason(expected or 0, stored_val)
         elif key == "high_risk_group":
             reason = _high_risk_reason(expected or 0, stored_val)
+        elif key == "caution_risk_group":
+            reason = _caution_risk_reason(expected or 0, stored_val)
+        elif key == "good_risk_group":
+            reason = _good_risk_reason(expected or 0, stored_val)
+        elif key == "questionnaire_completed":
+            reason = _questionnaire_reason(
+                expected or 0,
+                stored_val,
+                questionnaire_details if isinstance(questionnaire_details, dict) else None,
+            )
+        elif key == "bio_ai_report_generated":
+            reason = _bio_ai_reason(
+                expected or 0,
+                stored_val,
+                bio_ai_mismatch if isinstance(bio_ai_mismatch, dict) else None,
+            )
         elif key in (
             "doctor_consultation",
             "nutritionist_consultation",
@@ -229,6 +396,7 @@ def build_kpis_bts(
     stored_consultations = stored.get("consultations") if isinstance(stored.get("consultations"), dict) else {}
     if not isinstance(expected_consultations, dict):
         expected_consultations = {}
+    details_out["consultations"] = expected_consultations
 
     # If the saved report is an older shape without consultations{}, fall back to
     # the legacy doctor/nutritionist fields so we do not false-flag a mismatch.
@@ -257,6 +425,21 @@ def build_kpis_bts(
             reason=_consultation_reason(label, expected or 0, stored_val),
         )
 
+    high = _int_or_none(expected_data.get("high_risk_group")) or 0
+    caution = _int_or_none(expected_data.get("caution_risk_group")) or 0
+    good = _int_or_none(expected_data.get("good_risk_group")) or 0
+    bio_ai = _int_or_none(expected_data.get("bio_ai_report_generated")) or 0
+    risk_sum = high + caution + good
+    risk_sum_matches = risk_sum == bio_ai
+    fields["risk_groups_sum"] = {
+        "match": risk_sum_matches,
+        "expected": bio_ai,
+        "stored": risk_sum,
+        "reason": None
+        if risk_sum_matches
+        else _risk_sum_reason(high=high, caution=caution, good=good, bio_ai=bio_ai),
+    }
+
     all_match = all(bool(entry.get("match")) for entry in fields.values())
     return {
         "status": "ok" if all_match else "mismatch",
@@ -264,10 +447,7 @@ def build_kpis_bts(
         "expected": expected_data,
         "stored": stored_data,
         "fields": fields,
-        "details": {
-            "blood": details,
-            "consultations": expected_consultations,
-        },
+        "details": details_out,
         "message": (
             "All KPI numbers match."
             if all_match
