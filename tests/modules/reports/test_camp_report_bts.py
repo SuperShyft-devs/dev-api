@@ -111,7 +111,7 @@ def test_build_kpis_bts_mismatch_reason():
 
 
 def test_build_kpis_bts_consultations_fallback_to_legacy_fields():
-    """Older reports without consultations{} should not false-flag when legacy counts match."""
+    """Older reports without consultations{} / new KPI keys should not false-flag."""
     expected = {
         "employees_enrolled": 140,
         "male_enrolled": 91,
@@ -145,16 +145,52 @@ def test_build_kpis_bts_consultations_fallback_to_legacy_fields():
         blood_details={"with_booking_id": 100, "with_metsights_collection": 32},
         checked_at="t",
     )
-    assert bts["status"] == "mismatch"
+    assert bts["status"] == "ok"
+    assert "added new KPI fields" in bts["message"]
     assert bts["fields"]["consultations.doctor"]["match"] is True
     assert bts["fields"]["consultations.doctor"]["stored"] == 86
     assert bts["fields"]["consultations.nutritionist"]["match"] is True
     assert bts["fields"]["consultations.doctor_nutritionist"]["match"] is True
-    assert bts["fields"]["questionnaire_completed"]["match"] is False
-    assert bts["fields"]["bio_ai_report_generated"]["match"] is False
-    assert bts["fields"]["caution_risk_group"]["match"] is False
-    assert bts["fields"]["good_risk_group"]["match"] is False
+    # Newly introduced keys are treated as schema upgrade, not mismatches.
+    assert bts["fields"]["questionnaire_completed"]["match"] is True
+    assert bts["fields"]["questionnaire_completed"]["stored"] == 40
+    assert bts["fields"]["bio_ai_report_generated"]["match"] is True
+    assert bts["fields"]["caution_risk_group"]["match"] is True
+    assert bts["fields"]["good_risk_group"]["match"] is True
     assert bts["fields"]["risk_groups_sum"]["match"] is True
+    # Nested consultations{} already covers these — no duplicate flat rows.
+    assert "doctor_consultation" not in bts["fields"]
+    assert "nutritionist_consultation" not in bts["fields"]
+    assert "doctor_and_nutritionist_consultation" not in bts["fields"]
+
+
+def test_build_kpis_bts_new_field_wrong_value_still_mismatches():
+    expected = {
+        "employees_enrolled": 10,
+        "male_enrolled": 6,
+        "female_enrolled": 4,
+        "total_blood_test": 8,
+        "blood_test_percent": 80,
+        "consultations": {"doctor": 3},
+        "doctor_consultation": 3,
+        "nutritionist_consultation": 0,
+        "doctor_and_nutritionist_consultation": 0,
+        "questionnaire_completed": 8,
+        "bio_ai_report_generated": 7,
+        "high_risk_group": 1,
+        "caution_risk_group": 2,
+        "good_risk_group": 4,
+    }
+    stored = {**expected, "questionnaire_completed": 5}
+    bts = build_kpis_bts(
+        expected_data=expected,
+        stored_data=stored,
+        blood_details={},
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["questionnaire_completed"]["match"] is False
+    assert bts["fields"]["questionnaire_completed"]["stored"] == 5
 
 
 def test_build_kpis_bts_risk_sum_integrity():

@@ -269,6 +269,24 @@ def _percent_reason(expected: int, stored: int | None) -> str:
     )
 
 
+# Fields added in later KPI shapes. If an older saved report is missing them,
+# that is a schema upgrade — not a real number mismatch.
+_KPI_SCHEMA_NEW_KEYS = frozenset(
+    {
+        "caution_risk_group",
+        "good_risk_group",
+        "questionnaire_completed",
+        "bio_ai_report_generated",
+    }
+)
+
+_LEGACY_CONSULTATION_KEYS = (
+    "doctor_consultation",
+    "nutritionist_consultation",
+    "doctor_and_nutritionist_consultation",
+)
+
+
 def build_kpis_bts(
     *,
     expected_data: dict[str, Any],
@@ -301,6 +319,7 @@ def build_kpis_bts(
         else {}
     )
     fields: dict[str, Any] = {}
+    newly_added_keys: list[str] = []
 
     details_out: dict[str, Any] = {
         "blood": details,
@@ -328,6 +347,13 @@ def build_kpis_bts(
             ),
         }
 
+    expected_consultations = expected_data.get("consultations") or {}
+    if not isinstance(expected_consultations, dict):
+        expected_consultations = {}
+    # Prefer consultations{} in the field table; skip duplicate legacy flat rows
+    # when the nested map is present.
+    include_legacy_consult_fields = not bool(expected_consultations)
+
     simple_specs: list[tuple[str, str, Any]] = [
         ("employees_enrolled", "people enrolled", _enrolled_reason),
         ("male_enrolled", "men enrolled", _enrolled_reason),
@@ -337,18 +363,34 @@ def build_kpis_bts(
         ("good_risk_group", "good-risk people", None),
         ("questionnaire_completed", "questionnaire completed", None),
         ("bio_ai_report_generated", "Bio AI reports generated", None),
-        ("doctor_consultation", "doctor consultations", None),
-        ("nutritionist_consultation", "nutritionist consultations", None),
-        (
-            "doctor_and_nutritionist_consultation",
-            "doctor and nutritionist consultations",
-            None,
-        ),
         ("blood_test_percent", "blood-test coverage", None),
     ]
+    if include_legacy_consult_fields:
+        simple_specs.extend(
+            [
+                ("doctor_consultation", "doctor consultations", None),
+                ("nutritionist_consultation", "nutritionist consultations", None),
+                (
+                    "doctor_and_nutritionist_consultation",
+                    "doctor and nutritionist consultations",
+                    None,
+                ),
+            ]
+        )
 
     for key, label, _reason_fn in simple_specs:
         expected = _int_or_none(expected_data.get(key))
+        if key not in stored and key in _KPI_SCHEMA_NEW_KEYS:
+            # Older report shape: field did not exist yet. We just wrote it.
+            newly_added_keys.append(key)
+            fields[key] = {
+                "match": True,
+                "expected": expected,
+                "stored": expected,
+                "reason": None,
+            }
+            continue
+
         stored_val = _int_or_none(stored.get(key)) if key in stored else None
         if key == "blood_test_percent":
             reason = _percent_reason(expected or 0, stored_val)
@@ -370,11 +412,7 @@ def build_kpis_bts(
                 stored_val,
                 bio_ai_mismatch if isinstance(bio_ai_mismatch, dict) else None,
             )
-        elif key in (
-            "doctor_consultation",
-            "nutritionist_consultation",
-            "doctor_and_nutritionist_consultation",
-        ):
+        elif key in _LEGACY_CONSULTATION_KEYS:
             reason = _consultation_reason(label, expected or 0, stored_val)
         else:
             reason = _enrolled_reason(label, expected or 0, stored_val)
@@ -392,10 +430,7 @@ def build_kpis_bts(
         ),
     )
 
-    expected_consultations = expected_data.get("consultations") or {}
     stored_consultations = stored.get("consultations") if isinstance(stored.get("consultations"), dict) else {}
-    if not isinstance(expected_consultations, dict):
-        expected_consultations = {}
     details_out["consultations"] = expected_consultations
 
     # If the saved report is an older shape without consultations{}, fall back to
@@ -441,6 +476,16 @@ def build_kpis_bts(
     }
 
     all_match = all(bool(entry.get("match")) for entry in fields.values())
+    if all_match and newly_added_keys:
+        message = (
+            "All KPI numbers match. "
+            "We also added new KPI fields that were not in the older saved report yet."
+        )
+    elif all_match:
+        message = "All KPI numbers match."
+    else:
+        message = "Some KPI numbers do not match. See the notes below for each one."
+
     return {
         "status": "ok" if all_match else "mismatch",
         "checked_at": checked_at,
@@ -448,11 +493,7 @@ def build_kpis_bts(
         "stored": stored_data,
         "fields": fields,
         "details": details_out,
-        "message": (
-            "All KPI numbers match."
-            if all_match
-            else "Some KPI numbers do not match. See the notes below for each one."
-        ),
+        "message": message,
     }
 
 
