@@ -313,6 +313,64 @@ def test_build_participation_by_age_bts_all_match():
     assert "match" in bts["message"].lower()
 
 
+def test_refresh_pattern_bts_ok_when_comparing_just_written_age_data():
+    """Service validates the just-written section data, not the stale previous snapshot."""
+    expected, details = _age_expected_and_details()
+    stale_previous = {
+        **expected,
+        "total_enrolled": 99,
+        "enrolled": [99, 0, 0, 0, 0],
+        "percent": [100.0, 0.0, 0.0, 0.0, 0.0],
+    }
+    bts = build_participation_by_age_bts(
+        expected_data=expected,
+        stored_data=expected,
+        details={**details, "previous": stale_previous},
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["details"]["previous"]["total_enrolled"] == 99
+
+
+def test_refresh_pattern_bts_ok_when_comparing_just_written_kpi_data():
+    expected = {
+        "employees_enrolled": 140,
+        "male_enrolled": 91,
+        "female_enrolled": 49,
+        "total_blood_test": 132,
+        "blood_test_percent": 94,
+        "consultations": {"doctor": 86, "nutritionist": 0, "doctor_nutritionist": 0},
+        "doctor_consultation": 86,
+        "nutritionist_consultation": 0,
+        "doctor_and_nutritionist_consultation": 0,
+        "questionnaire_completed": 61,
+        "bio_ai_report_generated": 81,
+        "high_risk_group": 27,
+        "caution_risk_group": 8,
+        "good_risk_group": 46,
+    }
+    stale_previous = {
+        "employees_enrolled": 1,
+        "male_enrolled": 0,
+        "female_enrolled": 0,
+        "total_blood_test": 0,
+        "blood_test_percent": 0,
+        "doctor_consultation": 0,
+        "nutritionist_consultation": 0,
+        "doctor_and_nutritionist_consultation": 0,
+        "high_risk_group": 0,
+    }
+    bts = build_kpis_bts(
+        expected_data=expected,
+        stored_data=expected,
+        blood_details={},
+        checked_at="t",
+        kpi_details={"previous": stale_previous},
+    )
+    assert bts["status"] == "ok"
+    assert bts["details"]["previous"]["employees_enrolled"] == 1
+
+
 def test_build_participation_by_age_details_empty_camp():
     payload, details = build_participation_by_age_details(
         [],

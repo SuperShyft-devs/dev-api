@@ -1090,26 +1090,33 @@ class CampReportsService:
         report[normalized_section] = section_payload
 
         report_bts = dict(row.report_bts or {})
+        # Refresh/validate always writes ``section_payload`` first. BTS must validate
+        # that just-written data — not the pre-refresh snapshot. Comparing to
+        # ``previous_data`` made the first refresh look like a mismatch even though
+        # the report was already corrected (same for KPIs, participation_by_age,
+        # and any future section BTS).
         if normalized_section == "kpis":
             expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
             blood_details = dict((kpi_metrics or {}).get("blood_details") or {})
             kpi_details = dict((kpi_metrics or {}).get("kpi_bts_details") or {})
-            # Compare recomputed values to what was already saved (before this refresh).
-            # build_kpis_bts falls back to legacy doctor/nutritionist fields when the
-            # older report shape has no consultations{} yet — avoids false mismatches.
+            if previous_data is not None:
+                kpi_details["previous"] = previous_data
             report_bts[normalized_section] = build_kpis_bts(
                 expected_data=expected_data,
-                stored_data=previous_data if previous_data is not None else expected_data,
+                stored_data=expected_data,
                 blood_details=blood_details,
                 checked_at=checked_at,
                 kpi_details=kpi_details,
             )
         elif normalized_section == "participation_by_age":
             expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            age_details = dict(age_bts_details or {})
+            if previous_data is not None:
+                age_details["previous"] = previous_data
             report_bts[normalized_section] = build_participation_by_age_bts(
                 expected_data=expected_data,
-                stored_data=previous_data if previous_data is not None else expected_data,
-                details=age_bts_details or {},
+                stored_data=expected_data,
+                details=age_details,
                 checked_at=checked_at,
             )
         else:

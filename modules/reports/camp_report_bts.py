@@ -328,6 +328,8 @@ def build_kpis_bts(
         "bio_ai_mismatch": bio_ai_mismatch,
         "risk_groups": risk_groups,
     }
+    if "previous" in kpi_details_payload:
+        details_out["previous"] = kpi_details_payload.get("previous")
 
     if not stored:
         expected_consultations = expected_data.get("consultations") or {}
