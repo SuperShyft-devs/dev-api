@@ -508,19 +508,42 @@ def build_distribution_by_sleeping_hours(
     }
 
 
-def build_overall_risk_score(
-    scores: list[float],
-    *,
-    total_enrolled: int | None = None,
-    bio_ai_reports: int | None = None,
-) -> dict:
+_METABOLIC_BAND_SCORE_RANGES: dict[str, str] = {
+    "optimal": "0 to 25",
+    "low_risk": "26 to 42",
+    "increased_risk": "43 to 58",
+    "high_risk": "59 and above",
+}
+
+_METABOLIC_EXCLUSION_REASON_LABELS: dict[str, str] = {
+    "No Metsights Basic/Pro assessment instance for this camp": (
+        "No Metsights Basic or Pro health assessment for this camp"
+    ),
+    "Bio AI not generated — report row missing or reports JSON is null "
+    "(empty shell excluded from Overall Risk Score)": (
+        "Bio AI report was not generated yet"
+    ),
+    "Bio AI not generated — reports JSON is empty (excluded from Overall Risk Score)": (
+        "Bio AI report was not generated yet (empty report)"
+    ),
+    "Bio AI generated but metabolic_score field is missing from reports JSON": (
+        "Bio AI report exists, but the metabolic score is missing"
+    ),
+}
+
+
+def _friendly_metabolic_exclusion_reason(reason: str | None) -> str:
+    if not reason:
+        return "Not included in this chart"
+    return _METABOLIC_EXCLUSION_REASON_LABELS.get(reason, reason)
+
+
+def build_overall_risk_score(scores: list[float]) -> dict:
     """Build overall_risk_score section payload from metabolic scores.
 
     Inclusion rule: Bio AI must be generated (non-empty reports JSON). Banding uses
-    extractable ``metabolic_score`` from that JSON. ``total_employees`` is the count of
-    participants with an extractable metabolic_score — not total enrollment and not
-    questionnaire starters. ``bio_ai_reports`` is the count with generated Bio AI JSON
-    (empty report shells are excluded).
+    extractable ``metabolic_score`` from that JSON. Only people with an extractable
+    score appear in ``count`` / ``percent`` / ``elevated_metabolic_score``.
     """
     counts = {band: 0 for band in METABOLIC_SCORE_BANDS}
     for score in scores:
@@ -531,23 +554,184 @@ def build_overall_risk_score(
     percent = [_percent(c, total) for c in count]
     elevated = _percent(counts["increased_risk"] + counts["high_risk"], total)
 
-    enrolled = int(total_enrolled) if total_enrolled is not None else total
-    reports = int(bio_ai_reports) if bio_ai_reports is not None else total
-    missing = max(reports - total, 0)
-
     return {
         "data": {
             "group": list(METABOLIC_SCORE_BANDS),
             "count": count,
             "percent": percent,
-            "total_employees": total,
-            "total_with_metabolic_score": total,
-            "total_enrolled": enrolled,
-            "bio_ai_reports": reports,
-            "missing_metabolic_score": missing,
             "elevated_metabolic_score": elevated,
         },
     }
+
+
+def build_elevated_metabolic_math(
+    *,
+    increased_risk_count: int,
+    high_risk_count: int,
+    total_with_score: int,
+) -> dict[str, Any]:
+    """Primary-school style steps for elevated_metabolic_score."""
+    elevated_count = int(increased_risk_count) + int(high_risk_count)
+    result_percent = _percent(elevated_count, total_with_score)
+
+    if total_with_score <= 0:
+        return {
+            "increased_risk_count": int(increased_risk_count),
+            "high_risk_count": int(high_risk_count),
+            "elevated_count": elevated_count,
+            "total_with_score": 0,
+            "result_percent": 0.0,
+            "steps": [
+                "No one in this camp has a metabolic score yet.",
+                "So we cannot calculate an elevated percentage (there is nothing to divide).",
+                "Elevated metabolic score = 0%.",
+            ],
+        }
+
+    ratio = elevated_count / total_with_score
+    percent_raw = ratio * 100
+    ratio_text = f"{ratio:.10f}".rstrip("0").rstrip(".") or "0"
+    percent_raw_text = f"{percent_raw:.10f}".rstrip("0").rstrip(".") or "0"
+    steps = [
+        f"Step 1: Count people in Increased Risk = {increased_risk_count}",
+        f"Step 2: Count people in High Risk = {high_risk_count}",
+        (
+            f"Step 3: Add them together: {increased_risk_count} + {high_risk_count} "
+            f"= {elevated_count}"
+        ),
+        f"Step 4: Count everyone who has a metabolic score = {total_with_score}",
+        f"Step 5: Divide: {elevated_count} ÷ {total_with_score} = {ratio_text}",
+        f"Step 6: Turn into a percent: {ratio_text} × 100 = {percent_raw_text}",
+        f"Step 7: Round to 1 decimal place: {result_percent}%",
+    ]
+
+    return {
+        "increased_risk_count": int(increased_risk_count),
+        "high_risk_count": int(high_risk_count),
+        "elevated_count": elevated_count,
+        "total_with_score": int(total_with_score),
+        "result_percent": result_percent,
+        "steps": steps,
+    }
+
+
+def build_overall_risk_score_details(
+    status_rows: list[tuple[int, str | None, str | None, str | None, float | None, str | None]],
+    *,
+    total_enrolled: int,
+    bio_ai_reports: int,
+    scope_label: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build slim section data + BTS details from metabolic score status rows.
+
+    ``status_rows``: (user_id, first_name, last_name, gender, score, reason).
+    ``reason`` is set when the person is excluded from the chart.
+    """
+    bands: dict[str, dict[str, Any]] = {
+        band: {
+            "count": 0,
+            "score_range_label": _METABOLIC_BAND_SCORE_RANGES[band],
+            "people": [],
+        }
+        for band in METABOLIC_SCORE_BANDS
+    }
+    excluded_people: list[dict[str, Any]] = []
+    scores: list[float] = []
+
+    for user_id, first_name, last_name, _gender, score, reason in status_rows:
+        name = _display_person_name(first_name, last_name)
+        if score is None or reason is not None:
+            excluded_people.append(
+                {
+                    "user_id": int(user_id),
+                    "name": name,
+                    "reason": _friendly_metabolic_exclusion_reason(reason),
+                }
+            )
+            continue
+
+        band = metabolic_score_to_band(float(score))
+        scores.append(float(score))
+        bands[band]["count"] += 1
+        bands[band]["people"].append(
+            {
+                "user_id": int(user_id),
+                "name": name,
+                "metabolic_score": float(score),
+                "band": band,
+            }
+        )
+
+    for band in METABOLIC_SCORE_BANDS:
+        bands[band]["people"].sort(key=lambda p: (p["name"].lower(), p["user_id"]))
+
+    excluded_people.sort(key=lambda p: (p["name"].lower(), p["user_id"]))
+
+    payload = build_overall_risk_score(scores)
+    data = payload["data"]
+    total_with_score = sum(int(c) for c in data["count"])
+    missing_metabolic_score = max(int(bio_ai_reports) - total_with_score, 0)
+
+    increased = int(bands["increased_risk"]["count"])
+    high = int(bands["high_risk"]["count"])
+    elevated_math = build_elevated_metabolic_math(
+        increased_risk_count=increased,
+        high_risk_count=high,
+        total_with_score=total_with_score,
+    )
+
+    notes: list[str] = []
+    if total_with_score == 0:
+        notes.append(
+            "Nobody has a metabolic score yet, so every risk group is 0 and the elevated "
+            "percentage is 0%."
+        )
+    if excluded_people:
+        notes.append(
+            f"{len(excluded_people)} enrolled "
+            f"{'person was' if len(excluded_people) == 1 else 'people were'} "
+            "not included in this chart — see the list below for why."
+        )
+    if missing_metabolic_score > 0:
+        notes.append(
+            f"{missing_metabolic_score} Bio AI "
+            f"{'report has' if missing_metabolic_score == 1 else 'reports have'} "
+            "no metabolic score, so they are left out of the risk groups."
+        )
+
+    details: dict[str, Any] = {
+        "method": {
+            "scope_label": scope_label,
+            "counting_rule": (
+                "We only count people who have a Metsights Basic or Pro Bio AI report "
+                "with a metabolic score. FitPrint and empty reports are left out."
+            ),
+            "who_is_included": (
+                "Enrolled people whose latest Basic/Pro health report has a metabolic score."
+            ),
+            "who_is_excluded": (
+                "People with no Basic/Pro assessment, no Bio AI report yet, or a Bio AI report "
+                "missing the metabolic score."
+            ),
+            "band_rules": [
+                {"band": band, "score_range_label": _METABOLIC_BAND_SCORE_RANGES[band]}
+                for band in METABOLIC_SCORE_BANDS
+            ],
+            "total_enrolled": int(total_enrolled),
+            "bio_ai_reports": int(bio_ai_reports),
+            "with_metabolic_score": total_with_score,
+            "missing_metabolic_score": missing_metabolic_score,
+            "excluded_people_count": len(excluded_people),
+        },
+        "elevated_math": elevated_math,
+        "bands": bands,
+        "excluded": {
+            "count": len(excluded_people),
+            "people": excluded_people,
+        },
+        "notes": notes,
+    }
+    return payload, details
 
 
 DISEASE_RISK_BANDS: tuple[str, ...] = ("healthy", "increased", "high", "very_high")

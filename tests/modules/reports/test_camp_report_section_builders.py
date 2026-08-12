@@ -9,8 +9,10 @@ from modules.reports.camp_report_section_builders import (
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
     build_distribution_by_physical_activity_frequency,
+    build_elevated_metabolic_math,
     build_kpis,
     build_overall_risk_score,
+    build_overall_risk_score_details,
     build_participation_by_age,
     extract_disease_risk_scores,
     extract_metabolic_age,
@@ -139,21 +141,17 @@ def test_metabolic_score_to_band_boundaries():
 
 
 def test_build_overall_risk_score():
-    payload = build_overall_risk_score(
-        [20.0, 30.0, 50.0, 70.0],
-        total_enrolled=10,
-        bio_ai_reports=6,
-    )
+    payload = build_overall_risk_score([20.0, 30.0, 50.0, 70.0])
     data = payload["data"]
     assert data["group"] == ["optimal", "low_risk", "increased_risk", "high_risk"]
     assert data["count"] == [1, 1, 1, 1]
     assert data["percent"] == [25.0, 25.0, 25.0, 25.0]
-    assert data["total_employees"] == 4
-    assert data["total_with_metabolic_score"] == 4
-    assert data["total_enrolled"] == 10
-    assert data["bio_ai_reports"] == 6
-    assert data["missing_metabolic_score"] == 2
     assert data["elevated_metabolic_score"] == 50.0
+    assert "total_employees" not in data
+    assert "total_with_metabolic_score" not in data
+    assert "total_enrolled" not in data
+    assert "bio_ai_reports" not in data
+    assert "missing_metabolic_score" not in data
 
 
 def test_build_overall_risk_score_empty():
@@ -161,8 +159,74 @@ def test_build_overall_risk_score_empty():
     data = payload["data"]
     assert data["count"] == [0, 0, 0, 0]
     assert data["percent"] == [0.0, 0.0, 0.0, 0.0]
-    assert data["total_employees"] == 0
     assert data["elevated_metabolic_score"] == 0.0
+    assert set(data.keys()) == {
+        "group",
+        "count",
+        "percent",
+        "elevated_metabolic_score",
+    }
+
+
+def test_build_elevated_metabolic_math_example():
+    math = build_elevated_metabolic_math(
+        increased_risk_count=16,
+        high_risk_count=7,
+        total_with_score=81,
+    )
+    assert math["elevated_count"] == 23
+    assert math["result_percent"] == 28.4
+    assert math["steps"][0].startswith("Step 1:")
+    assert "28.4%" in math["steps"][-1]
+
+
+def test_build_elevated_metabolic_math_zero_total():
+    math = build_elevated_metabolic_math(
+        increased_risk_count=0,
+        high_risk_count=0,
+        total_with_score=0,
+    )
+    assert math["result_percent"] == 0.0
+    assert any("cannot calculate" in step.lower() for step in math["steps"])
+
+
+def test_build_overall_risk_score_details_people_and_excluded():
+    rows = [
+        (1, "Ann", "Optimal", "female", 20.0, None),
+        (2, "Bob", "Low", "male", 30.0, None),
+        (3, "Cara", "Inc", "female", 50.0, None),
+        (4, "Dan", "High", "male", 70.0, None),
+        (
+            5,
+            "Eve",
+            "Missing",
+            "female",
+            None,
+            "Bio AI generated but metabolic_score field is missing from reports JSON",
+        ),
+    ]
+    payload, details = build_overall_risk_score_details(
+        rows,
+        total_enrolled=5,
+        bio_ai_reports=5,
+        scope_label="Whole camp",
+    )
+    data = payload["data"]
+    assert data["count"] == [1, 1, 1, 1]
+    assert data["elevated_metabolic_score"] == 50.0
+    assert "total_employees" not in data
+    assert details["method"]["total_enrolled"] == 5
+    assert details["method"]["bio_ai_reports"] == 5
+    assert details["method"]["with_metabolic_score"] == 4
+    assert details["method"]["missing_metabolic_score"] == 1
+    assert details["bands"]["optimal"]["count"] == 1
+    assert details["bands"]["optimal"]["people"][0]["name"] == "Ann Optimal"
+    assert details["bands"]["optimal"]["people"][0]["metabolic_score"] == 20.0
+    assert details["excluded"]["count"] == 1
+    assert details["excluded"]["people"][0]["user_id"] == 5
+    assert "metabolic score is missing" in details["excluded"]["people"][0]["reason"].lower()
+    assert details["elevated_math"]["result_percent"] == 50.0
+    assert len(details["elevated_math"]["steps"]) >= 5
 
 
 def test_extract_oxidative_stress_score_top_level():

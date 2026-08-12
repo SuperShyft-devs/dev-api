@@ -42,7 +42,7 @@ from modules.reports.camp_report_section_builders import (
     build_distribution_by_physical_activity_frequency,
     build_distribution_by_sleeping_hours,
     build_kpis,
-    build_overall_risk_score,
+    build_overall_risk_score_details,
     build_participation_by_age_details,
     build_positive_wins,
     build_ranking,
@@ -50,6 +50,7 @@ from modules.reports.camp_report_section_builders import (
 from modules.reports.camp_report_bts import (
     build_kpis_bts,
     build_not_implemented_bts,
+    build_overall_risk_score_bts,
     build_participation_by_age_bts,
 )
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
@@ -1050,6 +1051,7 @@ class CampReportsService:
 
         kpi_metrics: dict[str, Any] | None = None
         age_bts_details: dict[str, Any] | None = None
+        ors_bts_details: dict[str, Any] | None = None
         if normalized_section == "kpis":
             built_payload, kpi_metrics = await self._build_kpis_payload_with_metrics(
                 db,
@@ -1065,6 +1067,13 @@ class CampReportsService:
                 department=department,
                 city=city,
                 camp_start_date=context["camp_start_date"],
+            )
+        elif normalized_section == "overall_risk_score":
+            built_payload, ors_bts_details = await self._build_overall_risk_score_with_details(
+                db,
+                camp_no=camp_no,
+                department=department,
+                city=city,
             )
         else:
             built_payload = await self._build_section_payload(
@@ -1117,6 +1126,17 @@ class CampReportsService:
                 expected_data=expected_data,
                 stored_data=expected_data,
                 details=age_details,
+                checked_at=checked_at,
+            )
+        elif normalized_section == "overall_risk_score":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            ors_details = dict(ors_bts_details or {})
+            if previous_data is not None:
+                ors_details["previous"] = previous_data
+            report_bts[normalized_section] = build_overall_risk_score_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=ors_details,
                 checked_at=checked_at,
             )
         else:
@@ -1881,6 +1901,42 @@ class CampReportsService:
             return f"Department: {department}"
         return "Whole camp"
 
+    async def _build_overall_risk_score_with_details(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None,
+    ) -> tuple[dict, dict]:
+        status_rows = await self._repository.list_metabolic_score_status(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        total_enrolled = await self._repository.count_enrolled_users(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        bio_ai_reports = await self._repository.count_bio_ai_reports(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        return build_overall_risk_score_details(
+            status_rows,
+            total_enrolled=total_enrolled,
+            bio_ai_reports=bio_ai_reports,
+            scope_label=self._age_participation_scope_label(
+                department=department,
+                city=city,
+            ),
+        )
+
     async def _build_participation_by_age_with_details(
         self,
         db: AsyncSession,
@@ -1954,29 +2010,13 @@ class CampReportsService:
             return payload
 
         if section_key == "overall_risk_score":
-            scores = await self._repository.list_metabolic_scores(
+            payload, _details = await self._build_overall_risk_score_with_details(
                 db,
                 camp_no=camp_no,
                 department=department,
-            city=city,
+                city=city,
             )
-            total_enrolled = await self._repository.count_enrolled_users(
-                db,
-                camp_no=camp_no,
-                department=department,
-            city=city,
-            )
-            bio_ai_reports = await self._repository.count_bio_ai_reports(
-                db,
-                camp_no=camp_no,
-                department=department,
-            city=city,
-            )
-            return build_overall_risk_score(
-                scores,
-                total_enrolled=total_enrolled,
-                bio_ai_reports=bio_ai_reports,
-            )
+            return payload
 
         if section_key == "distribution_by_oxidative_stress":
             scores = await self._repository.list_oxidative_stress_scores(

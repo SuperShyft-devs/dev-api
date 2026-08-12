@@ -1490,13 +1490,18 @@ async def test_refresh_camp_report_overall_risk_score(async_client, test_db_sess
     assert data["group"] == ["optimal", "low_risk", "increased_risk", "high_risk"]
     assert data["count"] == [1, 1, 1, 1]
     assert data["percent"] == [25.0, 25.0, 25.0, 25.0]
-    assert data["total_employees"] == 4
     assert data["elevated_metabolic_score"] == 50.0
+    assert "total_employees" not in data
+    assert "total_enrolled" not in data
 
     row = (
         await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
     ).scalar_one()
-    assert row.report["overall_risk_score"]["data"]["total_employees"] == 4
+    assert row.report["overall_risk_score"]["data"]["elevated_metabolic_score"] == 50.0
+    assert "total_employees" not in row.report["overall_risk_score"]["data"]
+    assert row.report_bts["overall_risk_score"]["status"] == "ok"
+    assert "elevated_math" in row.report_bts["overall_risk_score"]["details"]
+    assert "bands" in row.report_bts["overall_risk_score"]["details"]
 
 
 @pytest.mark.asyncio
@@ -1522,8 +1527,8 @@ async def test_refresh_department_camp_report_overall_risk_score(async_client, t
     assert response.status_code == 200
     data = response.json()["data"]["section"]["data"]
     assert data["count"] == [1, 1, 0, 0]
-    assert data["total_employees"] == 2
     assert data["elevated_metabolic_score"] == 0.0
+    assert "total_employees" not in data
 
 
 @pytest.mark.asyncio
@@ -1559,7 +1564,8 @@ async def test_refresh_overall_risk_score_updates_existing(async_client, test_db
     ).scalar_one()
     assert "participation_by_age" in row.report
     assert "overall_risk_score" in row.report
-    assert row.report["overall_risk_score"]["data"]["total_employees"] == 4
+    assert row.report["overall_risk_score"]["data"]["elevated_metabolic_score"] == 50.0
+    assert "total_employees" not in row.report["overall_risk_score"]["data"]
 
     overall_again = await async_client.put(
         f"/reports/camps/{camp_no}/refresh",
@@ -1567,7 +1573,8 @@ async def test_refresh_overall_risk_score_updates_existing(async_client, test_db
         json={"section": "overall_risk_score"},
     )
     assert overall_again.status_code == 200
-    assert overall_again.json()["data"]["section"]["data"]["total_employees"] == 4
+    assert overall_again.json()["data"]["section"]["data"]["elevated_metabolic_score"] == 50.0
+    assert "total_employees" not in overall_again.json()["data"]["section"]["data"]
     assert row.report["participation_by_age"]["data"]["total_enrolled"] == 6
 
 
@@ -3939,7 +3946,7 @@ async def test_refresh_participation_by_age_writes_real_bts(async_client, test_d
 
 
 @pytest.mark.asyncio
-async def test_refresh_non_kpi_writes_bts_stub(async_client, test_db_session):
+async def test_refresh_overall_risk_score_writes_bts(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7913, employee_id=913)
     await _seed_overall_risk_score_section(test_db_session, report_sections=95130)
     camp_no = await _seed_overall_risk_score_camp_data(
@@ -3959,12 +3966,24 @@ async def test_refresh_non_kpi_writes_bts_stub(async_client, test_db_session):
     )
     assert response.status_code == 200
     bts = response.json()["data"]["report_bts"]
-    assert bts["status"] == "not_implemented"
+    assert bts["status"] == "ok"
+    assert bts["expected"]["elevated_metabolic_score"] == 50.0
+    assert "elevated_math" in bts["details"]
+    assert "bands" in bts["details"]
+    assert set(bts["details"]["bands"].keys()) == {
+        "optimal",
+        "low_risk",
+        "increased_risk",
+        "high_risk",
+    }
+    assert bts["details"]["elevated_math"]["result_percent"] == 50.0
+    assert len(bts["details"]["elevated_math"]["steps"]) >= 5
 
     row = (
         await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
     ).scalar_one()
-    assert row.report_bts["overall_risk_score"]["status"] == "not_implemented"
+    assert row.report_bts["overall_risk_score"]["status"] == "ok"
+    assert "excluded" in row.report_bts["overall_risk_score"]["details"]
 
 
 @pytest.mark.asyncio

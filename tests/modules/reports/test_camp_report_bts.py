@@ -5,9 +5,14 @@ from datetime import date
 from modules.reports.camp_report_bts import (
     build_kpis_bts,
     build_not_implemented_bts,
+    build_overall_risk_score_bts,
     build_participation_by_age_bts,
 )
-from modules.reports.camp_report_section_builders import build_participation_by_age_details
+from modules.reports.camp_report_section_builders import (
+    build_overall_risk_score,
+    build_overall_risk_score_details,
+    build_participation_by_age_details,
+)
 
 
 def test_build_not_implemented_bts():
@@ -389,3 +394,113 @@ def test_build_participation_by_age_details_empty_camp():
         checked_at="t",
     )
     assert "no one is enrolled" in bts["message"].lower()
+
+
+def test_build_overall_risk_score_bts_ok_and_math():
+    expected = build_overall_risk_score([20.0, 30.0, 50.0, 70.0])["data"]
+    _, details = build_overall_risk_score_details(
+        [
+            (1, "A", "One", None, 20.0, None),
+            (2, "B", "Two", None, 30.0, None),
+            (3, "C", "Three", None, 50.0, None),
+            (4, "D", "Four", None, 70.0, None),
+        ],
+        total_enrolled=4,
+        bio_ai_reports=4,
+        scope_label="Whole camp",
+    )
+    bts = build_overall_risk_score_bts(
+        expected_data=expected,
+        stored_data=expected,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["fields"]["elevated_metabolic_score"]["match"] is True
+    assert bts["fields"]["counts_sum"]["match"] is True
+    assert bts["fields"]["elevated_consistency"]["match"] is True
+    assert bts["details"]["elevated_math"]["result_percent"] == 50.0
+    assert "bands" in bts["details"]
+
+
+def test_build_overall_risk_score_bts_mismatch_reasons():
+    expected = {
+        "group": ["optimal", "low_risk", "increased_risk", "high_risk"],
+        "count": [1, 1, 1, 1],
+        "percent": [25.0, 25.0, 25.0, 25.0],
+        "elevated_metabolic_score": 50.0,
+    }
+    stored = {
+        **expected,
+        "count": [2, 0, 1, 1],
+        "percent": [50.0, 0.0, 25.0, 25.0],
+        "elevated_metabolic_score": 40.0,
+        # Legacy keys should be ignored for matching.
+        "total_employees": 4,
+        "total_enrolled": 10,
+    }
+    bts = build_overall_risk_score_bts(
+        expected_data=expected,
+        stored_data=stored,
+        details={},
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["count.optimal"]["match"] is False
+    assert "we now count 1" in bts["fields"]["count.optimal"]["reason"].lower()
+    assert bts["fields"]["elevated_metabolic_score"]["match"] is False
+    assert "should be 50.0%" in bts["fields"]["elevated_metabolic_score"]["reason"]
+
+
+def test_build_overall_risk_score_bts_legacy_extra_keys_ignored_when_slim_matches():
+    expected = build_overall_risk_score([20.0, 30.0, 50.0, 70.0])["data"]
+    stored = {
+        **expected,
+        "total_employees": 4,
+        "total_with_metabolic_score": 4,
+        "total_enrolled": 10,
+        "bio_ai_reports": 6,
+        "missing_metabolic_score": 2,
+    }
+    bts = build_overall_risk_score_bts(
+        expected_data=expected,
+        stored_data=stored,
+        details={},
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+
+
+def test_build_overall_risk_score_bts_first_check_empty():
+    expected = build_overall_risk_score([])["data"]
+    bts = build_overall_risk_score_bts(
+        expected_data=expected,
+        stored_data=None,
+        details={"elevated_math": {"steps": ["No one has a score."]}},
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["stored"] is None
+    assert "no one has a metabolic score" in bts["message"].lower()
+
+
+def test_build_overall_risk_score_bts_elevated_consistency_mismatch():
+    expected = {
+        "group": ["optimal", "low_risk", "increased_risk", "high_risk"],
+        "count": [1, 1, 1, 1],
+        "percent": [25.0, 25.0, 25.0, 25.0],
+        "elevated_metabolic_score": 50.0,
+    }
+    stored = {
+        **expected,
+        "elevated_metabolic_score": 12.0,
+    }
+    bts = build_overall_risk_score_bts(
+        expected_data=expected,
+        stored_data=stored,
+        details={},
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["elevated_consistency"]["match"] is False
+    assert "Increased Risk" in bts["fields"]["elevated_consistency"]["reason"]
