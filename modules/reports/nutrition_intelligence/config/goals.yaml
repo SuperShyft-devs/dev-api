@@ -1,0 +1,193 @@
+# Goal profiles for the Nutrition Intelligence Engine.
+# Science/product values live here — not hard-coded in Python scorers.
+#
+# Targets are TARGETS only (what to aim for). They are NOT measured intake.
+# priority_levels feed Goal Alignment only; they never invent better behaviour.
+
+goals:
+  weight_loss:
+    questionnaire_code: "0"
+    display_name: "Weight Loss"
+    base_target_keys:
+      - protein_g_per_kg_weight_loss
+      - carbohydrate_quality_focused
+      - fibre_priority_high
+      - hydration_standard
+      - energy_concept_deficit
+    priority_levels:
+      vegetable_intake: high
+      fruit_intake: medium
+      food_diversity: high
+      dessert_sugar_control: high
+      baked_goods_control: high
+      hydration: medium
+      protein_supporting_foods: high
+      meal_regularity: high
+      sodium_control: medium
+    food_quality_priorities:
+      - vegetables
+      - fruits
+      - pulses
+      - whole_grains
+    activity_dependencies: {}
+    conflict_tags:
+      - energy_surplus_sensitive
+    notes:
+      - "Energy deficit is a target concept only; questionnaire does not measure energy balance."
+
+  muscle_gain:
+    questionnaire_code: "1"
+    display_name: "Building Muscle Mass"
+    base_target_keys:
+      - protein_g_per_kg_muscle_gain
+      - carbohydrate_adequate
+      - fibre_priority_moderate
+      - hydration_standard
+      - energy_concept_adequate
+    priority_levels:
+      vegetable_intake: medium
+      fruit_intake: medium
+      food_diversity: high
+      dessert_sugar_control: medium
+      baked_goods_control: medium
+      hydration: medium
+      protein_supporting_foods: very_high
+      meal_regularity: medium
+      sodium_control: low
+    food_quality_priorities:
+      - pulses
+      - dairy
+      - eggs
+      - nuts_seeds
+      - chicken_fish
+      - whole_grains
+    activity_dependencies: {}
+    conflict_tags:
+      - energy_deficit_sensitive
+    notes:
+      - "Protein target ~1.6–2.2 g/kg/day is a TARGET range, not measured intake."
+
+  metabolic_health:
+    questionnaire_code: "2"
+    display_name: "Increasing Metabolic Health"
+    base_target_keys:
+      - protein_g_per_kg_general
+      - carbohydrate_quality_focused
+      - fibre_priority_high
+      - hydration_standard
+      - energy_concept_none
+    priority_levels:
+      vegetable_intake: very_high
+      fruit_intake: very_high
+      food_diversity: high
+      dessert_sugar_control: high
+      baked_goods_control: high
+      hydration: medium
+      protein_supporting_foods: medium
+      meal_regularity: medium
+      sodium_control: very_high
+    food_quality_priorities:
+      - vegetables
+      - fruits
+      - whole_grains
+      - pulses
+      - nuts_seeds
+    activity_dependencies: {}
+    conflict_tags: []
+    notes:
+      - "Emphasises food quality, fibre proxies, free-sugar control, sodium awareness."
+
+  energy_levels:
+    questionnaire_code: "3"
+    display_name: "Increasing Energy Levels"
+    base_target_keys:
+      - protein_g_per_kg_general
+      - carbohydrate_quality_focused
+      - fibre_priority_high
+      - hydration_standard
+      - energy_concept_none
+    priority_levels:
+      vegetable_intake: high
+      fruit_intake: high
+      food_diversity: high
+      dessert_sugar_control: medium
+      baked_goods_control: medium
+      hydration: high
+      protein_supporting_foods: medium
+      meal_regularity: very_high
+      sodium_control: low
+    food_quality_priorities:
+      - whole_grains
+      - fruits
+      - vegetables
+      - pulses
+    activity_dependencies: {}
+    conflict_tags: []
+    notes:
+      - "No artificial macro prescription. Do not imply diagnosis of low-energy causes."
+
+  strength:
+    questionnaire_code: "4"
+    display_name: "Increasing Strength"
+    base_target_keys:
+      - protein_g_per_kg_strength
+      - carbohydrate_adequate
+      - fibre_priority_moderate
+      - hydration_standard
+      - energy_concept_adequate
+    priority_levels:
+      vegetable_intake: medium
+      fruit_intake: medium
+      food_diversity: high
+      dessert_sugar_control: medium
+      baked_goods_control: medium
+      hydration: high
+      protein_supporting_foods: very_high
+      meal_regularity: medium
+      sodium_control: low
+    food_quality_priorities:
+      - pulses
+      - dairy
+      - eggs
+      - nuts_seeds
+      - chicken_fish
+      - whole_grains
+    activity_dependencies: {}
+    conflict_tags:
+      - energy_deficit_sensitive
+    notes:
+      - "Protein target ~1.6–2.0 g/kg/day is a TARGET range; substantial overlap with muscle_gain."
+
+  endurance:
+    questionnaire_code: "5"
+    display_name: "Increasing Physical Endurance"
+    base_target_keys:
+      - protein_g_per_kg_endurance
+      - carbohydrate_endurance_activity_dependent
+      - fibre_priority_moderate
+      - hydration_endurance
+      - energy_concept_adequate
+    priority_levels:
+      vegetable_intake: medium
+      fruit_intake: medium
+      food_diversity: high
+      dessert_sugar_control: medium
+      baked_goods_control: medium
+      hydration: very_high
+      protein_supporting_foods: high
+      meal_regularity: high
+      sodium_control: medium
+    food_quality_priorities:
+      - whole_grains
+      - fruits
+      - vegetables
+      - pulses
+    activity_dependencies:
+      carbohydrate_g_per_kg:
+        source: activity_load_index
+        # Exact g/kg bands live in targets.yaml; activity only modifies TARGETS.
+        modifies_target_key: carbohydrate_endurance_activity_dependent
+    conflict_tags:
+      - high_carb_training
+    notes:
+      - "Carbohydrate targets are activity/training-load dependent (g/kg/day). Activity must not inflate Nutrition Score."

@@ -1,0 +1,247 @@
+# Behavioural nutrition indicators (v1).
+#
+# Every indicator is an OBSERVABLE QUESTIONNAIRE BEHAVIOUR PROXY.
+# None represent measured calorie, protein, carbohydrate, fat, fibre,
+# or micronutrient intake.
+#
+# protein_supporting_foods:
+#   Presence/diversity of reported protein-supporting food groups,
+#   interpreted with diet_preference as CONTEXT only — NOT protein adequacy
+#   and NOT protein intake.
+#
+# fruit / vegetable / fibre-related indicators:
+#   Behavioural frequency/diversity proxies only — NOT measured nutrient intake.
+#
+# hydration:
+#   water_intake_frequency contributes as a hydration BEHAVIOUR indicator.
+#   Questionnaire glasses are NOT scientifically measured litres.
+#
+# Excluded from v1 scoring (by design):
+#   - sickness_frequency
+#   - exercise_frequency_week / exercise_level (targets only)
+#   - diet_preference as a direct scored variable
+#   - tobacco_frequency / alcohol_frequency
+
+priority_levels_allowed:
+  - very_high
+  - high
+  - medium
+  - low
+  - none
+
+indicators:
+  vegetable_intake:
+    display_name: "Vegetable intake"
+    source_fields:
+      - fresh_vegetable_frequency
+    score_direction: higher_better
+    general_quality_priority: high
+    goal_relevance:
+      weight_loss: high
+      muscle_gain: medium
+      energy_levels: high
+      metabolic_health: very_high
+      endurance: medium
+      strength: medium
+    description: >
+      Behavioural proxy for vegetable consumption frequency.
+      Not measured vegetable servings or fibre grams.
+    ordinal_scores:
+      "0": 100   # 1-2 times per day
+      "2": 75    # 2-3 times a week
+      "3": 50    # once a week or less
+      "4": 25    # 1-2 times per month
+      "5": 0     # rarely or never
+
+  fruit_intake:
+    display_name: "Fruit intake"
+    source_fields:
+      - fresh_fruit_frequency
+    score_direction: higher_better
+    general_quality_priority: high
+    goal_relevance:
+      weight_loss: medium
+      muscle_gain: medium
+      energy_levels: high
+      metabolic_health: very_high
+      endurance: medium
+      strength: medium
+    description: >
+      Behavioural proxy for fruit consumption frequency.
+      Not measured fruit servings or micronutrient intake.
+    ordinal_scores:
+      "0": 100
+      "2": 75
+      "3": 50
+      "4": 25
+      "5": 0
+
+  food_diversity:
+    display_name: "Food diversity"
+    source_fields:
+      - food_groups
+    score_direction: higher_better
+    general_quality_priority: high
+    goal_relevance:
+      weight_loss: high
+      muscle_gain: high
+      energy_levels: high
+      metabolic_health: high
+      endurance: high
+      strength: high
+    description: >
+      Behavioural proxy for daily food-group diversity reported by the user.
+      Not measured dietary variety index or nutrient adequacy.
+    # Scoring algorithm for multi-select is implemented in a later phase;
+    # quality_group_codes list the groups that count toward diversity.
+    quality_group_codes:
+      - "0"  # Whole grains
+      - "1"  # Pulses/Legumes
+      - "2"  # Whole Milk/Curd
+      - "3"  # Fresh vegetables
+      - "4"  # Fresh fruits
+      - "5"  # Nuts/Seeds
+      - "6"  # Eggs
+      - "7"  # Chicken/Fish
+      - "9"  # Cruciferous
+
+  dessert_sugar_control:
+    display_name: "Dessert frequency"
+    source_fields:
+      - dessert_frequency
+    score_direction: lower_better
+    general_quality_priority: high
+    goal_relevance:
+      weight_loss: high
+      muscle_gain: medium
+      energy_levels: medium
+      metabolic_health: high
+      endurance: medium
+      strength: medium
+    description: >
+      Behavioural proxy for sugary drinks/desserts frequency control.
+      Not measured free-sugar grams.
+    ordinal_scores:
+      "1": 0     # 4 or more times a week
+      "2": 25    # 2-3 times a week
+      "3": 50    # once a week or less
+      "4": 75    # 1-2 times per month
+      "5": 100   # rarely or never
+
+  baked_goods_control:
+    display_name: "Baked goods"
+    source_fields:
+      - baked_goods_frequency
+    score_direction: lower_better
+    general_quality_priority: high
+    goal_relevance:
+      weight_loss: high
+      muscle_gain: medium
+      energy_levels: medium
+      metabolic_health: high
+      endurance: medium
+      strength: medium
+    description: >
+      Behavioural proxy for cookies/biscuits/bread/cakes frequency control.
+      Not measured refined-carbohydrate intake.
+    ordinal_scores:
+      "1": 0
+      "2": 25
+      "3": 50
+      "4": 75
+      "5": 100
+
+  hydration:
+    display_name: "Hydration"
+    source_fields:
+      - water_intake_frequency
+    score_direction: higher_better
+    general_quality_priority: high
+    goal_relevance:
+      weight_loss: medium
+      muscle_gain: medium
+      energy_levels: high
+      metabolic_health: medium
+      endurance: very_high
+      strength: high
+    description: >
+      Behavioural proxy from self-reported daily water-glass frequency.
+      Questionnaire glasses are NOT scientifically measured litres.
+    ordinal_scores:
+      "0": 10   # less than 2 glasses
+      "1": 30   # 2 glasses
+      "2": 55   # 4 glasses
+      "3": 75   # 6 glasses
+      "4": 100  # 8 glasses
+      "5": 90   # more than 8 glasses (still high; slight taper configurable)
+
+  protein_supporting_foods:
+    display_name: "Protein-supporting pattern"
+    source_fields:
+      - food_groups
+      - diet_preference
+    score_direction: higher_better
+    general_quality_priority: medium
+    uses_diet_preference_context: true
+    goal_relevance:
+      weight_loss: high
+      muscle_gain: very_high
+      energy_levels: medium
+      metabolic_health: medium
+      endurance: high
+      strength: very_high
+    description: >
+      Presence/diversity of reported protein-supporting food groups,
+      interpreted with diet_preference as context only.
+      NOT protein adequacy and NOT protein intake (grams).
+    # Codes treated as protein-supporting when present in food_groups.
+    protein_supporting_group_codes:
+      - "1"  # Pulses/Legumes
+      - "2"  # Whole Milk/Curd
+      - "5"  # Nuts/Seeds
+      - "6"  # Eggs
+      - "7"  # Chicken/Fish
+    # diet_preference is CONTEXT for interpreting which codes are available /
+    # expected — never a direct score award/penalty by diet type alone.
+
+  meal_regularity:
+    display_name: "Meal regularity"
+    source_fields:
+      - healthy_breakfast_frequency
+    score_direction: higher_better
+    general_quality_priority: medium
+    goal_relevance:
+      weight_loss: high
+      muscle_gain: medium
+      energy_levels: very_high
+      metabolic_health: medium
+      endurance: high
+      strength: medium
+    description: >
+      Behavioural proxy for healthy homemade breakfast regularity.
+      Not measured meal timing adequacy or calorie distribution.
+    ordinal_scores:
+      "0": 0     # do not have breakfast
+      "1": 50    # less than 5 times
+      "2": 100   # more than 5 times
+
+  sodium_control:
+    display_name: "Sodium behaviour"
+    source_fields:
+      - extra_salt_frequency
+    score_direction: lower_better
+    general_quality_priority: medium
+    goal_relevance:
+      weight_loss: medium
+      muscle_gain: low
+      energy_levels: low
+      metabolic_health: very_high
+      endurance: medium
+      strength: low
+    description: >
+      Behavioural proxy for adding extra salt to food.
+      Not measured sodium milligrams.
+    ordinal_scores:
+      "0": 100   # never
+      "1": 60    # rarely
+      "2": 0     # usually

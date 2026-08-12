@@ -1,0 +1,145 @@
+# Generic goal-combination rules.
+# All 15 two-goal pairs use the SAME combination engine; this file only
+# supplies pair overlays and default merge strategies — not 15 scorers.
+
+defaults:
+  compatibility: moderate
+  priority_resolution: max_of_shared
+  target_resolution:
+    protein_g_per_kg: overlap_or_widen
+    carbohydrate_g_per_kg: prefer_activity_aware
+    fibre_priority: prefer_higher
+    hydration_priority: prefer_higher
+    energy_concept: resolve_energy_conflict
+  conflict_severity: medium
+
+# Tag-based defaults applied when no explicit pair rule matches.
+tag_rules:
+  - when_both_tags:
+      - energy_surplus_sensitive
+      - energy_deficit_sensitive
+    compatibility: moderate
+    conflict_severity: medium
+    target_resolution:
+      energy_concept: protein_priority_with_moderate_guidance
+    notes:
+      - "Weight-loss deficit concept vs muscle/strength adequate-energy concept."
+
+  - when_any_tag:
+      - high_carb_training
+    target_resolution:
+      carbohydrate_g_per_kg: prefer_activity_aware
+    notes:
+      - "Endurance carbohydrate targets remain activity-dependent after merge."
+
+# Explicit pairwise overlays (goal ids are order-independent at load time).
+pairs:
+  - goals: [muscle_gain, strength]
+    compatibility: high
+    priority_resolution: max_of_shared
+    target_resolution:
+      protein_g_per_kg: overlap_higher_protein
+      energy_concept: prefer_adequate
+    conflict_severity: low
+    notes:
+      - "Substantial scientific overlap expected."
+
+  - goals: [weight_loss, muscle_gain]
+    compatibility: moderate
+    priority_resolution: weighted_blend
+    target_resolution:
+      protein_g_per_kg: prefer_higher_protein
+      energy_concept: protein_priority_with_moderate_guidance
+      carbohydrate_g_per_kg: quality_focused
+    conflict_severity: medium
+
+  - goals: [weight_loss, strength]
+    compatibility: moderate
+    priority_resolution: weighted_blend
+    target_resolution:
+      protein_g_per_kg: prefer_higher_protein
+      energy_concept: protein_priority_with_moderate_guidance
+    conflict_severity: medium
+
+  - goals: [weight_loss, endurance]
+    compatibility: moderate
+    priority_resolution: weighted_blend
+    target_resolution:
+      carbohydrate_g_per_kg: prefer_activity_aware
+      energy_concept: resolve_energy_conflict
+    conflict_severity: medium
+    notes:
+      - "Training-day carbohydrate targets may conflict with deficit concept; resolve via config strategy."
+
+  - goals: [weight_loss, metabolic_health]
+    compatibility: high
+    priority_resolution: max_of_shared
+    target_resolution:
+      fibre_priority: prefer_higher
+      carbohydrate_g_per_kg: quality_focused
+    conflict_severity: low
+
+  - goals: [weight_loss, energy_levels]
+    compatibility: moderate
+    priority_resolution: weighted_blend
+    target_resolution:
+      energy_concept: resolve_energy_conflict
+    conflict_severity: medium
+
+  - goals: [muscle_gain, endurance]
+    compatibility: moderate
+    priority_resolution: weighted_blend
+    target_resolution:
+      carbohydrate_g_per_kg: prefer_activity_aware
+      protein_g_per_kg: overlap_or_widen
+      energy_concept: prefer_adequate
+    conflict_severity: medium
+
+  - goals: [muscle_gain, metabolic_health]
+    compatibility: moderate
+    priority_resolution: weighted_blend
+    conflict_severity: low
+
+  - goals: [muscle_gain, energy_levels]
+    compatibility: high
+    priority_resolution: max_of_shared
+    conflict_severity: low
+
+  - goals: [energy_levels, metabolic_health]
+    compatibility: high
+    priority_resolution: max_of_shared
+    conflict_severity: low
+
+  - goals: [energy_levels, endurance]
+    compatibility: high
+    priority_resolution: max_of_shared
+    target_resolution:
+      carbohydrate_g_per_kg: prefer_activity_aware
+      hydration_priority: prefer_higher
+    conflict_severity: low
+
+  - goals: [energy_levels, strength]
+    compatibility: high
+    priority_resolution: max_of_shared
+    conflict_severity: low
+
+  - goals: [metabolic_health, endurance]
+    compatibility: moderate
+    priority_resolution: weighted_blend
+    target_resolution:
+      carbohydrate_g_per_kg: prefer_activity_aware
+    conflict_severity: medium
+
+  - goals: [metabolic_health, strength]
+    compatibility: moderate
+    priority_resolution: weighted_blend
+    conflict_severity: low
+
+  - goals: [endurance, strength]
+    compatibility: moderate
+    priority_resolution: weighted_blend
+    target_resolution:
+      carbohydrate_g_per_kg: prefer_activity_aware
+      protein_g_per_kg: overlap_or_widen
+      energy_concept: prefer_adequate
+    conflict_severity: medium

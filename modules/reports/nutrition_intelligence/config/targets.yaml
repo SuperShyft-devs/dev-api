@@ -1,0 +1,144 @@
+# Nutrition TARGET tables only.
+#
+# These values describe what a user might aim for.
+# They are NEVER measured intake and MUST NOT be converted into
+# fabricated protein/carbohydrate/fat/fibre intake estimate ranges.
+#
+# Activity may modify endurance carbohydrate targets later;
+# activity must NOT inflate General Nutrition Quality.
+
+meta:
+  note: >
+    Target keys are referenced from goals.yaml via base_target_keys.
+    Units and ranges are configuration — update here without changing scorers.
+
+target_definitions:
+  protein_g_per_kg_weight_loss:
+    kind: protein_g_per_kg
+    range:
+      low: 1.6
+      high: 2.2
+      unit: g_per_kg_day
+    notes:
+      - "TARGET only. Not measured protein intake."
+
+  protein_g_per_kg_muscle_gain:
+    kind: protein_g_per_kg
+    range:
+      low: 1.6
+      high: 2.2
+      unit: g_per_kg_day
+    notes:
+      - "TARGET only. Not measured protein intake."
+
+  protein_g_per_kg_strength:
+    kind: protein_g_per_kg
+    range:
+      low: 1.6
+      high: 2.0
+      unit: g_per_kg_day
+    notes:
+      - "TARGET only. Overlaps muscle_gain; combination engine preserves overlap."
+
+  protein_g_per_kg_endurance:
+    kind: protein_g_per_kg
+    range:
+      low: 1.2
+      high: 1.8
+      unit: g_per_kg_day
+    notes:
+      - "TARGET only. Supports recovery; not measured intake."
+
+  protein_g_per_kg_general:
+    kind: protein_g_per_kg
+    range:
+      low: 1.2
+      high: 1.6
+      unit: g_per_kg_day
+    notes:
+      - "Baseline target for goals without a specialised protein prescription."
+
+  carbohydrate_quality_focused:
+    kind: carbohydrate_g_per_kg
+    range:
+      low: null
+      high: null
+      unit: g_per_kg_day
+      mode: quality_focused
+    notes:
+      - "No fixed g/kg prescription. Emphasise carbohydrate quality via behaviour indicators."
+
+  carbohydrate_adequate:
+    kind: carbohydrate_g_per_kg
+    range:
+      low: 3.0
+      high: 5.0
+      unit: g_per_kg_day
+      mode: adequate
+    notes:
+      - "TARGET only. Not measured carbohydrate intake."
+
+  carbohydrate_endurance_activity_dependent:
+    kind: carbohydrate_g_per_kg
+    range:
+      low: 6.0
+      high: 10.0
+      unit: g_per_kg_day
+      mode: activity_dependent
+    activity_bands:
+      # activity_load_index is derived later from exercise fields; bands modify TARGETS only.
+      low:
+        low: 3.0
+        high: 5.0
+      moderate:
+        low: 5.0
+        high: 7.0
+      high:
+        low: 6.0
+        high: 10.0
+    notes:
+      - "Approx 6–10 g/kg/day for relevant moderate/high endurance training ranges."
+      - "Higher values only for appropriate training loads."
+      - "Activity must not inflate Nutrition Score."
+
+  fibre_priority_high:
+    kind: fibre_priority
+    priority: high
+    notes:
+      - "Priority flag for Target Generator / counselling — not measured fibre grams."
+
+  fibre_priority_moderate:
+    kind: fibre_priority
+    priority: moderate
+    notes:
+      - "Priority flag only — not measured fibre grams."
+
+  hydration_standard:
+    kind: hydration_priority
+    priority: standard
+    notes:
+      - "Hydration TARGET priority. Questionnaire water glasses are not measured litres."
+
+  hydration_endurance:
+    kind: hydration_priority
+    priority: elevated
+    notes:
+      - "Elevated hydration TARGET priority for endurance. Not measured litres."
+
+  energy_concept_deficit:
+    kind: energy_concept
+    concept: deficit
+    notes:
+      - "TARGET concept only. Questionnaire does not measure energy balance."
+
+  energy_concept_adequate:
+    kind: energy_concept
+    concept: adequate
+    notes:
+      - "TARGET concept only. Not measured calorie surplus/adequacy."
+
+  energy_concept_none:
+    kind: energy_concept
+    concept: none
+    notes:
+      - "No energy prescription for this goal profile."

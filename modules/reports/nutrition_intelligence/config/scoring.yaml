@@ -1,0 +1,34 @@
+# Scoring blend, priority-level numeric map, and score bands.
+# Higher nutrition_score = better nutrition behaviour quality.
+# Do not hard-code these values in Python scorers.
+
+score_formula:
+  general_quality_weight: 0.70
+  goal_alignment_weight: 0.30
+  # When 0 goals are resolved:
+  #   renormalize_quality_only — final score = general quality only
+  #   use_neutral_alignment — use neutral_alignment_score for A
+  zero_goal_mode: renormalize_quality_only
+  missing_indicator_policy: exclude_and_renormalize
+  neutral_alignment_score: 50.0
+
+# Maps PriorityLevel labels used in goals/indicators YAML → numeric weights.
+priority_level_weights:
+  very_high: 1.0
+  high: 0.75
+  medium: 0.5
+  low: 0.25
+  none: 0.0
+
+# Bands applied to final nutrition_score (0–100, higher = better).
+# Label field is emitted as legacy risk_band for contract compatibility;
+# naming may be revisited by product without changing the engine.
+score_bands:
+  - min_score: 80
+    label: "Excellent"
+  - min_score: 60
+    label: "Healthy"
+  - min_score: 40
+    label: "Needs Improvement"
+  - min_score: 0
+    label: "At Risk"
