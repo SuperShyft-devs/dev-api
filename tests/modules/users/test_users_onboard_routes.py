@@ -1150,3 +1150,226 @@ async def test_engagement_onboard_me_inactive_engagement_issues_no_tokens(
 
     token_count = (await test_db_session.execute(text("SELECT COUNT(*) FROM auth_tokens"))).scalar_one()
     assert token_count == 0
+
+
+async def _seed_onboard_packages(test_db_session) -> None:
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_rejects_same_camp_no_across_engagements(
+    async_client, test_db_session
+):
+    """Same user cannot enroll in two engagements that share camp_no."""
+    await _seed_onboard_packages(test_db_session)
+    await test_db_session.execute(
+        text(
+            "INSERT INTO organizations (organization_id, name, status, departments) "
+            "VALUES (8801, 'Same Camp Org', 'active', "
+            "'[{\"department\": \"HR\", \"slug\": \"hr\"}]'::json)"
+        )
+    )
+    # org 8801 + start 2026-02-01 → camp_no 8801010226
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, "
+            "camp_no, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, "
+            "start_date, end_date, status) "
+            "VALUES (8801, 'Camp City A', 'CAMPA01', 8801, 8801010226, 'bio_ai', 1, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-01', 'running')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, "
+            "camp_no, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, "
+            "start_date, end_date, status) "
+            "VALUES (8802, 'Camp City B', 'CAMPB01', 8801, 8801010226, 'bio_ai', 1, 1, 'HYD', 20, "
+            "'2026-02-01', '2026-02-01', 'running')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "Same",
+        "last_name": "Camp",
+        "phone": "8801000001",
+        "email": "same.camp@example.com",
+        "city": "BLR",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "10:00",
+        "participant_department": "hr",
+    }
+
+    first = await async_client.post("/users/code/CAMPA01/onboard", json=payload)
+    assert first.status_code == 200
+    assert first.json()["data"]["engagement_id"] == 8801
+
+    second = await async_client.post("/users/code/CAMPB01/onboard", json=payload)
+    assert second.status_code == 409
+    body = second.json()
+    assert body["error_code"] == "ALREADY_ENROLLED_SAME_CAMP"
+    assert "camp" in body["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_allows_different_camp_no(
+    async_client, test_db_session
+):
+    """Same user may enroll in engagements with different camp_no values."""
+    await _seed_onboard_packages(test_db_session)
+    await test_db_session.execute(
+        text(
+            "INSERT INTO organizations (organization_id, name, status, departments) "
+            "VALUES (8802, 'Diff Camp Org', 'active', "
+            "'[{\"department\": \"HR\", \"slug\": \"hr\"}]'::json)"
+        )
+    )
+    # Different start dates → different camp_no
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, "
+            "camp_no, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, "
+            "start_date, end_date, status) "
+            "VALUES (8811, 'Camp Feb', 'DIFFC01', 8802, 8802010226, 'bio_ai', 1, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-01', 'running')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, "
+            "camp_no, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, "
+            "start_date, end_date, status) "
+            "VALUES (8812, 'Camp Mar', 'DIFFC02', 8802, 8802010326, 'bio_ai', 1, 1, 'BLR', 20, "
+            "'2026-03-01', '2026-03-01', 'running')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload_a = {
+        "age": 28,
+        "first_name": "Diff",
+        "last_name": "Camp",
+        "phone": "8802000001",
+        "email": "diff.camp@example.com",
+        "city": "BLR",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "10:00",
+        "participant_department": "hr",
+    }
+    payload_b = {
+        **payload_a,
+        "blood_collection_date": "2026-03-01",
+        "blood_collection_time_slot": "11:00",
+    }
+
+    first = await async_client.post("/users/code/DIFFC01/onboard", json=payload_a)
+    assert first.status_code == 200
+    assert first.json()["data"]["engagement_id"] == 8811
+
+    second = await async_client.post("/users/code/DIFFC02/onboard", json=payload_b)
+    assert second.status_code == 200
+    assert second.json()["data"]["engagement_id"] == 8812
+    assert second.json()["data"]["user_id"] == first.json()["data"]["user_id"]
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_allows_b2c_null_camp_across_engagements(
+    async_client, test_db_session
+):
+    """B2C engagements (camp_no null) do not block cross-engagement enroll."""
+    await _seed_onboard_packages(test_db_session)
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
+            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
+            "status) "
+            "VALUES (8821, 'B2C-A', 'B2CNULLA', 'bio_ai', 1, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-01', 'running')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
+            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
+            "status) "
+            "VALUES (8822, 'B2C-B', 'B2CNULLB', 'bio_ai', 1, 1, 'HYD', 20, "
+            "'2026-02-01', '2026-02-01', 'running')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 32,
+        "first_name": "B2C",
+        "last_name": "User",
+        "phone": "8803000001",
+        "email": "b2c.null@example.com",
+        "city": "BLR",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "09:00",
+    }
+
+    first = await async_client.post("/users/code/B2CNULLA/onboard", json=payload)
+    assert first.status_code == 200
+    assert first.json()["data"]["engagement_id"] == 8821
+
+    second = await async_client.post("/users/code/B2CNULLB/onboard", json=payload)
+    assert second.status_code == 200
+    assert second.json()["data"]["engagement_id"] == 8822
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_same_engagement_still_already_enrolled(
+    async_client, test_db_session
+):
+    """Re-onboarding the same engagement still returns ALREADY_ENROLLED."""
+    await _seed_onboard_packages(test_db_session)
+    await test_db_session.execute(
+        text(
+            "INSERT INTO organizations (organization_id, name, status, departments) "
+            "VALUES (8803, 'Dup Eng Org', 'active', "
+            "'[{\"department\": \"HR\", \"slug\": \"hr\"}]'::json)"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, "
+            "camp_no, engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, "
+            "start_date, end_date, status) "
+            "VALUES (8831, 'Dup Eng', 'DUPENG01', 8803, 8803010226, 'bio_ai', 1, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-01', 'running')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 29,
+        "first_name": "Dup",
+        "last_name": "Eng",
+        "phone": "8804000001",
+        "email": "dup.eng@example.com",
+        "city": "BLR",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "10:00",
+        "participant_department": "hr",
+    }
+
+    first = await async_client.post("/users/code/DUPENG01/onboard", json=payload)
+    assert first.status_code == 200
+
+    second = await async_client.post("/users/code/DUPENG01/onboard", json=payload)
+    assert second.status_code == 409
+    assert second.json()["error_code"] == "ALREADY_ENROLLED"

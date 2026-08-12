@@ -293,6 +293,27 @@ class EngagementsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_participant_for_user_camp_no(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        camp_no: int,
+        exclude_engagement_id: int | None = None,
+    ) -> EngagementParticipant | None:
+        query = (
+            select(EngagementParticipant)
+            .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
+            .where(EngagementParticipant.user_id == user_id)
+            .where(Engagement.camp_no == camp_no)
+        )
+        if exclude_engagement_id is not None:
+            query = query.where(EngagementParticipant.engagement_id != exclude_engagement_id)
+        result = await db.execute(
+            query.order_by(EngagementParticipant.engagement_participant_id.desc()).limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def get_participant_by_booking_id(
         self,
         db: AsyncSession,

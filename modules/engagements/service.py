@@ -1165,6 +1165,21 @@ class EngagementsService:
         if existing_participant is not None:
             raise AppError(status_code=409, error_code="ALREADY_ENROLLED", message="User is already enrolled in this engagement")
 
+        camp_no = engagement.camp_no
+        if camp_no is not None:
+            same_camp_participant = await self._repository.get_participant_for_user_camp_no(
+                db,
+                user_id=user_id,
+                camp_no=int(camp_no),
+                exclude_engagement_id=int(engagement.engagement_id),
+            )
+            if same_camp_participant is not None:
+                raise AppError(
+                    status_code=409,
+                    error_code="ALREADY_ENROLLED_SAME_CAMP",
+                    message="User is already enrolled in another engagement for this camp",
+                )
+
         booked_by = booked_by_user_id if booked_by_user_id is not None else user_id
         participant = EngagementParticipant(
             engagement_id=engagement.engagement_id,
@@ -1843,6 +1858,8 @@ class EngagementsService:
 
         missing_on_source: list[int] = []
         already_on_target: list[int] = []
+        already_on_same_camp: list[int] = []
+        target_camp_no = target.camp_no
         for user_id in normalized_user_ids:
             on_source = await self._repository.has_participant_for_user_engagement(
                 db,
@@ -1859,6 +1876,16 @@ class EngagementsService:
             )
             if on_target:
                 already_on_target.append(user_id)
+                continue
+            if target_camp_no is not None:
+                same_camp = await self._repository.get_participant_for_user_camp_no(
+                    db,
+                    user_id=user_id,
+                    camp_no=int(target_camp_no),
+                    exclude_engagement_id=int(source_engagement_id),
+                )
+                if same_camp is not None:
+                    already_on_same_camp.append(user_id)
 
         if missing_on_source:
             raise AppError(
@@ -1877,6 +1904,16 @@ class EngagementsService:
                 message=_cannot_move_participant_message(
                     "These participants are already enrolled in the target engagement: "
                     + ", ".join(str(uid) for uid in already_on_target)
+                    + "."
+                ),
+            )
+        if already_on_same_camp:
+            raise AppError(
+                status_code=409,
+                error_code="ALREADY_ENROLLED_SAME_CAMP",
+                message=_cannot_move_participant_message(
+                    "These participants are already enrolled in another engagement for this camp: "
+                    + ", ".join(str(uid) for uid in already_on_same_camp)
                     + "."
                 ),
             )
