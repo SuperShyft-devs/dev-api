@@ -208,6 +208,9 @@ class PaymentsService:
         authenticated_user_id: int,
         booking_type: str | None = None,
         metadata_by_user: dict[int, dict] | None = None,
+        discount_code: str | None = None,
+        discount_context: dict | None = None,
+        client_ip: str | None = None,
     ) -> dict[str, Any]:
         try:
             payer_result = await db.execute(select(User).where(User.user_id == payer_user_id))
@@ -269,7 +272,7 @@ class PaymentsService:
                     (b.user_id, (b.entity_type or "").strip(), b.entity_id)
                     for b in linked_bookings
                 )
-                if existing_lines == requested_lines:
+                if existing_lines == requested_lines and not discount_code:
                     logger.info(
                         "create_order: reusing order_id=%s (razorpay=%s) "
                         "for payer_user_id=%s — same session, same items",
@@ -292,6 +295,7 @@ class PaymentsService:
 
             bookings_created: list[Booking] = []
             total_paise = 0
+            line_paise_list: list[int] = []
 
             for member_user_id, entity_type, entity_id in items:
                 member_result = await db.execute(select(User).where(User.user_id == member_user_id))
@@ -306,6 +310,7 @@ class PaymentsService:
                 assert isinstance(resolved, tuple)
                 line_paise, entity_name = resolved
                 total_paise += line_paise
+                line_paise_list.append(line_paise)
 
                 member_meta = (metadata_by_user or {}).get(member_user_id)
                 booking = Booking(
@@ -327,13 +332,95 @@ class PaymentsService:
                 await db.rollback()
                 return {"_error": (400, "No booking lines")}
 
+            discount_meta: dict[str, Any] = {}
+            charge_paise = total_paise
+            eval_result = None
+            if discount_code:
+                from modules.discounts.schemas import CartLine, CheckoutContext
+                from modules.discounts.service import DiscountService
+                from modules.discounts import abuse as discount_abuse
+
+                try:
+                    await discount_abuse.assert_not_locked(
+                        db, user_id=payer_user_id, client_ip=client_ip
+                    )
+                    await discount_abuse.assert_discounted_create_cap(
+                        db, user_id=payer_user_id, client_ip=client_ip
+                    )
+                except discount_abuse.AbuseError as exc:
+                    await db.rollback()
+                    return {"_error": (exc.status_code, exc.message)}
+
+                ctx_data = discount_context or {}
+                context = CheckoutContext(
+                    organization_id=ctx_data.get("organization_id"),
+                    camp_no=str(ctx_data["camp_no"]) if ctx_data.get("camp_no") is not None else None,
+                    engagement_id=ctx_data.get("engagement_id"),
+                    city=ctx_data.get("city"),
+                )
+                cart_items = [
+                    CartLine(
+                        user_id=uid,
+                        entity_type=etype,
+                        entity_id=eid,
+                        amount_paise=line_paise_list[idx],
+                    )
+                    for idx, (uid, etype, eid) in enumerate(items)
+                ]
+                discount_service = DiscountService()
+                eval_result = await discount_service.engine.evaluate(
+                    db,
+                    code=discount_code,
+                    user_id=payer_user_id,
+                    items=cart_items,
+                    context=context,
+                    lock_code=True,
+                )
+                if not eval_result.ok:
+                    await discount_abuse.record_attempt(
+                        db,
+                        user_id=payer_user_id,
+                        client_ip=client_ip,
+                        code_submitted=discount_code,
+                        outcome=discount_abuse.map_engine_outcome(False, eval_result.reason),
+                        endpoint="/payments/create-order",
+                        detail=eval_result.reason,
+                    )
+                    await db.rollback()
+                    return {
+                        "_error": (
+                            400,
+                            eval_result.public_message or "This code is not valid for this order",
+                        )
+                    }
+                charge_paise = max(0, eval_result.final_paise)
+                for i, line_idx in enumerate(eval_result.eligible_line_indexes):
+                    if 0 <= line_idx < len(bookings_created):
+                        off = (
+                            eval_result.line_discounts_paise[i]
+                            if i < len(eval_result.line_discounts_paise)
+                            else 0
+                        )
+                        bookings_created[line_idx].amount_paise = max(
+                            0, bookings_created[line_idx].amount_paise - off
+                        )
+                discount_meta = {
+                    "discount_code": eval_result.code,
+                    "discount_paise": eval_result.discount_paise,
+                    "original_paise": eval_result.original_paise,
+                }
+
+            if charge_paise <= 0:
+                await db.rollback()
+                return {"_error": (400, "Order amount must be greater than zero")}
+
             anchor_booking_id = bookings_created[0].booking_id
             receipt = f"checkout_{anchor_booking_id}"
 
             try:
                 rz_order = await asyncio.to_thread(
                     _create_razorpay_order_sync,
-                    amount_paise=total_paise,
+                    amount_paise=charge_paise,
                     receipt=receipt,
                 )
             except Exception as exc:
@@ -350,7 +437,7 @@ class PaymentsService:
                 booking_id=anchor_booking_id,
                 user_id=payer_user_id,
                 razorpay_order_id=razorpay_order_id,
-                amount_paise=total_paise,
+                amount_paise=charge_paise,
                 currency="INR",
                 status="created",
             )
@@ -362,17 +449,59 @@ class PaymentsService:
 
             await db.flush()
 
+            if discount_code and eval_result is not None and eval_result.discount_code_id:
+                from modules.discounts.models import DiscountUsage
+                from modules.discounts.repository import DiscountRepository
+                from modules.discounts import abuse as discount_abuse
+                from modules.discounts.schemas import CheckoutContext
+
+                ctx_data = discount_context or {}
+                repo = DiscountRepository()
+                existing = await repo.find_open_reservation(
+                    db, user_id=payer_user_id, discount_code_id=eval_result.discount_code_id
+                )
+                if existing is not None:
+                    existing.status = "released"
+                usage = DiscountUsage(
+                    discount_code_id=eval_result.discount_code_id,
+                    instance_id=eval_result.instance_id,
+                    user_id=payer_user_id,
+                    order_id=order_row.order_id,
+                    booking_ids=[b.booking_id for b in bookings_created],
+                    original_paise=eval_result.original_paise,
+                    discount_paise=eval_result.discount_paise,
+                    final_paise=eval_result.final_paise,
+                    organization_id=ctx_data.get("organization_id"),
+                    camp_no=str(ctx_data["camp_no"]) if ctx_data.get("camp_no") is not None else None,
+                    engagement_id=ctx_data.get("engagement_id"),
+                    status="reserved",
+                )
+                db.add(usage)
+                await db.flush()
+                await discount_abuse.record_attempt(
+                    db,
+                    user_id=payer_user_id,
+                    client_ip=client_ip,
+                    code_submitted=eval_result.code,
+                    outcome="ok",
+                    endpoint="/payments/create-order",
+                )
+                discount_meta["usage_id"] = usage.usage_id
+
             booking_ids = [b.booking_id for b in bookings_created]
-            return {
+            payload = {
                 "success": True,
                 "booking_ids": booking_ids,
                 "booking_id": booking_ids[0],
                 "razorpay_order_id": razorpay_order_id,
-                "amount_paise": total_paise,
-                "amount_rupees": rupees_from_paise(total_paise),
+                "amount_paise": charge_paise,
+                "amount_rupees": rupees_from_paise(charge_paise),
                 "currency": "INR",
                 "key_id": settings.RAZORPAY_KEY_ID,
             }
+            if discount_meta:
+                payload["discount"] = discount_meta
+            return payload
         except Exception as exc:
             logger.exception("create_order failed: %s", exc)
             await db.rollback()
@@ -489,6 +618,13 @@ class PaymentsService:
 
             await db.flush()
 
+            try:
+                from modules.discounts.service import DiscountService
+
+                await DiscountService().commit_for_order(db, order_row.order_id)
+            except Exception:
+                logger.exception("discount commit_for_order failed order_id=%s", order_row.order_id)
+
             fulfillment_results: list[FulfillmentResult] = []
             if not skip_fulfillment:
                 fulfillment_results = await self._run_post_payment_fulfillment(
@@ -579,6 +715,13 @@ class PaymentsService:
                     len(failed_booking_ids),
                     order_row.order_id,
                 )
+
+            try:
+                from modules.discounts.service import DiscountService
+
+                await DiscountService().release_for_order(db, order_row.order_id)
+            except Exception:
+                logger.exception("discount release_for_order failed order_id=%s", order_row.order_id)
 
             await db.flush()
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +34,11 @@ class CreateOrderRequest(BaseModel):
 
     user_id: int = Field(..., ge=1)
     items: list[CreateOrderLineItem] = Field(..., min_length=1, max_length=10)
+    discount_code: str | None = None
+    organization_id: int | None = None
+    camp_no: str | None = None
+    engagement_id: int | None = None
+    city: str | None = None
 
     @model_validator(mode="after")
     def unique_line_user_ids(self) -> "CreateOrderRequest":
@@ -57,11 +62,22 @@ class FailedPaymentRequest(BaseModel):
 @router.post("/create-order")
 async def create_order(
     body: CreateOrderRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     service: PaymentsService = Depends(get_payments_service),
     current_user=Depends(get_current_user),
 ):
     try:
+        from core.network import get_client_ip
+
+        discount_context = None
+        if body.discount_code or body.organization_id or body.camp_no or body.engagement_id:
+            discount_context = {
+                "organization_id": body.organization_id,
+                "camp_no": body.camp_no,
+                "engagement_id": body.engagement_id,
+                "city": body.city,
+            }
         result = await service.create_order(
             db,
             payer_user_id=body.user_id,
@@ -69,6 +85,9 @@ async def create_order(
                 (line.user_id, line.entity_type.strip(), line.entity_id) for line in body.items
             ],
             authenticated_user_id=current_user.user_id,
+            discount_code=body.discount_code.strip() if body.discount_code else None,
+            discount_context=discount_context,
+            client_ip=get_client_ip(request),
         )
         err = result.get("_error")
         if err:

@@ -552,11 +552,14 @@ async def create_pay_order_for_draft_engagements(
     *,
     members: list[dict[str, Any]],
     payer_user_id: int,
+    discount_code: str | None = None,
+    client_ip: str | None = None,
 ) -> dict[str, Any]:
     """Create a Razorpay order for locked draft engagements."""
     validated_items: list[tuple[int, str, int]] = []
     metadata_by_user: dict[int, dict[str, Any]] = {}
     member_statuses: list[dict[str, Any]] = []
+    discount_context: dict[str, Any] | None = None
 
     for member in members:
         user_id = member["user_id"]
@@ -575,6 +578,13 @@ async def create_pay_order_for_draft_engagements(
             "engagement_id": engagement_id,
             "status": "success",
         })
+        if discount_context is None:
+            discount_context = {
+                "organization_id": engagement.organization_id,
+                "camp_no": str(engagement.camp_no) if engagement.camp_no is not None else None,
+                "engagement_id": engagement.engagement_id,
+                "city": getattr(engagement, "city", None),
+            }
 
     payments_service = PaymentsService()
     result = await payments_service.create_order(
@@ -584,13 +594,16 @@ async def create_pay_order_for_draft_engagements(
         authenticated_user_id=payer_user_id,
         booking_type=None,
         metadata_by_user=metadata_by_user,
+        discount_code=discount_code.strip() if discount_code else None,
+        discount_context=discount_context,
+        client_ip=client_ip,
     )
     err = result.get("_error")
     if err:
         code, msg = err
         raise AppError(status_code=code, error_code="PAYMENT_ERROR", message=msg)
 
-    return {
+    out = {
         "razorpay_order_id": result["razorpay_order_id"],
         "amount_paise": result["amount_paise"],
         "amount_rupees": result["amount_rupees"],
@@ -600,6 +613,9 @@ async def create_pay_order_for_draft_engagements(
         "booking_id": result["booking_id"],
         "members": member_statuses,
     }
+    if result.get("discount"):
+        out["discount"] = result["discount"]
+    return out
 
 
 def _members_from_order_bookings(bookings: list[Booking]) -> list[dict[str, Any]]:

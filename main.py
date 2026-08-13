@@ -44,6 +44,7 @@ from modules.webhooks.router import router as webhooks_router
 from modules.audit.router import router as audit_router
 from modules.geocoding.router import router as geocode_router
 from modules.server_health.router import router as server_health_router
+from modules.discounts.router import router as discounts_router
 
 
 # Configure logging
@@ -133,6 +134,7 @@ app.include_router(webhooks_router)
 app.include_router(audit_router)
 app.include_router(geocode_router)
 app.include_router(server_health_router)
+app.include_router(discounts_router)
 
 
 _media_root = Path(settings.MEDIA_ROOT)

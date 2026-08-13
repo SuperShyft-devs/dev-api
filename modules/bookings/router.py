@@ -34,9 +34,15 @@ async def book_pay(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    from core.network import get_client_ip
+
     members = [{"user_id": m.user_id, "engagement_id": m.engagement_id} for m in payload.members]
     result = await booking_service.create_pay_order_for_draft_engagements(
-        db, members=members, payer_user_id=current_user.user_id
+        db,
+        members=members,
+        payer_user_id=current_user.user_id,
+        discount_code=payload.discount_code,
+        client_ip=get_client_ip(request),
     )
     await db.commit()
     return success_response(result)

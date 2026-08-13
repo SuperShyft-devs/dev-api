@@ -42,6 +42,7 @@ class DiagnosticPackageCreate(BaseModel):
     bookings_count: Optional[int] = None
     price: Optional[float] = None
     original_price: Optional[float] = None
+    min_price: Optional[float] = None
     is_most_popular: Optional[bool] = None
     complementary_consultation: Optional[dict[str, bool]] = None
     gender_suitability: Optional[str] = None
@@ -61,6 +62,7 @@ class DiagnosticPackageUpdate(BaseModel):
     bookings_count: Optional[int] = None
     price: Optional[float] = None
     original_price: Optional[float] = None
+    min_price: Optional[float] = None
     is_most_popular: Optional[bool] = None
     complementary_consultation: Optional[dict[str, bool]] = None
     gender_suitability: Optional[str] = None

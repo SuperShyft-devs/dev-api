@@ -35,6 +35,7 @@ class DiagnosticPackage(Base):
     bookings_count = Column(Integer, nullable=False, default=0, server_default="0")
     price = Column(Numeric(10, 2))
     original_price = Column(Numeric(10, 2))
+    min_price = Column(Numeric(10, 2), nullable=True)
     is_most_popular = Column(Boolean, nullable=False, default=False, server_default="false")
     complementary_consultation = Column(JSON, nullable=True)
     gender_suitability = Column(String)

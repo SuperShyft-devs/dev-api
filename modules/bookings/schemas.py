@@ -57,6 +57,7 @@ class BookPayMember(BaseModel):
 
 class BookPayRequest(BaseModel):
     members: list[BookPayMember] = Field(..., min_length=1, max_length=10)
+    discount_code: str | None = None
 
     @model_validator(mode="after")
     def unique_member_user_ids(self) -> "BookPayRequest":

@@ -32,3 +32,4 @@ from modules.platform_settings import models as _platform_settings_models  # noq
 from modules.payments import models as _payments_models  # noqa: F401, E402
 from modules.experts import models as _experts_models  # noqa: F401, E402
 from modules.notifications import models as _notifications_models  # noqa: F401, E402
+from modules.discounts import models as _discounts_models  # noqa: F401, E402
