@@ -121,13 +121,23 @@ class OrganizationParticipantItem(BaseModel):
     status: Optional[str] = None
 
 
+class CampDepartmentItem(BaseModel):
+    name: str
+    slug: str
+
+
+class CampDepartmentsPayload(BaseModel):
+    count: int
+    departments: list[CampDepartmentItem]
+
+
 class CampListItem(BaseModel):
     camp_no: int
     camp_name: str
-    organization_id: int
-    organization_name: str
     start_date: date
-    engagement_count: int
+    year: int
+    engagement_ids: list[int]
+    departments: CampDepartmentsPayload
 
 
 class CampRemapRequest(BaseModel):

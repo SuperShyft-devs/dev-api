@@ -130,7 +130,8 @@ async def test_list_organization_camps_admin_sees_only_target_org(async_client, 
     assert camp_no_a in camp_nos
     assert camp_no_b in camp_nos
     assert other_camp_no not in camp_nos
-    assert all(row["organization_id"] == 8101 for row in camps)
+    assert all("organization_id" not in row for row in camps)
+    assert all("year" in row and "engagement_ids" in row and "departments" in row for row in camps)
 
 
 @pytest.mark.asyncio

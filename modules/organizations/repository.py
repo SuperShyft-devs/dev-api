@@ -277,13 +277,11 @@ class OrganizationsRepository:
             0
         )
 
-    def _camp_report_counts_subquery(self):
+    def _camp_report_camp_nos_subquery(self):
         return (
-            select(
-                CampReport.camp_no,
-                func.count().label("report_count"),
-            )
-            .group_by(CampReport.camp_no)
+            select(CampReport.camp_no)
+            .where(CampReport.camp_no.isnot(None))
+            .distinct()
             .subquery()
         )
 
@@ -294,28 +292,22 @@ class OrganizationsRepository:
         organization_id: int | None = None,
         initialized_only: bool = True,
     ):
-        report_counts = self._camp_report_counts_subquery()
         query = (
             select(
                 Engagement.camp_no,
                 Engagement.organization_id,
                 Organization.name.label("organization_name"),
                 func.min(Engagement.start_date).label("start_date"),
-                func.count().label("engagement_count"),
-                func.max(self._department_count_expr()).label("department_count"),
-                func.max(func.coalesce(report_counts.c.report_count, 0)).label("report_count"),
+                func.count(Engagement.engagement_id).label("engagement_count"),
             )
             .select_from(Engagement)
             .join(Organization, Organization.organization_id == Engagement.organization_id)
+            .where(Engagement.camp_no.isnot(None))
+            .group_by(Engagement.camp_no, Engagement.organization_id, Organization.name)
         )
-        # initialized_only: only camps with at least one camp_reports row
         if initialized_only:
-            query = query.join(report_counts, report_counts.c.camp_no == Engagement.camp_no)
-        else:
-            query = query.outerjoin(report_counts, report_counts.c.camp_no == Engagement.camp_no)
-        query = query.where(Engagement.camp_no.isnot(None)).group_by(
-            Engagement.camp_no, Engagement.organization_id, Organization.name
-        )
+            reported = self._camp_report_camp_nos_subquery()
+            query = query.join(reported, reported.c.camp_no == Engagement.camp_no)
         if organization_id is not None:
             query = query.where(Engagement.organization_id == organization_id)
         if search is not None and search.strip():
@@ -363,12 +355,15 @@ class OrganizationsRepository:
         normalized_sort = (sort_by or "camp_no").strip().lower()
         descending = (sort_dir or "desc").strip().lower() == "desc"
 
-        if normalized_sort == "engagement_count":
-            order_col = func.count()
+        if normalized_sort in {"engagement_count", "engagement_ids"}:
+            order_col = func.count(Engagement.engagement_id)
         elif normalized_sort == "camp_name":
             order_col = Organization.name
-        elif normalized_sort == "department_count":
+        elif normalized_sort in {"department_count", "departments"}:
+            # Approximate: org department config size (reported depts enriched in service).
             order_col = func.max(self._department_count_expr())
+        elif normalized_sort == "year":
+            order_col = func.min(Engagement.start_date)
         else:
             order_col = Engagement.camp_no
 
@@ -377,6 +372,89 @@ class OrganizationsRepository:
         query = query.offset(offset).limit(limit)
         result = await db.execute(query)
         return list(result.all())
+
+    async def list_engagement_ids_by_camp_nos(
+        self,
+        db: AsyncSession,
+        *,
+        camp_nos: list[int],
+    ) -> dict[int, list[int]]:
+        if not camp_nos:
+            return {}
+        result = await db.execute(
+            select(Engagement.camp_no, Engagement.engagement_id)
+            .where(Engagement.camp_no.in_(camp_nos))
+            .order_by(Engagement.camp_no.asc(), Engagement.engagement_id.asc())
+        )
+        by_camp: dict[int, list[int]] = {int(c): [] for c in camp_nos}
+        for camp_no, engagement_id in result.all():
+            if camp_no is None or engagement_id is None:
+                continue
+            by_camp.setdefault(int(camp_no), []).append(int(engagement_id))
+        return by_camp
+
+    async def list_reported_department_slugs_by_camp_nos(
+        self,
+        db: AsyncSession,
+        *,
+        camp_nos: list[int],
+    ) -> dict[int, list[str]]:
+        """Distinct non-null department slugs that have camp_reports rows for each camp."""
+        if not camp_nos:
+            return {}
+        result = await db.execute(
+            select(CampReport.camp_no, CampReport.department)
+            .where(
+                CampReport.camp_no.in_(camp_nos),
+                CampReport.department.isnot(None),
+                func.trim(CampReport.department) != "",
+            )
+            .distinct()
+            .order_by(CampReport.camp_no.asc(), CampReport.department.asc())
+        )
+        by_camp: dict[int, list[str]] = {int(c): [] for c in camp_nos}
+        seen: dict[int, set[str]] = {int(c): set() for c in camp_nos}
+        for camp_no, department in result.all():
+            if camp_no is None or department is None:
+                continue
+            cid = int(camp_no)
+            slug = str(department).strip()
+            if not slug:
+                continue
+            key = slug.lower()
+            if key in seen.setdefault(cid, set()):
+                continue
+            seen[cid].add(key)
+            by_camp.setdefault(cid, []).append(slug)
+        return by_camp
+
+    async def list_organization_departments_by_ids(
+        self,
+        db: AsyncSession,
+        *,
+        organization_ids: list[int],
+    ) -> dict[int, list[dict[str, str]]]:
+        if not organization_ids:
+            return {}
+        result = await db.execute(
+            select(Organization.organization_id, Organization.departments).where(
+                Organization.organization_id.in_(organization_ids)
+            )
+        )
+        out: dict[int, list[dict[str, str]]] = {}
+        for organization_id, departments in result.all():
+            items: list[dict[str, str]] = []
+            if isinstance(departments, list):
+                for item in departments:
+                    if not isinstance(item, dict):
+                        continue
+                    slug = str(item.get("slug") or "").strip()
+                    name = str(item.get("department") or item.get("name") or "").strip()
+                    if not slug:
+                        continue
+                    items.append({"slug": slug, "name": name or slug})
+            out[int(organization_id)] = items
+        return out
 
     async def list_distinct_engagement_cities_by_org_ids(
         self,

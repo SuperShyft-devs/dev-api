@@ -636,31 +636,73 @@ class OrganizationsService:
         return result, total
 
     @staticmethod
-    def _camp_rows_to_dicts(rows: list[tuple]) -> list[dict]:
+    def _camp_rows_to_dicts(
+        rows: list[tuple],
+        *,
+        engagement_ids_by_camp: dict[int, list[int]],
+        reported_slugs_by_camp: dict[int, list[str]],
+        org_departments_by_id: dict[int, list[dict[str, str]]],
+    ) -> list[dict]:
         result = []
         for (
             camp_no,
             organization_id,
             organization_name,
             start_date,
-            engagement_count,
-            department_count,
-            report_count,
+            _engagement_count,
         ) in rows:
+            cid = int(camp_no)
+            oid = int(organization_id)
             org_name = organization_name or ""
+            year = int(start_date.year) if start_date is not None else 0
+
+            slug_to_name = {
+                item["slug"].lower(): item["name"]
+                for item in org_departments_by_id.get(oid, [])
+                if item.get("slug")
+            }
+            departments = []
+            for slug in reported_slugs_by_camp.get(cid, []):
+                departments.append(
+                    {
+                        "name": slug_to_name.get(slug.lower(), slug),
+                        "slug": slug,
+                    }
+                )
+
             result.append(
                 {
-                    "camp_no": int(camp_no),
+                    "camp_no": cid,
                     "camp_name": format_camp_name(org_name, start_date),
-                    "organization_id": int(organization_id),
-                    "organization_name": org_name,
                     "start_date": start_date,
-                    "engagement_count": int(engagement_count),
-                    "department_count": int(department_count or 0),
-                    "report_count": int(report_count or 0),
+                    "year": year,
+                    "engagement_ids": engagement_ids_by_camp.get(cid, []),
+                    "departments": {
+                        "count": len(departments),
+                        "departments": departments,
+                    },
                 }
             )
         return result
+
+    async def _enrich_camp_rows(self, db, rows: list[tuple]) -> list[dict]:
+        camp_nos = [int(row[0]) for row in rows]
+        organization_ids = list({int(row[1]) for row in rows})
+        engagement_ids_by_camp = await self._repository.list_engagement_ids_by_camp_nos(
+            db, camp_nos=camp_nos
+        )
+        reported_slugs_by_camp = await self._repository.list_reported_department_slugs_by_camp_nos(
+            db, camp_nos=camp_nos
+        )
+        org_departments_by_id = await self._repository.list_organization_departments_by_ids(
+            db, organization_ids=organization_ids
+        )
+        return self._camp_rows_to_dicts(
+            rows,
+            engagement_ids_by_camp=engagement_ids_by_camp,
+            reported_slugs_by_camp=reported_slugs_by_camp,
+            org_departments_by_id=org_departments_by_id,
+        )
 
     async def list_camps_for_employee(
         self,
@@ -691,7 +733,7 @@ class OrganizationsService:
             initialized_only=initialized_only,
         )
 
-        return self._camp_rows_to_dicts(rows), total
+        return await self._enrich_camp_rows(db, rows), total
 
     async def list_camps_for_organization_for_employee(
         self,
@@ -730,7 +772,7 @@ class OrganizationsService:
             initialized_only=initialized_only,
         )
 
-        return self._camp_rows_to_dicts(rows), total
+        return await self._enrich_camp_rows(db, rows), total
 
     async def remap_camp_no_for_employee(
         self,

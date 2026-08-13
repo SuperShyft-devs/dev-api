@@ -122,11 +122,15 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
     camps = body["data"]
     matching = [row for row in camps if row["camp_no"] == camp_no]
     assert len(matching) == 1
-    assert matching[0]["engagement_count"] == 2
     assert matching[0]["camp_name"] == "Camp Org 23 June 2026"
-    assert matching[0]["organization_id"] == 8001
-    assert matching[0]["department_count"] == 2
-    assert matching[0]["report_count"] == 0
+    assert matching[0]["year"] == 2026
+    assert matching[0]["engagement_ids"] == [8201, 8202]
+    assert matching[0]["departments"] == {"count": 0, "departments": []}
+    assert "organization_id" not in matching[0]
+    assert "organization_name" not in matching[0]
+    assert "engagement_count" not in matching[0]
+    assert "department_count" not in matching[0]
+    assert "report_count" not in matching[0]
 
 
 @pytest.mark.asyncio
@@ -192,6 +196,15 @@ async def test_list_camps_initialized_only_returns_camps_with_reports(async_clie
             organization_id=8010,
         )
     )
+    test_db_session.add(
+        CampReport(
+            report={},
+            camp_no=camp_no,
+            department="sales",
+            city=None,
+            organization_id=8010,
+        )
+    )
     await test_db_session.commit()
 
     response = await async_client.get(
@@ -203,4 +216,9 @@ async def test_list_camps_initialized_only_returns_camps_with_reports(async_clie
     assert camp_no in camp_nos
     assert other_camp_no not in camp_nos
     matching = [row for row in response.json()["data"] if row["camp_no"] == camp_no]
-    assert matching[0]["report_count"] == 1
+    assert matching[0]["year"] == 2026
+    assert matching[0]["engagement_ids"] == [8210]
+    assert matching[0]["departments"] == {
+        "count": 1,
+        "departments": [{"name": "Sales", "slug": "sales"}],
+    }
