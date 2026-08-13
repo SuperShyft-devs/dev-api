@@ -292,6 +292,7 @@ class OrganizationsRepository:
         *,
         search: str | None = None,
         organization_id: int | None = None,
+        initialized_only: bool = True,
     ):
         report_counts = self._camp_report_counts_subquery()
         query = (
@@ -306,9 +307,14 @@ class OrganizationsRepository:
             )
             .select_from(Engagement)
             .join(Organization, Organization.organization_id == Engagement.organization_id)
-            .outerjoin(report_counts, report_counts.c.camp_no == Engagement.camp_no)
-            .where(Engagement.camp_no.isnot(None))
-            .group_by(Engagement.camp_no, Engagement.organization_id, Organization.name)
+        )
+        # initialized_only: only camps with at least one camp_reports row
+        if initialized_only:
+            query = query.join(report_counts, report_counts.c.camp_no == Engagement.camp_no)
+        else:
+            query = query.outerjoin(report_counts, report_counts.c.camp_no == Engagement.camp_no)
+        query = query.where(Engagement.camp_no.isnot(None)).group_by(
+            Engagement.camp_no, Engagement.organization_id, Organization.name
         )
         if organization_id is not None:
             query = query.where(Engagement.organization_id == organization_id)
@@ -327,8 +333,13 @@ class OrganizationsRepository:
         *,
         search: str | None = None,
         organization_id: int | None = None,
+        initialized_only: bool = True,
     ) -> int:
-        subq = self._camps_grouped_query(search=search, organization_id=organization_id).subquery()
+        subq = self._camps_grouped_query(
+            search=search,
+            organization_id=organization_id,
+            initialized_only=initialized_only,
+        ).subquery()
         result = await db.execute(select(func.count()).select_from(subq))
         return int(result.scalar_one())
 
@@ -342,8 +353,13 @@ class OrganizationsRepository:
         organization_id: int | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
+        initialized_only: bool = True,
     ) -> list[tuple]:
-        query = self._camps_grouped_query(search=search, organization_id=organization_id)
+        query = self._camps_grouped_query(
+            search=search,
+            organization_id=organization_id,
+            initialized_only=initialized_only,
+        )
         normalized_sort = (sort_by or "camp_no").strip().lower()
         descending = (sort_dir or "desc").strip().lower() == "desc"
 

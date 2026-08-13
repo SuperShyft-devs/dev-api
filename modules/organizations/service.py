@@ -672,10 +672,15 @@ class OrganizationsService:
         search: str | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
+        initialized_only: bool = True,
     ) -> tuple[list[dict], int]:
         ensure_admin(employee)
 
-        total = await self._repository.count_camps(db, search=search)
+        total = await self._repository.count_camps(
+            db,
+            search=search,
+            initialized_only=initialized_only,
+        )
         rows = await self._repository.list_camps(
             db,
             page=page,
@@ -683,6 +688,7 @@ class OrganizationsService:
             search=search,
             sort_by=sort_by,
             sort_dir=sort_dir,
+            initialized_only=initialized_only,
         )
 
         return self._camp_rows_to_dicts(rows), total
@@ -698,6 +704,7 @@ class OrganizationsService:
         search: str | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
+        initialized_only: bool = True,
     ) -> tuple[list[dict], int]:
         await ensure_camp_access_admin_or_org_manager(
             db,
@@ -710,6 +717,7 @@ class OrganizationsService:
             db,
             search=search,
             organization_id=organization_id,
+            initialized_only=initialized_only,
         )
         rows = await self._repository.list_camps(
             db,
@@ -719,6 +727,7 @@ class OrganizationsService:
             organization_id=organization_id,
             sort_by=sort_by,
             sort_dir=sort_dir,
+            initialized_only=initialized_only,
         )
 
         return self._camp_rows_to_dicts(rows), total

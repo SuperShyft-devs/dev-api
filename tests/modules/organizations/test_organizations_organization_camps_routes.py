@@ -12,6 +12,7 @@ from modules.employee.models import Employee
 from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.models import Engagement
 from modules.organizations.models import Organization
+from modules.reports.models import CampReport
 from modules.users.models import User
 
 
@@ -81,6 +82,21 @@ async def _seed_org_with_camps(
                 start_date=start_a if camp_no != camp_no_b else start_b,
                 end_date=start_a if camp_no != camp_no_b else start_b,
                 status="running",
+            )
+        )
+    # Default list endpoints only return camps with initialized reports.
+    for camp_no, org_id in (
+        (camp_no_a, organization_id),
+        (camp_no_b, organization_id),
+        (other_camp_no, other_organization_id),
+    ):
+        test_db_session.add(
+            CampReport(
+                report={},
+                camp_no=camp_no,
+                department=None,
+                city=None,
+                organization_id=org_id,
             )
         )
     await test_db_session.commit()
@@ -209,3 +225,76 @@ async def test_list_organization_camps_nonexistent_org_404(async_client, test_db
         headers=_auth_header(7314),
     )
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_organization_camps_excludes_uninitialized_by_default(
+    async_client, test_db_session
+):
+    await _seed_admin(test_db_session, user_id=7315, employee_id=54)
+
+    organization_id = 8140
+    start_a = date(2026, 6, 23)
+    start_b = date(2026, 7, 1)
+    camp_no_a = compute_camp_no(organization_id, start_a)
+    camp_no_b = compute_camp_no(organization_id, start_b)
+
+    test_db_session.add(
+        Organization(
+            organization_id=organization_id,
+            name="Filter Org",
+            organization_type="corporate",
+            status="active",
+            departments=[{"department": "Sales", "slug": "sales"}],
+        )
+    )
+    await test_db_session.commit()
+
+    for engagement_id, camp_no, start in (
+        (8501, camp_no_a, start_a),
+        (8502, camp_no_b, start_b),
+    ):
+        test_db_session.add(
+            Engagement(
+                engagement_id=engagement_id,
+                engagement_name=f"Engagement {engagement_id}",
+                organization_id=organization_id,
+                camp_no=camp_no,
+                engagement_code=f"F{engagement_id}",
+                engagement_type="bio_ai",
+                assessment_package_id=None,
+                diagnostic_package_id=None,
+                city="BLR",
+                slot_duration=20,
+                start_date=start,
+                end_date=start,
+                status="running",
+            )
+        )
+    # Only camp_no_a is initialized
+    test_db_session.add(
+        CampReport(
+            report={},
+            camp_no=camp_no_a,
+            department=None,
+            city=None,
+            organization_id=organization_id,
+        )
+    )
+    await test_db_session.commit()
+
+    default_response = await async_client.get(
+        f"/organizations/{organization_id}/camps?page=1&limit=10",
+        headers=_auth_header(7315),
+    )
+    assert default_response.status_code == 200
+    default_camp_nos = {row["camp_no"] for row in default_response.json()["data"]}
+    assert default_camp_nos == {camp_no_a}
+
+    all_response = await async_client.get(
+        f"/organizations/{organization_id}/camps?page=1&limit=10&initialized_only=false",
+        headers=_auth_header(7315),
+    )
+    assert all_response.status_code == 200
+    all_camp_nos = {row["camp_no"] for row in all_response.json()["data"]}
+    assert all_camp_nos == {camp_no_a, camp_no_b}

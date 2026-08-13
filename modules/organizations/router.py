@@ -177,6 +177,7 @@ async def list_camps(
     search: str | None = None,
     sort_by: str | None = None,
     sort_dir: str | None = None,
+    initialized_only: bool = True,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     organizations_service: OrganizationsService = Depends(get_organizations_service),
@@ -192,6 +193,7 @@ async def list_camps(
         search=search,
         sort_by=sort_by,
         sort_dir=sort_dir,
+        initialized_only=initialized_only,
     )
     return success_response(camps, meta={"page": page, "limit": limit, "total": total})
 
@@ -331,6 +333,7 @@ async def list_organization_camps(
     search: str | None = None,
     sort_by: str | None = None,
     sort_dir: str | None = None,
+    initialized_only: bool = True,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     organizations_service: OrganizationsService = Depends(get_organizations_service),
@@ -347,6 +350,7 @@ async def list_organization_camps(
         search=search,
         sort_by=sort_by,
         sort_dir=sort_dir,
+        initialized_only=initialized_only,
     )
     return success_response(camps, meta={"page": page, "limit": limit, "total": total})
 

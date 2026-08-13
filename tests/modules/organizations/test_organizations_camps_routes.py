@@ -103,7 +103,19 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/organizations/camps?page=1&limit=10", headers=_auth_header(7201))
+    # Default: only camps with initialized camp reports
+    default_response = await async_client.get(
+        "/organizations/camps?page=1&limit=10",
+        headers=_auth_header(7201),
+    )
+    assert default_response.status_code == 200
+    assert all(row["camp_no"] != camp_no for row in default_response.json()["data"])
+
+    # Admin can still list uninitialized camps
+    response = await async_client.get(
+        "/organizations/camps?page=1&limit=10&initialized_only=false",
+        headers=_auth_header(7201),
+    )
     assert response.status_code == 200
 
     body = response.json()
@@ -115,3 +127,80 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
     assert matching[0]["organization_id"] == 8001
     assert matching[0]["department_count"] == 2
     assert matching[0]["report_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_list_camps_initialized_only_returns_camps_with_reports(async_client, test_db_session):
+    from modules.reports.models import CampReport
+
+    await _seed_employee(test_db_session, user_id=7210, employee_id=33)
+
+    test_db_session.add(
+        Organization(
+            organization_id=8010,
+            name="Init Camp Org",
+            organization_type="corporate",
+            status="active",
+            departments=[{"department": "Sales", "slug": "sales"}],
+        )
+    )
+    await test_db_session.commit()
+    start = date(2026, 6, 23)
+    camp_no = compute_camp_no(8010, start)
+    other_camp_no = compute_camp_no(8010, date(2026, 7, 1))
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=8210,
+            engagement_name="Initialized Camp",
+            organization_id=8010,
+            camp_no=camp_no,
+            engagement_code="INIT1",
+            engagement_type="bio_ai",
+            assessment_package_id=None,
+            diagnostic_package_id=None,
+            city="BLR",
+            slot_duration=20,
+            start_date=start,
+            end_date=start,
+            status="running",
+        )
+    )
+    test_db_session.add(
+        Engagement(
+            engagement_id=8211,
+            engagement_name="Uninitialized Camp",
+            organization_id=8010,
+            camp_no=other_camp_no,
+            engagement_code="INIT2",
+            engagement_type="bio_ai",
+            assessment_package_id=None,
+            diagnostic_package_id=None,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 7, 1),
+            status="running",
+        )
+    )
+    test_db_session.add(
+        CampReport(
+            report={},
+            camp_no=camp_no,
+            department=None,
+            city=None,
+            organization_id=8010,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        "/organizations/camps?page=1&limit=10",
+        headers=_auth_header(7210),
+    )
+    assert response.status_code == 200
+    camp_nos = {row["camp_no"] for row in response.json()["data"]}
+    assert camp_no in camp_nos
+    assert other_camp_no not in camp_nos
+    matching = [row for row in response.json()["data"] if row["camp_no"] == camp_no]
+    assert matching[0]["report_count"] == 1
