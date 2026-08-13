@@ -444,6 +444,7 @@ class EngagementsService:
             engagement_code=code,
             engagement_type=payload.engagement_type,
             consultations=payload.consultations,
+            slot_detail=payload.slot_detail.model_dump(mode="json", exclude_none=True) if payload.slot_detail is not None else None,
             assessment_package_id=payload.assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
             city=payload.city,
@@ -746,6 +747,12 @@ class EngagementsService:
         # Callers that never send the key keep whatever is already configured.
         if "consultations" in update_fields:
             engagement.consultations = payload.consultations
+        if "slot_detail" in update_fields:
+            engagement.slot_detail = (
+                payload.slot_detail.model_dump(mode="json", exclude_none=True)
+                if payload.slot_detail is not None
+                else None
+            )
         engagement.assessment_package_id = payload.assessment_package_id
         engagement.diagnostic_package_id = payload.diagnostic_package_id
         engagement.city = payload.city

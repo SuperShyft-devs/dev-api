@@ -266,6 +266,164 @@ async def test_create_engagement_persists_location_fields(async_client, test_db_
     assert data2["longitude"] == pytest.approx(72.88)
 
 
+async def _engagement_type_id(test_db_session, code: str = "bio_ai") -> int:
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagement_types (code, display_name, is_active) "
+            "VALUES (:code, :dn, true) "
+            "ON CONFLICT (code) DO UPDATE SET is_active = true"
+        ),
+        {"code": code, "dn": code},
+    )
+    await test_db_session.commit()
+    row = (
+        await test_db_session.execute(
+            text("SELECT id FROM engagement_types WHERE code = :code"),
+            {"code": code},
+        )
+    ).one()
+    return int(row[0])
+
+
+@pytest.mark.asyncio
+async def test_create_and_update_engagement_persists_slot_detail(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7020, employee_id=25)
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+    type_id = await _engagement_type_id(test_db_session, "blood_test_with_consultation")
+
+    slot_detail = {
+        "blood_collection": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Blood Test Cabin 1",
+                    "cabin_key": "btc-001",
+                    "start_time": "09:00",
+                    "end_time": "17:00",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 2,
+                    "breaks": [{"start_time": "13:00", "end_time": "14:00"}],
+                    "is_active": True,
+                }
+            ]
+        },
+        "consultation": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Consultation Cabin 1",
+                    "cabin_key": "cc-001",
+                    "start_time": "10:00",
+                    "end_time": "18:00",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 1,
+                    "breaks": [],
+                    "is_active": True,
+                }
+            ]
+        },
+    }
+
+    payload = {
+        "engagement_name": "Slot Detail Camp",
+        "organization_id": 1,
+        "engagement_type": type_id,
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "city": "BLR",
+        "slot_duration": 30,
+        "start_date": "2026-08-20",
+        "end_date": "2026-08-21",
+        "slot_detail": slot_detail,
+    }
+
+    response = await async_client.post("/engagements", headers=_auth_header(7020), json=payload)
+    assert response.status_code == 201, response.text
+    engagement_id = response.json()["data"]["engagement_id"]
+
+    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7020))
+    assert details.status_code == 200
+    data = details.json()["data"]
+    assert data["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_key"] == "btc-001"
+    assert data["slot_detail"]["consultation"]["2026-08-20"][0]["cabin_name"] == "Consultation Cabin 1"
+    assert data["slot_detail"]["blood_collection"]["2026-08-20"][0]["breaks"][0]["start_time"] == "13:00"
+
+    updated_slot = {
+        "blood_collection": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Blood Test Cabin 1 Updated",
+                    "cabin_key": "btc-001",
+                    "start_time": "08:00",
+                    "end_time": "16:00",
+                    "slot_duration": 20,
+                    "capacity_per_slot": 3,
+                    "breaks": [],
+                    "is_active": False,
+                }
+            ]
+        }
+    }
+    update_payload = {
+        "engagement_name": "Slot Detail Camp",
+        "engagement_code": data["engagement_code"],
+        "organization_id": 1,
+        "engagement_type": type_id,
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "city": "BLR",
+        "slot_duration": 30,
+        "start_date": "2026-08-20",
+        "end_date": "2026-08-21",
+        "slot_detail": updated_slot,
+    }
+    updated = await async_client.put(
+        f"/engagements/{engagement_id}", headers=_auth_header(7020), json=update_payload
+    )
+    assert updated.status_code == 200, updated.text
+
+    details2 = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7020))
+    data2 = details2.json()["data"]
+    assert data2["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_name"] == "Blood Test Cabin 1 Updated"
+    assert data2["slot_detail"]["blood_collection"]["2026-08-20"][0]["is_active"] is False
+    assert data2["slot_detail"].get("consultation") in (None, {})
+
+
+@pytest.mark.asyncio
+async def test_create_engagement_rejects_invalid_slot_detail(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7021, employee_id=26)
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
+    type_id = await _engagement_type_id(test_db_session, "blood_test")
+
+    payload = {
+        "engagement_name": "Bad Slot Detail",
+        "organization_id": 1,
+        "engagement_type": type_id,
+        "city": "BLR",
+        "slot_duration": 30,
+        "start_date": "2026-08-20",
+        "end_date": "2026-08-21",
+        "slot_detail": {
+            "blood_collection": {
+                "2026-08-20": [
+                    {
+                        "cabin_name": "Cabin A",
+                        "cabin_key": "btc-001",
+                        "start_time": "17:00",
+                        "end_time": "09:00",
+                        "slot_duration": 30,
+                        "capacity_per_slot": 1,
+                        "breaks": [],
+                        "is_active": True,
+                    }
+                ]
+            }
+        },
+    }
+    response = await async_client.post("/engagements", headers=_auth_header(7021), json=payload)
+    assert response.status_code == 422
+
+
 @pytest.mark.asyncio
 async def test_create_engagement_sets_camp_no_for_org_8(async_client, test_db_session):
 

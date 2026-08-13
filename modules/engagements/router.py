@@ -65,6 +65,7 @@ def _engagement_to_dict(
         "engagement_code": engagement.engagement_code,
         "engagement_type": engagement.engagement_type,
         "consultations": engagement.consultations,
+        "slot_detail": engagement.slot_detail,
         "assessment_package_id": engagement.assessment_package_id,
         "diagnostic_package_id": engagement.diagnostic_package_id,
         "city": engagement.city,

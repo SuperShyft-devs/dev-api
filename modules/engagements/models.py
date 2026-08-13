@@ -68,6 +68,7 @@ class Engagement(Base):
     engagement_code = Column(String, nullable=False)
     engagement_type = Column(Integer, ForeignKey("engagement_types.id"), nullable=True)
     consultations = Column(JSON, nullable=True)
+    slot_detail = Column(JSON, nullable=True)
     assessment_package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=True)
     diagnostic_package_id = Column(Integer, ForeignKey("diagnostic_package.diagnostic_package_id"), nullable=True)
     address = Column(String, nullable=True)
