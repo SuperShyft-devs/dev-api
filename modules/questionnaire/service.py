@@ -561,6 +561,78 @@ class QuestionnaireService:
                 return False
         return True
 
+    async def list_unanswered_questions(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        category_id: int,
+        user_id: int,
+    ) -> list[dict]:
+        """Visible questions in a category that do not yet have a provided answer.
+
+        Required questions are listed first. Visibility, prefill, and answer
+        validation match ``is_category_complete``.
+        """
+        category_questions = await self._list_active_questions_for_category(db, category_id=category_id)
+        if not category_questions:
+            return []
+
+        all_responses = await self._repository.list_responses_for_instance(
+            db, assessment_instance_id=assessment_instance_id,
+        )
+        all_qids = [int(r.question_id) for r in all_responses]
+        all_qdefs_map = (
+            await self._repository.get_definitions_by_ids(db, question_ids=all_qids) if all_qids else {}
+        )
+        full_answers_by_key: dict[str, object] = {}
+        for response_row in all_responses:
+            qdef = all_qdefs_map.get(int(response_row.question_id))
+            if qdef is None:
+                continue
+            qkey = _normalize_text(qdef.question_key)
+            if qkey and response_row.answer is not None:
+                full_answers_by_key[qkey] = response_row.answer
+
+        category_answers_by_question_id: dict[int, object] = {
+            int(r.question_id): r.answer
+            for r in all_responses
+            if int(category_id) in (r.category_ids or [])
+        }
+        preferences = self._build_preferences_map(
+            await self._users_repository.get_preferences(db, user_id=user_id)
+        )
+        visibility = self._compute_visibility_state(
+            questions=category_questions,
+            answers_by_question_id=category_answers_by_question_id,
+            preferences=preferences,
+            extra_answers_by_key=full_answers_by_key,
+        )
+
+        unanswered: list[dict] = []
+        for question in category_questions:
+            question_id = int(question["question_id"])
+            if not visibility.get(question_id, False):
+                continue
+            answer = category_answers_by_question_id.get(question_id)
+            if answer is None:
+                answer = self._resolve_prefill_answer(
+                    prefill_from=question.get("prefill_from"),
+                    preferences=preferences,
+                )
+            if self._is_answer_provided(question=question, answer=answer):
+                continue
+            unanswered.append(
+                {
+                    "question_id": question_id,
+                    "question_key": question.get("question_key"),
+                    "question_text": question.get("question_text"),
+                    "is_required": bool(question.get("is_required")),
+                }
+            )
+        unanswered.sort(key=lambda item: (not item["is_required"], int(item["question_id"])))
+        return unanswered
+
     async def _sync_category_progress_after_responses(
         self,
         db: AsyncSession,

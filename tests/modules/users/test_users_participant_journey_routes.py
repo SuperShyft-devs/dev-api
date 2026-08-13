@@ -493,9 +493,22 @@ async def test_participant_journey_summary_includes_imported_answers_without_pro
                 status="active",
             )
         )
+    if await test_db_session.get(QuestionnaireDefinition, 9642) is None:
+        test_db_session.add(
+            QuestionnaireDefinition(
+                question_id=9642,
+                question_key="pj_lh_value",
+                question_text="LH value",
+                question_type="scale",
+                is_required=True,
+                status="active",
+            )
+        )
     await test_db_session.flush()
     if not await _has_category_question(test_db_session, category_id=9641, question_id=9641):
         test_db_session.add(QuestionnaireCategoryQuestion(category_id=9641, question_id=9641, display_order=1))
+    if not await _has_category_question(test_db_session, category_id=9641, question_id=9642):
+        test_db_session.add(QuestionnaireCategoryQuestion(category_id=9641, question_id=9642, display_order=2))
     if not await _has_package_category(test_db_session, package_id=9641, category_id=9641):
         test_db_session.add(AssessmentPackageCategory(package_id=9641, category_id=9641, display_order=1))
     test_db_session.add(
@@ -518,4 +531,7 @@ async def test_participant_journey_summary_includes_imported_answers_without_pro
     assert blood["category_of"] == "metsights"
     assert blood["has_responses"] is True
     assert blood["status"] == "incomplete"
+    unanswered = blood.get("unanswered") or []
+    assert any(q["question_key"] == "pj_lh_value" for q in unanswered)
+    assert all(q["question_key"] != "pj_haemoglobin" for q in unanswered)
 

@@ -55,6 +55,7 @@ class ParticipantJourneyService:
         *,
         assessment_instance_id: int,
         package_id: int,
+        user_id: int,
     ) -> list[dict]:
         """Package categories plus any extra progress rows, with live has_responses.
 
@@ -96,16 +97,26 @@ class ParticipantJourneyService:
                 )
                 > 0
             )
+            status = (pr.status if pr else "incomplete") or "incomplete"
+            unanswered: list[dict] = []
+            if has_resp and (status or "").strip().lower() != "complete":
+                unanswered = await self._questionnaire_service.list_unanswered_questions(
+                    db,
+                    assessment_instance_id=assessment_instance_id,
+                    category_id=cid,
+                    user_id=user_id,
+                )
             category_progress.append(
                 {
                     "category_id": cid,
                     "display_name": getattr(cat, "display_name", None) if cat else None,
                     "category_key": getattr(cat, "category_key", None) if cat else None,
                     "category_of": getattr(cat, "category_of", None) if cat else None,
-                    "status": (pr.status if pr else "incomplete") or "incomplete",
+                    "status": status,
                     "is_submitted": bool(pr.is_submitted) if pr else False,
                     "has_responses": has_resp,
                     "completed_at": _dt_iso(pr.completed_at) if pr else None,
+                    "unanswered": unanswered,
                 }
             )
         return category_progress
@@ -150,6 +161,7 @@ class ParticipantJourneyService:
                 db,
                 assessment_instance_id=instance.assessment_instance_id,
                 package_id=int(instance.package_id),
+                user_id=int(instance.user_id),
             )
 
             ihr = ihr_by_instance.get(instance.assessment_instance_id)
@@ -229,6 +241,7 @@ class ParticipantJourneyService:
             db,
             assessment_instance_id=assessment_instance_id,
             package_id=int(instance.package_id),
+            user_id=int(instance.user_id),
         )
         cat_progress_map = {int(c["category_id"]): c for c in category_progress}
 
