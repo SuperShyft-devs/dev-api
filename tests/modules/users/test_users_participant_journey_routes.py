@@ -399,3 +399,123 @@ async def test_participant_journey_detail_returns_categories_and_answer_state(as
     assert len(qs) == 1
     assert qs[0]["answer_state"] == "submitted"
     assert qs[0]["answer"] == "hello"
+
+
+@pytest.mark.asyncio
+async def test_participant_journey_summary_includes_imported_answers_without_progress_row(
+    async_client, test_db_session
+):
+    """Metsights import can write responses before a progress row exists.
+
+    The journey table must still report has_responses so admin icons are not stuck
+    on "not started".
+    """
+    test_db_session.add(User(user_id=9640, phone="96400000000", status="active", age=30))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=9640, user_id=9640, role="admin", status="active"))
+    test_db_session.add(User(user_id=9641, phone="96410000000", status="active", age=25))
+    await test_db_session.flush()
+
+    if await test_db_session.get(DiagnosticPackage, 9702) is None:
+        test_db_session.add(
+            DiagnosticPackage(
+                diagnostic_package_id=9702,
+                reference_id="REF9640",
+                package_name="Diag Package",
+                diagnostic_provider="test_provider",
+                status="active",
+                bookings_count=0,
+            )
+        )
+    if await test_db_session.get(Organization, 9641) is None:
+        test_db_session.add(
+            Organization(organization_id=9641, name="O9641", organization_type="corporate", status="active")
+        )
+    if await test_db_session.get(AssessmentPackage, 9641) is None:
+        test_db_session.add(
+            AssessmentPackage(
+                package_id=9641,
+                package_code="PJ_MS",
+                display_name="Metsights Pro",
+                assessment_type_code="2",
+                status="active",
+            )
+        )
+    await test_db_session.flush()
+    if await test_db_session.get(Engagement, 9641) is None:
+        test_db_session.add(
+            Engagement(
+                engagement_id=9641,
+                engagement_name="Camp 9641",
+                organization_id=9641,
+                engagement_code="PJ9641",
+                engagement_type="doctor",
+                assessment_package_id=9641,
+                diagnostic_package_id=9702,
+                city="Pune",
+                slot_duration=30,
+                start_date=date(2026, 1, 1),
+                end_date=date(2026, 12, 31),
+                status="active",
+            )
+        )
+    await test_db_session.flush()
+
+    inst = AssessmentInstance(
+        user_id=9641,
+        package_id=9641,
+        engagement_id=9641,
+        status="active",
+        assigned_at=datetime.now(timezone.utc),
+        completed_at=None,
+    )
+    test_db_session.add(inst)
+    await test_db_session.flush()
+
+    if await test_db_session.get(QuestionnaireCategory, 9641) is None:
+        test_db_session.add(
+            QuestionnaireCategory(
+                category_id=9641,
+                category_key="pj_ms_blood",
+                display_name="Blood Parameters",
+                category_of="metsights",
+                status="active",
+            )
+        )
+    await test_db_session.flush()
+    if await test_db_session.get(QuestionnaireDefinition, 9641) is None:
+        test_db_session.add(
+            QuestionnaireDefinition(
+                question_id=9641,
+                question_key="pj_haemoglobin",
+                question_text="Haemoglobin",
+                question_type="scale",
+                status="active",
+            )
+        )
+    await test_db_session.flush()
+    if not await _has_category_question(test_db_session, category_id=9641, question_id=9641):
+        test_db_session.add(QuestionnaireCategoryQuestion(category_id=9641, question_id=9641, display_order=1))
+    if not await _has_package_category(test_db_session, package_id=9641, category_id=9641):
+        test_db_session.add(AssessmentPackageCategory(package_id=9641, category_id=9641, display_order=1))
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=inst.assessment_instance_id,
+            question_id=9641,
+            category_ids=[9641],
+            answer={"value": 15.5, "unit": "g/dL"},
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get("/users/9641/participant-journey", headers=_auth_header(9640))
+    assert response.status_code == 200
+    instances = response.json()["data"]["instances"]
+    assert len(instances) == 1
+    progress = instances[0]["category_progress"]
+    blood = next((p for p in progress if p["category_key"] == "pj_ms_blood"), None)
+    assert blood is not None
+    assert blood["category_of"] == "metsights"
+    assert blood["has_responses"] is True
+    assert blood["status"] == "incomplete"
+

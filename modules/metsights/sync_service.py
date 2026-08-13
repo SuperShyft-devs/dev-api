@@ -2302,7 +2302,21 @@ class MetsightsSyncService:
                         await assessments_repo.update_category_progress(db, progress)
             else:
                 all_complete = False
-                if progress is not None and (progress.status or "").strip().lower() == "complete":
+                if progress is None:
+                    # Keep a progress row so admin journey / ops tables can show
+                    # Partial when some answers were imported but the category is
+                    # not fully complete.
+                    await assessments_repo.create_category_progress(
+                        db,
+                        AssessmentCategoryProgress(
+                            assessment_instance_id=int(instance.assessment_instance_id),
+                            category_id=int(cat.category_id),
+                            status="incomplete",
+                            is_submitted=False,
+                            completed_at=None,
+                        ),
+                    )
+                elif (progress.status or "").strip().lower() == "complete":
                     progress.status = "incomplete"
                     progress.completed_at = None
                     await assessments_repo.update_category_progress(db, progress)

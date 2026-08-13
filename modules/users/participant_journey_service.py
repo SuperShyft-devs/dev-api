@@ -49,6 +49,67 @@ class ParticipantJourneyService:
         if user is None:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
+    async def _build_category_progress(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        package_id: int,
+    ) -> list[dict]:
+        """Package categories plus any extra progress rows, with live has_responses.
+
+        Progress rows are only created when a category is completed (or when an
+        instance is first assigned). Categories added to a package later — or
+        Metsights imports that are only partial — would otherwise be omitted,
+        so the admin journey table would keep showing "not started".
+        """
+        progress_rows = await self._assessments_repository.list_category_progress_for_instance(
+            db, assessment_instance_id=assessment_instance_id
+        )
+        package_links = await self._assessments_repository.list_package_categories(
+            db, package_id=package_id
+        )
+        progress_by_id = {int(pr.category_id): pr for pr in progress_rows}
+
+        category_ids: list[int] = []
+        seen: set[int] = set()
+        for link in package_links:
+            cid = int(link.category_id)
+            if cid not in seen:
+                seen.add(cid)
+                category_ids.append(cid)
+        for pr in progress_rows:
+            cid = int(pr.category_id)
+            if cid not in seen:
+                seen.add(cid)
+                category_ids.append(cid)
+
+        category_progress: list[dict] = []
+        for cid in category_ids:
+            cat = await self._questionnaire_repository.get_category_by_id(db, cid)
+            pr = progress_by_id.get(cid)
+            has_resp = (
+                await self._assessments_repository.count_responses_by_category_for_instance(
+                    db,
+                    assessment_instance_id=assessment_instance_id,
+                    category_id=cid,
+                )
+                > 0
+            )
+            category_progress.append(
+                {
+                    "category_id": cid,
+                    "display_name": getattr(cat, "display_name", None) if cat else None,
+                    "category_key": getattr(cat, "category_key", None) if cat else None,
+                    "category_of": getattr(cat, "category_of", None) if cat else None,
+                    "status": (pr.status if pr else "incomplete") or "incomplete",
+                    "is_submitted": bool(pr.is_submitted) if pr else False,
+                    "has_responses": has_resp,
+                    "completed_at": _dt_iso(pr.completed_at) if pr else None,
+                }
+            )
+        return category_progress
+
     async def get_summary(
         self,
         db: AsyncSession,
@@ -73,9 +134,6 @@ class ParticipantJourneyService:
 
         instances_out: list[dict] = []
         for instance, package, engagement in rows:
-            progress_rows = await self._assessments_repository.list_category_progress_for_instance(
-                db, assessment_instance_id=instance.assessment_instance_id
-            )
             responses = await self._questionnaire_repository.list_responses_for_instance(
                 db,
                 assessment_instance_id=instance.assessment_instance_id,
@@ -88,24 +146,11 @@ class ParticipantJourneyService:
                     cat_ids_touched.add(cid)
             categories_touched = len(cat_ids_touched)
 
-            category_progress: list[dict] = []
-            for pr in progress_rows:
-                cat = await self._questionnaire_repository.get_category_by_id(db, int(pr.category_id))
-                has_resp = await self._assessments_repository.count_responses_by_category_for_instance(
-                    db, assessment_instance_id=instance.assessment_instance_id, category_id=int(pr.category_id),
-                ) > 0
-                category_progress.append(
-                    {
-                        "category_id": int(pr.category_id),
-                        "display_name": getattr(cat, "display_name", None) if cat else None,
-                        "category_key": getattr(cat, "category_key", None) if cat else None,
-                        "category_of": getattr(cat, "category_of", None) if cat else None,
-                        "status": pr.status,
-                        "is_submitted": bool(pr.is_submitted),
-                        "has_responses": has_resp,
-                        "completed_at": _dt_iso(pr.completed_at),
-                    }
-                )
+            category_progress = await self._build_category_progress(
+                db,
+                assessment_instance_id=instance.assessment_instance_id,
+                package_id=int(instance.package_id),
+            )
 
             ihr = ihr_by_instance.get(instance.assessment_instance_id)
             has_blood = bool((ihr.diagnostic_report_url or "").strip()) if ihr else False
@@ -180,27 +225,12 @@ class ParticipantJourneyService:
         for r in responses:
             resp_by_qid[int(r.question_id)] = r
 
-        progress_rows = await self._assessments_repository.list_category_progress_for_instance(
-            db, assessment_instance_id=assessment_instance_id
+        category_progress = await self._build_category_progress(
+            db,
+            assessment_instance_id=assessment_instance_id,
+            package_id=int(instance.package_id),
         )
-        category_progress: list[dict] = []
-        for pr in progress_rows:
-            cat = await self._questionnaire_repository.get_category_by_id(db, int(pr.category_id))
-            has_resp = await self._assessments_repository.count_responses_by_category_for_instance(
-                db, assessment_instance_id=assessment_instance_id, category_id=int(pr.category_id),
-            ) > 0
-            category_progress.append(
-                {
-                    "category_id": int(pr.category_id),
-                    "display_name": getattr(cat, "display_name", None) if cat else None,
-                    "category_key": getattr(cat, "category_key", None) if cat else None,
-                    "category_of": getattr(cat, "category_of", None) if cat else None,
-                    "status": pr.status,
-                    "is_submitted": bool(pr.is_submitted),
-                    "has_responses": has_resp,
-                    "completed_at": _dt_iso(pr.completed_at),
-                }
-            )
+        cat_progress_map = {int(c["category_id"]): c for c in category_progress}
 
         ordered_category_ids = await self._assessments_repository.get_assigned_category_ids_for_package_ordered(
             db, package_id=instance.package_id
@@ -212,10 +242,8 @@ class ParticipantJourneyService:
             questions = await self._questionnaire_service.list_category_questions_for_user(
                 db, category_id=category_id
             )
-            # Determine category-level is_submitted from progress
-            cat_progress_map = {int(pr.category_id): pr for pr in progress_rows}
             cat_pr = cat_progress_map.get(category_id)
-            cat_is_submitted = bool(cat_pr.is_submitted) if cat_pr else False
+            cat_is_submitted = bool(cat_pr["is_submitted"]) if cat_pr else False
 
             questions_out: list[dict] = []
             for q in questions:
