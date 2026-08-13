@@ -5,7 +5,7 @@ from __future__ import annotations
 import itertools
 import json
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import and_, case, delete, extract, func, select
@@ -17,7 +17,12 @@ from modules.assessments.models import (
     AssessmentPackage,
     AssessmentPackageCategory,
 )
-from modules.engagements.models import Engagement, EngagementParticipant
+from modules.engagements.models import (
+    AutoNotificationEvent,
+    Engagement,
+    EngagementNotification,
+    EngagementParticipant,
+)
 from modules.experts.models import ConsultationBooking, ExpertTypeModel
 from modules.organizations.models import Organization
 from modules.questionnaire.models import (
@@ -34,11 +39,14 @@ from modules.reports.camp_report_section_builders import (
     metabolic_risk_bucket,
     resolve_user_age,
 )
+from modules.notifications.expire_stale import DEFAULT_PENDING_TIMEOUT_HOURS
+from modules.notifications.models import Notification
 from modules.reports.models import CampReport, IndividualHealthReport
 from modules.users.models import User
 
 _MALE_GENDERS = ("male", "m", "1")
 _FEMALE_GENDERS = ("female", "f", "2")
+_METSIGHTS_PRO_BASIC_TYPE_CODES = ("1", "2")
 _METSIGHTS_CATEGORY_KEYS = (
     "physical-measurement",
     "diet-lifestyle-parameters",
@@ -108,6 +116,42 @@ def _dedupe_enrolled_assessment_contexts(
         if new_has_blood and not existing_has_blood:
             by_id[aid] = ctx
     return list(by_id.values())
+
+
+@dataclass
+class CampParticipantEnrichment:
+    """Enriched camp participant fields loaded in batch for one page."""
+
+    questionnaires: dict[str, bool]
+    blood_report_generated: bool
+    bio_ai_report_generated: bool
+    blood_report_sent: bool
+    bio_ai_report_sent: bool
+    consultations: bool
+
+
+def _url_present(value: str | None) -> bool:
+    return bool(str(value).strip() if value else "")
+
+
+def _notification_user_ids(raw_user: Any) -> set[int]:
+    if not isinstance(raw_user, dict):
+        return set()
+    ids = raw_user.get("user_ids")
+    if not isinstance(ids, list):
+        return set()
+    return {int(uid) for uid in ids if uid is not None}
+
+
+def _notification_counts_as_sent(status: str | None, dispatched_at: datetime | None) -> bool:
+    normalized = (status or "").strip().lower()
+    if normalized == "sent":
+        return True
+    if normalized != "pending" or dispatched_at is None:
+        return False
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=DEFAULT_PENDING_TIMEOUT_HOURS)
+    dispatched = dispatched_at if dispatched_at.tzinfo else dispatched_at.replace(tzinfo=timezone.utc)
+    return dispatched >= cutoff
 
 
 class CampReportsRepository:
@@ -1930,6 +1974,8 @@ class CampReportsRepository:
                 User.first_name,
                 User.last_name,
                 User.phone,
+                User.email,
+                User.age,
                 User.gender,
                 EngagementParticipant.participant_blood_group,
                 EngagementParticipant.participant_department,
@@ -1955,6 +2001,259 @@ class CampReportsRepository:
 
         result = await db.execute(query)
         return list(result.all())
+
+    async def enrich_camp_participants_page(
+        self,
+        db: AsyncSession,
+        *,
+        rows: list[tuple],
+    ) -> dict[int, CampParticipantEnrichment]:
+        """Batch-load questionnaires, reports, notifications, and consultations for a page."""
+        if not rows:
+            return {}
+
+        participant_ids = [int(row[0]) for row in rows]
+        user_ids = [int(row[2]) for row in rows]
+        engagement_ids = list({int(row[1]) for row in rows})
+        enrollment_keys = {(int(row[2]), int(row[1])) for row in rows}
+
+        default = CampParticipantEnrichment(
+            questionnaires={},
+            blood_report_generated=False,
+            bio_ai_report_generated=False,
+            blood_report_sent=False,
+            bio_ai_report_sent=False,
+            consultations=False,
+        )
+        by_participant_id = {
+            pid: CampParticipantEnrichment(
+                questionnaires=dict(default.questionnaires),
+                blood_report_generated=default.blood_report_generated,
+                bio_ai_report_generated=default.bio_ai_report_generated,
+                blood_report_sent=default.blood_report_sent,
+                bio_ai_report_sent=default.bio_ai_report_sent,
+                consultations=default.consultations,
+            )
+            for pid in participant_ids
+        }
+        participant_by_key = {
+            (int(row[2]), int(row[1])): int(row[0])
+            for row in rows
+        }
+
+        consultation_result = await db.execute(
+            select(EngagementParticipant.engagement_participant_id)
+            .select_from(EngagementParticipant)
+            .join(
+                ConsultationBooking,
+                ConsultationBooking.engagement_participant_id
+                == EngagementParticipant.engagement_participant_id,
+            )
+            .where(
+                EngagementParticipant.engagement_participant_id.in_(participant_ids),
+                ConsultationBooking.want.is_(True),
+            )
+        )
+        for (participant_id,) in consultation_result.all():
+            by_participant_id[int(participant_id)].consultations = True
+
+        ihr_result = await db.execute(
+            select(
+                IndividualHealthReport.user_id,
+                IndividualHealthReport.engagement_id,
+                IndividualHealthReport.diagnostic_report_url,
+                IndividualHealthReport.report_url,
+            ).where(
+                IndividualHealthReport.user_id.in_(user_ids),
+                IndividualHealthReport.engagement_id.in_(engagement_ids),
+            )
+        )
+        blood_generated: set[tuple[int, int]] = set()
+        bio_generated: set[tuple[int, int]] = set()
+        for user_id, engagement_id, diagnostic_url, report_url in ihr_result.all():
+            key = (int(user_id), int(engagement_id))
+            if key not in enrollment_keys:
+                continue
+            if _url_present(diagnostic_url):
+                blood_generated.add(key)
+            if _url_present(report_url):
+                bio_generated.add(key)
+
+        for key, participant_id in participant_by_key.items():
+            if key in blood_generated:
+                by_participant_id[participant_id].blood_report_generated = True
+            if key in bio_generated:
+                by_participant_id[participant_id].bio_ai_report_generated = True
+
+        blood_services_by_engagement: dict[int, list[str]] = {}
+        bio_services_by_engagement: dict[int, list[str]] = {}
+        if engagement_ids:
+            event_result = await db.execute(
+                select(
+                    EngagementNotification.engagement_id,
+                    AutoNotificationEvent.event_code,
+                    EngagementNotification.notification_services,
+                )
+                .join(
+                    AutoNotificationEvent,
+                    AutoNotificationEvent.id == EngagementNotification.notification_event_id,
+                )
+                .where(
+                    EngagementNotification.engagement_id.in_(engagement_ids),
+                    AutoNotificationEvent.event_code.in_(("blood_report_ready", "bioai_report_ready")),
+                )
+            )
+            all_service_keys: set[str] = set()
+            for engagement_id, event_code, services in event_result.all():
+                keys = [str(sk).strip() for sk in (services or []) if sk and str(sk).strip()]
+                if not keys:
+                    continue
+                all_service_keys.update(keys)
+                eid = int(engagement_id)
+                if event_code == "blood_report_ready":
+                    blood_services_by_engagement.setdefault(eid, []).extend(keys)
+                elif event_code == "bioai_report_ready":
+                    bio_services_by_engagement.setdefault(eid, []).extend(keys)
+
+            if all_service_keys:
+                notification_result = await db.execute(
+                    select(
+                        Notification.engagement_id,
+                        Notification.service_key,
+                        Notification.status,
+                        Notification.dispatched_at,
+                        Notification.user,
+                    ).where(
+                        Notification.engagement_id.in_(engagement_ids),
+                        Notification.service_key.in_(list(all_service_keys)),
+                    )
+                )
+                sent_pairs: set[tuple[int, int, str]] = set()
+                for engagement_id, service_key, status, dispatched_at, user_payload in notification_result.all():
+                    if not _notification_counts_as_sent(status, dispatched_at):
+                        continue
+                    eid = int(engagement_id)
+                    sk = str(service_key).strip()
+                    for uid in _notification_user_ids(user_payload):
+                        sent_pairs.add((uid, eid, sk))
+
+                for row in rows:
+                    participant_id = int(row[0])
+                    user_id = int(row[2])
+                    engagement_id = int(row[1])
+                    blood_keys = blood_services_by_engagement.get(engagement_id, [])
+                    bio_keys = bio_services_by_engagement.get(engagement_id, [])
+                    if any((user_id, engagement_id, sk) in sent_pairs for sk in blood_keys):
+                        by_participant_id[participant_id].blood_report_sent = True
+                    if any((user_id, engagement_id, sk) in sent_pairs for sk in bio_keys):
+                        by_participant_id[participant_id].bio_ai_report_sent = True
+
+        if enrollment_keys:
+            ranked_primary = (
+                select(
+                    AssessmentInstance.user_id,
+                    AssessmentInstance.engagement_id,
+                    AssessmentInstance.assessment_instance_id,
+                    AssessmentInstance.package_id,
+                    func.row_number()
+                    .over(
+                        partition_by=(
+                            AssessmentInstance.user_id,
+                            AssessmentInstance.engagement_id,
+                        ),
+                        order_by=AssessmentInstance.assessment_instance_id.asc(),
+                    )
+                    .label("rn"),
+                )
+                .select_from(AssessmentInstance)
+                .join(
+                    AssessmentPackage,
+                    AssessmentPackage.package_id == AssessmentInstance.package_id,
+                )
+                .where(
+                    AssessmentInstance.user_id.in_(user_ids),
+                    AssessmentInstance.engagement_id.in_(engagement_ids),
+                    AssessmentPackage.assessment_type_code.in_(_METSIGHTS_PRO_BASIC_TYPE_CODES),
+                )
+            ).subquery()
+
+            primary_result = await db.execute(
+                select(
+                    ranked_primary.c.user_id,
+                    ranked_primary.c.engagement_id,
+                    ranked_primary.c.assessment_instance_id,
+                    ranked_primary.c.package_id,
+                ).where(ranked_primary.c.rn == 1)
+            )
+            primary_by_key: dict[tuple[int, int], tuple[int, int]] = {}
+            instance_ids: list[int] = []
+            package_ids: set[int] = set()
+            for user_id, engagement_id, instance_id, package_id in primary_result.all():
+                key = (int(user_id), int(engagement_id))
+                if key not in enrollment_keys:
+                    continue
+                iid = int(instance_id)
+                pid = int(package_id)
+                primary_by_key[key] = (iid, pid)
+                instance_ids.append(iid)
+                package_ids.add(pid)
+
+            if instance_ids and package_ids:
+                pkg_cat_result = await db.execute(
+                    select(
+                        AssessmentPackageCategory.package_id,
+                        QuestionnaireCategory.category_key,
+                    )
+                    .join(
+                        QuestionnaireCategory,
+                        QuestionnaireCategory.category_id == AssessmentPackageCategory.category_id,
+                    )
+                    .where(
+                        AssessmentPackageCategory.package_id.in_(list(package_ids)),
+                        QuestionnaireCategory.category_of == "metsights",
+                    )
+                )
+                categories_by_package: dict[int, list[str]] = {}
+                for package_id, category_key in pkg_cat_result.all():
+                    if category_key is None:
+                        continue
+                    categories_by_package.setdefault(int(package_id), []).append(str(category_key))
+
+                progress_result = await db.execute(
+                    select(
+                        AssessmentCategoryProgress.assessment_instance_id,
+                        QuestionnaireCategory.category_key,
+                        AssessmentCategoryProgress.status,
+                    )
+                    .join(
+                        QuestionnaireCategory,
+                        QuestionnaireCategory.category_id == AssessmentCategoryProgress.category_id,
+                    )
+                    .where(
+                        AssessmentCategoryProgress.assessment_instance_id.in_(instance_ids),
+                        QuestionnaireCategory.category_of == "metsights",
+                    )
+                )
+                progress_by_instance: dict[int, dict[str, bool]] = {}
+                for instance_id, category_key, status in progress_result.all():
+                    if category_key is None:
+                        continue
+                    progress_by_instance.setdefault(int(instance_id), {})[
+                        str(category_key)
+                    ] = (status or "").strip().lower() == "complete"
+
+                for key, participant_id in participant_by_key.items():
+                    primary = primary_by_key.get(key)
+                    if primary is None:
+                        continue
+                    instance_id, package_id = primary
+                    category_keys = categories_by_package.get(package_id, [])
+                    progress = progress_by_instance.get(instance_id, {})
+                    by_participant_id[participant_id].questionnaires = {
+                        ck: bool(progress.get(ck, False)) for ck in category_keys
+                    }
+
+        return by_participant_id
 
     async def list_enrolled_assessment_contexts(
         self,

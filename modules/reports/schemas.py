@@ -250,6 +250,13 @@ class CampReportEstimateResponse(BaseModel):
     all_allowed: bool
 
 
+class CampParticipantReports(BaseModel):
+    blood_report_generated: bool = False
+    blood_report_sent: bool = False
+    bio_ai_report_generated: bool = False
+    bio_ai_report_sent: bool = False
+
+
 class CampParticipantResponse(BaseModel):
     engagement_participant_id: int
     engagement_id: int
@@ -257,6 +264,11 @@ class CampParticipantResponse(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     phone: str | None = None
+    email: str | None = None
     gender: str | None = None
+    age: int | None = None
     participant_blood_group: str | None = None
     participant_department: str | None = None
+    questionnaires: dict[str, bool] = Field(default_factory=dict)
+    reports: CampParticipantReports = Field(default_factory=CampParticipantReports)
+    consultations: bool = False

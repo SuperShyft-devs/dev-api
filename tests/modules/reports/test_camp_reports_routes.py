@@ -1966,6 +1966,7 @@ async def _seed_camp_participants_with_profile_fields(
             gender="female",
             age=30,
             phone="960010000000",
+            email="jane.doe@example.com",
             status="active",
         )
     )
@@ -2043,10 +2044,295 @@ async def test_list_camp_participants_includes_profile_fields(async_client, test
     row = response.json()["data"][0]
     assert row["first_name"] == "Jane"
     assert row["last_name"] == "Doe"
-    assert row["phone"] == "960010000000"
+    assert row["phone"] == "********0000"
+    assert row["email"] == "****e.doe@example.com"
+    assert row["age"] == 30
     assert row["gender"] == "female"
     assert row["participant_blood_group"] == "O+"
     assert row["participant_department"] == "engineering"
+    assert row["questionnaires"] == {}
+    assert row["reports"] == {
+        "blood_report_generated": False,
+        "blood_report_sent": False,
+        "bio_ai_report_generated": False,
+        "bio_ai_report_sent": False,
+    }
+    assert row["consultations"] is False
+
+
+async def _seed_camp_participants_enriched(test_db_session, *, organization_id: int = 9701, engagement_id: int = 9701):
+    from datetime import datetime, timezone
+
+    from sqlalchemy import text
+
+    from modules.assessments.models import (
+        AssessmentCategoryProgress,
+        AssessmentInstance,
+        AssessmentPackage,
+        AssessmentPackageCategory,
+    )
+    from modules.engagements.models import AutoNotificationEvent, Engagement, EngagementNotification
+    from modules.notifications.models import Notification
+    from modules.questionnaire.models import QuestionnaireCategory
+    from modules.reports.models import IndividualHealthReport
+
+    camp_no, _ = await _seed_camp(
+        test_db_session,
+        organization_id=organization_id,
+        engagement_id=engagement_id,
+    )
+    start = date(2026, 6, 23)
+    pkg_id = organization_id
+    cat_complete_id = organization_id + 1
+    cat_incomplete_id = organization_id + 2
+    user_id = organization_id + 10
+    participant_id = organization_id + 20
+    assessment_id = organization_id + 30
+    blood_service = f"camp-blood-{organization_id}"
+    bio_service = f"camp-bio-{organization_id}"
+
+    engagement = (
+        await test_db_session.execute(select(Engagement).where(Engagement.engagement_id == engagement_id))
+    ).scalar_one()
+    engagement.assessment_package_id = pkg_id
+
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pkg_id,
+            package_code=f"PKG-{organization_id}",
+            display_name=f"Package {organization_id}",
+            assessment_type_code="2",
+            status="active",
+        )
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            QuestionnaireCategory(
+                category_id=cat_complete_id,
+                category_key="physical-measurement",
+                display_name="Physical Measurement",
+                category_of="metsights",
+                status="active",
+            ),
+            QuestionnaireCategory(
+                category_id=cat_incomplete_id,
+                category_key="vitals",
+                display_name="Vitals",
+                category_of="metsights",
+                status="active",
+            ),
+        ]
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            AssessmentPackageCategory(
+                id=organization_id + 100,
+                package_id=pkg_id,
+                category_id=cat_complete_id,
+                display_order=1,
+            ),
+            AssessmentPackageCategory(
+                id=organization_id + 101,
+                package_id=pkg_id,
+                category_id=cat_incomplete_id,
+                display_order=2,
+            ),
+        ]
+    )
+
+    test_db_session.add(
+        User(
+            user_id=user_id,
+            first_name="Kiran",
+            last_name="Amrute",
+            gender="male",
+            age=32,
+            phone="9867458059",
+            email="pratheek.fitnastic@gmail.com",
+            status="active",
+        )
+    )
+    await test_db_session.flush()
+
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=participant_id,
+            engagement_id=engagement_id,
+            user_id=user_id,
+            engagement_date=start,
+            slot_start_time=time(10, 0),
+            participant_department="hr_admin",
+            participant_blood_group="AB+",
+        )
+    )
+    await test_db_session.flush()
+
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=assessment_id,
+            user_id=user_id,
+            package_id=pkg_id,
+            engagement_id=engagement_id,
+            status="active",
+            metsights_record_id=f"REC-{assessment_id}",
+            assigned_at=datetime.now(timezone.utc),
+        )
+    )
+    await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            AssessmentCategoryProgress(
+                id=organization_id + 200,
+                assessment_instance_id=assessment_id,
+                category_id=cat_complete_id,
+                status="complete",
+                is_submitted=True,
+            ),
+            AssessmentCategoryProgress(
+                id=organization_id + 201,
+                assessment_instance_id=assessment_id,
+                category_id=cat_incomplete_id,
+                status="incomplete",
+                is_submitted=False,
+            ),
+        ]
+    )
+
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=organization_id + 300,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=assessment_id,
+            diagnostic_report_url="https://example.com/blood.pdf",
+            report_url="https://example.com/bio-ai.pdf",
+        )
+    )
+
+    test_db_session.add(
+        ConsultationBooking(
+            consultation_id=organization_id + 400,
+            engagement_participant_id=participant_id,
+            expert_type="doctor",
+            want=True,
+        )
+    )
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES (:blood_sk, :blood_sk, 'email', 'test-webhook', true, true, false, false), "
+            "(:bio_sk, :bio_sk, 'email', 'test-webhook', true, false, true, false) "
+            "ON CONFLICT (service_key) DO NOTHING"
+        ),
+        {"blood_sk": blood_service, "bio_sk": bio_service},
+    )
+
+    blood_event = (
+        await test_db_session.execute(
+            select(AutoNotificationEvent).where(AutoNotificationEvent.event_code == "blood_report_ready")
+        )
+    ).scalar_one_or_none()
+    if blood_event is None:
+        blood_event = AutoNotificationEvent(
+            id=organization_id + 500,
+            engagement_type_ids=[1],
+            event_code="blood_report_ready",
+            display_name="Blood Report Ready",
+        )
+        test_db_session.add(blood_event)
+        await test_db_session.flush()
+
+    bio_event = (
+        await test_db_session.execute(
+            select(AutoNotificationEvent).where(AutoNotificationEvent.event_code == "bioai_report_ready")
+        )
+    ).scalar_one_or_none()
+    if bio_event is None:
+        bio_event = AutoNotificationEvent(
+            id=organization_id + 501,
+            engagement_type_ids=[1],
+            event_code="bioai_report_ready",
+            display_name="Bio AI Report Ready",
+        )
+        test_db_session.add(bio_event)
+        await test_db_session.flush()
+
+    test_db_session.add_all(
+        [
+            EngagementNotification(
+                id=organization_id + 600,
+                engagement_id=engagement_id,
+                notification_event_id=blood_event.id,
+                notification_services=[blood_service],
+            ),
+            EngagementNotification(
+                id=organization_id + 601,
+                engagement_id=engagement_id,
+                notification_event_id=bio_event.id,
+                notification_services=[bio_service],
+            ),
+        ]
+    )
+
+    test_db_session.add_all(
+        [
+            Notification(
+                service_key=blood_service,
+                status="sent",
+                channel="email",
+                user={"user_ids": [user_id]},
+                engagement_id=engagement_id,
+                message="blood report sent",
+                dispatched_at=datetime.now(timezone.utc),
+            ),
+            Notification(
+                service_key=bio_service,
+                status="sent",
+                channel="email",
+                user={"user_ids": [user_id]},
+                engagement_id=engagement_id,
+                message="bio ai report sent",
+                dispatched_at=datetime.now(timezone.utc),
+            ),
+        ]
+    )
+    await test_db_session.commit()
+    return camp_no, user_id
+
+
+@pytest.mark.asyncio
+async def test_list_camp_participants_enriched_fields(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7906, employee_id=215)
+    camp_no, user_id = await _seed_camp_participants_enriched(test_db_session)
+    headers = _auth_header(7906)
+
+    response = await async_client.get(f"/reports/camps/{camp_no}/participants", headers=headers)
+    assert response.status_code == 200
+    row = next(item for item in response.json()["data"] if item["user_id"] == user_id)
+
+    assert row["first_name"] == "Kiran"
+    assert row["phone"] == "******8059"
+    assert row["email"] == "*************stic@gmail.com"
+    assert row["age"] == 32
+    assert row["participant_department"] == "hr_admin"
+    assert row["questionnaires"] == {
+        "physical-measurement": True,
+        "vitals": False,
+    }
+    assert row["reports"] == {
+        "blood_report_generated": True,
+        "blood_report_sent": True,
+        "bio_ai_report_generated": True,
+        "bio_ai_report_sent": True,
+    }
+    assert row["consultations"] is True
 
 
 @pytest.mark.asyncio

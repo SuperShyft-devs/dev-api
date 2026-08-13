@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.masking import mask_email, mask_phone
 from core.config import settings
 from core.exceptions import AppError
 from modules.audit.service import AuditService
@@ -57,7 +58,11 @@ from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.assessments.repository import AssessmentsRepository
 from modules.diagnostics.repository import DiagnosticsRepository
 from modules.reports.camp_report_sections_repository import CampReportSectionsRepository
-from modules.reports.camp_reports_repository import CampReportsRepository, EnrolledAssessmentContext
+from modules.reports.camp_reports_repository import (
+    CampParticipantEnrichment,
+    CampReportsRepository,
+    EnrolledAssessmentContext,
+)
 from modules.reports.models import CampReport, IndividualHealthReport
 from modules.reports.service import BLOOD_DATA_UNAVAILABLE_ERROR_CODES, ReportsService
 from db.session import AsyncSessionLocal
@@ -590,7 +595,11 @@ class CampReportsService:
         return [self._serialize_camp_report(row) for row in rows]
 
     @staticmethod
-    def _camp_participant_to_dict(row: tuple) -> dict:
+    def _camp_participant_to_dict(
+        row: tuple,
+        *,
+        enrichment: CampParticipantEnrichment | None = None,
+    ) -> dict:
         (
             engagement_participant_id,
             engagement_id,
@@ -598,20 +607,34 @@ class CampReportsService:
             first_name,
             last_name,
             phone,
+            email,
+            age,
             gender,
             participant_blood_group,
             participant_department,
         ) = row
+        extra = enrichment
+        reports = {
+            "blood_report_generated": bool(extra.blood_report_generated) if extra else False,
+            "blood_report_sent": bool(extra.blood_report_sent) if extra else False,
+            "bio_ai_report_generated": bool(extra.bio_ai_report_generated) if extra else False,
+            "bio_ai_report_sent": bool(extra.bio_ai_report_sent) if extra else False,
+        }
         return {
             "engagement_participant_id": engagement_participant_id,
             "engagement_id": engagement_id,
             "user_id": user_id,
             "first_name": first_name,
             "last_name": last_name,
-            "phone": phone,
+            "phone": mask_phone(phone),
+            "email": mask_email(email),
             "gender": gender,
+            "age": age,
             "participant_blood_group": participant_blood_group,
             "participant_department": participant_department,
+            "questionnaires": dict(extra.questionnaires) if extra else {},
+            "reports": reports,
+            "consultations": bool(extra.consultations) if extra else False,
         }
 
     async def list_camp_participants(
@@ -661,7 +684,17 @@ class CampReportsService:
             department=department,
             city=city,
         )
-        return [self._camp_participant_to_dict(row) for row in rows], total
+        enrichment_by_participant = await self._repository.enrich_camp_participants_page(
+            db,
+            rows=rows,
+        )
+        return [
+            self._camp_participant_to_dict(
+                row,
+                enrichment=enrichment_by_participant.get(int(row[0])),
+            )
+            for row in rows
+        ], total
 
     async def _get_camp_report_row(
         self,
