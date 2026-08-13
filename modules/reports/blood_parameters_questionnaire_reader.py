@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.seed.blood_parameters_registry import (
@@ -51,7 +51,14 @@ class BloodParametersQuestionnaireReader:
                 QuestionnaireDefinition.question_id == QuestionnaireResponse.question_id,
             )
             .where(QuestionnaireResponse.assessment_instance_id == assessment_instance_id)
-            .where(QuestionnaireResponse.category_id.in_(category_ids))
+            .where(
+                or_(
+                    *(
+                        QuestionnaireResponse.category_ids.any(cid)
+                        for cid in category_ids
+                    )
+                )
+            )
         )
         rows = result.all()
         if not rows:

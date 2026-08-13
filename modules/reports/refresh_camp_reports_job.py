@@ -157,7 +157,12 @@ async def refresh_camp_reports(
 
     for camp, rows in eligible:
         for row in rows:
-            scope = _scope_label(department=row.department, city=row.city)
+            # Snapshot ORM attrs before refresh/rollback so except never lazy-loads
+            # expired attributes (MissingGreenlet on asyncpg).
+            report_id = int(row.report_id)
+            department = row.department
+            city = row.city
+            scope = _scope_label(department=department, city=city)
             for section_key in section_keys:
                 step_index = done + 1
                 if on_event is not None:
@@ -167,7 +172,7 @@ async def refresh_camp_reports(
                             "index": step_index,
                             "total": total,
                             "camp_no": camp,
-                            "report_id": row.report_id,
+                            "report_id": report_id,
                             "scope": scope,
                             "section": section_key,
                             "dry_run": dry_run,
@@ -179,7 +184,7 @@ async def refresh_camp_reports(
                     done += 1
                     detail = {
                         "camp_no": camp,
-                        "report_id": row.report_id,
+                        "report_id": report_id,
                         "scope": scope,
                         "section": section_key,
                         "action": "would_refresh",
@@ -203,14 +208,14 @@ async def refresh_camp_reports(
                         db,
                         camp_no=camp,
                         section=section_key,
-                        department=row.department,
-                        city=row.city,
+                        department=department,
+                        city=city,
                     )
                     await db.commit()
                     refreshed += 1
                     detail = {
                         "camp_no": camp,
-                        "report_id": row.report_id,
+                        "report_id": report_id,
                         "scope": scope,
                         "section": section_key,
                         "action": "refreshed",
@@ -239,7 +244,7 @@ async def refresh_camp_reports(
                     )
                     error_entry = {
                         "camp_no": camp,
-                        "report_id": row.report_id,
+                        "report_id": report_id,
                         "scope": scope,
                         "section": section_key,
                         "reason": reason,

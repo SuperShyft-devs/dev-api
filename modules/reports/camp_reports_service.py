@@ -1446,10 +1446,17 @@ class CampReportsService:
                 return [], [], []
             package = await session.get(AssessmentPackage, ai.package_id) if ai.package_id else None
             engagement = await session.get(Engagement, ai.engagement_id) if ai.engagement_id else None
+            # Multiple IHR rows per assessment are allowed; prefer blood, then latest.
             ihr_result = await session.execute(
-                select(IndividualHealthReport).where(
+                select(IndividualHealthReport)
+                .where(
                     IndividualHealthReport.assessment_instance_id == assessment_instance_id
                 )
+                .order_by(
+                    IndividualHealthReport.blood_parameters.isnot(None).desc(),
+                    IndividualHealthReport.report_id.desc(),
+                )
+                .limit(1)
             )
             individual_report = ihr_result.scalar_one_or_none()
             ctx = EnrolledAssessmentContext(
