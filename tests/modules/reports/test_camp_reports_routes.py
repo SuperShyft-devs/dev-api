@@ -287,8 +287,20 @@ async def test_delete_camp_reports(async_client, test_db_session):
         headers=headers,
     )
     assert init_dept.status_code == 201
+    init_city = await async_client.post(f"/reports/camps/{camp_no}/BLR/init", headers=headers)
+    assert init_city.status_code == 201
+    init_city_dept = await async_client.post(
+        f"/reports/camps/{camp_no}/BLR/department/sales/init",
+        headers=headers,
+    )
+    assert init_city_dept.status_code == 201
 
-    # DELETE /reports/camps/{camp_no} removes overall + all department reports
+    seeded = (
+        await test_db_session.execute(select(CampReport).where(CampReport.camp_no == camp_no))
+    ).scalars().all()
+    assert len(seeded) == 4
+
+    # DELETE /reports/camps/{camp_no} removes overall, department, city, and city×department
     delete_all = await async_client.delete(f"/reports/camps/{camp_no}", headers=headers)
     assert delete_all.status_code == 200
 

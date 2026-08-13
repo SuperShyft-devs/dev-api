@@ -491,7 +491,7 @@ class CampReportsService:
     ) -> None:
         ensure_internal_employee(employee)
 
-        # Delete overall + every department report for this camp_no.
+        # Delete all scopes for this camp_no: overall, department, city, and city×department.
         deleted = await self._repository.delete_all_for_camp_no(db, camp_no=camp_no)
         if deleted == 0:
             raise AppError(
