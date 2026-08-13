@@ -104,13 +104,13 @@ async def get_engagement_by_code(
     row = await engagements_service.get_engagement_by_code_public(db, engagement_code=engagement_code)
     if row is None:
         raise AppError(status_code=404, error_code="NOT_FOUND", message="Engagement not found")
-    engagement, org_name, org_logo = row
+    engagement, org_name, org_logo, engagement_type_code = row
     return success_response({
         "engagement_name": engagement.engagement_name,
         "organization_name": org_name,
         "organization_logo_url": org_logo,
         "engagement_code": engagement.engagement_code,
-        "engagement_type": engagement.engagement_type.value if engagement.engagement_type else None,
+        "engagement_type": engagement_type_code,
         "slot_duration": engagement.slot_duration,
         "status": engagement.status,
         "consultations": engagement.consultations,

@@ -138,8 +138,10 @@ class EngagementsRepository:
                 Engagement,
                 Organization.name.label("organization_name"),
                 Organization.logo.label("organization_logo_url"),
+                EngagementType.code.label("engagement_type_code"),
             )
             .outerjoin(Organization, Engagement.organization_id == Organization.organization_id)
+            .outerjoin(EngagementType, Engagement.engagement_type == EngagementType.id)
             .where(Engagement.engagement_code == engagement_code)
         )
         result = await db.execute(query)
