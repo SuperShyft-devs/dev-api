@@ -55,7 +55,7 @@ async def _seed_camp(test_db_session, *, organization_id: int = 9101, engagement
             organization_id=organization_id,
             camp_no=camp_no,
             engagement_code="CAMPREP1",
-            engagement_type="bio_ai",
+            engagement_type=None,
             assessment_package_id=None,
             diagnostic_package_id=None,
             city="BLR",
@@ -4095,4 +4095,217 @@ async def test_estimate_camp_report_invalid_action(async_client, test_db_session
     )
     assert response.status_code == 400
     assert response.json()["error_code"] == "INVALID_INPUT"
+
+
+def _overall_risk_section_payload(*, total_employees: int = 4) -> dict:
+    return {
+        "data": {
+            "group": ["optimal", "low_risk", "increased_risk", "high_risk"],
+            "count": [1, 1, 1, 1] if total_employees == 4 else [1, 1, 0, 0],
+            "percent": [25.0, 25.0, 25.0, 25.0] if total_employees == 4 else [50.0, 50.0, 0.0, 0.0],
+            "total_employees": total_employees,
+            "elevated_metabolic_score": 50.0 if total_employees == 4 else 0.0,
+        },
+        "name": "Overall Risk Score",
+        "description": "Metabolic score distribution across risk bands",
+    }
+
+
+async def _seed_enrichable_camp_report(
+    test_db_session,
+    *,
+    organization_id: int,
+    engagement_id: int,
+    department: str | None = None,
+    city: str | None = None,
+    total_employees: int = 4,
+) -> tuple[int, int, dict]:
+    """Seed org/camp + stored report JSON with overall_risk_score (no file I/O)."""
+    await _seed_overall_risk_score_section(test_db_session, report_sections=organization_id)
+    camp_no, org_id = await _seed_camp(
+        test_db_session,
+        organization_id=organization_id,
+        engagement_id=engagement_id,
+    )
+    section = _overall_risk_section_payload(total_employees=total_employees)
+    report = {
+        "meta": {
+            "camp_name": "Enrich Test Camp",
+            "summary_available": True,
+            "refreshed_at": None,
+            "next_refresh": None,
+            "camp_start_date": "2026-06-23",
+            "camp_end_date": "2026-06-25",
+        },
+        "overall_risk_score": section,
+        "kpis": {"data": {"male_enrolled": 2, "female_enrolled": 2}, "name": "KPIs", "description": None},
+    }
+    row = CampReport(
+        report=report,
+        camp_no=camp_no,
+        department=department,
+        city=city,
+        organization_id=org_id,
+    )
+    test_db_session.add(row)
+    await test_db_session.commit()
+    await test_db_session.refresh(row)
+    return camp_no, row.report_id, section["data"]
+
+
+def _assert_enriched_overall_risk_section(section: dict, *, snapshot_data: dict) -> None:
+    assert section["name"] == "Overall Risk Score"
+    assert section["description"] == "Metabolic score distribution across risk bands"
+    assert section["data"] == snapshot_data
+    intel = section.get("intelligence")
+    assert isinstance(intel, dict)
+    assert set(intel.keys()) == {"tone", "observation", "explanation", "recommendation"}
+    assert intel["tone"]
+    assert intel["observation"]
+    assert intel["explanation"]
+    assert intel["recommendation"]
+
+
+@pytest.mark.asyncio
+async def test_enrich_camp_report_section(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8811, employee_id=811)
+    camp_no, report_id, snapshot_data = await _seed_enrichable_camp_report(
+        test_db_session,
+        organization_id=9811,
+        engagement_id=9811,
+        total_employees=4,
+    )
+    headers = _auth_header(8811)
+
+    enrich = await async_client.put(
+        f"/reports/camps/{camp_no}/enrich",
+        headers=headers,
+        json={"section": "overall_risk_score"},
+    )
+    assert enrich.status_code == 200
+    section = enrich.json()["data"]
+    _assert_enriched_overall_risk_section(section, snapshot_data=snapshot_data)
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.report["overall_risk_score"]["data"] == snapshot_data
+    assert "intelligence" not in row.report["overall_risk_score"]
+
+
+@pytest.mark.asyncio
+async def test_enrich_department_camp_report_section(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8812, employee_id=812)
+    camp_no, report_id, snapshot_data = await _seed_enrichable_camp_report(
+        test_db_session,
+        organization_id=9812,
+        engagement_id=9812,
+        department="sales",
+        total_employees=2,
+    )
+    headers = _auth_header(8812)
+
+    enrich = await async_client.put(
+        f"/reports/camps/{camp_no}/departments/sales/enrich",
+        headers=headers,
+        json={"section": "overall_risk_score"},
+    )
+    assert enrich.status_code == 200
+    section = enrich.json()["data"]
+    _assert_enriched_overall_risk_section(section, snapshot_data=snapshot_data)
+    assert section["data"]["total_employees"] == 2
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.department == "sales"
+    assert row.report["overall_risk_score"]["data"] == snapshot_data
+    assert "intelligence" not in row.report["overall_risk_score"]
+
+
+@pytest.mark.asyncio
+async def test_enrich_city_camp_report_section(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8813, employee_id=813)
+    camp_no, report_id, snapshot_data = await _seed_enrichable_camp_report(
+        test_db_session,
+        organization_id=9813,
+        engagement_id=9813,
+        city="BLR",
+        total_employees=4,
+    )
+    headers = _auth_header(8813)
+
+    enrich = await async_client.put(
+        f"/reports/camps/{camp_no}/BLR/enrich",
+        headers=headers,
+        json={"section": "overall_risk_score"},
+    )
+    assert enrich.status_code == 200
+    section = enrich.json()["data"]
+    _assert_enriched_overall_risk_section(section, snapshot_data=snapshot_data)
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.city == "BLR"
+    assert row.report["overall_risk_score"]["data"] == snapshot_data
+    assert "intelligence" not in row.report["overall_risk_score"]
+
+
+@pytest.mark.asyncio
+async def test_enrich_city_department_camp_report_section(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8814, employee_id=814)
+    camp_no, report_id, snapshot_data = await _seed_enrichable_camp_report(
+        test_db_session,
+        organization_id=9814,
+        engagement_id=9814,
+        department="sales",
+        city="BLR",
+        total_employees=2,
+    )
+    headers = _auth_header(8814)
+
+    enrich = await async_client.put(
+        f"/reports/camps/{camp_no}/BLR/departments/sales/enrich",
+        headers=headers,
+        json={"section": "overall_risk_score"},
+    )
+    assert enrich.status_code == 200
+    section = enrich.json()["data"]
+    _assert_enriched_overall_risk_section(section, snapshot_data=snapshot_data)
+    assert section["data"]["total_employees"] == 2
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
+    ).scalar_one()
+    assert row.city == "BLR"
+    assert row.department == "sales"
+    assert row.report["overall_risk_score"]["data"] == snapshot_data
+    assert "intelligence" not in row.report["overall_risk_score"]
+
+
+@pytest.mark.asyncio
+async def test_enrich_camp_report_section_not_found(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=8815, employee_id=815)
+    await _seed_overall_risk_score_section(test_db_session, report_sections=815)
+    camp_no, org_id = await _seed_camp(test_db_session, organization_id=9815, engagement_id=9815)
+    headers = _auth_header(8815)
+
+    row = CampReport(
+        report={"meta": {"camp_name": "Empty"}, "kpis": {"data": {}, "name": "KPIs", "description": None}},
+        camp_no=camp_no,
+        department=None,
+        city=None,
+        organization_id=org_id,
+    )
+    test_db_session.add(row)
+    await test_db_session.commit()
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/enrich",
+        headers=headers,
+        json={"section": "overall_risk_score"},
+    )
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "SECTION_NOT_FOUND"
 

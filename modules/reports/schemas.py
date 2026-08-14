@@ -139,6 +139,8 @@ class NutrientDetail(BaseModel):
 
 class WaterDetail(BaseModel):
     estimated_litres: float | None = None
+    estimated_low_litres: float | None = None
+    estimated_high_litres: float | None = None
     ideal_low_litres: float | None = None
     ideal_high_litres: float | None = None
     status: str | None = None
@@ -213,6 +215,12 @@ class CampReportSectionUpdateRequest(BaseModel):
 
 
 class CampReportRefreshRequest(BaseModel):
+    section: str = Field(min_length=1, max_length=200)
+
+
+class CampReportEnrichRequest(BaseModel):
+    """Request enrichment for one stored camp report section."""
+
     section: str = Field(min_length=1, max_length=200)
 
 

@@ -47,6 +47,10 @@ from modules.reports.camp_report_section_builders import (
     build_positive_wins,
     build_ranking,
 )
+from modules.reports.camp_report_intelligence import (
+    INTELLIGENCE_CAMP_SECTIONS,
+    enrich_camp_report_with_intelligence,
+)
 from modules.reports.camp_report_bts import (
     build_kpis_bts,
     build_not_implemented_bts,
@@ -840,7 +844,37 @@ class CampReportsService:
                 error_code="SECTION_NOT_FOUND",
                 message="Report section has not been refreshed",
             )
+        # On-read enrichment only — never write intelligence back to camp_reports.report.
+        if normalized_section in INTELLIGENCE_CAMP_SECTIONS:
+            enriched = enrich_camp_report_with_intelligence(report)
+            section = enriched.get(normalized_section)
+            if isinstance(section, dict):
+                return dict(section)
         return dict(report[normalized_section])
+
+    async def enrich_camp_report_section(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        section: str,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> dict:
+        """Enrich one camp-report section from live DB JSON (never from files).
+
+        Uses the same scope resolution and intelligence engine as dashboard GET.
+        Does not persist ``intelligence`` onto ``camp_reports.report``.
+        """
+        return await self.get_camp_report_dashboard(
+            db,
+            employee=employee,
+            camp_no=camp_no,
+            section=section,
+            department=department,
+            city=city,
+        )
 
     async def update_camp_report_section_payload(
         self,
