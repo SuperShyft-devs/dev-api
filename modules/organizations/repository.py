@@ -297,13 +297,19 @@ class OrganizationsRepository:
                 Engagement.camp_no,
                 Engagement.organization_id,
                 Organization.name.label("organization_name"),
+                Organization.logo.label("organization_logo"),
                 func.min(Engagement.start_date).label("start_date"),
                 func.count(Engagement.engagement_id).label("engagement_count"),
             )
             .select_from(Engagement)
             .join(Organization, Organization.organization_id == Engagement.organization_id)
             .where(Engagement.camp_no.isnot(None))
-            .group_by(Engagement.camp_no, Engagement.organization_id, Organization.name)
+            .group_by(
+                Engagement.camp_no,
+                Engagement.organization_id,
+                Organization.name,
+                Organization.logo,
+            )
         )
         if initialized_only:
             reported = self._camp_report_camp_nos_subquery()

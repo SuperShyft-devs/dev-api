@@ -124,10 +124,11 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
     assert len(matching) == 1
     assert matching[0]["camp_name"] == "Camp Org 23 June 2026"
     assert matching[0]["year"] == 2026
+    assert matching[0]["organization_id"] == 8001
+    assert matching[0]["organization_name"] == "Camp Org"
+    assert matching[0]["organization_logo"] is None
     assert matching[0]["engagement_ids"] == [8201, 8202]
     assert matching[0]["departments"] == {"count": 0, "departments": []}
-    assert "organization_id" not in matching[0]
-    assert "organization_name" not in matching[0]
     assert "engagement_count" not in matching[0]
     assert "department_count" not in matching[0]
     assert "report_count" not in matching[0]

@@ -136,6 +136,9 @@ class CampListItem(BaseModel):
     camp_name: str
     start_date: date
     year: int
+    organization_id: int
+    organization_name: str
+    organization_logo: Optional[str] = None
     engagement_ids: list[int]
     departments: CampDepartmentsPayload
 

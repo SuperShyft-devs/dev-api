@@ -648,6 +648,7 @@ class OrganizationsService:
             camp_no,
             organization_id,
             organization_name,
+            organization_logo,
             start_date,
             _engagement_count,
         ) in rows:
@@ -676,6 +677,9 @@ class OrganizationsService:
                     "camp_name": format_camp_name(org_name, start_date),
                     "start_date": start_date,
                     "year": year,
+                    "organization_id": oid,
+                    "organization_name": org_name,
+                    "organization_logo": organization_logo,
                     "engagement_ids": engagement_ids_by_camp.get(cid, []),
                     "departments": {
                         "count": len(departments),
