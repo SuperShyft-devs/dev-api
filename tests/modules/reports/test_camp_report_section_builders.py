@@ -8,10 +8,12 @@ from modules.reports.camp_report_section_builders import (
     build_company_average_scores,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
+    build_distribution_by_oxidative_stress_details,
     build_distribution_by_physical_activity_frequency,
     build_distribution_by_sleeping_hours,
     build_questionnaire_gender_distribution_details,
     build_elevated_metabolic_math,
+    build_elevated_oxidative_math,
     build_kpis,
     build_overall_risk_score,
     build_overall_risk_score_details,
@@ -289,6 +291,61 @@ def test_build_distribution_by_oxidative_stress_empty():
     assert data["percent"] == [0.0, 0.0, 0.0, 0.0]
     assert data["total_employees"] == 0
     assert data["elevated_oxidative_stress_percent"] == 0.0
+
+
+def test_build_elevated_oxidative_math_sample():
+    math = build_elevated_oxidative_math(
+        high_count=11,
+        very_high_count=7,
+        total_with_score=81,
+    )
+    assert math["result_percent"] == 22.2
+    assert math["kind"] == "oxidative_stress"
+    assert "Step 1: Count people in High = 11" in math["steps"]
+    assert "Step 7: Round to 1 decimal place: 22.2%" in math["steps"]
+
+
+def test_build_elevated_oxidative_math_empty():
+    math = build_elevated_oxidative_math(
+        high_count=0,
+        very_high_count=0,
+        total_with_score=0,
+    )
+    assert math["result_percent"] == 0.0
+    assert any("cannot calculate" in step.lower() for step in math["steps"])
+
+
+def test_build_distribution_by_oxidative_stress_details_people_and_excluded():
+    rows = [
+        (1, "Ann", "Low", "female", 20.0, None),
+        (2, "Bob", "Moderate", "male", 35.0, None),
+        (3, "Cara", "High", "female", 50.0, None),
+        (4, "Dan", "VeryHigh", "male", 65.0, None),
+        (
+            5,
+            "Eve",
+            "Missing",
+            "female",
+            None,
+            "Bio AI generated but oxidative_stress risk_score_scaled is missing from reports JSON",
+        ),
+    ]
+    payload, details = build_distribution_by_oxidative_stress_details(
+        rows,
+        total_enrolled=5,
+        bio_ai_reports=5,
+        scope_label="Whole camp",
+    )
+    data = payload["data"]
+    assert data["count"] == [1, 1, 1, 1]
+    assert data["total_employees"] == 4
+    assert data["elevated_oxidative_stress_percent"] == 50.0
+    assert details["method"]["with_oxidative_stress_score"] == 4
+    assert details["method"]["missing_oxidative_stress_score"] == 1
+    assert details["bands"]["low"]["people"][0]["oxidative_stress_score"] == 20.0
+    assert details["excluded"]["count"] == 1
+    assert "oxidative stress score is missing" in details["excluded"]["people"][0]["reason"].lower()
+    assert details["elevated_math"]["result_percent"] == 50.0
 
 
 def test_normalize_camp_gender():

@@ -41,6 +41,7 @@ from modules.reports.camp_report_section_builders import (
     build_company_average_scores,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
+    build_distribution_by_oxidative_stress_details,
     build_kpis,
     build_overall_risk_score_details,
     build_participation_by_age_details,
@@ -55,6 +56,7 @@ from modules.reports.camp_report_section_builders import (
     sleeping_hours_answer_to_bucket,
 )
 from modules.reports.camp_report_bts import (
+    build_distribution_by_oxidative_stress_bts,
     build_kpis_bts,
     build_not_implemented_bts,
     build_overall_risk_score_bts,
@@ -1092,6 +1094,7 @@ class CampReportsService:
         kpi_metrics: dict[str, Any] | None = None
         age_bts_details: dict[str, Any] | None = None
         ors_bts_details: dict[str, Any] | None = None
+        oxidative_bts_details: dict[str, Any] | None = None
         pa_bts_details: dict[str, Any] | None = None
         sleep_bts_details: dict[str, Any] | None = None
         pa_bts_meta: dict[str, Any] | None = None
@@ -1118,6 +1121,15 @@ class CampReportsService:
                 camp_no=camp_no,
                 department=department,
                 city=city,
+            )
+        elif normalized_section == "distribution_by_oxidative_stress":
+            built_payload, oxidative_bts_details = (
+                await self._build_distribution_by_oxidative_stress_with_details(
+                    db,
+                    camp_no=camp_no,
+                    department=department,
+                    city=city,
+                )
             )
         elif normalized_section == "distribution_by_physical_activity_frequency":
             built_payload, pa_bts_details = await self._build_physical_activity_with_details(
@@ -1203,6 +1215,17 @@ class CampReportsService:
                 expected_data=expected_data,
                 stored_data=expected_data,
                 details=ors_details,
+                checked_at=checked_at,
+            )
+        elif normalized_section == "distribution_by_oxidative_stress":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            oxidative_details = dict(oxidative_bts_details or {})
+            if previous_data is not None:
+                oxidative_details["previous"] = previous_data
+            report_bts[normalized_section] = build_distribution_by_oxidative_stress_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=oxidative_details,
                 checked_at=checked_at,
             )
         elif normalized_section == "distribution_by_physical_activity_frequency":
@@ -2029,6 +2052,42 @@ class CampReportsService:
             city=city,
         )
         return build_overall_risk_score_details(
+            status_rows,
+            total_enrolled=total_enrolled,
+            bio_ai_reports=bio_ai_reports,
+            scope_label=self._age_participation_scope_label(
+                department=department,
+                city=city,
+            ),
+        )
+
+    async def _build_distribution_by_oxidative_stress_with_details(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None,
+    ) -> tuple[dict, dict]:
+        status_rows = await self._repository.list_oxidative_stress_status(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        total_enrolled = await self._repository.count_enrolled_users(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        bio_ai_reports = await self._repository.count_bio_ai_reports(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        return build_distribution_by_oxidative_stress_details(
             status_rows,
             total_enrolled=total_enrolled,
             bio_ai_reports=bio_ai_reports,

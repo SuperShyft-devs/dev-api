@@ -3,6 +3,7 @@
 from datetime import date
 
 from modules.reports.camp_report_bts import (
+    build_distribution_by_oxidative_stress_bts,
     build_kpis_bts,
     build_not_implemented_bts,
     build_overall_risk_score_bts,
@@ -12,6 +13,8 @@ from modules.reports.camp_report_bts import (
 from modules.reports.camp_report_section_builders import (
     PHYSICAL_ACTIVITY_BUCKET_LABELS,
     PHYSICAL_ACTIVITY_BUCKETS,
+    build_distribution_by_oxidative_stress,
+    build_distribution_by_oxidative_stress_details,
     build_overall_risk_score,
     build_overall_risk_score_details,
     build_participation_by_age_details,
@@ -509,6 +512,98 @@ def test_build_overall_risk_score_bts_elevated_consistency_mismatch():
     assert bts["status"] == "mismatch"
     assert bts["fields"]["elevated_consistency"]["match"] is False
     assert "Increased Risk" in bts["fields"]["elevated_consistency"]["reason"]
+
+
+def test_build_distribution_by_oxidative_stress_bts_ok_and_math():
+    expected = build_distribution_by_oxidative_stress([20.0, 35.0, 50.0, 65.0])["data"]
+    _, details = build_distribution_by_oxidative_stress_details(
+        [
+            (1, "A", "One", None, 20.0, None),
+            (2, "B", "Two", None, 35.0, None),
+            (3, "C", "Three", None, 50.0, None),
+            (4, "D", "Four", None, 65.0, None),
+        ],
+        total_enrolled=4,
+        bio_ai_reports=4,
+        scope_label="Whole camp",
+    )
+    bts = build_distribution_by_oxidative_stress_bts(
+        expected_data=expected,
+        stored_data=expected,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["fields"]["elevated_oxidative_stress_percent"]["match"] is True
+    assert bts["fields"]["total_employees"]["match"] is True
+    assert bts["fields"]["counts_sum"]["match"] is True
+    assert bts["fields"]["elevated_consistency"]["match"] is True
+    assert bts["details"]["elevated_math"]["result_percent"] == 50.0
+    assert "bands" in bts["details"]
+
+
+def test_build_distribution_by_oxidative_stress_bts_mismatch_reasons():
+    expected = {
+        "group": ["low", "moderate", "high", "very_high"],
+        "count": [1, 1, 1, 1],
+        "percent": [25.0, 25.0, 25.0, 25.0],
+        "total_employees": 4,
+        "elevated_oxidative_stress_percent": 50.0,
+    }
+    stored = {
+        **expected,
+        "count": [2, 0, 1, 1],
+        "percent": [50.0, 0.0, 25.0, 25.0],
+        "total_employees": 4,
+        "elevated_oxidative_stress_percent": 40.0,
+    }
+    bts = build_distribution_by_oxidative_stress_bts(
+        expected_data=expected,
+        stored_data=stored,
+        details={},
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["count.low"]["match"] is False
+    assert "we now count 1" in bts["fields"]["count.low"]["reason"].lower()
+    assert bts["fields"]["elevated_oxidative_stress_percent"]["match"] is False
+    assert "should be 50.0%" in bts["fields"]["elevated_oxidative_stress_percent"]["reason"]
+
+
+def test_build_distribution_by_oxidative_stress_bts_first_check_empty():
+    expected = build_distribution_by_oxidative_stress([])["data"]
+    bts = build_distribution_by_oxidative_stress_bts(
+        expected_data=expected,
+        stored_data=None,
+        details={"elevated_math": {"steps": ["No one has a score."]}},
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["stored"] is None
+    assert "no one has an oxidative stress score" in bts["message"].lower()
+
+
+def test_build_distribution_by_oxidative_stress_bts_elevated_consistency_mismatch():
+    expected = {
+        "group": ["low", "moderate", "high", "very_high"],
+        "count": [1, 1, 1, 1],
+        "percent": [25.0, 25.0, 25.0, 25.0],
+        "total_employees": 4,
+        "elevated_oxidative_stress_percent": 50.0,
+    }
+    stored = {
+        **expected,
+        "elevated_oxidative_stress_percent": 12.0,
+    }
+    bts = build_distribution_by_oxidative_stress_bts(
+        expected_data=expected,
+        stored_data=stored,
+        details={},
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["elevated_consistency"]["match"] is False
+    assert "Very High" in bts["fields"]["elevated_consistency"]["reason"]
 
 
 def _physical_activity_expected_and_details():

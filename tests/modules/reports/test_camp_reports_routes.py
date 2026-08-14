@@ -1871,10 +1871,21 @@ async def test_refresh_camp_report_distribution_by_oxidative_stress(async_client
     assert data["total_employees"] == 4
     assert data["elevated_oxidative_stress_percent"] == 50.0
 
+    bts = payload.get("report_bts")
+    assert bts is not None
+    assert bts["status"] == "ok"
+    assert bts["status"] != "not_implemented"
+    assert "bands" in bts["details"]
+    assert "elevated_math" in bts["details"]
+    assert bts["details"]["elevated_math"]["result_percent"] == 50.0
+
     row = (
         await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
     ).scalar_one()
     assert row.report["distribution_by_oxidative_stress"]["data"]["total_employees"] == 4
+    assert row.report_bts is not None
+    assert row.report_bts["distribution_by_oxidative_stress"]["status"] == "ok"
+    assert "bands" in row.report_bts["distribution_by_oxidative_stress"]["details"]
 
 
 @pytest.mark.asyncio

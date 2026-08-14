@@ -1103,6 +1103,37 @@ def build_distribution_by_gender_by_metabolic_syndrome(
     return {"data": {"diseases": diseases}}
 
 
+_OXIDATIVE_BAND_SCORE_RANGES: dict[str, str] = {
+    "low": "0 to 25",
+    "moderate": "26 to 42",
+    "high": "43 to 58",
+    "very_high": "59 and above",
+}
+
+_OXIDATIVE_EXCLUSION_REASON_LABELS: dict[str, str] = {
+    "No Metsights Basic/Pro assessment instance for this camp": (
+        "No Metsights Basic or Pro health assessment for this camp"
+    ),
+    "Bio AI not generated — report row missing or reports JSON is null "
+    "(empty shell excluded from Oxidative Stress Distribution)": (
+        "Bio AI report was not generated yet"
+    ),
+    "Bio AI not generated — reports JSON is empty "
+    "(excluded from Oxidative Stress Distribution)": (
+        "Bio AI report was not generated yet (empty report)"
+    ),
+    "Bio AI generated but oxidative_stress risk_score_scaled is missing from reports JSON": (
+        "Bio AI report exists, but the oxidative stress score is missing"
+    ),
+}
+
+
+def _friendly_oxidative_exclusion_reason(reason: str | None) -> str:
+    if not reason:
+        return "Not included in this chart"
+    return _OXIDATIVE_EXCLUSION_REASON_LABELS.get(reason, reason)
+
+
 def build_distribution_by_oxidative_stress(scores: list[float]) -> dict:
     """Build distribution_by_oxidative_stress section payload from oxidative stress scores."""
     counts = {band: 0 for band in OXIDATIVE_STRESS_BANDS}
@@ -1123,6 +1154,174 @@ def build_distribution_by_oxidative_stress(scores: list[float]) -> dict:
             "elevated_oxidative_stress_percent": elevated,
         },
     }
+
+
+def build_elevated_oxidative_math(
+    *,
+    high_count: int,
+    very_high_count: int,
+    total_with_score: int,
+) -> dict[str, Any]:
+    """Primary-school style steps for elevated_oxidative_stress_percent."""
+    elevated_count = int(high_count) + int(very_high_count)
+    result_percent = _percent(elevated_count, total_with_score)
+
+    if total_with_score <= 0:
+        return {
+            "kind": "oxidative_stress",
+            "high_count": int(high_count),
+            "very_high_count": int(very_high_count),
+            "elevated_count": elevated_count,
+            "total_with_score": 0,
+            "result_percent": 0.0,
+            "steps": [
+                "No one in this camp has an oxidative stress score yet.",
+                "So we cannot calculate an elevated percentage (there is nothing to divide).",
+                "Elevated oxidative stress = 0%.",
+            ],
+        }
+
+    ratio = elevated_count / total_with_score
+    percent_raw = ratio * 100
+    ratio_text = f"{ratio:.10f}".rstrip("0").rstrip(".") or "0"
+    percent_raw_text = f"{percent_raw:.10f}".rstrip("0").rstrip(".") or "0"
+    steps = [
+        f"Step 1: Count people in High = {high_count}",
+        f"Step 2: Count people in Very High = {very_high_count}",
+        (
+            f"Step 3: Add them together: {high_count} + {very_high_count} "
+            f"= {elevated_count}"
+        ),
+        f"Step 4: Count everyone who has an oxidative stress score = {total_with_score}",
+        f"Step 5: Divide: {elevated_count} ÷ {total_with_score} = {ratio_text}",
+        f"Step 6: Turn into a percent: {ratio_text} × 100 = {percent_raw_text}",
+        f"Step 7: Round to 1 decimal place: {result_percent}%",
+    ]
+
+    return {
+        "kind": "oxidative_stress",
+        "high_count": int(high_count),
+        "very_high_count": int(very_high_count),
+        "elevated_count": elevated_count,
+        "total_with_score": int(total_with_score),
+        "result_percent": result_percent,
+        "steps": steps,
+    }
+
+
+def build_distribution_by_oxidative_stress_details(
+    status_rows: list[tuple[int, str | None, str | None, str | None, float | None, str | None]],
+    *,
+    total_enrolled: int,
+    bio_ai_reports: int,
+    scope_label: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build slim section data + BTS details from oxidative stress status rows."""
+    bands: dict[str, dict[str, Any]] = {
+        band: {
+            "count": 0,
+            "score_range_label": _OXIDATIVE_BAND_SCORE_RANGES[band],
+            "people": [],
+        }
+        for band in OXIDATIVE_STRESS_BANDS
+    }
+    excluded_people: list[dict[str, Any]] = []
+    scores: list[float] = []
+
+    for user_id, first_name, last_name, _gender, score, reason in status_rows:
+        name = _display_person_name(first_name, last_name)
+        if score is None or reason is not None:
+            excluded_people.append(
+                {
+                    "user_id": int(user_id),
+                    "name": name,
+                    "reason": _friendly_oxidative_exclusion_reason(reason),
+                }
+            )
+            continue
+
+        band = oxidative_stress_to_band(float(score))
+        scores.append(float(score))
+        bands[band]["count"] += 1
+        bands[band]["people"].append(
+            {
+                "user_id": int(user_id),
+                "name": name,
+                "oxidative_stress_score": float(score),
+                "band": band,
+            }
+        )
+
+    for band in OXIDATIVE_STRESS_BANDS:
+        bands[band]["people"].sort(key=lambda p: (p["name"].lower(), p["user_id"]))
+
+    excluded_people.sort(key=lambda p: (p["name"].lower(), p["user_id"]))
+
+    payload = build_distribution_by_oxidative_stress(scores)
+    data = payload["data"]
+    total_with_score = sum(int(c) for c in data["count"])
+    missing_oxidative_score = max(int(bio_ai_reports) - total_with_score, 0)
+
+    high = int(bands["high"]["count"])
+    very_high = int(bands["very_high"]["count"])
+    elevated_math = build_elevated_oxidative_math(
+        high_count=high,
+        very_high_count=very_high,
+        total_with_score=total_with_score,
+    )
+
+    notes: list[str] = []
+    if total_with_score == 0:
+        notes.append(
+            "Nobody has an oxidative stress score yet, so every group is 0 and the elevated "
+            "percentage is 0%."
+        )
+    if excluded_people:
+        notes.append(
+            f"{len(excluded_people)} enrolled "
+            f"{'person was' if len(excluded_people) == 1 else 'people were'} "
+            "not included in this chart — see the list below for why."
+        )
+    if missing_oxidative_score > 0:
+        notes.append(
+            f"{missing_oxidative_score} Bio AI "
+            f"{'report has' if missing_oxidative_score == 1 else 'reports have'} "
+            "no oxidative stress score, so they are left out of the groups."
+        )
+
+    details: dict[str, Any] = {
+        "method": {
+            "scope_label": scope_label,
+            "counting_rule": (
+                "We only count people who have a Metsights Basic or Pro Bio AI report "
+                "with an oxidative stress score. FitPrint and empty reports are left out."
+            ),
+            "who_is_included": (
+                "Enrolled people whose latest Basic/Pro health report has an oxidative stress score."
+            ),
+            "who_is_excluded": (
+                "People with no Basic/Pro assessment, no Bio AI report yet, or a Bio AI report "
+                "missing the oxidative stress score."
+            ),
+            "band_rules": [
+                {"band": band, "score_range_label": _OXIDATIVE_BAND_SCORE_RANGES[band]}
+                for band in OXIDATIVE_STRESS_BANDS
+            ],
+            "total_enrolled": int(total_enrolled),
+            "bio_ai_reports": int(bio_ai_reports),
+            "with_oxidative_stress_score": total_with_score,
+            "missing_oxidative_stress_score": missing_oxidative_score,
+            "excluded_people_count": len(excluded_people),
+        },
+        "elevated_math": elevated_math,
+        "bands": bands,
+        "excluded": {
+            "count": len(excluded_people),
+            "people": excluded_people,
+        },
+        "notes": notes,
+    }
+    return payload, details
 
 
 def aggregate_top_healthy_habits(
