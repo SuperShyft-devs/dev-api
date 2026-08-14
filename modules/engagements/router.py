@@ -96,7 +96,7 @@ def _engagement_to_dict(
 
 
 
-@router.get("/by-code/{engagement_code}")
+@router.get("/code/{engagement_code}")
 async def get_engagement_by_code(
     engagement_code: str,
     db: AsyncSession = Depends(get_db),
@@ -115,6 +115,7 @@ async def get_engagement_by_code(
         "slot_duration": engagement.slot_duration,
         "status": engagement.status,
         "consultations": engagement.consultations,
+        "slot_detail": engagement.slot_detail,
     })
 
 
