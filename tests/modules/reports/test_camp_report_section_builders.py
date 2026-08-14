@@ -9,6 +9,8 @@ from modules.reports.camp_report_section_builders import (
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
     build_distribution_by_physical_activity_frequency,
+    build_distribution_by_sleeping_hours,
+    build_questionnaire_gender_distribution_details,
     build_elevated_metabolic_math,
     build_kpis,
     build_overall_risk_score,
@@ -24,7 +26,10 @@ from modules.reports.camp_report_section_builders import (
     metabolic_score_to_band,
     normalize_camp_gender,
     oxidative_stress_to_band,
+    PHYSICAL_ACTIVITY_BUCKETS,
+    SLEEPING_HOURS_BUCKETS,
     physical_activity_answer_to_bucket,
+    sleeping_hours_answer_to_bucket,
     risk_score_scaled_to_band,
 )
 
@@ -300,8 +305,17 @@ def test_physical_activity_answer_to_bucket():
     assert physical_activity_answer_to_bucket("2") == "30_60_mins"
     assert physical_activity_answer_to_bucket("3") == "more_than_60_mins"
     assert physical_activity_answer_to_bucket("5") == "rarely_or_never"
-    assert physical_activity_answer_to_bucket("4") == "unmapped"
+    assert physical_activity_answer_to_bucket("4") is None
     assert physical_activity_answer_to_bucket(None) is None
+
+
+def test_sleeping_hours_answer_to_bucket():
+    assert sleeping_hours_answer_to_bucket("0") == "less_than_5hrs"
+    assert sleeping_hours_answer_to_bucket("1") == "between_5_7_hrs"
+    assert sleeping_hours_answer_to_bucket("2") == "between_7_9_hrs"
+    assert sleeping_hours_answer_to_bucket("3") == "more_than_9hrs"
+    assert sleeping_hours_answer_to_bucket("4") is None
+    assert sleeping_hours_answer_to_bucket(None) is None
 
 
 def test_build_distribution_by_physical_activity_frequency():
@@ -322,22 +336,69 @@ def test_build_distribution_by_physical_activity_frequency():
         "30_60_mins",
         "more_than_60_mins",
         "rarely_or_never",
-        "unmapped",
     ]
-    assert male["count"] == [1, 1, 0, 0, 1]
-    assert male["percent"] == [33.3, 33.3, 0.0, 0.0, 33.3]
-    assert male["total_responded"] == 3
-    assert male["unmapped_responded"] == 1
-    assert female["count"] == [0, 0, 1, 1, 0]
-    assert female["percent"] == [0.0, 0.0, 50.0, 50.0, 0.0]
+    assert male["count"] == [1, 1, 0, 0]
+    assert male["percent"] == [50.0, 50.0, 0.0, 0.0]
+    assert male["total_responded"] == 2
+    assert "unmapped_responded" not in male
+    assert female["count"] == [0, 0, 1, 1]
+    assert female["percent"] == [0.0, 0.0, 50.0, 50.0]
+
+
+def test_build_distribution_by_sleeping_hours():
+    rows = [
+        ("male", "0"),
+        ("male", "1"),
+        ("female", "2"),
+        ("female", "3"),
+        ("male", "9"),
+    ]
+    payload = build_distribution_by_sleeping_hours(rows)
+    male = payload["data"]["male"]
+    female = payload["data"]["female"]
+    assert male["group"] == list(SLEEPING_HOURS_BUCKETS)
+    assert male["count"] == [1, 1, 0, 0]
+    assert male["total_responded"] == 2
+    assert female["count"] == [0, 0, 1, 1]
+    assert female["total_responded"] == 2
 
 
 def test_build_distribution_by_physical_activity_frequency_empty():
     payload = build_distribution_by_physical_activity_frequency([])
     for gender in ("male", "female"):
         data = payload["data"][gender]
-        assert data["count"] == [0, 0, 0, 0, 0]
-        assert data["percent"] == [0.0, 0.0, 0.0, 0.0, 0.0]
+        assert data["count"] == [0, 0, 0, 0]
+        assert data["percent"] == [0.0, 0.0, 0.0, 0.0]
+
+
+def test_build_questionnaire_gender_distribution_details():
+    roster = [
+        (1, "Alex", "Lee", "male", "1"),
+        (2, "Sam", "Kim", "female", "4"),
+        (3, "Pat", "Ng", "other", "2"),
+        (4, "Jamie", "Fox", "female", None),
+    ]
+    payload, details = build_questionnaire_gender_distribution_details(
+        roster,
+        filled_user_ids={4},
+        questionnaire_completed=1,
+        buckets=PHYSICAL_ACTIVITY_BUCKETS,
+        answer_to_bucket=physical_activity_answer_to_bucket,
+        bucket_labels={
+            "less_than_30mins": "Less than 30 minutes a day",
+            "30_60_mins": "30–60 minutes a day",
+            "more_than_60_mins": "More than 60 minutes a day",
+            "rarely_or_never": "Rarely or never",
+        },
+        scope_label="Whole camp",
+        question_label="daily physical activity",
+    )
+    assert payload["data"]["male"]["count"] == [1, 0, 0, 0]
+    assert payload["data"]["male"]["total_responded"] == 1
+    assert len(details["exceptions"]["answer_not_a_known_choice"]) == 1
+    assert len(details["exceptions"]["gender_not_male_or_female"]) == 1
+    assert len(details["exceptions"]["answered_without_finishing_questionnaire"]) == 3
+    assert len(details["exceptions"]["finished_questionnaire_without_this_answer"]) == 1
 
 
 def test_risk_score_scaled_to_band_boundaries():

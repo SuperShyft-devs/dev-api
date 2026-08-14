@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+from collections.abc import Callable
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -40,19 +41,25 @@ from modules.reports.camp_report_section_builders import (
     build_company_average_scores,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_oxidative_stress,
-    build_distribution_by_physical_activity_frequency,
-    build_distribution_by_sleeping_hours,
     build_kpis,
     build_overall_risk_score_details,
     build_participation_by_age_details,
     build_positive_wins,
+    build_questionnaire_gender_distribution_details,
     build_ranking,
+    PHYSICAL_ACTIVITY_BUCKET_LABELS,
+    PHYSICAL_ACTIVITY_BUCKETS,
+    SLEEPING_HOURS_BUCKET_LABELS,
+    SLEEPING_HOURS_BUCKETS,
+    physical_activity_answer_to_bucket,
+    sleeping_hours_answer_to_bucket,
 )
 from modules.reports.camp_report_bts import (
     build_kpis_bts,
     build_not_implemented_bts,
     build_overall_risk_score_bts,
     build_participation_by_age_bts,
+    build_questionnaire_gender_distribution_bts,
 )
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.assessments.repository import AssessmentsRepository
@@ -1085,6 +1092,10 @@ class CampReportsService:
         kpi_metrics: dict[str, Any] | None = None
         age_bts_details: dict[str, Any] | None = None
         ors_bts_details: dict[str, Any] | None = None
+        pa_bts_details: dict[str, Any] | None = None
+        sleep_bts_details: dict[str, Any] | None = None
+        pa_bts_meta: dict[str, Any] | None = None
+        sleep_bts_meta: dict[str, Any] | None = None
         if normalized_section == "kpis":
             built_payload, kpi_metrics = await self._build_kpis_payload_with_metrics(
                 db,
@@ -1108,6 +1119,28 @@ class CampReportsService:
                 department=department,
                 city=city,
             )
+        elif normalized_section == "distribution_by_physical_activity_frequency":
+            built_payload, pa_bts_details = await self._build_physical_activity_with_details(
+                db,
+                camp_no=camp_no,
+                department=department,
+                city=city,
+            )
+            pa_bts_meta = {
+                "section_title": "Physical activity",
+                "bucket_labels": PHYSICAL_ACTIVITY_BUCKET_LABELS,
+            }
+        elif normalized_section == "distribution_by_sleeping_hours":
+            built_payload, sleep_bts_details = await self._build_sleeping_hours_with_details(
+                db,
+                camp_no=camp_no,
+                department=department,
+                city=city,
+            )
+            sleep_bts_meta = {
+                "section_title": "Sleeping hours",
+                "bucket_labels": SLEEPING_HOURS_BUCKET_LABELS,
+            }
         else:
             built_payload = await self._build_section_payload(
                 db,
@@ -1171,6 +1204,34 @@ class CampReportsService:
                 stored_data=expected_data,
                 details=ors_details,
                 checked_at=checked_at,
+            )
+        elif normalized_section == "distribution_by_physical_activity_frequency":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            pa_details = dict(pa_bts_details or {})
+            if previous_data is not None:
+                pa_details["previous"] = previous_data
+            meta = dict(pa_bts_meta or {})
+            report_bts[normalized_section] = build_questionnaire_gender_distribution_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=pa_details,
+                checked_at=checked_at,
+                section_title=str(meta.get("section_title") or "Physical activity"),
+                bucket_labels=dict(meta.get("bucket_labels") or PHYSICAL_ACTIVITY_BUCKET_LABELS),
+            )
+        elif normalized_section == "distribution_by_sleeping_hours":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            sleep_details = dict(sleep_bts_details or {})
+            if previous_data is not None:
+                sleep_details["previous"] = previous_data
+            meta = dict(sleep_bts_meta or {})
+            report_bts[normalized_section] = build_questionnaire_gender_distribution_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=sleep_details,
+                checked_at=checked_at,
+                section_title=str(meta.get("section_title") or "Sleeping hours"),
+                bucket_labels=dict(meta.get("bucket_labels") or SLEEPING_HOURS_BUCKET_LABELS),
             )
         else:
             report_bts[normalized_section] = build_not_implemented_bts(checked_at=checked_at)
@@ -1977,6 +2038,88 @@ class CampReportsService:
             ),
         )
 
+    async def _build_questionnaire_gender_distribution_with_details(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None,
+        question_key: str,
+        question_label: str,
+        buckets: tuple[str, ...],
+        bucket_labels: dict[str, str],
+        answer_to_bucket: Callable[[object | None], str | None],
+    ) -> tuple[dict, dict]:
+        roster = await self._repository.list_enrolled_users_with_questionnaire_answer(
+            db,
+            camp_no=camp_no,
+            question_key=question_key,
+            department=department,
+            city=city,
+        )
+        questionnaire_completed, filled_user_ids = (
+            await self._repository.get_questionnaire_filled_user_ids(
+                db,
+                camp_no=camp_no,
+                department=department,
+                city=city,
+            )
+        )
+        return build_questionnaire_gender_distribution_details(
+            roster,
+            filled_user_ids=filled_user_ids,
+            questionnaire_completed=questionnaire_completed,
+            buckets=buckets,
+            answer_to_bucket=answer_to_bucket,
+            bucket_labels=bucket_labels,
+            scope_label=self._age_participation_scope_label(
+                department=department,
+                city=city,
+            ),
+            question_label=question_label,
+        )
+
+    async def _build_physical_activity_with_details(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None,
+    ) -> tuple[dict, dict]:
+        return await self._build_questionnaire_gender_distribution_with_details(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+            question_key="physical_activity_frequency",
+            question_label="daily physical activity",
+            buckets=PHYSICAL_ACTIVITY_BUCKETS,
+            bucket_labels=PHYSICAL_ACTIVITY_BUCKET_LABELS,
+            answer_to_bucket=physical_activity_answer_to_bucket,
+        )
+
+    async def _build_sleeping_hours_with_details(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None,
+    ) -> tuple[dict, dict]:
+        return await self._build_questionnaire_gender_distribution_with_details(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+            question_key="sleeping_hours",
+            question_label="sleeping hours",
+            buckets=SLEEPING_HOURS_BUCKETS,
+            bucket_labels=SLEEPING_HOURS_BUCKET_LABELS,
+            answer_to_bucket=sleeping_hours_answer_to_bucket,
+        )
+
     async def _build_participation_by_age_with_details(
         self,
         db: AsyncSession,
@@ -2068,22 +2211,22 @@ class CampReportsService:
             return build_distribution_by_oxidative_stress(scores)
 
         if section_key == "distribution_by_physical_activity_frequency":
-            rows = await self._repository.list_physical_activity_frequency_by_gender(
+            payload, _details = await self._build_physical_activity_with_details(
                 db,
                 camp_no=camp_no,
                 department=department,
-            city=city,
+                city=city,
             )
-            return build_distribution_by_physical_activity_frequency(rows)
+            return payload
 
         if section_key == "distribution_by_sleeping_hours":
-            rows = await self._repository.list_sleeping_hours_by_gender(
+            payload, _details = await self._build_sleeping_hours_with_details(
                 db,
                 camp_no=camp_no,
                 department=department,
-            city=city,
+                city=city,
             )
-            return build_distribution_by_sleeping_hours(rows)
+            return payload
 
         if section_key == "distribution_by_gender_by_metabolic_syndrome":
             rows = await self._repository.list_health_reports_by_gender(

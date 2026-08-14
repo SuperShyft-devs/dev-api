@@ -1404,6 +1404,31 @@ class CampReportsRepository:
         result = await db.execute(select(func.count()).select_from(enrolled))
         return int(result.scalar_one())
 
+    async def get_questionnaire_filled_user_ids(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> tuple[int, set[int]]:
+        """Return (questionnaire_completed count, filled user ids) for camp scope."""
+        enrolled = self._enrolled_users_ranked_subquery(
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        result = await db.execute(select(enrolled.c.user_id))
+        enrolled_user_ids = {int(row[0]) for row in result.all()}
+        questionnaire = await self._compute_kpi_questionnaire_status(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+            enrolled_user_ids=enrolled_user_ids,
+        )
+        return int(questionnaire["questionnaire_completed"]), set(questionnaire["filled_user_ids"])
+
     async def count_any_questionnaire_responders_by_gender(
         self,
         db: AsyncSession,

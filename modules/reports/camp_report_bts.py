@@ -806,6 +806,7 @@ def build_overall_risk_score_bts(
     }
 
 
+
 def build_participation_by_age_bts(
     *,
     expected_data: dict[str, Any],
@@ -914,6 +915,359 @@ def build_participation_by_age_bts(
 
     return {
         "status": "ok" if all_match else "mismatch",
+        "checked_at": checked_at,
+        "expected": expected_data,
+        "stored": stored_data,
+        "fields": fields,
+        "details": details_payload,
+        "message": message,
+    }
+
+
+def _qgd_bucket_label(bucket: str, bucket_labels: dict[str, str]) -> str:
+    return bucket_labels.get(bucket, bucket.replace("_", " "))
+
+
+def _qgd_gender_groups_reason(
+    gender: str,
+    expected_groups: list[str],
+    stored_groups: Any,
+    bucket_labels: dict[str, str],
+) -> str:
+    expected_text = ", ".join(_qgd_bucket_label(b, bucket_labels) for b in expected_groups)
+    gender_label = "Men" if gender == "male" else "Women"
+    return (
+        f"The chart groups for {gender_label} in the saved report do not match the expected "
+        f"list ({expected_text}). What we found in the report: {stored_groups!r}."
+    )
+
+
+def _qgd_count_reason(
+    *,
+    gender: str,
+    bucket: str,
+    expected: int,
+    stored: int | None,
+    bucket_labels: dict[str, str],
+) -> str:
+    gender_label = "Men" if gender == "male" else "Women"
+    bucket_label = _qgd_bucket_label(bucket, bucket_labels)
+    if stored is None:
+        return (
+            f"The saved report did not show how many {gender_label.lower()} chose "
+            f"{bucket_label}. We now count {expected}."
+        )
+    return (
+        f"The report says {stored} {gender_label.lower()} chose {bucket_label}, "
+        f"but we now count {expected}. Someone may have updated their answer or "
+        f"been added or removed since the report was last saved."
+    )
+
+
+def _qgd_percent_reason(
+    *,
+    gender: str,
+    bucket: str,
+    expected: float,
+    stored: float | None,
+    bucket_labels: dict[str, str],
+) -> str:
+    gender_label = "Men" if gender == "male" else "Women"
+    bucket_label = _qgd_bucket_label(bucket, bucket_labels)
+    if stored is None:
+        return (
+            f"The saved report did not show the share for {gender_label.lower()} in "
+            f"{bucket_label}. Based on the latest counts it should be {expected}%."
+        )
+    return (
+        f"The share for {gender_label.lower()} in {bucket_label} should be {expected}% "
+        f"based on the latest counts, but the report shows {stored}%. "
+        f"Percents are calculated from the group counts and the total for that gender."
+    )
+
+
+def _qgd_total_reason(gender: str, expected: int, stored: int | None) -> str:
+    gender_label = "Men" if gender == "male" else "Women"
+    if stored is None:
+        return (
+            f"The saved report did not show how many {gender_label.lower()} are on the chart. "
+            f"We now count {expected}."
+        )
+    return (
+        f"The report says {stored} {gender_label.lower()} are on the chart, "
+        f"but we now count {expected}."
+    )
+
+
+def _qgd_counts_sum_reason(gender: str, stored_sum: int, expected_total: int) -> str:
+    gender_label = "Men" if gender == "male" else "Women"
+    return (
+        f"The {gender_label.lower()} group counts add up to {stored_sum}, "
+        f"but total responded for {gender_label.lower()} is {expected_total}. "
+        f"These should match. The report data looks incomplete or out of date — "
+        f"refresh this section."
+    )
+
+
+def _qgd_answered_vs_questionnaire_reason(
+    *,
+    answered: int,
+    questionnaire_completed: int,
+    chart_total: int,
+    question_label: str,
+) -> str:
+    if answered == questionnaire_completed:
+        return (
+            f"{answered} people answered {question_label}, which matches Questionnaire "
+            f"completed ({questionnaire_completed}). The chart shows {chart_total} people "
+            f"because only known answers with male or female gender appear on the chart."
+        )
+    if answered > questionnaire_completed:
+        extra = answered - questionnaire_completed
+        return (
+            f"{answered} people answered {question_label}, but Questionnaire completed is "
+            f"{questionnaire_completed}. The extra {extra} "
+            f"{'person' if extra == 1 else 'people'} answered this question without finishing "
+            f"every required question in their Metsights Pro/Basic health assessment. "
+            f"They are listed below. The chart shows {chart_total} people with a known answer "
+            f"and male or female gender."
+        )
+    missing = questionnaire_completed - answered
+    return (
+        f"Questionnaire completed is {questionnaire_completed}, but only {answered} people "
+        f"answered {question_label}. {missing} "
+        f"{'person finished' if missing == 1 else 'people finished'} the questionnaire but "
+        f"has no answer saved for this question. They are listed below. The chart shows "
+        f"{chart_total} people."
+    )
+
+
+def _qgd_unknown_answers_reason(count: int, question_label: str) -> str:
+    if count == 0:
+        return None
+    if count == 1:
+        return (
+            f"1 person answered {question_label} with a choice we could not map to the chart. "
+            f"They are listed below under “Answer is not a known choice”."
+        )
+    return (
+        f"{count} people answered {question_label} with choices we could not map to the chart. "
+        f"They are listed below under “Answer is not a known choice”."
+    )
+
+
+def _qgd_unknown_gender_reason(count: int) -> str:
+    if count == 0:
+        return None
+    if count == 1:
+        return (
+            "1 person answered this question but is not on the chart because their gender "
+            "is not recorded as male or female. They are listed below."
+        )
+    return (
+        f"{count} people answered this question but are not on the chart because their gender "
+        "is not recorded as male or female. They are listed below."
+    )
+
+
+def build_questionnaire_gender_distribution_bts(
+    *,
+    expected_data: dict[str, Any],
+    stored_data: dict[str, Any] | None,
+    details: dict[str, Any],
+    checked_at: str,
+    section_title: str,
+    bucket_labels: dict[str, str],
+) -> dict[str, Any]:
+    """Compare questionnaire gender distribution data to freshly computed expected values."""
+    stored = stored_data if isinstance(stored_data, dict) else {}
+    details_payload = dict(details or {})
+    method = details_payload.get("method") if isinstance(details_payload.get("method"), dict) else {}
+    comparison = (
+        details_payload.get("comparison")
+        if isinstance(details_payload.get("comparison"), dict)
+        else {}
+    )
+    exceptions = (
+        details_payload.get("exceptions")
+        if isinstance(details_payload.get("exceptions"), dict)
+        else {}
+    )
+
+    answered_this_question = _int_or_none(method.get("answered_this_question")) or 0
+    questionnaire_completed = _int_or_none(method.get("questionnaire_completed")) or 0
+    chart_total = _int_or_none(method.get("counted_on_chart")) or 0
+    unknown_answer_count = len(exceptions.get("answer_not_a_known_choice") or [])
+    unknown_gender_count = len(exceptions.get("gender_not_male_or_female") or [])
+
+    if not stored:
+        if chart_total == 0 and answered_this_question == 0:
+            message = (
+                f"This is the first check for {section_title}. "
+                f"No one has answered yet, so every group is 0."
+            )
+        else:
+            message = (
+                f"This is the first check for {section_title}. "
+                f"We saved the latest numbers and listed who is in each group."
+            )
+        return {
+            "status": "ok",
+            "checked_at": checked_at,
+            "expected": expected_data,
+            "stored": None,
+            "fields": {},
+            "details": details_payload,
+            "message": message,
+        }
+
+    fields: dict[str, Any] = {}
+
+    for gender in ("male", "female"):
+        expected_side = expected_data.get(gender) if isinstance(expected_data.get(gender), dict) else {}
+        stored_side = stored.get(gender) if isinstance(stored.get(gender), dict) else {}
+
+        expected_groups = list(expected_side.get("group") or [])
+        stored_groups = stored_side.get("group") if "group" in stored_side else None
+        fields[f"{gender}.group"] = _field_entry(
+            expected=expected_groups,
+            stored=stored_groups,
+            reason=_qgd_gender_groups_reason(gender, expected_groups, stored_groups, bucket_labels),
+        )
+
+        expected_counts = expected_side.get("count") if isinstance(expected_side.get("count"), list) else []
+        stored_counts = stored_side.get("count") if isinstance(stored_side.get("count"), list) else None
+        expected_percents = (
+            expected_side.get("percent") if isinstance(expected_side.get("percent"), list) else []
+        )
+        stored_percents = stored_side.get("percent") if isinstance(stored_side.get("percent"), list) else None
+
+        for index, bucket in enumerate(expected_groups):
+            expected_c = _int_or_none(expected_counts[index]) if index < len(expected_counts) else 0
+            if stored_counts is not None and index < len(stored_counts):
+                stored_c = _int_or_none(stored_counts[index])
+            else:
+                stored_c = None
+            fields[f"count.{gender}.{bucket}"] = _field_entry(
+                expected=expected_c if expected_c is not None else 0,
+                stored=stored_c,
+                reason=_qgd_count_reason(
+                    gender=gender,
+                    bucket=bucket,
+                    expected=expected_c or 0,
+                    stored=stored_c,
+                    bucket_labels=bucket_labels,
+                ),
+            )
+
+            expected_pct = (
+                _float_or_none(expected_percents[index]) if index < len(expected_percents) else 0.0
+            )
+            if stored_percents is not None and index < len(stored_percents):
+                stored_pct = _float_or_none(stored_percents[index])
+            else:
+                stored_pct = None
+            fields[f"percent.{gender}.{bucket}"] = _field_entry(
+                expected=expected_pct if expected_pct is not None else 0.0,
+                stored=stored_pct,
+                reason=_qgd_percent_reason(
+                    gender=gender,
+                    bucket=bucket,
+                    expected=expected_pct or 0.0,
+                    stored=stored_pct,
+                    bucket_labels=bucket_labels,
+                ),
+            )
+
+        expected_total = _int_or_none(expected_side.get("total_responded"))
+        stored_total = (
+            _int_or_none(stored_side.get("total_responded"))
+            if "total_responded" in stored_side
+            else None
+        )
+        fields[f"{gender}.total_responded"] = _field_entry(
+            expected=expected_total if expected_total is not None else 0,
+            stored=stored_total,
+            reason=_qgd_total_reason(gender, expected_total or 0, stored_total),
+        )
+
+        count_source = (
+            stored_counts if isinstance(stored_counts, list) and stored_counts else expected_counts
+        )
+        stored_sum = (
+            sum(_int_or_none(v) or 0 for v in count_source) if isinstance(count_source, list) else 0
+        )
+        sum_matches = stored_sum == (expected_total or 0)
+        fields[f"{gender}.counts_sum"] = {
+            "match": sum_matches,
+            "expected": expected_total or 0,
+            "stored": stored_sum,
+            "reason": None
+            if sum_matches
+            else _qgd_counts_sum_reason(gender, stored_sum, expected_total or 0),
+        }
+
+    question_label = str(method.get("question_label") or "this question")
+    answered_match = answered_this_question == questionnaire_completed
+    fields["answered_vs_questionnaire_completed"] = {
+        "match": answered_match,
+        "expected": questionnaire_completed,
+        "stored": answered_this_question,
+        "reason": None
+        if answered_match
+        else _qgd_answered_vs_questionnaire_reason(
+            answered=answered_this_question,
+            questionnaire_completed=questionnaire_completed,
+            chart_total=chart_total,
+            question_label=question_label,
+        ),
+    }
+
+    unknown_answers_match = unknown_answer_count == 0
+    fields["unknown_answers"] = {
+        "match": unknown_answers_match,
+        "expected": 0,
+        "stored": unknown_answer_count,
+        "reason": _qgd_unknown_answers_reason(unknown_answer_count, question_label),
+    }
+
+    unknown_gender_match = unknown_gender_count == 0
+    fields["unknown_gender"] = {
+        "match": unknown_gender_match,
+        "expected": 0,
+        "stored": unknown_gender_count,
+        "reason": _qgd_unknown_gender_reason(unknown_gender_count),
+    }
+
+    chart_math_match = all(
+        bool(entry.get("match"))
+        for key, entry in fields.items()
+        if key.endswith(".counts_sum") or key.startswith("count.") or key.startswith("percent.")
+        or key.endswith(".total_responded") or key.endswith(".group")
+    )
+    cross_checks_match = answered_match and unknown_answers_match and unknown_gender_match
+
+    if chart_math_match and cross_checks_match:
+        if chart_total == 0:
+            message = f"No one is on the {section_title} chart yet, so every group is 0."
+        else:
+            message = f"All {section_title} numbers match."
+        status = "ok"
+    elif chart_math_match and not cross_checks_match:
+        message = (
+            f"The {section_title} chart numbers are correct, but the total does not line up "
+            f"with Questionnaire completed or some people were left off the chart. "
+            f"See the notes below — this is often expected."
+        )
+        status = "mismatch"
+    else:
+        message = (
+            f"Some {section_title} numbers do not match. See the notes below for each one."
+        )
+        status = "mismatch"
+
+    return {
+        "status": status,
         "checked_at": checked_at,
         "expected": expected_data,
         "stored": stored_data,

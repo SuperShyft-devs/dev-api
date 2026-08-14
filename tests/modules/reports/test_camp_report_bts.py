@@ -7,11 +7,16 @@ from modules.reports.camp_report_bts import (
     build_not_implemented_bts,
     build_overall_risk_score_bts,
     build_participation_by_age_bts,
+    build_questionnaire_gender_distribution_bts,
 )
 from modules.reports.camp_report_section_builders import (
+    PHYSICAL_ACTIVITY_BUCKET_LABELS,
+    PHYSICAL_ACTIVITY_BUCKETS,
     build_overall_risk_score,
     build_overall_risk_score_details,
     build_participation_by_age_details,
+    build_questionnaire_gender_distribution_details,
+    physical_activity_answer_to_bucket,
 )
 
 
@@ -504,3 +509,89 @@ def test_build_overall_risk_score_bts_elevated_consistency_mismatch():
     assert bts["status"] == "mismatch"
     assert bts["fields"]["elevated_consistency"]["match"] is False
     assert "Increased Risk" in bts["fields"]["elevated_consistency"]["reason"]
+
+
+def _physical_activity_expected_and_details():
+    roster = [
+        (1, "Alex", "Lee", "male", "1"),
+        (2, "Sam", "Kim", "female", "2"),
+    ]
+    payload, details = build_questionnaire_gender_distribution_details(
+        roster,
+        filled_user_ids={1, 2},
+        questionnaire_completed=2,
+        buckets=PHYSICAL_ACTIVITY_BUCKETS,
+        answer_to_bucket=physical_activity_answer_to_bucket,
+        bucket_labels=PHYSICAL_ACTIVITY_BUCKET_LABELS,
+        scope_label="Whole camp",
+        question_label="daily physical activity",
+    )
+    return payload["data"], details
+
+
+def test_build_questionnaire_gender_distribution_bts_all_match():
+    expected, details = _physical_activity_expected_and_details()
+    bts = build_questionnaire_gender_distribution_bts(
+        expected_data=expected,
+        stored_data=expected,
+        details=details,
+        checked_at="t",
+        section_title="Physical activity",
+        bucket_labels=PHYSICAL_ACTIVITY_BUCKET_LABELS,
+    )
+    assert bts["status"] == "ok"
+    assert bts["fields"]["male.total_responded"]["match"] is True
+    assert bts["fields"]["answered_vs_questionnaire_completed"]["match"] is True
+    assert bts["fields"]["unknown_answers"]["match"] is True
+
+
+def test_build_questionnaire_gender_distribution_bts_kpi_gap():
+    expected, details = _physical_activity_expected_and_details()
+    details = dict(details)
+    details["exceptions"] = dict(details["exceptions"])
+    details["exceptions"]["answered_without_finishing_questionnaire"] = [
+        {
+            "user_id": 3,
+            "name": "Pat Ng",
+            "answer_shown": "Rarely or never",
+            "reason": "Answered without finishing questionnaire.",
+        }
+    ]
+    details["method"] = dict(details["method"])
+    details["method"]["answered_this_question"] = 3
+    bts = build_questionnaire_gender_distribution_bts(
+        expected_data=expected,
+        stored_data=expected,
+        details=details,
+        checked_at="t",
+        section_title="Physical activity",
+        bucket_labels=PHYSICAL_ACTIVITY_BUCKET_LABELS,
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["answered_vs_questionnaire_completed"]["match"] is False
+    assert "without finishing" in bts["fields"]["answered_vs_questionnaire_completed"]["reason"]
+
+
+def test_build_questionnaire_gender_distribution_bts_unknown_answer():
+    roster = [(1, "Alex", "Lee", "male", "4")]
+    payload, details = build_questionnaire_gender_distribution_details(
+        roster,
+        filled_user_ids=set(),
+        questionnaire_completed=0,
+        buckets=PHYSICAL_ACTIVITY_BUCKETS,
+        answer_to_bucket=physical_activity_answer_to_bucket,
+        bucket_labels=PHYSICAL_ACTIVITY_BUCKET_LABELS,
+        scope_label="Whole camp",
+        question_label="daily physical activity",
+    )
+    bts = build_questionnaire_gender_distribution_bts(
+        expected_data=payload["data"],
+        stored_data=payload["data"],
+        details=details,
+        checked_at="t",
+        section_title="Physical activity",
+        bucket_labels=PHYSICAL_ACTIVITY_BUCKET_LABELS,
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["unknown_answers"]["match"] is False
+    assert bts["fields"]["unknown_answers"]["stored"] == 1

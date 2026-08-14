@@ -2857,17 +2857,19 @@ async def test_refresh_camp_report_physical_activity_distribution(async_client, 
         "30_60_mins",
         "more_than_60_mins",
         "rarely_or_never",
-        "unmapped",
     ]
-    assert male["count"] == [1, 1, 1, 0, 0]
-    assert male["percent"] == [33.3, 33.3, 33.3, 0.0, 0.0]
-    assert female["count"] == [1, 0, 1, 1, 0]
-    assert female["percent"] == [33.3, 0.0, 33.3, 33.3, 0.0]
+    assert male["count"] == [1, 1, 1, 0]
+    assert male["percent"] == [33.3, 33.3, 33.3, 0.0]
+    assert female["count"] == [1, 0, 1, 1]
+    assert female["percent"] == [33.3, 0.0, 33.3, 33.3]
+    bts = payload.get("report_bts") or {}
+    assert bts.get("status") in {"ok", "mismatch"}
+    assert "details" in bts
 
     row = (
         await test_db_session.execute(select(CampReport).where(CampReport.report_id == report_id))
     ).scalar_one()
-    assert row.report["distribution_by_physical_activity_frequency"]["data"]["male"]["count"] == [1, 1, 1, 0, 0]
+    assert row.report["distribution_by_physical_activity_frequency"]["data"]["male"]["count"] == [1, 1, 1, 0]
 
 
 @pytest.mark.asyncio
@@ -2893,10 +2895,10 @@ async def test_refresh_department_camp_report_physical_activity_distribution(asy
     assert response.status_code == 200
     male = response.json()["data"]["section"]["data"]["male"]
     female = response.json()["data"]["section"]["data"]["female"]
-    assert male["count"] == [1, 1, 0, 0, 0]
-    assert male["percent"] == [50.0, 50.0, 0.0, 0.0, 0.0]
-    assert female["count"] == [1, 0, 0, 0, 0]
-    assert female["percent"] == [100.0, 0.0, 0.0, 0.0, 0.0]
+    assert male["count"] == [1, 1, 0, 0]
+    assert male["percent"] == [50.0, 50.0, 0.0, 0.0]
+    assert female["count"] == [1, 0, 0, 0]
+    assert female["percent"] == [100.0, 0.0, 0.0, 0.0]
 
 
 @pytest.mark.asyncio
@@ -2932,7 +2934,7 @@ async def test_refresh_physical_activity_distribution_updates_existing(async_cli
     ).scalar_one()
     assert "participation_by_age" in row.report
     assert "distribution_by_physical_activity_frequency" in row.report
-    assert row.report["distribution_by_physical_activity_frequency"]["data"]["male"]["count"] == [1, 1, 1, 0, 0]
+    assert row.report["distribution_by_physical_activity_frequency"]["data"]["male"]["count"] == [1, 1, 1, 0]
 
     physical_again = await async_client.put(
         f"/reports/camps/{camp_no}/refresh",

@@ -14,8 +14,13 @@ PHYSICAL_ACTIVITY_BUCKETS: tuple[str, ...] = (
     "30_60_mins",
     "more_than_60_mins",
     "rarely_or_never",
-    "unmapped",
 )
+PHYSICAL_ACTIVITY_BUCKET_LABELS: dict[str, str] = {
+    "less_than_30mins": "Less than 30 minutes a day",
+    "30_60_mins": "30–60 minutes a day",
+    "more_than_60_mins": "More than 60 minutes a day",
+    "rarely_or_never": "Rarely or never",
+}
 _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET: dict[str, str] = {
     "1": "less_than_30mins",
     "2": "30_60_mins",
@@ -34,8 +39,13 @@ SLEEPING_HOURS_BUCKETS: tuple[str, ...] = (
     "between_5_7_hrs",
     "between_7_9_hrs",
     "more_than_9hrs",
-    "unmapped",
 )
+SLEEPING_HOURS_BUCKET_LABELS: dict[str, str] = {
+    "less_than_5hrs": "Less than 5 hours",
+    "between_5_7_hrs": "Between 5 and 7 hours",
+    "between_7_9_hrs": "Between 7 and 9 hours",
+    "more_than_9hrs": "More than 9 hours",
+}
 _OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET: dict[str, str] = {
     "0": "less_than_5hrs",
     "1": "between_5_7_hrs",
@@ -414,33 +424,24 @@ def normalize_camp_gender(value: object | None) -> str | None:
 def physical_activity_answer_to_bucket(answer: object | None) -> str | None:
     """Map questionnaire option_value or display text to a physical activity bucket key.
 
-    Returns ``unmapped`` when an answer exists but is not a known Metsights choice
-    (so chart totals stay equal to questionnaire responders). Returns ``None`` only
-    when there is no answer to count.
+    Returns ``None`` when there is no answer or the answer is not a known Metsights choice.
     """
     normalized = normalize_questionnaire_answer(answer)
     if normalized is None:
         return None
-    mapped = _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET.get(normalized.lower())
-    if mapped is not None:
-        return mapped
-    return "unmapped"
+    return _OPTION_VALUE_TO_PHYSICAL_ACTIVITY_BUCKET.get(normalized.lower())
 
 
 def _build_gender_distribution(counts: dict[str, int], buckets: tuple[str, ...]) -> dict:
     total = sum(counts[bucket] for bucket in buckets)
     count = [counts[bucket] for bucket in buckets]
     percent = [_percent(c, total) for c in count]
-    mapped_total = total - counts.get("unmapped", 0)
-    payload = {
+    return {
         "group": list(buckets),
         "count": count,
         "percent": percent,
         "total_responded": total,
-        "mapped_responded": mapped_total,
-        "unmapped_responded": counts.get("unmapped", 0),
     }
-    return payload
 
 
 def build_distribution_by_physical_activity_frequency(
@@ -471,16 +472,12 @@ def build_distribution_by_physical_activity_frequency(
 def sleeping_hours_answer_to_bucket(answer: object | None) -> str | None:
     """Map questionnaire option_value or display text to a sleeping hours bucket key.
 
-    Returns ``unmapped`` for unrecognized non-empty answers so chart totals match
-    responders. Returns ``None`` only when there is no answer.
+    Returns ``None`` when there is no answer or the answer is not a known Metsights choice.
     """
     normalized = normalize_questionnaire_answer(answer)
     if normalized is None:
         return None
-    mapped = _OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET.get(normalized.lower())
-    if mapped is not None:
-        return mapped
-    return "unmapped"
+    return _OPTION_VALUE_TO_SLEEPING_HOURS_BUCKET.get(normalized.lower())
 
 
 def build_distribution_by_sleeping_hours(
@@ -506,6 +503,264 @@ def build_distribution_by_sleeping_hours(
             "female": _build_gender_distribution(female_counts, SLEEPING_HOURS_BUCKETS),
         },
     }
+
+
+def _format_answer_shown(answer: object | None) -> str | None:
+    normalized = normalize_questionnaire_answer(answer)
+    if normalized is not None:
+        return normalized
+    if answer is None:
+        return None
+    text = str(answer).strip()
+    return text or None
+
+
+def build_questionnaire_gender_distribution_details(
+    roster: list[tuple[int, str | None, str | None, str | None, object | None]],
+    *,
+    filled_user_ids: set[int],
+    questionnaire_completed: int,
+    buckets: tuple[str, ...],
+    answer_to_bucket: Callable[[object | None], str | None],
+    bucket_labels: dict[str, str],
+    scope_label: str,
+    question_label: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build gender-split questionnaire distribution + BTS details from enrolled roster.
+
+    ``roster`` rows: (user_id, first_name, last_name, gender, answer).
+    """
+    groups: dict[str, dict[str, dict[str, Any]]] = {
+        gender: {bucket: {"count": 0, "people": []} for bucket in buckets}
+        for gender in ("male", "female")
+    }
+    exceptions: dict[str, list[dict[str, Any]]] = {
+        "answered_without_finishing_questionnaire": [],
+        "finished_questionnaire_without_this_answer": [],
+        "answer_not_a_known_choice": [],
+        "gender_not_male_or_female": [],
+        "blank_answer": [],
+    }
+
+    answered_user_ids: set[int] = set()
+
+    for user_id, first_name, last_name, gender_raw, answer in roster:
+        uid = int(user_id)
+        name = _display_person_name(first_name, last_name)
+        gender = normalize_camp_gender(gender_raw)
+        normalized = normalize_questionnaire_answer(answer)
+        bucket = answer_to_bucket(answer) if normalized is not None else None
+        questionnaire_filled = uid in filled_user_ids
+
+        if answer is not None and normalized is None:
+            exceptions["blank_answer"].append(
+                {
+                    "user_id": uid,
+                    "name": name,
+                    "reason": "A response was saved, but the answer was empty.",
+                }
+            )
+            continue
+
+        if normalized is None:
+            if questionnaire_filled:
+                exceptions["finished_questionnaire_without_this_answer"].append(
+                    {
+                        "user_id": uid,
+                        "name": name,
+                        "reason": (
+                            "This person finished the full questionnaire, "
+                            f"but has no answer saved for {question_label}."
+                        ),
+                    }
+                )
+            continue
+
+        answered_user_ids.add(uid)
+
+        if bucket is None:
+            answer_shown = _format_answer_shown(answer) or normalized
+            exceptions["answer_not_a_known_choice"].append(
+                {
+                    "user_id": uid,
+                    "name": name,
+                    "answer_shown": answer_shown,
+                    "reason": (
+                        f"Their answer ({answer_shown!r}) is not one of the usual choices "
+                        f"for {question_label}, so they are not shown on the chart."
+                    ),
+                }
+            )
+
+        if gender is None:
+            exceptions["gender_not_male_or_female"].append(
+                {
+                    "user_id": uid,
+                    "name": name,
+                    "answer_shown": bucket_labels.get(bucket, normalized) if bucket else normalized,
+                    "reason": (
+                        "This person answered the question, but their gender on file is "
+                        "not male or female, so they cannot be placed on the men/women chart."
+                    ),
+                }
+            )
+
+        if not questionnaire_filled:
+            exceptions["answered_without_finishing_questionnaire"].append(
+                {
+                    "user_id": uid,
+                    "name": name,
+                    "answer_shown": bucket_labels.get(bucket, normalized) if bucket else normalized,
+                    "reason": (
+                        f"This person answered {question_label}, but has not finished every "
+                        "required question in their Metsights Pro/Basic health assessment. "
+                        "Questionnaire completed in KPIs only counts a fully finished "
+                        "Pro/Basic questionnaire."
+                    ),
+                }
+            )
+
+        if gender in ("male", "female") and bucket is not None:
+            groups[gender][bucket]["count"] += 1
+            groups[gender][bucket]["people"].append(
+                {
+                    "user_id": uid,
+                    "name": name,
+                    "answer_label": bucket_labels[bucket],
+                }
+            )
+
+    male_counts = {bucket: int(groups["male"][bucket]["count"]) for bucket in buckets}
+    female_counts = {bucket: int(groups["female"][bucket]["count"]) for bucket in buckets}
+    male_data = _build_gender_distribution(male_counts, buckets)
+    female_data = _build_gender_distribution(female_counts, buckets)
+
+    for gender in ("male", "female"):
+        for bucket in buckets:
+            groups[gender][bucket]["people"].sort(
+                key=lambda p: (p["name"].lower(), p["user_id"])
+            )
+
+    enrolled = len(roster)
+    male_total = int(male_data["total_responded"])
+    female_total = int(female_data["total_responded"])
+    chart_total = male_total + female_total
+    answered_this_question = len(answered_user_ids)
+    not_on_chart = max(answered_this_question - chart_total, 0)
+
+    notes: list[str] = []
+    partial = exceptions["answered_without_finishing_questionnaire"]
+    if len(partial) == 1:
+        notes.append(
+            "1 person answered this question without finishing the rest of the questionnaire. "
+            "That is why the chart total may not match Questionnaire completed in KPIs."
+        )
+    elif len(partial) > 1:
+        notes.append(
+            f"{len(partial)} people answered this question without finishing the rest of the "
+            "questionnaire. That is why the chart total may not match Questionnaire completed "
+            "in KPIs."
+        )
+
+    missing = exceptions["finished_questionnaire_without_this_answer"]
+    if len(missing) == 1:
+        notes.append(
+            "1 person finished the questionnaire but has no answer saved for this question."
+        )
+    elif len(missing) > 1:
+        notes.append(
+            f"{len(missing)} people finished the questionnaire but have no answer saved "
+            "for this question."
+        )
+
+    unknown = exceptions["answer_not_a_known_choice"]
+    if len(unknown) == 1:
+        notes.append(
+            "1 person gave an answer we could not map to a chart group. "
+            "They are listed below and are not on the chart."
+        )
+    elif len(unknown) > 1:
+        notes.append(
+            f"{len(unknown)} people gave answers we could not map to a chart group. "
+            "They are listed below and are not on the chart."
+        )
+
+    other_gender = exceptions["gender_not_male_or_female"]
+    if len(other_gender) == 1:
+        notes.append(
+            "1 person answered this question but is not shown on the chart because "
+            "their gender is not recorded as male or female."
+        )
+    elif len(other_gender) > 1:
+        notes.append(
+            f"{len(other_gender)} people answered this question but are not shown on the chart "
+            "because their gender is not recorded as male or female."
+        )
+
+    if chart_total == questionnaire_completed and chart_total > 0:
+        comparison_summary = (
+            f"Everyone on the chart ({chart_total} people) matches Questionnaire completed "
+            f"({questionnaire_completed})."
+        )
+    elif chart_total != questionnaire_completed:
+        comparison_summary = (
+            f"The chart shows {chart_total} people ({male_total} men + {female_total} women), "
+            f"while Questionnaire completed is {questionnaire_completed}. "
+            f"{answered_this_question} people answered this question in total. "
+            "See the lists below for who is included or left out and why."
+        )
+    else:
+        comparison_summary = (
+            "No one is on the chart yet because nobody answered with a known choice "
+            "and a recorded male or female gender."
+        )
+
+    for key in exceptions:
+        exceptions[key].sort(key=lambda p: (p["name"].lower(), p["user_id"]))
+
+    details: dict[str, Any] = {
+        "method": {
+            "scope_label": scope_label,
+            "question_label": question_label,
+            "counting_rule": (
+                f"We count each enrolled person once using their latest answer to {question_label} "
+                "in this camp. Only answers that match a usual choice and a male or female gender "
+                "appear on the chart."
+            ),
+            "who_is_included": (
+                f"Enrolled people with a known answer to {question_label} and gender recorded as "
+                "male or female."
+            ),
+            "who_is_excluded": (
+                "People with no answer, an empty answer, an unrecognized answer, or gender not "
+                "recorded as male or female."
+            ),
+            "enrolled": enrolled,
+            "questionnaire_completed": questionnaire_completed,
+            "answered_this_question": answered_this_question,
+            "counted_on_chart": chart_total,
+            "not_on_chart": not_on_chart,
+        },
+        "groups": groups,
+        "exceptions": exceptions,
+        "comparison": {
+            "chart_total": chart_total,
+            "male_total": male_total,
+            "female_total": female_total,
+            "answered_this_question": answered_this_question,
+            "questionnaire_completed": questionnaire_completed,
+            "summary": comparison_summary,
+        },
+        "notes": notes,
+    }
+
+    section_payload = {
+        "data": {
+            "male": male_data,
+            "female": female_data,
+        },
+    }
+    return section_payload, details
 
 
 _METABOLIC_BAND_SCORE_RANGES: dict[str, str] = {
