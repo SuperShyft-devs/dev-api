@@ -1,0 +1,601 @@
+{
+  "patient": {
+    "record_id": "REC-TEST-001",
+    "name": "Nikhil Pereira",
+    "age": 42,
+    "sex": "male",
+    "gender": "male",
+    "date_of_birth": "1983-06-15",
+    "height": 175,
+    "weight": 80,
+    "bmi": 26.1,
+    "profile_id": "019874e3-0000-0000-0000-000000000001",
+    "metabolic_age": 48.0,
+    "metabolic_score": 62.5,
+    "metabolic_health_status": "Increased Risk",
+    "assessment_code": "MET_PRO",
+    "assessment_date": "2026-08-01T10:00:00Z"
+  },
+  "executive_summary": {
+    "patient": {
+      "record_id": "REC-TEST-001",
+      "name": "Nikhil Pereira",
+      "age": 42,
+      "sex": "male",
+      "gender": "male",
+      "date_of_birth": "1983-06-15",
+      "height": 175,
+      "weight": 80,
+      "bmi": 26.1,
+      "profile_id": "019874e3-0000-0000-0000-000000000001",
+      "metabolic_age": 48.0,
+      "metabolic_score": 62.5,
+      "metabolic_health_status": "Increased Risk",
+      "assessment_code": "MET_PRO",
+      "assessment_date": "2026-08-01T10:00:00Z"
+    },
+    "assessment_date": "2026-08-01T10:00:00Z",
+    "metabolic_score": 62.5,
+    "metabolic_age": 48.0,
+    "overall_status": "Increased Risk",
+    "top_disease_risks": [
+      {
+        "disease_id": "nafld",
+        "title": "Non-Alcoholic Fatty Liver Disease",
+        "score": 67,
+        "risk": "High",
+        "band": "66-70"
+      },
+      {
+        "disease_id": "metabolic_syndrome",
+        "title": "Metabolic Syndrome",
+        "score": 61,
+        "risk": "High",
+        "band": "61-65"
+      },
+      {
+        "disease_id": "hypertension",
+        "title": "Hypertension",
+        "score": 58,
+        "risk": "High",
+        "band": "56-60"
+      }
+    ],
+    "top_health_strengths": [
+      {
+        "disease_id": "cardiac_health",
+        "title": "Cardiac Health",
+        "score": 8,
+        "risk": "Healthy",
+        "band": "6-10"
+      },
+      {
+        "disease_id": "oxidative_stress",
+        "title": "Oxidative Stress",
+        "score": 12,
+        "risk": "Healthy",
+        "band": "11-15"
+      },
+      {
+        "disease_id": "thyroid_health",
+        "title": "Thyroid Health",
+        "score": 18,
+        "risk": "Healthy",
+        "band": "16-20"
+      }
+    ],
+    "actionable_insights": [
+      "Aim for about 10% weight loss under medical guidance.",
+      "Eliminate sugary drinks and added sugars.",
+      "Follow a structured exercise program.",
+      "Follow a Mediterranean-style diet.",
+      "Reduce fructose and added sugars."
+    ]
+  },
+  "disease_sections": [
+    {
+      "disease_id": "nafld",
+      "title": "Non-Alcoholic Fatty Liver Disease",
+      "overview": "Non-Alcoholic Fatty Liver Disease (NAFLD) is a condition where excess fat builds up in the liver in people who drink little or no alcohol, commonly linked to obesity, diabetes, and metabolic syndrome. If left untreated, it can progress from simple fatty liver to inflammation, fibrosis, cirrhosis, and even liver failure.",
+      "current_status": {
+        "score": 67,
+        "risk": "High",
+        "band": "66-70",
+        "percentile": 72,
+        "healthy_percentile": 35,
+        "lifestyle_contribution": 40,
+        "interpretation": "Your findings suggest substantial liver fat with an increased risk of inflammation or early scarring. Prompt medical review is recommended.",
+        "clinical_warning": "Timely medical review is recommended for ongoing liver monitoring."
+      },
+      "lifestyle": {
+        "tips": [
+          "Aim for about 10% weight loss under medical guidance.",
+          "Eliminate sugary drinks and added sugars.",
+          "Follow a structured exercise program."
+        ],
+        "exercise": [
+          "Aim for up to 300 minutes of aerobic exercise weekly.",
+          "Strength train three times weekly.",
+          "Include flexibility exercises."
+        ]
+      },
+      "nutrition": {
+        "recommendations": [
+          "Follow a Mediterranean-style diet.",
+          "Reduce fructose and added sugars.",
+          "Increase fibre intake."
+        ],
+        "foods_to_include": [
+          "Spinach",
+          "Cauliflower",
+          "Olive oil",
+          "Salmon",
+          "Walnuts"
+        ],
+        "foods_to_avoid": [
+          "Sugary sodas",
+          "Fruit juices",
+          "Pastries",
+          "Deep-fried foods",
+          "Processed meats"
+        ]
+      },
+      "monitoring": {
+        "recommendations": [
+          "Monitor liver enzymes, FIB-4, and FibroScan.",
+          "Repeat liver assessment every 3 months."
+        ]
+      },
+      "positive_takeaway": "With consistent care, your liver health can still improve."
+    },
+    {
+      "disease_id": "metabolic_syndrome",
+      "title": "Metabolic Syndrome",
+      "overview": "Metabolic syndrome is a cluster of conditions including increased waist circumference, high blood sugar, elevated blood pressure, abnormal cholesterol, and high triglycerides.",
+      "current_status": {
+        "score": 61,
+        "risk": "High",
+        "band": "61-65",
+        "percentile": 65,
+        "healthy_percentile": 38,
+        "lifestyle_contribution": 35,
+        "interpretation": "Your results indicate a higher metabolic risk with multiple contributing factors requiring closer attention.",
+        "clinical_warning": "Persistent or worsening metabolic abnormalities should be medically reviewed even without symptoms."
+      },
+      "lifestyle": {
+        "tips": [
+          "Exercise regularly at a comfortable intensity.",
+          "Strength train when appropriate.",
+          "Reduce prolonged sitting."
+        ],
+        "exercise": [
+          "150–300 minutes of aerobic activity weekly.",
+          "Strength training twice weekly.",
+          "Include flexibility exercises."
+        ]
+      },
+      "nutrition": {
+        "recommendations": [
+          "Choose a vegetable-rich, minimally processed diet.",
+          "Increase legumes and whole grains.",
+          "Prefer fish and healthy fats."
+        ],
+        "foods_to_include": [
+          "Leafy greens",
+          "Berries",
+          "Lentils",
+          "Barley",
+          "Almonds"
+        ],
+        "foods_to_avoid": [
+          "Sugary beverages",
+          "Processed meats",
+          "Deep-fried foods",
+          "White bread",
+          "Fast food"
+        ]
+      },
+      "monitoring": {
+        "recommendations": [
+          "Monitor blood pressure closely.",
+          "Check glucose or HbA1c."
+        ]
+      },
+      "positive_takeaway": "Focused lifestyle improvements can still meaningfully reduce your overall metabolic risk."
+    },
+    {
+      "disease_id": "hypertension",
+      "title": "Hypertension",
+      "overview": "",
+      "current_status": {
+        "score": 58,
+        "risk": "High",
+        "band": "56-60",
+        "percentile": 60,
+        "healthy_percentile": 40,
+        "lifestyle_contribution": 25,
+        "interpretation": "This score suggests a substantial blood-pressure risk burden that should not be managed by lifestyle changes alone if measurements are persistently high. Keep a reliable record of readings and arrange timely healthcare follow-up to review the full picture.",
+        "clinical_warning": "Timely healthcare follow-up is appropriate if home readings remain elevated or are rising. Urgent assessment is needed when severe symptoms occur with a very high reading."
+      },
+      "lifestyle": {
+        "tips": [
+          "Make lower-sodium meals, regular exercise, and weight management central weekly goals.",
+          "Combine aerobic activity with resistance training on at least two days each week.",
+          "Favor steady weight reduction if excess weight is contributing to risk."
+        ],
+        "exercise": [
+          "Combine regular aerobic exercise with twice-weekly resistance training.",
+          "Work toward 150–300 minutes of moderate activity weekly as tolerated.",
+          "Add mobility and stretching to support adherence and comfort."
+        ]
+      },
+      "nutrition": {
+        "recommendations": [
+          "Make sodium awareness part of every meal, including packaged staples and restaurant foods.",
+          "Emphasize fibre-rich vegetables, fruit, legumes, and whole grains.",
+          "Choose fish, poultry, beans, and lentils instead of cured meats."
+        ],
+        "foods_to_include": [
+          "Leafy greens",
+          "Tomatoes",
+          "Guava",
+          "Citrus fruit",
+          "Brown rice"
+        ],
+        "foods_to_avoid": [
+          "Processed meats",
+          "Namkeen",
+          "Pickles",
+          "Papad",
+          "Instant noodles"
+        ]
+      },
+      "monitoring": {
+        "recommendations": [
+          "Check blood pressure regularly at home if recommended and share the trend with your healthcare professional.",
+          "Follow a risk-based schedule for kidney function, glucose, cholesterol, and weight assessment."
+        ]
+      },
+      "positive_takeaway": "Active monitoring plus consistent lifestyle changes can help you regain better control of modifiable risk factors."
+    },
+    {
+      "disease_id": "obesity",
+      "title": "Obesity",
+      "overview": "",
+      "current_status": {
+        "score": 55,
+        "risk": "High",
+        "band": "51-55",
+        "percentile": 58,
+        "healthy_percentile": 42,
+        "lifestyle_contribution": 45,
+        "interpretation": "Your score indicates high obesity-related metabolic risk. A structured weight-management plan with medical support can improve your health.",
+        "clinical_warning": "Consult your healthcare provider if metabolic markers are abnormal or weight loss remains difficult."
+      },
+      "lifestyle": {
+        "tips": [
+          "Aim for gradual weight loss.",
+          "Combine aerobic and strength exercise.",
+          "Reduce sugary drinks and processed snacks."
+        ],
+        "exercise": [
+          "Aim for 150–300 minutes of aerobic activity weekly.",
+          "Strength train at least twice weekly.",
+          "Walk after meals."
+        ]
+      },
+      "nutrition": {
+        "recommendations": [
+          "Base meals on vegetables, legumes, whole grains, and lean protein.",
+          "Increase fibre intake.",
+          "Choose minimally processed foods."
+        ],
+        "foods_to_include": [
+          "Leafy greens",
+          "Broccoli",
+          "Tomatoes",
+          "Berries",
+          "Oats"
+        ],
+        "foods_to_avoid": [
+          "Sugary drinks",
+          "Milkshakes",
+          "Fried foods",
+          "Chips",
+          "Pastries"
+        ]
+      },
+      "monitoring": {
+        "recommendations": [
+          "Track weight and waist circumference.",
+          "Monitor blood pressure, HbA1c, and cholesterol."
+        ]
+      },
+      "positive_takeaway": "A sustainable lifestyle plan can improve multiple metabolic risk factors."
+    },
+    {
+      "disease_id": "dyslipidemia",
+      "title": "Dyslipidemia",
+      "overview": "Dyslipidemia is a condition in which the levels of cholesterol or triglycerides in the blood become unhealthy. If left unmanaged, it can gradually increase the risk of heart attack, stroke, and other cardiovascular diseases.",
+      "current_status": {
+        "score": 44,
+        "risk": "Increased",
+        "band": "41-45",
+        "percentile": 52,
+        "healthy_percentile": 50,
+        "lifestyle_contribution": 28,
+        "interpretation": "Your cholesterol or triglycerides are noticeably above the healthy range. This increased-risk stage calls for consistent lifestyle changes and regular monitoring to reduce future cardiovascular risk.",
+        "clinical_warning": "Consult your doctor for regular monitoring. This is a preventive step, not an emergency."
+      },
+      "lifestyle": {
+        "tips": [
+          "Aim for 7-10% weight loss if overweight.",
+          "Exercise regularly with cardio and strength training.",
+          "Avoid smoking."
+        ],
+        "exercise": [
+          "250+ minutes of moderate exercise weekly.",
+          "Strength training 3 times/week.",
+          "Reduce prolonged sitting."
+        ]
+      },
+      "nutrition": {
+        "recommendations": [
+          "Follow a Mediterranean-style diet.",
+          "Increase soluble fibre intake.",
+          "Choose fish, legumes, and lean proteins."
+        ],
+        "foods_to_include": [
+          "Oats",
+          "Barley",
+          "Chickpeas",
+          "Lentils",
+          "Fish"
+        ],
+        "foods_to_avoid": [
+          "Sugary drinks",
+          "Fried foods",
+          "Cakes",
+          "Processed meats",
+          "Sugary cereals"
+        ]
+      },
+      "monitoring": {
+        "recommendations": [
+          "Repeat lipid profile and blood sugar in about 6 months.",
+          "Monitor weight, waist, and blood pressure."
+        ]
+      },
+      "positive_takeaway": "Healthy lifestyle changes can significantly improve your cholesterol levels."
+    },
+    {
+      "disease_id": "type2_diabetes",
+      "title": "Type 2 Diabetes",
+      "overview": "Type 2 diabetes is a metabolic disorder in which the body becomes resistant to insulin or does not produce enough insulin to maintain healthy blood sugar levels. Persistently elevated blood glucose can damage the eyes, kidneys, nerves, heart, and blood vessels over time.",
+      "current_status": {
+        "score": 38,
+        "risk": "Increased",
+        "band": "36-40",
+        "percentile": 48,
+        "healthy_percentile": 55,
+        "lifestyle_contribution": 30,
+        "interpretation": "Your results suggest significant insulin resistance and rising blood sugar. Early intervention can still prevent progression.",
+        "clinical_warning": "Consult your doctor for monitoring and lifestyle guidance."
+      },
+      "lifestyle": {
+        "tips": [
+          "Aim for about 7% weight loss if overweight.",
+          "Exercise on most days.",
+          "Avoid sugary drinks and refined carbohydrates."
+        ],
+        "exercise": [
+          "250 min/week aerobic activity.",
+          "Strength training 3 times/week.",
+          "Daily post-meal walks."
+        ]
+      },
+      "nutrition": {
+        "recommendations": [
+          "Maintain a high-fibre, low-glycaemic diet.",
+          "Prioritise vegetables, legumes, whole grains, and healthy fats.",
+          "Avoid fried and ultra-processed foods."
+        ],
+        "foods_to_include": [
+          "Lentils",
+          "Beans",
+          "Leafy greens",
+          "Oats",
+          "Barley"
+        ],
+        "foods_to_avoid": [
+          "Sugary drinks",
+          "Pastries",
+          "White bread",
+          "Refined grains",
+          "Sweetened cereals"
+        ]
+      },
+      "monitoring": {
+        "recommendations": [
+          "Repeat HbA1c and fasting glucose in about 6 months.",
+          "Monitor weight, blood pressure, lipids, and kidney health."
+        ]
+      },
+      "positive_takeaway": "Blood sugar often improves significantly with sustained healthy habits."
+    },
+    {
+      "disease_id": "thyroid_health",
+      "title": "Thyroid Health",
+      "overview": "The thyroid gland produces hormones that regulate metabolism, energy production, body temperature, and many essential body functions. Changes in thyroid function can affect multiple organs and influence weight, heart rate, mood, and overall metabolic health.",
+      "current_status": {
+        "score": 18,
+        "risk": "Healthy",
+        "band": "16-20",
+        "percentile": 25,
+        "healthy_percentile": 80,
+        "lifestyle_contribution": 12,
+        "interpretation": "Your score remains healthy but is approaching the upper end of this range. Strengthening preventive habits now may help reduce future thyroid-related risk.",
+        "clinical_warning": "Persistent symptoms or unexplained weight changes should be reviewed by a healthcare professional."
+      },
+      "lifestyle": {
+        "tips": [
+          "Exercise consistently.",
+          "Prioritize quality sleep.",
+          "Avoid fad diets."
+        ],
+        "exercise": [
+          "150–300 minutes of moderate exercise weekly.",
+          "Strength training twice weekly.",
+          "Include mobility exercises."
+        ]
+      },
+      "nutrition": {
+        "recommendations": [
+          "Use iodized salt appropriately.",
+          "Include fish, eggs, and dairy.",
+          "Increase vegetables and legumes."
+        ],
+        "foods_to_include": [
+          "Eggs",
+          "Fish",
+          "Milk",
+          "Plain yogurt",
+          "Beans"
+        ],
+        "foods_to_avoid": [
+          "High-dose iodine supplements",
+          "Concentrated seaweed",
+          "Processed foods",
+          "Sugary drinks",
+          "Frequent fried foods"
+        ]
+      },
+      "monitoring": {
+        "recommendations": [
+          "Monitor persistent symptoms.",
+          "Consider thyroid testing if indicated."
+        ]
+      },
+      "positive_takeaway": "Early lifestyle improvements can help keep your thyroid health on track."
+    },
+    {
+      "disease_id": "oxidative_stress",
+      "title": "Oxidative Stress",
+      "overview": "Oxidative stress occurs when harmful free radicals outweigh the body's antioxidant defenses, leading to gradual damage of cells and tissues. Over time, this imbalance may contribute to aging and increase the risk of several chronic diseases.",
+      "current_status": {
+        "score": 12,
+        "risk": "Healthy",
+        "band": "11-15",
+        "percentile": 20,
+        "healthy_percentile": 90,
+        "lifestyle_contribution": 10,
+        "interpretation": "Your score remains healthy but offers an opportunity to further strengthen antioxidant-supporting habits.",
+        "clinical_warning": "Consult your doctor if metabolic markers become abnormal or symptoms persist."
+      },
+      "lifestyle": {
+        "tips": [
+          "Prioritize restorative sleep.",
+          "Stay active throughout the day.",
+          "Avoid tobacco exposure."
+        ],
+        "exercise": [
+          "Aim for 150–300 minutes of aerobic activity weekly.",
+          "Strength train twice weekly.",
+          "Include flexibility exercises."
+        ]
+      },
+      "nutrition": {
+        "recommendations": [
+          "Increase vegetables and fruits.",
+          "Choose whole grains and legumes.",
+          "Use healthy fats from nuts and fish."
+        ],
+        "foods_to_include": [
+          "Kale",
+          "Broccoli",
+          "Tomatoes",
+          "Blueberries",
+          "Oranges"
+        ],
+        "foods_to_avoid": [
+          "Sugary drinks",
+          "Processed meats",
+          "Fried foods",
+          "Refined sweets",
+          "Trans fats"
+        ]
+      },
+      "monitoring": {
+        "recommendations": [
+          "Monitor blood pressure, glucose, and lipids.",
+          "Track weight if needed."
+        ]
+      },
+      "positive_takeaway": "You remain in a healthy range, and reinforcing healthy habits now provides lasting benefits."
+    },
+    {
+      "disease_id": "cardiac_health",
+      "title": "Cardiac Health",
+      "overview": "Cardiac health reflects how well your heart and blood vessels support healthy blood circulation. This score estimates your cardiovascular risk based on factors like blood pressure, cholesterol, blood sugar, weight, and lifestyle.",
+      "current_status": {
+        "score": 8,
+        "risk": "Healthy",
+        "band": "6-10",
+        "percentile": 15,
+        "healthy_percentile": 92,
+        "lifestyle_contribution": 8,
+        "interpretation": "Your heart health is very good, with healthy blood pressure, cholesterol, and circulation. Staying consistent with your current habits will help maintain these results.",
+        "clinical_warning": "No additional follow-up is needed beyond routine check-ups. Seek medical advice if you develop chest pain or unexplained breathlessness."
+      },
+      "lifestyle": {
+        "tips": [
+          "Stay smoke-free.",
+          "Be physically active every day.",
+          "Maintain a healthy weight."
+        ],
+        "exercise": [
+          "Exercise for at least 150 minutes each week.",
+          "Strength train twice weekly.",
+          "Stretch regularly."
+        ]
+      },
+      "nutrition": {
+        "recommendations": [
+          "Follow a Mediterranean or DASH-style diet.",
+          "Reduce salt and processed foods.",
+          "Eat more fruits and vegetables."
+        ],
+        "foods_to_include": [
+          "Spinach",
+          "Mackerel",
+          "Almonds",
+          "Lentils",
+          "Blueberries"
+        ],
+        "foods_to_avoid": [
+          "Processed meats",
+          "Fried foods",
+          "Salty snacks",
+          "Sugary drinks",
+          "Fast food"
+        ]
+      },
+      "monitoring": {
+        "recommendations": [
+          "Check blood pressure and cholesterol routinely.",
+          "Monitor weight periodically."
+        ]
+      },
+      "positive_takeaway": "Your heart is in great shape, keep up your healthy lifestyle."
+    }
+  ],
+  "report_metadata": {
+    "record_id": "REC-TEST-001",
+    "engine_version": "1.0.0",
+    "kb_version": "1.0",
+    "template_version": "1.0.0",
+    "generated_at": "2026-08-03T00:00:00Z",
+    "disease_count": 9,
+    "source": "metsights"
+  }
+}

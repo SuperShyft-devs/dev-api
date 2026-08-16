@@ -9,7 +9,6 @@ from collections.abc import Callable, Coroutine
 from datetime import date, datetime, timezone
 from typing import Any
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -1591,6 +1590,7 @@ class ReportsService:
     # ------------------------------------------------------------------
 
     _NUTRITION_API_QUESTION_KEYS = [
+        "health_priorities",
         "exercise_frequency_week",
         "exercise_level",
         "healthy_breakfast_frequency",
@@ -1602,6 +1602,7 @@ class ReportsService:
         "red_meat_frequency",
         "butter_dish_frequency",
         "dessert_frequency",
+        "extra_salt_frequency",
         "caffeine_frequency",
         "water_intake_frequency",
         "tobacco_frequency",
@@ -1629,8 +1630,8 @@ class ReportsService:
                     IntegrationSyncLog(
                         engagement_id=engagement_id,
                         user_id=user_id,
-                        provider="nutrition_api",
-                        api_endpoint_url=settings.NUTRITION_API_URL,
+                        provider="nutrition_intelligence",
+                        api_endpoint_url="local://nutrition_intelligence",
                         request_payload=payload,
                         status=status,
                         response_payload=response_payload,
@@ -1657,8 +1658,14 @@ class ReportsService:
         *,
         user_id: int | None = None,
         engagement_id: int | None = None,
+        option_reverse_map: dict[str, dict[str, str]] | None = None,
+        user_gender: str | None = None,
     ) -> dict[str, Any]:
-        # `db` is unused for logging on purpose: request rollback must not erase sync logs.
+        """Run the local Nutrition Intelligence Engine and return Health Span payload.
+
+        ``payload`` must use stable questionnaire option_value codes (not UI indexes).
+        ``db`` is unused for logging on purpose: request rollback must not erase sync logs.
+        """
         _ = db
         sync_log_id = await self._persist_nutrition_sync_log(
             engagement_id=engagement_id,
@@ -1668,85 +1675,51 @@ class ReportsService:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=settings.NUTRITION_API_TIMEOUT_SECONDS) as client:
-                response = await client.post(
-                    settings.NUTRITION_API_URL,
-                    json=payload,
-                    headers={"X-API-Key": settings.NUTRITION_API_KEY},
-                )
-                response.raise_for_status()
-                data = response.json()
-                response_payload = data if isinstance(data, dict) else {}
-                await self._persist_nutrition_sync_log(
-                    engagement_id=engagement_id,
-                    user_id=user_id,
-                    payload=payload,
-                    status="success",
-                    response_payload=response_payload,
-                    sync_log_id=sync_log_id,
-                )
-                return response_payload
-        except httpx.HTTPStatusError as exc:
-            status = exc.response.status_code
-            error_message = f"HTTP {status}"
-            if 400 <= status < 500:
-                detail: str | None = None
-                try:
-                    body = exc.response.json()
-                    if isinstance(body, dict):
-                        raw_detail = body.get("detail")
-                        if isinstance(raw_detail, str):
-                            detail = raw_detail
-                        elif isinstance(raw_detail, list):
-                            # FastAPI-style validation error array from nutrition API.
-                            detail = str(raw_detail)[:500]
-                except Exception:
-                    detail = None
-                error_message = detail or "Nutrition API rejected request payload"
-                # Annotate which payload field likely caused the rejection.
-                for qkey, qval in payload.items():
-                    if str(qval) and str(qval) in error_message:
-                        error_message = f"[{qkey}] {error_message}"
-                        break
-                await self._persist_nutrition_sync_log(
-                    engagement_id=engagement_id,
-                    user_id=user_id,
-                    payload=payload,
-                    status="failed",
-                    error_message=error_message,
-                    sync_log_id=sync_log_id,
-                )
-                raise AppError(
-                    status_code=400,
-                    error_code="INVALID_INPUT",
-                    message=error_message,
-                ) from exc
+            from modules.reports.nutrition_intelligence.engine import (
+                run_nutrition_intelligence_from_lookup,
+                serialize_health_span_nutrition,
+            )
+
+            lookup = dict(payload)
+            if "gender" not in lookup and user_gender is not None:
+                lookup["gender"] = user_gender
+            # Height may arrive as scalar + height_unit from the legacy payload builder.
+            if "height" in lookup and not isinstance(lookup.get("height"), dict):
+                lookup["height"] = {
+                    "value": lookup.get("height"),
+                    "unit": lookup.get("height_unit"),
+                }
+
+            result = run_nutrition_intelligence_from_lookup(
+                lookup,
+                user_gender=user_gender,
+                option_reverse_map=option_reverse_map,
+            )
+            response_payload = serialize_health_span_nutrition(result)
+            await self._persist_nutrition_sync_log(
+                engagement_id=engagement_id,
+                user_id=user_id,
+                payload=payload,
+                status="success",
+                response_payload=response_payload,
+                sync_log_id=sync_log_id,
+            )
+            return response_payload
+        except AppError:
+            raise
+        except Exception as exc:
             await self._persist_nutrition_sync_log(
                 engagement_id=engagement_id,
                 user_id=user_id,
                 payload=payload,
                 status="failed",
-                error_message=error_message,
+                error_message=str(exc)[:500],
                 sync_log_id=sync_log_id,
             )
             raise AppError(
-                status_code=503,
-                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
-                message="Nutrition API request failed",
-            ) from exc
-        except httpx.HTTPError as exc:
-            await self._persist_nutrition_sync_log(
-                engagement_id=engagement_id,
-                user_id=user_id,
-                payload=payload,
-                status="failed",
-                error_message=str(exc),
-                sync_log_id=sync_log_id,
-            )
-            raise AppError(
-                status_code=503,
-                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
-                message="Nutrition API request failed",
+                status_code=500,
+                error_code="INTERNAL_ERROR",
+                message="Nutrition intelligence calculation failed",
             ) from exc
 
     async def _build_questionnaire_lookup(
@@ -1942,6 +1915,10 @@ class ReportsService:
         if normalized_height_unit is not None:
             payload["height_unit"] = normalized_height_unit
 
+        weight_value, weight_unit = self._extract_scale_answer(lookup.get("weight"))
+        if weight_value is not None:
+            payload["weight"] = {"value": weight_value, "unit": weight_unit}
+
         return payload
 
     @staticmethod
@@ -2126,6 +2103,8 @@ class ReportsService:
             nutrition_payload,
             user_id=user_id,
             engagement_id=assessment_instance.engagement_id,
+            option_reverse_map=option_reverse_map,
+            user_gender=user_gender,
         )
         nutrition_score_raw = nutrition_response.get("nutrition_score")
         nutrition_score = float(nutrition_score_raw) if isinstance(nutrition_score_raw, (int, float)) else None
@@ -2190,6 +2169,8 @@ class ReportsService:
         if isinstance(water_raw, dict):
             water_detail = WaterDetail(
                 estimated_litres=water_raw.get("estimated_litres"),
+                estimated_low_litres=water_raw.get("estimated_low_litres"),
+                estimated_high_litres=water_raw.get("estimated_high_litres"),
                 ideal_low_litres=water_raw.get("ideal_low_litres"),
                 ideal_high_litres=water_raw.get("ideal_high_litres"),
                 status=water_raw.get("status"),

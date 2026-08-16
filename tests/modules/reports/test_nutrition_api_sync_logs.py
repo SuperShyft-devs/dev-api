@@ -1,13 +1,11 @@
-"""Tests for integration_sync_logs on nutrition API calls."""
+"""Tests for integration_sync_logs on local Nutrition Intelligence calls."""
 
 from __future__ import annotations
 
 import pytest
-import httpx
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from core.config import settings
 from core.exceptions import AppError
 from modules.assessments.repository import AssessmentsRepository
 from modules.audit.repository import AuditRepository
@@ -22,34 +20,6 @@ class _FakeMetsightsService:
     pass
 
 
-async def _seed_engagement(test_db_session, *, engagement_id: int):
-    await test_db_session.execute(
-        text(
-            "INSERT INTO diagnostic_package (diagnostic_package_id, package_name, diagnostic_provider, status) "
-            "VALUES (1, 'Test Diagnostic', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
-        )
-    )
-    await test_db_session.execute(
-        text(
-            "INSERT INTO assessment_packages (package_id, package_code, display_name, assessment_type_code, status) "
-            "VALUES (1, 'FITPRINT', 'FitPrint', '7', 'active') "
-            "ON CONFLICT (package_id) DO UPDATE SET assessment_type_code = EXCLUDED.assessment_type_code"
-        )
-    )
-    await test_db_session.execute(
-        text(
-            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
-            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
-            "status, organization_id) "
-            "VALUES (:eid, 'Nutrition Log Camp', 'ENG-NUT-LOG', 'bio_ai', 1, 1, 'BLR', 20, "
-            "'2026-02-01', '2026-02-28', 'running', 0, NULL) "
-            "ON CONFLICT (engagement_id) DO NOTHING"
-        ),
-        {"eid": engagement_id},
-    )
-    await test_db_session.commit()
-
-
 def _build_reports_service(session_factory=None) -> ReportsService:
     return ReportsService(
         repository=ReportsRepository(),
@@ -62,66 +32,19 @@ def _build_reports_service(session_factory=None) -> ReportsService:
     )
 
 
-def _fake_httpx_client_success(*, nutrition_score: int = 75):
-    class _FakeResponse:
-        status_code = 200
-
-        def raise_for_status(self):
-            return None
-
-        def json(self):
-            return {"nutrition_score": nutrition_score}
-
-    class _FakeClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        async def post(self, url, json=None, headers=None):
-            return _FakeResponse()
-
-    return _FakeClient
-
-
-def _fake_httpx_client_client_error():
-    class _FakeClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        async def post(self, url, json=None, headers=None):
-            request = httpx.Request("POST", url)
-            response = httpx.Response(
-                400,
-                request=request,
-                json={"detail": "invalid literal for int() with base 10: 'Moderate-intensity'"},
-            )
-            raise httpx.HTTPStatusError("bad request", request=request, response=response)
-
-    return _FakeClient
-
-
 @pytest.mark.asyncio
 async def test_call_nutrition_api_creates_integration_sync_log_on_success(
-    test_db_session, test_engine, monkeypatch
+    test_db_session, test_engine
 ):
     await _seed_user(test_db_session, user_id=8801)
-    await _seed_engagement(test_db_session, engagement_id=9901)
-    payload = {"diet_preference": "vegetarian", "water_intake_frequency": "often"}
-    monkeypatch.setattr(
-        "modules.reports.service.httpx.AsyncClient",
-        _fake_httpx_client_success(nutrition_score=82),
-    )
+    payload = {
+        "diet_preference": "1",
+        "food_groups": ["0", "1", "2", "5"],
+        "fresh_fruit_frequency": "0",
+        "fresh_vegetable_frequency": "0",
+        "water_intake_frequency": "4",
+        "health_priorities": ["0"],
+    }
 
     session_factory = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
     service = _build_reports_service(session_factory=session_factory)
@@ -129,26 +52,31 @@ async def test_call_nutrition_api_creates_integration_sync_log_on_success(
         test_db_session,
         payload,
         user_id=8801,
-        engagement_id=9901,
+        engagement_id=None,
     )
-    assert response == {"nutrition_score": 82}
+    assert isinstance(response.get("nutrition_score"), (int, float))
+    assert "carbs" in response
+    assert "protein" in response
+    assert "fats" in response
+    assert "fibre" in response
+    assert "water" in response
 
     result = await test_db_session.execute(
         text(
             "SELECT provider, engagement_id, user_id, api_endpoint_url, request_payload, "
             "response_payload, status, error_message "
-            "FROM integration_sync_logs WHERE provider = 'nutrition_api' "
+            "FROM integration_sync_logs WHERE provider = 'nutrition_intelligence' "
             "ORDER BY sync_log_id DESC LIMIT 1"
         )
     )
     row = result.mappings().one()
-    assert row["provider"] == "nutrition_api"
-    assert row["engagement_id"] == 9901
+    assert row["provider"] == "nutrition_intelligence"
+    assert row["engagement_id"] is None
     assert row["user_id"] == 8801
-    assert row["api_endpoint_url"] == settings.NUTRITION_API_URL
+    assert row["api_endpoint_url"] == "local://nutrition_intelligence"
     assert row["request_payload"] == payload
     assert row["status"] == "success"
-    assert row["response_payload"] == {"nutrition_score": 82}
+    assert row["response_payload"]["nutrition_score"] == response["nutrition_score"]
     assert row["error_message"] is None
 
 
@@ -158,11 +86,14 @@ async def test_call_nutrition_api_creates_integration_sync_log_on_failure_withou
 ):
     """Failed nutrition calls must persist sync logs even when the request session rolls back."""
     await _seed_user(test_db_session, user_id=8802)
-    await _seed_engagement(test_db_session, engagement_id=9902)
-    payload = {"exercise_level": "Moderate-intensity"}
+    payload = {"diet_preference": "1"}
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("engine exploded")
+
     monkeypatch.setattr(
-        "modules.reports.service.httpx.AsyncClient",
-        _fake_httpx_client_client_error(),
+        "modules.reports.nutrition_intelligence.engine.run_nutrition_intelligence_from_lookup",
+        _boom,
     )
 
     session_factory = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
@@ -172,25 +103,23 @@ async def test_call_nutrition_api_creates_integration_sync_log_on_failure_withou
             test_db_session,
             payload,
             user_id=8802,
-            engagement_id=9902,
+            engagement_id=None,
         )
-    assert exc_info.value.error_code == "INVALID_INPUT"
-    assert "[exercise_level]" in exc_info.value.message
+    assert exc_info.value.error_code == "INTERNAL_ERROR"
 
-    # Simulate route rollback of the request session (do NOT commit test_db_session).
     await test_db_session.rollback()
 
     result = await test_db_session.execute(
         text(
             "SELECT status, error_message, response_payload, request_payload "
-            "FROM integration_sync_logs WHERE provider = 'nutrition_api' "
+            "FROM integration_sync_logs WHERE provider = 'nutrition_intelligence' "
             "AND user_id = 8802 "
             "ORDER BY sync_log_id DESC LIMIT 1"
         )
     )
     row = result.mappings().one()
     assert row["status"] == "failed"
-    assert "Moderate-intensity" in (row["error_message"] or "")
+    assert "engine exploded" in (row["error_message"] or "")
     assert row["response_payload"] is None
     assert row["request_payload"] == payload
 
