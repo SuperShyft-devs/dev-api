@@ -13,7 +13,7 @@ from modules.diagnostics.models import DiagnosticPackage
 from modules.employee.models import Employee
 from modules.engagements.models import Engagement, OnboardingAssistantAssignment
 from modules.organizations.models import Organization
-from modules.users.models import User
+from tests.helpers.org_contact import org_contact_person_ids
 
 
 def _auth_header(user_id: int) -> dict[str, str]:
@@ -125,7 +125,9 @@ async def _seed_org_manager_with_engagement(
             name=f"Org {organization_id}",
             organization_type="corporate",
             status="active",
-            contact_person_user_id=contact_person_user_id if contact_person_user_id is not None else manager_user_id,
+            contact_person_user_ids=org_contact_person_ids(
+                contact_person_user_id if contact_person_user_id is not None else manager_user_id
+            ),
         )
     )
     engagement = await _seed_engagement(

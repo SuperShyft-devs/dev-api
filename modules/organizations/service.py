@@ -26,6 +26,12 @@ from modules.employee.models import Employee, EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import format_camp_name
+from modules.organizations.contact_person import (
+    build_camp_report_access,
+    iter_contact_person_user_ids,
+    parse_contact_person_user_ids,
+    validate_contact_person_department_slugs,
+)
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.schemas import OrganizationCreateRequest, OrganizationUpdateRequest
@@ -144,6 +150,23 @@ class OrganizationsService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         return user_id
 
+    async def _validate_contact_person_user_ids(
+        self,
+        db,
+        raw,
+        *,
+        allowed_department_slugs: set[str],
+    ) -> dict | None:
+        parsed = parse_contact_person_user_ids(raw)
+        validate_contact_person_department_slugs(parsed, allowed_department_slugs)
+        for user_id in iter_contact_person_user_ids(parsed):
+            await self._validate_contact_person_user_id(db, user_id)
+        return parsed
+
+    async def _ensure_contact_person_employees(self, db, user_ids: set[int]) -> None:
+        for user_id in user_ids:
+            await self._ensure_contact_person_employee(db, user_id)
+
     async def _ensure_contact_person_employee(self, db, user_id: int) -> None:
         existing = await self._employee_repository.get_by_user_id(db, user_id)
         if existing is None:
@@ -179,9 +202,12 @@ class OrganizationsService:
         if existing is not None:
             raise AppError(status_code=409, error_code="ORGANIZATION_ALREADY_EXISTS", message="Organization already exists")
 
-        contact_person_user_id = await self._validate_contact_person_user_id(
+        departments = _normalize_departments(payload.departments)
+        allowed_slugs = {item["slug"] for item in departments} if departments else set()
+        contact_person_user_ids = await self._validate_contact_person_user_ids(
             db,
-            payload.contact_person_user_id,
+            payload.contact_person_user_ids,
+            allowed_department_slugs=allowed_slugs,
         )
 
         organization = Organization(
@@ -194,9 +220,9 @@ class OrganizationsService:
             city=payload.city,
             state=payload.state,
             country=payload.country,
-            contact_person_user_id=contact_person_user_id,
+            contact_person_user_ids=contact_person_user_ids,
             bd_employee_id=payload.bd_employee_id,
-            departments=_normalize_departments(payload.departments),
+            departments=departments,
             industry_key=payload.industry_key or None,
             status="active",
             created_employee_id=employee.employee_id,
@@ -205,8 +231,10 @@ class OrganizationsService:
 
         organization = await self._repository.create(db, organization)
 
-        if contact_person_user_id is not None:
-            await self._ensure_contact_person_employee(db, contact_person_user_id)
+        await self._ensure_contact_person_employees(
+            db,
+            iter_contact_person_user_ids(contact_person_user_ids),
+        )
 
         audit = self._require_audit_service()
         await audit.log_event(
@@ -236,7 +264,7 @@ class OrganizationsService:
             "country": organization.country,
             "industry_key": organization.industry_key,
             "industry": industry,
-            "contact_person_user_id": organization.contact_person_user_id,
+            "contact_person_user_ids": organization.contact_person_user_ids,
             "bd_employee_id": organization.bd_employee_id,
             "departments": organization.departments,
             "status": organization.status,
@@ -342,10 +370,23 @@ class OrganizationsService:
             db,
             organization_ids=org_ids,
         )
+        reported_slugs_by_org = await self._repository.list_reported_department_slugs_by_organization_ids(
+            db,
+            organization_ids=org_ids,
+        )
         result = []
         for org, industry in organizations:
+            oid = int(org.organization_id)
+            camp_cities = cities_by_org.get(oid, [])
             item = self.organization_to_details_dict(org, industry)
-            item["camp_cities"] = cities_by_org.get(int(org.organization_id), [])
+            item["camp_cities"] = camp_cities
+            item["report_access"] = build_camp_report_access(
+                org.contact_person_user_ids,
+                employee.user_id,
+                camp_cities=camp_cities,
+                reported_dept_slugs=reported_slugs_by_org.get(oid, []),
+                is_admin=employee.role == EmployeeRole.admin,
+            )
             result.append(item)
         return result, total
 
@@ -499,16 +540,24 @@ class OrganizationsService:
         organization.state = payload.state
         organization.country = payload.country
         organization.industry_key = payload.industry_key or None
+        departments = _normalize_departments(payload.departments)
+        allowed_slugs = (
+            {item["slug"] for item in departments}
+            if departments
+            else get_department_slugs(organization)
+        )
         if is_internal_employee(employee.role):
-            contact_person_user_id = await self._validate_contact_person_user_id(
+            previous_user_ids = iter_contact_person_user_ids(organization.contact_person_user_ids)
+            contact_person_user_ids = await self._validate_contact_person_user_ids(
                 db,
-                payload.contact_person_user_id,
+                payload.contact_person_user_ids,
+                allowed_department_slugs=allowed_slugs,
             )
-            organization.contact_person_user_id = contact_person_user_id
-            if contact_person_user_id is not None:
-                await self._ensure_contact_person_employee(db, contact_person_user_id)
+            organization.contact_person_user_ids = contact_person_user_ids
+            new_user_ids = iter_contact_person_user_ids(contact_person_user_ids)
+            await self._ensure_contact_person_employees(db, previous_user_ids | new_user_ids)
         organization.bd_employee_id = payload.bd_employee_id
-        organization.departments = _normalize_departments(payload.departments)
+        organization.departments = departments
         organization.updated_employee_id = employee.employee_id
 
         organization = await self._repository.update(db, organization)
@@ -641,6 +690,7 @@ class OrganizationsService:
         *,
         engagement_ids_by_camp: dict[int, list[int]],
         reported_slugs_by_camp: dict[int, list[str]],
+        cities_by_camp: dict[int, list[str]],
         org_departments_by_id: dict[int, list[dict[str, str]]],
     ) -> list[dict]:
         result = []
@@ -663,7 +713,8 @@ class OrganizationsService:
                 if item.get("slug")
             }
             departments = []
-            for slug in reported_slugs_by_camp.get(cid, []):
+            reported_slugs = reported_slugs_by_camp.get(cid, [])
+            for slug in reported_slugs:
                 departments.append(
                     {
                         "name": slug_to_name.get(slug.lower(), slug),
@@ -671,6 +722,7 @@ class OrganizationsService:
                     }
                 )
 
+            camp_cities = cities_by_camp.get(cid, [])
             result.append(
                 {
                     "camp_no": cid,
@@ -685,11 +737,19 @@ class OrganizationsService:
                         "count": len(departments),
                         "departments": departments,
                     },
+                    "cities": {
+                        "count": len(camp_cities),
+                        "cities": camp_cities,
+                    },
                 }
             )
         return result
 
-    async def _enrich_camp_rows(self, db, rows: list[tuple]) -> list[dict]:
+    async def _enrich_camp_rows(
+        self,
+        db,
+        rows: list[tuple],
+    ) -> list[dict]:
         camp_nos = [int(row[0]) for row in rows]
         organization_ids = list({int(row[1]) for row in rows})
         engagement_ids_by_camp = await self._repository.list_engagement_ids_by_camp_nos(
@@ -698,6 +758,10 @@ class OrganizationsService:
         reported_slugs_by_camp = await self._repository.list_reported_department_slugs_by_camp_nos(
             db, camp_nos=camp_nos
         )
+        cities_by_camp = await self._repository.list_distinct_cities_by_camp_nos(
+            db,
+            camp_nos=camp_nos,
+        )
         org_departments_by_id = await self._repository.list_organization_departments_by_ids(
             db, organization_ids=organization_ids
         )
@@ -705,6 +769,7 @@ class OrganizationsService:
             rows,
             engagement_ids_by_camp=engagement_ids_by_camp,
             reported_slugs_by_camp=reported_slugs_by_camp,
+            cities_by_camp=cities_by_camp,
             org_departments_by_id=org_departments_by_id,
         )
 

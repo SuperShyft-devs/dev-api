@@ -13,7 +13,7 @@ from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.models import Engagement
 from modules.organizations.models import Organization
 from modules.reports.models import CampReport
-from modules.users.models import User
+from tests.helpers.org_contact import org_contact_person_ids
 
 
 def _auth_header(user_id: int) -> dict[str, str]:
@@ -47,7 +47,7 @@ async def _seed_org_with_camps(
             name="Target Org",
             organization_type="corporate",
             status="active",
-            contact_person_user_id=contact_person_user_id,
+            contact_person_user_ids=org_contact_person_ids(contact_person_user_id),
             departments=[{"department": "Sales", "slug": "sales"}],
         )
     )
@@ -133,7 +133,8 @@ async def test_list_organization_camps_admin_sees_only_target_org(async_client, 
     assert all(row["organization_id"] == 8101 for row in camps)
     assert all(row["organization_name"] == "Target Org" for row in camps)
     assert all(row["organization_logo"] is None for row in camps)
-    assert all("year" in row and "engagement_ids" in row and "departments" in row for row in camps)
+    assert all("year" in row and "engagement_ids" in row and "departments" in row and "cities" in row for row in camps)
+    assert all("report_access" not in row for row in camps)
 
 
 @pytest.mark.asyncio

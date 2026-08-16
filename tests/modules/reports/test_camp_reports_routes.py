@@ -549,7 +549,7 @@ async def _seed_organization_manager_for_camp(
             name="Managed Camp Org",
             organization_type="corporate",
             status="active",
-            contact_person_user_id=manager_user_id,
+            contact_person_user_ids={"organization_managers": [manager_user_id]},
             departments=[
                 {"department": "Sales", "slug": "sales"},
                 {"department": "Engineering", "slug": "engineering"},

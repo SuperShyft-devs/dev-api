@@ -139,7 +139,7 @@ async def test_update_organization_updates_fields(async_client, test_db_session)
         "city": None,
         "state": None,
         "country": None,
-        "contact_person_user_id": None,
+        "contact_person_user_ids": None,
         "bd_employee_id": None,
     }
 
@@ -255,7 +255,7 @@ async def test_create_organization_with_contact_person_creates_organization_mana
 
     payload = {
         "name": "ContactPersonOrg",
-        "contact_person_user_id": 7111,
+        "contact_person_user_ids": {"organization_managers": [7111]},
     }
 
     response = await async_client.post("/organizations", headers=_auth_header(7110), json=payload)
@@ -264,7 +264,7 @@ async def test_create_organization_with_contact_person_creates_organization_mana
     organization_id = response.json()["data"]["organization_id"]
     created = await test_db_session.get(Organization, organization_id)
     assert created is not None
-    assert created.contact_person_user_id == 7111
+    assert created.contact_person_user_ids == {"organization_managers": [7111]}
 
     from sqlalchemy import select
 
@@ -289,14 +289,14 @@ async def test_organization_manager_can_get_own_organization(async_client, test_
             organization_id=9501,
             name="ManagedOrg",
             status="active",
-            contact_person_user_id=7120,
+            contact_person_user_ids={"organization_managers": [7120]},
         )
     )
     await test_db_session.commit()
 
     response = await async_client.get("/organizations/9501", headers=_auth_header(7120))
     assert response.status_code == 200
-    assert response.json()["data"]["contact_person_user_id"] == 7120
+    assert response.json()["data"]["contact_person_user_ids"] == {"organization_managers": [7120]}
 
 
 @pytest.mark.asyncio
@@ -313,7 +313,7 @@ async def test_organization_manager_cannot_get_other_organization(async_client, 
             organization_id=9502,
             name="OtherOrg",
             status="active",
-            contact_person_user_id=7123,
+            contact_person_user_ids={"organization_managers": [7123]},
         )
     )
     await test_db_session.commit()

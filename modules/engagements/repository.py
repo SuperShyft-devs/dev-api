@@ -431,12 +431,18 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         engagement_id: int,
+        participant_department_slugs: set[str] | None = None,
     ) -> int:
-        result = await db.execute(
-            select(func.count(func.distinct(EngagementParticipant.user_id))).where(
-                EngagementParticipant.engagement_id == engagement_id
-            )
+        query = select(func.count(func.distinct(EngagementParticipant.user_id))).where(
+            EngagementParticipant.engagement_id == engagement_id
         )
+        if participant_department_slugs is not None:
+            if not participant_department_slugs:
+                return 0
+            query = query.where(
+                EngagementParticipant.participant_department.in_(participant_department_slugs)
+            )
+        result = await db.execute(query)
         return int(result.scalar_one() or 0)
 
     async def count_distinct_participants_by_engagement_ids(
@@ -589,9 +595,11 @@ class EngagementsRepository:
         *,
         employee_id: int,
         user_id: int,
+        allowed_cities: list[str] | None = None,
     ) -> list[Engagement]:
-        """List engagements assigned to employee where user is org contact person (any status)."""
+        """List engagements assigned to employee where user is in org contact persons (any status)."""
         from modules.organizations.models import Organization
+        from modules.organizations.repository import OrganizationsRepository
 
         query = (
             select(Engagement)
@@ -605,10 +613,20 @@ class EngagementsRepository:
             )
             .where(
                 OnboardingAssistantAssignment.employee_id == employee_id,
-                Organization.contact_person_user_id == user_id,
+                OrganizationsRepository._contact_person_user_ids_contains_user(user_id),
             )
             .order_by(Engagement.start_date.desc(), Engagement.engagement_id.desc())
         )
+        if allowed_cities is not None:
+            normalized_cities = [city.strip() for city in allowed_cities if city and city.strip()]
+            if normalized_cities:
+                query = query.where(
+                    func.lower(func.trim(Engagement.city)).in_(
+                        [city.casefold() for city in normalized_cities]
+                    )
+                )
+            else:
+                return []
         result = await db.execute(query)
         return list(result.scalars().all())
 
@@ -697,11 +715,20 @@ class EngagementsRepository:
         engagement_id: int,
         page: int,
         limit: int,
+        participant_department_slugs: set[str] | None = None,
     ) -> list[tuple]:
         """Fetch participant enrollment rows for a specific engagement."""
         from modules.users.models import User
 
         offset = (page - 1) * limit
+
+        participant_filters = [EngagementParticipant.engagement_id == engagement_id]
+        if participant_department_slugs is not None:
+            if not participant_department_slugs:
+                return []
+            participant_filters.append(
+                EngagementParticipant.participant_department.in_(participant_department_slugs)
+            )
 
         ranked_rows = (
             select(
@@ -741,7 +768,7 @@ class EngagementsRepository:
             )
             .select_from(EngagementParticipant)
             .join(User, User.user_id == EngagementParticipant.user_id)
-            .where(EngagementParticipant.engagement_id == engagement_id)
+            .where(*participant_filters)
         ).subquery()
 
         query = (

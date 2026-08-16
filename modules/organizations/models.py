@@ -38,7 +38,7 @@ class Organization(Base):
     state = Column(String)
     country = Column(String)
 
-    contact_person_user_id = Column(Integer, ForeignKey("users.user_id"))
+    contact_person_user_ids = Column(JSON, nullable=True)
 
     bd_employee_id = Column(Integer, ForeignKey("employee.employee_id"))
     departments = Column(JSON, nullable=True)

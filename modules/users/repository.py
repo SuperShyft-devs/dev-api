@@ -690,11 +690,19 @@ class UsersRepository:
             .where(Notification.triggered_by_user_id.in_(user_ids))
             .values(triggered_by_user_id=None)
         )
-        await db.execute(
-            update(Organization)
-            .where(Organization.contact_person_user_id.in_(user_ids))
-            .values(contact_person_user_id=None)
+        org_rows = await db.execute(
+            select(Organization).where(Organization.contact_person_user_ids.isnot(None))
         )
+        from modules.organizations.contact_person import remove_user_from_contact_person_user_ids
+
+        for organization in org_rows.scalars().all():
+            for user_id in user_ids:
+                updated = remove_user_from_contact_person_user_ids(
+                    organization.contact_person_user_ids,
+                    user_id,
+                )
+                if updated != organization.contact_person_user_ids:
+                    organization.contact_person_user_ids = updated
 
         # Employee rows reference users; organizations and onboarding assignments reference employee.
         employee_ids_subq = select(Employee.employee_id).where(Employee.user_id.in_(user_ids))

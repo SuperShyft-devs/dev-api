@@ -37,7 +37,7 @@ async def _seed_orgs(test_db_session):
             name="Managed Org A",
             organization_type="corporate",
             status="active",
-            contact_person_user_id=7410,
+            contact_person_user_ids={"organization_managers": [7410]},
             departments=[{"department": "Sales", "slug": "sales"}],
             address="Addr A",
             city="BLR",
@@ -50,7 +50,7 @@ async def _seed_orgs(test_db_session):
             name="Other Org",
             organization_type="corporate",
             status="active",
-            contact_person_user_id=7411,
+            contact_person_user_ids={"organization_managers": [7411]},
             city="MUM",
             country="IN",
         )
@@ -81,9 +81,12 @@ async def test_list_my_organizations_admin_returns_all_with_details(async_client
 
     managed = next(row for row in orgs if row["organization_id"] == 8501)
     assert managed["name"] == "Managed Org A"
-    assert managed["contact_person_user_id"] == 7410
+    assert managed["contact_person_user_ids"] == {"organization_managers": [7410]}
     assert managed["address"] == "Addr A"
     assert managed["departments"] == [{"department": "Sales", "slug": "sales"}]
+    assert "camp_cities" in managed
+    assert "report_access" in managed
+    assert managed["report_access"]["organization_manager"] is True
     assert "created_at" in managed
     assert "updated_at" in managed
 
@@ -106,7 +109,9 @@ async def test_list_my_organizations_org_manager_own_only(async_client, test_db_
     assert len(orgs) == 1
     assert orgs[0]["organization_id"] == 8501
     assert orgs[0]["name"] == "Managed Org A"
-    assert orgs[0]["contact_person_user_id"] == manager_user_id
+    assert orgs[0]["contact_person_user_ids"] == {"organization_managers": [manager_user_id]}
+    assert "report_access" in orgs[0]
+    assert orgs[0]["report_access"]["organization_manager"] is True
 
 
 @pytest.mark.asyncio

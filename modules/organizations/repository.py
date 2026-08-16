@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import case, cast, func, or_, select
+from sqlalchemy import case, cast, func, or_, select, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,39 @@ from modules.reports.models import CampReport
 
 class OrganizationsRepository:
     """Organization database queries."""
+
+    _CONTACT_PERSON_JSON_MEMBER_SQL = """
+        (
+            organizations.contact_person_user_ids IS NOT NULL
+            AND (
+                organizations.contact_person_user_ids::jsonb->'organization_managers' @> :uid_json::jsonb
+                OR EXISTS (
+                    SELECT 1
+                    FROM jsonb_each(organizations.contact_person_user_ids::jsonb) AS city_entry(city_key, city_val)
+                    WHERE city_key <> 'organization_managers'
+                      AND jsonb_typeof(city_val) = 'object'
+                      AND (
+                          city_val->'managers' @> :uid_json::jsonb
+                          OR EXISTS (
+                              SELECT 1
+                              FROM jsonb_each(city_val) AS dept_entry(dept_key, dept_val)
+                              WHERE dept_key <> 'managers'
+                                AND jsonb_typeof(dept_val) = 'array'
+                                AND dept_val @> :uid_json::jsonb
+                          )
+                      )
+                )
+            )
+        )
+    """
+
+    @staticmethod
+    def _contact_person_user_ids_contains_user(user_id: int):
+        import json
+
+        return text(OrganizationsRepository._CONTACT_PERSON_JSON_MEMBER_SQL).bindparams(
+            uid_json=json.dumps([user_id])
+        )
 
     _ORG_SORT_COLUMNS = {
         "organization_id": Organization.organization_id,
@@ -49,7 +82,7 @@ class OrganizationsRepository:
         if bd_employee_id is not None:
             query = query.where(Organization.bd_employee_id == bd_employee_id)
         if contact_person_user_id is not None:
-            query = query.where(Organization.contact_person_user_id == contact_person_user_id)
+            query = query.where(self._contact_person_user_ids_contains_user(contact_person_user_id))
         if city is not None and city.strip():
             query = query.where(func.lower(func.trim(Organization.city)) == city.strip().lower())
         if country is not None and country.strip():
@@ -432,6 +465,76 @@ class OrganizationsRepository:
                 continue
             seen[cid].add(key)
             by_camp.setdefault(cid, []).append(slug)
+        return by_camp
+
+    async def list_reported_department_slugs_by_organization_ids(
+        self,
+        db: AsyncSession,
+        *,
+        organization_ids: list[int],
+    ) -> dict[int, list[str]]:
+        """Distinct non-null department slugs from camp_reports rows per organization."""
+        if not organization_ids:
+            return {}
+        result = await db.execute(
+            select(CampReport.organization_id, CampReport.department)
+            .where(
+                CampReport.organization_id.in_(organization_ids),
+                CampReport.department.isnot(None),
+                func.trim(CampReport.department) != "",
+            )
+            .distinct()
+            .order_by(CampReport.organization_id.asc(), CampReport.department.asc())
+        )
+        by_org: dict[int, list[str]] = {int(oid): [] for oid in organization_ids}
+        seen: dict[int, set[str]] = {int(oid): set() for oid in organization_ids}
+        for organization_id, department in result.all():
+            if organization_id is None or department is None:
+                continue
+            oid = int(organization_id)
+            slug = str(department).strip()
+            if not slug:
+                continue
+            key = slug.lower()
+            if key in seen.setdefault(oid, set()):
+                continue
+            seen[oid].add(key)
+            by_org.setdefault(oid, []).append(slug)
+        return by_org
+
+    async def list_distinct_cities_by_camp_nos(
+        self,
+        db: AsyncSession,
+        *,
+        camp_nos: list[int],
+    ) -> dict[int, list[str]]:
+        """Distinct non-empty engagement.city values per camp_no."""
+        if not camp_nos:
+            return {}
+        result = await db.execute(
+            select(Engagement.camp_no, Engagement.city)
+            .where(
+                Engagement.camp_no.in_(camp_nos),
+                Engagement.city.isnot(None),
+                func.trim(Engagement.city) != "",
+            )
+            .distinct()
+            .order_by(Engagement.camp_no.asc(), Engagement.city.asc())
+        )
+        by_camp: dict[int, list[str]] = {int(c): [] for c in camp_nos}
+        seen: dict[int, set[str]] = {int(c): set() for c in camp_nos}
+        for camp_no, city in result.all():
+            if camp_no is None or city is None:
+                continue
+            cid = int(camp_no)
+            trimmed = str(city).strip()
+            if not trimmed:
+                continue
+            key = trimmed.casefold()
+            if key in seen.setdefault(cid, set()):
+                continue
+            seen[cid].add(key)
+            by_camp.setdefault(cid, []).append(trimmed)
         return by_camp
 
     async def list_organization_departments_by_ids(

@@ -8,6 +8,12 @@ from core.exceptions import AppError
 from modules.employee.models import EmployeeRole
 from modules.employee.service import EmployeeContext
 from modules.engagements.repository import EngagementsRepository
+from modules.organizations.contact_person import (
+    OrgManagerScope,
+    normalize_city_key,
+    resolve_org_manager_scope,
+    user_has_any_org_contact_role,
+)
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
 
@@ -112,6 +118,65 @@ def ensure_engagement_running(engagement) -> None:
         )
 
 
+def resolve_org_manager_scope_for_organization(
+    organization: Organization,
+    user_id: int,
+) -> OrgManagerScope | None:
+    return resolve_org_manager_scope(organization.contact_person_user_ids, user_id)
+
+
+def ensure_org_manager_has_contact_role(organization: Organization, user_id: int) -> OrgManagerScope:
+    scope = resolve_org_manager_scope_for_organization(organization, user_id)
+    if scope is None:
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+    return scope
+
+
+def ensure_engagement_city_access(scope: OrgManagerScope, engagement_city: str | None) -> None:
+    if not scope.can_access_engagement_city(engagement_city):
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+
+def ensure_camp_report_scope(
+    scope: OrgManagerScope,
+    *,
+    city: str | None,
+    department: str | None,
+) -> None:
+    if not scope.can_access_camp_report(city, department):
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+
+def ensure_participant_department_access(
+    scope: OrgManagerScope,
+    *,
+    engagement_city: str | None,
+    participant_department: str | None,
+) -> None:
+    allowed_slugs = scope.participant_department_slugs_for_city(engagement_city)
+    if allowed_slugs is None:
+        return
+    dept = (participant_department or "").strip()
+    if dept not in allowed_slugs:
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+
 async def ensure_console_access(
     db: AsyncSession,
     employee: EmployeeContext | None,
@@ -148,7 +213,16 @@ async def ensure_console_access(
                 error_code="FORBIDDEN",
                 message="You do not have permission to perform this action",
             )
-        await ensure_org_access(db, employee, engagement.organization_id)
+
+        organization = await _load_organization(db, engagement.organization_id)
+        if organization is None:
+            raise AppError(
+                status_code=404,
+                error_code="ORGANIZATION_NOT_FOUND",
+                message="Organization does not exist",
+            )
+        scope = ensure_org_manager_has_contact_role(organization, employee.user_id)
+        ensure_engagement_city_access(scope, engagement.city)
         return
 
     if employee.role != EmployeeRole.onboarding_assistant:
@@ -216,12 +290,15 @@ async def ensure_org_manager_assignable_to_engagement(
             error_code="ORGANIZATION_NOT_FOUND",
             message="Organization does not exist",
         )
-    if organization.contact_person_user_id != assignee_user_id:
+
+    scope = resolve_org_manager_scope_for_organization(organization, assignee_user_id)
+    if scope is None:
         raise AppError(
             status_code=400,
             error_code="INVALID_INPUT",
-            message="Organization manager must be the contact person for the engagement organization",
+            message="Organization manager must be assigned in the organization contact persons",
         )
+    ensure_engagement_city_access(scope, engagement.city)
 
 
 async def ensure_org_access(
@@ -230,10 +307,10 @@ async def ensure_org_access(
     organization_id: int,
     *,
     repository: OrganizationsRepository | None = None,
-) -> None:
+) -> OrgManagerScope | None:
     ensure_employee_present(employee)
     if is_internal_employee(employee.role):
-        return
+        return None
 
     if employee.role != EmployeeRole.organization_manager:
         raise AppError(
@@ -250,12 +327,7 @@ async def ensure_org_access(
             message="Organization does not exist",
         )
 
-    if organization.contact_person_user_id != employee.user_id:
-        raise AppError(
-            status_code=403,
-            error_code="FORBIDDEN",
-            message="You do not have permission to perform this action",
-        )
+    return ensure_org_manager_has_contact_role(organization, employee.user_id)
 
 
 async def ensure_camp_access(
@@ -264,13 +336,18 @@ async def ensure_camp_access(
     organization_id: int,
     *,
     repository: OrganizationsRepository | None = None,
+    city: str | None = None,
+    department: str | None = None,
 ) -> None:
-    await ensure_org_access(
+    scope = await ensure_org_access(
         db,
         employee,
         organization_id,
         repository=repository,
     )
+    if scope is None:
+        return
+    ensure_camp_report_scope(scope, city=city, department=department)
 
 
 async def ensure_camp_access_admin_or_org_manager(
@@ -300,7 +377,7 @@ async def ensure_camp_access_admin_or_org_manager(
             message="Organization does not exist",
         )
 
-    if organization.contact_person_user_id != employee.user_id:
+    if not user_has_any_org_contact_role(organization.contact_person_user_ids, employee.user_id):
         raise AppError(
             status_code=403,
             error_code="FORBIDDEN",
@@ -308,11 +385,48 @@ async def ensure_camp_access_admin_or_org_manager(
         )
 
 
+async def ensure_camp_report_access_for_employee(
+    db: AsyncSession,
+    employee: EmployeeContext | None,
+    organization_id: int,
+    *,
+    city: str | None,
+    department: str | None,
+    repository: OrganizationsRepository | None = None,
+) -> None:
+    scope = await ensure_org_access(
+        db,
+        employee,
+        organization_id,
+        repository=repository,
+    )
+    if scope is None:
+        return
+    ensure_camp_report_scope(scope, city=city, department=department)
+
+
+async def get_org_manager_scope_for_employee(
+    db: AsyncSession,
+    employee: EmployeeContext,
+    organization_id: int,
+    *,
+    repository: OrganizationsRepository | None = None,
+) -> OrgManagerScope | None:
+    if employee.role == EmployeeRole.admin:
+        return OrgManagerScope(is_org_manager=True)
+    if employee.role != EmployeeRole.organization_manager:
+        return None
+    organization = await _load_organization(db, organization_id, repository=repository)
+    if organization is None:
+        return None
+    return resolve_org_manager_scope_for_organization(organization, employee.user_id)
+
+
 async def _load_organization(
     db: AsyncSession,
     organization_id: int,
     *,
-    repository: OrganizationsRepository | None,
+    repository: OrganizationsRepository | None = None,
 ) -> Organization | None:
     if repository is not None:
         return await repository.get_by_id(db, organization_id)

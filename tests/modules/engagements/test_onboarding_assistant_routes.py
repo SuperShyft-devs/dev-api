@@ -544,7 +544,7 @@ async def test_add_onboarding_assistants_accepts_organization_manager_when_conta
             name="Assignable Org",
             organization_type="corporate",
             status="active",
-            contact_person_user_id=9033,
+            contact_person_user_ids={"organization_managers": [9033]},
         )
     )
     test_db_session.add(
@@ -592,7 +592,7 @@ async def test_add_onboarding_assistants_rejects_organization_manager_wrong_org(
             name="Other Org",
             organization_type="corporate",
             status="active",
-            contact_person_user_id=9999,
+            contact_person_user_ids={"organization_managers": [9999]},
         )
     )
     test_db_session.add(

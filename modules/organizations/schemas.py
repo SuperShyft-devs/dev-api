@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -42,7 +42,7 @@ class OrganizationCreateRequest(BaseModel):
     state: Optional[str] = Field(default=None, max_length=100)
     country: Optional[str] = Field(default=None, max_length=100)
 
-    contact_person_user_id: Optional[int] = Field(default=None, gt=0)
+    contact_person_user_ids: Optional[dict[str, Any]] = None
     bd_employee_id: Optional[int] = Field(default=None, gt=0)
     departments: Optional[list[OrganizationDepartmentInput]] = None
     industry_key: Optional[str] = Field(default=None, max_length=100)
@@ -59,7 +59,7 @@ class OrganizationUpdateRequest(BaseModel):
     state: Optional[str] = Field(default=None, max_length=100)
     country: Optional[str] = Field(default=None, max_length=100)
 
-    contact_person_user_id: Optional[int] = Field(default=None, gt=0)
+    contact_person_user_ids: Optional[dict[str, Any]] = None
     bd_employee_id: Optional[int] = Field(default=None, gt=0)
     departments: Optional[list[OrganizationDepartmentInput]] = None
     industry_key: Optional[str] = Field(default=None, max_length=100)
@@ -97,7 +97,7 @@ class OrganizationDetailsResponse(BaseModel):
     industry_key: Optional[str] = None
     industry: Optional[str] = None
 
-    contact_person_user_id: Optional[int] = None
+    contact_person_user_ids: Optional[dict[str, Any]] = None
 
     bd_employee_id: Optional[int] = None
     departments: Optional[list[OrganizationDepartment]] = None
@@ -107,6 +107,11 @@ class OrganizationDetailsResponse(BaseModel):
     created_employee_id: Optional[int] = None
     updated_at: Optional[datetime] = None
     updated_employee_id: Optional[int] = None
+
+
+class MyOrganizationListItem(OrganizationDetailsResponse):
+    camp_cities: list[str] = []
+    report_access: dict[str, Any] = {}
 
 
 class OrganizationParticipantItem(BaseModel):
@@ -131,6 +136,11 @@ class CampDepartmentsPayload(BaseModel):
     departments: list[CampDepartmentItem]
 
 
+class CampCitiesPayload(BaseModel):
+    count: int
+    cities: list[str]
+
+
 class CampListItem(BaseModel):
     camp_no: int
     camp_name: str
@@ -141,6 +151,7 @@ class CampListItem(BaseModel):
     organization_logo: Optional[str] = None
     engagement_ids: list[int]
     departments: CampDepartmentsPayload
+    cities: CampCitiesPayload
 
 
 class CampRemapRequest(BaseModel):

@@ -20,9 +20,12 @@ from modules.employee.access_control import (
     ensure_console_access,
     ensure_employee_present,
     ensure_engagement_running,
+    ensure_participant_department_access,
+    resolve_org_manager_scope_for_organization,
 )
 from modules.employee.models import EmployeeRole
 from modules.employee.service import EmployeeContext
+from modules.organizations.models import Organization
 from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
 from modules.assessments.repository import AssessmentsRepository
 from modules.engagements.models import Engagement, EngagementParticipant
@@ -122,6 +125,23 @@ class ConsoleService:
         self._questionnaire_service = questionnaire_service
         self._metsights_sync_service = metsights_sync_service
 
+    async def _resolve_console_participant_department_slugs(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement: Engagement,
+    ) -> set[str] | None:
+        if employee.role != EmployeeRole.organization_manager or engagement.organization_id is None:
+            return None
+        organization = await db.get(Organization, engagement.organization_id)
+        if organization is None:
+            return set()
+        scope = resolve_org_manager_scope_for_organization(organization, employee.user_id)
+        if scope is None:
+            return set()
+        return scope.participant_department_slugs_for_city(engagement.city)
+
     async def _ensure_console_participant_access(
         self,
         db: AsyncSession,
@@ -131,6 +151,14 @@ class ConsoleService:
         user_id: int,
     ) -> EngagementParticipant:
         await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
 
         participant = await self._repository.get_participant_for_user_engagement(
             db,
@@ -143,6 +171,17 @@ class ConsoleService:
                 error_code="PARTICIPANT_NOT_FOUND",
                 message="Participant is not enrolled in this engagement",
             )
+
+        if employee.role == EmployeeRole.organization_manager and engagement.organization_id is not None:
+            organization = await db.get(Organization, engagement.organization_id)
+            if organization is not None:
+                scope = resolve_org_manager_scope_for_organization(organization, employee.user_id)
+                if scope is not None:
+                    ensure_participant_department_access(
+                        scope,
+                        engagement_city=engagement.city,
+                        participant_department=participant.participant_department,
+                    )
         return participant
 
     async def _ensure_console_participant_instance(
@@ -243,11 +282,21 @@ class ConsoleService:
                 db, employee_id=employee.employee_id
             )
         elif employee.role == EmployeeRole.organization_manager:
-            engagements = await self._repository.list_engagements_for_assigned_org_contact_person(
+            assigned = await self._repository.list_engagements_for_assigned_org_contact_person(
                 db,
                 employee_id=employee.employee_id,
                 user_id=employee.user_id,
             )
+            engagements = []
+            for engagement in assigned:
+                if engagement.organization_id is None:
+                    continue
+                organization = await db.get(Organization, engagement.organization_id)
+                if organization is None:
+                    continue
+                scope = resolve_org_manager_scope_for_organization(organization, employee.user_id)
+                if scope is not None and scope.can_access_engagement_city(engagement.city):
+                    engagements.append(engagement)
         else:
             raise AppError(
                 status_code=403,
@@ -284,9 +333,15 @@ class ConsoleService:
                 message="Engagement does not exist",
             )
 
+        department_slugs = await self._resolve_console_participant_department_slugs(
+            db,
+            employee=employee,
+            engagement=engagement,
+        )
         participant_count = await self._repository.count_distinct_participants_for_engagement(
             db,
             engagement_id=engagement_id,
+            participant_department_slugs=department_slugs,
         )
         return self._engagement_to_console_dict(engagement, participant_count=participant_count)
 
@@ -309,15 +364,23 @@ class ConsoleService:
                 message="Engagement does not exist",
             )
 
+        department_slugs = await self._resolve_console_participant_department_slugs(
+            db,
+            employee=employee,
+            engagement=engagement,
+        )
+
         participants = await self._repository.list_participants_by_engagement_id(
             db,
             engagement_id=engagement_id,
             page=page,
             limit=limit,
+            participant_department_slugs=department_slugs,
         )
         total = await self._repository.count_distinct_participants_for_engagement(
             db,
             engagement_id=engagement_id,
+            participant_department_slugs=department_slugs,
         )
 
         result = [_console_participant_to_dict(row) for row in participants]
@@ -354,6 +417,18 @@ class ConsoleService:
                 error_code="PARTICIPANT_NOT_FOUND",
                 message="Participant is not enrolled in this engagement",
             )
+
+        if employee.role == EmployeeRole.organization_manager and engagement.organization_id is not None:
+            organization = await db.get(Organization, engagement.organization_id)
+            if organization is not None:
+                scope = resolve_org_manager_scope_for_organization(organization, employee.user_id)
+                if scope is not None:
+                    ensure_participant_department_access(
+                        scope,
+                        engagement_city=engagement.city,
+                        participant_department=participant.participant_department,
+                    )
+
         if participant.booking_id:
             raise AppError(
                 status_code=409,

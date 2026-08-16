@@ -69,7 +69,7 @@ class SeedOrganization:
     city: str
     state: str
     country: str
-    contact_person_user_id: int | None
+    contact_person_user_ids: dict | None
     bd_employee_id: int | None
     status: str
     created_employee_id: int | None
@@ -333,7 +333,7 @@ async def _upsert_organizations(session: AsyncSession, organizations: Iterable[S
         row.city = seed.city
         row.state = seed.state
         row.country = seed.country
-        row.contact_person_user_id = seed.contact_person_user_id
+        row.contact_person_user_ids = seed.contact_person_user_ids
         row.bd_employee_id = seed.bd_employee_id
         row.status = seed.status
         row.created_employee_id = seed.created_employee_id

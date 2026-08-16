@@ -19,6 +19,7 @@ from modules.audit.service import AuditService
 from modules.employee.access_control import (
     ensure_camp_access,
     ensure_camp_access_admin_or_org_manager,
+    ensure_camp_report_access_for_employee,
     ensure_internal_employee,
 )
 from modules.employee.service import EmployeeContext
@@ -219,6 +220,77 @@ class CampReportsService:
             if existing.lower() == normalized.lower():
                 return existing
         return normalized
+
+    async def _ensure_scoped_camp_report_access(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        organization_id: int,
+        city: str | None,
+        department: str | None,
+    ) -> None:
+        await ensure_camp_report_access_for_employee(
+            db,
+            employee,
+            organization_id,
+            city=city,
+            department=department,
+            repository=self._organizations_repository,
+        )
+
+    async def _normalize_report_filters(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        organization_id: int,
+        department: str | None,
+        city: str | None,
+    ) -> tuple[str | None, str | None]:
+        normalized_department = department
+        normalized_city = city
+
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=organization_id,
+                slug=normalized_department,
+            )
+
+        if city is not None:
+            normalized_city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+
+        return normalized_department, normalized_city
+
+    async def _normalize_and_ensure_report_access(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        organization_id: int,
+        department: str | None,
+        city: str | None,
+    ) -> tuple[str | None, str | None]:
+        normalized_department, normalized_city = await self._normalize_report_filters(
+            db,
+            camp_no=camp_no,
+            organization_id=organization_id,
+            department=department,
+            city=city,
+        )
+        await self._ensure_scoped_camp_report_access(
+            db,
+            employee=employee,
+            organization_id=organization_id,
+            city=normalized_city,
+            department=normalized_department,
+        )
+        return normalized_department, normalized_city
 
     async def init_camp_report(
         self,
@@ -658,26 +730,14 @@ class CampReportsService:
         city: str | None = None,
     ) -> tuple[list[dict], int]:
         context = await self._resolve_camp_context(db, camp_no=camp_no)
-        await ensure_camp_access(
+        department, city = await self._normalize_and_ensure_report_access(
             db,
-            employee,
-            context["organization_id"],
-            repository=self._organizations_repository,
+            employee=employee,
+            camp_no=camp_no,
+            organization_id=context["organization_id"],
+            department=department,
+            city=city,
         )
-
-        if department is not None:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            await self._validate_department_slug(
-                db,
-                organization_id=context["organization_id"],
-                slug=normalized_department,
-            )
-            department = normalized_department
-
-        if city is not None:
-            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
 
         rows = await self._repository.list_participants_by_camp_no(
             db,
@@ -762,26 +822,14 @@ class CampReportsService:
         city: str | None = None,
     ) -> dict:
         context = await self._resolve_camp_context(db, camp_no=camp_no)
-        await ensure_camp_access(
+        department, city = await self._normalize_and_ensure_report_access(
             db,
-            employee,
-            context["organization_id"],
-            repository=self._organizations_repository,
+            employee=employee,
+            camp_no=camp_no,
+            organization_id=context["organization_id"],
+            department=department,
+            city=city,
         )
-
-        if department is not None:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            await self._validate_department_slug(
-                db,
-                organization_id=context["organization_id"],
-                slug=normalized_department,
-            )
-            department = normalized_department
-
-        if city is not None:
-            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
 
         row = await self._get_camp_report_row(db, camp_no=camp_no, department=department,
             city=city,
@@ -806,19 +854,20 @@ class CampReportsService:
             repository=self._organizations_repository,
         )
 
-        if department is not None:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            await self._validate_department_slug(
-                db,
-                organization_id=context["organization_id"],
-                slug=normalized_department,
-            )
-            department = normalized_department
-
-        if city is not None:
-            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+        department, city = await self._normalize_report_filters(
+            db,
+            camp_no=camp_no,
+            organization_id=context["organization_id"],
+            department=department,
+            city=city,
+        )
+        await self._ensure_scoped_camp_report_access(
+            db,
+            employee=employee,
+            organization_id=context["organization_id"],
+            city=city,
+            department=department,
+        )
 
         row = await self._get_camp_report_row(db, camp_no=camp_no, department=department,
             city=city,
@@ -841,26 +890,14 @@ class CampReportsService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
         context = await self._resolve_camp_context(db, camp_no=camp_no)
-        await ensure_camp_access(
+        department, city = await self._normalize_and_ensure_report_access(
             db,
-            employee,
-            context["organization_id"],
-            repository=self._organizations_repository,
+            employee=employee,
+            camp_no=camp_no,
+            organization_id=context["organization_id"],
+            department=department,
+            city=city,
         )
-
-        if department is not None:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            await self._validate_department_slug(
-                db,
-                organization_id=context["organization_id"],
-                slug=normalized_department,
-            )
-            department = normalized_department
-
-        if city is not None:
-            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
 
         section_row = await self._sections_repository.get_by_section_key(
             db,
@@ -913,26 +950,14 @@ class CampReportsService:
             )
 
         context = await self._resolve_camp_context(db, camp_no=camp_no)
-        await ensure_camp_access(
+        department, city = await self._normalize_and_ensure_report_access(
             db,
-            employee,
-            context["organization_id"],
-            repository=self._organizations_repository,
+            employee=employee,
+            camp_no=camp_no,
+            organization_id=context["organization_id"],
+            department=department,
+            city=city,
         )
-
-        if department is not None:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            await self._validate_department_slug(
-                db,
-                organization_id=context["organization_id"],
-                slug=normalized_department,
-            )
-            department = normalized_department
-
-        if city is not None:
-            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
 
         section_row = await self._sections_repository.get_by_section_key(
             db,
@@ -1420,26 +1445,14 @@ class CampReportsService:
         endpoint: str,
     ) -> dict:
         context = await self._resolve_camp_context(db, camp_no=camp_no)
-        await ensure_camp_access(
+        department, city = await self._normalize_and_ensure_report_access(
             db,
-            employee,
-            context["organization_id"],
-            repository=self._organizations_repository,
+            employee=employee,
+            camp_no=camp_no,
+            organization_id=context["organization_id"],
+            department=department,
+            city=city,
         )
-
-        if city is not None:
-            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
-
-        if department is not None:
-            normalized_department = department.strip()
-            if not normalized_department:
-                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-            await self._validate_department_slug(
-                db,
-                organization_id=context["organization_id"],
-                slug=normalized_department,
-            )
-            department = normalized_department
 
         return await self._refresh_camp_report_section_core(
             db,
