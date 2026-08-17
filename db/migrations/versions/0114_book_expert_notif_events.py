@@ -1,6 +1,6 @@
 """Seed book_expert and consultation_remainder auto notification events.
 
-Revision ID: 0114_book_expert_consultation_remainder_events
+Revision ID: 0114_book_expert_notif_events
 Revises: 0113_ep_blood_collection_cabin
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0114_book_expert_consultation_remainder_events"
+revision = "0114_book_expert_notif_events"
 down_revision = "0113_ep_blood_collection_cabin"
 branch_labels = None
 depends_on = None
