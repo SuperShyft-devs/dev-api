@@ -347,6 +347,7 @@ class EngagementUserOnboardRequest(BaseModel):
 
     blood_collection_date: date
     blood_collection_time_slot: str = Field(min_length=1, max_length=20)
+    blood_collection_cabin: Optional[str] = Field(default=None, max_length=100)
 
     participants_employee_id: Optional[str] = Field(default=None, max_length=100)
     participant_department: Optional[str] = Field(default=None, max_length=100)

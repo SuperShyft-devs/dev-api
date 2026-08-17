@@ -5,7 +5,7 @@ Only database queries live here.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, time
 
 from sqlalchemy import String, and_, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -258,6 +258,47 @@ class EngagementsRepository:
         db.add(slot)
         await db.flush()
         return slot
+
+    async def count_cabin_slot_participants(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        blood_collection_cabin: str,
+        engagement_date: date,
+        slot_start_time: time,
+    ) -> int:
+        query = (
+            select(func.count())
+            .select_from(EngagementParticipant)
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .where(EngagementParticipant.blood_collection_cabin == blood_collection_cabin)
+            .where(EngagementParticipant.engagement_date == engagement_date)
+            .where(EngagementParticipant.slot_start_time == slot_start_time)
+        )
+        result = await db.execute(query)
+        return int(result.scalar_one())
+
+    async def list_cabin_slot_occupancy(self, db: AsyncSession, *, engagement_id: int) -> list[tuple]:
+        query = (
+            select(
+                EngagementParticipant.blood_collection_cabin,
+                EngagementParticipant.engagement_date,
+                EngagementParticipant.slot_start_time,
+                func.count(),
+            )
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .where(EngagementParticipant.blood_collection_cabin.isnot(None))
+            .where(EngagementParticipant.engagement_date.isnot(None))
+            .where(EngagementParticipant.slot_start_time.isnot(None))
+            .group_by(
+                EngagementParticipant.blood_collection_cabin,
+                EngagementParticipant.engagement_date,
+                EngagementParticipant.slot_start_time,
+            )
+        )
+        result = await db.execute(query)
+        return list(result.all())
 
     async def update_participant(self, db: AsyncSession, participant: EngagementParticipant) -> EngagementParticipant:
         db.add(participant)

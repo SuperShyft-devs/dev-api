@@ -35,6 +35,13 @@ from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
+from modules.engagements.slot_availability import (
+    build_public_slot_detail,
+    occupancy_map_from_rows,
+    require_available_blood_collection_slot,
+    slot_detail_is_configured,
+    slot_unavailable,
+)
 from modules.experts.consultation_bookings_repository import ConsultationBookingsRepository
 from modules.experts.consultations import bookings_to_consultations_map, empty_consent, normalize_consultations_map, normalize_consent
 from modules.engagements.schemas import (
@@ -682,6 +689,47 @@ class EngagementsService:
     async def get_engagement_by_code_public(self, db: AsyncSession, *, engagement_code: str):
         return await self._repository.get_engagement_with_org_by_code(db, engagement_code)
 
+    async def public_slot_detail_for_engagement(self, db: AsyncSession, engagement: Engagement):
+        if not slot_detail_is_configured(engagement.slot_detail):
+            return None
+        rows = await self._repository.list_cabin_slot_occupancy(
+            db,
+            engagement_id=int(engagement.engagement_id),
+        )
+        return build_public_slot_detail(engagement.slot_detail, occupancy_map_from_rows(rows))
+
+    async def validate_blood_collection_slot_for_onboard(
+        self,
+        db: AsyncSession,
+        *,
+        engagement: Engagement,
+        collection_date: date,
+        cabin_key: str | None,
+        slot_time: time,
+    ) -> str | None:
+        normalized_cabin = (cabin_key or "").strip() or None
+        if not slot_detail_is_configured(engagement.slot_detail):
+            return normalized_cabin
+
+        cabin = require_available_blood_collection_slot(
+            engagement.slot_detail,
+            collection_date=collection_date,
+            cabin_key=normalized_cabin,
+            slot_time=slot_time,
+        )
+        persisted_cabin = (cabin.get("cabin_key") or "").strip()
+        count = await self._repository.count_cabin_slot_participants(
+            db,
+            engagement_id=int(engagement.engagement_id),
+            blood_collection_cabin=persisted_cabin,
+            engagement_date=collection_date,
+            slot_start_time=time(slot_time.hour, slot_time.minute),
+        )
+        capacity = int(cabin.get("capacity_per_slot") or 0)
+        if count >= capacity:
+            raise slot_unavailable()
+        return persisted_cabin
+
     async def get_engagement_details_for_employee(
         self,
         db: AsyncSession,
@@ -1157,6 +1205,7 @@ class EngagementsService:
         participants_employee_id: str | None = None,
         participant_department: str | None = None,
         participant_blood_group: str | None = None,
+        blood_collection_cabin: str | None = None,
         consultations: dict | None = None,
         is_profile_created_on_metsights: bool = False,
         is_primary_record_id_synced: bool = False,
@@ -1197,6 +1246,7 @@ class EngagementsService:
             participants_employee_id=participants_employee_id,
             participant_department=participant_department,
             participant_blood_group=participant_blood_group,
+            blood_collection_cabin=(blood_collection_cabin or "").strip() or None,
             is_profile_created_on_metsights=is_profile_created_on_metsights,
             is_primary_record_id_synced=is_primary_record_id_synced,
             is_fitprint_record_id_synced=is_fitprint_record_id_synced,

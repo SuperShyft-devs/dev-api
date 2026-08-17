@@ -2215,6 +2215,16 @@ class UsersService:
         if engagement is None:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
+        slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
+        slot_start = time(hour=slot_start.hour, minute=slot_start.minute)
+        blood_collection_cabin = await self._engagements_service.validate_blood_collection_slot_for_onboard(
+            db,
+            engagement=engagement,
+            collection_date=payload.blood_collection_date,
+            cabin_key=payload.blood_collection_cabin,
+            slot_time=slot_start,
+        )
+
         consultations = _validate_requested_consultations(
             payload.consultations,
             engagement.consultations,
@@ -2269,7 +2279,6 @@ class UsersService:
             if updated is not None:
                 user = updated
 
-        slot_start = self._parse_time_slot(payload.blood_collection_time_slot)
         validated_department = await self._engagements_service.resolve_participant_department_for_engagement(
             db,
             engagement=engagement,
@@ -2284,6 +2293,7 @@ class UsersService:
             participants_employee_id=payload.participants_employee_id,
             participant_department=validated_department,
             participant_blood_group=payload.participant_blood_group,
+            blood_collection_cabin=blood_collection_cabin,
             consultations=consultations,
             is_profile_created_on_metsights=False,
             is_primary_record_id_synced=False,
