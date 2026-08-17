@@ -24,6 +24,7 @@ from modules.notifications.schemas import (
     DispatchRequest,
     NotificationServiceCreate,
     NotificationServiceUpdate,
+    SessionDetails,
 )
 from modules.notifications.report_prepare import prepare_user_report_urls
 from modules.reports.bio_ai_report_resolver import resolve_bio_ai_report_url
@@ -32,6 +33,19 @@ from modules.reports.blood_report_resolver import resolve_blood_report_url
 logger = logging.getLogger(__name__)
 
 _VALID_NOTIFICATION_STATUSES = frozenset({"pending", "sent", "failed"})
+
+
+def _resolve_session_details_for_user(
+    payload: DispatchRequest,
+    user_id: int,
+) -> SessionDetails | None:
+    if payload.session_details_by_user_id:
+        details = payload.session_details_by_user_id.get(user_id)
+        if details is not None:
+            return details
+    if payload.session_details is not None:
+        return payload.session_details
+    return None
 _VALID_NOTIFICATION_CHANNELS = frozenset({"email", "whatsapp"})
 
 
@@ -122,6 +136,22 @@ class NotificationsService:
                 error_code="INVALID_INPUT",
                 message="This service requires otp but none was provided",
             )
+
+        if svc.require_session_details:
+            missing_session_details = [
+                uid
+                for uid in payload.user_ids
+                if _resolve_session_details_for_user(payload, uid) is None
+            ]
+            if missing_session_details:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message=(
+                        "This service requires session_details for each user; "
+                        f"missing for: {missing_session_details}"
+                    ),
+                )
 
         needs_report = svc.require_blood_report_url or svc.require_bio_ai_report_url
 
@@ -259,6 +289,11 @@ class NotificationsService:
 
             if svc.require_otp:
                 member["otp"] = otp_value
+
+            session_details = _resolve_session_details_for_user(payload, user.user_id)
+            if session_details is not None:
+                member["session_details"] = session_details.model_dump(mode="json")
+
             members.append(member)
 
         notification = Notification(
@@ -521,6 +556,7 @@ class NotificationsService:
             require_bio_ai_report_url=payload.require_bio_ai_report_url,
             require_participant_detail=payload.require_participant_detail,
             require_otp=payload.require_otp,
+            require_session_details=payload.require_session_details,
         )
         return await self._repo.create_service(db, svc)
 
@@ -554,6 +590,8 @@ class NotificationsService:
             svc.require_participant_detail = payload.require_participant_detail
         if payload.require_otp is not None:
             svc.require_otp = payload.require_otp
+        if payload.require_session_details is not None:
+            svc.require_session_details = payload.require_session_details
         return await self._repo.update_service(db, svc)
 
     async def delete_notification(

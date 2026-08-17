@@ -1591,3 +1591,166 @@ async def test_dispatch_vifc_without_report_url_returns_400(
     )
     assert response.status_code == 400, response.text
     assert "report" in response.text.lower()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_requires_session_details_when_service_flag_set(
+    async_client, test_db_session, monkeypatch
+):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
+    test_db_session.add(User(user_id=9841, age=30, phone="9841000000", status="active"))
+    service_key = "session_details_required_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, "
+            "require_bio_ai_report_url, require_participant_detail, require_otp, require_session_details) "
+            "VALUES (:sk, 'Session Required', 'email', 'session-required', true, false, false, false, false, true) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_session_details = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_api_key_header(),
+        json={"service_key": service_key, "user_ids": [9841]},
+    )
+    assert response.status_code == 400
+    assert "session_details" in response.json()["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_includes_session_details_in_webhook_when_provided(
+    async_client, test_db_session, monkeypatch
+):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
+    test_db_session.add(
+        User(
+            user_id=9842,
+            age=30,
+            phone="9842000000",
+            status="active",
+            email="user9842@example.com",
+            first_name="Jane",
+            last_name="Doe",
+        )
+    )
+    service_key = "session_details_dispatch_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, "
+            "require_bio_ai_report_url, require_participant_detail, require_otp, require_session_details) "
+            "VALUES (:sk, 'Session Dispatch', 'email', 'session-dispatch', true, false, false, false, false, true) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_session_details = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_api_key_header(),
+        json={
+            "service_key": service_key,
+            "user_ids": [9842],
+            "session_details": {
+                "want": True,
+                "date": "2026-08-17",
+                "slot": "14:00-14:30",
+                "expert_type": "doctor",
+            },
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert webhook_calls
+    member = webhook_calls[0]["json"]["members"][0]
+    assert member["session_details"] == {
+        "want": True,
+        "date": "2026-08-17",
+        "slot": "14:00-14:30",
+        "expert_type": "doctor",
+    }
+    assert "session_details" not in webhook_calls[0]["json"]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_omits_session_details_when_not_required(
+    async_client, test_db_session, monkeypatch
+):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
+    test_db_session.add(User(user_id=9843, age=30, phone="9843000000", status="active"))
+    service_key = "session_details_optional_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, "
+            "require_bio_ai_report_url, require_participant_detail, require_otp, require_session_details) "
+            "VALUES (:sk, 'Session Optional', 'email', 'session-optional', true, false, false, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_session_details = false"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_api_key_header(),
+        json={"service_key": service_key, "user_ids": [9843]},
+    )
+    assert response.status_code == 201, response.text
+    assert webhook_calls
+    assert "session_details" not in webhook_calls[0]["json"]
+    assert "session_details" not in webhook_calls[0]["json"]["members"][0]

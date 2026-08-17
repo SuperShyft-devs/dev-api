@@ -36,19 +36,25 @@ async def _seed_dependencies(test_db_session) -> None:
             "VALUES (1, 'Test Diagnostic', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
         )
     )
-    for service_key, channel, webhook_path in (
-        (REMAINDER_WHATSAPP_KEY, "whatsapp", "consultation-remainder-whatsapp"),
-        (REMAINDER_EMAIL_KEY, "email", "consultation-remainder-email"),
+    for service_key, channel, webhook_path, require_session in (
+        (REMAINDER_WHATSAPP_KEY, "whatsapp", "consultation-remainder-whatsapp", False),
+        (REMAINDER_EMAIL_KEY, "email", "consultation-remainder-email", True),
     ):
         await test_db_session.execute(
             text(
                 "INSERT INTO notification_services "
                 "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, "
-                "require_bio_ai_report_url, require_participant_detail) "
-                "VALUES (:sk, :dn, :ch, :wp, true, false, false, false) "
-                "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
+                "require_bio_ai_report_url, require_participant_detail, require_session_details) "
+                "VALUES (:sk, :dn, :ch, :wp, true, false, false, false, :rsd) "
+                "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_session_details = :rsd"
             ),
-            {"sk": service_key, "dn": service_key, "ch": channel, "wp": webhook_path},
+            {
+                "sk": service_key,
+                "dn": service_key,
+                "ch": channel,
+                "wp": webhook_path,
+                "rsd": require_session,
+            },
         )
     await test_db_session.execute(
         text(
@@ -157,12 +163,13 @@ async def _insert_consultation_booking(
     expert_type: str,
     consultation_date: str,
     want: bool = True,
+    consultation_slot: str | None = None,
 ) -> None:
     await test_db_session.execute(
         text(
             "INSERT INTO consultation_bookings "
-            "(consultation_id, engagement_participant_id, expert_type, want, consultation_date) "
-            "VALUES (:cid, :pid, :etype, :want, :cdate)"
+            "(consultation_id, engagement_participant_id, expert_type, want, consultation_date, consultation_slot) "
+            "VALUES (:cid, :pid, :etype, :want, :cdate, :cslot)"
         ),
         {
             "cid": consultation_id,
@@ -170,6 +177,7 @@ async def _insert_consultation_booking(
             "etype": expert_type,
             "want": want,
             "cdate": date.fromisoformat(consultation_date),
+            "cslot": consultation_slot,
         },
     )
     await test_db_session.execute(
@@ -232,6 +240,7 @@ async def test_consultation_remainder_sends_for_today_booking(test_db_session, m
         participant_id=participant_id,
         expert_type="doctor",
         consultation_date="2026-06-10",
+        consultation_slot="10:00-10:30",
     )
     await test_db_session.commit()
 
@@ -254,6 +263,17 @@ async def test_consultation_remainder_sends_for_today_booking(test_db_session, m
     assert result["matched"] == 1
     assert result["sent"] == 1
     assert len(webhook_calls) == 2
+    email_call = next(
+        call
+        for call in webhook_calls
+        if call["json"]["members"][0].get("session_details") is not None
+    )
+    assert email_call["json"]["members"][0]["session_details"] == {
+        "want": True,
+        "date": "2026-06-10",
+        "slot": "10:00-10:30",
+        "expert_type": "doctor",
+    }
 
 
 @pytest.mark.asyncio
@@ -301,7 +321,7 @@ async def test_consultation_remainder_skips_tomorrow_booking(test_db_session, mo
 
 
 @pytest.mark.asyncio
-async def test_consultation_remainder_two_bookings_same_day_single_dispatch(
+async def test_consultation_remainder_two_bookings_same_day_dispatches_per_booking(
     test_db_session, monkeypatch
 ):
     await _seed_dependencies(test_db_session)
@@ -349,9 +369,15 @@ async def test_consultation_remainder_two_bookings_same_day_single_dispatch(
     )
     await test_db_session.commit()
 
-    assert result["matched"] == 1
-    assert result["sent"] == 1
-    assert len(webhook_calls) == 2
+    assert result["matched"] == 2
+    assert result["sent"] == 2
+    assert len(webhook_calls) == 4
+    expert_types = {
+        call["json"]["members"][0]["session_details"]["expert_type"]
+        for call in webhook_calls
+        if call["json"]["members"][0].get("session_details")
+    }
+    assert expert_types == {"doctor", "nutritionist"}
 
 
 @pytest.mark.asyncio

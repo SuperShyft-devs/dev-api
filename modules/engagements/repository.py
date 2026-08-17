@@ -5,6 +5,7 @@ Only database queries live here.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, time
 
 from sqlalchemy import String, and_, cast, func, or_, select, text, update
@@ -22,6 +23,17 @@ from modules.engagements.models import (
 )
 from modules.organizations.models import Organization
 from modules.reports.models import IndividualHealthReport
+
+
+@dataclass(frozen=True)
+class ConsultationRemainderParticipant:
+    user_id: int
+    engagement_id: int
+    service_keys: list[str]
+    want: bool
+    consultation_date: date
+    consultation_slot: str | None
+    expert_type: str
 
 
 class EngagementsRepository:
@@ -1316,18 +1328,21 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         consultation_date: date,
-    ) -> list[tuple[int, int, list[str]]]:
-        """Return (user_id, engagement_id, service_keys) for consultation_remainder notifications.
+    ) -> list[ConsultationRemainderParticipant]:
+        """Return participants with consultation bookings for consultation_remainder notifications.
 
-        Participants in scheduled/running engagements with a want=true booking whose
-        consultation_date is *consultation_date* (via consultation_booking_ids).
+        One row per want=true booking on *consultation_date* (via consultation_booking_ids).
         """
         query = text(
             """
-            SELECT DISTINCT
+            SELECT
                 ep.user_id,
                 ep.engagement_id,
-                en.notification_services
+                en.notification_services,
+                cb.want,
+                cb.consultation_date,
+                cb.consultation_slot,
+                cb.expert_type
             FROM engagement_participants ep
             JOIN engagements e ON e.engagement_id = ep.engagement_id
             JOIN engagement_notifications en ON en.engagement_id = e.engagement_id
@@ -1338,11 +1353,19 @@ class EngagementsRepository:
               AND ane.event_code = 'consultation_remainder'
               AND cb.consultation_date = :consultation_date
               AND cb.want IS TRUE
-            ORDER BY ep.engagement_id ASC, ep.user_id ASC
+            ORDER BY ep.engagement_id ASC, ep.user_id ASC, cb.expert_type ASC
             """
         )
         result = await db.execute(query, {"consultation_date": consultation_date})
         return [
-            (int(row.user_id), int(row.engagement_id), list(row.notification_services or []))
+            ConsultationRemainderParticipant(
+                user_id=int(row.user_id),
+                engagement_id=int(row.engagement_id),
+                service_keys=list(row.notification_services or []),
+                want=bool(row.want),
+                consultation_date=row.consultation_date,
+                consultation_slot=row.consultation_slot,
+                expert_type=str(row.expert_type),
+            )
             for row in result.all()
         ]

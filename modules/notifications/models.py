@@ -22,6 +22,7 @@ class NotificationService(Base):
     require_bio_ai_report_url = Column(Boolean, nullable=False, server_default="false")
     require_participant_detail = Column(Boolean, nullable=False, server_default="false")
     require_otp = Column(Boolean, nullable=False, server_default="false")
+    require_session_details = Column(Boolean, nullable=False, server_default="false")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 

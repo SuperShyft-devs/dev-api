@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from datetime import date
+
+from pydantic import BaseModel, Field, field_validator
+
+
+class SessionDetails(BaseModel):
+    want: bool
+    date: date
+    slot: str
+    expert_type: str
 
 
 class PrepareReportsRequest(BaseModel):
@@ -18,6 +27,15 @@ class DispatchRequest(BaseModel):
     assessment_instance_id: int | None = None
     participant_details: dict | None = None
     otp: str | None = None
+    session_details: SessionDetails | None = None
+    session_details_by_user_id: dict[int, SessionDetails] | None = None
+
+    @field_validator("session_details_by_user_id", mode="before")
+    @classmethod
+    def _coerce_session_details_user_ids(cls, value: object) -> object:
+        if value is None or not isinstance(value, dict):
+            return value
+        return {int(user_id): details for user_id, details in value.items()}
 
 
 class CallbackRequest(BaseModel):
@@ -36,6 +54,7 @@ class NotificationServiceCreate(BaseModel):
     require_bio_ai_report_url: bool = False
     require_participant_detail: bool = False
     require_otp: bool = False
+    require_session_details: bool = False
 
 
 class NotificationServiceUpdate(BaseModel):
@@ -47,3 +66,4 @@ class NotificationServiceUpdate(BaseModel):
     require_bio_ai_report_url: bool | None = None
     require_participant_detail: bool | None = None
     require_otp: bool | None = None
+    require_session_details: bool | None = None

@@ -48,6 +48,7 @@ def _service_dict(s) -> dict:
         "require_bio_ai_report_url": s.require_bio_ai_report_url,
         "require_participant_detail": s.require_participant_detail,
         "require_otp": s.require_otp,
+        "require_session_details": s.require_session_details,
         "created_at": s.created_at.isoformat() if s.created_at else None,
     }
 

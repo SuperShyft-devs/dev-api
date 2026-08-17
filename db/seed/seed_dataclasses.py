@@ -97,3 +97,4 @@ class SeedNotificationService:
     require_bio_ai_report_url: bool = False
     require_participant_detail: bool = False
     require_otp: bool = False
+    require_session_details: bool = False

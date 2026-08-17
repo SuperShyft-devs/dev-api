@@ -9,9 +9,9 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.engagements.repository import EngagementsRepository
+from modules.engagements.repository import ConsultationRemainderParticipant, EngagementsRepository
 from modules.notifications.dedup import should_skip_notification_on_date
-from modules.notifications.schemas import DispatchRequest
+from modules.notifications.schemas import DispatchRequest, SessionDetails
 from modules.notifications.service import NotificationsService
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,17 @@ def today_in_ist(*, as_of: date | None = None) -> date:
     if as_of is not None:
         return as_of
     return datetime.now(_IST).date()
+
+
+def _session_details_from_participant(
+    participant: ConsultationRemainderParticipant,
+) -> SessionDetails:
+    return SessionDetails(
+        want=participant.want,
+        date=participant.consultation_date,
+        slot=participant.consultation_slot or "",
+        expert_type=participant.expert_type,
+    )
 
 
 async def dispatch_consultation_remainder_notifications(
@@ -49,13 +60,14 @@ async def dispatch_consultation_remainder_notifications(
     reference_date = consultation_date.isoformat()
 
     if dry_run:
-        for user_id, engagement_id, service_keys in participants:
+        for participant in participants:
             details.append({
-                "user_id": user_id,
-                "engagement_id": engagement_id,
-                "service_key": ",".join(service_keys) if service_keys else None,
+                "user_id": participant.user_id,
+                "engagement_id": participant.engagement_id,
+                "expert_type": participant.expert_type,
+                "service_key": ",".join(participant.service_keys) if participant.service_keys else None,
                 "action": "dry_run",
-                "reason": "no notification keys configured" if not service_keys else "would dispatch",
+                "reason": "no notification keys configured" if not participant.service_keys else "would dispatch",
             })
         return {
             "as_of": reference_date,
@@ -68,12 +80,13 @@ async def dispatch_consultation_remainder_notifications(
             "details": details,
         }
 
-    for user_id, engagement_id, service_keys in participants:
-        if not service_keys:
+    for participant in participants:
+        if not participant.service_keys:
             skipped += 1
             details.append({
-                "user_id": user_id,
-                "engagement_id": engagement_id,
+                "user_id": participant.user_id,
+                "engagement_id": participant.engagement_id,
+                "expert_type": participant.expert_type,
                 "action": "skipped",
                 "reason": "no notification keys configured",
             })
@@ -82,18 +95,20 @@ async def dispatch_consultation_remainder_notifications(
         try:
             dispatched_any = False
             skipped_all = True
-            for sk in service_keys:
+            session_details = _session_details_from_participant(participant)
+            for sk in participant.service_keys:
                 skip_reason = await should_skip_notification_on_date(
                     db,
                     service_key=sk,
-                    user_id=user_id,
-                    engagement_id=engagement_id,
+                    user_id=participant.user_id,
+                    engagement_id=participant.engagement_id,
                     reference_date=consultation_date,
                 )
                 if skip_reason:
                     details.append({
-                        "user_id": user_id,
-                        "engagement_id": engagement_id,
+                        "user_id": participant.user_id,
+                        "engagement_id": participant.engagement_id,
+                        "expert_type": participant.expert_type,
                         "service_key": sk,
                         "action": "skipped",
                         "reason": f"notification '{sk}' {skip_reason}",
@@ -105,15 +120,17 @@ async def dispatch_consultation_remainder_notifications(
                     db,
                     payload=DispatchRequest(
                         service_key=sk,
-                        user_ids=[user_id],
-                        engagement_id=engagement_id,
+                        user_ids=[participant.user_id],
+                        engagement_id=participant.engagement_id,
+                        session_details=session_details,
                     ),
                     triggered_by_user_id=None,
                 )
                 dispatched_any = True
                 details.append({
-                    "user_id": user_id,
-                    "engagement_id": engagement_id,
+                    "user_id": participant.user_id,
+                    "engagement_id": participant.engagement_id,
+                    "expert_type": participant.expert_type,
                     "service_key": sk,
                     "action": "sent",
                     "reason": f"dispatched '{sk}'",
@@ -126,17 +143,19 @@ async def dispatch_consultation_remainder_notifications(
         except Exception as exc:
             failed += 1
             details.append({
-                "user_id": user_id,
-                "engagement_id": engagement_id,
-                "service_key": ",".join(service_keys),
+                "user_id": participant.user_id,
+                "engagement_id": participant.engagement_id,
+                "expert_type": participant.expert_type,
+                "service_key": ",".join(participant.service_keys),
                 "action": "failed",
                 "reason": str(exc),
             })
             logger.warning(
-                "Consultation remainder dispatch failed: service_keys=%s user_id=%s engagement_id=%s: %s",
-                ",".join(service_keys),
-                user_id,
-                engagement_id,
+                "Consultation remainder dispatch failed: service_keys=%s user_id=%s engagement_id=%s expert_type=%s: %s",
+                ",".join(participant.service_keys),
+                participant.user_id,
+                participant.engagement_id,
+                participant.expert_type,
                 str(exc),
             )
 
