@@ -1977,3 +1977,162 @@ async def test_create_engagement_rejects_overlapping_questionnaire_reminders(asy
     response = await async_client.post("/engagements", headers=_auth_header(7050), json=payload)
     assert response.status_code == 400
     assert "service-b" in response.json()["message"]
+
+
+_EXPECTED_BLOOD_SLOTS = [
+    "09:00",
+    "09:30",
+    "10:00",
+    "10:30",
+    "11:00",
+    "11:30",
+    "12:00",
+    "12:30",
+    "14:00",
+    "14:30",
+    "15:00",
+    "15:30",
+    "16:00",
+    "16:30",
+]
+
+
+@pytest.mark.asyncio
+async def test_get_engagement_by_code_returns_available_slots_with_spot_left(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7410, employee_id=410)
+    await _seed_organization(test_db_session, organization_id=9101, name="Slot Public Org")
+    await _seed_assessment_package(test_db_session, package_id=9101, package_code="PKG9101")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9101)
+    type_id = await _engagement_type_id(test_db_session, "blood_test_with_consultation")
+
+    slot_detail = {
+        "blood_collection": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Blood Test Cabin 1",
+                    "cabin_key": "btc-001",
+                    "start_time": "09:00",
+                    "end_time": "17:00",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 6,
+                    "breaks": [{"start_time": "13:00", "end_time": "14:00"}],
+                    "is_active": True,
+                },
+                {
+                    "cabin_name": "Inactive Cabin",
+                    "cabin_key": "btc-off",
+                    "start_time": "09:00",
+                    "end_time": "17:00",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 6,
+                    "breaks": [],
+                    "is_active": False,
+                },
+            ]
+        },
+        "consultation": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Consultation Cabin 1",
+                    "cabin_key": "cc-001",
+                    "start_time": "09:00",
+                    "end_time": "10:00",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 1,
+                    "breaks": [],
+                    "is_active": True,
+                }
+            ]
+        },
+    }
+    create = await async_client.post(
+        "/engagements",
+        headers=_auth_header(7410),
+        json={
+            "engagement_name": "Public Slot Camp",
+            "organization_id": 9101,
+            "engagement_type": type_id,
+            "assessment_package_id": 9101,
+            "diagnostic_package_id": 9101,
+            "city": "BLR",
+            "slot_duration": 30,
+            "start_date": "2026-08-20",
+            "end_date": "2026-08-21",
+            "engagement_code": "SLOTPUB1",
+            "slot_detail": slot_detail,
+        },
+    )
+    assert create.status_code == 201, create.text
+
+    public = await async_client.get("/engagements/code/SLOTPUB1")
+    assert public.status_code == 200, public.text
+    data = public.json()["data"]
+    blood = data["slot_detail"]["blood_collection"]["2026-08-20"]
+    assert [cabin["cabin_key"] for cabin in blood] == ["btc-001"]
+    assert set(blood[0].keys()) == {"cabin_name", "cabin_key", "slot_duration", "available_slots"}
+    assert [item["slot"] for item in blood[0]["available_slots"]] == _EXPECTED_BLOOD_SLOTS
+    assert all(item["spot_left"] == 6 for item in blood[0]["available_slots"])
+
+    consult = data["slot_detail"]["consultation"]["2026-08-20"][0]
+    assert consult["available_slots"] == [
+        {"slot": "09:00", "spot_left": 1},
+        {"slot": "09:30", "spot_left": 1},
+    ]
+
+    admin = await async_client.get("/engagements/" + str(create.json()["data"]["engagement_id"]), headers=_auth_header(7410))
+    raw_cabin = admin.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"][0]
+    assert "start_time" in raw_cabin
+    assert "capacity_per_slot" in raw_cabin
+    assert "available_slots" not in raw_cabin
+
+    onboard = await async_client.post(
+        "/users/code/SLOTPUB1/onboard",
+        json={
+            "age": 30,
+            "first_name": "Slot",
+            "last_name": "User",
+            "phone": "9101000001",
+            "email": "slot.public@example.com",
+            "city": "BLR",
+            "blood_collection_date": "2026-08-20",
+            "blood_collection_time_slot": "09:00",
+            "blood_collection_cabin": "btc-001",
+        },
+    )
+    assert onboard.status_code == 200, onboard.text
+
+    after = await async_client.get("/engagements/code/SLOTPUB1")
+    after_slots = after.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"][0]["available_slots"]
+    by_slot = {item["slot"]: item["spot_left"] for item in after_slots}
+    assert by_slot["09:00"] == 5
+    assert by_slot["09:30"] == 6
+
+
+@pytest.mark.asyncio
+async def test_get_engagement_by_code_returns_null_slot_detail_when_unset(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7411, employee_id=411)
+    await _seed_organization(test_db_session, organization_id=9102, name="No Slot Org")
+    await _seed_assessment_package(test_db_session, package_id=9102, package_code="PKG9102")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9102)
+    type_id = await _engagement_type_id(test_db_session, "bio_ai")
+
+    create = await async_client.post(
+        "/engagements",
+        headers=_auth_header(7411),
+        json={
+            "engagement_name": "No Slot Camp",
+            "organization_id": 9102,
+            "engagement_type": type_id,
+            "assessment_package_id": 9102,
+            "diagnostic_package_id": 9102,
+            "city": "BLR",
+            "slot_duration": 30,
+            "start_date": "2026-08-20",
+            "end_date": "2026-08-21",
+            "engagement_code": "SLOTNONE",
+        },
+    )
+    assert create.status_code == 201, create.text
+    public = await async_client.get("/engagements/code/SLOTNONE")
+    assert public.status_code == 200
+    assert public.json()["data"]["slot_detail"] is None

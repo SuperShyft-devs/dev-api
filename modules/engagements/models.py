@@ -122,6 +122,13 @@ class EngagementParticipant(Base):
         Index("ix_ep_booked_by_user_id", "booked_by_user_id"),
         Index("ix_ep_engagement_date", "engagement_date"),
         Index("ix_engagement_participants_booking_id", "booking_id"),
+        Index(
+            "ix_ep_cabin_slot_occupancy",
+            "engagement_id",
+            "blood_collection_cabin",
+            "engagement_date",
+            "slot_start_time",
+        ),
     )
 
     engagement_participant_id = Column(Integer, primary_key=True)
@@ -140,6 +147,7 @@ class EngagementParticipant(Base):
     barcode = Column(String, nullable=True)
     booking_id = Column(String, nullable=True)
     blood_collection_time_slot_id = Column(String, nullable=True)
+    blood_collection_cabin = Column(String, nullable=True)
     face_scan_link = Column(String, nullable=True)
     address = Column(String, nullable=True)
     sub_locality = Column(String, nullable=True)
