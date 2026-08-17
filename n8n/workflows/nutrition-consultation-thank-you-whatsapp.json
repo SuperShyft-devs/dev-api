@@ -1,0 +1,495 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Nutrition Consultation Thank You WhatsApp\nSends camp17 post-consultation thank you WhatsApp to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    external_link\n  }]\n}\n\nNotification service must have require_external_link enabled (API attaches feedback URL per member).",
+        "height": 640,
+        "width": 2336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4448,
+        6400
+      ],
+      "typeVersion": 1,
+      "id": "nt01-sticky-note-0001",
+      "name": "Sticky Note Nutrition Thank You WhatsApp"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nutrition-consultation-thank-you-whatsapp-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4576,
+        6592
+      ],
+      "id": "nt01-webhook-0001",
+      "name": "Nutrition Consultation Thank You WhatsApp",
+      "webhookId": "nt01-webhook-id-0001"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "nt01-val-001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "nt01-val-002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "nt01-val-003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "nt01-val-004",
+              "leftValue": "={{ $json.body.members[0].external_link }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4784,
+        6592
+      ],
+      "id": "nt01-validate-0001",
+      "name": "Validate WhatsApp Payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || '',\n    external_link: member.external_link || 'https://app.supershyft.com'\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5008,
+        6480
+      ],
+      "id": "nt01-split-0001",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst feedbackLink = (member.external_link || 'https://app.supershyft.com').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message = `camp17,${name},Thank you for attending your consultation with our doctor.,We hope the session helped you better understand your Bio-AI Health Report and your overall health status.,We would love to hear your thoughts on your overall experience with Supershyft so far.,Your feedback helps us continue shaping a better preventive health journey for you.,You can check the details below for your convenience.,${feedbackLink},Thanks for taking a moment to read this message.,Regards,Team Supershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5264,
+        6480
+      ],
+      "id": "nt01-prepare-0001",
+      "name": "Prepare Nutrition Thank You WhatsApp"
+    },
+    {
+      "parameters": {
+        "url": "https://webhook.whatapi.in/webhook/6a057e696f1a8bf9dd523d1f",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5488,
+        6480
+      ],
+      "id": "nt01-send-0001",
+      "name": "Send WhatsApp Message",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "nt01-accept-001",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5712,
+        6368
+      ],
+      "id": "nt01-accepted-0001",
+      "name": "WhatAPI Accepted?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nt01-sent-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Nutrition Thank You WhatsApp').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "nt01-sent-002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "nt01-sent-003",
+              "name": "message",
+              "value": "Message sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6208,
+        6288
+      ],
+      "id": "nt01-sent-resp-001",
+      "name": "WhatsApp Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nt01-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Nutrition Thank You WhatsApp').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "nt01-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "nt01-fail-003",
+              "name": "message",
+              "value": "WhatsApp sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5808,
+        6560
+      ],
+      "id": "nt01-fail-resp-001",
+      "name": "WhatsApp Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nt01-notacc-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Nutrition Thank You WhatsApp').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "nt01-notacc-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "nt01-notacc-003",
+              "name": "message",
+              "value": "WhatsApp sending failed: message not accepted",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6032,
+        6464
+      ],
+      "id": "nt01-notacc-resp-001",
+      "name": "WhatAPI Not Accepted"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nt01-valfail-001",
+              "name": "notification_id",
+              "value": "={{ $('Nutrition Consultation Thank You WhatsApp').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "nt01-valfail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "nt01-valfail-003",
+              "name": "message",
+              "value": "Payload validation failed: each member requires external_link (enable require_external_link on the notification service)",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5008,
+        6736
+      ],
+      "id": "nt01-valfail-resp-001",
+      "name": "WhatsApp Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6576,
+        6752
+      ],
+      "id": "nt01-callback-0001",
+      "name": "WhatsApp Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Nutrition Consultation Thank You WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Validate WhatsApp Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate WhatsApp Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Nutrition Thank You WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Nutrition Thank You WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "WhatAPI Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Accepted?": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatAPI Not Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Sent Response": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Failed Response": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Not Accepted": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}
