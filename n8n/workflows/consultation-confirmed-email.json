@@ -1,0 +1,417 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Consultation Confirmed Email\nSends consultation booking confirmation email to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    session_details: { want, date, slot, expert_type }\n  }],\n  engagement_id?: number\n}\n\nNotification service must have require_session_details enabled.",
+        "height": 560,
+        "width": 1984
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4432,
+        2528
+      ],
+      "typeVersion": 1,
+      "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567891",
+      "name": "Sticky Note Consultation Confirmed"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "consultation-confirmed-email-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4544,
+        2752
+      ],
+      "id": "a2b3c4d5-e6f7-8901-bcde-f12345678902",
+      "name": "Consultation Confirmed Email",
+      "webhookId": "b3c4d5e6-f7a8-9012-cdef-123456789013"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d1000001-0000-0000-0000-000000000001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d1000002-0000-0000-0000-000000000002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d1000003-0000-0000-0000-000000000003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "d1000004-0000-0000-0000-000000000004",
+              "leftValue": "={{ $json.body.members[0].session_details }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d1000005-0000-0000-0000-000000000005",
+              "leftValue": "={{ $json.body.members[0].session_details.date }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d1000006-0000-0000-0000-000000000006",
+              "leftValue": "={{ $json.body.members[0].session_details.slot }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4784,
+        2752
+      ],
+      "id": "c4d5e6f7-a8b9-0123-def0-234567890125",
+      "name": "Validate Email Payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members\n  .filter((member) => member.session_details && member.session_details.want !== false)\n  .map((member) => ({\n    json: {\n      notification_id: notificationId,\n      first_name: member.first_name || 'Participant',\n      last_name: member.last_name || '',\n      email: member.email || '',\n      phone: member.phone || '',\n      session_details: {\n        want: Boolean(member.session_details.want),\n        date: member.session_details.date || '',\n        slot: member.session_details.slot || '',\n        expert_type: member.session_details.expert_type || 'doctor'\n      }\n    }\n  }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4992,
+        2640
+      ],
+      "id": "d5e6f7a8-b9c0-1234-ef01-345678901235",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst consultationDate = (member.session_details?.date || '').trim();\nconst consultationTime = (member.session_details?.slot || '').trim();\n\nconst body = `Hi ${name},\\n\\nYour doctor consultation has been successfully scheduled.\\n\\nDate: ${consultationDate}\\nTime: ${consultationTime}\\n\\nPlease keep your Bio-AI Health Report accessible during the session so your doctor can walk you through the findings in detail.\\n\\nIf you need to reschedule, please inform us in advance.\\n\\nWarm regards,\\nTeam Supershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Your Doctor Consultation is Confirmed',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5216,
+        2640
+      ],
+      "id": "e6f7a8b9-c0d1-2345-f012-456789012346",
+      "name": "Prepare Consultation Confirmed Email"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        5456,
+        2640
+      ],
+      "id": "f7a8b9c0-d1e2-3456-0123-567890123457",
+      "name": "Send Consultation Confirmed Email",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "a8b9c0d1-e2f3-4567-1234-678901234568",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d2000001-0000-0000-0000-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Consultation Confirmed Email').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "d2000002-0000-0000-0000-000000000002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "d2000003-0000-0000-0000-000000000003",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5696,
+        2560
+      ],
+      "id": "b9c0d1e2-f3a4-5678-2345-678901234569",
+      "name": "Email Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d2000011-0000-0000-0000-000000000011",
+              "name": "notification_id",
+              "value": "={{ $json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "d2000012-0000-0000-0000-000000000012",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "d2000013-0000-0000-0000-000000000013",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5696,
+        2736
+      ],
+      "id": "c0d1e2f3-a4b5-6789-3456-789012345679",
+      "name": "Email Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d2000021-0000-0000-0000-000000000021",
+              "name": "notification_id",
+              "value": "={{ $('Consultation Confirmed Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "d2000022-0000-0000-0000-000000000022",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "d2000023-0000-0000-0000-000000000023",
+              "name": "message",
+              "value": "Payload validation failed: each member requires session_details with date and slot",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4992,
+        2880
+      ],
+      "id": "d1e2f3a4-b5c6-7890-4567-890123456790",
+      "name": "Email Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6128,
+        2880
+      ],
+      "id": "e2f3a4b5-c6d7-8901-5678-901234567891",
+      "name": "Email Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Consultation Confirmed Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Email Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Consultation Confirmed Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Consultation Confirmed Email": {
+      "main": [
+        [
+          {
+            "node": "Send Consultation Confirmed Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Consultation Confirmed Email": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

@@ -1,0 +1,397 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Fan out: one output item per member\nconst body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email,\n    phone: member.phone || '',\n    external_link: member.external_link || 'https://app.supershyft.com'\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4944,
+        960
+      ],
+      "id": "a3b4c5d6-e7f8-9012-cdef-123456789014",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "content": "## Nutrition Consultation Thank You Email\nSends a post-consultation thank you email to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    external_link\n  }]\n}\n\nNotification service must have require_external_link enabled (API attaches feedback URL per member).",
+        "height": 640,
+        "width": 1848
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4400,
+        800
+      ],
+      "typeVersion": 1,
+      "id": "b4c5d6e7-f8a9-0123-def0-234567890125",
+      "name": "Sticky Note Nutrition Thank You"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nutrition-consultation-thank-you-email-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4496,
+        1040
+      ],
+      "id": "c5d6e7f8-a9b0-1234-ef01-345678901236",
+      "name": "Nutrition Consultation Thank You Email",
+      "webhookId": "d6e7f8a9-b0c1-2345-f012-456789012347"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "n1000001-0000-0000-0000-000000000001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "n1000002-0000-0000-0000-000000000002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "n1000003-0000-0000-0000-000000000003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "n1000004-0000-0000-0000-000000000004",
+              "leftValue": "={{ $json.body.members[0].external_link }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4720,
+        1040
+      ],
+      "id": "d6e7f8a9-b0c1-2345-f012-456789012348",
+      "name": "Validate Email Payload"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst feedbackLink = (member.external_link || 'https://app.supershyft.com').trim();\n\nconst body = `Hi ${name},\\n\\nThank you for attending your consultation with our doctor. We hope the session provided you with a clearer understanding of your Bio-AI Health Report, your current health status, and the recommendations discussed during the consultation.\\n\\nWe would love to hear your thoughts on your overall experience with Supershyft so far.\\nYour feedback helps us continue shaping a better preventive health journey for you and every member of our community.\\nYou can share your feedback using the link below.\\n${feedbackLink}\\n\\nShould you have any additional questions or require further assistance, please don't hesitate to reach out to us.\\n\\nWarm regards,\\nTeam Supershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Thank You for Attending Your Nutrition Consultation',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5152,
+        960
+      ],
+      "id": "e7f8a9b0-c1d2-3456-0123-567890123458",
+      "name": "Prepare Nutrition Thank You Email"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        5376,
+        960
+      ],
+      "id": "f8a9b0c1-d2e3-4567-1234-678901234569",
+      "name": "Send Nutrition Thank You Email",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "a9b0c1d2-e3f4-5678-2345-789012345670",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n5000001-0000-0000-0000-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Nutrition Consultation Thank You Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "n5000002-0000-0000-0000-000000000002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "n5000003-0000-0000-0000-000000000003",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5728,
+        944
+      ],
+      "id": "b0c1d2e3-f4a5-6789-3456-789012345671",
+      "name": "Email Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n5000011-0000-0000-0000-000000000011",
+              "name": "notification_id",
+              "value": "={{ $('Nutrition Consultation Thank You Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "n5000012-0000-0000-0000-000000000012",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "n5000013-0000-0000-0000-000000000013",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5584,
+        1072
+      ],
+      "id": "c1d2e3f4-a5b6-7890-4567-890123456792",
+      "name": "Email Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n5000021-0000-0000-0000-000000000021",
+              "name": "notification_id",
+              "value": "={{ $('Nutrition Consultation Thank You Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "n5000022-0000-0000-0000-000000000022",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "n5000023-0000-0000-0000-000000000023",
+              "name": "message",
+              "value": "Payload validation failed: each member requires external_link (enable require_external_link on the notification service)",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4944,
+        1168
+      ],
+      "id": "d2e3f4a5-b6c7-8901-5678-901234567893",
+      "name": "Email Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6000,
+        1168
+      ],
+      "id": "e3f4a5b6-c7d8-9012-6789-012345678904",
+      "name": "Email Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Nutrition Thank You Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nutrition Consultation Thank You Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Email Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Nutrition Thank You Email": {
+      "main": [
+        [
+          {
+            "node": "Send Nutrition Thank You Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Nutrition Thank You Email": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}
