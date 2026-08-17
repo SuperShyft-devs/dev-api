@@ -428,6 +428,7 @@ async def upsert_notification_services(
                     require_participant_detail=seed.require_participant_detail,
                     require_otp=seed.require_otp,
                     require_session_details=seed.require_session_details,
+                    require_external_link=seed.require_external_link,
                 )
             )
         else:
@@ -440,6 +441,7 @@ async def upsert_notification_services(
             existing.require_participant_detail = seed.require_participant_detail
             existing.require_otp = seed.require_otp
             existing.require_session_details = seed.require_session_details
+            existing.require_external_link = seed.require_external_link
 
 
 async def upsert_default_platform_settings(session: AsyncSession) -> None:

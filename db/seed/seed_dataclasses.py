@@ -98,3 +98,4 @@ class SeedNotificationService:
     require_participant_detail: bool = False
     require_otp: bool = False
     require_session_details: bool = False
+    require_external_link: bool = False

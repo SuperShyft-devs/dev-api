@@ -1,0 +1,387 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Fan out: one output item per member\nconst body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email,\n    phone: member.phone || '',\n    external_link: member.external_link || 'https://app.supershyft.com'\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4944,
+        320
+      ],
+      "id": "a1a2a3a4-b5c6-7890-abcd-ef1234567890",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "content": "## Book Doctor Consultation Email\nSends a consultation booking email to each member in the payload.\nExpects: { notification_id, members: [{ first_name, last_name, email, phone, external_link }] }",
+        "height": 640,
+        "width": 1848
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4400,
+        160
+      ],
+      "typeVersion": 1,
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Sticky Note Book Consultation"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-doctor-consultation-email-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4496,
+        400
+      ],
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Book Doctor Consultation Email",
+      "webhookId": "d4e5f6a7-b8c9-0123-def0-234567890123"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b1000001-0000-0000-0000-000000000001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b1000002-0000-0000-0000-000000000002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b1000003-0000-0000-0000-000000000003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4720,
+        400
+      ],
+      "id": "d4e5f6a7-b8c9-0123-def0-234567890124",
+      "name": "Validate Email Payload"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst bookingLink = (member.external_link || 'https://app.supershyft.com').trim();\n\nconst body = `Hi ${name},\\n\\nYour health assessment has been completed and you are now eligible for a consultation with one of our doctors.\\n\\nThe consultation will help you better understand your report findings and develop a personalized action plan.\\n\\nPlease book a convenient slot below:\\n${bookingLink}\\n\\nWarm regards,\\nTeam Supershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Book Your doctor Consultation',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5152,
+        320
+      ],
+      "id": "e5f6a7b8-c9d0-1234-ef01-345678901234",
+      "name": "Prepare Book Consultation Email"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        5376,
+        320
+      ],
+      "id": "f6a7b8c9-d0e1-2345-f012-456789012345",
+      "name": "Send Book Consultation Email",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "a7b8c9d0-e1f2-3456-0123-456789012346",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b5000001-0000-0000-0000-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Book Doctor Consultation Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "b5000002-0000-0000-0000-000000000002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "b5000003-0000-0000-0000-000000000003",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5728,
+        304
+      ],
+      "id": "a8b9c0d1-e2f3-4567-1234-567890123456",
+      "name": "Email Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b5000011-0000-0000-0000-000000000011",
+              "name": "notification_id",
+              "value": "={{ $('Book Doctor Consultation Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "b5000012-0000-0000-0000-000000000012",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "b5000013-0000-0000-0000-000000000013",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5584,
+        432
+      ],
+      "id": "b9c0d1e2-f3a4-5678-2345-678901234567",
+      "name": "Email Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b5000021-0000-0000-0000-000000000021",
+              "name": "notification_id",
+              "value": "={{ $('Book Doctor Consultation Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "b5000022-0000-0000-0000-000000000022",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "b5000023-0000-0000-0000-000000000023",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4944,
+        576
+      ],
+      "id": "c0d1e2f3-a4b5-6789-3456-789012345678",
+      "name": "Email Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6000,
+        576
+      ],
+      "id": "d1e2f3a4-b5c6-7890-4567-890123456789",
+      "name": "Email Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Book Consultation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book Doctor Consultation Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Email Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Book Consultation Email": {
+      "main": [
+        [
+          {
+            "node": "Send Book Consultation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Book Consultation Email": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

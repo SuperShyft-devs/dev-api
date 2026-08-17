@@ -32,6 +32,8 @@ from modules.reports.blood_report_resolver import resolve_blood_report_url
 
 logger = logging.getLogger(__name__)
 
+_HARDCODED_EXTERNAL_LINK = "https://app.supershyft.com"
+
 _VALID_NOTIFICATION_STATUSES = frozenset({"pending", "sent", "failed"})
 
 
@@ -293,6 +295,9 @@ class NotificationsService:
             session_details = _resolve_session_details_for_user(payload, user.user_id)
             if session_details is not None:
                 member["session_details"] = session_details.model_dump(mode="json")
+
+            if svc.require_external_link:
+                member["external_link"] = _HARDCODED_EXTERNAL_LINK
 
             members.append(member)
 
@@ -557,6 +562,7 @@ class NotificationsService:
             require_participant_detail=payload.require_participant_detail,
             require_otp=payload.require_otp,
             require_session_details=payload.require_session_details,
+            require_external_link=payload.require_external_link,
         )
         return await self._repo.create_service(db, svc)
 
@@ -592,6 +598,8 @@ class NotificationsService:
             svc.require_otp = payload.require_otp
         if payload.require_session_details is not None:
             svc.require_session_details = payload.require_session_details
+        if payload.require_external_link is not None:
+            svc.require_external_link = payload.require_external_link
         return await self._repo.update_service(db, svc)
 
     async def delete_notification(

@@ -613,6 +613,131 @@ async def test_dispatch_omits_otp_in_members_when_not_required(async_client, tes
     assert "otp" not in member
 
 
+@pytest.mark.asyncio
+async def test_dispatch_includes_external_link_in_members_when_required(
+    async_client, test_db_session, monkeypatch
+):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
+    test_db_session.add(
+        User(
+            user_id=9544,
+            age=30,
+            phone="9544000000",
+            status="active",
+            email="user9544@example.com",
+            first_name="Jane",
+            last_name="Smith",
+        )
+    )
+    service_key = "external_link_dispatch_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, "
+            "require_blood_report_url, require_bio_ai_report_url, require_participant_detail, "
+            "require_otp, require_session_details, require_external_link) "
+            "VALUES (:sk, 'External Link Dispatch', 'email', 'external-link-dispatch', true, "
+            "false, false, false, false, false, true) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_external_link = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_api_key_header(),
+        json={"service_key": service_key, "user_ids": [9544]},
+    )
+    assert response.status_code == 201, response.text
+    assert webhook_calls
+    member = webhook_calls[0]["json"]["members"][0]
+    assert member["external_link"] == "https://app.supershyft.com"
+    assert member["first_name"] == "Jane"
+    assert member["email"] == "user9544@example.com"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_omits_external_link_in_members_when_not_required(
+    async_client, test_db_session, monkeypatch
+):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
+    test_db_session.add(User(user_id=9545, age=30, phone="9545000000", status="active"))
+    service_key = "external_link_not_required_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, "
+            "require_blood_report_url, require_bio_ai_report_url, require_participant_detail, "
+            "require_otp, require_session_details, require_external_link) "
+            "VALUES (:sk, 'No External Link', 'email', 'no-external-link', true, "
+            "false, false, false, false, false, false) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_external_link = false"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": "ok"}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json=None):
+            webhook_calls.append({"url": url, "json": json})
+            return _FakeResponse()
+
+    monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_api_key_header(),
+        json={"service_key": service_key, "user_ids": [9545]},
+    )
+    assert response.status_code == 201, response.text
+    member = webhook_calls[0]["json"]["members"][0]
+    assert "external_link" not in member
+
+
 async def _seed_simple_dispatch_service(
     test_db_session, *, user_id: int, service_key: str, webhook_path: str = "test-webhook"
 ):

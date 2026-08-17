@@ -55,6 +55,7 @@ class NotificationServiceCreate(BaseModel):
     require_participant_detail: bool = False
     require_otp: bool = False
     require_session_details: bool = False
+    require_external_link: bool = False
 
 
 class NotificationServiceUpdate(BaseModel):
@@ -67,3 +68,4 @@ class NotificationServiceUpdate(BaseModel):
     require_participant_detail: bool | None = None
     require_otp: bool | None = None
     require_session_details: bool | None = None
+    require_external_link: bool | None = None
