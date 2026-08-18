@@ -12,6 +12,7 @@ def empty_preference(*, want: bool = False) -> dict[str, Any]:
     return {
         "want": want,
         "date": None,
+        "cabin": None,
         "slot": None,
         "expert_id": None,
         "done": False,
@@ -45,6 +46,7 @@ def normalize_preference(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         want = bool(value.get("want", False))
         date_val = value.get("date")
+        cabin_val = value.get("cabin")
         slot_val = value.get("slot")
         expert_id = value.get("expert_id")
         if expert_id is not None:
@@ -52,9 +54,11 @@ def normalize_preference(value: Any) -> dict[str, Any]:
                 expert_id = int(expert_id)
             except (TypeError, ValueError):
                 expert_id = None
+        cabin = str(cabin_val).strip() if cabin_val else None
         return {
             "want": want,
             "date": str(date_val) if date_val else None,
+            "cabin": cabin or None,
             "slot": str(slot_val) if slot_val else None,
             "expert_id": expert_id,
             "done": bool(value.get("done", False)),
@@ -152,6 +156,7 @@ def booking_to_api_preference(booking: Any) -> dict[str, Any]:
         "consultation_id": booking.consultation_id,
         "want": bool(booking.want),
         "date": date_val,
+        "cabin": booking.consultation_cabin,
         "slot": booking.consultation_slot,
         "expert_id": booking.expert_id,
         "done": bool(booking.done),

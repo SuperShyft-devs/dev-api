@@ -2229,6 +2229,11 @@ class UsersService:
             payload.consultations,
             engagement.consultations,
         )
+        consultations = await self._engagements_service.validate_consultation_slots_for_onboard(
+            db,
+            engagement=engagement,
+            consultations=consultations,
+        )
 
         email = str(payload.email) if payload.email is not None else None
 

@@ -15,6 +15,7 @@ from modules.engagements.console.service import ConsoleService
 from modules.engagements.onboarding_assistants_service import OnboardingAssistantsService
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService
+from modules.experts.dependencies import get_expert_types_service
 from modules.metsights.client import MetsightsClient
 from modules.metsights.service import MetsightsService
 from modules.notifications.dependencies import get_notifications_service
@@ -41,6 +42,7 @@ def get_engagements_service() -> EngagementsService:
         metsights_service=MetsightsService(client=MetsightsClient()),
         notifications_repository=NotificationsRepository(),
         notifications_service=get_notifications_service(),
+        expert_types_service=get_expert_types_service(),
     )
 
 

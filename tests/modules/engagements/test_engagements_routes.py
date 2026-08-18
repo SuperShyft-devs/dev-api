@@ -315,6 +315,7 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
                     "cabin_key": "cc-001",
                     "start_time": "10:00",
                     "end_time": "18:00",
+                    "expert_type": "doctor",
                     "slot_duration": 30,
                     "capacity_per_slot": 1,
                     "breaks": [],
@@ -346,6 +347,7 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
     data = details.json()["data"]
     assert data["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_key"] == "btc-001"
     assert data["slot_detail"]["consultation"]["2026-08-20"][0]["cabin_name"] == "Consultation Cabin 1"
+    assert data["slot_detail"]["consultation"]["2026-08-20"][0]["expert_type"] == "doctor"
     assert data["slot_detail"]["blood_collection"]["2026-08-20"][0]["breaks"][0]["start_time"] == "13:00"
 
     updated_slot = {
@@ -421,7 +423,88 @@ async def test_create_engagement_rejects_invalid_slot_detail(async_client, test_
         },
     }
     response = await async_client.post("/engagements", headers=_auth_header(7021), json=payload)
-    assert response.status_code == 422
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_create_engagement_rejects_consultation_cabin_without_expert_type(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7022, employee_id=27)
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+    type_id = await _engagement_type_id(test_db_session, "blood_test_with_consultation")
+
+    payload = {
+        "engagement_name": "Missing Expert Type",
+        "organization_id": 1,
+        "engagement_type": type_id,
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "city": "BLR",
+        "slot_duration": 30,
+        "start_date": "2026-08-20",
+        "end_date": "2026-08-21",
+        "slot_detail": {
+            "consultation": {
+                "2026-08-20": [
+                    {
+                        "cabin_name": "Consultation Cabin 1",
+                        "cabin_key": "cc-001",
+                        "start_time": "09:00",
+                        "end_time": "17:00",
+                        "slot_duration": 30,
+                        "capacity_per_slot": 1,
+                        "breaks": [],
+                        "is_active": True,
+                    }
+                ]
+            }
+        },
+    }
+    response = await async_client.post("/engagements", headers=_auth_header(7022), json=payload)
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_create_engagement_rejects_unknown_consultation_expert_type(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7023, employee_id=28)
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+    type_id = await _engagement_type_id(test_db_session, "blood_test_with_consultation")
+
+    payload = {
+        "engagement_name": "Unknown Expert Type",
+        "organization_id": 1,
+        "engagement_type": type_id,
+        "assessment_package_id": 1,
+        "diagnostic_package_id": 1,
+        "city": "BLR",
+        "slot_duration": 30,
+        "start_date": "2026-08-20",
+        "end_date": "2026-08-21",
+        "slot_detail": {
+            "consultation": {
+                "2026-08-20": [
+                    {
+                        "cabin_name": "Consultation Cabin 1",
+                        "cabin_key": "cc-001",
+                        "start_time": "09:00",
+                        "end_time": "17:00",
+                        "expert_type": "unknown_type",
+                        "slot_duration": 30,
+                        "capacity_per_slot": 1,
+                        "breaks": [],
+                        "is_active": True,
+                    }
+                ]
+            }
+        },
+    }
+    response = await async_client.post("/engagements", headers=_auth_header(7023), json=payload)
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT"
+    assert response.json()["message"] == "Unknown expert type: unknown_type"
 
 
 @pytest.mark.asyncio
@@ -2037,6 +2120,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
                     "cabin_key": "cc-001",
                     "start_time": "09:00",
                     "end_time": "10:00",
+                    "expert_type": "doctor",
                     "slot_duration": 30,
                     "capacity_per_slot": 1,
                     "breaks": [],
@@ -2059,6 +2143,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
             "start_date": "2026-08-20",
             "end_date": "2026-08-21",
             "engagement_code": "SLOTPUB1",
+            "consultations": {"doctor": True},
             "slot_detail": slot_detail,
         },
     )
@@ -2074,6 +2159,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
     assert all(item["spot_left"] == 6 for item in blood[0]["available_slots"])
 
     consult = data["slot_detail"]["consultation"]["2026-08-20"][0]
+    assert consult["expert_type"] == "doctor"
     assert consult["available_slots"] == [
         {"slot": "09:00", "spot_left": 1},
         {"slot": "09:30", "spot_left": 1},
@@ -2097,6 +2183,14 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
             "blood_collection_date": "2026-08-20",
             "blood_collection_time_slot": "09:00",
             "blood_collection_cabin": "btc-001",
+            "consultations": {
+                "doctor": {
+                    "want": True,
+                    "date": "2026-08-20",
+                    "cabin": "cc-001",
+                    "slot": "09:00",
+                }
+            },
         },
     )
     assert onboard.status_code == 200, onboard.text
@@ -2106,6 +2200,10 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
     by_slot = {item["slot"]: item["spot_left"] for item in after_slots}
     assert by_slot["09:00"] == 5
     assert by_slot["09:30"] == 6
+    consult_after = after.json()["data"]["slot_detail"]["consultation"]["2026-08-20"][0]["available_slots"]
+    consult_by_slot = {item["slot"]: item["spot_left"] for item in consult_after}
+    assert consult_by_slot["09:00"] == 0
+    assert consult_by_slot["09:30"] == 1
 
 
 @pytest.mark.asyncio

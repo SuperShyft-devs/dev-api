@@ -275,7 +275,7 @@ class PublicUserOnboardRequest(BaseModel):
     want_doctor_consultation: Optional[bool] = None
     want_nutritionist_consultation: Optional[bool] = None
     want_doctor_and_nutritionist_consultation: Optional[bool] = None
-    # New field: { expert_type: { want, date, slot, expert_id } }
+    # New field: { expert_type: { want, date, cabin, slot, expert_id } }
     consultations: Optional[dict[str, Any]] = None
 
     # Optional: category_key -> { responses: [{ question_id, answer }, ...] }
@@ -356,7 +356,7 @@ class EngagementUserOnboardRequest(BaseModel):
     want_doctor_consultation: Optional[bool] = None
     want_nutritionist_consultation: Optional[bool] = None
     want_doctor_and_nutritionist_consultation: Optional[bool] = None
-    # New field: { expert_type: { want, date, slot, expert_id } }
+    # New field: { expert_type: { want, date, cabin, slot, expert_id } }
     consultations: Optional[dict[str, Any]] = None
 
     @model_validator(mode="after")

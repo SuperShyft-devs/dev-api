@@ -179,11 +179,58 @@ def require_available_blood_collection_slot(
     return cabin
 
 
-def build_public_slot_detail(slot_detail: Any, occupancy: OccupancyMap | None = None) -> dict[str, Any] | None:
+def require_available_consultation_slot(
+    slot_detail: Any,
+    *,
+    expert_type: str,
+    consultation_date: date,
+    cabin_key: str | None,
+    slot_time: time,
+) -> dict[str, Any]:
+    date_key = consultation_date.isoformat()
+    cabin = find_active_cabin(
+        slot_detail,
+        section="consultation",
+        date_key=date_key,
+        cabin_key=cabin_key or "",
+    )
+    if cabin is None:
+        raise slot_unavailable()
+
+    wanted_type = (expert_type or "").strip()
+    cabin_type = (cabin.get("expert_type") or "").strip()
+    if not wanted_type or cabin_type != wanted_type:
+        raise slot_unavailable()
+
+    starts = generate_slot_starts(
+        cabin.get("start_time"),
+        cabin.get("end_time"),
+        int(cabin.get("slot_duration") or 0),
+        cabin.get("breaks") or [],
+    )
+    wanted = coerce_time(slot_time)
+    if wanted is None or wanted not in starts:
+        raise slot_unavailable()
+
+    try:
+        capacity = int(cabin.get("capacity_per_slot") or 0)
+    except (TypeError, ValueError) as exc:
+        raise slot_unavailable() from exc
+    if capacity <= 0:
+        raise slot_unavailable()
+    return cabin
+
+
+def build_public_slot_detail(
+    slot_detail: Any,
+    occupancy: OccupancyMap | None = None,
+    consultation_occupancy: OccupancyMap | None = None,
+) -> dict[str, Any] | None:
     if not slot_detail_is_configured(slot_detail) or not isinstance(slot_detail, dict):
         return None
 
     occupancy = occupancy or {}
+    consultation_occupancy = consultation_occupancy or {}
     result: dict[str, Any] = {}
     for section_key in ("blood_collection", "consultation"):
         section = slot_detail.get(section_key)
@@ -213,23 +260,25 @@ def build_public_slot_detail(slot_detail: Any, occupancy: OccupancyMap | None = 
                     duration,
                     cabin.get("breaks") or [],
                 )
+                section_occupancy = consultation_occupancy if section_key == "consultation" else occupancy
                 available_slots = []
                 for slot_t in starts:
-                    count = occupancy.get(occupancy_key(cabin_key, slot_date, slot_t), 0)
+                    count = section_occupancy.get(occupancy_key(cabin_key, slot_date, slot_t), 0)
                     available_slots.append(
                         {
                             "slot": format_hhmm(slot_t),
                             "spot_left": max(0, capacity - int(count)),
                         }
                     )
-                public_cabins.append(
-                    {
-                        "cabin_name": cabin.get("cabin_name") or "",
-                        "cabin_key": cabin_key,
-                        "slot_duration": duration,
-                        "available_slots": available_slots,
-                    }
-                )
+                public_cabin: dict[str, Any] = {
+                    "cabin_name": cabin.get("cabin_name") or "",
+                    "cabin_key": cabin_key,
+                    "slot_duration": duration,
+                    "available_slots": available_slots,
+                }
+                if section_key == "consultation":
+                    public_cabin["expert_type"] = (cabin.get("expert_type") or "").strip()
+                public_cabins.append(public_cabin)
             if public_cabins:
                 public_section[str(date_key)] = public_cabins
         if public_section:

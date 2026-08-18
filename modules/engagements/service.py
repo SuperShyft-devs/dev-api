@@ -37,8 +37,11 @@ from modules.engagements.models import BloodCollectionType, Engagement, Engageme
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.slot_availability import (
     build_public_slot_detail,
+    coerce_time,
+    format_hhmm,
     occupancy_map_from_rows,
     require_available_blood_collection_slot,
+    require_available_consultation_slot,
     slot_detail_is_configured,
     slot_unavailable,
 )
@@ -51,7 +54,10 @@ from modules.engagements.schemas import (
     ConsultationConsentRequest,
     ResolveHealthiansZoneRequest,
     ResolveHealthiansZoneResponse,
+    SlotDetail,
 )
+from modules.experts.repository import ExpertTypesRepository
+from modules.experts.service import ExpertTypesService
 from modules.notifications.repository import NotificationsRepository
 from modules.organizations.repository import OrganizationsRepository
 from modules.platform_settings.repository import PlatformSettingsRepository
@@ -250,6 +256,7 @@ class EngagementsService:
         notifications_repository: NotificationsRepository | None = None,
         notifications_service: "NotificationsService | None" = None,
         consultation_bookings_repository: ConsultationBookingsRepository | None = None,
+        expert_types_service: ExpertTypesService | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
@@ -265,6 +272,7 @@ class EngagementsService:
         self._questionnaire_repository = QuestionnaireRepository()
         self._reports_repository = ReportsRepository()
         self._consultation_bookings = consultation_bookings_repository or ConsultationBookingsRepository()
+        self._expert_types_service = expert_types_service or ExpertTypesService(repository=ExpertTypesRepository())
         self._checklists_service = None
 
     async def _participant_rows_to_dicts(self, db: AsyncSession, rows: list[tuple]) -> list[dict[str, Any]]:
@@ -295,6 +303,22 @@ class EngagementsService:
                 engagements_service=self,
             )
         return self._checklists_service
+
+    async def _validate_consultation_expert_types(
+        self,
+        db: AsyncSession,
+        slot_detail: SlotDetail | None,
+    ) -> None:
+        if slot_detail is None or not slot_detail.consultation:
+            return
+        seen: set[str] = set()
+        for cabins in slot_detail.consultation.values():
+            for cabin in cabins:
+                key = cabin.expert_type.strip()
+                if not key or key in seen:
+                    continue
+                seen.add(key)
+                await self._expert_types_service.validate_type_key(db, key)
 
     def _group_slots_by_date(self, rows: list[tuple]) -> dict[str, list[str]]:
         """Group (date, time) rows into a {"YYYY-MM-DD": ["HH:MM:SS", ...]} mapping."""
@@ -421,6 +445,7 @@ class EngagementsService:
                 )
 
         diagnostic_package_id = payload.diagnostic_package_id
+        await self._validate_consultation_expert_types(db, payload.slot_detail)
 
         # Use provided engagement_code or generate a unique one.
         if payload.engagement_code:
@@ -696,7 +721,15 @@ class EngagementsService:
             db,
             engagement_id=int(engagement.engagement_id),
         )
-        return build_public_slot_detail(engagement.slot_detail, occupancy_map_from_rows(rows))
+        consultation_rows = await self._consultation_bookings.list_consultation_cabin_slot_occupancy(
+            db,
+            engagement_id=int(engagement.engagement_id),
+        )
+        return build_public_slot_detail(
+            engagement.slot_detail,
+            occupancy_map_from_rows(rows),
+            occupancy_map_from_rows(consultation_rows),
+        )
 
     async def validate_blood_collection_slot_for_onboard(
         self,
@@ -729,6 +762,63 @@ class EngagementsService:
         if count >= capacity:
             raise slot_unavailable()
         return persisted_cabin
+
+    async def validate_consultation_slots_for_onboard(
+        self,
+        db: AsyncSession,
+        *,
+        engagement: Engagement,
+        consultations: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        normalized = normalize_consultations_map(consultations)
+        if not slot_detail_is_configured(engagement.slot_detail):
+            return normalized
+        section = None
+        if isinstance(engagement.slot_detail, dict):
+            section = engagement.slot_detail.get("consultation")
+        if not isinstance(section, dict) or not section:
+            return normalized
+
+        for expert_type, pref in normalized.items():
+            if pref.get("want") is not True:
+                continue
+            date_val = pref.get("date")
+            cabin_val = (pref.get("cabin") or "").strip() or None
+            slot_val = pref.get("slot")
+            if not date_val and not cabin_val and not slot_val:
+                continue
+            if not date_val or not cabin_val or not slot_val:
+                raise slot_unavailable()
+            try:
+                consultation_date = date.fromisoformat(str(date_val)[:10])
+            except ValueError as exc:
+                raise slot_unavailable() from exc
+            slot_time = coerce_time(slot_val)
+            if slot_time is None:
+                raise slot_unavailable()
+            cabin = require_available_consultation_slot(
+                engagement.slot_detail,
+                expert_type=str(expert_type),
+                consultation_date=consultation_date,
+                cabin_key=cabin_val,
+                slot_time=slot_time,
+            )
+            persisted_cabin = (cabin.get("cabin_key") or "").strip()
+            slot_hhmm = format_hhmm(slot_time)
+            count = await self._consultation_bookings.count_cabin_slot_bookings(
+                db,
+                engagement_id=int(engagement.engagement_id),
+                consultation_cabin=persisted_cabin,
+                consultation_date=consultation_date,
+                consultation_slot=slot_hhmm,
+            )
+            capacity = int(cabin.get("capacity_per_slot") or 0)
+            if count >= capacity:
+                raise slot_unavailable()
+            pref["cabin"] = persisted_cabin
+            pref["slot"] = slot_hhmm
+            pref["date"] = consultation_date.isoformat()
+        return normalized
 
     async def get_engagement_details_for_employee(
         self,
@@ -796,6 +886,7 @@ class EngagementsService:
         if "consultations" in update_fields:
             engagement.consultations = payload.consultations
         if "slot_detail" in update_fields:
+            await self._validate_consultation_expert_types(db, payload.slot_detail)
             engagement.slot_detail = (
                 payload.slot_detail.model_dump(mode="json", exclude_none=True)
                 if payload.slot_detail is not None
@@ -1446,6 +1537,7 @@ class EngagementsService:
                     "expert_type": booking.expert_type,
                     "expert_id": booking.expert_id,
                     "date": date_val,
+                    "cabin": booking.consultation_cabin,
                     "slot": booking.consultation_slot,
                     "done": bool(booking.done),
                     "consultation_summary": booking.consultation_summary,
