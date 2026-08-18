@@ -88,8 +88,8 @@ async def _engagement_type_id(test_db_session, code: str = "bio_ai") -> int:
     return int(row[0])
 
 
-def _slot_detail(*, capacity: int = 6, is_active: bool = True) -> dict:
-    return {
+def _slot_detail(*, capacity: int = 6, is_active: bool = True, consultation: dict | None = None) -> dict:
+    detail = {
         "blood_collection": {
             "2026-08-20": [
                 {
@@ -105,6 +105,27 @@ def _slot_detail(*, capacity: int = 6, is_active: bool = True) -> dict:
             ]
         }
     }
+    if consultation is not None:
+        detail["consultation"] = consultation
+    return detail
+
+
+def _consultation_cabin(*, capacity: int = 1, expert_type: str = "doctor") -> dict:
+    return {
+        "2026-08-20": [
+            {
+                "cabin_name": "Consultation Cabin 1",
+                "cabin_key": "cc-001",
+                "start_time": "09:00",
+                "end_time": "17:00",
+                "expert_type": expert_type,
+                "slot_duration": 30,
+                "capacity_per_slot": capacity,
+                "breaks": [{"start_time": "13:00", "end_time": "14:00"}],
+                "is_active": True,
+            }
+        ]
+    }
 
 
 async def _create_slot_engagement(
@@ -117,27 +138,40 @@ async def _create_slot_engagement(
     code: str,
     capacity: int = 6,
     is_active: bool = True,
+    consultation: dict | None = None,
+    consultations: dict | None = None,
 ):
+    if consultation is not None:
+        await test_db_session.execute(
+            text(
+                "INSERT INTO expert_types (type_key, type) VALUES ('doctor', 'Doctor') "
+                "ON CONFLICT (type_key) DO NOTHING"
+            )
+        )
+        await test_db_session.commit()
     await _seed_employee(test_db_session, user_id=user_id, employee_id=employee_id)
     await _seed_organization(test_db_session, organization_id=organization_id, name=f"Org {organization_id}")
     await _seed_packages(test_db_session, package_id=organization_id)
     type_id = await _engagement_type_id(test_db_session, "bio_ai")
+    payload = {
+        "engagement_name": f"Camp {code}",
+        "organization_id": organization_id,
+        "engagement_type": type_id,
+        "assessment_package_id": organization_id,
+        "diagnostic_package_id": organization_id,
+        "city": "BLR",
+        "slot_duration": 30,
+        "start_date": "2026-08-20",
+        "end_date": "2026-08-21",
+        "engagement_code": code,
+        "slot_detail": _slot_detail(capacity=capacity, is_active=is_active, consultation=consultation),
+    }
+    if consultations is not None:
+        payload["consultations"] = consultations
     response = await async_client.post(
         "/engagements",
         headers=_auth_header(user_id),
-        json={
-            "engagement_name": f"Camp {code}",
-            "organization_id": organization_id,
-            "engagement_type": type_id,
-            "assessment_package_id": organization_id,
-            "diagnostic_package_id": organization_id,
-            "city": "BLR",
-            "slot_duration": 30,
-            "start_date": "2026-08-20",
-            "end_date": "2026-08-21",
-            "engagement_code": code,
-            "slot_detail": _slot_detail(capacity=capacity, is_active=is_active),
-        },
+        json=payload,
     )
     assert response.status_code == 201, response.text
     return response.json()["data"]["engagement_id"]
@@ -262,6 +296,117 @@ async def test_onboard_rejects_when_slot_capacity_is_full(async_client, test_db_
     second = await async_client.post(
         "/users/code/SLOTFULL/onboard",
         json=_onboard_payload(phone="9204000002"),
+    )
+    assert second.status_code == 400
+    assert second.json()["error_code"] == "SLOT_UNAVAILABLE"
+    assert second.json()["message"] == "No such Slot Available"
+
+
+def _consult_onboard_payload(
+    *,
+    phone: str,
+    slot: str = "09:00",
+    cabin: str = "cc-001",
+    date: str = "2026-08-20",
+    blood_slot: str = "09:00",
+) -> dict:
+    payload = _onboard_payload(phone=phone, slot=blood_slot)
+    payload["consultations"] = {
+        "doctor": {
+            "want": True,
+            "date": date,
+            "cabin": cabin,
+            "slot": slot,
+        }
+    }
+    return payload
+
+
+@pytest.mark.asyncio
+async def test_onboard_persists_consultation_cabin(async_client, test_db_session):
+    await _create_slot_engagement(
+        async_client,
+        test_db_session,
+        user_id=7424,
+        employee_id=424,
+        organization_id=9205,
+        code="SLOTCON1",
+        consultation=_consultation_cabin(),
+        consultations={"doctor": True},
+    )
+    response = await async_client.post(
+        "/users/code/SLOTCON1/onboard",
+        json=_consult_onboard_payload(phone="9205000001", slot="09:30"),
+    )
+    assert response.status_code == 200, response.text
+    pid = response.json()["data"]["engagement_participant_id"]
+    row = (
+        await test_db_session.execute(
+            text(
+                "SELECT consultation_cabin, consultation_date, consultation_slot, expert_type, want "
+                "FROM consultation_bookings WHERE engagement_participant_id = :pid"
+            ),
+            {"pid": pid},
+        )
+    ).first()
+    assert row.consultation_cabin == "cc-001"
+    assert str(row.consultation_date) == "2026-08-20"
+    assert row.consultation_slot == "09:30"
+    assert row.expert_type == "doctor"
+    assert row.want is True
+
+
+@pytest.mark.asyncio
+async def test_onboard_rejects_unavailable_consultation_slot_variants(async_client, test_db_session):
+    await _create_slot_engagement(
+        async_client,
+        test_db_session,
+        user_id=7425,
+        employee_id=425,
+        organization_id=9206,
+        code="SLOTCONB",
+        consultation=_consultation_cabin(),
+        consultations={"doctor": True},
+    )
+    cases = [
+        _consult_onboard_payload(phone="9206000001", date="2026-08-21"),
+        _consult_onboard_payload(phone="9206000002", cabin="missing"),
+        _consult_onboard_payload(phone="9206000003", slot="13:00"),
+        _consult_onboard_payload(phone="9206000004", slot="17:00"),
+    ]
+    partial = _onboard_payload(phone="9206000005")
+    partial["consultations"] = {"doctor": {"want": True, "date": "2026-08-20"}}
+    cases.append(partial)
+    for payload in cases:
+        limiter.reset()
+        response = await async_client.post("/users/code/SLOTCONB/onboard", json=payload)
+        assert response.status_code == 400, payload
+        assert response.json() == {
+            "error_code": "SLOT_UNAVAILABLE",
+            "message": "No such Slot Available",
+        }
+
+
+@pytest.mark.asyncio
+async def test_onboard_rejects_when_consultation_slot_capacity_is_full(async_client, test_db_session):
+    await _create_slot_engagement(
+        async_client,
+        test_db_session,
+        user_id=7426,
+        employee_id=426,
+        organization_id=9207,
+        code="SLOTCONF",
+        consultation=_consultation_cabin(capacity=1),
+        consultations={"doctor": True},
+    )
+    first = await async_client.post(
+        "/users/code/SLOTCONF/onboard",
+        json=_consult_onboard_payload(phone="9207000001"),
+    )
+    assert first.status_code == 200, first.text
+    second = await async_client.post(
+        "/users/code/SLOTCONF/onboard",
+        json=_consult_onboard_payload(phone="9207000002", blood_slot="09:30"),
     )
     assert second.status_code == 400
     assert second.json()["error_code"] == "SLOT_UNAVAILABLE"

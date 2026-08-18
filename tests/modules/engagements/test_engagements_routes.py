@@ -2143,6 +2143,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
             "start_date": "2026-08-20",
             "end_date": "2026-08-21",
             "engagement_code": "SLOTPUB1",
+            "consultations": {"doctor": True},
             "slot_detail": slot_detail,
         },
     )
@@ -2182,6 +2183,14 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
             "blood_collection_date": "2026-08-20",
             "blood_collection_time_slot": "09:00",
             "blood_collection_cabin": "btc-001",
+            "consultations": {
+                "doctor": {
+                    "want": True,
+                    "date": "2026-08-20",
+                    "cabin": "cc-001",
+                    "slot": "09:00",
+                }
+            },
         },
     )
     assert onboard.status_code == 200, onboard.text
@@ -2191,6 +2200,10 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
     by_slot = {item["slot"]: item["spot_left"] for item in after_slots}
     assert by_slot["09:00"] == 5
     assert by_slot["09:30"] == 6
+    consult_after = after.json()["data"]["slot_detail"]["consultation"]["2026-08-20"][0]["available_slots"]
+    consult_by_slot = {item["slot"]: item["spot_left"] for item in consult_after}
+    assert consult_by_slot["09:00"] == 0
+    assert consult_by_slot["09:30"] == 1
 
 
 @pytest.mark.asyncio

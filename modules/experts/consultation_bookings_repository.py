@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.engagements.models import EngagementParticipant
@@ -65,6 +65,68 @@ class ConsultationBookingsRepository:
             grouped.setdefault(booking.engagement_participant_id, []).append(booking)
         return grouped
 
+    async def count_cabin_slot_bookings(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        consultation_cabin: str,
+        consultation_date: Any,
+        consultation_slot: str,
+    ) -> int:
+        filtered_bookings = (
+            select(ConsultationBooking.engagement_participant_id)
+            .where(ConsultationBooking.consultation_cabin == consultation_cabin)
+            .where(ConsultationBooking.consultation_date == consultation_date)
+            .where(ConsultationBooking.consultation_slot == consultation_slot)
+            .where(ConsultationBooking.want.is_(True))
+            .subquery()
+        )
+        query = (
+            select(func.count())
+            .select_from(filtered_bookings)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_participant_id
+                == filtered_bookings.c.engagement_participant_id,
+            )
+            .where(EngagementParticipant.engagement_id == engagement_id)
+        )
+        result = await db.execute(query)
+        return int(result.scalar_one())
+
+    async def list_consultation_cabin_slot_occupancy(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> list[tuple]:
+        query = (
+            select(
+                ConsultationBooking.consultation_cabin,
+                ConsultationBooking.consultation_date,
+                ConsultationBooking.consultation_slot,
+                func.count(),
+            )
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_participant_id
+                == ConsultationBooking.engagement_participant_id,
+            )
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .where(ConsultationBooking.want.is_(True))
+            .where(ConsultationBooking.consultation_cabin.isnot(None))
+            .where(ConsultationBooking.consultation_date.isnot(None))
+            .where(ConsultationBooking.consultation_slot.isnot(None))
+            .group_by(
+                ConsultationBooking.consultation_cabin,
+                ConsultationBooking.consultation_date,
+                ConsultationBooking.consultation_slot,
+            )
+        )
+        result = await db.execute(query)
+        return list(result.all())
+
     def _append_booking_id(self, participant: EngagementParticipant, consultation_id: int) -> None:
         ids = list(participant.consultation_booking_ids or [])
         if consultation_id not in ids:
@@ -80,6 +142,7 @@ class ConsultationBookingsRepository:
         want: bool | None = None,
         consultation_date: Any = None,
         consultation_slot: str | None = None,
+        consultation_cabin: str | None = None,
         expert_id: int | None = None,
         done: bool | None = None,
         meet_link: str | None = None,
@@ -108,6 +171,7 @@ class ConsultationBookingsRepository:
         if clear_scheduling:
             booking.consultation_date = None
             booking.consultation_slot = None
+            booking.consultation_cabin = None
             booking.expert_id = None
             booking.done = False
             booking.meet_link = None
@@ -115,6 +179,8 @@ class ConsultationBookingsRepository:
             booking.consultation_date = consultation_date
         if consultation_slot is not None:
             booking.consultation_slot = consultation_slot
+        if consultation_cabin is not None:
+            booking.consultation_cabin = (consultation_cabin or "").strip() or None
         if expert_id is not None:
             booking.expert_id = expert_id
         if done is not None:
@@ -163,6 +229,7 @@ class ConsultationBookingsRepository:
                 want=want,
                 consultation_date=consultation_date,
                 consultation_slot=pref.get("slot") if want else None,
+                consultation_cabin=(pref.get("cabin") or "").strip() or None if want else None,
                 expert_id=pref.get("expert_id") if want else None,
                 done=bool(pref.get("done")) if want else False,
                 meet_link=pref.get("meet_link") if want else None,

@@ -15,6 +15,7 @@ from modules.engagements.slot_availability import (
     generate_slot_starts,
     occupancy_key,
     require_available_blood_collection_slot,
+    require_available_consultation_slot,
 )
 
 
@@ -136,7 +137,8 @@ def test_build_public_slot_detail_applies_occupancy_and_skips_inactive():
         },
     }
     occupancy = {occupancy_key("btc-001", date(2026, 8, 20), time(9, 0)): 5}
-    public = build_public_slot_detail(slot_detail, occupancy)
+    consultation_occupancy = {occupancy_key("cc-001", date(2026, 8, 20), time(9, 0)): 1}
+    public = build_public_slot_detail(slot_detail, occupancy, consultation_occupancy)
     blood_cabins = public["blood_collection"]["2026-08-20"]
     assert [cabin["cabin_key"] for cabin in blood_cabins] == ["btc-001"]
     assert blood_cabins[0]["available_slots"] == [
@@ -147,9 +149,49 @@ def test_build_public_slot_detail_applies_occupancy_and_skips_inactive():
     assert consult_cabin["expert_type"] == "doctor"
     consult_slots = consult_cabin["available_slots"]
     assert consult_slots == [
-        {"slot": "09:00", "spot_left": 1},
+        {"slot": "09:00", "spot_left": 0},
         {"slot": "09:30", "spot_left": 1},
     ]
+
+
+def test_require_available_consultation_slot_rejects_break_cabin_and_expert_type():
+    slot_detail = {
+        "consultation": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Consultation Cabin 1",
+                    "cabin_key": "cc-001",
+                    "start_time": "09:00",
+                    "end_time": "17:00",
+                    "expert_type": "doctor",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 1,
+                    "breaks": [{"start_time": "13:00", "end_time": "14:00"}],
+                    "is_active": True,
+                }
+            ]
+        }
+    }
+    cabin = require_available_consultation_slot(
+        slot_detail,
+        expert_type="doctor",
+        consultation_date=date(2026, 8, 20),
+        cabin_key="cc-001",
+        slot_time=time(9, 0),
+    )
+    assert cabin["cabin_key"] == "cc-001"
+
+    cases = [
+        {"consultation_date": date(2026, 8, 21), "cabin_key": "cc-001", "slot_time": time(9, 0), "expert_type": "doctor"},
+        {"consultation_date": date(2026, 8, 20), "cabin_key": "missing", "slot_time": time(9, 0), "expert_type": "doctor"},
+        {"consultation_date": date(2026, 8, 20), "cabin_key": "cc-001", "slot_time": time(13, 0), "expert_type": "doctor"},
+        {"consultation_date": date(2026, 8, 20), "cabin_key": "cc-001", "slot_time": time(9, 0), "expert_type": "nutritionist"},
+    ]
+    for kwargs in cases:
+        with pytest.raises(AppError) as err:
+            require_available_consultation_slot(slot_detail, **kwargs)
+        assert err.value.error_code == SLOT_UNAVAILABLE_CODE
+        assert err.value.message == SLOT_UNAVAILABLE_MESSAGE
 
 
 def test_build_public_slot_detail_returns_none_when_unconfigured():

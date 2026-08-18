@@ -165,6 +165,7 @@ class ConsultationPreferenceSchema(BaseModel):
     consultation_id: Optional[int] = Field(default=None, gt=0)
     want: bool = False
     date: Optional[str] = None
+    cabin: Optional[str] = Field(default=None, max_length=100)
     slot: Optional[str] = None
     expert_id: Optional[int] = Field(default=None, gt=0)
     done: bool = False

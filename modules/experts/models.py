@@ -118,6 +118,7 @@ class ConsultationBooking(Base):
     want = Column(Boolean, nullable=False, default=False, server_default="false")
     consultation_date = Column(Date, nullable=True)
     consultation_slot = Column(String(20), nullable=True)
+    consultation_cabin = Column(String, nullable=True)
     done = Column(Boolean, nullable=False, default=False, server_default="false")
     meet_link = Column(String(500), nullable=True)
     consent = Column(JSON, nullable=False, default=lambda: {"bio_ai": False, "blood_report": False, "questionnaire": False})
