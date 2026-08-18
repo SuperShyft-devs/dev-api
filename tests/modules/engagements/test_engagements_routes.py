@@ -874,7 +874,7 @@ async def test_get_engagement_details_returns_row(async_client, test_db_session)
     assert response.status_code == 200
     body = response.json()["data"]
     assert body["engagement_id"] == 8201
-    assert body["onboarding_notification"] is None
+    assert body.get("notifications") == []
     assert body["assessment_package_id"] == 1
 
 
