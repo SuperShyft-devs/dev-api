@@ -686,17 +686,23 @@ async def load_blood_reports(
                                                 ),
                                             })
                                         except Exception as exc:
-                                            await db.rollback()
+                                            # Keep integration_sync_logs for the Metsights API
+                                            # call; a rollback would drop the failed row.
+                                            try:
+                                                await db.commit()
+                                            except Exception:
+                                                await db.rollback()
                                             logger.warning(
                                                 "Metsights blood push failed for user=%s category=%s: %s",
                                                 user_id, category_key, exc,
                                             )
+                                            push_error = getattr(exc, "message", None) or str(exc)
                                             details.append({
                                                 "user_id": user_id, "engagement_id": engagement_id,
                                                 "action": "failed",
                                                 "reason": (
                                                     f"metsights push failed for {category_key}: "
-                                                    f"{str(exc)[:100]}"
+                                                    f"{str(push_error)[:100]}"
                                                 ),
                                             })
 

@@ -852,6 +852,7 @@ class MetsightsSyncService:
         status: str,
         response_payload: dict | None = None,
         error_message: str | None = None,
+        persist: bool = False,
     ) -> None:
         audit_repo = AuditRepository()
         await audit_repo.update_sync_log_status(
@@ -861,6 +862,8 @@ class MetsightsSyncService:
             response_payload=response_payload,
             error_message=error_message,
         )
+        if persist:
+            await db.commit()
 
     async def _log_skipped_metsights_sync(
         self,
@@ -1864,7 +1867,6 @@ class MetsightsSyncService:
         from modules.assessments.repository import AssessmentsRepository
 
         assessments_repo = AssessmentsRepository()
-        audit_repo = AuditRepository()
 
         category = await self._questionnaire.get_category_by_key_and_category_of(
             db, category_key=category_key, category_of=category_of,
@@ -1930,16 +1932,12 @@ class MetsightsSyncService:
 
         api_url = f"/records/{mrid}/{api_path}/"
 
-        sync_log = await audit_repo.create_sync_log(
+        sync_log = await self._create_pending_sync_log(
             db,
-            IntegrationSyncLog(
-                engagement_id=engagement_id,
-                user_id=user_id,
-                provider="metsights",
-                api_endpoint_url=api_url,
-                request_payload=metsights_payload,
-                status="pending",
-            ),
+            engagement_id=engagement_id,
+            user_id=user_id,
+            api_url=api_url,
+            request_payload=metsights_payload,
         )
 
         try:
@@ -1949,17 +1947,29 @@ class MetsightsSyncService:
             _validate_measurement_ranges(metsights_payload)
             metsights_payload["is_complete"] = True
             await self._metsights.upsert_record_subresource(record_id=mrid, resource=api_path, body=metsights_payload)
-            await audit_repo.update_sync_log_status(
-                db, sync_log_id=sync_log.sync_log_id, status="success", response_payload={"pushed": True},
+            await self._finalize_sync_log(
+                db,
+                sync_log_id=sync_log.sync_log_id,
+                status="success",
+                response_payload={"pushed": True},
+                persist=True,
             )
         except AppError as exc:
-            await audit_repo.update_sync_log_status(
-                db, sync_log_id=sync_log.sync_log_id, status="failed", error_message=str(exc.message),
+            await self._finalize_sync_log(
+                db,
+                sync_log_id=sync_log.sync_log_id,
+                status="failed",
+                error_message=str(exc.message),
+                persist=True,
             )
             raise
         except Exception as exc:
-            await audit_repo.update_sync_log_status(
-                db, sync_log_id=sync_log.sync_log_id, status="failed", error_message=str(exc),
+            await self._finalize_sync_log(
+                db,
+                sync_log_id=sync_log.sync_log_id,
+                status="failed",
+                error_message=str(exc),
+                persist=True,
             )
             raise AppError(
                 status_code=503,
