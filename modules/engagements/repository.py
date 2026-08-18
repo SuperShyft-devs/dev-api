@@ -1225,8 +1225,9 @@ class EngagementsRepository:
         Eligible when engagement is scheduled/running, has consultation_ready
         notification configured, the matching report is ready on any
         individual_health_report row for that participant, and at least one
-        offered consultation type is still unbooked (either no booking row yet
-        or a booking exists with want=false).
+        offered consultation type is still unscheduled: no booking row, want=false,
+        or want=true with consultation_date, consultation_slot, and
+        consultation_cabin all empty.
         """
         query = text(
             """
@@ -1271,6 +1272,11 @@ class EngagementsRepository:
                             WHERE cb.engagement_participant_id = ep.engagement_participant_id
                               AND cb.expert_type = kv.key
                               AND cb.want IS TRUE
+                              AND (
+                                    cb.consultation_date IS NOT NULL
+                                 OR NULLIF(TRIM(cb.consultation_slot), '') IS NOT NULL
+                                 OR NULLIF(TRIM(cb.consultation_cabin), '') IS NOT NULL
+                              )
                       )
               )
             ORDER BY ep.engagement_id ASC, ep.user_id ASC

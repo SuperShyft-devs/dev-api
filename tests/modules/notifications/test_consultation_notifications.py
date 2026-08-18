@@ -185,14 +185,26 @@ async def _insert_consultation_booking(
     participant_id: int,
     expert_type: str,
     want: bool,
+    consultation_date: str | None = None,
+    consultation_slot: str | None = None,
+    consultation_cabin: str | None = None,
 ) -> None:
     await test_db_session.execute(
         text(
             "INSERT INTO consultation_bookings "
-            "(consultation_id, engagement_participant_id, expert_type, want) "
-            "VALUES (:cid, :pid, :etype, :want)"
+            "(consultation_id, engagement_participant_id, expert_type, want, "
+            "consultation_date, consultation_slot, consultation_cabin) "
+            "VALUES (:cid, :pid, :etype, :want, :cdate, :cslot, :ccabin)"
         ),
-        {"cid": consultation_id, "pid": participant_id, "etype": expert_type, "want": want},
+        {
+            "cid": consultation_id,
+            "pid": participant_id,
+            "etype": expert_type,
+            "want": want,
+            "cdate": date.fromisoformat(consultation_date) if consultation_date else None,
+            "cslot": consultation_slot,
+            "ccabin": consultation_cabin,
+        },
     )
     await test_db_session.execute(
         text(
@@ -365,6 +377,9 @@ async def test_consultation_notifications_skips_when_all_offered_types_are_booke
         participant_id=participant_id,
         expert_type="doctor",
         want=True,
+        consultation_date="2026-06-10",
+        consultation_slot="10:00:00",
+        consultation_cabin="cabin-a",
     )
     await _insert_consultation_booking(
         test_db_session,
@@ -372,6 +387,9 @@ async def test_consultation_notifications_skips_when_all_offered_types_are_booke
         participant_id=participant_id,
         expert_type="nutritionist",
         want=True,
+        consultation_date="2026-06-11",
+        consultation_slot="11:00:00",
+        consultation_cabin="cabin-b",
     )
     await _insert_bioai_ihr(
         test_db_session, report_id=9703, user_id=97031, engagement_id=9703, ready=True
@@ -395,6 +413,115 @@ async def test_consultation_notifications_skips_when_all_offered_types_are_booke
 
     assert result["matched"] == 0
     assert len(webhook_calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_consultation_notifications_sends_when_want_true_but_slot_cabin_date_null(
+    test_db_session, monkeypatch
+):
+    await _seed_dependencies(test_db_session)
+    await _insert_engagement(
+        test_db_session,
+        engagement_id=9710,
+        engagement_code="ENG9710",
+        status="running",
+        consultations={"doctor": True, "nutritionist": True},
+    )
+    participant_id = await _insert_participant(test_db_session, engagement_id=9710, user_id=97101)
+    await _insert_consultation_booking(
+        test_db_session,
+        consultation_id=97101,
+        participant_id=participant_id,
+        expert_type="doctor",
+        want=True,
+    )
+    await _insert_consultation_booking(
+        test_db_session,
+        consultation_id=97102,
+        participant_id=participant_id,
+        expert_type="nutritionist",
+        want=True,
+    )
+    await _insert_bioai_ihr(
+        test_db_session, report_id=9710, user_id=97101, engagement_id=9710, ready=True
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+    monkeypatch.setattr(
+        "modules.notifications.service.httpx.AsyncClient",
+        _fake_httpx_client(webhook_calls),
+    )
+
+    notifications_service, engagements_repository = _services()
+    result = await dispatch_consultation_notifications(
+        test_db_session,
+        notifications_service=notifications_service,
+        engagements_repository=engagements_repository,
+        dry_run=False,
+    )
+    await test_db_session.commit()
+
+    assert result["matched"] == 1
+    assert result["sent"] == 1
+    assert result["skipped"] == 0
+    assert result["failed"] == 0
+    assert len(webhook_calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_consultation_notifications_sends_when_one_offered_type_is_still_unscheduled(
+    test_db_session, monkeypatch
+):
+    await _seed_dependencies(test_db_session)
+    await _insert_engagement(
+        test_db_session,
+        engagement_id=9711,
+        engagement_code="ENG9711",
+        status="running",
+        consultations={"doctor": True, "nutritionist": True},
+    )
+    participant_id = await _insert_participant(test_db_session, engagement_id=9711, user_id=97111)
+    await _insert_consultation_booking(
+        test_db_session,
+        consultation_id=97111,
+        participant_id=participant_id,
+        expert_type="doctor",
+        want=True,
+        consultation_date="2026-06-10",
+        consultation_slot="10:00:00",
+        consultation_cabin="cabin-a",
+    )
+    await _insert_consultation_booking(
+        test_db_session,
+        consultation_id=97112,
+        participant_id=participant_id,
+        expert_type="nutritionist",
+        want=True,
+    )
+    await _insert_bioai_ihr(
+        test_db_session, report_id=9711, user_id=97111, engagement_id=9711, ready=True
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+    monkeypatch.setattr(
+        "modules.notifications.service.httpx.AsyncClient",
+        _fake_httpx_client(webhook_calls),
+    )
+
+    notifications_service, engagements_repository = _services()
+    result = await dispatch_consultation_notifications(
+        test_db_session,
+        notifications_service=notifications_service,
+        engagements_repository=engagements_repository,
+        dry_run=False,
+    )
+    await test_db_session.commit()
+
+    assert result["matched"] == 1
+    assert result["sent"] == 1
+    assert len(webhook_calls) == 2
 
 
 @pytest.mark.asyncio
@@ -464,6 +591,9 @@ async def test_consultation_notifications_ignores_non_offered_false_booking(test
         participant_id=participant_id,
         expert_type="doctor",
         want=True,
+        consultation_date="2026-06-10",
+        consultation_slot="10:00:00",
+        consultation_cabin="cabin-a",
     )
     await _insert_consultation_booking(
         test_db_session,
