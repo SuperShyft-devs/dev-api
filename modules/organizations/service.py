@@ -251,6 +251,8 @@ class OrganizationsService:
 
     @staticmethod
     def organization_to_details_dict(organization: Organization, industry: str | None = None) -> dict:
+        created_at = organization.created_at.isoformat() if organization.created_at else None
+        updated_at = organization.updated_at.isoformat() if organization.updated_at else None
         return {
             "organization_id": organization.organization_id,
             "name": organization.name,
@@ -268,9 +270,9 @@ class OrganizationsService:
             "bd_employee_id": organization.bd_employee_id,
             "departments": organization.departments,
             "status": organization.status,
-            "created_at": organization.created_at,
+            "created_at": created_at,
             "created_employee_id": organization.created_employee_id,
-            "updated_at": organization.updated_at,
+            "updated_at": updated_at,
             "updated_employee_id": organization.updated_employee_id,
         }
 

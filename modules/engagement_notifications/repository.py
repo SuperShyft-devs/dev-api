@@ -5,6 +5,12 @@ from __future__ import annotations
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from modules.engagement_notifications.service_config import (
+    extract_service_keys,
+    normalize_notification_services,
+    prepare_notification_items_for_storage,
+    serialize_for_db,
+)
 from modules.engagements.models import (
     AutoNotificationEvent,
     EngagementNotification,
@@ -53,13 +59,13 @@ class EngagementNotificationsRepository:
         engagement_id: int,
         event_code: str,
     ) -> list[str]:
-        """Return the notification_services array for an engagement+event, or empty list."""
+        """Return service keys for an engagement+event, or empty list."""
         en = await self.get_for_engagement_and_event_code(
             db, engagement_id=engagement_id, event_code=event_code
         )
         if en is None:
             return []
-        return list(en.notification_services or [])
+        return extract_service_keys(en.notification_services)
 
     async def upsert_for_engagement(
         self,
@@ -67,24 +73,20 @@ class EngagementNotificationsRepository:
         engagement_id: int,
         notifications: list[dict],
     ) -> list[EngagementNotification]:
-        """Bulk upsert notification configs for an engagement.
+        """Bulk upsert notification configs for an engagement."""
+        prepared = await prepare_notification_items_for_storage(db, notifications)
 
-        Each dict: {notification_event_id: int, notification_services: list[str]}
-        """
         await db.execute(
             delete(EngagementNotification).where(
                 EngagementNotification.engagement_id == engagement_id
             )
         )
         result = []
-        for item in notifications:
-            services = item.get("notification_services", [])
-            if not services:
-                continue
+        for item in prepared:
             obj = EngagementNotification(
                 engagement_id=engagement_id,
                 notification_event_id=item["notification_event_id"],
-                notification_services=services,
+                notification_services=item["notification_services"],
             )
             db.add(obj)
             result.append(obj)
@@ -102,10 +104,11 @@ class EngagementNotificationsRepository:
         defaults = await self.list_defaults_for_type(db, engagement_type_id)
         items = []
         for d in defaults:
-            if d.notification_services:
+            configs = normalize_notification_services(d.notification_services)
+            if configs:
                 items.append({
                     "notification_event_id": d.notification_event_id,
-                    "notification_services": list(d.notification_services),
+                    "notification_services": serialize_for_db(configs),
                 })
         if not items:
             return []
@@ -132,24 +135,20 @@ class EngagementNotificationsRepository:
         engagement_type_id: int,
         defaults: list[dict],
     ) -> list[EngagementNotificationDefault]:
-        """Bulk upsert notification defaults for an engagement type.
+        """Bulk upsert notification defaults for an engagement type."""
+        prepared = await prepare_notification_items_for_storage(db, defaults)
 
-        Each dict: {notification_event_id: int, notification_services: list[str]}
-        """
         await db.execute(
             delete(EngagementNotificationDefault).where(
                 EngagementNotificationDefault.engagement_type_id == engagement_type_id
             )
         )
         result = []
-        for item in defaults:
-            services = item.get("notification_services", [])
-            if not services:
-                continue
+        for item in prepared:
             obj = EngagementNotificationDefault(
                 engagement_type_id=engagement_type_id,
                 notification_event_id=item["notification_event_id"],
-                notification_services=services,
+                notification_services=item["notification_services"],
             )
             db.add(obj)
             result.append(obj)

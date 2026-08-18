@@ -154,14 +154,15 @@ async def dispatch_questionnaire_reminders(
         for user_id, engagement_id, engagement_date, qr_before_services, qr_after_services in participants:
             reminder_type = "reminder_before" if engagement_date == tomorrow else "reminder_after"
             keys = qr_before_services if engagement_date == tomorrow else qr_after_services
+            service_keys = [cfg.service_key for cfg in keys]
             details.append({
                 "user_id": user_id,
                 "engagement_id": engagement_id,
                 "engagement_date": engagement_date.isoformat(),
                 "reminder_type": reminder_type,
-                "service_key": ",".join(keys) if keys else None,
+                "service_key": ",".join(service_keys) if service_keys else None,
                 "action": "dry_run",
-                "reason": "no service key configured" if not keys else "would check and dispatch",
+                "reason": "no service key configured" if not service_keys else "would check and dispatch",
             })
         return {
             "as_of": today.isoformat(),
@@ -179,9 +180,9 @@ async def dispatch_questionnaire_reminders(
         reminder_type = "reminder_before" if engagement_date == tomorrow else "reminder_after"
 
         if engagement_date == tomorrow:
-            service_keys = list(qr_before_services or [])
+            service_configs = list(qr_before_services or [])
         elif engagement_date == yesterday:
-            service_keys = list(qr_after_services or [])
+            service_configs = list(qr_after_services or [])
         else:
             skipped += 1
             details.append({
@@ -191,7 +192,8 @@ async def dispatch_questionnaire_reminders(
                 "reason": f"engagement_date {engagement_date} is neither tomorrow nor yesterday",
             })
             continue
-        if not service_keys:
+        service_keys = [cfg.service_key for cfg in service_configs]
+        if not service_configs:
             skipped += 1
             details.append({
                 "user_id": user_id, "engagement_id": engagement_id,
@@ -252,7 +254,8 @@ async def dispatch_questionnaire_reminders(
 
             dispatched_any = False
             skipped_all = True
-            for sk in service_keys:
+            for cfg in service_configs:
+                sk = cfg.service_key
                 skip_reason = await should_skip_notification(
                     db,
                     service_key=sk,
@@ -278,6 +281,7 @@ async def dispatch_questionnaire_reminders(
                         service_key=sk,
                         user_ids=[user_id],
                         engagement_id=engagement_id,
+                        external_link=cfg.external_link,
                     ),
                     triggered_by_user_id=None,
                 )

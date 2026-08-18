@@ -502,9 +502,16 @@ class EngagementsService:
         engagement = await self._repository.create_engagement(db, engagement)
 
         from modules.engagement_notifications.repository import EngagementNotificationsRepository
+        from modules.engagement_notifications.service_config import serialize_for_db
         en_repo = EngagementNotificationsRepository()
         if payload.notifications is not None:
-            items = [{"notification_event_id": n.notification_event_id, "notification_services": n.notification_services} for n in payload.notifications]
+            items = [
+                {
+                    "notification_event_id": n.notification_event_id,
+                    "notification_services": serialize_for_db(n.notification_services),
+                }
+                for n in payload.notifications
+            ]
             await en_repo.upsert_for_engagement(db, engagement.engagement_id, items)
         else:
             await en_repo.populate_from_defaults(
@@ -921,8 +928,15 @@ class EngagementsService:
 
         if payload.notifications is not None:
             from modules.engagement_notifications.repository import EngagementNotificationsRepository
+            from modules.engagement_notifications.service_config import serialize_for_db
             en_repo = EngagementNotificationsRepository()
-            items = [{"notification_event_id": n.notification_event_id, "notification_services": n.notification_services} for n in payload.notifications]
+            items = [
+                {
+                    "notification_event_id": n.notification_event_id,
+                    "notification_services": serialize_for_db(n.notification_services),
+                }
+                for n in payload.notifications
+            ]
             await en_repo.upsert_for_engagement(db, engagement.engagement_id, items)
 
         audit = self._require_audit_service()

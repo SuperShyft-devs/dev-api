@@ -96,7 +96,8 @@ async def dispatch_consultation_remainder_notifications(
             dispatched_any = False
             skipped_all = True
             session_details = _session_details_from_participant(participant)
-            for sk in participant.service_keys:
+            for cfg in participant.service_configs:
+                sk = cfg.service_key
                 skip_reason = await should_skip_notification_on_date(
                     db,
                     service_key=sk,
@@ -123,6 +124,7 @@ async def dispatch_consultation_remainder_notifications(
                         user_ids=[participant.user_id],
                         engagement_id=participant.engagement_id,
                         session_details=session_details,
+                        external_link=cfg.external_link,
                     ),
                     triggered_by_user_id=None,
                 )

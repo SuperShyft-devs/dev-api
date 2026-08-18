@@ -23,6 +23,10 @@ from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.audit.cron_sync_logging import tracked_integration_call
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.metsights.service import MetsightsService
+from modules.engagement_notifications.service_config import (
+    NotificationServiceConfigItem,
+    normalize_notification_services,
+)
 from modules.notifications.dedup import should_skip_notification
 from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
@@ -123,7 +127,7 @@ async def _send_report_notifications(
     db: AsyncSession,
     *,
     notifications_service: NotificationsService,
-    service_keys: list[str],
+    service_configs: list[NotificationServiceConfigItem],
     user_id: int,
     engagement_id: int,
     assessment_instance_id: int,
@@ -132,7 +136,8 @@ async def _send_report_notifications(
     """Dispatch configured notification services that have not already been sent."""
     sent_count = 0
 
-    for sk in service_keys:
+    for cfg in service_configs:
+        sk = cfg.service_key
         skip_reason = await should_skip_notification(
             db, service_key=sk, user_id=user_id, engagement_id=engagement_id,
         )
@@ -152,6 +157,7 @@ async def _send_report_notifications(
                 user_ids=[user_id],
                 engagement_id=engagement_id,
                 assessment_instance_id=assessment_instance_id,
+                external_link=cfg.external_link,
             ),
             triggered_by_user_id=None,
         )
@@ -377,8 +383,8 @@ async def load_bioai_reports(
                     })
                     continue
 
-                service_keys = list(bioai_report_services or [])
-                if not service_keys:
+                service_configs = normalize_notification_services(bioai_report_services)
+                if not service_configs:
                     skipped += 1
                     details.append({
                         "user_id": user_id, "engagement_id": engagement_id,
@@ -389,7 +395,7 @@ async def load_bioai_reports(
                 notified += await _send_report_notifications(
                     db,
                     notifications_service=notifications_service,
-                    service_keys=service_keys,
+                    service_configs=service_configs,
                     user_id=user_id,
                     engagement_id=engagement_id,
                     assessment_instance_id=instance_id,

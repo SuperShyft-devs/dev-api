@@ -23,6 +23,7 @@ class OrganizationsRepository:
     _CONTACT_PERSON_JSON_MEMBER_SQL = """
         (
             organizations.contact_person_user_ids IS NOT NULL
+            AND jsonb_typeof(organizations.contact_person_user_ids::jsonb) = 'object'
             AND (
                 organizations.contact_person_user_ids::jsonb->'organization_managers' @> :uid_json::jsonb
                 OR EXISTS (

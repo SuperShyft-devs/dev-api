@@ -148,8 +148,16 @@ def parse_contact_person_user_ids(raw: Any) -> dict[str, Any] | None:
     return normalized
 
 
+def try_parse_contact_person_user_ids(raw: Any) -> dict[str, Any] | None:
+    """Best-effort parse for read paths; returns None on invalid stored data."""
+    try:
+        return parse_contact_person_user_ids(raw)
+    except AppError:
+        return None
+
+
 def iter_contact_person_user_ids(raw: Any) -> set[int]:
-    parsed = parse_contact_person_user_ids(raw)
+    parsed = try_parse_contact_person_user_ids(raw)
     if parsed is None:
         return set()
 
@@ -178,7 +186,7 @@ def _city_keys_match(stored_key: str, engagement_city: str | None) -> bool:
 
 
 def resolve_org_manager_scope(raw: Any, user_id: int) -> OrgManagerScope | None:
-    parsed = parse_contact_person_user_ids(raw)
+    parsed = try_parse_contact_person_user_ids(raw)
     if parsed is None:
         return None
 

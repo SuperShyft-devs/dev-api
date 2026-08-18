@@ -21,18 +21,25 @@ from modules.engagements.models import (
     OnboardingAssistantAssignment,
 )
 from modules.organizations.models import Organization
-from modules.reports.models import IndividualHealthReport
+from modules.engagement_notifications.service_config import (
+    NotificationServiceConfigItem,
+    normalize_notification_services,
+)
 
 
 @dataclass(frozen=True)
 class ConsultationRemainderParticipant:
     user_id: int
     engagement_id: int
-    service_keys: list[str]
+    service_configs: tuple[NotificationServiceConfigItem, ...]
     want: bool
     consultation_date: date
     consultation_slot: str | None
     expert_type: str
+
+    @property
+    def service_keys(self) -> list[str]:
+        return [cfg.service_key for cfg in self.service_configs]
 
 
 class EngagementsRepository:
@@ -1106,8 +1113,8 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         collection_date: date,
-    ) -> list[tuple[int, int, list[str]]]:
-        """Return (user_id, engagement_id, service_keys) for scheduled or running engagements with collection on collection_date."""
+    ) -> list[tuple[int, int, list[NotificationServiceConfigItem]]]:
+        """Return (user_id, engagement_id, service_configs) for scheduled or running engagements with collection on collection_date."""
         query = (
             select(
                 EngagementParticipant.user_id,
@@ -1134,7 +1141,11 @@ class EngagementsRepository:
         )
         result = await db.execute(query)
         return [
-            (int(row.user_id), int(row.engagement_id), list(row.notification_services or []))
+            (
+                int(row.user_id),
+                int(row.engagement_id),
+                normalize_notification_services(row.notification_services),
+            )
             for row in result.all()
         ]
 
@@ -1143,7 +1154,7 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         target_dates: list[date],
-    ) -> list[tuple[int, int, date, list[str], list[str]]]:
+    ) -> list[tuple[int, int, date, list[NotificationServiceConfigItem], list[NotificationServiceConfigItem]]]:
         """Return (user_id, engagement_id, engagement_date, reminder_before_services, reminder_after_services)
         for scheduled or running engagements with participants whose engagement_date is in *target_dates*."""
         from modules.engagements.models import AutoNotificationEvent, EngagementNotification
@@ -1199,8 +1210,8 @@ class EngagementsRepository:
                 int(row.user_id),
                 int(row.engagement_id),
                 row.engagement_date,
-                list(row.qr_before_services or []),
-                list(row.qr_after_services or []),
+                normalize_notification_services(row.qr_before_services),
+                normalize_notification_services(row.qr_after_services),
             )
             for row in result.all()
         ]
@@ -1208,8 +1219,8 @@ class EngagementsRepository:
     async def list_participants_for_consultation_notification(
         self,
         db: AsyncSession,
-    ) -> list[tuple[int, int, list[str]]]:
-        """Return (user_id, engagement_id, service_keys) for eligible participants.
+    ) -> list[tuple[int, int, list[NotificationServiceConfigItem]]]:
+        """Return (user_id, engagement_id, service_configs) for eligible participants.
 
         Eligible when engagement is scheduled/running, has consultation_ready
         notification configured, the matching report is ready on any
@@ -1267,7 +1278,11 @@ class EngagementsRepository:
         )
         result = await db.execute(query)
         return [
-            (int(row.user_id), int(row.engagement_id), list(row.notification_services or []))
+            (
+                int(row.user_id),
+                int(row.engagement_id),
+                normalize_notification_services(row.notification_services),
+            )
             for row in result.all()
         ]
 
@@ -1309,7 +1324,7 @@ class EngagementsRepository:
             ConsultationRemainderParticipant(
                 user_id=int(row.user_id),
                 engagement_id=int(row.engagement_id),
-                service_keys=list(row.notification_services or []),
+                service_configs=tuple(normalize_notification_services(row.notification_services)),
                 want=bool(row.want),
                 consultation_date=row.consultation_date,
                 consultation_slot=row.consultation_slot,

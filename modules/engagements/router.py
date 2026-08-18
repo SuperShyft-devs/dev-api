@@ -17,6 +17,7 @@ from modules.employee.service import EmployeeContext
 from modules.engagements.models import EngagementParticipant
 
 # NOTE: The occupied-slots endpoints are intentionally public (no auth).
+from modules.engagement_notifications.schemas import configs_to_api
 from modules.engagements.dependencies import get_engagements_service, get_onboarding_assistants_service
 from modules.engagements.onboarding_assistants_service import OnboardingAssistantsService
 from modules.engagements.schemas import (
@@ -119,7 +120,7 @@ async def _engagement_notifications_payload(
         data.append(
             EngagementNotificationOutput(
                 notification_event_id=row.notification_event_id,
-                notification_services=list(row.notification_services or []),
+                notification_services=configs_to_api(row.notification_services),
                 event_code=event.event_code if event else None,
                 event_display_name=event.display_name if event else None,
             ).model_dump()

@@ -136,13 +136,15 @@ async def _insert_engagement(
     )
     if service_keys:
         evt_id = await _event_id(test_db_session, "consultation_ready")
-        keys_array = "{" + ",".join(f'"{k.strip()}"' for k in service_keys.split(",")) + "}"
+        services_json = json.dumps(
+            [{"service_key": k.strip(), "external_link": None} for k in service_keys.split(",") if k.strip()]
+        )
         await test_db_session.execute(
             text(
                 "INSERT INTO engagement_notifications (engagement_id, notification_event_id, notification_services) "
-                "VALUES (:engagement_id, :event_id, CAST(:keys AS varchar[]))"
+                "VALUES (:engagement_id, :event_id, CAST(:services AS jsonb))"
             ),
-            {"engagement_id": engagement_id, "event_id": evt_id, "keys": keys_array},
+            {"engagement_id": engagement_id, "event_id": evt_id, "services": services_json},
         )
 
 

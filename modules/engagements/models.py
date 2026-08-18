@@ -201,7 +201,7 @@ class EngagementNotification(Base):
     id = Column(Integer, primary_key=True)
     engagement_id = Column(Integer, ForeignKey("engagements.engagement_id"), nullable=False)
     notification_event_id = Column(Integer, ForeignKey("auto_notification_events.id"), nullable=False)
-    notification_services = Column(ARRAY(String), nullable=False)
+    notification_services = Column(JSON, nullable=False)
 
 
 class EngagementNotificationDefault(Base):
@@ -215,4 +215,4 @@ class EngagementNotificationDefault(Base):
     id = Column(Integer, primary_key=True)
     engagement_type_id = Column(Integer, ForeignKey("engagement_types.id"), nullable=False)
     notification_event_id = Column(Integer, ForeignKey("auto_notification_events.id"), nullable=False)
-    notification_services = Column(ARRAY(String), nullable=False)
+    notification_services = Column(JSON, nullable=False)

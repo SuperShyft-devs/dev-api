@@ -32,8 +32,6 @@ from modules.reports.blood_report_resolver import resolve_blood_report_url
 
 logger = logging.getLogger(__name__)
 
-_HARDCODED_EXTERNAL_LINK = "https://app.supershyft.com"
-
 _VALID_NOTIFICATION_STATUSES = frozenset({"pending", "sent", "failed"})
 
 
@@ -154,6 +152,14 @@ class NotificationsService:
                         f"missing for: {missing_session_details}"
                     ),
                 )
+
+        external_link_value = (payload.external_link or "").strip()
+        if svc.require_external_link and not external_link_value:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="This service requires external_link but none was provided",
+            )
 
         needs_report = svc.require_blood_report_url or svc.require_bio_ai_report_url
 
@@ -297,7 +303,7 @@ class NotificationsService:
                 member["session_details"] = session_details.model_dump(mode="json")
 
             if svc.require_external_link:
-                member["external_link"] = _HARDCODED_EXTERNAL_LINK
+                member["external_link"] = external_link_value
 
             members.append(member)
 

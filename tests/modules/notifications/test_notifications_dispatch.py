@@ -672,14 +672,47 @@ async def test_dispatch_includes_external_link_in_members_when_required(
     response = await async_client.post(
         "/notifications/dispatch",
         headers=_api_key_header(),
-        json={"service_key": service_key, "user_ids": [9544]},
+        json={
+            "service_key": service_key,
+            "user_ids": [9544],
+            "external_link": "https://booking.example.com/path",
+        },
     )
     assert response.status_code == 201, response.text
     assert webhook_calls
     member = webhook_calls[0]["json"]["members"][0]
-    assert member["external_link"] == "https://app.supershyft.com"
+    assert member["external_link"] == "https://booking.example.com/path"
     assert member["first_name"] == "Jane"
     assert member["email"] == "user9544@example.com"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_requires_external_link_when_service_requires_it(
+    async_client, test_db_session, monkeypatch
+):
+    monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
+    test_db_session.add(User(user_id=9546, age=30, phone="9546000000", status="active"))
+    service_key = "external_link_required_missing_test"
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, "
+            "require_blood_report_url, require_bio_ai_report_url, require_participant_detail, "
+            "require_otp, require_session_details, require_external_link) "
+            "VALUES (:sk, 'External Link Required', 'email', 'external-link-required', true, "
+            "false, false, false, false, false, true) "
+            "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_external_link = true"
+        ),
+        {"sk": service_key},
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/notifications/dispatch",
+        headers=_api_key_header(),
+        json={"service_key": service_key, "user_ids": [9546]},
+    )
+    assert response.status_code == 400, response.text
 
 
 @pytest.mark.asyncio

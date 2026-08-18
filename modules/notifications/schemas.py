@@ -29,6 +29,22 @@ class DispatchRequest(BaseModel):
     otp: str | None = None
     session_details: SessionDetails | None = None
     session_details_by_user_id: dict[int, SessionDetails] | None = None
+    external_link: str | None = None
+
+    @field_validator("external_link")
+    @classmethod
+    def validate_external_link(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            return None
+        from urllib.parse import urlparse
+
+        parsed = urlparse(stripped)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("external_link must be a valid http(s) URL")
+        return stripped
 
     @field_validator("session_details_by_user_id", mode="before")
     @classmethod

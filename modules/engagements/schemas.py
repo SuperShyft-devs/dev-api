@@ -8,6 +8,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from modules.engagement_notifications.service_config import NotificationServiceConfigItem
+
 from modules.checklists.schemas import ChecklistReadiness
 from modules.engagements.models import BloodCollectionType, EngagementStatus
 
@@ -113,7 +115,14 @@ class EngagementNotificationInput(BaseModel):
     """A single notification event config for create/update."""
 
     notification_event_id: int
-    notification_services: list[str] = Field(default_factory=list)
+    notification_services: list[NotificationServiceConfigItem] = Field(default_factory=list)
+
+    @field_validator("notification_services", mode="before")
+    @classmethod
+    def normalize_services(cls, value: object) -> list[NotificationServiceConfigItem]:
+        from modules.engagement_notifications.service_config import normalize_notification_services
+
+        return normalize_notification_services(value if isinstance(value, list) else [])
 
 
 class EngagementCreateRequest(BaseModel):
@@ -207,7 +216,14 @@ class EngagementNotificationOutput(BaseModel):
     notification_event_id: int
     event_code: str | None = None
     event_display_name: str | None = None
-    notification_services: list[str] = Field(default_factory=list)
+    notification_services: list[NotificationServiceConfigItem] = Field(default_factory=list)
+
+    @field_validator("notification_services", mode="before")
+    @classmethod
+    def normalize_services(cls, value: object) -> list[NotificationServiceConfigItem]:
+        from modules.engagement_notifications.service_config import normalize_notification_services
+
+        return normalize_notification_services(value if isinstance(value, list) else [])
 
 
 class EngagementListItem(BaseModel):

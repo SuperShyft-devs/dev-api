@@ -15,6 +15,7 @@ from modules.engagement_notifications.schemas import (
     EngagementNotificationsUpsertRequest,
     NotificationDefaultResponse,
     NotificationDefaultsUpsertRequest,
+    configs_to_api,
 )
 from modules.engagements.models import AutoNotificationEvent
 from modules.notification_events.repository import NotificationEventsRepository
@@ -54,7 +55,7 @@ async def get_engagement_notifications(
             id=row.id,
             engagement_id=row.engagement_id,
             notification_event_id=row.notification_event_id,
-            notification_services=list(row.notification_services or []),
+            notification_services=configs_to_api(row.notification_services),
             event_code=event.event_code if event else None,
             event_display_name=event.display_name if event else None,
         ).model_dump())
@@ -79,7 +80,7 @@ async def upsert_engagement_notifications(
             id=row.id,
             engagement_id=row.engagement_id,
             notification_event_id=row.notification_event_id,
-            notification_services=list(row.notification_services or []),
+            notification_services=configs_to_api(row.notification_services),
         ).model_dump()
         for row in rows
     ]
@@ -110,7 +111,7 @@ async def get_notification_defaults(
             id=row.id,
             engagement_type_id=row.engagement_type_id,
             notification_event_id=row.notification_event_id,
-            notification_services=list(row.notification_services or []),
+            notification_services=configs_to_api(row.notification_services),
             event_code=event.event_code if event else None,
             event_display_name=event.display_name if event else None,
         ).model_dump())
@@ -134,7 +135,7 @@ async def upsert_notification_defaults(
             id=row.id,
             engagement_type_id=row.engagement_type_id,
             notification_event_id=row.notification_event_id,
-            notification_services=list(row.notification_services or []),
+            notification_services=configs_to_api(row.notification_services),
         ).model_dump()
         for row in rows
     ]

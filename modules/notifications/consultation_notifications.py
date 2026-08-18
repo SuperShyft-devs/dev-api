@@ -38,7 +38,8 @@ async def dispatch_consultation_notifications(
     reference_date = (as_of or datetime.now(_IST).date()).isoformat()
 
     if dry_run:
-        for user_id, engagement_id, service_keys in participants:
+        for user_id, engagement_id, service_configs in participants:
+            service_keys = [cfg.service_key for cfg in service_configs]
             details.append({
                 "user_id": user_id,
                 "engagement_id": engagement_id,
@@ -56,8 +57,9 @@ async def dispatch_consultation_notifications(
             "details": details,
         }
 
-    for user_id, engagement_id, service_keys in participants:
-        if not service_keys:
+    for user_id, engagement_id, service_configs in participants:
+        service_keys = [cfg.service_key for cfg in service_configs]
+        if not service_configs:
             skipped += 1
             details.append({
                 "user_id": user_id,
@@ -70,7 +72,8 @@ async def dispatch_consultation_notifications(
         try:
             dispatched_any = False
             skipped_all = True
-            for sk in service_keys:
+            for cfg in service_configs:
+                sk = cfg.service_key
                 skip_reason = await should_skip_notification(
                     db,
                     service_key=sk,
@@ -94,6 +97,7 @@ async def dispatch_consultation_notifications(
                         service_key=sk,
                         user_ids=[user_id],
                         engagement_id=engagement_id,
+                        external_link=cfg.external_link,
                     ),
                     triggered_by_user_id=None,
                 )
