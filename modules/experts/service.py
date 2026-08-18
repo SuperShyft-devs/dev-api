@@ -771,6 +771,30 @@ class ExpertAvailabilityService:
         db.add(participant)
         await db.flush()
 
+        participant_user = await db.get(User, user_id)
+        if participant_user is not None:
+            from modules.engagements.repository import EngagementsRepository
+            from modules.notifications.consultation_booking_alert_notify import (
+                notify_onboarding_assistants_on_consultation_booking,
+            )
+            from modules.notifications.repository import NotificationsRepository
+            from modules.notifications.service import NotificationsService
+
+            await notify_onboarding_assistants_on_consultation_booking(
+                db,
+                notifications_service=NotificationsService(
+                    repository=NotificationsRepository(),
+                ),
+                notifications_repository=NotificationsRepository(),
+                engagements_repository=EngagementsRepository(),
+                engagement=engagement,
+                participant_user=participant_user,
+                participant_user_id=user_id,
+                expert_type=payload.expert_type,
+                consultation_date=payload.date,
+                consultation_slot=slot_hhmm,
+            )
+
         return {
             "message": "We have received your slot. We will let you know when expert confirms",
             "engagement_id": payload.engagement_id,

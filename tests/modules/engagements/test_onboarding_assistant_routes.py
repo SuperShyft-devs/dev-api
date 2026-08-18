@@ -231,6 +231,41 @@ async def test_add_onboarding_assistants_creates_assignment(async_client, test_d
 
 
 @pytest.mark.asyncio
+async def test_add_expert_as_onboarding_assistant(async_client, test_db_session):
+    """Expert-role employees may be assigned as onboarding assistants."""
+    await _seed_employee(test_db_session, user_id=9015, employee_id=113, role="admin")
+    expert_user_id = 9016
+    test_db_session.add(User(user_id=expert_user_id, age=35, phone="9016000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=114, user_id=expert_user_id, role="expert", status="active"))
+    await _ensure_assessment_package(test_db_session)
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=5005,
+            engagement_name="Expert OA Engagement",
+            engagement_code="ENG005",
+            engagement_type="doctor",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            status="running",
+            start_date=date.today(),
+            end_date=date.today(),
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/engagements/5005/onboarding-assistants",
+        headers=_auth_header(9015),
+        json={"employee_ids": [114]},
+    )
+    assert response.status_code == 201
+    data = response.json()["data"]
+    assert data["added_employee_ids"] == [114]
+
+
+@pytest.mark.asyncio
 async def test_add_onboarding_assistants_skips_duplicates(async_client, test_db_session):
     """Test that adding onboarding assistants skips duplicate assignments."""
     await _seed_employee(test_db_session, user_id=9010, employee_id=108)

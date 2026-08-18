@@ -20,7 +20,12 @@ from modules.organizations.repository import OrganizationsRepository
 INTERNAL_ROLES = frozenset({EmployeeRole.admin, EmployeeRole.onboarding_assistant})
 
 ONBOARDING_ASSISTANT_ASSIGNEE_ROLES = frozenset(
-    {EmployeeRole.admin, EmployeeRole.onboarding_assistant, EmployeeRole.organization_manager}
+    {
+        EmployeeRole.admin,
+        EmployeeRole.onboarding_assistant,
+        EmployeeRole.organization_manager,
+        EmployeeRole.expert,
+    }
 )
 
 EXPERT_PORTAL_ROLES = frozenset({EmployeeRole.admin, EmployeeRole.expert})
@@ -100,7 +105,7 @@ def ensure_expert_portal_owns(
 
 
 def ensure_valid_onboarding_assistant_assignee_role(role: EmployeeRole) -> None:
-    """Only admin, onboarding_assistant, and organization_manager may be assigned."""
+    """Only admin, onboarding_assistant, organization_manager, and expert may be assigned."""
     if role not in ONBOARDING_ASSISTANT_ASSIGNEE_ROLES:
         raise AppError(
             status_code=400,

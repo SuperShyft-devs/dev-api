@@ -124,4 +124,12 @@ DEFAULT_NOTIFICATION_SERVICES: tuple[SeedNotificationService, ...] = (
         webhook_path="/send-otp-whatsapp-v3",
         require_otp=True,
     ),
+    SeedNotificationService(
+        service_key="consultation-booking-alert-whatsapp",
+        display_name="Consultation Booking Alert",
+        channel="whatsapp",
+        webhook_path="/consultation-booking-alert-whatsapp-v1",
+        require_participant_detail=True,
+        require_session_details=True,
+    ),
 )

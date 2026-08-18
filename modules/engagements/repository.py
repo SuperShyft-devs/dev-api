@@ -709,9 +709,15 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         engagement_id: int,
+        roles: frozenset | None = None,
     ) -> list[int]:
-        """Return user_ids for admin-role onboarding assistants assigned to an engagement."""
+        """Return user_ids for onboarding assistants assigned to an engagement.
+
+        When roles is omitted, only admin-role assistants are returned (enrollment alerts).
+        """
         from modules.employee.models import Employee, EmployeeRole
+
+        effective_roles = roles if roles is not None else frozenset({EmployeeRole.admin})
 
         query = (
             select(Employee.user_id)
@@ -720,7 +726,7 @@ class EngagementsRepository:
                 OnboardingAssistantAssignment.employee_id == Employee.employee_id,
             )
             .where(OnboardingAssistantAssignment.engagement_id == engagement_id)
-            .where(Employee.role == EmployeeRole.admin)
+            .where(Employee.role.in_(effective_roles))
         )
         result = await db.execute(query)
         return [int(uid) for uid in result.scalars().all()]
