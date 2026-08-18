@@ -1,4 +1,4 @@
-"""Seed book_expert and consultation_remainder auto notification events.
+"""Seed consultation_remainder auto notification event.
 
 Revision ID: 0114_book_expert_notif_events
 Revises: 0113_ep_blood_collection_cabin
@@ -15,11 +15,6 @@ branch_labels = None
 depends_on = None
 
 _EVENT_SEEDS: list[tuple[str, str, str]] = [
-    (
-        "book_expert",
-        "Book Expert",
-        "Notification sent the day before camp when a participant has not booked an offered consultation",
-    ),
     (
         "consultation_remainder",
         "Consultation Remainder",

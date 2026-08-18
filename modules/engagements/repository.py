@@ -1270,59 +1270,6 @@ class EngagementsRepository:
             for row in result.all()
         ]
 
-    async def list_participants_for_book_expert(
-        self,
-        db: AsyncSession,
-        *,
-        engagement_date: date,
-    ) -> list[tuple[int, int, list[str]]]:
-        """Return (user_id, engagement_id, service_keys) for book_expert notifications.
-
-        Participants in scheduled/running engagements whose camp date is *engagement_date*
-        and who have at least one offered consultation type without a want=true booking.
-        """
-        query = text(
-            """
-            SELECT DISTINCT
-                ep.user_id,
-                ep.engagement_id,
-                en.notification_services
-            FROM engagement_participants ep
-            JOIN engagements e ON e.engagement_id = ep.engagement_id
-            JOIN engagement_notifications en ON en.engagement_id = e.engagement_id
-            JOIN auto_notification_events ane ON ane.id = en.notification_event_id
-            WHERE lower(trim(e.status)) IN ('scheduled', 'running')
-              AND ep.engagement_date = :engagement_date
-              AND ane.event_code = 'book_expert'
-              AND e.consultations IS NOT NULL
-              AND jsonb_typeof(e.consultations::jsonb) = 'object'
-              AND EXISTS (
-                  SELECT 1
-                  FROM jsonb_each(e.consultations::jsonb) AS kv(key, value)
-                  WHERE (
-                      (jsonb_typeof(kv.value) = 'boolean' AND kv.value = 'true'::jsonb)
-                      OR (
-                          jsonb_typeof(kv.value) = 'object'
-                          AND COALESCE((kv.value->>'want')::boolean, false) = true
-                      )
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM consultation_bookings cb
-                      WHERE cb.engagement_participant_id = ep.engagement_participant_id
-                        AND cb.expert_type = kv.key
-                        AND cb.want IS TRUE
-                  )
-              )
-            ORDER BY ep.engagement_id ASC, ep.user_id ASC
-            """
-        )
-        result = await db.execute(query, {"engagement_date": engagement_date})
-        return [
-            (int(row.user_id), int(row.engagement_id), list(row.notification_services or []))
-            for row in result.all()
-        ]
-
     async def list_participants_for_consultation_remainder(
         self,
         db: AsyncSession,
