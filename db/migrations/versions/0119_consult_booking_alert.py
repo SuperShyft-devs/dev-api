@@ -1,6 +1,6 @@
 """Seed consultation_booking_alert event and notification service.
 
-Revision ID: 0119_consultation_booking_alert_notif
+Revision ID: 0119_consult_booking_alert
 Revises: 0118_eng_notif_service_configs
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0119_consultation_booking_alert_notif"
+revision = "0119_consult_booking_alert"
 down_revision = "0118_eng_notif_service_configs"
 branch_labels = None
 depends_on = None
