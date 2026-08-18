@@ -9,7 +9,7 @@ from sqlalchemy import select, text
 
 from core.config import settings
 from modules.assessments.dependencies import get_assessments_service
-from modules.assessments.models import AssessmentInstance
+from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance, AssessmentPackageCategory
 from modules.engagements.dependencies import get_engagements_service
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.metsights.client import MetsightsClient
@@ -19,6 +19,7 @@ from modules.notifications.load_blood_reports import load_blood_reports, _match_
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.service import NotificationsService
 from modules.platform_settings.dependencies import get_platform_settings_service_readonly
+from modules.questionnaire.models import QuestionnaireCategory
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.models import IndividualHealthReport
 from modules.users.models import User
@@ -160,6 +161,75 @@ def _build_services(monkeypatch) -> tuple[MetsightsService, MetsightsSyncService
     assessments_service = get_assessments_service()
     notifications_service = NotificationsService(NotificationsRepository())
     return metsights_service, sync_service, assessments_service, notifications_service
+
+
+async def _ensure_metsights_blood_categories(
+    test_db_session,
+    *,
+    package_id: int,
+    instance_id: int,
+    submitted: bool,
+) -> None:
+    keys = (
+        ("blood-parameters", "Blood Parameters", 98111),
+        ("advanced-blood-parameters", "Advanced Blood Parameters", 98112),
+    )
+    for key, name, category_id in keys:
+        category = (
+            await test_db_session.execute(
+                select(QuestionnaireCategory).where(
+                    QuestionnaireCategory.category_key == key,
+                    QuestionnaireCategory.category_of == "metsights",
+                )
+            )
+        ).scalar_one_or_none()
+        if category is None:
+            category = QuestionnaireCategory(
+                category_id=category_id,
+                category_key=key,
+                display_name=name,
+                category_of="metsights",
+                status="active",
+            )
+            test_db_session.add(category)
+            await test_db_session.flush()
+        link = (
+            await test_db_session.execute(
+                select(AssessmentPackageCategory).where(
+                    AssessmentPackageCategory.package_id == package_id,
+                    AssessmentPackageCategory.category_id == category.category_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if link is None:
+            test_db_session.add(
+                AssessmentPackageCategory(
+                    package_id=package_id,
+                    category_id=int(category.category_id),
+                )
+            )
+        if submitted:
+            existing_progress = (
+                await test_db_session.execute(
+                    select(AssessmentCategoryProgress).where(
+                        AssessmentCategoryProgress.assessment_instance_id == instance_id,
+                        AssessmentCategoryProgress.category_id == category.category_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if existing_progress is None:
+                test_db_session.add(
+                    AssessmentCategoryProgress(
+                        assessment_instance_id=instance_id,
+                        category_id=int(category.category_id),
+                        status="complete",
+                        is_submitted=True,
+                    )
+                )
+            else:
+                existing_progress.is_submitted = True
+                existing_progress.status = "complete"
+    await test_db_session.commit()
 
 
 def _fake_group_factory():
@@ -375,6 +445,30 @@ async def test_load_blood_reports_skips_reload_when_verified_at_unchanged(
 
     metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
 
+    async def _fake_draft(db, *, user_id, assessment_instance_id, allow_completed=False):
+        return {"responses_drafted": 1}
+
+    monkeypatch.setattr(assessments_service, "draft_blood_parameters_from_report", _fake_draft)
+
+    async def _report_missing(self, *, record_id: str, assessment_type_code: str | None):
+        return False
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.is_bioai_report_generated",
+        _report_missing,
+    )
+
+    push_calls: list[str] = []
+
+    async def _fake_push(self, db, *, assessment_instance_id, user_id, category_key, category_of="metsights"):
+        push_calls.append(category_key)
+        return {"fields_pushed": ["glucose_fasting_value"]}
+
+    monkeypatch.setattr(
+        "modules.metsights.sync_service.MetsightsSyncService._push_category_to_metsights",
+        _fake_push,
+    )
+
     async def _fake_dispatch(self, db, *, payload, triggered_by_user_id=None):
         return {"dispatched": 1}
 
@@ -394,6 +488,103 @@ async def test_load_blood_reports_skips_reload_when_verified_at_unchanged(
     assert digital_calls == []
     assert any(
         "verified_at unchanged" in d["reason"]
+        for d in result["details"]
+        if d["action"] == "skipped"
+    )
+    assert "blood-parameters" in push_calls
+
+
+@pytest.mark.asyncio
+async def test_load_blood_reports_skips_metsights_retry_when_categories_submitted(
+    test_db_session, monkeypatch
+):
+    existing_blood = [
+        {
+            "group_name": "Metabolic",
+            "test_count": 1,
+            "tests": [{"parameter_key": "glucose_fasting", "value": 80.0, "unit": "mg/dL"}],
+        }
+    ]
+    await _seed_running_participant(
+        test_db_session,
+        user_id=88013,
+        engagement_id=88013,
+        assessment_id=88013,
+        existing_blood_parameters=existing_blood,
+        existing_verified_at=_VERIFIED_AT_DT,
+        existing_full_report=True,
+        existing_diag_url=_REPORT_URL,
+    )
+    await _ensure_metsights_blood_categories(
+        test_db_session,
+        package_id=1,
+        instance_id=88013,
+        submitted=True,
+    )
+
+    digital_calls: list[str] = []
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_report(_token, _booking_id):
+        return _report_payload()
+
+    async def _fake_digital(_token, booking_id):
+        digital_calls.append(booking_id)
+        return {"data": []}
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_report",
+        _fake_report,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_digital_value",
+        _fake_digital,
+    )
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    async def _fake_draft(db, *, user_id, assessment_instance_id, allow_completed=False):
+        raise AssertionError("should not draft when blood categories are already submitted")
+
+    monkeypatch.setattr(assessments_service, "draft_blood_parameters_from_report", _fake_draft)
+
+    push_calls: list[str] = []
+
+    async def _fake_push(self, db, *, assessment_instance_id, user_id, category_key, category_of="metsights"):
+        push_calls.append(category_key)
+        return {"fields_pushed": []}
+
+    monkeypatch.setattr(
+        "modules.metsights.sync_service.MetsightsSyncService._push_category_to_metsights",
+        _fake_push,
+    )
+
+    async def _fake_dispatch(self, db, *, payload, triggered_by_user_id=None):
+        return {"dispatched": 1}
+
+    monkeypatch.setattr(
+        "modules.notifications.service.NotificationsService.dispatch",
+        _fake_dispatch,
+    )
+
+    result = await load_blood_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=notifications_service,
+        assessments_service=assessments_service,
+        sync_service=sync_service,
+    )
+
+    assert digital_calls == []
+    assert push_calls == []
+    assert any(
+        "already submitted to Metsights" in d["reason"]
         for d in result["details"]
         if d["action"] == "skipped"
     )
@@ -582,7 +773,7 @@ async def test_load_blood_reports_always_fetches_digital_value_even_when_blood_e
 
     assert len(digital_calls) == 1
     assert digital_calls[0] == "BOOK-88001"
-    assert push_calls == ["blood-parameters"]
+    assert "blood-parameters" in push_calls
     drafted = [d for d in result["details"] if d["action"] == "drafted"]
     assert len(drafted) == 1
 
