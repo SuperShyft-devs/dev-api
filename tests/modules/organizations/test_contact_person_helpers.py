@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from sqlalchemy import select
+from sqlalchemy.dialects import postgresql
+
 from modules.organizations.contact_person import (
     build_camp_report_access,
     iter_contact_person_user_ids,
@@ -9,6 +12,8 @@ from modules.organizations.contact_person import (
     remove_user_from_contact_person_user_ids,
     resolve_org_manager_scope,
 )
+from modules.organizations.models import Organization
+from modules.organizations.repository import OrganizationsRepository
 
 
 def test_parse_and_resolve_org_manager_scope():
@@ -62,3 +67,11 @@ def test_build_camp_report_access_for_org_manager():
     assert access["organization_manager"] is True
     assert access["Mumbai"]["manager"] is True
     assert access["Mumbai"]["sales"] is True
+
+
+def test_contact_person_membership_sql_binds_uid_json():
+    clause = OrganizationsRepository._contact_person_user_ids_contains_user(7410)
+    compiled = select(Organization).where(clause).compile(dialect=postgresql.dialect())
+    assert "uid_json" in compiled.params
+    assert compiled.params["uid_json"] == "[7410]"
+    assert ":jsonb" not in str(compiled)

@@ -20,25 +20,34 @@ from modules.reports.models import CampReport
 class OrganizationsRepository:
     """Organization database queries."""
 
+    # Use CAST(... AS jsonb), not Postgres :: casts. sqlalchemy.text() treats
+    # ":uid_json::jsonb" as a missing bind name, which 500s GET /organizations/we.
     _CONTACT_PERSON_JSON_MEMBER_SQL = """
         (
             organizations.contact_person_user_ids IS NOT NULL
-            AND jsonb_typeof(organizations.contact_person_user_ids::jsonb) = 'object'
+            AND jsonb_typeof(CAST(organizations.contact_person_user_ids AS jsonb)) = 'object'
             AND (
-                organizations.contact_person_user_ids::jsonb->'organization_managers' @> :uid_json::jsonb
+                (CAST(organizations.contact_person_user_ids AS jsonb)->'organization_managers')
+                    @> CAST(:uid_json AS jsonb)
                 OR EXISTS (
                     SELECT 1
-                    FROM jsonb_each(organizations.contact_person_user_ids::jsonb) AS city_entry(city_key, city_val)
+                    FROM jsonb_each(
+                        CASE
+                            WHEN jsonb_typeof(CAST(organizations.contact_person_user_ids AS jsonb)) = 'object'
+                            THEN CAST(organizations.contact_person_user_ids AS jsonb)
+                            ELSE CAST('{}' AS jsonb)
+                        END
+                    ) AS city_entry(city_key, city_val)
                     WHERE city_key <> 'organization_managers'
                       AND jsonb_typeof(city_val) = 'object'
                       AND (
-                          city_val->'managers' @> :uid_json::jsonb
+                          (city_val->'managers') @> CAST(:uid_json AS jsonb)
                           OR EXISTS (
                               SELECT 1
                               FROM jsonb_each(city_val) AS dept_entry(dept_key, dept_val)
                               WHERE dept_key <> 'managers'
                                 AND jsonb_typeof(dept_val) = 'array'
-                                AND dept_val @> :uid_json::jsonb
+                                AND dept_val @> CAST(:uid_json AS jsonb)
                           )
                       )
                 )
