@@ -585,6 +585,105 @@ async def test_refresh_department_camp_report_participation_by_age(async_client,
 
 
 @pytest.mark.asyncio
+async def test_refresh_city_camp_report_persists_participation_by_age(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7620, employee_id=920)
+    await _seed_participation_section(test_db_session, report_sections=9610)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9610,
+        engagement_id=9610,
+    )
+    headers = _auth_header(7620)
+
+    init_overall = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
+    assert init_overall.status_code == 201
+    overall_id = init_overall.json()["data"]["report_id"]
+
+    init_city = await async_client.post(f"/reports/camps/{camp_no}/BLR/init", headers=headers)
+    assert init_city.status_code == 201
+    city_id = init_city.json()["data"]["report_id"]
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/BLR/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert response.status_code == 200
+    section = response.json()["data"]["section"]
+    assert section["data"]["total_enrolled"] == 3
+    assert section["data"]["enrolled"] == [1, 0, 1, 0, 1]
+
+    test_db_session.expire_all()
+    city_row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == city_id))
+    ).scalar_one()
+    overall_row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == overall_id))
+    ).scalar_one()
+    assert city_row.report["participation_by_age"]["data"]["total_enrolled"] == 3
+    assert city_row.report["meta"]["summary_available"] is True
+    assert "participation_by_age" not in (overall_row.report or {})
+
+    dashboard = await async_client.get(
+        f"/reports/camps/{camp_no}/BLR/dashboard",
+        headers=headers,
+        params={"section": "participation_by_age"},
+    )
+    assert dashboard.status_code == 200
+    assert dashboard.json()["data"]["data"]["total_enrolled"] == 3
+
+
+@pytest.mark.asyncio
+async def test_refresh_city_department_camp_report_persists_participation_by_age(
+    async_client,
+    test_db_session,
+):
+    await _seed_employee(test_db_session, user_id=7621, employee_id=921)
+    await _seed_participation_section(test_db_session, report_sections=9611)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9611,
+        engagement_id=9611,
+    )
+    headers = _auth_header(7621)
+
+    init_dept = await async_client.post(
+        f"/reports/camps/{camp_no}/department/sales/init",
+        headers=headers,
+    )
+    assert init_dept.status_code == 201
+    department_id = init_dept.json()["data"]["report_id"]
+
+    init_combo = await async_client.post(
+        f"/reports/camps/{camp_no}/BLR/department/sales/init",
+        headers=headers,
+    )
+    assert init_combo.status_code == 201
+    combo_id = init_combo.json()["data"]["report_id"]
+
+    response = await async_client.put(
+        f"/reports/camps/{camp_no}/BLR/department/sales/refresh",
+        headers=headers,
+        json={"section": "participation_by_age"},
+    )
+    assert response.status_code == 200
+    section = response.json()["data"]["section"]
+    assert section["data"]["total_enrolled"] == 2
+    assert section["data"]["enrolled"] == [1, 0, 1, 0, 0]
+
+    test_db_session.expire_all()
+    combo_row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == combo_id))
+    ).scalar_one()
+    department_row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.report_id == department_id))
+    ).scalar_one()
+    assert combo_row.report["participation_by_age"]["data"]["total_enrolled"] == 2
+    assert combo_row.report["meta"]["summary_available"] is True
+    assert "participation_by_age" not in (department_row.report or {})
+
+
+@pytest.mark.asyncio
 async def test_refresh_camp_report_replaces_existing_section(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7506, employee_id=66)
     await _seed_participation_section(test_db_session, report_sections=13)
@@ -4412,8 +4511,39 @@ async def test_estimate_camp_report_department_scope(async_client, test_db_sessi
     assert response.status_code == 200
     op = response.json()["data"]["operations"][0]
     assert op["department"] == "sales"
+    assert op["city"] is None
     assert op["participant_count"] == 3
     assert op["unit_count"] == 0  # kpi_metsights: no record ids needing fetch-collections
+
+
+@pytest.mark.asyncio
+async def test_estimate_camp_report_city_scope(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7908, employee_id=908)
+    camp_no = await _seed_refresh_camp_with_participants(
+        test_db_session,
+        organization_id=9508,
+        engagement_id=9508,
+    )
+    headers = _auth_header(7908)
+
+    response = await async_client.post(
+        f"/reports/camps/{camp_no}/estimate",
+        headers=headers,
+        json={
+            "operations": [
+                {
+                    "section": "participation_by_age",
+                    "action": "refresh",
+                    "city": "BLR",
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200
+    op = response.json()["data"]["operations"][0]
+    assert op["city"] == "BLR"
+    assert op["department"] is None
+    assert op["participant_count"] == 4
 
 
 @pytest.mark.asyncio

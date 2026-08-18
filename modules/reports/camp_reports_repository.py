@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlalchemy import and_, case, delete, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from modules.assessments.models import (
     AssessmentCategoryProgress,
@@ -375,7 +376,8 @@ class CampReportsRepository:
         return row
 
     async def update_report(self, db: AsyncSession, row: CampReport, report: dict) -> CampReport:
-        row.report = report
+        row.report = dict(report)
+        flag_modified(row, "report")
         await db.flush()
         return row
 
@@ -386,8 +388,10 @@ class CampReportsRepository:
         report: dict,
         report_bts: dict,
     ) -> CampReport:
-        row.report = report
-        row.report_bts = report_bts
+        row.report = dict(report)
+        row.report_bts = dict(report_bts)
+        flag_modified(row, "report")
+        flag_modified(row, "report_bts")
         await db.flush()
         return row
 

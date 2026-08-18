@@ -1501,14 +1501,16 @@ class CampReportsService:
         )
 
         timeout_seconds = settings.CAMP_REPORT_CLIENT_TIMEOUT_SECONDS
-        count_cache: dict[tuple[str, str | None], int] = {}
+        count_cache: dict[tuple[str, str | None, str | None], int] = {}
         results: list[dict[str, Any]] = []
 
         for op in operations:
             section = str(op.get("section") or "").strip()
             action = str(op.get("action") or "").strip().lower()
             department_raw = op.get("department")
+            city_raw = op.get("city")
             department: str | None = None
+            city: str | None = None
             if department_raw is not None:
                 normalized_department = str(department_raw).strip()
                 if not normalized_department:
@@ -1517,12 +1519,24 @@ class CampReportsService:
                         error_code="INVALID_INPUT",
                         message="Invalid request",
                     )
-                await self._validate_department_slug(
-                    db,
-                    organization_id=context["organization_id"],
-                    slug=normalized_department,
-                )
                 department = normalized_department
+            if city_raw is not None:
+                normalized_city = str(city_raw).strip()
+                if not normalized_city:
+                    raise AppError(
+                        status_code=400,
+                        error_code="INVALID_INPUT",
+                        message="Invalid request",
+                    )
+                city = normalized_city
+
+            department, city = await self._normalize_report_filters(
+                db,
+                camp_no=camp_no,
+                organization_id=context["organization_id"],
+                department=department,
+                city=city,
+            )
 
             if not section:
                 raise AppError(
@@ -1533,40 +1547,44 @@ class CampReportsService:
 
             base, per_unit, unit_kind = self._resolve_estimate_cost(section, action)
 
-            participant_key = ("participants", department)
+            participant_key = ("participants", department, city)
             if participant_key not in count_cache:
                 count_cache[participant_key] = await self._repository.count_participants_by_camp_no(
                     db,
                     camp_no=camp_no,
                     department=department,
+                    city=city,
                 )
             participant_count = count_cache[participant_key]
 
             if unit_kind == "fitprint":
-                fitprint_key = ("fitprint", department)
+                fitprint_key = ("fitprint", department, city)
                 if fitprint_key not in count_cache:
                     count_cache[fitprint_key] = await self._repository.count_fitprint_assessment_contexts(
                         db,
                         camp_no=camp_no,
                         department=department,
+                        city=city,
                     )
                 unit_count = count_cache[fitprint_key]
             elif unit_kind == "health":
-                health_key = ("health", department)
+                health_key = ("health", department, city)
                 if health_key not in count_cache:
                     count_cache[health_key] = await self._repository.count_health_assessment_contexts(
                         db,
                         camp_no=camp_no,
                         department=department,
+                        city=city,
                     )
                 unit_count = count_cache[health_key]
             elif unit_kind == "kpi_metsights":
-                metsights_key = ("kpi_metsights", department)
+                metsights_key = ("kpi_metsights", department, city)
                 if metsights_key not in count_cache:
                     candidates = await self._repository.list_kpi_blood_candidates(
                         db,
                         camp_no=camp_no,
                         department=department,
+                        city=city,
                     )
                     count_cache[metsights_key] = sum(
                         1
@@ -1584,6 +1602,7 @@ class CampReportsService:
                     "section": section,
                     "action": action,
                     "department": department,
+                    "city": city,
                     "participant_count": participant_count,
                     "unit_count": unit_count,
                     "estimated_seconds": estimated_seconds,

@@ -227,6 +227,7 @@ class CampReportEstimateOperationRequest(BaseModel):
     section: str = Field(min_length=1, max_length=200)
     action: str = Field(min_length=1, max_length=50)
     department: str | None = None
+    city: str | None = None
 
 
 class CampReportEstimateRequest(BaseModel):
@@ -237,6 +238,7 @@ class CampReportEstimateOperationResult(BaseModel):
     section: str
     action: str
     department: str | None = None
+    city: str | None = None
     participant_count: int
     unit_count: int
     estimated_seconds: int
