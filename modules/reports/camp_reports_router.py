@@ -502,6 +502,26 @@ async def init_camp_report(
     return success_response({"report_id": created.report_id})
 
 
+@router.post("/{camp_no}/init-all")
+async def init_all_camp_reports(
+    camp_no: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.init_all_camp_reports(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
 @router.post("/{camp_no}/department/{slug}/init", status_code=201)
 async def init_department_camp_report(
     camp_no: int,

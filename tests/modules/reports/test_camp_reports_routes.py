@@ -261,6 +261,103 @@ async def test_init_camp_report_not_found(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
+async def test_init_all_camp_reports_creates_overall_departments_cities_and_combos(
+    async_client, test_db_session
+):
+    await _seed_employee(test_db_session, user_id=7480, employee_id=80)
+    camp_no, organization_id = await _seed_camp(
+        test_db_session, organization_id=9180, engagement_id=9180
+    )
+    test_db_session.add(
+        Engagement(
+            engagement_id=9181,
+            engagement_name="Camp Engagement HYD",
+            organization_id=organization_id,
+            camp_no=camp_no,
+            engagement_code="CAMPREP2",
+            engagement_type="bio_ai",
+            assessment_package_id=None,
+            diagnostic_package_id=None,
+            city="HYD",
+            slot_duration=20,
+            start_date=date(2026, 6, 23),
+            end_date=date(2026, 6, 25),
+            status="running",
+        )
+    )
+    await test_db_session.commit()
+    headers = _auth_header(7480)
+
+    response = await async_client.post(f"/reports/camps/{camp_no}/init-all", headers=headers)
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["created"] == {
+        "overall": 1,
+        "departments": 2,
+        "cities": 2,
+        "city_departments": 4,
+    }
+    assert payload["skipped"] == {
+        "overall": 0,
+        "departments": 0,
+        "cities": 0,
+        "city_departments": 0,
+    }
+    assert sorted(payload["departments"]) == ["engineering", "sales"]
+    assert sorted(city.lower() for city in payload["cities"]) == ["blr", "hyd"]
+
+    rows = (
+        await test_db_session.execute(select(CampReport).where(CampReport.camp_no == camp_no))
+    ).scalars().all()
+    assert len(rows) == 9
+    overall = [r for r in rows if r.department is None and r.city is None]
+    departments = [r for r in rows if r.department is not None and r.city is None]
+    cities = [r for r in rows if r.department is None and r.city is not None]
+    combos = [r for r in rows if r.department is not None and r.city is not None]
+    assert len(overall) == 1
+    assert {r.department for r in departments} == {"sales", "engineering"}
+    assert {r.city for r in cities} == {"BLR", "HYD"}
+    assert {(r.city, r.department) for r in combos} == {
+        ("BLR", "sales"),
+        ("BLR", "engineering"),
+        ("HYD", "sales"),
+        ("HYD", "engineering"),
+    }
+
+    again = await async_client.post(f"/reports/camps/{camp_no}/init-all", headers=headers)
+    assert again.status_code == 200
+    skipped = again.json()["data"]["skipped"]
+    assert skipped == {
+        "overall": 1,
+        "departments": 2,
+        "cities": 2,
+        "city_departments": 4,
+    }
+    assert again.json()["data"]["created"] == {
+        "overall": 0,
+        "departments": 0,
+        "cities": 0,
+        "city_departments": 0,
+    }
+
+
+@pytest.mark.asyncio
+async def test_init_all_camp_reports_requires_auth(async_client):
+    response = await async_client.post("/reports/camps/123/init-all")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_init_all_camp_reports_not_found(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7481, employee_id=81)
+    headers = _auth_header(7481)
+
+    response = await async_client.post("/reports/camps/999999998/init-all", headers=headers)
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "CAMP_NOT_FOUND"
+
+
+@pytest.mark.asyncio
 async def test_init_department_invalid_slug(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7405, employee_id=55)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9105, engagement_id=9105)

@@ -565,6 +565,174 @@ class CampReportsService:
         )
         return created
 
+    @staticmethod
+    def _report_scope_key(
+        department: str | None,
+        city: str | None,
+    ) -> tuple[str | None, str | None]:
+        dept = (department or "").strip().lower() or None
+        cty = (city or "").strip().lower() or None
+        return dept, cty
+
+    async def _create_scoped_report_if_missing(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        organization_id: int,
+        department: str | None,
+        city: str | None,
+        camp_name: str,
+        camp_start_date: date | None,
+        camp_end_date: date | None,
+        existing_keys: set[tuple[str | None, str | None]],
+    ) -> bool:
+        key = self._report_scope_key(department, city)
+        if key in existing_keys:
+            return False
+
+        row = CampReport(
+            report=self._build_initial_report(
+                camp_name=camp_name,
+                camp_start_date=camp_start_date,
+                camp_end_date=camp_end_date,
+            ),
+            camp_no=camp_no,
+            department=department,
+            city=city,
+            organization_id=organization_id,
+        )
+        try:
+            async with db.begin_nested():
+                await self._repository.create(db, row)
+        except IntegrityError:
+            return False
+
+        existing_keys.add(key)
+        return True
+
+    async def init_all_camp_reports(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict[str, Any]:
+        """Create overall, department, city, and city×department reports for a camp.
+
+        Existing rows are skipped so the action is safe to retry.
+        """
+        ensure_internal_employee(employee)
+
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        organization_id = int(context["organization_id"])
+        organization_name = context["organization_name"]
+        camp_start_date = context["camp_start_date"]
+        camp_end_date = context["camp_end_date"]
+
+        organization = await db.get(Organization, organization_id)
+        department_slugs = sorted(get_department_slugs(organization)) if organization is not None else []
+        cities = await self._repository.list_distinct_cities_for_camp(db, camp_no=camp_no)
+
+        existing_rows = await self._repository.list_by_camp_no(db, camp_no=camp_no)
+        existing_keys = {
+            self._report_scope_key(row.department, row.city) for row in existing_rows
+        }
+
+        created = {"overall": 0, "departments": 0, "cities": 0, "city_departments": 0}
+        skipped = {"overall": 0, "departments": 0, "cities": 0, "city_departments": 0}
+
+        overall_name = format_camp_name(organization_name, camp_start_date)
+        if await self._create_scoped_report_if_missing(
+            db,
+            camp_no=camp_no,
+            organization_id=organization_id,
+            department=None,
+            city=None,
+            camp_name=overall_name,
+            camp_start_date=camp_start_date,
+            camp_end_date=camp_end_date,
+            existing_keys=existing_keys,
+        ):
+            created["overall"] = 1
+        else:
+            skipped["overall"] = 1
+
+        for slug in department_slugs:
+            dept_name = format_department_camp_name(organization_name, slug, camp_start_date)
+            if await self._create_scoped_report_if_missing(
+                db,
+                camp_no=camp_no,
+                organization_id=organization_id,
+                department=slug,
+                city=None,
+                camp_name=dept_name,
+                camp_start_date=camp_start_date,
+                camp_end_date=camp_end_date,
+                existing_keys=existing_keys,
+            ):
+                created["departments"] += 1
+            else:
+                skipped["departments"] += 1
+
+        for city in cities:
+            city_name = format_city_camp_name(organization_name, city, camp_start_date)
+            if await self._create_scoped_report_if_missing(
+                db,
+                camp_no=camp_no,
+                organization_id=organization_id,
+                department=None,
+                city=city,
+                camp_name=city_name,
+                camp_start_date=camp_start_date,
+                camp_end_date=camp_end_date,
+                existing_keys=existing_keys,
+            ):
+                created["cities"] += 1
+            else:
+                skipped["cities"] += 1
+
+            for slug in department_slugs:
+                combo_name = format_city_department_camp_name(
+                    organization_name,
+                    city,
+                    slug,
+                    camp_start_date,
+                )
+                if await self._create_scoped_report_if_missing(
+                    db,
+                    camp_no=camp_no,
+                    organization_id=organization_id,
+                    department=slug,
+                    city=city,
+                    camp_name=combo_name,
+                    camp_start_date=camp_start_date,
+                    camp_end_date=camp_end_date,
+                    existing_keys=existing_keys,
+                ):
+                    created["city_departments"] += 1
+                else:
+                    skipped["city_departments"] += 1
+
+        await self._audit_service.log_event(
+            db,
+            action="EMPLOYEE_INIT_ALL_CAMP_REPORTS",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return {
+            "created": created,
+            "skipped": skipped,
+            "cities": cities,
+            "departments": department_slugs,
+        }
+
     async def delete_camp_report(
         self,
         db: AsyncSession,
