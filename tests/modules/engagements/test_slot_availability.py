@@ -126,6 +126,7 @@ def test_build_public_slot_detail_applies_occupancy_and_skips_inactive():
                     "cabin_key": "cc-001",
                     "start_time": "09:00",
                     "end_time": "10:00",
+                    "expert_type": "doctor",
                     "slot_duration": 30,
                     "capacity_per_slot": 1,
                     "breaks": [],
@@ -142,7 +143,9 @@ def test_build_public_slot_detail_applies_occupancy_and_skips_inactive():
         {"slot": "09:00", "spot_left": 1},
         {"slot": "09:30", "spot_left": 6},
     ]
-    consult_slots = public["consultation"]["2026-08-20"][0]["available_slots"]
+    consult_cabin = public["consultation"]["2026-08-20"][0]
+    assert consult_cabin["expert_type"] == "doctor"
+    consult_slots = consult_cabin["available_slots"]
     assert consult_slots == [
         {"slot": "09:00", "spot_left": 1},
         {"slot": "09:30", "spot_left": 1},

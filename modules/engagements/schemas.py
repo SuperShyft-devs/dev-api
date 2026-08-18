@@ -69,15 +69,25 @@ class CabinSlotConfig(BaseModel):
         return self
 
 
+class ConsultationCabinSlotConfig(CabinSlotConfig):
+    expert_type: str = Field(min_length=1, max_length=100)
+
+    @field_validator("expert_type")
+    @classmethod
+    def validate_expert_type(cls, value: str) -> str:
+        stripped = (value or "").strip()
+        if not stripped:
+            raise ValueError("expert_type is required")
+        return stripped
+
+
 class SlotDetail(BaseModel):
     blood_collection: Optional[dict[str, list[CabinSlotConfig]]] = None
-    consultation: Optional[dict[str, list[CabinSlotConfig]]] = None
+    consultation: Optional[dict[str, list[ConsultationCabinSlotConfig]]] = None
 
     @field_validator("blood_collection", "consultation")
     @classmethod
-    def validate_date_keys(
-        cls, value: Optional[dict[str, list[CabinSlotConfig]]]
-    ) -> Optional[dict[str, list[CabinSlotConfig]]]:
+    def validate_date_keys(cls, value: Optional[dict[str, list[Any]]]) -> Optional[dict[str, list[Any]]]:
         if value is None:
             return value
         for date_key in value:

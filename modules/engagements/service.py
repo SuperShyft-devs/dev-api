@@ -51,7 +51,10 @@ from modules.engagements.schemas import (
     ConsultationConsentRequest,
     ResolveHealthiansZoneRequest,
     ResolveHealthiansZoneResponse,
+    SlotDetail,
 )
+from modules.experts.repository import ExpertTypesRepository
+from modules.experts.service import ExpertTypesService
 from modules.notifications.repository import NotificationsRepository
 from modules.organizations.repository import OrganizationsRepository
 from modules.platform_settings.repository import PlatformSettingsRepository
@@ -250,6 +253,7 @@ class EngagementsService:
         notifications_repository: NotificationsRepository | None = None,
         notifications_service: "NotificationsService | None" = None,
         consultation_bookings_repository: ConsultationBookingsRepository | None = None,
+        expert_types_service: ExpertTypesService | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
@@ -265,6 +269,7 @@ class EngagementsService:
         self._questionnaire_repository = QuestionnaireRepository()
         self._reports_repository = ReportsRepository()
         self._consultation_bookings = consultation_bookings_repository or ConsultationBookingsRepository()
+        self._expert_types_service = expert_types_service or ExpertTypesService(repository=ExpertTypesRepository())
         self._checklists_service = None
 
     async def _participant_rows_to_dicts(self, db: AsyncSession, rows: list[tuple]) -> list[dict[str, Any]]:
@@ -295,6 +300,22 @@ class EngagementsService:
                 engagements_service=self,
             )
         return self._checklists_service
+
+    async def _validate_consultation_expert_types(
+        self,
+        db: AsyncSession,
+        slot_detail: SlotDetail | None,
+    ) -> None:
+        if slot_detail is None or not slot_detail.consultation:
+            return
+        seen: set[str] = set()
+        for cabins in slot_detail.consultation.values():
+            for cabin in cabins:
+                key = cabin.expert_type.strip()
+                if not key or key in seen:
+                    continue
+                seen.add(key)
+                await self._expert_types_service.validate_type_key(db, key)
 
     def _group_slots_by_date(self, rows: list[tuple]) -> dict[str, list[str]]:
         """Group (date, time) rows into a {"YYYY-MM-DD": ["HH:MM:SS", ...]} mapping."""
@@ -421,6 +442,7 @@ class EngagementsService:
                 )
 
         diagnostic_package_id = payload.diagnostic_package_id
+        await self._validate_consultation_expert_types(db, payload.slot_detail)
 
         # Use provided engagement_code or generate a unique one.
         if payload.engagement_code:
@@ -796,6 +818,7 @@ class EngagementsService:
         if "consultations" in update_fields:
             engagement.consultations = payload.consultations
         if "slot_detail" in update_fields:
+            await self._validate_consultation_expert_types(db, payload.slot_detail)
             engagement.slot_detail = (
                 payload.slot_detail.model_dump(mode="json", exclude_none=True)
                 if payload.slot_detail is not None

@@ -222,14 +222,15 @@ def build_public_slot_detail(slot_detail: Any, occupancy: OccupancyMap | None = 
                             "spot_left": max(0, capacity - int(count)),
                         }
                     )
-                public_cabins.append(
-                    {
-                        "cabin_name": cabin.get("cabin_name") or "",
-                        "cabin_key": cabin_key,
-                        "slot_duration": duration,
-                        "available_slots": available_slots,
-                    }
-                )
+                public_cabin: dict[str, Any] = {
+                    "cabin_name": cabin.get("cabin_name") or "",
+                    "cabin_key": cabin_key,
+                    "slot_duration": duration,
+                    "available_slots": available_slots,
+                }
+                if section_key == "consultation":
+                    public_cabin["expert_type"] = (cabin.get("expert_type") or "").strip()
+                public_cabins.append(public_cabin)
             if public_cabins:
                 public_section[str(date_key)] = public_cabins
         if public_section:
