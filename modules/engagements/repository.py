@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common.listing import apply_sort, ilike_pattern
 from modules.engagements.models import (
     AutoNotificationEvent,
-    BloodCollectionType,
     Engagement,
     EngagementNotification,
     EngagementParticipant,
@@ -1212,57 +1211,59 @@ class EngagementsRepository:
     ) -> list[tuple[int, int, list[str]]]:
         """Return (user_id, engagement_id, service_keys) for eligible participants.
 
-        Eligible when engagement is scheduled/running, home collection, has consultation_ready
-        notification configured, and the matching report is ready on any individual_health_report
-        row for that participant.
+        Eligible when engagement is scheduled/running, has consultation_ready
+        notification configured, the matching report is ready on any
+        individual_health_report row for that participant, and at least one
+        offered consultation type is still unbooked (either no booking row yet
+        or a booking exists with want=false).
         """
-        from modules.engagements.models import AutoNotificationEvent, EngagementNotification, EngagementType
-
-        bio_ai_type = select(EngagementType.id).where(EngagementType.code == "bio_ai_with_consultation").scalar_subquery()
-        blood_type = select(EngagementType.id).where(EngagementType.code == "blood_test_with_consultation").scalar_subquery()
-
-        bio_ai_ready = and_(
-            Engagement.engagement_type == bio_ai_type,
-            IndividualHealthReport.reports.isnot(None),
-            IndividualHealthReport.report_url.isnot(None),
-        )
-        blood_ready = and_(
-            Engagement.engagement_type == blood_type,
-            IndividualHealthReport.blood_report_raw.isnot(None),
-            IndividualHealthReport.diagnostic_report_url.isnot(None),
-        )
-        query = (
-            select(
-                EngagementParticipant.user_id,
-                EngagementParticipant.engagement_id,
-                EngagementNotification.notification_services,
-            )
-            .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
-            .join(
-                EngagementNotification,
-                EngagementNotification.engagement_id == Engagement.engagement_id,
-            )
-            .join(
-                AutoNotificationEvent,
-                AutoNotificationEvent.id == EngagementNotification.notification_event_id,
-            )
-            .join(
-                IndividualHealthReport,
-                and_(
-                    IndividualHealthReport.user_id == EngagementParticipant.user_id,
-                    IndividualHealthReport.engagement_id == EngagementParticipant.engagement_id,
-                ),
-            )
-            .where(self._scheduled_or_running_engagement_status_filter())
-            .where(Engagement.blood_collection_type == BloodCollectionType.home_collection)
-            .where(Engagement.engagement_type.in_([bio_ai_type, blood_type]))
-            .where(AutoNotificationEvent.event_code == "consultation_ready")
-            .where(or_(bio_ai_ready, blood_ready))
-            .distinct()
-            .order_by(
-                EngagementParticipant.engagement_id.asc(),
-                EngagementParticipant.user_id.asc(),
-            )
+        query = text(
+            """
+            SELECT DISTINCT
+                ep.user_id,
+                ep.engagement_id,
+                en.notification_services
+            FROM engagement_participants ep
+            JOIN engagements e ON e.engagement_id = ep.engagement_id
+            JOIN engagement_notifications en ON en.engagement_id = e.engagement_id
+            JOIN auto_notification_events ane ON ane.id = en.notification_event_id
+            JOIN engagement_types et ON et.id = e.engagement_type
+            JOIN individual_health_report ihr
+              ON ihr.user_id = ep.user_id
+             AND ihr.engagement_id = ep.engagement_id
+            WHERE lower(trim(e.status)) IN ('scheduled', 'running')
+              AND ane.event_code = 'consultation_ready'
+              AND et.code IN ('bio_ai_with_consultation', 'blood_test_with_consultation')
+              AND (
+                    (et.code = 'bio_ai_with_consultation'
+                     AND ihr.reports IS NOT NULL
+                     AND ihr.report_url IS NOT NULL)
+                 OR (et.code = 'blood_test_with_consultation'
+                     AND ihr.blood_report_raw IS NOT NULL
+                     AND ihr.diagnostic_report_url IS NOT NULL)
+              )
+              AND e.consultations IS NOT NULL
+              AND jsonb_typeof(e.consultations::jsonb) = 'object'
+              AND EXISTS (
+                    SELECT 1
+                    FROM jsonb_each(e.consultations::jsonb) AS kv(key, value)
+                    WHERE (
+                            (jsonb_typeof(kv.value) = 'boolean' AND kv.value = 'true'::jsonb)
+                         OR (
+                                jsonb_typeof(kv.value) = 'object'
+                                AND COALESCE((kv.value->>'want')::boolean, false) = true
+                            )
+                    )
+                      AND NOT EXISTS (
+                            SELECT 1
+                            FROM consultation_bookings cb
+                            WHERE cb.engagement_participant_id = ep.engagement_participant_id
+                              AND cb.expert_type = kv.key
+                              AND cb.want IS TRUE
+                      )
+              )
+            ORDER BY ep.engagement_id ASC, ep.user_id ASC
+            """
         )
         result = await db.execute(query)
         return [
