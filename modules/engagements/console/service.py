@@ -266,6 +266,7 @@ class ConsoleService:
             "status": engagement.status,
             "participant_count": participant_count,
             "blood_collection_type": engagement.blood_collection_type.value if engagement.blood_collection_type else None,
+            "consultation_mode": engagement.consultation_mode.value if engagement.consultation_mode else None,
         }
 
     async def list_console_engagements(

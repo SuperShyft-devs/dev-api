@@ -9,7 +9,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.types import JSON
 
 from db.base import Base
-from modules.engagements.enums import BloodCollectionType, EngagementKind, EngagementStatus
+from modules.engagements.enums import BloodCollectionType, ConsultationMode, EngagementKind, EngagementStatus
 
 
 _engagement_kind = SAEnum(
@@ -63,6 +63,10 @@ class Engagement(Base):
     external_camp_id = Column(Integer, nullable=True)
     blood_collection_type = Column(
         SAEnum(BloodCollectionType, name="blood_collection_type_enum", values_callable=lambda obj: [e.value for e in obj], create_type=False),
+        nullable=True,
+    )
+    consultation_mode = Column(
+        SAEnum(ConsultationMode, name="consultation_mode_enum", values_callable=lambda obj: [e.value for e in obj], create_type=False),
         nullable=True,
     )
 

@@ -13,6 +13,11 @@ from modules.employee.access_control import ensure_expert_portal_access, ensure_
 from modules.employee.models import Employee, EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
+from modules.engagements.enums import ConsultationMode
+from modules.engagements.consultation_booking_validation import (
+    effective_consultation_mode,
+    validate_consultation_cabin_slot_for_booking,
+)
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.experts.consultation_bookings_repository import ConsultationBookingsRepository
 from modules.experts.consultations import (
@@ -751,22 +756,45 @@ class ExpertAvailabilityService:
                 message="Consultation already confirmed by an expert",
             )
 
-        available = await self._slot_is_available(
-            db,
-            expert_type=payload.expert_type,
-            day=payload.date,
-            slot_hhmm=slot_hhmm,
-            expert_id=payload.expert_id,
-        )
-        if not available:
-            raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message="Selected slot is not available",
+        mode = effective_consultation_mode(engagement)
+        persisted_cabin: str | None = None
+
+        if mode == ConsultationMode.offline:
+            cabin_key = (payload.cabin or "").strip()
+            if not cabin_key:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="cabin is required for offline consultations",
+                )
+            persisted_cabin, slot_hhmm = await validate_consultation_cabin_slot_for_booking(
+                db,
+                engagement=engagement,
+                expert_type=payload.expert_type,
+                consultation_date=payload.date,
+                cabin_key=cabin_key,
+                slot_val=payload.slot,
+                consultation_bookings=self._consultation_bookings,
             )
+        else:
+            slot_hhmm = normalize_hhmm(payload.slot)
+            available = await self._slot_is_available(
+                db,
+                expert_type=payload.expert_type,
+                day=payload.date,
+                slot_hhmm=slot_hhmm,
+                expert_id=payload.expert_id,
+            )
+            if not available:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="Selected slot is not available",
+                )
 
         booking.consultation_date = payload.date
         booking.consultation_slot = slot_hhmm
+        booking.consultation_cabin = persisted_cabin
         db.add(booking)
         db.add(participant)
         await db.flush()

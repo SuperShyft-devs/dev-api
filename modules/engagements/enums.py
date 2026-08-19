@@ -22,6 +22,13 @@ class BloodCollectionType(str, enum.Enum):
     camp_collection = "camp_collection"
 
 
+class ConsultationMode(str, enum.Enum):
+    """PostgreSQL enum `consultation_mode_enum`."""
+
+    online = "online"
+    offline = "offline"
+
+
 class EngagementStatus(str, enum.Enum):
     """Application-level engagement status values."""
 

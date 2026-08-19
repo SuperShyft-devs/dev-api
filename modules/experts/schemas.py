@@ -187,6 +187,7 @@ class ConsultationBookRequest(BaseModel):
     expert_id: Optional[int] = Field(default=None, gt=0)
     date: date
     slot: str = Field(min_length=1, max_length=20)
+    cabin: Optional[str] = Field(default=None, max_length=100)
 
 
 class ConsultationConfirmRequest(BaseModel):

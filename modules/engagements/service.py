@@ -33,7 +33,8 @@ from modules.employee.models import EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import compute_camp_no
-from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
+from modules.engagements.consultation_booking_validation import validate_consultation_cabin_slot_for_booking
+from modules.engagements.models import BloodCollectionType, ConsultationMode, Engagement, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.slot_availability import (
     build_public_slot_detail,
@@ -74,6 +75,27 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+def _consultations_enabled(consultations: dict[str, bool] | None) -> bool:
+    if not consultations:
+        return False
+    return any(value is True for value in consultations.values())
+
+
+def _prepare_slot_detail_for_consultation_mode(
+    slot_detail: SlotDetail | None,
+    consultation_mode: ConsultationMode | None,
+) -> SlotDetail | None:
+    if slot_detail is None:
+        return None
+    if consultation_mode != ConsultationMode.online:
+        return slot_detail
+    dumped = slot_detail.model_dump(mode="json", exclude_none=True)
+    dumped.pop("consultation", None)
+    if not dumped:
+        return None
+    return SlotDetail.model_validate(dumped)
 
 
 def _generate_engagement_code(length: int = 8) -> str:
@@ -445,7 +467,11 @@ class EngagementsService:
                 )
 
         diagnostic_package_id = payload.diagnostic_package_id
-        await self._validate_consultation_expert_types(db, payload.slot_detail)
+        prepared_slot_detail = _prepare_slot_detail_for_consultation_mode(
+            payload.slot_detail,
+            payload.consultation_mode,
+        )
+        await self._validate_consultation_expert_types(db, prepared_slot_detail)
 
         # Use provided engagement_code or generate a unique one.
         if payload.engagement_code:
@@ -476,7 +502,7 @@ class EngagementsService:
             engagement_code=code,
             engagement_type=payload.engagement_type,
             consultations=payload.consultations,
-            slot_detail=payload.slot_detail.model_dump(mode="json", exclude_none=True) if payload.slot_detail is not None else None,
+            slot_detail=prepared_slot_detail.model_dump(mode="json", exclude_none=True) if prepared_slot_detail is not None else None,
             assessment_package_id=payload.assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
             city=payload.city,
@@ -495,6 +521,7 @@ class EngagementsService:
             healthians_zone_id=payload.healthians_zone_id,
             external_camp_id=payload.external_camp_id,
             blood_collection_type=payload.blood_collection_type,
+            consultation_mode=payload.consultation_mode,
             create_profile_on_metsights=payload.create_profile_on_metsights,
             enroll_for_fitprint_full=payload.enroll_for_fitprint_full,
         )
@@ -800,28 +827,15 @@ class EngagementsService:
                 consultation_date = date.fromisoformat(str(date_val)[:10])
             except ValueError as exc:
                 raise slot_unavailable() from exc
-            slot_time = coerce_time(slot_val)
-            if slot_time is None:
-                raise slot_unavailable()
-            cabin = require_available_consultation_slot(
-                engagement.slot_detail,
+            persisted_cabin, slot_hhmm = await validate_consultation_cabin_slot_for_booking(
+                db,
+                engagement=engagement,
                 expert_type=str(expert_type),
                 consultation_date=consultation_date,
                 cabin_key=cabin_val,
-                slot_time=slot_time,
+                slot_val=str(slot_val),
+                consultation_bookings=self._consultation_bookings,
             )
-            persisted_cabin = (cabin.get("cabin_key") or "").strip()
-            slot_hhmm = format_hhmm(slot_time)
-            count = await self._consultation_bookings.count_cabin_slot_bookings(
-                db,
-                engagement_id=int(engagement.engagement_id),
-                consultation_cabin=persisted_cabin,
-                consultation_date=consultation_date,
-                consultation_slot=slot_hhmm,
-            )
-            capacity = int(cabin.get("capacity_per_slot") or 0)
-            if count >= capacity:
-                raise slot_unavailable()
             pref["cabin"] = persisted_cabin
             pref["slot"] = slot_hhmm
             pref["date"] = consultation_date.isoformat()
@@ -892,13 +906,28 @@ class EngagementsService:
         # Callers that never send the key keep whatever is already configured.
         if "consultations" in update_fields:
             engagement.consultations = payload.consultations
+        consultation_mode = payload.consultation_mode
+        if "consultation_mode" in update_fields:
+            engagement.consultation_mode = consultation_mode
+        elif "consultations" in update_fields and _consultations_enabled(payload.consultations):
+            engagement.consultation_mode = consultation_mode
+        effective_mode = engagement.consultation_mode
         if "slot_detail" in update_fields:
-            await self._validate_consultation_expert_types(db, payload.slot_detail)
+            prepared_slot_detail = _prepare_slot_detail_for_consultation_mode(
+                payload.slot_detail,
+                effective_mode,
+            )
+            await self._validate_consultation_expert_types(db, prepared_slot_detail)
             engagement.slot_detail = (
-                payload.slot_detail.model_dump(mode="json", exclude_none=True)
-                if payload.slot_detail is not None
+                prepared_slot_detail.model_dump(mode="json", exclude_none=True)
+                if prepared_slot_detail is not None
                 else None
             )
+        elif "consultation_mode" in update_fields and effective_mode == ConsultationMode.online:
+            if isinstance(engagement.slot_detail, dict):
+                slot_detail_data = dict(engagement.slot_detail)
+                slot_detail_data.pop("consultation", None)
+                engagement.slot_detail = slot_detail_data or None
         engagement.assessment_package_id = payload.assessment_package_id
         engagement.diagnostic_package_id = payload.diagnostic_package_id
         engagement.city = payload.city
@@ -1114,6 +1143,7 @@ class EngagementsService:
             start_date=engagement_date,
             end_date=engagement_date,
             status="running" if engagement_date <= date.today() else "scheduled",
+            consultation_mode=ConsultationMode.online if _consultations_enabled(consultations) else None,
             create_profile_on_metsights=create_profile_on_metsights,
             enroll_for_fitprint_full=enroll_for_fitprint_full,
         )

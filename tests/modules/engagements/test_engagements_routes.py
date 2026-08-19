@@ -2237,3 +2237,107 @@ async def test_get_engagement_by_code_returns_null_slot_detail_when_unset(async_
     public = await async_client.get("/engagements/code/SLOTNONE")
     assert public.status_code == 200
     assert public.json()["data"]["slot_detail"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_engagement_by_code_includes_consultation_mode(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7420, employee_id=420)
+    await _seed_organization(test_db_session, organization_id=9201, name="Mode Public Org")
+    await _seed_assessment_package(test_db_session, package_id=9201, package_code="PKG9201")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9201)
+    type_id = await _engagement_type_id(test_db_session, "consultation")
+
+    create = await async_client.post(
+        "/engagements",
+        headers=_auth_header(7420),
+        json={
+            "engagement_name": "Offline Consult Camp",
+            "organization_id": 9201,
+            "engagement_type": type_id,
+            "assessment_package_id": 9201,
+            "diagnostic_package_id": 9201,
+            "city": "BLR",
+            "slot_duration": 30,
+            "start_date": "2026-08-20",
+            "end_date": "2026-08-21",
+            "engagement_code": "MODEPUB1",
+            "consultations": {"doctor": True},
+            "consultation_mode": "offline",
+            "slot_detail": {
+                "consultation": {
+                    "2026-08-20": [
+                        {
+                            "cabin_name": "Consultation Cabin 1",
+                            "cabin_key": "cc-001",
+                            "start_time": "09:00",
+                            "end_time": "17:00",
+                            "expert_type": "doctor",
+                            "slot_duration": 30,
+                            "capacity_per_slot": 1,
+                            "breaks": [],
+                            "is_active": True,
+                        }
+                    ]
+                }
+            },
+        },
+    )
+    assert create.status_code == 201, create.text
+
+    public = await async_client.get("/engagements/code/MODEPUB1")
+    assert public.status_code == 200, public.text
+    data = public.json()["data"]
+    assert data["consultation_mode"] == "offline"
+    assert data["slot_detail"]["consultation"]["2026-08-20"][0]["cabin_key"] == "cc-001"
+
+
+@pytest.mark.asyncio
+async def test_create_engagement_online_strips_consultation_slot_detail(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7421, employee_id=421)
+    await _seed_organization(test_db_session, organization_id=9202, name="Online Mode Org")
+    await _seed_assessment_package(test_db_session, package_id=9202, package_code="PKG9202")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9202)
+    type_id = await _engagement_type_id(test_db_session, "consultation")
+
+    create = await async_client.post(
+        "/engagements",
+        headers=_auth_header(7421),
+        json={
+            "engagement_name": "Online Consult Camp",
+            "organization_id": 9202,
+            "engagement_type": type_id,
+            "assessment_package_id": 9202,
+            "diagnostic_package_id": 9202,
+            "city": "BLR",
+            "slot_duration": 30,
+            "start_date": "2026-08-20",
+            "end_date": "2026-08-21",
+            "engagement_code": "MODEON1",
+            "consultations": {"doctor": True},
+            "consultation_mode": "online",
+            "slot_detail": {
+                "consultation": {
+                    "2026-08-20": [
+                        {
+                            "cabin_name": "Should Be Stripped",
+                            "cabin_key": "cc-strip",
+                            "start_time": "09:00",
+                            "end_time": "17:00",
+                            "expert_type": "doctor",
+                            "slot_duration": 30,
+                            "capacity_per_slot": 1,
+                            "breaks": [],
+                            "is_active": True,
+                        }
+                    ]
+                }
+            },
+        },
+    )
+    assert create.status_code == 201, create.text
+    engagement_id = create.json()["data"]["engagement_id"]
+
+    detail = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7421))
+    assert detail.status_code == 200, detail.text
+    slot_detail = detail.json()["data"].get("slot_detail")
+    assert slot_detail is None or "consultation" not in slot_detail

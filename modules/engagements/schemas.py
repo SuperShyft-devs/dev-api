@@ -12,6 +12,7 @@ from modules.engagement_notifications.service_config import NotificationServiceC
 
 from modules.checklists.schemas import ChecklistReadiness
 from modules.engagements.models import BloodCollectionType, EngagementStatus
+from modules.engagements.enums import ConsultationMode
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -125,6 +126,12 @@ class EngagementNotificationInput(BaseModel):
         return normalize_notification_services(value if isinstance(value, list) else [])
 
 
+def _consultations_enabled(consultations: dict[str, bool] | None) -> bool:
+    if not consultations:
+        return False
+    return any(value is True for value in consultations.values())
+
+
 class EngagementCreateRequest(BaseModel):
     """Create a new B2B engagement."""
 
@@ -153,9 +160,16 @@ class EngagementCreateRequest(BaseModel):
     healthians_zone_id: Optional[str] = Field(default=None, max_length=50)
     external_camp_id: Optional[int] = None
     blood_collection_type: Optional[BloodCollectionType] = None
+    consultation_mode: Optional[ConsultationMode] = None
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
     notifications: list[EngagementNotificationInput] | None = None
+
+    @model_validator(mode="after")
+    def consultation_mode_required_when_consultations(self) -> EngagementCreateRequest:
+        if _consultations_enabled(self.consultations) and self.consultation_mode is None:
+            raise ValueError("consultation_mode is required when consultations are enabled")
+        return self
 
 
 class EngagementUpdateRequest(BaseModel):
@@ -185,10 +199,17 @@ class EngagementUpdateRequest(BaseModel):
     healthians_zone_id: Optional[str] = Field(default=None, max_length=50)
     external_camp_id: Optional[int] = None
     blood_collection_type: Optional[BloodCollectionType] = None
+    consultation_mode: Optional[ConsultationMode] = None
     metsights_engagement_id: Optional[str] = Field(default=None, max_length=200)
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
     notifications: list[EngagementNotificationInput] | None = None
+
+    @model_validator(mode="after")
+    def consultation_mode_required_when_consultations(self) -> EngagementUpdateRequest:
+        if _consultations_enabled(self.consultations) and self.consultation_mode is None:
+            raise ValueError("consultation_mode is required when consultations are enabled")
+        return self
 
 
 class EngagementStatusUpdateRequest(BaseModel):
@@ -255,6 +276,7 @@ class EngagementListItem(BaseModel):
     healthians_zone_id: Optional[str] = None
     external_camp_id: Optional[int] = None
     blood_collection_type: Optional[str] = None
+    consultation_mode: Optional[str] = None
     create_profile_on_metsights: bool = False
     enroll_for_fitprint_full: bool = False
     notifications: list[EngagementNotificationOutput] = Field(default_factory=list)

@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from modules.diagnostics.models import DiagnosticPackage
+from modules.engagements.enums import ConsultationMode
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.experts.repository import (
     ExpertAvailabilityOverrideRepository,
@@ -57,6 +58,7 @@ async def test_book_consultation_slot_triggers_booking_alert(test_db_session, mo
             engagement_code="BK78601",
             engagement_type="consultation",
             consultations={"doctor": True},
+            consultation_mode=ConsultationMode.online,
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="BLR",

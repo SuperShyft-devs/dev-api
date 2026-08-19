@@ -88,6 +88,7 @@ def _engagement_to_dict(
         "healthians_zone_id": engagement.healthians_zone_id,
         "external_camp_id": engagement.external_camp_id,
         "blood_collection_type": engagement.blood_collection_type.value if engagement.blood_collection_type else None,
+        "consultation_mode": engagement.consultation_mode.value if engagement.consultation_mode else None,
         "create_profile_on_metsights": engagement.create_profile_on_metsights,
         "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
         "notifications": notifications or [],
@@ -148,6 +149,7 @@ async def get_engagement_by_code(
         "slot_duration": engagement.slot_duration,
         "status": engagement.status,
         "consultations": engagement.consultations,
+        "consultation_mode": engagement.consultation_mode.value if engagement.consultation_mode else None,
         "slot_detail": slot_detail,
     })
 
