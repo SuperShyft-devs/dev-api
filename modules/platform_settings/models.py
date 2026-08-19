@@ -6,7 +6,7 @@ from sqlalchemy import Boolean, Column, DateTime, Enum as SAEnum, ForeignKey, In
 from sqlalchemy.dialects.postgresql import JSONB
 
 from db.base import Base
-from modules.engagements.models import BloodCollectionType, EngagementKind
+from modules.engagements.enums import BloodCollectionType, EngagementKind
 
 
 _engagement_kind = SAEnum(
