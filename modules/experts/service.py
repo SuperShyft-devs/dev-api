@@ -833,6 +833,11 @@ class ExpertAvailabilityService:
             "slot": slot_hhmm,
         }
 
+    @staticmethod
+    def _online_consultation_engagement_sql_filter():
+        """Engagements eligible for expert portal request flow."""
+        return Engagement.consultation_mode == ConsultationMode.online
+
     async def list_consultation_requests(self, db, *, employee: EmployeeContext) -> list[dict[str, Any]]:
         ensure_expert_portal_access(employee)
         result = await db.execute(
@@ -844,7 +849,7 @@ class ExpertAvailabilityService:
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
             .join(User, User.user_id == EngagementParticipant.user_id)
             .where(Engagement.status.in_(("running", "scheduled")))
-            .where(Engagement.organization_id.is_(None))
+            .where(self._online_consultation_engagement_sql_filter())
             .where(ConsultationBooking.want.is_(True))
             .where(ConsultationBooking.expert_id.is_(None))
             .order_by(ConsultationBooking.consultation_id.desc())
@@ -909,6 +914,12 @@ class ExpertAvailabilityService:
         engagement = await db.get(Engagement, payload.engagement_id)
         if engagement is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Engagement not found")
+        if engagement.consultation_mode != ConsultationMode.online:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation requests are only available for online engagements",
+            )
 
         result = await db.execute(
             select(EngagementParticipant)
