@@ -1866,7 +1866,7 @@ async def test_update_consultation_consent_for_participant(async_client, test_db
 async def test_get_engagement_consultations_for_user(async_client, test_db_session):
     from datetime import time
 
-    from modules.engagements.models import Engagement, EngagementParticipant
+    from modules.engagements.models import ConsultationMode, Engagement, EngagementParticipant
     from modules.experts.models import ConsultationBooking
 
     user_id = 1037
@@ -1883,6 +1883,7 @@ async def test_get_engagement_consultations_for_user(async_client, test_db_sessi
             engagement_code="UCON8706",
             engagement_type="consultation",
             consultations={"doctor": True, "nutritionist": True},
+            consultation_mode=ConsultationMode.offline,
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="BLR",
@@ -1937,7 +1938,7 @@ async def test_get_engagement_consultations_for_user(async_client, test_db_sessi
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["engagement_id"] == engagement_id
-    assert data["user_id"] == user_id
+    assert data["consultation_mode"] == "offline"
     assert data["consultations"] == {"doctor": True, "nutritionist": True}
     assert len(data["my_consultations"]) == 2
     by_type = {item["expert_type"]: item for item in data["my_consultations"]}

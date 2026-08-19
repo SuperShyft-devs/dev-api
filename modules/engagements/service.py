@@ -33,7 +33,10 @@ from modules.employee.models import EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import compute_camp_no
-from modules.engagements.consultation_booking_validation import validate_consultation_cabin_slot_for_booking
+from modules.engagements.consultation_booking_validation import (
+    effective_consultation_mode,
+    validate_consultation_cabin_slot_for_booking,
+)
 from modules.engagements.models import BloodCollectionType, ConsultationMode, Engagement, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.slot_availability import (
@@ -1604,7 +1607,7 @@ class EngagementsService:
 
         return {
             "engagement_id": engagement_id,
-            "user_id": user_id,
+            "consultation_mode": effective_consultation_mode(engagement).value,
             "my_consultations": my_consultations,
             "consultations": engagement_consultations,
         }
