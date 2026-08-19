@@ -11,6 +11,7 @@ from common.responses import success_response
 from core.exceptions import AppError
 from db.session import get_db
 from modules.audit.dependencies import get_audit_service
+from modules.audit.payload_search import parse_payload_search
 from modules.audit.service import AuditService
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
@@ -28,6 +29,7 @@ async def list_integration_sync_logs(
     user_id: int | None = None,
     engagement_id: int | None = None,
     search: str | None = None,
+    payload_search: str | None = None,
     from_: datetime | None = Query(default=None, alias="from"),
     to: datetime | None = None,
     db: AsyncSession = Depends(get_db),
@@ -52,5 +54,6 @@ async def list_integration_sync_logs(
         created_from=from_,
         created_to=to,
         search=(search or "").strip() or None,
+        payload_search=parse_payload_search(payload_search),
     )
     return success_response(items, meta={"page": page, "limit": limit, "total": total})

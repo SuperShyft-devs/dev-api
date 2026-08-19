@@ -11,6 +11,7 @@ from typing import Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.audit.models import DataAuditLog, IntegrationSyncLog
+from modules.audit.payload_search import PayloadSearchCriteria
 from modules.audit.repository import AuditRepository
 
 
@@ -55,6 +56,7 @@ class AuditService:
         created_from: datetime | None = None,
         created_to: datetime | None = None,
         search: str | None = None,
+        payload_search: PayloadSearchCriteria | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         rows = await self._repository.list_sync_logs(
             db,
@@ -67,6 +69,7 @@ class AuditService:
             created_from=created_from,
             created_to=created_to,
             search=search,
+            payload_search=payload_search,
         )
         total = await self._repository.count_sync_logs(
             db,
@@ -77,6 +80,7 @@ class AuditService:
             created_from=created_from,
             created_to=created_to,
             search=search,
+            payload_search=payload_search,
         )
         return [self._serialize_sync_log(row) for row in rows], total
 

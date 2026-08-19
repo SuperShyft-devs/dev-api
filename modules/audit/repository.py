@@ -11,6 +11,7 @@ from sqlalchemy import func, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.audit.models import DataAuditLog, IntegrationSyncLog
+from modules.audit.payload_search import PayloadSearchCriteria
 
 
 class AuditRepository:
@@ -56,11 +57,18 @@ class AuditRepository:
         created_from: datetime | None = None,
         created_to: datetime | None = None,
         search: str | None = None,
+        payload_search: PayloadSearchCriteria | None = None,
     ):
         if provider is not None:
             query = query.where(IntegrationSyncLog.provider == provider)
         if search:
             query = query.where(IntegrationSyncLog.api_endpoint_url.ilike(f"%{search}%"))
+        if payload_search and payload_search.is_active:
+            query = query.where(IntegrationSyncLog.request_payload.isnot(None))
+            if payload_search.contains:
+                query = query.where(IntegrationSyncLog.request_payload.contains(payload_search.contains))
+            for key in payload_search.keys:
+                query = query.where(IntegrationSyncLog.request_payload.has_key(key))
         if statuses:
             query = query.where(IntegrationSyncLog.status.in_(statuses))
         if user_id is not None:
@@ -86,6 +94,7 @@ class AuditRepository:
         created_from: datetime | None = None,
         created_to: datetime | None = None,
         search: str | None = None,
+        payload_search: PayloadSearchCriteria | None = None,
     ) -> list[IntegrationSyncLog]:
         offset = (page - 1) * limit
         query = (
@@ -103,6 +112,7 @@ class AuditRepository:
             created_from=created_from,
             created_to=created_to,
             search=search,
+            payload_search=payload_search,
         )
         result = await db.execute(query)
         return list(result.scalars().all())
@@ -118,6 +128,7 @@ class AuditRepository:
         created_from: datetime | None = None,
         created_to: datetime | None = None,
         search: str | None = None,
+        payload_search: PayloadSearchCriteria | None = None,
     ) -> int:
         query = select(func.count()).select_from(IntegrationSyncLog)
         query = self._apply_sync_log_filters(
@@ -129,6 +140,7 @@ class AuditRepository:
             created_from=created_from,
             created_to=created_to,
             search=search,
+            payload_search=payload_search,
         )
         result = await db.execute(query)
         return int(result.scalar_one())
