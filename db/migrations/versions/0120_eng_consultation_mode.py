@@ -1,6 +1,6 @@
 """Add engagements.consultation_mode enum column.
 
-Revision ID: 0120_engagement_consultation_mode
+Revision ID: 0120_eng_consultation_mode
 Revises: 0119_consult_booking_alert
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy import inspect
 
-revision = "0120_engagement_consultation_mode"
+revision = "0120_eng_consultation_mode"
 down_revision = "0119_consult_booking_alert"
 branch_labels = None
 depends_on = None
