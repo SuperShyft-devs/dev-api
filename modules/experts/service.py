@@ -7,6 +7,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
+from common.masking import mask_email, mask_phone
 from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.employee.access_control import ensure_expert_portal_access, ensure_not_expert_employee
@@ -68,7 +69,7 @@ from modules.experts.slot_engine import (
 )
 from modules.users.models import User
 from modules.users.repository import UsersRepository
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 
 _ALLOWED_STATUS = {"active", "inactive"}
@@ -1149,6 +1150,256 @@ class ExpertAvailabilityService:
                 message="Consultation cannot be marked done before the scheduled slot",
             )
 
+    @staticmethod
+    def _is_offline_b2b_engagement(engagement: Engagement) -> bool:
+        if engagement.organization_id is None:
+            return False
+        return effective_consultation_mode(engagement) == ConsultationMode.offline
+
+    async def _ensure_camp_consultation_access(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        booking: ConsultationBooking,
+        engagement: Engagement,
+        actor_expert: Expert | None,
+    ) -> None:
+        if not self._is_offline_b2b_engagement(engagement):
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+        if not booking.want:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Participant did not request this consultation",
+            )
+        if employee.role == EmployeeRole.admin:
+            return
+        if employee.role != EmployeeRole.expert:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        from modules.engagements.repository import EngagementsRepository
+
+        repo = EngagementsRepository()
+        assignment = await repo.get_onboarding_assistant_assignment(
+            db,
+            engagement_id=engagement.engagement_id,
+            employee_id=employee.employee_id,
+        )
+        if assignment is None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You are not assigned to this engagement",
+            )
+        if actor_expert is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Current user is not linked to an expert profile",
+            )
+        if booking.expert_type != actor_expert.expert_type:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="Consultation type does not match your expert profile",
+            )
+
+    async def _ensure_camp_engagement_list_access(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        engagement: Engagement,
+        actor_expert: Expert | None,
+    ) -> str | None:
+        """Return expert_type filter for list queries (None = all types for admin)."""
+        if not self._is_offline_b2b_engagement(engagement):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Engagement is not an offline camp consultation",
+            )
+        if employee.role == EmployeeRole.admin:
+            return None
+        if employee.role != EmployeeRole.expert:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+        if actor_expert is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Current user is not linked to an expert profile",
+            )
+
+        from modules.engagements.repository import EngagementsRepository
+
+        repo = EngagementsRepository()
+        assignment = await repo.get_onboarding_assistant_assignment(
+            db,
+            engagement_id=engagement.engagement_id,
+            employee_id=employee.employee_id,
+        )
+        if assignment is None:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You are not assigned to this engagement",
+            )
+        return actor_expert.expert_type
+
+    async def _count_camp_consultation_pending(
+        self,
+        db,
+        *,
+        engagement_id: int,
+        expert_type: str | None = None,
+    ) -> int:
+        query = (
+            select(func.count())
+            .select_from(ConsultationBooking)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_participant_id
+                == ConsultationBooking.engagement_participant_id,
+            )
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .where(ConsultationBooking.want.is_(True))
+            .where(ConsultationBooking.done.is_(False))
+        )
+        if expert_type is not None:
+            query = query.where(ConsultationBooking.expert_type == expert_type)
+        result = await db.execute(query)
+        return int(result.scalar_one())
+
+    async def list_camp_consultation_engagements(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+    ) -> list[dict[str, Any]]:
+        ensure_expert_portal_access(employee)
+        from modules.engagements.repository import EngagementsRepository
+
+        repo = EngagementsRepository()
+        actor_expert = await self._experts.get_by_user_id(db, employee.user_id)
+        expert_type_filter: str | None = None
+
+        if employee.role == EmployeeRole.expert:
+            if actor_expert is None:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="Current user is not linked to an expert profile",
+                )
+            expert_type_filter = actor_expert.expert_type
+            engagements = await repo.list_running_engagements_for_assigned_employee(
+                db,
+                employee_id=employee.employee_id,
+            )
+        elif employee.role == EmployeeRole.admin:
+            engagements = await repo.list_running_engagements(db)
+        else:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        offline_engagements = [e for e in engagements if self._is_offline_b2b_engagement(e)]
+        items: list[dict[str, Any]] = []
+        for engagement in offline_engagements:
+            pending_count = await self._count_camp_consultation_pending(
+                db,
+                engagement_id=engagement.engagement_id,
+                expert_type=expert_type_filter,
+            )
+            items.append(
+                {
+                    "engagement_id": engagement.engagement_id,
+                    "engagement_name": engagement.engagement_name,
+                    "engagement_code": engagement.engagement_code,
+                    "start_date": engagement.start_date.isoformat() if engagement.start_date else None,
+                    "end_date": engagement.end_date.isoformat() if engagement.end_date else None,
+                    "status": engagement.status,
+                    "camp_no": engagement.camp_no,
+                    "city": engagement.city,
+                    "consultation_pending_count": pending_count,
+                }
+            )
+        return items
+
+    async def list_camp_consultation_participants(
+        self,
+        db,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+    ) -> list[dict[str, Any]]:
+        ensure_expert_portal_access(employee)
+        engagement = await db.get(Engagement, engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Engagement not found")
+
+        actor_expert = await self._experts.get_by_user_id(db, employee.user_id)
+        expert_type_filter = await self._ensure_camp_engagement_list_access(
+            db,
+            employee=employee,
+            engagement=engagement,
+            actor_expert=actor_expert,
+        )
+
+        query = (
+            select(ConsultationBooking, EngagementParticipant, User)
+            .join(
+                EngagementParticipant,
+                EngagementParticipant.engagement_participant_id
+                == ConsultationBooking.engagement_participant_id,
+            )
+            .join(User, User.user_id == EngagementParticipant.user_id)
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .where(ConsultationBooking.want.is_(True))
+        )
+        if expert_type_filter is not None:
+            query = query.where(ConsultationBooking.expert_type == expert_type_filter)
+        query = query.order_by(
+            ConsultationBooking.consultation_date.asc().nulls_last(),
+            ConsultationBooking.consultation_slot.asc().nulls_last(),
+            User.first_name.asc().nulls_last(),
+            User.last_name.asc().nulls_last(),
+        )
+        result = await db.execute(query)
+        items: list[dict[str, Any]] = []
+        for booking, _participant, user in result.all():
+            pref = booking_to_api_preference(booking)
+            items.append(
+                {
+                    "consultation_id": booking.consultation_id,
+                    "user_id": user.user_id,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "email": mask_email(user.email),
+                    "phone": mask_phone(user.phone),
+                    "date": pref.get("date"),
+                    "slot": pref.get("slot"),
+                    "cabin": pref.get("cabin"),
+                    "done": bool(booking.done),
+                    "expert_type": booking.expert_type,
+                }
+            )
+        return items
+
     async def _load_assigned_consultation_context(
         self,
         db,
@@ -1160,21 +1411,6 @@ class ExpertAvailabilityService:
         booking = await self._consultation_bookings.get_by_id(db, consultation_id)
         if booking is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Consultation not found")
-
-        actor_expert = await self._experts.get_by_user_id(db, employee.user_id)
-        if employee.role == EmployeeRole.expert:
-            if actor_expert is None or booking.expert_id != actor_expert.expert_id:
-                raise AppError(
-                    status_code=403,
-                    error_code="FORBIDDEN",
-                    message="Consultation is not assigned to you",
-                )
-        elif booking.expert_id is None:
-            raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message="Consultation is not assigned to an expert yet",
-            )
 
         participant = await db.get(EngagementParticipant, booking.engagement_participant_id)
         if participant is None:
@@ -1188,7 +1424,38 @@ class ExpertAvailabilityService:
         if user is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="User not found")
 
-        return booking, participant, engagement, user
+        actor_expert = await self._experts.get_by_user_id(db, employee.user_id)
+        if booking.expert_id is not None:
+            if employee.role == EmployeeRole.expert:
+                if actor_expert is None or booking.expert_id != actor_expert.expert_id:
+                    raise AppError(
+                        status_code=403,
+                        error_code="FORBIDDEN",
+                        message="Consultation is not assigned to you",
+                    )
+            return booking, participant, engagement, user
+
+        if self._is_offline_b2b_engagement(engagement):
+            await self._ensure_camp_consultation_access(
+                db,
+                employee=employee,
+                booking=booking,
+                engagement=engagement,
+                actor_expert=actor_expert,
+            )
+            return booking, participant, engagement, user
+
+        if employee.role == EmployeeRole.expert:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="Consultation is not assigned to you",
+            )
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message="Consultation is not assigned to an expert yet",
+        )
 
     async def get_consultation_manage_detail(
         self,
@@ -1240,13 +1507,17 @@ class ExpertAvailabilityService:
 
             slot_reached = datetime.now() >= when
 
+        is_camp_consultation = booking.expert_id is None and self._is_offline_b2b_engagement(engagement)
+        email_out = mask_email(user.email) if is_camp_consultation else user.email
+        phone_out = mask_phone(user.phone) if is_camp_consultation else user.phone
+
         return {
             "consultation_id": booking.consultation_id,
             "user_id": user.user_id,
             "first_name": user.first_name,
             "last_name": user.last_name,
-            "email": user.email,
-            "phone": user.phone,
+            "email": email_out,
+            "phone": phone_out,
             "engagement_id": engagement.engagement_id,
             "engagement_code": engagement.engagement_code,
             "engagement_participant_id": participant.engagement_participant_id,
@@ -1254,6 +1525,7 @@ class ExpertAvailabilityService:
             "expert_id": booking.expert_id,
             "date": date_val,
             "slot": slot_val,
+            "cabin": pref.get("cabin"),
             "done": bool(booking.done),
             "meet_link": booking.meet_link,
             "consent": consent,

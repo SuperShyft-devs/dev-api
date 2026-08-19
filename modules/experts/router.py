@@ -229,6 +229,31 @@ async def portal_list_upcoming_consultations(
     return success_response(data)
 
 
+@portal_router.get("/camp-consultations/engagements")
+async def portal_list_camp_consultation_engagements(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.list_camp_consultation_engagements(db, employee=employee)
+    return success_response(data)
+
+
+@portal_router.get("/camp-consultations/engagements/{engagement_id}/participants")
+async def portal_list_camp_consultation_participants(
+    engagement_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.list_camp_consultation_participants(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+    )
+    return success_response(data)
+
+
 @portal_router.post("/consultations/done")
 async def portal_mark_consultation_done(
     payload: ConsultationDoneRequest,
