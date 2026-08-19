@@ -819,6 +819,7 @@ class ExpertAvailabilityService:
                 participant_user=participant_user,
                 participant_user_id=user_id,
                 expert_type=payload.expert_type,
+                expert_id=payload.expert_id,
                 consultation_date=payload.date,
                 consultation_slot=slot_hhmm,
             )

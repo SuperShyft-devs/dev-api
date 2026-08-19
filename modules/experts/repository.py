@@ -145,6 +145,16 @@ class ExpertsRepository:
         result = await db.execute(query)
         return list(result.scalars().all())
 
+    async def list_active_user_ids_by_type(self, db: AsyncSession, *, expert_type: str) -> list[int]:
+        result = await db.execute(
+            select(Expert.user_id)
+            .where(Expert.status == "active")
+            .where(Expert.expert_type == expert_type)
+            .where(Expert.user_id.isnot(None))
+            .order_by(Expert.expert_id.asc())
+        )
+        return [int(uid) for uid in result.scalars().all() if uid is not None]
+
     async def create(self, db: AsyncSession, expert: Expert) -> Expert:
         db.add(expert)
         await db.flush()
