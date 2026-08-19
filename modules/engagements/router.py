@@ -288,7 +288,7 @@ async def get_engagement_consultations_for_user(
     current_user=Depends(get_current_user),
     engagements_service: EngagementsService = Depends(get_engagements_service),
 ):
-    """Return all consultation bookings for the current user in this engagement."""
+    """Return the user's consultation bookings and engagement consultation config."""
     data = await engagements_service.get_consultations_for_user(
         db,
         user_id=current_user.user_id,

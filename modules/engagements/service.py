@@ -1535,20 +1535,29 @@ class EngagementsService:
                 message="You are not a participant in this engagement",
             )
 
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+
         bookings = await self._consultation_bookings.get_for_participant(
             db,
             participant.engagement_participant_id,
         )
-        consultations: list[dict[str, Any]] = []
+        my_consultations: list[dict[str, Any]] = []
         for booking in bookings:
             date_val = booking.consultation_date.isoformat() if booking.consultation_date else None
             attachments = booking.attachments
             if attachments is not None and not isinstance(attachments, list):
                 attachments = list(attachments)
-            consultations.append(
+            my_consultations.append(
                 {
                     "consultation_id": booking.consultation_id,
                     "expert_type": booking.expert_type,
+                    "want": bool(booking.want),
                     "expert_id": booking.expert_id,
                     "date": date_val,
                     "cabin": booking.consultation_cabin,
@@ -1559,10 +1568,15 @@ class EngagementsService:
                 }
             )
 
+        engagement_consultations = engagement.consultations
+        if not isinstance(engagement_consultations, dict):
+            engagement_consultations = {}
+
         return {
             "engagement_id": engagement_id,
             "user_id": user_id,
-            "consultations": consultations,
+            "my_consultations": my_consultations,
+            "consultations": engagement_consultations,
         }
 
     async def update_participant_department_for_employee(

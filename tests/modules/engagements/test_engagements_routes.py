@@ -1938,12 +1938,15 @@ async def test_get_engagement_consultations_for_user(async_client, test_db_sessi
     data = response.json()["data"]
     assert data["engagement_id"] == engagement_id
     assert data["user_id"] == user_id
-    assert len(data["consultations"]) == 2
-    by_type = {item["expert_type"]: item for item in data["consultations"]}
+    assert data["consultations"] == {"doctor": True, "nutritionist": True}
+    assert len(data["my_consultations"]) == 2
+    by_type = {item["expert_type"]: item for item in data["my_consultations"]}
+    assert by_type["doctor"]["want"] is True
     assert by_type["doctor"]["consultation_summary"] == "Doctor notes"
     assert by_type["doctor"]["attachments"] == ["http://example.com/a.pdf"]
     assert by_type["doctor"]["date"] == "2026-02-01"
     assert by_type["doctor"]["slot"] == "10:00"
+    assert by_type["nutritionist"]["want"] is True
     assert by_type["nutritionist"]["consultation_summary"] is None
     assert by_type["nutritionist"]["done"] is False
 
