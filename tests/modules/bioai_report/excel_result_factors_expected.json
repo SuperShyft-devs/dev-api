@@ -1,0 +1,390 @@
+{
+  "metabolic_syndrome": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional inactivity",
+        "Inconsistent meal timing",
+        "Mild stress"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Lower daily movement",
+        "Frequent snacking",
+        "Irregular sleep"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Sedentary routine",
+        "Higher refined-carbohydrate intake",
+        "Increased stress"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Lack of daily movement",
+        "Unhealthy eating patterns",
+        "Persistent stress"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Prolonged inactivity",
+        "Frequent processed/refined foods",
+        "Poor dietary pattern",
+        "High ongoing stress"
+      ]
+    }
+  },
+  "dyslipidemia": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional Inactivity",
+        "Inconsistent physical activity",
+        "Moderate dietary imbalance"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Limited daily movement",
+        "Inconsistent healthy-fat intake",
+        "Frequent processed foods"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Sedentary habits",
+        "Insufficient healthy dietary fats",
+        "Higher refined-carbohydrate intake"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Prolonged sedentary lifestyle",
+        "Poor dietary fat quality",
+        "Frequent processed foods"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Very low physical activity",
+        "Unfavorable dietary fat pattern",
+        "Frequent refined/processed foods",
+        "Poor overall dietary pattern"
+      ]
+    }
+  },
+  "cardiac_health": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Sedentary Routine",
+        "Mild dietary imbalance",
+        "Periodic stress"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Lower physical activity",
+        "Occasional high-sodium foods",
+        "Inconsistent stress management"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Reduced physical activity",
+        "Higher sodium intake",
+        "Ongoing stress"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Long-term fatigue and burnout",
+        "High sodium consumption",
+        "Low physical activity"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Prolonged inactivity",
+        "High sodium consumption",
+        "Persistent stress/burnout",
+        "Unhealthy dietary pattern"
+      ]
+    }
+  },
+  "oxidative_stress": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Mild nutritional gaps",
+        "Occasional poor recovery",
+        "Increased day-to-day stress"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Possible vitamin D insufficiency",
+        "Limited dietary variety",
+        "Inconsistent recovery"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Vitamin B12 insufficiency",
+        "Increased stress"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Vitamin B12 deficiency",
+        "Increased inflammatory activity"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Vitamin B12 deficiency",
+        "Elevated IgE",
+        "Increased systemic inflammation"
+      ]
+    }
+  },
+  "nafld": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional high-sugar intake",
+        "Lower physical activity",
+        "Irregular eating pattern"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Increased refined-carbohydrate intake",
+        "Lower daily movement",
+        "Early blood-sugar concerns"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Elevated blood sugar",
+        "Sedentary lifestyle",
+        "Higher refined-carbohydrate intake"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Elevated blood sugar",
+        "Mildly altered protein markers",
+        "Sedentary lifestyle"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Elevated blood sugar",
+        "Mildly low total protein and globulin",
+        "Sedentary lifestyle",
+        "Unhealthy dietary pattern"
+      ]
+    }
+  },
+  "hypertension": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional high-sodium meals",
+        "Lower physical activity",
+        "Periodic stress"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Higher sodium intake",
+        "Limited daily movement",
+        "Low-normal magnesium"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Higher sodium intake",
+        "Low-normal magnesium",
+        "Blood sugar as a future risk"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Low-normal magnesium",
+        "Higher sodium consumption",
+        "Blood sugar as future risk",
+        "Sedentary lifestyle"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "High sodium consumption",
+        "Low-normal magnesium",
+        "Blood sugar as future risk",
+        "Prolonged inactivity"
+      ]
+    }
+  },
+  "obesity": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional inactivity",
+        "Irregular exercise",
+        "Occasional calorie-dense foods"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Lower daily activity",
+        "Inconsistent exercise",
+        "Frequent calorie-dense foods"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Sedentary lifestyle",
+        "Higher calorie-dense food intake",
+        "Reduced physical activity"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Sedentary lifestyle",
+        "Frequent calorie-dense foods",
+        "Low physical activity"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Prolonged sedentary lifestyle",
+        "Frequent calorie-dense foods",
+        "Very low physical activity",
+        "Unfavorable body-composition pattern"
+      ]
+    }
+  },
+  "thyroid_health": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Mild nutritional gaps",
+        "Inconsistent sleep",
+        "Periodic stress"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Lower protein intake",
+        "Inconsistent recovery",
+        "Mild inflammatory activity"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Chronic inflammation",
+        "Low protein intake",
+        "Poor recovery"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Chronic inflammation",
+        "Low protein intake",
+        "Prolonged stress"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Persistent inflammation",
+        "Low protein intake",
+        "Prolonged stress",
+        "Poor recovery pattern"
+      ]
+    }
+  },
+  "type2_diabetes": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional high-sugar intake",
+        "Lower physical activity",
+        "Irregular meal pattern"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Higher refined-carbohydrate intake",
+        "Lower physical activity",
+        "Possible vitamin D insufficiency"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Reduced physical activity",
+        "Increased systemic inflammation"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Systemic inflammation",
+        "Low-normal fasting insulin"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Systemic inflammation",
+        "Low-normal fasting insulin",
+        "Sedentary lifestyle"
+      ]
+    }
+  }
+}

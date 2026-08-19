@@ -1,0 +1,784 @@
+{
+  "meta": {
+    "camp_name": "Celebal Technologies 20 May 2026",
+    "summary_available": true,
+    "refreshed_at": "2026-07-25T20:17:07.895858+00:00",
+    "next_refresh": null,
+    "camp_start_date": "2026-05-20",
+    "camp_end_date": "2026-07-31"
+  },
+  "kpis": {
+    "data": {
+      "employees_enrolled": 74,
+      "male_enrolled": 61,
+      "female_enrolled": 13,
+      "total_blood_test": 58,
+      "blood_test_percent": 78,
+      "doctor_consultation": 0,
+      "nutritionist_consultation": 9,
+      "doctor_and_nutritionist_consultation": 0,
+      "high_risk_group": 10
+    },
+    "name": "KPIs",
+    "description": null
+  },
+  "participation_by_age": {
+    "data": {
+      "age_group": [
+        "18\u201325",
+        "26\u201335",
+        "36\u201345",
+        "46\u201355",
+        "55+"
+      ],
+      "enrolled": [
+        0,
+        0,
+        43,
+        28,
+        3
+      ],
+      "percent": [
+        0.0,
+        0.0,
+        58.1,
+        37.8,
+        4.1
+      ],
+      "total_enrolled": 74
+    },
+    "name": "Age wise Participation",
+    "description": null
+  },
+  "overall_risk_score": {
+    "data": {
+      "group": [
+        "optimal",
+        "low_risk",
+        "increased_risk",
+        "high_risk"
+      ],
+      "count": [
+        4,
+        21,
+        11,
+        4
+      ],
+      "percent": [
+        10.0,
+        52.5,
+        27.5,
+        10.0
+      ],
+      "total_employees": 40,
+      "total_with_metabolic_score": 40,
+      "total_enrolled": 74,
+      "bio_ai_reports": 40,
+      "missing_metabolic_score": 0,
+      "elevated_metabolic_score": 37.5
+    },
+    "name": "Overall Risk Score",
+    "description": null
+  },
+  "distribution_by_physical_activity_frequency": {
+    "data": {
+      "male": {
+        "group": [
+          "less_than_30mins",
+          "30_60_mins",
+          "more_than_60_mins",
+          "rarely_or_never",
+          "unmapped"
+        ],
+        "count": [
+          17,
+          7,
+          8,
+          7,
+          0
+        ],
+        "percent": [
+          43.6,
+          17.9,
+          20.5,
+          17.9,
+          0.0
+        ],
+        "total_responded": 39,
+        "mapped_responded": 39,
+        "unmapped_responded": 0
+      },
+      "female": {
+        "group": [
+          "less_than_30mins",
+          "30_60_mins",
+          "more_than_60_mins",
+          "rarely_or_never",
+          "unmapped"
+        ],
+        "count": [
+          5,
+          4,
+          0,
+          1,
+          0
+        ],
+        "percent": [
+          50.0,
+          40.0,
+          0.0,
+          10.0,
+          0.0
+        ],
+        "total_responded": 10,
+        "mapped_responded": 10,
+        "unmapped_responded": 0
+      }
+    },
+    "name": "Physical activity",
+    "description": null
+  },
+  "distribution_by_oxidative_stress": {
+    "data": {
+      "group": [
+        "low",
+        "moderate",
+        "high",
+        "very_high"
+      ],
+      "count": [
+        11,
+        19,
+        7,
+        3
+      ],
+      "percent": [
+        27.5,
+        47.5,
+        17.5,
+        7.5
+      ],
+      "total_employees": 40,
+      "elevated_oxidative_stress_percent": 25.0
+    },
+    "name": "Oxidative Stress",
+    "description": null
+  },
+  "distribution_by_sleeping_hours": {
+    "data": {
+      "male": {
+        "group": [
+          "less_than_5hrs",
+          "between_5_7_hrs",
+          "between_7_9_hrs",
+          "more_than_9hrs",
+          "unmapped"
+        ],
+        "count": [
+          2,
+          26,
+          10,
+          0,
+          0
+        ],
+        "percent": [
+          5.3,
+          68.4,
+          26.3,
+          0.0,
+          0.0
+        ],
+        "total_responded": 38,
+        "mapped_responded": 38,
+        "unmapped_responded": 0
+      },
+      "female": {
+        "group": [
+          "less_than_5hrs",
+          "between_5_7_hrs",
+          "between_7_9_hrs",
+          "more_than_9hrs",
+          "unmapped"
+        ],
+        "count": [
+          1,
+          9,
+          0,
+          0,
+          0
+        ],
+        "percent": [
+          10.0,
+          90.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "total_responded": 10,
+        "mapped_responded": 10,
+        "unmapped_responded": 0
+      }
+    },
+    "name": "Sleeping Hours",
+    "description": null
+  },
+  "distribution_by_gender_by_metabolic_syndrome": {
+    "data": {
+      "diseases": [
+        {
+          "code": "type_2_diabetes",
+          "male": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              12,
+              14,
+              2,
+              2
+            ],
+            "percent": [
+              40.0,
+              46.7,
+              6.7,
+              6.7
+            ],
+            "total_responded": 30,
+            "mapped_responded": 30,
+            "unmapped_responded": 0,
+            "elevated_percent": 13.4
+          },
+          "female": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              7,
+              3,
+              0,
+              0
+            ],
+            "percent": [
+              70.0,
+              30.0,
+              0.0,
+              0.0
+            ],
+            "total_responded": 10,
+            "mapped_responded": 10,
+            "unmapped_responded": 0,
+            "elevated_percent": 0.0
+          }
+        },
+        {
+          "code": "hypertension",
+          "male": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              22,
+              6,
+              2,
+              0
+            ],
+            "percent": [
+              73.3,
+              20.0,
+              6.7,
+              0.0
+            ],
+            "total_responded": 30,
+            "mapped_responded": 30,
+            "unmapped_responded": 0,
+            "elevated_percent": 6.7
+          },
+          "female": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              7,
+              3,
+              0,
+              0
+            ],
+            "percent": [
+              70.0,
+              30.0,
+              0.0,
+              0.0
+            ],
+            "total_responded": 10,
+            "mapped_responded": 10,
+            "unmapped_responded": 0,
+            "elevated_percent": 0.0
+          }
+        },
+        {
+          "code": "obesity",
+          "male": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              21,
+              4,
+              4,
+              1
+            ],
+            "percent": [
+              70.0,
+              13.3,
+              13.3,
+              3.3
+            ],
+            "total_responded": 30,
+            "mapped_responded": 30,
+            "unmapped_responded": 0,
+            "elevated_percent": 16.6
+          },
+          "female": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              8,
+              0,
+              2,
+              0
+            ],
+            "percent": [
+              80.0,
+              0.0,
+              20.0,
+              0.0
+            ],
+            "total_responded": 10,
+            "mapped_responded": 10,
+            "unmapped_responded": 0,
+            "elevated_percent": 20.0
+          }
+        },
+        {
+          "code": "pcos_pcod",
+          "male": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "percent": [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "total_responded": 0,
+            "mapped_responded": 0,
+            "unmapped_responded": 0,
+            "elevated_percent": 0.0
+          },
+          "female": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              3,
+              0,
+              2,
+              0
+            ],
+            "percent": [
+              60.0,
+              0.0,
+              40.0,
+              0.0
+            ],
+            "total_responded": 5,
+            "mapped_responded": 5,
+            "unmapped_responded": 0,
+            "elevated_percent": 40.0
+          }
+        },
+        {
+          "code": "nafld",
+          "male": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              3,
+              9,
+              6,
+              12
+            ],
+            "percent": [
+              10.0,
+              30.0,
+              20.0,
+              40.0
+            ],
+            "total_responded": 30,
+            "mapped_responded": 30,
+            "unmapped_responded": 0,
+            "elevated_percent": 60.0
+          },
+          "female": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              5,
+              2,
+              1,
+              2
+            ],
+            "percent": [
+              50.0,
+              20.0,
+              10.0,
+              20.0
+            ],
+            "total_responded": 10,
+            "mapped_responded": 10,
+            "unmapped_responded": 0,
+            "elevated_percent": 30.0
+          }
+        },
+        {
+          "code": "cardiac_health",
+          "male": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              4,
+              13,
+              7,
+              6
+            ],
+            "percent": [
+              13.3,
+              43.3,
+              23.3,
+              20.0
+            ],
+            "total_responded": 30,
+            "mapped_responded": 30,
+            "unmapped_responded": 0,
+            "elevated_percent": 43.3
+          },
+          "female": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              9,
+              1,
+              0,
+              0
+            ],
+            "percent": [
+              90.0,
+              10.0,
+              0.0,
+              0.0
+            ],
+            "total_responded": 10,
+            "mapped_responded": 10,
+            "unmapped_responded": 0,
+            "elevated_percent": 0.0
+          }
+        },
+        {
+          "code": "thyroid_health",
+          "male": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              24,
+              3,
+              0,
+              0
+            ],
+            "percent": [
+              88.9,
+              11.1,
+              0.0,
+              0.0
+            ],
+            "total_responded": 27,
+            "mapped_responded": 27,
+            "unmapped_responded": 0,
+            "elevated_percent": 0.0
+          },
+          "female": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              6,
+              0,
+              0,
+              0
+            ],
+            "percent": [
+              100.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "total_responded": 6,
+            "mapped_responded": 6,
+            "unmapped_responded": 0,
+            "elevated_percent": 0.0
+          }
+        },
+        {
+          "code": "dyslipidemia",
+          "male": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              13,
+              5,
+              2,
+              10
+            ],
+            "percent": [
+              43.3,
+              16.7,
+              6.7,
+              33.3
+            ],
+            "total_responded": 30,
+            "mapped_responded": 30,
+            "unmapped_responded": 0,
+            "elevated_percent": 40.0
+          },
+          "female": {
+            "group": [
+              "healthy",
+              "increased",
+              "high",
+              "very_high"
+            ],
+            "count": [
+              6,
+              0,
+              2,
+              2
+            ],
+            "percent": [
+              60.0,
+              0.0,
+              20.0,
+              20.0
+            ],
+            "total_responded": 10,
+            "mapped_responded": 10,
+            "unmapped_responded": 0,
+            "elevated_percent": 40.0
+          }
+        }
+      ]
+    },
+    "name": "Metabolic Syndrome",
+    "description": null
+  },
+  "positive_wins": {
+    "data": {
+      "low_risk": [
+        {
+          "code": "thyroid_health",
+          "name": "Thyroid Health",
+          "risk_status": "Healthy",
+          "risk_score_scaled": 0
+        },
+        {
+          "code": "hypertension",
+          "name": "Hypertension",
+          "risk_status": "Healthy",
+          "risk_score_scaled": 17
+        },
+        {
+          "code": "dyslipidemia",
+          "name": "Dyslipidemia",
+          "risk_status": "Healthy",
+          "risk_score_scaled": 11
+        }
+      ],
+      "healthy_habits": [
+        {
+          "habit_key": null,
+          "habit_label": "Better Hydration"
+        },
+        {
+          "habit_key": null,
+          "habit_label": "Improved Sleep"
+        },
+        {
+          "habit_key": null,
+          "habit_label": "Balanced Sodium"
+        }
+      ],
+      "healthy_profiles": [
+        "Complete Hemogram",
+        "Liver Profile",
+        "Lipid Profile"
+      ]
+    },
+    "name": "Positive Wins",
+    "description": null
+  },
+  "blood_and_lab_intelligence": {
+    "data": {
+      "vitamin_profile": {
+        "vitamin_b12": {
+          "in_range_percent": 44
+        },
+        "vitamin_d_total-25_hydroxy": {
+          "in_range_percent": 18
+        }
+      },
+      "diabetes_profile": {
+        "average_blood_glucose": {
+          "in_range_percent": 0
+        },
+        "hba1c": {
+          "in_range_percent": 43
+        }
+      },
+      "lipid_profile": {
+        "cholesterol_total": {
+          "in_range_percent": 74
+        },
+        "hdl_cholestrol_direct": {
+          "in_range_percent": 72
+        },
+        "triglycerides": {
+          "in_range_percent": 56
+        },
+        "non_hdl_cholestrol": {
+          "in_range_percent": 82
+        },
+        "chol_hdl_ratio": {
+          "in_range_percent": 64
+        },
+        "ldl_cholestrol": {
+          "in_range_percent": 39
+        },
+        "vldl_cholestrol": {
+          "in_range_percent": 57
+        },
+        "ldl/hdl_cholestrol": {
+          "in_range_percent": 94
+        },
+        "hdl/ldl_cholestrol_ratio": {
+          "in_range_percent": 100
+        },
+        "cholesterol_total__triglycerides__ldl_cholestrol": {
+          "in_range_percent": 27
+        }
+      },
+      "inflammatory": {
+        "homocysteine": {
+          "in_range_percent": 17
+        },
+        "hs-crp": {
+          "in_range_percent": 26
+        },
+        "esr": {
+          "in_range_percent": 64
+        },
+        "homocysteine__hs-crp__esr": {
+          "in_range_percent": 2
+        }
+      }
+    },
+    "name": "Blood and Lab Intelligence",
+    "description": null
+  },
+  "company_average_scores": {
+    "data": {
+      "nutrition": {
+        "score": 25
+      },
+      "fitness": {
+        "score": 17
+      },
+      "lifestyle": {
+        "score": 68
+      }
+    },
+    "name": "Company Average Scores",
+    "description": null
+  },
+  "ranking": {
+    "data": {
+      "city": null,
+      "industry_key": null,
+      "industry": null,
+      "avg_metabolic_score": null,
+      "rank_city": null,
+      "total_city": null,
+      "rank_city_industry": null,
+      "total_city_industry": null,
+      "error": "Organization or city not found for this camp"
+    },
+    "name": "Ranking",
+    "description": null
+  }
+}

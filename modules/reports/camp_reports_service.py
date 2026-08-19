@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 from collections.abc import Callable
 from datetime import date, datetime, timezone
@@ -74,6 +75,10 @@ from modules.reports.camp_reports_repository import (
 )
 from modules.reports.models import CampReport, IndividualHealthReport
 from modules.reports.service import BLOOD_DATA_UNAVAILABLE_ERROR_CODES, ReportsService
+from modules.reports.camp_report_intelligence import (
+    generate_camp_section_intelligence,
+    resolve_intelligence_section,
+)
 from db.session import AsyncSessionLocal
 
 # (base_seconds, per_unit_seconds, unit_kind)
@@ -99,6 +104,8 @@ _DEFAULT_ESTIMATE_COST: tuple[float, float, str] = (3.0, 0.02, "participants")
 # Concurrent workers for positive_wins refresh / KPI Metsights checks (bounded by DB pool).
 _POSITIVE_WINS_CONCURRENCY = 4
 _KPI_BLOOD_METSIGHTS_CONCURRENCY = 4
+
+logger = logging.getLogger(__name__)
 
 
 class CampReportsService:
@@ -884,6 +891,131 @@ class CampReportsService:
                 message="Report section has not been refreshed",
             )
         return dict(report[normalized_section])
+
+    async def enrich_camp_report_section(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        camp_no: int,
+        section: str,
+        department: str | None = None,
+        city: str | None = None,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        """Generate intelligence for one dashboard section at the requested scope."""
+        normalized_section = section.strip()
+        if not normalized_section:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        try:
+            camp_section_key = resolve_intelligence_section(normalized_section)
+        except ValueError:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_SECTION",
+                message="Invalid report section",
+            ) from None
+
+        context = await self._resolve_camp_context(db, camp_no=camp_no)
+        await ensure_camp_access(
+            db,
+            employee,
+            context["organization_id"],
+            repository=self._organizations_repository,
+        )
+
+        if department is not None:
+            normalized_department = department.strip()
+            if not normalized_department:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            await self._validate_department_slug(
+                db,
+                organization_id=context["organization_id"],
+                slug=normalized_department,
+            )
+            department = normalized_department
+
+        if city is not None:
+            city = await self._validate_camp_city(db, camp_no=camp_no, city=city)
+
+        row = await self._get_camp_report_row(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        report = dict(row.report or {})
+        if camp_section_key not in report or not isinstance(report.get(camp_section_key), dict):
+            raise AppError(
+                status_code=404,
+                error_code="SECTION_NOT_FOUND",
+                message="Report section has not been refreshed",
+            )
+
+        try:
+            _, intelligence = generate_camp_section_intelligence(report, normalized_section)
+        except ValueError:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_SECTION",
+                message="Invalid report section",
+            ) from None
+        except AppError:
+            raise
+        except Exception:
+            logger.exception("Camp report intelligence engine failed")
+            raise AppError(
+                status_code=500,
+                error_code="INTERNAL_ERROR",
+                message="An unexpected error occurred",
+            ) from None
+
+        section_payload = dict(report[camp_section_key])
+        section_payload["intelligence"] = intelligence
+        report[camp_section_key] = section_payload
+        await self._repository.update_report(db, row, report)
+
+        await self._audit_service.log_event(
+            db,
+            action=self._enrich_section_audit_action(department=department, city=city),
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+
+        return {
+            "camp_no": camp_no,
+            "scope": self._enrich_scope(city=city, department=department),
+            "section": normalized_section,
+            "data": intelligence,
+        }
+
+    @staticmethod
+    def _enrich_scope(*, city: str | None, department: str | None) -> dict[str, str | None]:
+        if city is not None and department is not None:
+            scope_type = "city_department"
+        elif city is not None:
+            scope_type = "city"
+        elif department is not None:
+            scope_type = "department"
+        else:
+            scope_type = "camp"
+        return {"type": scope_type, "city": city, "department": department}
+
+    @staticmethod
+    def _enrich_section_audit_action(*, department: str | None, city: str | None) -> str:
+        if city is None and department is None:
+            return "EMPLOYEE_ENRICH_CAMP_REPORT_SECTION"
+        if city is None and department is not None:
+            return "EMPLOYEE_ENRICH_DEPARTMENT_CAMP_REPORT_SECTION"
+        if city is not None and department is None:
+            return "EMPLOYEE_ENRICH_CITY_CAMP_REPORT_SECTION"
+        return "EMPLOYEE_ENRICH_CITY_DEPARTMENT_CAMP_REPORT_SECTION"
 
     async def update_camp_report_section_payload(
         self,

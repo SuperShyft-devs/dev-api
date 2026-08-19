@@ -99,6 +99,15 @@ class Settings:
     METSIGHTS_TIMEOUT_SECONDS: int = int(os.getenv("METSIGHTS_TIMEOUT_SECONDS", "15"))
     METSIGHTS_IMPORT_TIMEOUT_SECONDS: int = int(os.getenv("METSIGHTS_IMPORT_TIMEOUT_SECONDS", "60"))
 
+    # Qura LLM settings. Providers are configured through environment variables only.
+    QURA_LLM_PROVIDER: str = os.getenv("QURA_LLM_PROVIDER", "gemini").strip().lower()
+    QURA_ANTHROPIC_API_KEY: str = os.getenv("QURA_ANTHROPIC_API_KEY", "")
+    QURA_ANTHROPIC_MODEL: str = os.getenv("QURA_ANTHROPIC_MODEL", "")
+    QURA_GEMINI_API_KEY: str = os.getenv("QURA_GEMINI_API_KEY", "")
+    QURA_GEMINI_MODEL: str = os.getenv("QURA_GEMINI_MODEL", "")
+    QURA_LLM_TIMEOUT_SECONDS: int = int(os.getenv("QURA_LLM_TIMEOUT_SECONDS", "20"))
+    QURA_LLM_TEMPERATURE: float = float(os.getenv("QURA_LLM_TEMPERATURE", "0"))
+
     # Nutrition API settings
     NUTRITION_API_URL: str = os.getenv("NUTRITION_API_URL", "https://nutrition.supershyft.com/calculate")
     NUTRITION_API_KEY: str = os.getenv("NUTRITION_API_KEY", "metsights-secret-2024")

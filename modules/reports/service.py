@@ -2128,7 +2128,18 @@ class ReportsService:
             engagement_id=assessment_instance.engagement_id,
         )
         nutrition_score_raw = nutrition_response.get("nutrition_score")
-        nutrition_score = float(nutrition_score_raw) if isinstance(nutrition_score_raw, (int, float)) else None
+        # Keep the public whole-number score. Do not convert an int API value
+        # back to float (that would serialize as 95.0).
+        if isinstance(nutrition_score_raw, bool):
+            nutrition_score = None
+        elif isinstance(nutrition_score_raw, int):
+            nutrition_score = nutrition_score_raw
+        elif isinstance(nutrition_score_raw, float):
+            from modules.reports.nutrition_intelligence.scoring import display_nutrition_score
+
+            nutrition_score = display_nutrition_score(nutrition_score_raw)
+        else:
+            nutrition_score = None
 
         # Step 6: Build the response
         if not include_details:

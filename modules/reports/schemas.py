@@ -216,6 +216,10 @@ class CampReportRefreshRequest(BaseModel):
     section: str = Field(min_length=1, max_length=200)
 
 
+class CampReportEnrichRequest(BaseModel):
+    section: str = Field(min_length=1, max_length=200)
+
+
 class CampReportSectionPayloadUpdateRequest(BaseModel):
     """Manually overwrite a stored camp report section JSON blob."""
 
@@ -272,3 +276,9 @@ class CampParticipantResponse(BaseModel):
     questionnaires: dict[str, bool] = Field(default_factory=dict)
     reports: CampParticipantReports = Field(default_factory=CampParticipantReports)
     consultations: bool = False
+
+
+class CampEnrichRequest(BaseModel):
+    """Request body for section-level intelligence enrichment."""
+
+    section: str = Field(min_length=1, max_length=200)
