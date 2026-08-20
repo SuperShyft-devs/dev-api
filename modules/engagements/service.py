@@ -1607,6 +1607,7 @@ class EngagementsService:
 
         return {
             "engagement_id": engagement_id,
+            "engagement_code": engagement.engagement_code,
             "consultation_mode": effective_consultation_mode(engagement).value,
             "my_consultations": my_consultations,
             "consultations": engagement_consultations,

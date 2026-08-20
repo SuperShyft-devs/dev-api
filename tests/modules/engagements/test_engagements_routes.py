@@ -1938,6 +1938,7 @@ async def test_get_engagement_consultations_for_user(async_client, test_db_sessi
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["engagement_id"] == engagement_id
+    assert data["engagement_code"] == "UCON8706"
     assert data["consultation_mode"] == "offline"
     assert data["consultations"] == {"doctor": True, "nutritionist": True}
     assert len(data["my_consultations"]) == 2
