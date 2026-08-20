@@ -239,7 +239,7 @@ def build_metsights_sync(question_key: str) -> dict[str, Any]:
 
     if question_key == "health_priorities":
         return {
-            "pull": {"enabled": True, "strategy": "list_to_single"},
+            "pull": {"enabled": True, "strategy": "passthrough"},
             "push": {
                 "enabled": True,
                 "strategy": "single_to_list",

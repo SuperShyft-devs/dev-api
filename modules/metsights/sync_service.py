@@ -192,17 +192,33 @@ def _question_type_for_submit(raw: str | None) -> str:
     return {"multi_choice": "multiple_choice"}.get(t, t)
 
 
-def _expand_health_priorities_for_metsights(selected: str) -> list[str]:
-    """Keep the user's single choice and add a second distinct Metsights option."""
+def _pad_health_priorities_to_two(codes: list[str]) -> list[str]:
+    """Ensure up to two distinct Metsights option codes, padding when only one is provided."""
 
-    primary = str(selected).strip()
-    if not primary or primary not in HEALTH_PRIORITIES_OPTION_VALUES:
+    pool = sorted(HEALTH_PRIORITIES_OPTION_VALUES)
+    result: list[str] = []
+    for code in codes:
+        if code in HEALTH_PRIORITIES_OPTION_VALUES and code not in result:
+            result.append(code)
+        if len(result) >= 2:
+            return result[:2]
+    if not result:
         return []
-    others = sorted(v for v in HEALTH_PRIORITIES_OPTION_VALUES if v != primary)
-    if not others:
-        return [primary]
-    secondary = random.choice(others)
-    return [primary, secondary]
+    if len(result) == 1:
+        primary = result[0]
+        try:
+            idx = pool.index(primary)
+        except ValueError:
+            idx = 0
+        start_idx = idx
+        while len(result) < 2:
+            idx = (idx + 1) % len(pool)
+            candidate = pool[idx]
+            if candidate not in result:
+                result.append(candidate)
+            if idx == start_idx:
+                break
+    return result[:2]
 
 
 def _resolve_health_priority_option_code(raw: Any) -> str | None:
@@ -226,21 +242,24 @@ def _resolve_health_priority_option_code(raw: Any) -> str | None:
 
 
 def _health_priorities_to_metsights_fields(answer: Any) -> dict[str, Any]:
-    """Always send two distinct codes: user's selection plus a random other."""
+    """Send the user's selected priorities; pad to two distinct codes when only one is chosen."""
 
-    primary: str | None = None
+    raw_items: list[Any]
     if isinstance(answer, list):
-        for item in answer:
-            primary = _resolve_health_priority_option_code(item)
-            if primary:
-                break
+        raw_items = answer
+    elif answer is not None:
+        raw_items = [answer]
     else:
-        primary = _resolve_health_priority_option_code(answer)
-
-    if not primary:
         return {}
-    expanded = _expand_health_priorities_for_metsights(primary)
-    return {"health_priorities": expanded} if expanded else {}
+
+    codes: list[str] = []
+    for item in raw_items:
+        code = _resolve_health_priority_option_code(item)
+        if code and code not in codes:
+            codes.append(code)
+
+    padded = _pad_health_priorities_to_two(codes)
+    return {"health_priorities": padded} if padded else {}
 
 
 def _answer_to_metsights_fields(question_key: str, question_type: str, answer: Any) -> dict[str, Any]:

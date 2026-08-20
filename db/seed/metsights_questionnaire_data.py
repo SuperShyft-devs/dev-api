@@ -76,7 +76,7 @@ METSIGHTS_QUESTIONS: tuple[SeedQuestion, ...] = (
     SeedQuestion(18, "sleeping_hours", "What is your average duration of good-quality sleep?", "single_choice", True, False, None, "active"),
     SeedQuestion(19, "alcohol_frequency", "What is your alcohol consumption?", "single_choice", False, False, None, "active"),
     SeedQuestion(20, "tobacco_frequency", "How often do you smoke cigarettes or tobacco?", "single_choice", False, False, None, "active"),
-    SeedQuestion(21, "health_priorities", "What are your primary health and wellness priorities?", QUESTION_TYPE_OVERRIDES.get("health_priorities", "multiple_choice"), True, False, "Choose your priority", "active"),
+    SeedQuestion(21, "health_priorities", "What are your primary health and wellness priorities?", "multiple_choice", True, False, "Choose your top two priorities.", "active"),
     SeedQuestion(22, "goal_preference", "What aspect of your lifestyle changes would you like to prioritize?", "single_choice", True, False, None, "active"),
     SeedQuestion(23, "diet_preference", "What type of diet do you primarily consume?", "single_choice", True, False, None, "active"),
     SeedQuestion(24, "food_groups", "Which of the following food groups do you consume every day?", "multiple_choice", True, False, None, "active"),

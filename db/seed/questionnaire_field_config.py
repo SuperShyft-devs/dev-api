@@ -22,9 +22,6 @@ QUESTION_TYPE_OVERRIDES: dict[str, str] = {
     # Change 1: daily_active_duration was a raw float+unit scale field from
     # metsights; we now present it as a structured single-choice to the user.
     "daily_active_duration": "single_choice",
-    # Change 6: health_priorities was multiple_choice; business requirement
-    # changed to allow only one selection (single_choice).
-    "health_priorities": "single_choice",
     # Change 7: caffeine_type — users may select multiple beverage types, but
     # Metsights only accepts a single value for this field.  Store all selections
     # in our DB (multiple_choice) and pick one at random when pushing to Metsights.
@@ -191,7 +188,7 @@ NONE_CLEARS_MULTISELECT_FIELDS: frozenset[str] = frozenset({
 })
 
 # Metsights ``health_priorities`` accepts exactly two distinct choice codes.
-# Our UI is single_choice; sync expands the user's pick with a second random option.
+# Our UI is multiple_choice; sync sends the user's selections (padded to two when only one is chosen).
 HEALTH_PRIORITIES_OPTION_VALUES: frozenset[str] = frozenset({
     "0",
     "1",

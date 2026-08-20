@@ -131,15 +131,13 @@ def push_boolean_string(key: str, answer: Any, params: dict) -> dict[str, Any]:
 
 
 def push_single_to_list(key: str, answer: Any, params: dict) -> dict[str, Any]:
-    """Single selection -> padded list for Metsights.
+    """Selection(s) -> padded list for Metsights.
 
-    Uses ``fill_strategy`` (currently ``deterministic_next``) to pad the list
-    to ``min_list_size`` using ``fill_from_option_values`` as the pool.
+    Accepts a single value or a multi-select list. Uses ``fill_strategy``
+    (currently ``deterministic_next``) to pad the list to ``min_list_size``
+    using ``fill_from_option_values`` as the pool.
     """
     if answer is None:
-        return {}
-    primary = str(answer).strip()
-    if not primary:
         return {}
 
     min_size = int(params.get("min_list_size", 1))
@@ -147,13 +145,26 @@ def push_single_to_list(key: str, answer: Any, params: dict) -> dict[str, Any]:
     fill_strategy = params.get("fill_strategy", "deterministic_next")
     pool = params.get("fill_from_option_values") or []
 
-    result = [primary]
+    if isinstance(answer, list):
+        result: list[str] = []
+        for item in answer:
+            candidate = str(item).strip()
+            if candidate and candidate not in result:
+                result.append(candidate)
+            if len(result) >= max_size:
+                break
+    else:
+        primary = str(answer).strip()
+        if not primary:
+            return {}
+        result = [primary]
 
     if fill_strategy == "deterministic_next" and len(result) < min_size and pool:
         try:
-            idx = pool.index(primary)
+            idx = pool.index(result[0])
         except ValueError:
             idx = 0
+        start_idx = idx
         while len(result) < min_size:
             idx = (idx + 1) % len(pool)
             candidate = pool[idx]
@@ -161,10 +172,10 @@ def push_single_to_list(key: str, answer: Any, params: dict) -> dict[str, Any]:
                 result.append(candidate)
             if len(result) >= max_size:
                 break
-            if idx == (pool.index(primary) if primary in pool else 0):
+            if idx == start_idx:
                 break
 
-    return {key: result}
+    return {key: result[:max_size]}
 
 
 def push_list_to_single(key: str, answer: Any, params: dict) -> dict[str, Any]:
