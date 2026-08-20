@@ -1567,9 +1567,18 @@ async def test_upsert_hip_rejects_out_of_range_cm(async_client, test_db_session)
     assert resp.json()["error_code"] == "INVALID_INPUT"
     assert "Hip" in resp.json()["message"]
 
-    good = {"responses": [{"question_id": 4056, "answer": {"value": 21.0, "unit": "1"}}]}
+    good = {"responses": [{"question_id": 4056, "answer": {"value": 100.0, "unit": "0"}}]}
     resp = await async_client.put("/questionnaire/9056/category/8056/responses", headers=_auth_header(5086), json=good)
     assert resp.status_code == 200
+
+    good_in = {"responses": [{"question_id": 4056, "answer": {"value": 38.0, "unit": "1"}}]}
+    resp = await async_client.put("/questionnaire/9056/category/8056/responses", headers=_auth_header(5086), json=good_in)
+    assert resp.status_code == 200
+
+    bad_in = {"responses": [{"question_id": 4056, "answer": {"value": 21.0, "unit": "1"}}]}
+    resp = await async_client.put("/questionnaire/9056/category/8056/responses", headers=_auth_header(5086), json=bad_in)
+    assert resp.status_code == 422
+    assert resp.json()["error_code"] == "INVALID_INPUT"
 
 
 # ==================== category_status consistency Tests ====================

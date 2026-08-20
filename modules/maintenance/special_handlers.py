@@ -20,8 +20,7 @@ from common.slug import (
     sanitize_cabin_key,
 )
 from db.seed.questionnaire_field_config import MAX_MULTI_SELECT_CHOICES
-from modules.metsights.anthropometry_validation import ANTHROPOMETRY_SCALE_KEYS
-from modules.metsights.strategies import normalize_metsights_unit_code
+from modules.metsights.anthropometry_validation import ANTHROPOMETRY_SCALE_KEYS, clamp_scale_value
 
 _QUESTION_TYPE_ALIASES = {"multi_choice": "multiple_choice"}
 
@@ -37,61 +36,12 @@ def _normalize_question_type(value: str | None) -> str:
     return _QUESTION_TYPE_ALIASES.get(normalized, normalized)
 
 
-def _unit_code(raw: str | None) -> str:
-    unit = normalize_metsights_unit_code(str(raw or "").strip())
-    return (unit or str(raw or "").strip()).lower()
-
-
 def clamp_scale_answer(question_key: str, answer: dict[str, Any]) -> dict[str, Any]:
     """Clamp anthropometry scale values into valid Metsights ranges."""
     key = (question_key or "").strip()
     if key not in ANTHROPOMETRY_SCALE_KEYS:
         return answer
-
-    out = dict(answer)
-    raw_val = out.get("value")
-    try:
-        value = float(raw_val)
-    except (TypeError, ValueError):
-        return out
-
-    unit = _unit_code(out.get("unit"))
-
-    if key == "weight":
-        if unit in {"0", "kg"}:
-            out["value"] = min(max(value, 20.0), 300.0)
-        elif unit in {"1", "lb", "lbs"}:
-            out["value"] = min(max(value, 44.0), 660.0)
-        return out
-
-    if key == "height":
-        if unit in {"0", "cm"}:
-            out["value"] = min(max(value, 50.0), 250.0)
-        elif unit in {"2", "ft/in", "ft", "feet", "ftin"}:
-            out["value"] = min(max(value, 1.5), 8.5)
-        return out
-
-    if key == "waist_circumference":
-        if unit in {"0", "cm"}:
-            out["value"] = min(max(value, 60.0), 150.0)
-        elif unit in {"1", "in", "inch", "inches"}:
-            out["value"] = min(max(value, 23.62), 59.05)
-        return out
-
-    if key == "hip_circumference":
-        if unit in {"1", "in", "inch", "inches"}:
-            cm_value = value * 2.54
-            clamped_cm = min(max(cm_value, 27.56), 62.99)
-            out["value"] = round(clamped_cm / 2.54, 2)
-        else:
-            out["value"] = min(max(value, 27.56), 62.99)
-        return out
-
-    if key == "body_fat":
-        out["value"] = min(max(value, 1.0), 60.0)
-        return out
-
-    return out
+    return clamp_scale_value(key, answer)
 
 
 def _coerce_health_priorities(answer: Any) -> list[str]:
