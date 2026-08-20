@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from common.validation import OptionalChecklistText, PositiveIntId
 from modules.engagements.models import BloodCollectionType
 
 
 class B2cOnboardingTypeDefaults(BaseModel):
-    assessment_package_id: int = Field(..., ge=1)
-    diagnostic_package_id: int | None = Field(default=None, ge=1)
+    assessment_package_id: PositiveIntId
+    diagnostic_package_id: PositiveIntId | None = None
     blood_collection_type: BloodCollectionType | None = None
     create_profile_on_metsights: bool
     enroll_for_fitprint_full: bool
@@ -81,4 +82,4 @@ class SupportQueryNotificationRead(BaseModel):
 
 
 class SupportQueryNotificationUpdate(BaseModel):
-    default_support_query_notification: str | None = Field(default=None, max_length=500)
+    default_support_query_notification: OptionalChecklistText = None

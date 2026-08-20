@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from common.validation import ValidationError, optional_search_query
 from sqlalchemy import asc, desc
 from sqlalchemy.sql import ColumnElement
 
@@ -13,6 +14,11 @@ def normalize_sort_dir(sort_dir: str | None) -> str:
     if (sort_dir or "").lower() == SORT_ASC:
         return SORT_ASC
     return SORT_DESC
+
+
+def sanitize_list_search(search: str | None, *, max_len: int = 200) -> str | None:
+    """Sanitize optional list/search query string; raises ValidationError on unsafe input."""
+    return optional_search_query(search, max_len=max_len)
 
 
 def ilike_pattern(search: str) -> str:

@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from common.validation import (
+    OptionalCityStateCountry,
+    OptionalSafeDisplayName,
+    OptionalSafeText,
+    OptionalSlugKey,
+    SafeDisplayName,
+    SlugKey,
+    validate_nested_strings,
+)
 
 
 class BloodParameterTestInReportResponse(BaseModel):
@@ -201,33 +211,38 @@ class HealthSpanIndexResponse(BaseModel):
 
 
 class CampReportSectionCreateRequest(BaseModel):
-    section: str = Field(min_length=1, max_length=500)
-    section_key: str = Field(min_length=1, max_length=200)
-    description: str | None = None
+    section: SafeDisplayName
+    section_key: SlugKey
+    description: OptionalSafeText = None
 
 
 class CampReportSectionUpdateRequest(BaseModel):
-    section: str | None = Field(default=None, min_length=1, max_length=500)
-    section_key: str | None = Field(default=None, min_length=1, max_length=200)
-    description: str | None = None
+    section: OptionalSafeDisplayName = None
+    section_key: OptionalSlugKey = None
+    description: OptionalSafeText = None
 
 
 class CampReportRefreshRequest(BaseModel):
-    section: str = Field(min_length=1, max_length=200)
+    section: SlugKey
 
 
 class CampReportSectionPayloadUpdateRequest(BaseModel):
     """Manually overwrite a stored camp report section JSON blob."""
 
-    section: str = Field(min_length=1, max_length=200)
+    section: SlugKey
     payload: dict[str, Any]
+
+    @model_validator(mode="after")
+    def sanitize_payload(self) -> "CampReportSectionPayloadUpdateRequest":
+        validate_nested_strings(self.payload)
+        return self
 
 
 class CampReportEstimateOperationRequest(BaseModel):
-    section: str = Field(min_length=1, max_length=200)
-    action: str = Field(min_length=1, max_length=50)
-    department: str | None = None
-    city: str | None = None
+    section: SlugKey
+    action: SlugKey
+    department: OptionalSafeDisplayName = None
+    city: OptionalCityStateCountry = None
 
 
 class CampReportEstimateRequest(BaseModel):

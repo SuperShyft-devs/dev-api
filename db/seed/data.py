@@ -125,6 +125,13 @@ DEFAULT_NOTIFICATION_SERVICES: tuple[SeedNotificationService, ...] = (
         require_otp=True,
     ),
     SeedNotificationService(
+        service_key="email-otp",
+        display_name="OTP via Email",
+        channel="email",
+        webhook_path="/send-otp-email-v3",
+        require_otp=True,
+    ),
+    SeedNotificationService(
         service_key="consultation-booking-alert-whatsapp",
         display_name="Consultation Booking Alert",
         channel="whatsapp",

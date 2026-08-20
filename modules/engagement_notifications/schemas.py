@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field, field_validator
 
+from common.validation import PositiveIntId
+
 from modules.engagement_notifications.service_config import (
     NotificationServiceConfigItem,
     configs_to_api,
@@ -13,7 +15,7 @@ from modules.engagement_notifications.service_config import (
 
 
 class EngagementNotificationItem(BaseModel):
-    notification_event_id: int
+    notification_event_id: PositiveIntId
     notification_services: list[NotificationServiceConfigItem] = Field(default_factory=list)
 
     @field_validator("notification_services", mode="before")
@@ -41,7 +43,7 @@ class EngagementNotificationsUpsertRequest(BaseModel):
 
 
 class NotificationDefaultItem(BaseModel):
-    notification_event_id: int
+    notification_event_id: PositiveIntId
     notification_services: list[NotificationServiceConfigItem] = Field(default_factory=list)
 
     @field_validator("notification_services", mode="before")
@@ -65,7 +67,7 @@ class NotificationDefaultResponse(BaseModel):
 
 
 class NotificationDefaultsUpsertRequest(BaseModel):
-    engagement_type_id: int
+    engagement_type_id: PositiveIntId
     defaults: list[NotificationDefaultItem] = Field(default_factory=list)
 
 

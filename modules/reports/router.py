@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
+from common.validation import ValidationError, optional_search_query, sanitize_search_query
 from core.dependencies import get_current_user
 from core.exceptions import AppError
 from db.session import get_db
@@ -51,17 +52,21 @@ async def get_overview_report(
 async def get_risk_analysis(
     assessment_id: int,
     request: Request,
-    disease: str | None = Query(default=None),
+    disease: str | None = Query(default=None, max_length=100),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
     reports_service: ReportsService = Depends(get_reports_service),
 ):
-    if disease is not None and disease.strip():
+    try:
+        disease_code = optional_search_query(disease, max_len=100) if disease is not None else None
+    except ValidationError as exc:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message=str(exc)) from exc
+    if disease_code:
         result = await reports_service.get_disease_detail_for_user(
             db,
             assessment_id=assessment_id,
             user_id=user.user_id,
-            disease_code=disease.strip(),
+            disease_code=disease_code,
             ip_address=_client_ip(request),
             user_agent=request.headers.get("User-Agent", "unknown"),
             endpoint=str(request.url.path),
@@ -195,14 +200,17 @@ async def get_health_span_index(
 
 @router.get("/trends")
 async def get_report_trends(
-    blood_parameter: str | None = Query(default=None),
-    diseases: str | None = Query(default=None),
+    blood_parameter: str | None = Query(default=None, max_length=100),
+    diseases: str | None = Query(default=None, max_length=100),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
     reports_service: ReportsService = Depends(get_reports_service),
 ):
-    disease_key = (diseases or "").strip().lower()
-    parameter_key = (blood_parameter or "").strip().lower()
+    try:
+        disease_key = (optional_search_query(diseases, max_len=100) or "").lower()
+        parameter_key = (optional_search_query(blood_parameter, max_len=100) or "").lower()
+    except ValidationError as exc:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message=str(exc)) from exc
     if bool(disease_key) == bool(parameter_key):
         raise AppError(
             status_code=400,

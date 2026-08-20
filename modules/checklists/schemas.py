@@ -7,6 +7,15 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from common.validation import (
+    ChecklistText,
+    OptionalChecklistText,
+    OptionalSafeDisplayName,
+    PositiveIntId,
+    SafeDisplayName,
+    StatusStr,
+)
+
 
 ChecklistAudience = Literal["internal", "user"]
 
@@ -40,48 +49,48 @@ class ChecklistTemplateDetailResponse(ChecklistTemplateResponse):
 
 
 class ChecklistTemplateCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
-    description: Optional[str] = None
+    name: SafeDisplayName
+    description: OptionalChecklistText = None
     audience: ChecklistAudience = "internal"
 
 
 class ChecklistTemplateUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    description: Optional[str] = None
+    name: OptionalSafeDisplayName = None
+    description: OptionalChecklistText = None
     audience: Optional[ChecklistAudience] = None
 
 
 class ChecklistTemplateStatusUpdate(BaseModel):
-    status: str = Field(min_length=1, max_length=30)
+    status: StatusStr
 
 
 class ChecklistTemplateItemCreate(BaseModel):
-    title: str = Field(min_length=1, max_length=200)
-    description: Optional[str] = None
+    title: SafeDisplayName
+    description: OptionalChecklistText = None
     display_order: Optional[int] = Field(default=None, ge=1)
 
 
 class ChecklistTemplateItemUpdate(BaseModel):
-    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    description: Optional[str] = None
+    title: OptionalSafeDisplayName = None
+    description: OptionalChecklistText = None
     display_order: Optional[int] = Field(default=None, ge=1)
 
 
 class ApplyTemplateRequest(BaseModel):
-    template_id: int = Field(gt=0)
+    template_id: PositiveIntId
 
 
 class TaskAssignRequest(BaseModel):
-    assigned_employee_id: int | None = Field(default=None, gt=0)
+    assigned_employee_id: PositiveIntId | None = None
 
 
 class TaskStatusUpdate(BaseModel):
-    status: str = Field(min_length=1, max_length=30)
-    notes: Optional[str] = None
+    status: StatusStr
+    notes: OptionalChecklistText = None
 
 
 class TaskUpdate(BaseModel):
-    notes: Optional[str] = None
+    notes: OptionalChecklistText = None
     due_date: Optional[date] = None
 
 

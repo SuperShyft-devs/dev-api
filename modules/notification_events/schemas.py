@@ -6,18 +6,20 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from common.validation import OptionalSafeDisplayName, OptionalSafeText, PositiveIntId, SafeDisplayName, SlugKey
+
 
 class NotificationEventCreateRequest(BaseModel):
-    engagement_type_ids: list[int] = Field(..., min_length=1)
-    event_code: str = Field(..., min_length=1, max_length=100)
-    display_name: str = Field(..., min_length=1, max_length=200)
-    description: str | None = Field(default=None, max_length=1000)
+    engagement_type_ids: list[PositiveIntId] = Field(..., min_length=1)
+    event_code: SlugKey
+    display_name: SafeDisplayName
+    description: OptionalSafeText = None
 
 
 class NotificationEventUpdateRequest(BaseModel):
-    engagement_type_ids: list[int] | None = Field(default=None, min_length=1)
-    display_name: str | None = Field(default=None, min_length=1, max_length=200)
-    description: str | None = Field(default=None, max_length=1000)
+    engagement_type_ids: list[PositiveIntId] | None = Field(default=None, min_length=1)
+    display_name: OptionalSafeDisplayName = None
+    description: OptionalSafeText = None
 
 
 class EngagementTypeRef(BaseModel):

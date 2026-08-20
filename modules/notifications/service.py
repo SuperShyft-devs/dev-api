@@ -295,7 +295,10 @@ class NotificationsService:
                         )
                     member["bio_ai_report_url"] = str(bio_url).strip()
 
-            if svc.require_otp:
+            # Always forward OTP when the caller provided one. `require_otp` only
+            # validates presence; gating attach on the flag drops login OTPs when
+            # the service row was migrated with require_otp=false.
+            if otp_value:
                 member["otp"] = otp_value
 
             session_details = _resolve_session_details_for_user(payload, user.user_id)

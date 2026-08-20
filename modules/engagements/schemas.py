@@ -8,6 +8,20 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from common.validation import (
+    EngagementCode,
+    OptionalAddressText,
+    OptionalCityStateCountry,
+    OptionalEngagementCode,
+    OptionalLandmarkText,
+    OptionalPinCode,
+    OptionalSafeDisplayName,
+    PinCode,
+    PositiveIntId,
+    SafeDisplayName,
+    SlugKey,
+    StatusStr,
+)
 from modules.engagement_notifications.service_config import NotificationServiceConfigItem
 
 from modules.checklists.schemas import ChecklistReadiness
@@ -43,8 +57,8 @@ class CabinBreak(BaseModel):
 
 
 class CabinSlotConfig(BaseModel):
-    cabin_name: str = Field(min_length=1, max_length=200)
-    cabin_key: str = Field(min_length=1, max_length=100)
+    cabin_name: SafeDisplayName
+    cabin_key: SlugKey
     start_time: str
     end_time: str
     slot_duration: int = Field(gt=0, le=480)
@@ -73,15 +87,7 @@ class CabinSlotConfig(BaseModel):
 
 
 class ConsultationCabinSlotConfig(CabinSlotConfig):
-    expert_type: str = Field(min_length=1, max_length=100)
-
-    @field_validator("expert_type")
-    @classmethod
-    def validate_expert_type(cls, value: str) -> str:
-        stripped = (value or "").strip()
-        if not stripped:
-            raise ValueError("expert_type is required")
-        return stripped
+    expert_type: SlugKey
 
 
 class SlotDetail(BaseModel):
@@ -115,7 +121,7 @@ class SlotDetail(BaseModel):
 class EngagementNotificationInput(BaseModel):
     """A single notification event config for create/update."""
 
-    notification_event_id: int
+    notification_event_id: PositiveIntId
     notification_services: list[NotificationServiceConfigItem] = Field(default_factory=list)
 
     @field_validator("notification_services", mode="before")
@@ -135,23 +141,23 @@ def _consultations_enabled(consultations: dict[str, bool] | None) -> bool:
 class EngagementCreateRequest(BaseModel):
     """Create a new B2B engagement."""
 
-    engagement_name: Optional[str] = Field(default=None, max_length=200)
+    engagement_name: OptionalSafeDisplayName = None
     metsights_engagement_id: Optional[str] = Field(default=None, max_length=200)
-    organization_id: int = Field(gt=0)
+    organization_id: PositiveIntId
     camp_no: Optional[int] = None
-    engagement_type: int = Field(gt=0)
+    engagement_type: PositiveIntId
     consultations: Optional[dict[str, bool]] = None
     slot_detail: Optional[SlotDetail] = None
-    engagement_code: Optional[str] = Field(default=None, max_length=50)
-    assessment_package_id: Optional[int] = Field(default=None, gt=0)
-    diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
-    city: Optional[str] = Field(default=None, max_length=100)
-    address: Optional[str] = Field(default=None, max_length=500)
-    sub_locality: Optional[str] = Field(default=None, max_length=200)
-    landmark: Optional[str] = Field(default=None, max_length=200)
-    pincode: Optional[str] = Field(default=None, max_length=20)
-    state: Optional[str] = Field(default=None, max_length=100)
-    country: Optional[str] = Field(default=None, max_length=100)
+    engagement_code: OptionalEngagementCode = None
+    assessment_package_id: Optional[PositiveIntId] = None
+    diagnostic_package_id: Optional[PositiveIntId] = None
+    city: OptionalCityStateCountry = None
+    address: OptionalAddressText = None
+    sub_locality: OptionalLandmarkText = None
+    landmark: OptionalLandmarkText = None
+    pincode: OptionalPinCode = None
+    state: OptionalCityStateCountry = None
+    country: OptionalCityStateCountry = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     slot_duration: int = Field(gt=0, le=480)
@@ -175,22 +181,22 @@ class EngagementCreateRequest(BaseModel):
 class EngagementUpdateRequest(BaseModel):
     """Update editable engagement fields."""
 
-    engagement_name: Optional[str] = Field(default=None, max_length=200)
-    engagement_code: str = Field(min_length=1, max_length=50)
-    organization_id: Optional[int] = Field(default=None, gt=0)
+    engagement_name: OptionalSafeDisplayName = None
+    engagement_code: EngagementCode
+    organization_id: Optional[PositiveIntId] = None
     camp_no: Optional[int] = None
-    engagement_type: int = Field(gt=0)
+    engagement_type: PositiveIntId
     consultations: Optional[dict[str, bool]] = None
     slot_detail: Optional[SlotDetail] = None
-    assessment_package_id: Optional[int] = Field(default=None, gt=0)
-    diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
-    city: Optional[str] = Field(default=None, max_length=100)
-    address: Optional[str] = Field(default=None, max_length=500)
-    sub_locality: Optional[str] = Field(default=None, max_length=200)
-    landmark: Optional[str] = Field(default=None, max_length=200)
-    pincode: Optional[str] = Field(default=None, max_length=20)
-    state: Optional[str] = Field(default=None, max_length=100)
-    country: Optional[str] = Field(default=None, max_length=100)
+    assessment_package_id: Optional[PositiveIntId] = None
+    diagnostic_package_id: Optional[PositiveIntId] = None
+    city: OptionalCityStateCountry = None
+    address: OptionalAddressText = None
+    sub_locality: OptionalLandmarkText = None
+    landmark: OptionalLandmarkText = None
+    pincode: OptionalPinCode = None
+    state: OptionalCityStateCountry = None
+    country: OptionalCityStateCountry = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     slot_duration: int = Field(gt=0, le=480)
@@ -215,16 +221,16 @@ class EngagementUpdateRequest(BaseModel):
 class EngagementStatusUpdateRequest(BaseModel):
     """Change engagement status."""
 
-    status: str = Field(min_length=1, max_length=30)
+    status: StatusStr
 
 
 class ResolveHealthiansZoneRequest(BaseModel):
     """Resolve Healthians zone ID for an engagement location."""
 
-    diagnostic_package_id: int = Field(gt=0)
+    diagnostic_package_id: PositiveIntId
     latitude: float
     longitude: float
-    pincode: str = Field(min_length=1, max_length=20)
+    pincode: PinCode
 
 
 class ResolveHealthiansZoneResponse(BaseModel):
@@ -299,7 +305,7 @@ class OnboardingAssistantsAddRequest(BaseModel):
 class EngagementAssessmentPackageAddRequest(BaseModel):
     """Request to add an additional assessment package to an engagement."""
 
-    package_code: str = Field(..., min_length=1, max_length=100)
+    package_code: SlugKey
 
 
 # Metsights record sub-resource keys accepted by engagement questionnaire push.
@@ -318,10 +324,9 @@ PUSH_QUESTIONNAIRE_CATEGORY_KEYS = frozenset(
 class EngagementPushQuestionnairesRequest(BaseModel):
     """Request to push questionnaire answers for a specific package."""
 
-    package_id: int = Field(..., gt=0)
-    assessment_instance_id: int | None = Field(
+    package_id: PositiveIntId
+    assessment_instance_id: PositiveIntId | None = Field(
         default=None,
-        gt=0,
         description="When set, push only this assessment instance (client-side batching).",
     )
     categories: list[str] | None = Field(
@@ -333,7 +338,7 @@ class EngagementPushQuestionnairesRequest(BaseModel):
 class EngagementConnectMetsightsRecordsRequest(BaseModel):
     """Request to create Metsights records for existing assessment instances."""
 
-    package_id: int = Field(..., gt=0)
+    package_id: PositiveIntId
 
 
 class AssignParticipantsRow(BaseModel):
@@ -383,11 +388,11 @@ class EngagementParticipantUpdateRequest(BaseModel):
 
 
 class MoveParticipantRequest(BaseModel):
-    target_engagement_id: int
+    target_engagement_id: PositiveIntId
 
 
 class MoveParticipantsBatchRequest(BaseModel):
-    target_engagement_id: int
+    target_engagement_id: PositiveIntId
     user_ids: list[int] = Field(min_length=1)
 
 

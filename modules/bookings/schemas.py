@@ -3,18 +3,27 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 
+from common.validation import (
+    AddressText,
+    CityStateCountry,
+    OptionalLandmarkText,
+    PinCode,
+    PositiveIntId,
+    SafeText,
+    ShortSafeText,
+)
+
 
 class CheckServiceabilityMember(BaseModel):
-    user_id: int = Field(gt=0)
-    address_line: str = Field(min_length=1, max_length=500)
-    landmark: Optional[str] = Field(default=None, max_length=200)
-    city: str = Field(min_length=1, max_length=100)
-    pincode: str = Field(min_length=1, max_length=20)
-    diagnostic_package_id: int = Field(gt=0)
+    user_id: PositiveIntId
+    address_line: AddressText
+    landmark: OptionalLandmarkText = None
+    city: CityStateCountry
+    pincode: PinCode
+    diagnostic_package_id: PositiveIntId
 
 
 class CheckServiceabilityRequest(BaseModel):
@@ -29,8 +38,8 @@ class CheckServiceabilityRequest(BaseModel):
 
 
 class AvailableSlotsMember(BaseModel):
-    user_id: int = Field(gt=0)
-    engagement_id: int = Field(gt=0)
+    user_id: PositiveIntId
+    engagement_id: PositiveIntId
     blood_collection_date: date
 
 
@@ -39,11 +48,11 @@ class AvailableSlotsRequest(BaseModel):
 
 
 class LockSlotMember(BaseModel):
-    user_id: int = Field(gt=0)
-    engagement_id: int = Field(gt=0)
+    user_id: PositiveIntId
+    engagement_id: PositiveIntId
     blood_collection_date: date
     blood_collection_time_slot_id: str = Field(min_length=1, max_length=50)
-    blood_collection_time_slot: str = Field(min_length=1, max_length=50)
+    blood_collection_time_slot: ShortSafeText
 
 
 class LockSlotRequest(BaseModel):
@@ -51,8 +60,8 @@ class LockSlotRequest(BaseModel):
 
 
 class BookPayMember(BaseModel):
-    user_id: int = Field(gt=0)
-    engagement_id: int = Field(gt=0)
+    user_id: PositiveIntId
+    engagement_id: PositiveIntId
 
 
 class BookPayRequest(BaseModel):
@@ -73,8 +82,8 @@ class VerifyAndBookRequest(BaseModel):
 
 
 class BookFromDraftMember(BaseModel):
-    user_id: int = Field(gt=0)
-    engagement_id: int = Field(gt=0)
+    user_id: PositiveIntId
+    engagement_id: PositiveIntId
 
 
 class BookFromDraftRequest(BaseModel):
@@ -89,9 +98,9 @@ class BookFromDraftRequest(BaseModel):
 
 
 class CancelBookingMember(BaseModel):
-    user_id: int = Field(gt=0)
-    engagement_id: int = Field(gt=0)
-    remarks: str = Field(min_length=1, max_length=500)
+    user_id: PositiveIntId
+    engagement_id: PositiveIntId
+    remarks: SafeText
 
 
 class CancelBookingRequest(BaseModel):

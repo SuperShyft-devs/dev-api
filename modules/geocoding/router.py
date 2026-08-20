@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 
 from common.responses import success_response
+from common.validation import ValidationError, sanitize_search_query
 from core.exceptions import AppError
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
@@ -20,7 +21,14 @@ async def geocode_search(
     employee: EmployeeContext = Depends(get_current_employee),
 ):
     _ = employee
-    query = (q or "").strip()
+    try:
+        query = sanitize_search_query(q, max_len=500)
+    except ValidationError as exc:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message=str(exc),
+        ) from exc
     if len(query) < 3:
         raise AppError(
             status_code=400,

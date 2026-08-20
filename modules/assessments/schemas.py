@@ -7,6 +7,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from common.validation import PositiveIntId, SafeDisplayName, SlugKey, StatusStr
+
 
 class AssessmentListItem(BaseModel):
     assessment_instance_id: int
@@ -25,7 +27,7 @@ class AssessmentDetailsResponse(AssessmentListItem):
 
 
 class AssessmentStatusUpdateRequest(BaseModel):
-    status: str = Field(min_length=1, max_length=30)
+    status: StatusStr
 
 
 class AssessmentStatusUpdateResponse(BaseModel):
@@ -76,24 +78,24 @@ class MetsightsImportRequest(BaseModel):
 
 
 class AssessmentPackageCreateRequest(BaseModel):
-    package_code: str = Field(min_length=1, max_length=50)
-    display_name: str = Field(min_length=1, max_length=200)
-    assessment_type_code: str = Field(min_length=1, max_length=10)
-    status: str = Field(default="active", min_length=1, max_length=30)
+    package_code: SlugKey
+    display_name: SafeDisplayName
+    assessment_type_code: SlugKey
+    status: StatusStr = "active"
 
 
 class AssessmentPackageUpdateRequest(BaseModel):
-    package_code: str = Field(min_length=1, max_length=50)
-    display_name: str = Field(min_length=1, max_length=200)
-    assessment_type_code: str = Field(min_length=1, max_length=10)
+    package_code: SlugKey
+    display_name: SafeDisplayName
+    assessment_type_code: SlugKey
 
 
 class AssessmentPackageCategoriesAddRequest(BaseModel):
-    category_ids: list[int] = Field(..., min_length=1)
+    category_ids: list[PositiveIntId] = Field(..., min_length=1)
 
 
 class AssessmentPackageCategoriesReorderRequest(BaseModel):
-    category_ids: list[int] = Field(..., min_length=1)
+    category_ids: list[PositiveIntId] = Field(..., min_length=1)
 
 
 class AssessmentPackageListItem(BaseModel):
