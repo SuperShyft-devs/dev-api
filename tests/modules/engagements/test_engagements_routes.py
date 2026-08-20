@@ -2312,6 +2312,143 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
 
 
 @pytest.mark.asyncio
+async def test_shared_slot_detail_spot_left_counts_across_engagements(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7412, employee_id=412)
+    await _seed_organization(test_db_session, organization_id=9103, name="Shared Spot Org")
+    await _seed_assessment_package(test_db_session, package_id=9103, package_code="PKG9103")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9103)
+    type_id = await _engagement_type_id(test_db_session, "blood_test_with_consultation")
+
+    slot_detail = {
+        "blood_collection": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Shared Blood Cabin",
+                    "cabin_key": "btc-shared-spot",
+                    "start_time": "09:00",
+                    "end_time": "10:00",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 1,
+                    "breaks": [],
+                    "is_active": True,
+                }
+            ]
+        },
+        "consultation": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Shared Consult Cabin",
+                    "cabin_key": "cc-shared-spot",
+                    "start_time": "09:00",
+                    "end_time": "10:00",
+                    "expert_type": "doctor",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 1,
+                    "breaks": [],
+                    "is_active": True,
+                }
+            ]
+        },
+    }
+    base_payload = {
+        "organization_id": 9103,
+        "engagement_type": type_id,
+        "assessment_package_id": 9103,
+        "diagnostic_package_id": 9103,
+        "city": "BLR",
+        "slot_duration": 30,
+        "start_date": "2026-08-20",
+        "end_date": "2026-08-21",
+        "consultations": {"doctor": True},
+        "consultation_mode": "offline",
+        "slot_detail": slot_detail,
+    }
+
+    first = await async_client.post(
+        "/engagements",
+        headers=_auth_header(7412),
+        json={**base_payload, "engagement_name": "Shared Spot A", "engagement_code": "SHARESPA"},
+    )
+    assert first.status_code == 201, first.text
+    second = await async_client.post(
+        "/engagements",
+        headers=_auth_header(7412),
+        json={**base_payload, "engagement_name": "Shared Spot B", "engagement_code": "SHARESPB"},
+    )
+    assert second.status_code == 201, second.text
+
+    first_id = first.json()["data"]["engagement_id"]
+    second_id = second.json()["data"]["engagement_id"]
+    first_details = await async_client.get(f"/engagements/{first_id}", headers=_auth_header(7412))
+    second_details = await async_client.get(f"/engagements/{second_id}", headers=_auth_header(7412))
+    assert first_details.json()["data"]["slot_detail_id"] == second_details.json()["data"]["slot_detail_id"]
+
+    onboard = await async_client.post(
+        "/users/code/SHARESPA/onboard",
+        json={
+            "age": 30,
+            "first_name": "Shared",
+            "last_name": "Spot",
+            "phone": "9103000001",
+            "email": "shared.spot@example.com",
+            "city": "BLR",
+            "blood_collection_date": "2026-08-20",
+            "blood_collection_time_slot": "09:00",
+            "blood_collection_cabin": "btc-shared-spot",
+            "consultations": {
+                "doctor": {
+                    "want": True,
+                    "date": "2026-08-20",
+                    "cabin": "cc-shared-spot",
+                    "slot": "09:00",
+                }
+            },
+        },
+    )
+    assert onboard.status_code == 200, onboard.text
+
+    for code in ("SHARESPA", "SHARESPB"):
+        public = await async_client.get(f"/engagements/code/{code}")
+        assert public.status_code == 200, public.text
+        data = public.json()["data"]
+        blood_slots = {
+            item["slot"]: item["spot_left"]
+            for item in data["slot_detail"]["blood_collection"]["2026-08-20"][0]["available_slots"]
+        }
+        consult_slots = {
+            item["slot"]: item["spot_left"]
+            for item in data["slot_detail"]["consultation"]["2026-08-20"][0]["available_slots"]
+        }
+        assert blood_slots["09:00"] == 0
+        assert consult_slots["09:00"] == 0
+
+    rejected = await async_client.post(
+        "/users/code/SHARESPB/onboard",
+        json={
+            "age": 31,
+            "first_name": "Over",
+            "last_name": "Capacity",
+            "phone": "9103000002",
+            "email": "shared.spot.full@example.com",
+            "city": "BLR",
+            "blood_collection_date": "2026-08-20",
+            "blood_collection_time_slot": "09:00",
+            "blood_collection_cabin": "btc-shared-spot",
+            "consultations": {
+                "doctor": {
+                    "want": True,
+                    "date": "2026-08-20",
+                    "cabin": "cc-shared-spot",
+                    "slot": "09:30",
+                }
+            },
+        },
+    )
+    assert rejected.status_code == 400, rejected.text
+    assert rejected.json()["error_code"] == "SLOT_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
 async def test_get_engagement_by_code_returns_null_slot_detail_when_unset(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7411, employee_id=411)
     await _seed_organization(test_db_session, organization_id=9102, name="No Slot Org")

@@ -63,6 +63,9 @@ async def validate_consultation_cabin_slot_for_booking(
         consultation_cabin=persisted_cabin,
         consultation_date=consultation_date,
         consultation_slot=slot_hhmm,
+        slot_detail_id=(
+            int(engagement.slot_detail_id) if engagement.slot_detail_id is not None else None
+        ),
     )
     capacity = int(cabin.get("capacity_per_slot") or 0)
     if count >= capacity:

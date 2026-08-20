@@ -815,13 +815,18 @@ class EngagementsService:
         slot_detail = await self.resolve_slot_detail(db, engagement)
         if not slot_detail_is_configured(slot_detail):
             return None
+        shared_slot_detail_id = (
+            int(engagement.slot_detail_id) if engagement.slot_detail_id is not None else None
+        )
         rows = await self._repository.list_cabin_slot_occupancy(
             db,
             engagement_id=int(engagement.engagement_id),
+            slot_detail_id=shared_slot_detail_id,
         )
         consultation_rows = await self._consultation_bookings.list_consultation_cabin_slot_occupancy(
             db,
             engagement_id=int(engagement.engagement_id),
+            slot_detail_id=shared_slot_detail_id,
         )
         return build_public_slot_detail(
             slot_detail,
@@ -856,6 +861,9 @@ class EngagementsService:
             blood_collection_cabin=persisted_cabin,
             engagement_date=collection_date,
             slot_start_time=time(slot_time.hour, slot_time.minute),
+            slot_detail_id=(
+                int(engagement.slot_detail_id) if engagement.slot_detail_id is not None else None
+            ),
         )
         capacity = int(cabin.get("capacity_per_slot") or 0)
         if count >= capacity:
@@ -879,6 +887,9 @@ class EngagementsService:
         if not isinstance(section, dict) or not section:
             return normalized
 
+        shared_slot_detail_id = (
+            int(engagement.slot_detail_id) if engagement.slot_detail_id is not None else None
+        )
         for expert_type, pref in normalized.items():
             if pref.get("want") is not True:
                 continue
@@ -911,6 +922,7 @@ class EngagementsService:
                 consultation_cabin=persisted_cabin,
                 consultation_date=consultation_date,
                 consultation_slot=slot_hhmm,
+                slot_detail_id=shared_slot_detail_id,
             )
             capacity = int(cabin.get("capacity_per_slot") or 0)
             if count >= capacity:
