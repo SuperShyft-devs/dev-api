@@ -553,6 +553,10 @@ def _validate_payload_against_options(
                 cleaned[key] = value
             continue
         allowed = meta.valid_choices
+        if not allowed:
+            # Scale / numeric fields are often required in OPTIONS but have no choices list.
+            cleaned[key] = value
+            continue
         if isinstance(value, list):
             filtered: list[Any] = []
             for item in value:

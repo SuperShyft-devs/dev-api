@@ -79,6 +79,25 @@ def test_validate_payload_does_not_blindly_remap_labels_to_zero():
     assert "diet_preference" not in cleaned
 
 
+def test_validate_payload_keeps_required_scale_fields_without_choices():
+    """Metsights OPTIONS often marks height/weight required but omits a choices list."""
+    meta = {
+        "height": _FieldMeta(valid_choices=set(), required=True),
+        "weight": _FieldMeta(valid_choices=set(), required=True),
+        "waist_circumference": _FieldMeta(valid_choices=set(), required=True),
+    }
+    payload = {
+        "height": 170.0,
+        "height_unit": "0",
+        "weight": 70.0,
+        "weight_unit": "0",
+        "waist_circumference": 80.0,
+        "waist_circumference_unit": "0",
+    }
+    cleaned = _validate_payload_against_options(payload, meta)
+    assert cleaned == payload
+
+
 def test_validate_measurement_ranges_rejects_tiny_weight():
     from modules.metsights.sync_service import _validate_measurement_ranges
     from core.exceptions import AppError
