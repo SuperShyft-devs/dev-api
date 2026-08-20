@@ -13,6 +13,7 @@ from common.validation import (
     PositiveIntId,
     SafeDisplayName,
     SafeText,
+    ServiceKey,
     SlugKey,
     validate_nested_strings,
 )
@@ -32,7 +33,7 @@ class PrepareReportsRequest(BaseModel):
 
 
 class DispatchRequest(BaseModel):
-    service_key: SlugKey
+    service_key: ServiceKey
     user_ids: list[PositiveIntId] = Field(..., min_length=1)
     engagement_id: PositiveIntId | None = None
     assessment_instance_id: PositiveIntId | None = None
@@ -78,7 +79,7 @@ class CallbackRequest(BaseModel):
 
 
 class NotificationServiceCreate(BaseModel):
-    service_key: SlugKey
+    service_key: ServiceKey
     display_name: SafeDisplayName
     channel: str = Field(..., pattern=r"^(email|whatsapp)$")
     webhook_path: SafeText

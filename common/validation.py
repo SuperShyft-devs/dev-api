@@ -14,6 +14,7 @@ from pydantic import BeforeValidator, EmailStr, Field, StringConstraints
 _PIN_CODE_RE = re.compile(r"^\d{6}$")
 _OTP_RE = re.compile(r"^\d{4,10}$")
 _SLUG_KEY_RE = re.compile(r"^[a-z0-9_]+$")
+_SERVICE_KEY_RE = re.compile(r"^[a-z0-9_-]+$")
 _PHONE_ALLOWED = frozenset("0123456789+ -()")
 _SCRIPT_PATTERN = re.compile(r"(?i)<\s*script|javascript\s*:|on\w+\s*=")
 
@@ -265,6 +266,27 @@ def _validate_optional_slug_key(value: Any) -> str | None:
     return _validate_slug_key(value)
 
 
+def _validate_service_key(value: Any) -> str:
+    if value is None:
+        raise ValidationError("Key is required")
+    if not isinstance(value, str):
+        raise ValidationError("Key must be a string")
+    cleaned = value.strip().lower()
+    if not cleaned:
+        raise ValidationError("Key cannot be empty")
+    if len(cleaned) > 100:
+        raise ValidationError("Key must be at most 100 characters")
+    if not _SERVICE_KEY_RE.match(cleaned):
+        raise ValidationError("Key must be lowercase alphanumeric with underscores or hyphens only")
+    return cleaned
+
+
+def _validate_optional_service_key(value: Any) -> str | None:
+    if value is None:
+        return None
+    return _validate_service_key(value)
+
+
 def reject_unsafe_strings(
     obj: Any,
     *,
@@ -387,6 +409,9 @@ OtpCode = Annotated[str, BeforeValidator(_validate_otp)]
 
 SlugKey = Annotated[str, BeforeValidator(_validate_slug_key)]
 OptionalSlugKey = Annotated[str | None, BeforeValidator(_validate_optional_slug_key)]
+
+ServiceKey = Annotated[str, BeforeValidator(_validate_service_key)]
+OptionalServiceKey = Annotated[str | None, BeforeValidator(_validate_optional_service_key)]
 
 EngagementCode = Annotated[str, BeforeValidator(_make_safe_display_name_validator(50))]
 OptionalEngagementCode = Annotated[

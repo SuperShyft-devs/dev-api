@@ -18,6 +18,7 @@ from common.validation import (
     SafeDisplayName,
     SafeText,
     SlugKey,
+    ServiceKey,
     SupportQueryText,
     ValidationError,
     validate_nested_strings,
@@ -58,6 +59,10 @@ class _PositiveIdModel(BaseModel):
 
 class _SlugModel(BaseModel):
     key: SlugKey
+
+
+class _ServiceKeyModel(BaseModel):
+    key: ServiceKey
 
 
 class _SupportQueryModel(BaseModel):
@@ -203,6 +208,13 @@ def test_slug_key():
     assert _SlugModel(key="type_key_1").key == "type_key_1"
     with pytest.raises(PydanticValidationError):
         _SlugModel(key="Bad Key")
+
+
+def test_service_key_allows_hyphens():
+    assert _ServiceKeyModel(key="whatapi-otp").key == "whatapi-otp"
+    assert _ServiceKeyModel(key="email-otp").key == "email-otp"
+    with pytest.raises(PydanticValidationError):
+        _ServiceKeyModel(key="Bad Key")
 
 
 # ── Address ─────────────────────────────────────────────────────────────────────
