@@ -8,7 +8,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable
 
-from pydantic import EmailStr, ValidationError as PydanticValidationError
+from pydantic import EmailStr, TypeAdapter, ValidationError as PydanticValidationError
+
+_EMAIL_VALIDATOR = TypeAdapter(EmailStr)
 
 from common.slug import sanitize_cabin_key, sanitize_service_key
 from common.validation import (
@@ -283,7 +285,7 @@ def sanitize_email(value: Any, *, required: bool) -> SanitizeOutcome:
         return SanitizeOutcome(SanitizeStatus.NULL, None, "Email must be a string")
     cleaned = value.strip().lower()
     try:
-        validated = str(EmailStr(cleaned))
+        validated = str(_EMAIL_VALIDATOR.validate_python(cleaned))
         if len(validated) > 254:
             if required:
                 return SanitizeOutcome(SanitizeStatus.SKIP, value, "Email exceeds max length")

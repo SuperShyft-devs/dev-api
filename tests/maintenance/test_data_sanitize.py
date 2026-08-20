@@ -65,6 +65,15 @@ class TestSanitizeValue:
         assert out.status in {SanitizeStatus.OK, SanitizeStatus.UNCHANGED}
         assert out.value == "whatapi-otp"
 
+    def test_email_valid(self):
+        out = sanitize_value("User@Example.com", kind=SanitizeKind.EMAIL, required=False)
+        assert out.status in {SanitizeStatus.OK, SanitizeStatus.UNCHANGED}
+        assert out.value == "user@example.com"
+
+    def test_email_invalid_becomes_null(self):
+        out = sanitize_value("not-an-email", kind=SanitizeKind.EMAIL, required=False)
+        assert out.status == SanitizeStatus.NULL
+
     def test_safe_display_name_strips_html(self):
         out = sanitize_value("Acme <script>alert(1)</script> Corp", kind=SanitizeKind.SAFE_DISPLAY_NAME)
         assert out.status == SanitizeStatus.OK
