@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.engagements.enums import ConsultationMode
 from modules.engagements.models import Engagement
+from modules.engagements.slot_info_repository import EngagementSlotInfoRepository
 from modules.engagements.slot_availability import (
     coerce_time,
     format_hhmm,
@@ -41,8 +42,14 @@ async def validate_consultation_cabin_slot_for_booking(
     slot_time = coerce_time(slot_val)
     if slot_time is None:
         raise slot_unavailable()
+    slot_detail = None
+    if engagement.slot_detail_id is not None:
+        slot_detail = await EngagementSlotInfoRepository().get_by_id(
+            db,
+            int(engagement.slot_detail_id),
+        )
     cabin = require_available_consultation_slot(
-        engagement.slot_detail,
+        slot_detail,
         expert_type=str(expert_type),
         consultation_date=consultation_date,
         cabin_key=cabin_val,

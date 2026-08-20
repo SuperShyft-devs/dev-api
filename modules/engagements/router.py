@@ -57,6 +57,7 @@ def _engagement_to_dict(
     readiness=None,
     participant_count: int | None = None,
     notifications: list[dict] | None = None,
+    slot_detail: dict | None = None,
 ) -> dict:
     data = {
         "engagement_id": engagement.engagement_id,
@@ -67,7 +68,8 @@ def _engagement_to_dict(
         "engagement_code": engagement.engagement_code,
         "engagement_type": engagement.engagement_type,
         "consultations": engagement.consultations,
-        "slot_detail": engagement.slot_detail,
+        "slot_detail": slot_detail,
+        "slot_detail_id": engagement.slot_detail_id,
         "assessment_package_id": engagement.assessment_package_id,
         "diagnostic_package_id": engagement.diagnostic_package_id,
         "city": engagement.city,
@@ -238,11 +240,18 @@ async def list_engagements(
         sort_dir=sort_dir,
     )
 
+    slot_details_map = await engagements_service.resolve_slot_details_map(db, engagements)
+
     data = [
         _engagement_to_dict(
             engagement,
             readiness=readiness_by_id[engagement.engagement_id],
             participant_count=counts_by_id.get(int(engagement.engagement_id), 0),
+            slot_detail=(
+                slot_details_map.get(int(engagement.slot_detail_id))
+                if engagement.slot_detail_id is not None
+                else None
+            ),
         )
         for engagement in engagements
     ]
@@ -279,6 +288,7 @@ async def get_engagement_for_user(
                 db,
                 engagement_id=engagement_id,
             ),
+            slot_detail=await engagements_service.resolve_slot_detail(db, engagement),
         )
     )
 
@@ -321,6 +331,7 @@ async def get_engagement_details(
                 engagement_id=engagement_id,
             ),
             notifications=notifications,
+            slot_detail=await engagements_service.resolve_slot_detail(db, engagement),
         )
     )
 

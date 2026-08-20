@@ -392,6 +392,106 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
 
 
 @pytest.mark.asyncio
+async def test_create_engagements_with_same_metadata_share_slot_detail_id(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7030, employee_id=30)
+    await _seed_organization(test_db_session, organization_id=2, name="Shared Slot Org")
+    await _seed_assessment_package(test_db_session, package_id=2, package_code="PKG2")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=2)
+    type_id = await _engagement_type_id(test_db_session, "blood_test")
+
+    slot_detail = {
+        "blood_collection": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Shared Cabin",
+                    "cabin_key": "btc-shared",
+                    "start_time": "09:00",
+                    "end_time": "17:00",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 4,
+                    "breaks": [],
+                    "is_active": True,
+                }
+            ]
+        }
+    }
+    base_payload = {
+        "organization_id": 2,
+        "engagement_type": type_id,
+        "assessment_package_id": 2,
+        "diagnostic_package_id": 2,
+        "city": "BLR",
+        "slot_duration": 30,
+        "start_date": "2026-08-20",
+        "end_date": "2026-08-21",
+        "slot_detail": slot_detail,
+    }
+
+    first = await async_client.post(
+        "/engagements",
+        headers=_auth_header(7030),
+        json={**base_payload, "engagement_name": "Shared Camp A", "engagement_code": "SHARE001"},
+    )
+    assert first.status_code == 201, first.text
+    first_id = first.json()["data"]["engagement_id"]
+
+    second = await async_client.post(
+        "/engagements",
+        headers=_auth_header(7030),
+        json={**base_payload, "engagement_name": "Shared Camp B", "engagement_code": "SHARE002"},
+    )
+    assert second.status_code == 201, second.text
+    second_id = second.json()["data"]["engagement_id"]
+
+    first_details = await async_client.get(f"/engagements/{first_id}", headers=_auth_header(7030))
+    second_details = await async_client.get(f"/engagements/{second_id}", headers=_auth_header(7030))
+    first_data = first_details.json()["data"]
+    second_data = second_details.json()["data"]
+
+    assert first_data["slot_detail_id"] is not None
+    assert first_data["slot_detail_id"] == second_data["slot_detail_id"]
+    assert first_data["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_key"] == "btc-shared"
+
+    updated_slot = {
+        "blood_collection": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Shared Cabin Updated",
+                    "cabin_key": "btc-shared",
+                    "start_time": "08:00",
+                    "end_time": "16:00",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 4,
+                    "breaks": [],
+                    "is_active": True,
+                }
+            ]
+        }
+    }
+    update_payload = {
+        "engagement_name": "Shared Camp A",
+        "engagement_code": first_data["engagement_code"],
+        "organization_id": 2,
+        "engagement_type": type_id,
+        "assessment_package_id": 2,
+        "diagnostic_package_id": 2,
+        "city": "BLR",
+        "slot_duration": 30,
+        "start_date": "2026-08-20",
+        "end_date": "2026-08-21",
+        "slot_detail": updated_slot,
+    }
+    updated = await async_client.put(f"/engagements/{first_id}", headers=_auth_header(7030), json=update_payload)
+    assert updated.status_code == 200, updated.text
+
+    second_after = await async_client.get(f"/engagements/{second_id}", headers=_auth_header(7030))
+    assert (
+        second_after.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_name"]
+        == "Shared Cabin Updated"
+    )
+
+
+@pytest.mark.asyncio
 async def test_create_engagement_rejects_invalid_slot_detail(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7021, employee_id=26)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")

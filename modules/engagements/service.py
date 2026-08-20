@@ -35,7 +35,6 @@ from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.consultation_booking_validation import (
     effective_consultation_mode,
-    validate_consultation_cabin_slot_for_booking,
 )
 from modules.engagements.models import BloodCollectionType, ConsultationMode, Engagement, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
@@ -49,6 +48,7 @@ from modules.engagements.slot_availability import (
     slot_detail_is_configured,
     slot_unavailable,
 )
+from modules.engagements.slot_info_repository import EngagementSlotInfoRepository
 from modules.experts.consultation_bookings_repository import ConsultationBookingsRepository
 from modules.experts.consultations import bookings_to_consultations_map, empty_consent, normalize_consultations_map, normalize_consent
 from modules.engagements.schemas import (
@@ -282,6 +282,7 @@ class EngagementsService:
         notifications_service: "NotificationsService | None" = None,
         consultation_bookings_repository: ConsultationBookingsRepository | None = None,
         expert_types_service: ExpertTypesService | None = None,
+        slot_info_repository: EngagementSlotInfoRepository | None = None,
     ):
         self._repository = repository
         self._audit_service = audit_service
@@ -298,7 +299,57 @@ class EngagementsService:
         self._reports_repository = ReportsRepository()
         self._consultation_bookings = consultation_bookings_repository or ConsultationBookingsRepository()
         self._expert_types_service = expert_types_service or ExpertTypesService(repository=ExpertTypesRepository())
+        self._slot_info_repository = slot_info_repository or EngagementSlotInfoRepository()
         self._checklists_service = None
+
+    async def resolve_slot_detail(self, db: AsyncSession, engagement: Engagement) -> dict[str, Any] | None:
+        if engagement.slot_detail_id is None:
+            return None
+        return await self._slot_info_repository.get_by_id(db, int(engagement.slot_detail_id))
+
+    async def resolve_slot_details_map(
+        self,
+        db: AsyncSession,
+        engagements: list[Engagement],
+    ) -> dict[int, dict[str, Any]]:
+        ids = list({int(e.slot_detail_id) for e in engagements if e.slot_detail_id is not None})
+        return await self._slot_info_repository.get_by_ids(db, ids)
+
+    async def _persist_slot_detail(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: int | None,
+        city: str | None,
+        start_date: date,
+        end_date: date,
+        slot_detail: SlotDetail | None,
+        existing_slot_detail_id: int | None = None,
+        exclude_engagement_id: int | None = None,
+    ) -> int | None:
+        if slot_detail is None:
+            return None
+        data = slot_detail.model_dump(mode="json", exclude_none=True)
+        if not slot_detail_is_configured(data):
+            return None
+
+        shared_id = await self._slot_info_repository.find_shared_slot_detail_id(
+            db,
+            organization_id=organization_id,
+            city=city,
+            start_date=start_date,
+            end_date=end_date,
+            exclude_engagement_id=exclude_engagement_id,
+        )
+        if shared_id is not None:
+            await self._slot_info_repository.update(db, shared_id, data)
+            return shared_id
+
+        if existing_slot_detail_id is not None:
+            await self._slot_info_repository.update(db, existing_slot_detail_id, data)
+            return existing_slot_detail_id
+
+        return await self._slot_info_repository.create(db, data)
 
     async def _participant_rows_to_dicts(self, db: AsyncSession, rows: list[tuple]) -> list[dict[str, Any]]:
         all_booking_ids: list[int] = []
@@ -497,6 +548,15 @@ class EngagementsService:
 
         initial_status = "running" if payload.start_date <= date.today() else "scheduled"
 
+        slot_detail_id = await self._persist_slot_detail(
+            db,
+            organization_id=payload.organization_id,
+            city=payload.city,
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+            slot_detail=prepared_slot_detail,
+        )
+
         engagement = Engagement(
             engagement_name=payload.engagement_name,
             metsights_engagement_id=payload.metsights_engagement_id,
@@ -505,7 +565,7 @@ class EngagementsService:
             engagement_code=code,
             engagement_type=payload.engagement_type,
             consultations=payload.consultations,
-            slot_detail=prepared_slot_detail.model_dump(mode="json", exclude_none=True) if prepared_slot_detail is not None else None,
+            slot_detail_id=slot_detail_id,
             assessment_package_id=payload.assessment_package_id,
             diagnostic_package_id=diagnostic_package_id,
             city=payload.city,
@@ -752,7 +812,8 @@ class EngagementsService:
         return await self._repository.get_engagement_with_org_by_code(db, engagement_code)
 
     async def public_slot_detail_for_engagement(self, db: AsyncSession, engagement: Engagement):
-        if not slot_detail_is_configured(engagement.slot_detail):
+        slot_detail = await self.resolve_slot_detail(db, engagement)
+        if not slot_detail_is_configured(slot_detail):
             return None
         rows = await self._repository.list_cabin_slot_occupancy(
             db,
@@ -763,7 +824,7 @@ class EngagementsService:
             engagement_id=int(engagement.engagement_id),
         )
         return build_public_slot_detail(
-            engagement.slot_detail,
+            slot_detail,
             occupancy_map_from_rows(rows),
             occupancy_map_from_rows(consultation_rows),
         )
@@ -778,11 +839,12 @@ class EngagementsService:
         slot_time: time,
     ) -> str | None:
         normalized_cabin = (cabin_key or "").strip() or None
-        if not slot_detail_is_configured(engagement.slot_detail):
+        slot_detail = await self.resolve_slot_detail(db, engagement)
+        if not slot_detail_is_configured(slot_detail):
             return normalized_cabin
 
         cabin = require_available_blood_collection_slot(
-            engagement.slot_detail,
+            slot_detail,
             collection_date=collection_date,
             cabin_key=normalized_cabin,
             slot_time=slot_time,
@@ -808,11 +870,12 @@ class EngagementsService:
         consultations: dict[str, Any] | None,
     ) -> dict[str, Any]:
         normalized = normalize_consultations_map(consultations)
-        if not slot_detail_is_configured(engagement.slot_detail):
+        slot_detail = await self.resolve_slot_detail(db, engagement)
+        if not slot_detail_is_configured(slot_detail):
             return normalized
         section = None
-        if isinstance(engagement.slot_detail, dict):
-            section = engagement.slot_detail.get("consultation")
+        if isinstance(slot_detail, dict):
+            section = slot_detail.get("consultation")
         if not isinstance(section, dict) or not section:
             return normalized
 
@@ -830,15 +893,28 @@ class EngagementsService:
                 consultation_date = date.fromisoformat(str(date_val)[:10])
             except ValueError as exc:
                 raise slot_unavailable() from exc
-            persisted_cabin, slot_hhmm = await validate_consultation_cabin_slot_for_booking(
-                db,
-                engagement=engagement,
+            slot_time = coerce_time(slot_val)
+            if slot_time is None:
+                raise slot_unavailable()
+            cabin = require_available_consultation_slot(
+                slot_detail,
                 expert_type=str(expert_type),
                 consultation_date=consultation_date,
                 cabin_key=cabin_val,
-                slot_val=str(slot_val),
-                consultation_bookings=self._consultation_bookings,
+                slot_time=slot_time,
             )
+            persisted_cabin = (cabin.get("cabin_key") or "").strip()
+            slot_hhmm = format_hhmm(slot_time)
+            count = await self._consultation_bookings.count_cabin_slot_bookings(
+                db,
+                engagement_id=int(engagement.engagement_id),
+                consultation_cabin=persisted_cabin,
+                consultation_date=consultation_date,
+                consultation_slot=slot_hhmm,
+            )
+            capacity = int(cabin.get("capacity_per_slot") or 0)
+            if count >= capacity:
+                raise slot_unavailable()
             pref["cabin"] = persisted_cabin
             pref["slot"] = slot_hhmm
             pref["date"] = consultation_date.isoformat()
@@ -921,16 +997,38 @@ class EngagementsService:
                 effective_mode,
             )
             await self._validate_consultation_expert_types(db, prepared_slot_detail)
-            engagement.slot_detail = (
-                prepared_slot_detail.model_dump(mode="json", exclude_none=True)
-                if prepared_slot_detail is not None
-                else None
-            )
+            if prepared_slot_detail is None:
+                engagement.slot_detail_id = None
+            else:
+                engagement.slot_detail_id = await self._persist_slot_detail(
+                    db,
+                    organization_id=payload.organization_id,
+                    city=payload.city,
+                    start_date=payload.start_date,
+                    end_date=payload.end_date,
+                    slot_detail=prepared_slot_detail,
+                    existing_slot_detail_id=engagement.slot_detail_id,
+                    exclude_engagement_id=int(engagement.engagement_id),
+                )
         elif "consultation_mode" in update_fields and effective_mode == ConsultationMode.online:
-            if isinstance(engagement.slot_detail, dict):
-                slot_detail_data = dict(engagement.slot_detail)
+            existing = await self.resolve_slot_detail(db, engagement)
+            if isinstance(existing, dict) and existing.get("consultation"):
+                slot_detail_data = dict(existing)
                 slot_detail_data.pop("consultation", None)
-                engagement.slot_detail = slot_detail_data or None
+                if not slot_detail_is_configured(slot_detail_data):
+                    engagement.slot_detail_id = None
+                else:
+                    prepared = SlotDetail.model_validate(slot_detail_data)
+                    engagement.slot_detail_id = await self._persist_slot_detail(
+                        db,
+                        organization_id=payload.organization_id,
+                        city=payload.city,
+                        start_date=payload.start_date,
+                        end_date=payload.end_date,
+                        slot_detail=prepared,
+                        existing_slot_detail_id=engagement.slot_detail_id,
+                        exclude_engagement_id=int(engagement.engagement_id),
+                    )
         engagement.assessment_package_id = payload.assessment_package_id
         engagement.diagnostic_package_id = payload.diagnostic_package_id
         engagement.city = payload.city
