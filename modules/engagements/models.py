@@ -22,6 +22,15 @@ _engagement_kind = SAEnum(
 )
 
 
+class EngagementSlotInfo(Base):
+    """Shared cabin schedule configuration for one or more engagements."""
+
+    __tablename__ = "engagement_slot_info"
+
+    slot_detail_id = Column(Integer, primary_key=True, autoincrement=True)
+    slot_detail = Column(JSON, nullable=False)
+
+
 class Engagement(Base):
     """SQLAlchemy model for `engagements` table."""
 
@@ -40,7 +49,7 @@ class Engagement(Base):
     engagement_code = Column(String, nullable=False)
     engagement_type = Column(Integer, ForeignKey("engagement_types.id"), nullable=True)
     consultations = Column(JSON, nullable=True)
-    slot_detail = Column(JSON, nullable=True)
+    slot_detail_id = Column(Integer, ForeignKey("engagement_slot_info.slot_detail_id", ondelete="SET NULL"), nullable=True)
     assessment_package_id = Column(Integer, ForeignKey("assessment_packages.package_id"), nullable=True)
     diagnostic_package_id = Column(Integer, ForeignKey("diagnostic_package.diagnostic_package_id"), nullable=True)
     address = Column(String, nullable=True)
