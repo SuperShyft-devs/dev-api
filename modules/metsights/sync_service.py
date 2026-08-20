@@ -37,6 +37,7 @@ from modules.diagnostics.models import DiagnosticPackage
 from modules.assessments.service import AssessmentsService
 from modules.engagements.models import EngagementType
 from modules.engagements.service import EngagementsService
+from modules.metsights.anthropometry_validation import prepare_anthropometry_payload as _prepare_anthropometry_payload
 from modules.metsights.service import MetsightsService
 from modules.metsights.strategies import apply_pull_strategy, apply_push_strategy
 from modules.platform_settings.service import PlatformSettingsService
@@ -378,51 +379,6 @@ def _pick_metsights_payload_for_bases(merged: dict[str, Any], bases: frozenset[s
         if uk in merged:
             out[uk] = merged[uk]
     return out
-
-
-def _validate_measurement_ranges(payload: dict[str, Any]) -> None:
-    """Reject absurd anthropometry values before calling Metsights."""
-    weight = payload.get("weight")
-    if weight is not None:
-        try:
-            w = float(weight)
-        except (TypeError, ValueError):
-            w = None
-        unit = str(payload.get("weight_unit") or "0").strip()
-        if w is not None:
-            if unit in {"0", "kg"} and (w < 20 or w > 300):
-                raise AppError(
-                    status_code=422,
-                    error_code="INVALID_INPUT",
-                    message=f"Weight {w} kg is out of range (expected 20–300 kg)",
-                )
-            if unit in {"1", "lb", "lbs"} and (w < 44 or w > 660):
-                raise AppError(
-                    status_code=422,
-                    error_code="INVALID_INPUT",
-                    message=f"Weight {w} lb is out of range (expected 44–660 lb)",
-                )
-
-    height = payload.get("height")
-    if height is not None:
-        try:
-            h = float(height)
-        except (TypeError, ValueError):
-            h = None
-        unit = str(payload.get("height_unit") or "0").strip()
-        if h is not None:
-            if unit in {"0", "cm"} and (h < 50 or h > 250):
-                raise AppError(
-                    status_code=422,
-                    error_code="INVALID_INPUT",
-                    message=f"Height {h} cm is out of range (expected 50–250 cm)",
-                )
-            if unit in {"2", "ft/in", "ft", "feet"} and (h < 1.5 or h > 8.5):
-                raise AppError(
-                    status_code=422,
-                    error_code="INVALID_INPUT",
-                    message=f"Height {h} ft/in is out of range",
-                )
 
 
 class _FieldMeta:
@@ -1520,6 +1476,7 @@ class MetsightsSyncService:
                         reason="all_fields_invalid",
                     )
                     return
+            payload = _prepare_anthropometry_payload(payload)
             if mark_complete and resource in _METSIGHTS_QUESTIONNAIRE_RESOURCES:
                 payload["is_complete"] = True
             logger.info("Pushing to Metsights %s for record %s: %s", resource, mrid, payload)
@@ -2080,7 +2037,7 @@ class MetsightsSyncService:
         if field_meta:
             metsights_payload = _validate_payload_against_options(metsights_payload, field_meta)
         _validate_required_metsights_fields(metsights_payload, field_meta, category_key=category_key)
-        _validate_measurement_ranges(metsights_payload)
+        metsights_payload = _prepare_anthropometry_payload(metsights_payload)
 
         if not metsights_payload:
             raise AppError(

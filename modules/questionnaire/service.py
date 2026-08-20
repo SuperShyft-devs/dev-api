@@ -15,6 +15,7 @@ from core.exceptions import AppError
 from db.seed.metsights_sync_operations import reset_metsights_sync as run_reset_metsights_sync
 from db.seed.blood_parameters_operations import reload_blood_parameters_questions as run_reload_blood_parameters_questions
 from db.seed.questionnaire_field_config import MAX_MULTI_SELECT_CHOICES, QUESTION_TYPE_OVERRIDES
+from modules.metsights.anthropometry_validation import validate_scale_answer
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
 from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireHealthyHabitRule
@@ -463,6 +464,7 @@ class QuestionnaireService:
             }
             if unit not in allowed_units:
                 raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer unit is not allowed")
+            validate_scale_answer(_normalize_text(question.get("question_key")), answer)
             return
 
         if question_type == "single_choice":

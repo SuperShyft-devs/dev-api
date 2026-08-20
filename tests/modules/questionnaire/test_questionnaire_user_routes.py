@@ -1494,6 +1494,84 @@ async def test_upsert_text_rejects_non_string(async_client, test_db_session):
     assert resp.status_code == 200
 
 
+@pytest.mark.asyncio
+async def test_upsert_waist_rejects_out_of_range_inches(async_client, test_db_session):
+    """Waist circumference out of Metsights range is rejected at save time."""
+    await _seed_user(test_db_session, user_id=5085)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=9055, package_code="PKG9055", display_name="Waist Pkg", status="active")
+    category = QuestionnaireCategory(category_id=8055, category_key="anthropometry", display_name="Anthro", status="active")
+    question = QuestionnaireDefinition(
+        question_id=4055,
+        question_key="waist_circumference",
+        question_text="Waist size",
+        question_type="scale",
+        status="active",
+    )
+    test_db_session.add_all([package, category, question])
+    await test_db_session.commit()
+    test_db_session.add_all([
+        QuestionnaireOption(question_id=4055, option_value="0", display_name="cm"),
+        QuestionnaireOption(question_id=4055, option_value="1", display_name="in"),
+    ])
+    await _map_question_to_category(test_db_session, mapping_id=8955, category_id=8055, question_id=4055)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=9055, category_id=8055))
+    test_db_session.add(AssessmentInstance(
+        assessment_instance_id=9055, user_id=5085, package_id=9055, engagement_id=1, status="active",
+    ))
+    await test_db_session.commit()
+
+    bad = {"responses": [{"question_id": 4055, "answer": {"value": 21.0, "unit": "1"}}]}
+    resp = await async_client.put("/questionnaire/9055/category/8055/responses", headers=_auth_header(5085), json=bad)
+    assert resp.status_code == 422
+    assert resp.json()["error_code"] == "INVALID_INPUT"
+    assert "Waist" in resp.json()["message"]
+
+    good = {"responses": [{"question_id": 4055, "answer": {"value": 30.0, "unit": "1"}}]}
+    resp = await async_client.put("/questionnaire/9055/category/8055/responses", headers=_auth_header(5085), json=good)
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_upsert_hip_rejects_out_of_range_cm(async_client, test_db_session):
+    """Hip circumference out of Metsights range is rejected at save time."""
+    await _seed_user(test_db_session, user_id=5086)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=9056, package_code="PKG9056", display_name="Hip Pkg", status="active")
+    category = QuestionnaireCategory(category_id=8056, category_key="anthropometry", display_name="Anthro", status="active")
+    question = QuestionnaireDefinition(
+        question_id=4056,
+        question_key="hip_circumference",
+        question_text="Hip size",
+        question_type="scale",
+        status="active",
+    )
+    test_db_session.add_all([package, category, question])
+    await test_db_session.commit()
+    test_db_session.add_all([
+        QuestionnaireOption(question_id=4056, option_value="0", display_name="cm"),
+        QuestionnaireOption(question_id=4056, option_value="1", display_name="in"),
+    ])
+    await _map_question_to_category(test_db_session, mapping_id=8956, category_id=8056, question_id=4056)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=9056, category_id=8056))
+    test_db_session.add(AssessmentInstance(
+        assessment_instance_id=9056, user_id=5086, package_id=9056, engagement_id=1, status="active",
+    ))
+    await test_db_session.commit()
+
+    bad = {"responses": [{"question_id": 4056, "answer": {"value": 21.0, "unit": "0"}}]}
+    resp = await async_client.put("/questionnaire/9056/category/8056/responses", headers=_auth_header(5086), json=bad)
+    assert resp.status_code == 422
+    assert resp.json()["error_code"] == "INVALID_INPUT"
+    assert "Hip" in resp.json()["message"]
+
+    good = {"responses": [{"question_id": 4056, "answer": {"value": 21.0, "unit": "1"}}]}
+    resp = await async_client.put("/questionnaire/9056/category/8056/responses", headers=_auth_header(5086), json=good)
+    assert resp.status_code == 200
+
+
 # ==================== category_status consistency Tests ====================
 
 

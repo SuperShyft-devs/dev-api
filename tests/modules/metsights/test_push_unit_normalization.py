@@ -99,17 +99,75 @@ def test_validate_payload_keeps_required_scale_fields_without_choices():
 
 
 def test_validate_measurement_ranges_rejects_tiny_weight():
-    from modules.metsights.sync_service import _validate_measurement_ranges
+    from modules.metsights.anthropometry_validation import validate_metsights_payload_ranges
     from core.exceptions import AppError
     import pytest
 
     with pytest.raises(AppError) as ei:
-        _validate_measurement_ranges({"weight": 5.0, "weight_unit": "0"})
+        validate_metsights_payload_ranges({"weight": 5.0, "weight_unit": "0"})
     assert ei.value.error_code == "INVALID_INPUT"
     assert "20" in ei.value.message
 
 
 def test_validate_measurement_ranges_allows_normal_weight():
-    from modules.metsights.sync_service import _validate_measurement_ranges
+    from modules.metsights.anthropometry_validation import validate_metsights_payload_ranges
 
-    _validate_measurement_ranges({"weight": 70.0, "weight_unit": "0", "height": 185.0, "height_unit": "0"})
+    validate_metsights_payload_ranges({"weight": 70.0, "weight_unit": "0", "height": 185.0, "height_unit": "0"})
+
+
+def test_normalize_hip_inches_to_cm():
+    from modules.metsights.anthropometry_validation import normalize_anthropometry_for_metsights
+
+    out = normalize_anthropometry_for_metsights(
+        {"hip_circumference": 21.0, "hip_circumference_unit": "1"}
+    )
+    assert out["hip_circumference"] == 53.34
+    assert out["hip_circumference_unit"] == "0"
+
+
+def test_drop_invalid_optional_hip():
+    from modules.metsights.anthropometry_validation import drop_invalid_optional_hip
+
+    kept = drop_invalid_optional_hip({"hip_circumference": 21.0, "hip_circumference_unit": "1"})
+    assert kept["hip_circumference"] == 21.0
+
+    dropped = drop_invalid_optional_hip({"hip_circumference": 10.0, "hip_circumference_unit": "0"})
+    assert "hip_circumference" not in dropped
+
+
+def test_validate_measurement_ranges_rejects_small_waist_inches():
+    from modules.metsights.anthropometry_validation import validate_scale_answer
+    from core.exceptions import AppError
+    import pytest
+
+    with pytest.raises(AppError) as ei:
+        validate_scale_answer("waist_circumference", {"value": 21.0, "unit": "1"})
+    assert ei.value.error_code == "INVALID_INPUT"
+    assert "Waist" in ei.value.message
+
+
+def test_prepare_anthropometry_payload_converts_hip_and_validates_waist():
+    from modules.metsights.anthropometry_validation import prepare_anthropometry_payload
+    from core.exceptions import AppError
+    import pytest
+
+    with pytest.raises(AppError):
+        prepare_anthropometry_payload(
+            {
+                "waist_circumference": 21.0,
+                "waist_circumference_unit": "1",
+                "hip_circumference": 21.0,
+                "hip_circumference_unit": "1",
+            }
+        )
+
+    prepared = prepare_anthropometry_payload(
+        {
+            "waist_circumference": 30.0,
+            "waist_circumference_unit": "1",
+            "hip_circumference": 21.0,
+            "hip_circumference_unit": "1",
+        }
+    )
+    assert prepared["hip_circumference"] == 53.34
+    assert prepared["waist_circumference"] == 30.0

@@ -637,7 +637,6 @@ class MetsightsService:
                 "height",
                 "weight",
                 "waist_circumference",
-                "hip_circumference",
                 "body_fat",
             }
         )
