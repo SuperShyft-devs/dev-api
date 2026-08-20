@@ -8,6 +8,15 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from common.validation import (
+    OptionalSafeDisplayName,
+    OptionalSafeText,
+    OptionalSlugKey,
+    SafeDisplayName,
+    SlugKey,
+    StatusStr,
+)
+
 
 class ParameterType(str, Enum):
     TEST = "test"
@@ -30,15 +39,15 @@ class FilterChipForSchema(str, Enum):
 
 
 class DiagnosticPackageCreate(BaseModel):
-    package_name: str = Field(min_length=1)
+    package_name: SafeDisplayName
     package_image: Optional[str] = None
     diagnostic_provider: Optional[str] = None
     external_package_id: Optional[int] = None
     custom: bool = False
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
-    health_areas_covered: Optional[str] = None
-    about_text: Optional[str] = None
+    health_areas_covered: OptionalSafeText = None
+    about_text: OptionalSafeText = None
     bookings_count: Optional[int] = None
     price: Optional[float] = None
     original_price: Optional[float] = None
@@ -50,14 +59,14 @@ class DiagnosticPackageCreate(BaseModel):
 
 
 class DiagnosticPackageUpdate(BaseModel):
-    package_name: Optional[str] = Field(default=None, min_length=1)
+    package_name: OptionalSafeDisplayName = None
     package_image: Optional[str] = None
     diagnostic_provider: Optional[str] = None
     external_package_id: Optional[int] = None
     report_duration_hours: Optional[int] = None
     collection_type: Optional[str] = None
-    health_areas_covered: Optional[str] = None
-    about_text: Optional[str] = None
+    health_areas_covered: OptionalSafeText = None
+    about_text: OptionalSafeText = None
     bookings_count: Optional[int] = None
     price: Optional[float] = None
     original_price: Optional[float] = None
@@ -69,7 +78,7 @@ class DiagnosticPackageUpdate(BaseModel):
 
 
 class DiagnosticPackageStatusUpdate(BaseModel):
-    status: str = Field(min_length=1)
+    status: StatusStr
 
 
 class DiagnosticPackageResponse(BaseModel):
@@ -98,17 +107,17 @@ class DiagnosticPackageResponse(BaseModel):
 
 
 class FilterChipCreate(BaseModel):
-    chip_key: str = Field(min_length=1)
-    display_name: str = Field(min_length=1)
+    chip_key: SlugKey
+    display_name: SafeDisplayName
     display_order: Optional[int] = None
     chip_for: FilterChipForSchema = FilterChipForSchema.PUBLIC_PACKAGE
 
 
 class FilterChipUpdate(BaseModel):
-    chip_key: Optional[str] = Field(default=None, min_length=1)
-    display_name: Optional[str] = Field(default=None, min_length=1)
+    chip_key: OptionalSlugKey = None
+    display_name: OptionalSafeDisplayName = None
     display_order: Optional[int] = None
-    status: Optional[str] = None
+    status: Optional[StatusStr] = None
     chip_for: Optional[FilterChipForSchema] = None
 
 
@@ -134,12 +143,12 @@ class PackageFilterChipAssign(BaseModel):
 
 
 class ReasonCreate(BaseModel):
-    reason_text: str = Field(min_length=1)
+    reason_text: SafeDisplayName
     display_order: Optional[int] = None
 
 
 class ReasonUpdate(BaseModel):
-    reason_text: Optional[str] = None
+    reason_text: OptionalSafeDisplayName = None
     display_order: Optional[int] = None
 
 
@@ -151,7 +160,7 @@ class ReasonResponse(BaseModel):
 
 
 class TagCreate(BaseModel):
-    tag_name: str = Field(min_length=1)
+    tag_name: SafeDisplayName
     display_order: Optional[int] = None
 
 
@@ -164,11 +173,11 @@ class TagResponse(BaseModel):
 
 class HealthParameterCreate(BaseModel):
     parameter_type: ParameterType = ParameterType.TEST
-    test_name: str = Field(min_length=1)
+    test_name: SafeDisplayName
     external_parameter_id: Optional[int] = None
-    parameter_key: Optional[str] = None
+    parameter_key: OptionalSlugKey = None
     unit: Optional[str] = None
-    meaning: Optional[str] = None
+    meaning: OptionalSafeText = None
     low_risk_lower_range_male: Optional[float] = None
     low_risk_higher_range_male: Optional[float] = None
     moderate_risk_lower_range_male: Optional[float] = None
@@ -181,12 +190,12 @@ class HealthParameterCreate(BaseModel):
     moderate_risk_higher_range_female: Optional[float] = None
     high_risk_lower_range_female: Optional[float] = None
     high_risk_higher_range_female: Optional[float] = None
-    causes_when_high: Optional[str] = None
-    causes_when_low: Optional[str] = None
-    effects_when_high: Optional[str] = None
-    effects_when_low: Optional[str] = None
-    what_to_do_when_low: Optional[str] = None
-    what_to_do_when_high: Optional[str] = None
+    causes_when_high: OptionalSafeText = None
+    causes_when_low: OptionalSafeText = None
+    effects_when_high: OptionalSafeText = None
+    effects_when_low: OptionalSafeText = None
+    what_to_do_when_low: OptionalSafeText = None
+    what_to_do_when_high: OptionalSafeText = None
     is_available: bool = True
     display_order: Optional[int] = None
     price: Optional[float] = None
@@ -197,11 +206,11 @@ class HealthParameterCreate(BaseModel):
 
 class HealthParameterUpdate(BaseModel):
     parameter_type: Optional[ParameterType] = None
-    test_name: Optional[str] = None
+    test_name: OptionalSafeDisplayName = None
     external_parameter_id: Optional[int] = None
-    parameter_key: Optional[str] = None
+    parameter_key: OptionalSlugKey = None
     unit: Optional[str] = None
-    meaning: Optional[str] = None
+    meaning: OptionalSafeText = None
     low_risk_lower_range_male: Optional[float] = None
     low_risk_higher_range_male: Optional[float] = None
     moderate_risk_lower_range_male: Optional[float] = None
@@ -214,12 +223,12 @@ class HealthParameterUpdate(BaseModel):
     moderate_risk_higher_range_female: Optional[float] = None
     high_risk_lower_range_female: Optional[float] = None
     high_risk_higher_range_female: Optional[float] = None
-    causes_when_high: Optional[str] = None
-    causes_when_low: Optional[str] = None
-    effects_when_high: Optional[str] = None
-    effects_when_low: Optional[str] = None
-    what_to_do_when_low: Optional[str] = None
-    what_to_do_when_high: Optional[str] = None
+    causes_when_high: OptionalSafeText = None
+    causes_when_low: OptionalSafeText = None
+    effects_when_high: OptionalSafeText = None
+    effects_when_low: OptionalSafeText = None
+    what_to_do_when_low: OptionalSafeText = None
+    what_to_do_when_high: OptionalSafeText = None
     display_order: Optional[int] = None
     is_available: Optional[bool] = None
     price: Optional[float] = None
@@ -265,8 +274,8 @@ class HealthParameterResponse(BaseModel):
 
 
 class TestGroupCreate(BaseModel):
-    group_name: str = Field(min_length=1)
-    group_key: str = Field(min_length=1)
+    group_name: SafeDisplayName
+    group_key: SlugKey
     display_order: Optional[int] = None
     price: Optional[float] = None
     original_price: Optional[float] = None
@@ -276,8 +285,8 @@ class TestGroupCreate(BaseModel):
 
 
 class TestGroupUpdate(BaseModel):
-    group_name: Optional[str] = None
-    group_key: Optional[str] = Field(default=None, min_length=1)
+    group_name: OptionalSafeDisplayName = None
+    group_key: OptionalSlugKey = None
     display_order: Optional[int] = None
     price: Optional[float] = None
     original_price: Optional[float] = None
@@ -340,14 +349,14 @@ class PackageTestsResponse(BaseModel):
 
 
 class SampleCreate(BaseModel):
-    sample_type: str = Field(min_length=1)
-    description: Optional[str] = None
+    sample_type: SafeDisplayName
+    description: OptionalSafeText = None
     display_order: Optional[int] = None
 
 
 class SampleUpdate(BaseModel):
-    sample_type: Optional[str] = None
-    description: Optional[str] = None
+    sample_type: OptionalSafeDisplayName = None
+    description: OptionalSafeText = None
     display_order: Optional[int] = None
 
 
@@ -360,13 +369,13 @@ class SampleResponse(BaseModel):
 
 
 class PreparationCreate(BaseModel):
-    preparation_title: str = Field(min_length=1)
+    preparation_title: SafeDisplayName
     steps: Optional[list[str]] = None
     display_order: Optional[int] = None
 
 
 class PreparationUpdate(BaseModel):
-    preparation_title: Optional[str] = None
+    preparation_title: OptionalSafeDisplayName = None
     steps: Optional[list[str]] = None
     display_order: Optional[int] = None
 

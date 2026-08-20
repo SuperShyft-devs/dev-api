@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
-
-from core.config import settings
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
 from core.dependencies import get_current_user
 from core.network import get_client_ip
 from core.rate_limit import limiter
-from db.session import AsyncSessionLocal, get_db
+from db.session import get_db
 from modules.auth.dependencies import get_auth_service
 from modules.auth.schemas import (
     LogoutRequest,
@@ -20,25 +18,10 @@ from modules.auth.schemas import (
     SendOtpRequest,
     VerifyOtpRequest,
 )
-from modules.auth.service import AuthService, OtpDelivery
+from modules.auth.service import AuthService
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-async def _deliver_otp_background(delivery: OtpDelivery) -> None:
-    async with AsyncSessionLocal() as db:
-        auth_service = get_auth_service()
-        await auth_service.deliver_otp_via_notifications(db, delivery=delivery)
-        await db.commit()
-
-
-async def _deliver_otps_background(deliveries: list[OtpDelivery]) -> None:
-    async with AsyncSessionLocal() as db:
-        auth_service = get_auth_service()
-        for delivery in deliveries:
-            await auth_service.deliver_otp_via_notifications(db, delivery=delivery)
-        await db.commit()
 
 
 @router.post("/send-otp")
@@ -46,7 +29,6 @@ async def _deliver_otps_background(deliveries: list[OtpDelivery]) -> None:
 async def send_otp(
     payload: SendOtpRequest,
     request: Request,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service),
 ):
@@ -60,12 +42,11 @@ async def send_otp(
     )
     await db.commit()
 
+    # Await delivery so WhatsApp/email failures surface on send-otp instead of
+    # leaving a session that always 401s on verify-otp.
     if delivery is not None:
-        if settings.is_production():
-            background_tasks.add_task(_deliver_otp_background, delivery)
-        else:
-            await auth_service.deliver_otp_via_notifications(db, delivery=delivery)
-            await db.commit()
+        await auth_service.deliver_otp_via_notifications(db, delivery=delivery)
+        await db.commit()
 
     return success_response({"session_id": session_id})
 
@@ -75,7 +56,6 @@ async def send_otp(
 async def resend_otp(
     payload: ResendOtpRequest,
     request: Request,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service),
 ):
@@ -91,12 +71,9 @@ async def resend_otp(
     await db.commit()
 
     if deliveries:
-        if settings.is_production():
-            background_tasks.add_task(_deliver_otps_background, deliveries)
-        else:
-            for delivery in deliveries:
-                await auth_service.deliver_otp_via_notifications(db, delivery=delivery)
-            await db.commit()
+        for delivery in deliveries:
+            await auth_service.deliver_otp_via_notifications(db, delivery=delivery)
+        await db.commit()
 
     return success_response({"session_id": session_id})
 

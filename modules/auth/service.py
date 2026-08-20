@@ -409,14 +409,22 @@ class AuthService:
 
         session = await self._repository.get_latest_otp_session(db, user.user_id)
         if session is None:
-            raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
+            raise AppError(
+                status_code=401,
+                error_code="AUTH_FAILED",
+                message="OTP expired or not found. Please request a new code.",
+            )
 
         _MAX_OTP_ATTEMPTS = 5
 
         now = datetime.now(timezone.utc)
         if now >= session.otp_expires_at:
             await self._repository.delete_otp_session(db, session.session_id)
-            raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
+            raise AppError(
+                status_code=401,
+                error_code="AUTH_FAILED",
+                message="OTP expired or not found. Please request a new code.",
+            )
 
         if getattr(session, "failed_attempts", 0) >= _MAX_OTP_ATTEMPTS:
             await self._repository.delete_otp_session(db, session.session_id)
@@ -430,7 +438,7 @@ class AuthService:
         if not bypass_allowed and not _verify_otp(otp, session.otp_hash, self._otp_secret()):
             session.failed_attempts = getattr(session, "failed_attempts", 0) + 1
             await db.flush()
-            raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
+            raise AppError(status_code=401, error_code="AUTH_FAILED", message="Invalid OTP")
 
         # Store session_id before deletion for audit log
         session_id_for_audit = session.session_id

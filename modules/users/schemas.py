@@ -7,6 +7,27 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, model_validator, validator
 
+from common.validation import (
+    AddressText,
+    CityStateCountry,
+    EngagementCode,
+    OptionalAddressText,
+    OptionalCityStateCountry,
+    OptionalEngagementCode,
+    OptionalPersonName,
+    OptionalPhoneStr,
+    OptionalPinCode,
+    OptionalSafeDisplayName,
+    OptionalShortSafeText,
+    PersonName,
+    PhoneStr,
+    PinCode,
+    PositiveIntId,
+    SafeDisplayName,
+    SlugKey,
+    StatusStr,
+    validate_nested_strings,
+)
 from modules.questionnaire.schemas import ResponseItem
 
 _ALLOWED_DIET_PREFERENCES = {"veg", "non_veg", "vegan", "jain", "eggetarian", "keto"}
@@ -43,18 +64,18 @@ class UserProfileResponse(BaseModel):
 
 class UpdateMyProfileRequest(BaseModel):
     age: int
-    first_name: Optional[str] = Field(default=None, max_length=100)
-    last_name: Optional[str] = Field(default=None, max_length=100)
-    phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
+    first_name: OptionalPersonName = None
+    last_name: OptionalPersonName = None
+    phone: OptionalPhoneStr = None
     email: Optional[EmailStr] = None
     profile_photo: Optional[str] = Field(default=None, max_length=500)
     date_of_birth: Optional[date] = None
-    gender: Optional[str] = Field(default=None, max_length=30)
-    address: Optional[str] = Field(default=None, max_length=500)
-    pin_code: Optional[str] = Field(default=None, max_length=20)
-    city: Optional[str] = Field(default=None, max_length=100)
-    state: Optional[str] = Field(default=None, max_length=100)
-    country: Optional[str] = Field(default=None, max_length=100)
+    gender: OptionalSafeDisplayName = None
+    address: OptionalAddressText = None
+    pin_code: OptionalPinCode = None
+    city: OptionalCityStateCountry = None
+    state: OptionalCityStateCountry = None
+    country: OptionalCityStateCountry = None
 
     @validator("age")
     def age_must_be_valid(cls, v):
@@ -138,14 +159,14 @@ class UpcomingSlotResponse(BaseModel):
 
 class SubProfileCreate(BaseModel):
     age: int
-    first_name: str = Field(min_length=1, max_length=100)
-    last_name: str = Field(min_length=1, max_length=100)
+    first_name: PersonName
+    last_name: PersonName
     date_of_birth: Optional[date] = None
-    gender: str = Field(min_length=1, max_length=30)
+    gender: SafeDisplayName
     relationship: Literal["spouse", "child", "sibling", "parent", "grandparent", "other"]
-    phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
+    phone: OptionalPhoneStr = None
     email: Optional[EmailStr] = None
-    city: Optional[str] = Field(default=None, max_length=100)
+    city: OptionalCityStateCountry = None
 
     @validator("age")
     def age_must_be_valid(cls, v):
@@ -156,15 +177,15 @@ class SubProfileCreate(BaseModel):
 
 class SubProfileUpdate(BaseModel):
     age: int
-    first_name: Optional[str] = Field(default=None, max_length=100)
-    last_name: Optional[str] = Field(default=None, max_length=100)
+    first_name: OptionalPersonName = None
+    last_name: OptionalPersonName = None
     date_of_birth: Optional[date] = None
-    gender: Optional[str] = Field(default=None, max_length=30)
+    gender: OptionalSafeDisplayName = None
     relationship: Optional[Literal["spouse", "child", "sibling", "parent", "grandparent", "other"]] = None
-    phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
+    phone: OptionalPhoneStr = None
     email: Optional[EmailStr] = None
-    city: Optional[str] = Field(default=None, max_length=100)
-    address: Optional[str] = Field(default=None, max_length=500)
+    city: OptionalCityStateCountry = None
+    address: OptionalAddressText = None
 
     @validator("age")
     def age_must_be_valid(cls, v):
@@ -190,30 +211,30 @@ class SubProfileResponse(BaseModel):
 class UnlinkRequest(BaseModel):
     """Unlink a sub-profile from its parent. Sub-profile phone must differ from the parent's."""
 
-    child_user_id: Optional[int] = Field(default=None, gt=0)
+    child_user_id: PositiveIntId | None = None
 
 
 class BookBioAiRequest(BaseModel):
     """Authenticated B2C booking: new engagement, slot, assessment instance, Metsights record (when configured)."""
 
     blood_collection_date: date
-    blood_collection_time_slot: str = Field(min_length=1, max_length=20)
-    diagnostic_package_id: Optional[int] = Field(default=None, gt=0)
-    address: Optional[str] = Field(default=None, max_length=500)
-    pincode: Optional[str] = Field(default=None, max_length=20)
-    city: Optional[str] = Field(default=None, max_length=100)
+    blood_collection_time_slot: ShortSafeText
+    diagnostic_package_id: PositiveIntId | None = None
+    address: OptionalAddressText = None
+    pincode: OptionalPinCode = None
+    city: OptionalCityStateCountry = None
 
 
 class BookBioAiMemberPayload(BaseModel):
     """One member in a batch Bio AI or blood-test booking."""
 
-    user_id: int = Field(gt=0)
-    address: str = Field(min_length=1, max_length=500)
-    pincode: str = Field(min_length=1, max_length=20)
-    city: str = Field(min_length=1, max_length=100)
+    user_id: PositiveIntId
+    address: AddressText
+    pincode: PinCode
+    city: CityStateCountry
     blood_collection_date: date
-    blood_collection_time_slot: str = Field(min_length=1, max_length=20)
-    diagnostic_package_id: int = Field(gt=0)
+    blood_collection_time_slot: ShortSafeText
+    diagnostic_package_id: PositiveIntId
 
 
 class BookBioAiBatchRequest(BaseModel):
@@ -246,31 +267,31 @@ class PublicUserOnboardRequest(BaseModel):
     ``phone`` remain required (create / get-or-create by phone).
     """
 
-    user_id: Optional[int] = Field(default=None, ge=1)
+    user_id: PositiveIntId | None = None
 
     age: Optional[int] = None
-    first_name: Optional[str] = Field(default=None, max_length=100)
-    last_name: Optional[str] = Field(default=None, max_length=100)
+    first_name: OptionalPersonName = None
+    last_name: OptionalPersonName = None
     email: Optional[EmailStr] = None
-    phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
-    gender: Optional[str] = Field(default=None, max_length=30)
+    phone: OptionalPhoneStr = None
+    gender: OptionalSafeDisplayName = None
     dob: Optional[date] = None
-    address: Optional[str] = Field(default=None, max_length=500)
-    pincode: Optional[str] = Field(default=None, max_length=20)
-    city: Optional[str] = Field(default=None, max_length=100)
-    state: Optional[str] = Field(default=None, max_length=100)
-    country: Optional[str] = Field(default=None, max_length=100)
+    address: OptionalAddressText = None
+    pincode: OptionalPinCode = None
+    city: OptionalCityStateCountry = None
+    state: OptionalCityStateCountry = None
+    country: OptionalCityStateCountry = None
 
     # Must match an active row in engagement_types.code (validated in service).
-    engagement_type: str = Field(default="bio_ai", min_length=1, max_length=100)
+    engagement_type: SlugKey = "bio_ai"
 
     # Optional only when engagement_type is "vifc"; required for all other types.
     blood_collection_date: Optional[date] = None
-    blood_collection_time_slot: Optional[str] = Field(default=None, min_length=1, max_length=20)
+    blood_collection_time_slot: OptionalShortSafeText = None
 
-    participants_employee_id: Optional[str] = Field(default=None, max_length=100)
-    participant_department: Optional[str] = Field(default=None, max_length=100)
-    participant_blood_group: Optional[str] = Field(default=None, max_length=20)
+    participants_employee_id: OptionalSafeDisplayName = None
+    participant_department: OptionalSafeDisplayName = None
+    participant_blood_group: OptionalSafeDisplayName = None
     # Legacy fields (deprecated, kept for backward compat)
     want_doctor_consultation: Optional[bool] = None
     want_nutritionist_consultation: Optional[bool] = None
@@ -306,6 +327,14 @@ class PublicUserOnboardRequest(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def sanitize_nested_inputs(self):
+        if self.questionnaire is not None:
+            validate_nested_strings(self.questionnaire)
+        if self.consultations is not None:
+            validate_nested_strings(self.consultations)
+        return self
+
+    @model_validator(mode="after")
     def normalize_consultations(self):
         from modules.experts.consultations import empty_preference, normalize_consultations_map
 
@@ -331,33 +360,39 @@ class EngagementUserOnboardRequest(BaseModel):
     """
 
     age: int
-    first_name: Optional[str] = Field(default=None, max_length=100)
-    last_name: Optional[str] = Field(default=None, max_length=100)
+    first_name: OptionalPersonName = None
+    last_name: OptionalPersonName = None
     email: Optional[EmailStr] = None
-    phone: str = Field(min_length=5, max_length=30)
-    gender: Optional[str] = Field(default=None, max_length=30)
+    phone: PhoneStr
+    gender: OptionalSafeDisplayName = None
     dob: Optional[date] = None
-    address: Optional[str] = Field(default=None, max_length=500)
-    pincode: Optional[str] = Field(default=None, max_length=20)
-    city: Optional[str] = Field(default=None, max_length=100)
-    state: Optional[str] = Field(default=None, max_length=100)
-    country: Optional[str] = Field(default=None, max_length=100)
+    address: OptionalAddressText = None
+    pincode: OptionalPinCode = None
+    city: OptionalCityStateCountry = None
+    state: OptionalCityStateCountry = None
+    country: OptionalCityStateCountry = None
 
-    referred_by: Optional[str] = Field(default=None, max_length=200)
+    referred_by: OptionalEngagementCode = None
 
     blood_collection_date: date
-    blood_collection_time_slot: str = Field(min_length=1, max_length=20)
-    blood_collection_cabin: Optional[str] = Field(default=None, max_length=100)
+    blood_collection_time_slot: ShortSafeText
+    blood_collection_cabin: OptionalSafeDisplayName = None
 
-    participants_employee_id: Optional[str] = Field(default=None, max_length=100)
-    participant_department: Optional[str] = Field(default=None, max_length=100)
-    participant_blood_group: Optional[str] = Field(default=None, max_length=20)
+    participants_employee_id: OptionalSafeDisplayName = None
+    participant_department: OptionalSafeDisplayName = None
+    participant_blood_group: OptionalSafeDisplayName = None
     # Legacy fields (deprecated, kept for backward compat)
     want_doctor_consultation: Optional[bool] = None
     want_nutritionist_consultation: Optional[bool] = None
     want_doctor_and_nutritionist_consultation: Optional[bool] = None
     # New field: { expert_type: { want, date, cabin, slot, expert_id } }
     consultations: Optional[dict[str, Any]] = None
+
+    @model_validator(mode="after")
+    def sanitize_consultations(self):
+        if self.consultations is not None:
+            validate_nested_strings(self.consultations)
+        return self
 
     @model_validator(mode="after")
     def normalize_consultations(self):
@@ -401,20 +436,20 @@ class VifcQuickStartRequest(BaseModel):
     Without ``user_id``, ``age`` and ``phone`` remain required.
     """
 
-    user_id: Optional[int] = Field(default=None, ge=1)
+    user_id: PositiveIntId | None = None
 
     age: Optional[int] = None
-    first_name: Optional[str] = Field(default=None, max_length=100)
-    last_name: Optional[str] = Field(default=None, max_length=100)
+    first_name: OptionalPersonName = None
+    last_name: OptionalPersonName = None
     email: Optional[EmailStr] = None
-    phone: Optional[str] = Field(default=None, min_length=5, max_length=30)
-    gender: Optional[str] = Field(default=None, max_length=30)
+    phone: OptionalPhoneStr = None
+    gender: OptionalSafeDisplayName = None
     dob: Optional[date] = None
-    address: Optional[str] = Field(default=None, max_length=500)
-    pincode: Optional[str] = Field(default=None, max_length=20)
-    city: Optional[str] = Field(default=None, max_length=100)
-    state: Optional[str] = Field(default=None, max_length=100)
-    country: Optional[str] = Field(default=None, max_length=100)
+    address: OptionalAddressText = None
+    pincode: OptionalPinCode = None
+    city: OptionalCityStateCountry = None
+    state: OptionalCityStateCountry = None
+    country: OptionalCityStateCountry = None
 
     questionnaire: Optional[dict[str, OnboardCategoryQuestionnaire]] = None
 
@@ -428,6 +463,12 @@ class VifcQuickStartRequest(BaseModel):
             raise ValueError("age is required when user_id is not provided")
         if self.age < 1 or self.age > 120:
             raise ValueError("Age must be between 1 and 120")
+        return self
+
+    @model_validator(mode="after")
+    def sanitize_questionnaire(self):
+        if self.questionnaire is not None:
+            validate_nested_strings(self.questionnaire)
         return self
 
 
@@ -463,21 +504,21 @@ class UserStatusResponse(BaseModel):
 
 class EmployeeCreateUserRequest(BaseModel):
     age: int
-    first_name: Optional[str] = Field(default=None, max_length=100)
-    last_name: Optional[str] = Field(default=None, max_length=100)
-    phone: str = Field(min_length=5, max_length=30)
+    first_name: OptionalPersonName = None
+    last_name: OptionalPersonName = None
+    phone: PhoneStr
     email: Optional[EmailStr] = None
     profile_photo: Optional[str] = Field(default=None, max_length=500)
     date_of_birth: Optional[date] = None
-    gender: Optional[str] = Field(default=None, max_length=30)
-    address: Optional[str] = Field(default=None, max_length=500)
-    pin_code: Optional[str] = Field(default=None, max_length=20)
-    city: Optional[str] = Field(default=None, max_length=100)
-    state: Optional[str] = Field(default=None, max_length=100)
-    country: Optional[str] = Field(default=None, max_length=100)
-    referred_by: Optional[str] = Field(default=None, max_length=200)
+    gender: OptionalSafeDisplayName = None
+    address: OptionalAddressText = None
+    pin_code: OptionalPinCode = None
+    city: OptionalCityStateCountry = None
+    state: OptionalCityStateCountry = None
+    country: OptionalCityStateCountry = None
+    referred_by: OptionalEngagementCode = None
     is_participant: Optional[bool] = None
-    status: Optional[str] = Field(default="active", max_length=30)
+    status: StatusStr | None = "active"
 
     @validator("age")
     def age_must_be_valid(cls, v):
@@ -494,21 +535,21 @@ class UpdateMetsightsProfileIdRequest(BaseModel):
 
 class EmployeeUpdateUserRequest(BaseModel):
     age: int
-    first_name: Optional[str] = Field(default=None, max_length=100)
-    last_name: Optional[str] = Field(default=None, max_length=100)
-    phone: str = Field(min_length=5, max_length=30)
+    first_name: OptionalPersonName = None
+    last_name: OptionalPersonName = None
+    phone: PhoneStr
     email: Optional[EmailStr] = None
     profile_photo: Optional[str] = Field(default=None, max_length=500)
     date_of_birth: Optional[date] = None
-    gender: Optional[str] = Field(default=None, max_length=30)
-    address: Optional[str] = Field(default=None, max_length=500)
-    pin_code: Optional[str] = Field(default=None, max_length=20)
-    city: Optional[str] = Field(default=None, max_length=100)
-    state: Optional[str] = Field(default=None, max_length=100)
-    country: Optional[str] = Field(default=None, max_length=100)
-    referred_by: Optional[str] = Field(default=None, max_length=200)
+    gender: OptionalSafeDisplayName = None
+    address: OptionalAddressText = None
+    pin_code: OptionalPinCode = None
+    city: OptionalCityStateCountry = None
+    state: OptionalCityStateCountry = None
+    country: OptionalCityStateCountry = None
+    referred_by: OptionalEngagementCode = None
     is_participant: Optional[bool] = None
-    status: str = Field(default="active", max_length=30)
+    status: StatusStr = "active"
 
     @validator("age")
     def age_must_be_valid(cls, v):
@@ -520,7 +561,7 @@ class EmployeeUpdateUserRequest(BaseModel):
 class MetsightsSyncRecordsRequest(BaseModel):
     """Optional B2B engagement to attach synced Metsights records to."""
 
-    engagement_code: Optional[str] = Field(default=None, max_length=200)
+    engagement_code: OptionalEngagementCode = None
 
 
 class ImportMetsightsProfilesRequest(BaseModel):

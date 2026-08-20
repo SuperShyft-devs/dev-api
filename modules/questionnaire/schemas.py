@@ -4,7 +4,18 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from common.validation import (
+    OptionalQuestionText,
+    OptionalSafeText,
+    OptionalSlugKey,
+    QuestionText,
+    SafeDisplayName,
+    SlugKey,
+    StatusStr,
+    validate_nested_strings,
+)
 
 
 def _strip(value: str | None) -> str:
@@ -12,17 +23,28 @@ def _strip(value: str | None) -> str:
 
 
 class QuestionnaireQuestionCreateRequest(BaseModel):
-    question_key: str = Field(..., min_length=1, max_length=100)
-    question_text: str = Field(..., min_length=1, max_length=2000)
-    question_type: str = Field(..., min_length=1, max_length=50)
+    question_key: SlugKey
+    question_text: QuestionText
+    question_type: SlugKey
     is_required: bool = False
     is_read_only: bool = False
-    help_text: Optional[str] = Field(default=None, max_length=2000)
+    help_text: OptionalQuestionText = None
+    sub_text: OptionalQuestionText = None
     options: Optional[list[dict[str, str | None]]] = Field(default=None)
     visibility_rules: Optional[dict[str, Any]] = Field(default=None)
     prefill_from: Optional[dict[str, Any]] = Field(default=None)
     metsights_sync: Optional[dict[str, Any]] = Field(default=None)
-    status: Optional[str] = Field(default="active", min_length=1, max_length=20)
+    status: StatusStr = "active"
+
+    @model_validator(mode="after")
+    def sanitize_nested_fields(self) -> "QuestionnaireQuestionCreateRequest":
+        if self.visibility_rules is not None:
+            validate_nested_strings(self.visibility_rules)
+        if self.prefill_from is not None:
+            validate_nested_strings(self.prefill_from)
+        if self.metsights_sync is not None:
+            validate_nested_strings(self.metsights_sync)
+        return self
 
     def normalized_question_key(self) -> str:
         return _strip(self.question_key).lower()
@@ -38,16 +60,27 @@ class QuestionnaireQuestionCreateRequest(BaseModel):
 
 
 class QuestionnaireQuestionUpdateRequest(BaseModel):
-    question_key: str = Field(..., min_length=1, max_length=100)
-    question_text: str = Field(..., min_length=1, max_length=2000)
-    question_type: str = Field(..., min_length=1, max_length=50)
+    question_key: SlugKey
+    question_text: QuestionText
+    question_type: SlugKey
     is_required: bool = False
     is_read_only: bool = False
-    help_text: Optional[str] = Field(default=None, max_length=2000)
+    help_text: OptionalQuestionText = None
+    sub_text: OptionalQuestionText = None
     options: Optional[list[dict[str, str | None]]] = Field(default=None)
     visibility_rules: Optional[dict[str, Any]] = Field(default=None)
     prefill_from: Optional[dict[str, Any]] = Field(default=None)
     metsights_sync: Optional[dict[str, Any]] = Field(default=None)
+
+    @model_validator(mode="after")
+    def sanitize_nested_fields(self) -> "QuestionnaireQuestionUpdateRequest":
+        if self.visibility_rules is not None:
+            validate_nested_strings(self.visibility_rules)
+        if self.prefill_from is not None:
+            validate_nested_strings(self.prefill_from)
+        if self.metsights_sync is not None:
+            validate_nested_strings(self.metsights_sync)
+        return self
 
     def normalized_question_key(self) -> str:
         return _strip(self.question_key).lower()
@@ -62,6 +95,11 @@ class QuestionnaireQuestionUpdateRequest(BaseModel):
 class MetsightsSyncUpdateRequest(BaseModel):
     """Dedicated schema for updating metsights_sync on a question definition."""
     metsights_sync: dict[str, Any] = Field(...)
+
+    @model_validator(mode="after")
+    def sanitize_metsights_sync(self) -> "MetsightsSyncUpdateRequest":
+        validate_nested_strings(self.metsights_sync)
+        return self
 
 
 class MetsightsSyncGapsCategoryRef(BaseModel):
@@ -104,7 +142,7 @@ class BloodParametersReloadResponse(BaseModel):
 
 
 class QuestionnaireQuestionStatusUpdateRequest(BaseModel):
-    status: str = Field(..., min_length=1, max_length=20)
+    status: StatusStr
 
     def normalized_status(self) -> str:
         return _strip(self.status).lower()
@@ -118,6 +156,7 @@ class QuestionnaireQuestionResponse(BaseModel):
     is_required: bool
     is_read_only: bool
     help_text: str | None
+    sub_text: str | None
     options: Any | None
     visibility_rules: dict[str, Any] | None
     prefill_from: dict[str, Any] | None
@@ -138,6 +177,7 @@ class QuestionnaireQuestionWithAnswer(BaseModel):
     is_required: bool
     is_read_only: bool
     help_text: str | None
+    sub_text: str | None
     options: Any | None
     visibility_rules: dict[str, Any] | None
     prefill_from: dict[str, Any] | None
@@ -162,6 +202,12 @@ class ResponseItem(BaseModel):
     question_id: int
     answer: Any
 
+    @model_validator(mode="after")
+    def sanitize_answer(self) -> "ResponseItem":
+        if self.answer is not None:
+            validate_nested_strings(self.answer)
+        return self
+
     def normalized_answer(self) -> Any:
         """Return the answer as-is. Validation happens in service layer."""
         return self.answer
@@ -176,9 +222,9 @@ _VALID_CATEGORY_OF = {"supershyft", "metsights"}
 
 
 class QuestionnaireCategoryCreateRequest(BaseModel):
-    category_key: str = Field(..., min_length=1, max_length=100)
-    display_name: str = Field(..., min_length=1, max_length=200)
-    category_of: str = Field(default="supershyft", min_length=1, max_length=20)
+    category_key: SlugKey
+    display_name: SafeDisplayName
+    category_of: SlugKey = "supershyft"
 
     def normalized_category_key(self) -> str:
         return _strip(self.category_key).lower()
@@ -191,9 +237,9 @@ class QuestionnaireCategoryCreateRequest(BaseModel):
 
 
 class QuestionnaireCategoryUpdateRequest(BaseModel):
-    category_key: str = Field(..., min_length=1, max_length=100)
-    display_name: str = Field(..., min_length=1, max_length=200)
-    category_of: str = Field(default="supershyft", min_length=1, max_length=20)
+    category_key: SlugKey
+    display_name: SafeDisplayName
+    category_of: SlugKey = "supershyft"
 
     def normalized_category_key(self) -> str:
         return _strip(self.category_key).lower()
@@ -206,7 +252,7 @@ class QuestionnaireCategoryUpdateRequest(BaseModel):
 
 
 class QuestionnaireCategoryStatusUpdateRequest(BaseModel):
-    status: str = Field(..., min_length=1, max_length=20)
+    status: StatusStr
 
     def normalized_status(self) -> str:
         return _strip(self.status).lower()
@@ -221,15 +267,15 @@ class QuestionnaireCategoryQuestionsReorderRequest(BaseModel):
 
 
 class HealthyHabitRuleCreateRequest(BaseModel):
-    habit_key: Optional[str] = Field(default=None, max_length=200)
-    habit_label: str = Field(..., min_length=1, max_length=500)
+    habit_key: OptionalSlugKey = None
+    habit_label: SafeDisplayName
     display_order: Optional[int] = None
-    condition_type: str = Field(..., min_length=1, max_length=50)
+    condition_type: SlugKey
     matched_option_values: Optional[list[str]] = None
     scale_min: Optional[float] = None
     scale_max: Optional[float] = None
-    scale_unit: Optional[str] = Field(default=None, max_length=200)
-    status: str = Field(default="active", min_length=1, max_length=20)
+    scale_unit: OptionalSafeText = None
+    status: StatusStr = "active"
 
     def normalized_condition_type(self) -> str:
         return _strip(self.condition_type).lower()
@@ -239,15 +285,15 @@ class HealthyHabitRuleCreateRequest(BaseModel):
 
 
 class HealthyHabitRuleUpdateRequest(BaseModel):
-    habit_key: Optional[str] = Field(default=None, max_length=200)
-    habit_label: str = Field(..., min_length=1, max_length=500)
+    habit_key: OptionalSlugKey = None
+    habit_label: SafeDisplayName
     display_order: Optional[int] = None
-    condition_type: str = Field(..., min_length=1, max_length=50)
+    condition_type: SlugKey
     matched_option_values: Optional[list[str]] = None
     scale_min: Optional[float] = None
     scale_max: Optional[float] = None
-    scale_unit: Optional[str] = Field(default=None, max_length=200)
-    status: str = Field(default="active", min_length=1, max_length=20)
+    scale_unit: OptionalSafeText = None
+    status: StatusStr = "active"
 
     def normalized_condition_type(self) -> str:
         return _strip(self.condition_type).lower()

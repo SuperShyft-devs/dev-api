@@ -563,7 +563,8 @@ async def test_dispatch_includes_otp_in_members_when_required(async_client, test
 
 
 @pytest.mark.asyncio
-async def test_dispatch_omits_otp_in_members_when_not_required(async_client, test_db_session, monkeypatch):
+async def test_dispatch_includes_otp_in_members_even_when_not_required(async_client, test_db_session, monkeypatch):
+    """OTP in the dispatch payload is always forwarded to webhook members."""
     monkeypatch.setattr(settings, "NOTIFICATION_API_KEY", TEST_NOTIFICATION_API_KEY)
     test_db_session.add(User(user_id=9543, age=30, phone="9543000000", status="active"))
     service_key = "otp_not_required_test"
@@ -610,7 +611,8 @@ async def test_dispatch_omits_otp_in_members_when_not_required(async_client, tes
     )
     assert response.status_code == 201, response.text
     member = webhook_calls[0]["json"]["members"][0]
-    assert "otp" not in member
+    # OTP is forwarded whenever the caller supplies it, even if require_otp is false.
+    assert member["otp"] == "787878"
 
 
 @pytest.mark.asyncio

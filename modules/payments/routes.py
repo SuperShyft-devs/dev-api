@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
+
+from common.validation import PositiveIntId
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -24,15 +26,15 @@ def get_payments_service() -> PaymentsService:
 
 
 class CreateOrderLineItem(BaseModel):
-    user_id: int = Field(..., ge=1)
+    user_id: PositiveIntId
     entity_type: str = Field(..., min_length=1)
-    entity_id: int = Field(..., ge=1)
+    entity_id: PositiveIntId
 
 
 class CreateOrderRequest(BaseModel):
     """Payer user_id plus at least one line (member user_id + entity)."""
 
-    user_id: int = Field(..., ge=1)
+    user_id: PositiveIntId
     items: list[CreateOrderLineItem] = Field(..., min_length=1, max_length=10)
 
     @model_validator(mode="after")

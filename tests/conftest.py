@@ -92,6 +92,15 @@ from modules.notifications.router import router as notifications_router
 from modules.webhooks.router import router as webhooks_router
 from modules.server_health.router import router as server_health_router
 from modules.diagnostics.router import router as diagnostics_router
+from modules.support.router import router as support_router
+from modules.audit.router import router as audit_router
+from modules.geocoding.router import router as geocode_router
+from modules.admin_temp.router import router as admin_temp_router
+from modules.engagement_types.router import router as engagement_types_router
+from modules.notification_events.router import router as notification_events_router
+from modules.engagement_notifications.router import router as engagement_notifications_router
+from modules.experts.router import expert_types_router
+from modules.diagnostics.healthians.router import router as healthians_router
 
 
 def _project_root() -> Path:
@@ -339,6 +348,15 @@ async def fastapi_app(
     app.include_router(webhooks_router)
     app.include_router(server_health_router)
     app.include_router(diagnostics_router)
+    app.include_router(support_router)
+    app.include_router(audit_router)
+    app.include_router(geocode_router)
+    app.include_router(admin_temp_router)
+    app.include_router(engagement_types_router)
+    app.include_router(notification_events_router)
+    app.include_router(engagement_notifications_router)
+    app.include_router(expert_types_router)
+    app.include_router(healthians_router)
 
     async def _get_test_db():
         yield test_db_session

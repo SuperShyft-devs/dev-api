@@ -5,7 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.listing import sanitize_list_search
 from common.responses import success_response
+from common.validation import ValidationError
 from core.dependencies import get_current_user
 from core.exceptions import AppError
 from core.network import get_client_ip
@@ -592,6 +594,11 @@ async def employee_list_users(
 ):
     if page < 1 or limit < 1 or limit > 100:
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    try:
+        search = sanitize_list_search(search)
+    except ValidationError as exc:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message=str(exc)) from exc
 
     users, total = await users_service.list_users_for_employee(
         db,

@@ -5,12 +5,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+
+from common.validation import PositiveIntId, SupportQueryText
 
 
 class SupportTicketCreate(BaseModel):
-    user_id: int = Field(gt=0)
-    query_text: str = Field(min_length=1)
+    user_id: PositiveIntId
+    query_text: SupportQueryText
 
 
 class SupportTicketResponse(BaseModel):

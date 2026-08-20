@@ -1,4 +1,4 @@
-"""Merge engagement_slot_info and consultation_mode heads.
+"""Merge engagement slot info and consultation mode migration heads.
 
 Revision ID: 0121_merge_slot_consult
 Revises: 0117_engagement_slot_info, 0120_eng_consultation_mode

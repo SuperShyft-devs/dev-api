@@ -1055,6 +1055,15 @@ async def test_load_blood_reports_persists_metsights_sync_log_on_push_failure(
         _report_missing,
     )
 
+    async def _fake_fallback(db, *, user_id, assessment_instance_id, category_keys=None):
+        return {"responses_drafted": 0, "fallback_keys": []}
+
+    monkeypatch.setattr(
+        assessments_service,
+        "draft_blood_parameter_internal_fallbacks",
+        _fake_fallback,
+    )
+
     from modules.audit.models import IntegrationSyncLog
     from modules.audit.repository import AuditRepository
 
@@ -1116,4 +1125,258 @@ async def test_load_blood_reports_persists_metsights_sync_log_on_push_failure(
     assert all(row["provider"] == "metsights" for row in rows)
     assert any("blood-parameters" in row["api_endpoint_url"] for row in rows)
     assert any("rejected by Metsights" in (row["error_message"] or "") for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_load_blood_reports_retries_with_avg_fallbacks_on_full_report_push_failure(
+    test_db_session, monkeypatch
+):
+    await _seed_running_participant(
+        test_db_session,
+        user_id=88005,
+        engagement_id=88005,
+        assessment_id=88005,
+    )
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_digital(_token, _booking_id):
+        return {
+            "data": [
+                {
+                    "customer_name": "John Doe",
+                    "digital_data": [{"parameter_id": "1", "value": "91.0", "unit": "mg/dL"}],
+                }
+            ]
+        }
+
+    async def _fake_report(_token, _booking_id):
+        return _report_payload(full_report=1)
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_digital_value",
+        _fake_digital,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_report",
+        _fake_report,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports._group_provider_blood",
+        _fake_group_factory(),
+    )
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    async def _fake_draft(db, *, user_id, assessment_instance_id, allow_completed=False):
+        return {"responses_drafted": 1}
+
+    monkeypatch.setattr(assessments_service, "draft_blood_parameters_from_report", _fake_draft)
+
+    async def _report_missing(self, *, record_id: str, assessment_type_code: str | None):
+        return False
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.is_bioai_report_generated",
+        _report_missing,
+    )
+
+    fallback_calls: list[str] = []
+
+    async def _fake_fallback(db, *, user_id, assessment_instance_id, category_keys=None):
+        fallback_calls.extend(category_keys or [])
+        return {"responses_drafted": 3, "fallback_keys": ["glucose_fasting", "total_cholesterol", "hdlc_value"]}
+
+    monkeypatch.setattr(
+        assessments_service,
+        "draft_blood_parameter_internal_fallbacks",
+        _fake_fallback,
+    )
+
+    push_attempts: list[str] = []
+
+    async def _flaky_push(self, db, *, assessment_instance_id, user_id, category_key, category_of="metsights"):
+        push_attempts.append(category_key)
+        if push_attempts.count(category_key) == 1:
+            raise RuntimeError(f"{category_key} rejected by Metsights")
+        return {"fields_pushed": ["glucose_fasting_value", "total_cholesterol"]}
+
+    monkeypatch.setattr(
+        "modules.metsights.sync_service.MetsightsSyncService._push_category_to_metsights",
+        _flaky_push,
+    )
+
+    async def _fake_dispatch(self, db, *, payload, triggered_by_user_id=None):
+        return {"dispatched": 1}
+
+    monkeypatch.setattr(
+        "modules.notifications.service.NotificationsService.dispatch",
+        _fake_dispatch,
+    )
+
+    result = await load_blood_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=notifications_service,
+        assessments_service=assessments_service,
+        sync_service=sync_service,
+    )
+
+    assert "blood-parameters" in fallback_calls
+    assert push_attempts.count("blood-parameters") == 2
+    assert any(
+        "internal average blood fallbacks" in d["reason"]
+        for d in result["details"]
+        if d["action"] == "drafted"
+    )
+    assert any(
+        "after average fallbacks" in d["reason"]
+        for d in result["details"]
+        if d["action"] == "pushed"
+    )
+
+
+@pytest.mark.asyncio
+async def test_load_blood_reports_skips_avg_fallbacks_on_partial_report_push_failure(
+    test_db_session, monkeypatch
+):
+    await _seed_running_participant(
+        test_db_session,
+        user_id=88006,
+        engagement_id=88006,
+        assessment_id=88006,
+    )
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_digital(_token, _booking_id):
+        return {
+            "data": [
+                {
+                    "customer_name": "John Doe",
+                    "digital_data": [{"parameter_id": "1", "value": "91.0", "unit": "mg/dL"}],
+                }
+            ]
+        }
+
+    async def _fake_report(_token, _booking_id):
+        return _report_payload(full_report=0)
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_digital_value",
+        _fake_digital,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_report",
+        _fake_report,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports._group_provider_blood",
+        _fake_group_factory(),
+    )
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    async def _fake_draft(db, *, user_id, assessment_instance_id, allow_completed=False):
+        return {"responses_drafted": 1}
+
+    monkeypatch.setattr(assessments_service, "draft_blood_parameters_from_report", _fake_draft)
+
+    async def _report_missing(self, *, record_id: str, assessment_type_code: str | None):
+        return False
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.is_bioai_report_generated",
+        _report_missing,
+    )
+
+    async def _should_not_fallback(*args, **kwargs):
+        raise AssertionError("average fallbacks must not run for partial blood reports")
+
+    monkeypatch.setattr(
+        assessments_service,
+        "draft_blood_parameter_internal_fallbacks",
+        _should_not_fallback,
+    )
+
+    push_attempts: list[str] = []
+
+    async def _failing_push(self, db, *, assessment_instance_id, user_id, category_key, category_of="metsights"):
+        push_attempts.append(category_key)
+        raise RuntimeError(f"{category_key} rejected by Metsights")
+
+    monkeypatch.setattr(
+        "modules.metsights.sync_service.MetsightsSyncService._push_category_to_metsights",
+        _failing_push,
+    )
+
+    async def _fake_dispatch(self, db, *, payload, triggered_by_user_id=None):
+        return {"dispatched": 1}
+
+    monkeypatch.setattr(
+        "modules.notifications.service.NotificationsService.dispatch",
+        _fake_dispatch,
+    )
+
+    result = await load_blood_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=notifications_service,
+        assessments_service=assessments_service,
+        sync_service=sync_service,
+    )
+
+    assert push_attempts == ["blood-parameters"]
+    assert any(
+        "metsights push failed for blood-parameters" in d["reason"]
+        for d in result["details"]
+        if d["action"] == "failed"
+    )
+    assert not any("average fallbacks" in d["reason"] for d in result["details"])
+    assert any(
+        "full_report is 0" in d["reason"]
+        for d in result["details"]
+        if d["action"] == "skipped"
+    )
+
+
+def test_blood_parameter_internal_fallbacks_map_known_keys():
+    from db.seed.blood_parameters_registry import (
+        BLOOD_PARAMETER_INTERNAL_FALLBACKS,
+        FIELD_BY_KEY,
+    )
+
+    expected = {
+        "total_cholesterol": 170.0,
+        "hdlc_value": 50.0,
+        "ldlc_value": 100.0,
+        "triglycerides": 100.0,
+        "glucose_fasting": 90.0,
+        "glycated_haemoglobin": 5.2,
+        "insulin": 6.0,
+        "triiodothyronine": 1.1,
+        "thyroxine": 8.0,
+        "tsh_value": 2.0,
+        "wbc_value": 7.0,
+        "platelets": 250.0,
+        "monocytes": 6.0,
+        "alt_value": 20.0,
+        "ast_value": 20.0,
+        "uric_acid": 5.0,
+        "ggt_value": 20.0,
+    }
+    assert set(BLOOD_PARAMETER_INTERNAL_FALLBACKS) == set(expected)
+    for key, value in expected.items():
+        assert key in FIELD_BY_KEY
+        assert BLOOD_PARAMETER_INTERNAL_FALLBACKS[key][0] == value
 

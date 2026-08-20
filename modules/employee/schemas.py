@@ -5,24 +5,25 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
+from common.validation import PositiveIntId, StatusStr
 from modules.employee.models import EmployeeRole
 
 
 class EmployeeCreateRequest(BaseModel):
-    user_id: int = Field(gt=0)
+    user_id: PositiveIntId
     role: EmployeeRole
-    status: Optional[str] = Field(default="active", max_length=30)
+    status: Optional[StatusStr] = "active"
 
 
 class EmployeeUpdateRequest(BaseModel):
-    user_id: int = Field(gt=0)
+    user_id: PositiveIntId
     role: EmployeeRole
 
 
 class EmployeeStatusUpdateRequest(BaseModel):
-    status: str = Field(min_length=1, max_length=30)
+    status: StatusStr
 
 
 class EmployeeListItem(BaseModel):

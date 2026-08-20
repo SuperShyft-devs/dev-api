@@ -4,32 +4,49 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from common.validation import (
+    OptionalSafeDisplayName,
+    OptionalSafeText,
+    OtpCode,
+    PositiveIntId,
+    SafeDisplayName,
+    SafeText,
+    SlugKey,
+    validate_nested_strings,
+)
 
 
 class SessionDetails(BaseModel):
     want: bool
     date: date
     slot: str
-    expert_type: str
+    expert_type: SlugKey
 
 
 class PrepareReportsRequest(BaseModel):
-    user_id: int = Field(..., gt=0)
+    user_id: PositiveIntId
     require_blood_report_url: bool = False
     require_bio_ai_report_url: bool = False
 
 
 class DispatchRequest(BaseModel):
-    service_key: str = Field(..., min_length=1)
-    user_ids: list[int] = Field(..., min_length=1)
-    engagement_id: int | None = None
-    assessment_instance_id: int | None = None
+    service_key: SlugKey
+    user_ids: list[PositiveIntId] = Field(..., min_length=1)
+    engagement_id: PositiveIntId | None = None
+    assessment_instance_id: PositiveIntId | None = None
     participant_details: dict | None = None
-    otp: str | None = None
+    otp: OtpCode | None = None
     session_details: SessionDetails | None = None
     session_details_by_user_id: dict[int, SessionDetails] | None = None
     external_link: str | None = None
+
+    @model_validator(mode="after")
+    def sanitize_participant_details(self) -> "DispatchRequest":
+        if self.participant_details is not None:
+            validate_nested_strings(self.participant_details)
+        return self
 
     @field_validator("external_link")
     @classmethod
@@ -57,14 +74,14 @@ class DispatchRequest(BaseModel):
 class CallbackRequest(BaseModel):
     notification_id: int
     status: str = Field(..., pattern=r"^(sent|failed)$")
-    message: str | None = None
+    message: OptionalSafeText = None
 
 
 class NotificationServiceCreate(BaseModel):
-    service_key: str = Field(..., min_length=1)
-    display_name: str = Field(..., min_length=1)
+    service_key: SlugKey
+    display_name: SafeDisplayName
     channel: str = Field(..., pattern=r"^(email|whatsapp)$")
-    webhook_path: str = Field(..., min_length=1)
+    webhook_path: SafeText
     is_active: bool = True
     require_blood_report_url: bool = False
     require_bio_ai_report_url: bool = False
@@ -75,9 +92,9 @@ class NotificationServiceCreate(BaseModel):
 
 
 class NotificationServiceUpdate(BaseModel):
-    display_name: str | None = None
+    display_name: OptionalSafeDisplayName = None
     channel: str | None = Field(None, pattern=r"^(email|whatsapp)$")
-    webhook_path: str | None = None
+    webhook_path: OptionalSafeText = None
     is_active: bool | None = None
     require_blood_report_url: bool | None = None
     require_bio_ai_report_url: bool | None = None

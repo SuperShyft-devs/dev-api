@@ -7,6 +7,17 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from common.validation import (
+    OptionalCityStateCountry,
+    OptionalOrgAddressText,
+    OptionalPinCode,
+    OptionalSafeDisplayName,
+    OptionalSlugKey,
+    PositiveIntId,
+    SafeDisplayName,
+    StatusStr,
+)
+
 
 class IndustryItem(BaseModel):
     id: int
@@ -15,11 +26,11 @@ class IndustryItem(BaseModel):
 
 
 class IndustryCreateRequest(BaseModel):
-    industry: str = Field(min_length=1, max_length=100)
+    industry: SafeDisplayName
 
 
 class IndustryUpdateRequest(BaseModel):
-    industry: str = Field(min_length=1, max_length=100)
+    industry: SafeDisplayName
 
 
 class OrganizationDepartment(BaseModel):
@@ -28,45 +39,45 @@ class OrganizationDepartment(BaseModel):
 
 
 class OrganizationDepartmentInput(BaseModel):
-    department: str = Field(min_length=1, max_length=100)
+    department: SafeDisplayName
 
 
 class OrganizationCreateRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
+    name: SafeDisplayName
     organization_type: Optional[str] = Field(default=None, max_length=50)
     logo: Optional[str] = Field(default=None, max_length=500)
     website_url: Optional[str] = Field(default=None, max_length=500)
-    address: Optional[str] = Field(default=None, max_length=2000)
-    pin_code: Optional[str] = Field(default=None, max_length=20)
-    city: Optional[str] = Field(default=None, max_length=100)
-    state: Optional[str] = Field(default=None, max_length=100)
-    country: Optional[str] = Field(default=None, max_length=100)
+    address: OptionalOrgAddressText = None
+    pin_code: OptionalPinCode = None
+    city: OptionalCityStateCountry = None
+    state: OptionalCityStateCountry = None
+    country: OptionalCityStateCountry = None
 
     contact_person_user_ids: Optional[dict[str, Any]] = None
-    bd_employee_id: Optional[int] = Field(default=None, gt=0)
+    bd_employee_id: Optional[PositiveIntId] = None
     departments: Optional[list[OrganizationDepartmentInput]] = None
-    industry_key: Optional[str] = Field(default=None, max_length=100)
+    industry_key: OptionalSlugKey = None
 
 
 class OrganizationUpdateRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
+    name: SafeDisplayName
     organization_type: Optional[str] = Field(default=None, max_length=50)
     logo: Optional[str] = Field(default=None, max_length=500)
     website_url: Optional[str] = Field(default=None, max_length=500)
-    address: Optional[str] = Field(default=None, max_length=2000)
-    pin_code: Optional[str] = Field(default=None, max_length=20)
-    city: Optional[str] = Field(default=None, max_length=100)
-    state: Optional[str] = Field(default=None, max_length=100)
-    country: Optional[str] = Field(default=None, max_length=100)
+    address: OptionalOrgAddressText = None
+    pin_code: OptionalPinCode = None
+    city: OptionalCityStateCountry = None
+    state: OptionalCityStateCountry = None
+    country: OptionalCityStateCountry = None
 
     contact_person_user_ids: Optional[dict[str, Any]] = None
-    bd_employee_id: Optional[int] = Field(default=None, gt=0)
+    bd_employee_id: Optional[PositiveIntId] = None
     departments: Optional[list[OrganizationDepartmentInput]] = None
-    industry_key: Optional[str] = Field(default=None, max_length=100)
+    industry_key: OptionalSlugKey = None
 
 
 class OrganizationStatusUpdateRequest(BaseModel):
-    status: str = Field(min_length=1, max_length=30)
+    status: StatusStr
 
 
 class OrganizationListItem(BaseModel):
@@ -155,4 +166,4 @@ class CampListItem(BaseModel):
 
 
 class CampRemapRequest(BaseModel):
-    new_camp_no: int = Field(gt=0)
+    new_camp_no: PositiveIntId

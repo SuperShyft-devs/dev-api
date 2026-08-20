@@ -217,6 +217,55 @@ async def test_update_question_updates_fields(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
+async def test_admin_get_returns_stored_question_type_not_runtime_override(async_client, test_db_session):
+    """Employee management APIs must reflect the DB question_type, not QUESTION_TYPE_OVERRIDES."""
+    await _seed_employee(test_db_session, user_id=9005, employee_id=13)
+
+    test_db_session.add(
+        QuestionnaireDefinition(
+            question_id=301,
+            question_key="health_priorities",
+            question_text="What are your primary health and wellness priorities?",
+            question_type="multiple_choice",
+            status="active",
+        )
+    )
+    test_db_session.add(
+        QuestionnaireOption(
+            question_id=301,
+            option_value="0",
+            display_name="Weight loss",
+            tooltip_text=None,
+        )
+    )
+    await test_db_session.commit()
+
+    get_response = await async_client.get("/questionnaire/questions/301", headers=_auth_header(9005))
+    assert get_response.status_code == 200
+    assert get_response.json()["data"]["question_type"] == "multiple_choice"
+
+    update_payload = {
+        "question_key": "health_priorities",
+        "question_text": "What are your primary health and wellness priorities?",
+        "question_type": "single_choice",
+        "options": [
+            {"option_value": "0", "display_name": "Weight loss", "tooltip_text": None},
+            {"option_value": "1", "display_name": "Building muscle mass", "tooltip_text": None},
+        ],
+    }
+    update_response = await async_client.put(
+        "/questionnaire/questions/301",
+        headers=_auth_header(9005),
+        json=update_payload,
+    )
+    assert update_response.status_code == 200
+
+    refreshed = await async_client.get("/questionnaire/questions/301", headers=_auth_header(9005))
+    assert refreshed.status_code == 200
+    assert refreshed.json()["data"]["question_type"] == "single_choice"
+
+
+@pytest.mark.asyncio
 async def test_create_scale_question_requires_units(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9014, employee_id=22)
     payload = {

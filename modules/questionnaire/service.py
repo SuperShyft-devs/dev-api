@@ -280,7 +280,13 @@ class QuestionnaireService:
         if row is None:
             raise AppError(status_code=404, error_code="QUESTIONNAIRE_CATEGORY_NOT_FOUND", message="Category does not exist")
 
-    async def _serialize_question(self, db: AsyncSession, row: QuestionnaireDefinition) -> dict:
+    async def _serialize_question(
+        self,
+        db: AsyncSession,
+        row: QuestionnaireDefinition,
+        *,
+        apply_type_overrides: bool = True,
+    ) -> dict:
         options = await self._repository.list_options_for_question(db, question_id=row.question_id)
         serialized_options = [
             {
@@ -291,7 +297,7 @@ class QuestionnaireService:
             for opt in options
         ]
         question_type = row.question_type
-        if row.question_key and row.question_key in QUESTION_TYPE_OVERRIDES:
+        if apply_type_overrides and row.question_key and row.question_key in QUESTION_TYPE_OVERRIDES:
             question_type = QUESTION_TYPE_OVERRIDES[row.question_key]
 
         return {
@@ -302,6 +308,7 @@ class QuestionnaireService:
             "is_required": bool(row.is_required),
             "is_read_only": bool(row.is_read_only),
             "help_text": row.help_text,
+            "sub_text": row.sub_text,
             "options": serialized_options if serialized_options else None,
             "visibility_rules": row.visibility_rules,
             "prefill_from": row.prefill_from,
@@ -315,12 +322,13 @@ class QuestionnaireService:
         db: AsyncSession,
         *,
         category_id: int,
+        apply_type_overrides: bool = True,
     ) -> list[dict]:
         rows = await self._repository.list_questions_by_category(db, category_id=category_id)
         active_rows = [row for row in rows if (row.status or "").lower() == "active"]
         payloads: list[dict] = []
         for row in active_rows:
-            question = await self._serialize_question(db, row)
+            question = await self._serialize_question(db, row, apply_type_overrides=apply_type_overrides)
             question["category_id"] = category_id
             payloads.append(question)
         return payloads
@@ -413,7 +421,8 @@ class QuestionnaireService:
         return (package.package_code or "").strip() or ""
 
     async def serialize_question_definition(self, db: AsyncSession, row: QuestionnaireDefinition) -> dict:
-        return await self._serialize_question(db, row)
+        """Serialize for employee/admin management APIs (raw DB question_type)."""
+        return await self._serialize_question(db, row, apply_type_overrides=False)
 
     def _validate_options_by_type(self, *, question_type: str, options: list[dict[str, str | None]]) -> None:
         if question_type in _CHOICE_TYPES and len(options) == 0:
@@ -740,6 +749,7 @@ class QuestionnaireService:
             is_required=payload.is_required,
             is_read_only=payload.is_read_only,
             help_text=(payload.help_text or "").strip() or None,
+            sub_text=(payload.sub_text or "").strip() or None,
             visibility_rules=visibility_rules,
             prefill_from=prefill_from,
             metsights_sync=payload.metsights_sync,
@@ -974,6 +984,7 @@ class QuestionnaireService:
         row.is_required = payload.is_required
         row.is_read_only = payload.is_read_only
         row.help_text = (payload.help_text or "").strip() or None
+        row.sub_text = (payload.sub_text or "").strip() or None
         row.visibility_rules = self._normalize_visibility_rules(payload.visibility_rules)
         row.prefill_from = self._normalize_prefill_from(payload.prefill_from)
         if payload.metsights_sync is not None:
@@ -1158,7 +1169,7 @@ class QuestionnaireService:
         rows = await self._repository.list_questions_by_category(db, category_id=category_id)
         data: list[dict] = []
         for row in rows:
-            payload = await self._serialize_question(db, row)
+            payload = await self._serialize_question(db, row, apply_type_overrides=False)
             payload["category_id"] = category_id
             data.append(payload)
         return data
@@ -1493,6 +1504,7 @@ class QuestionnaireService:
                     "is_required": bool(question.get("is_required")),
                     "is_read_only": bool(question.get("is_read_only")),
                     "help_text": question.get("help_text"),
+                    "sub_text": question.get("sub_text"),
                     "options": question.get("options"),
                     "visibility_rules": question.get("visibility_rules"),
                     "prefill_from": question.get("prefill_from"),

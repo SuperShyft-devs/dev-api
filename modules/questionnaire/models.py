@@ -24,6 +24,7 @@ class QuestionnaireDefinition(Base):
     is_required = Column(Boolean, nullable=False, server_default=text("false"))
     is_read_only = Column(Boolean, nullable=False, server_default=text("false"))
     help_text = Column(Text, nullable=True)
+    sub_text = Column(Text, nullable=True)
     visibility_rules = Column(JSON, nullable=True)
     prefill_from = Column(JSON, nullable=True)
     metsights_sync = Column(JSON, nullable=True)

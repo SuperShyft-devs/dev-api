@@ -8,48 +8,41 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from common.validation import (
+    OptionalChecklistText,
+    OptionalExpertAboutText,
+    OptionalSafeDisplayName,
+    OptionalSafeText,
+    OptionalSlugKey,
+    PositiveIntId,
+    SafeDisplayName,
+    SlugKey,
+)
+
 
 class ExpertTypeCreateRequest(BaseModel):
-    type_key: str = Field(min_length=1, max_length=100)
-    type: str = Field(min_length=1, max_length=200)
-
-    @field_validator("type_key")
-    @classmethod
-    def _type_key_slug(cls, v: str) -> str:
-        v = v.strip().lower()
-        if not v.replace("_", "").isalnum():
-            raise ValueError("type_key must be alphanumeric with underscores only")
-        return v
+    type_key: SlugKey
+    type: SafeDisplayName
 
 
 class ExpertTypeUpdateRequest(BaseModel):
-    type_key: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    type: Optional[str] = Field(default=None, min_length=1, max_length=200)
-
-    @field_validator("type_key")
-    @classmethod
-    def _type_key_slug(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        v = v.strip().lower()
-        if not v.replace("_", "").isalnum():
-            raise ValueError("type_key must be alphanumeric with underscores only")
-        return v
+    type_key: OptionalSlugKey = None
+    type: OptionalSafeDisplayName = None
 
 
 ConsultationModeLiteral = Literal["video", "voice", "chat"]
 
 
 class ExpertCreateRequest(BaseModel):
-    user_id: int = Field(gt=0)
-    expert_type: str = Field(min_length=1, max_length=100)
-    specialization: str = Field(min_length=1, max_length=200)
+    user_id: PositiveIntId
+    expert_type: SlugKey
+    specialization: SafeDisplayName
     profile_photo: Optional[str] = Field(default=None, max_length=500)
     experience_years: Optional[int] = Field(default=None, ge=0, le=80)
-    qualifications: Optional[str] = Field(default=None, max_length=500)
-    about_text: Optional[str] = Field(default=None, max_length=8000)
+    qualifications: OptionalChecklistText = None
+    about_text: OptionalExpertAboutText = None
     consultation_modes: Optional[list[ConsultationModeLiteral]] = None
-    languages: Optional[list[str]] = None
+    languages: Optional[list[SafeDisplayName]] = None
     session_duration_mins: Optional[int] = Field(default=None, ge=5, le=480)
     appointment_fee_paise: Optional[int] = Field(default=None, ge=0)
     original_fee_paise: Optional[int] = Field(default=None, ge=0)
@@ -63,21 +56,21 @@ class ExpertCreateRequest(BaseModel):
         if v is None:
             return v
         for item in v:
-            if not item or len(item.strip()) > 50:
-                raise ValueError("Invalid languages")
-        return [x.strip() for x in v]
+            if len(item) > 50:
+                raise ValueError("Language name must be at most 50 characters")
+        return v
 
 
 class ExpertUpdateRequest(BaseModel):
-    user_id: int = Field(gt=0)
-    expert_type: str = Field(min_length=1, max_length=100)
-    specialization: str = Field(min_length=1, max_length=200)
+    user_id: PositiveIntId
+    expert_type: SlugKey
+    specialization: SafeDisplayName
     profile_photo: Optional[str] = Field(default=None, max_length=500)
     experience_years: Optional[int] = Field(default=None, ge=0, le=80)
-    qualifications: Optional[str] = Field(default=None, max_length=500)
-    about_text: Optional[str] = Field(default=None, max_length=8000)
+    qualifications: OptionalChecklistText = None
+    about_text: OptionalExpertAboutText = None
     consultation_modes: Optional[list[ConsultationModeLiteral]] = None
-    languages: Optional[list[str]] = None
+    languages: Optional[list[SafeDisplayName]] = None
     session_duration_mins: Optional[int] = Field(default=None, ge=5, le=480)
     appointment_fee_paise: Optional[int] = Field(default=None, ge=0)
     original_fee_paise: Optional[int] = Field(default=None, ge=0)
@@ -91,9 +84,9 @@ class ExpertUpdateRequest(BaseModel):
         if v is None:
             return v
         for item in v:
-            if not item or len(item.strip()) > 50:
-                raise ValueError("Invalid languages")
-        return [x.strip() for x in v]
+            if len(item) > 50:
+                raise ValueError("Language name must be at most 50 characters")
+        return v
 
 
 class ExpertStatusUpdateRequest(BaseModel):
@@ -101,13 +94,13 @@ class ExpertStatusUpdateRequest(BaseModel):
 
 
 class ExpertTagCreateRequest(BaseModel):
-    tag_name: str = Field(min_length=1, max_length=120)
+    tag_name: SafeDisplayName
     display_order: Optional[int] = Field(default=None, ge=0)
 
 
 class ExpertReviewCreateRequest(BaseModel):
     rating: Decimal = Field(ge=Decimal("1.0"), le=Decimal("5.0"))
-    review_text: Optional[str] = Field(default=None, max_length=4000)
+    review_text: OptionalSafeText = None
 
 
 # ─── Availability schemas ─────────────────────────────────────────────────────
