@@ -24,6 +24,7 @@ from common.validation import (
     PinCode,
     PositiveIntId,
     SafeDisplayName,
+    ShortSafeText,
     SlugKey,
     StatusStr,
     validate_nested_strings,
