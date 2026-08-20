@@ -6,6 +6,8 @@ from datetime import date
 import pytest
 from sqlalchemy import text
 
+from core.config import settings
+
 
 @pytest.mark.asyncio
 async def test_public_onboard_requires_blood_fields(async_client, test_db_session):
@@ -1373,3 +1375,90 @@ async def test_engagement_onboard_same_engagement_still_already_enrolled(
     second = await async_client.post("/users/code/DUPENG01/onboard", json=payload)
     assert second.status_code == 409
     assert second.json()["error_code"] == "ALREADY_ENROLLED"
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_logs_metsights_integration_sync(async_client, test_db_session, monkeypatch):
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+    monkeypatch.setattr(settings, "METSIGHTS_BASE_URL", "https://api.metsights.test")
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, assessment_type_code, status) "
+            "VALUES (8801, 'PK8801', 'Mets Pro', '2', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO organizations (organization_id, name, status) "
+            "VALUES (8801, 'Mets Org', 'active')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, "
+            "engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, "
+            "start_date, end_date, status, participant_count, create_profile_on_metsights, "
+            "metsights_engagement_id, enroll_for_fitprint_full) "
+            "VALUES (8801, 'Mets Camp', 'METS8801', 8801, 'bio_ai', 8801, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-28', 'running', 0, true, 'ms-eng-8801', false)"
+        )
+    )
+    await test_db_session.commit()
+
+    profile_id = "ms-profile-8801"
+    record_id = "ms-record-8801"
+
+    async def _fake_register(self, *, engagement_id: str, data: dict):
+        assert engagement_id == "ms-eng-8801"
+        return {"data": {"id": profile_id}}
+
+    async def _fake_list_records(self, *, profile_id: str, completed=None, code=None, search=None):
+        assert profile_id == "ms-profile-8801"
+        return {"data": [{"id": record_id, "date": "2026-02-01", "created_at": "2026-02-01T10:00:00Z"}]}
+
+    monkeypatch.setattr("modules.metsights.client.MetsightsClient.create_profile_for_engagement", _fake_register)
+    monkeypatch.setattr("modules.metsights.client.MetsightsClient.list_profile_records", _fake_list_records)
+
+    payload = {
+        "age": 30,
+        "first_name": "Mets",
+        "last_name": "Onboard",
+        "phone": "8801880188",
+        "email": "mets.onboard@example.com",
+        "gender": "male",
+        "city": "BLR",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "11:00",
+    }
+
+    response = await async_client.post("/users/code/METS8801/onboard", json=payload)
+    assert response.status_code == 200, response.text
+    data = response.json()["data"]
+    assert data["metsights_record_id"] == record_id
+
+    rows = (
+        await test_db_session.execute(
+            text(
+                "SELECT engagement_id, user_id, api_endpoint_url, status, request_payload, response_payload "
+                "FROM integration_sync_logs WHERE provider = 'metsights' AND engagement_id = 8801 "
+                "ORDER BY sync_log_id"
+            )
+        )
+    ).mappings().all()
+
+    assert len(rows) >= 2
+    register_row = next(r for r in rows if "/engagements/ms-eng-8801/register/" in r["api_endpoint_url"])
+    assert register_row["status"] == "success"
+    assert register_row["user_id"] == data["user_id"]
+    assert register_row["request_payload"]["first_name"] == "Mets"
+
+    records_row = next(r for r in rows if "/profiles/ms-profile-8801/records/" in r["api_endpoint_url"])
+    assert records_row["status"] == "success"
+    assert records_row["user_id"] == data["user_id"]

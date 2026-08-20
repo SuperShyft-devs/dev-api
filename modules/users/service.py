@@ -24,6 +24,7 @@ from core.exceptions import AppError
 from modules.employee.models import Employee
 from modules.audit.service import AuditService
 from modules.metsights.service import MetsightsService
+from modules.metsights.integration_logging import MetsightsSyncContext
 from modules.metsights.sync_service import (
     _normalize_metsights_type_code,
     _parse_iso_date,
@@ -1161,7 +1162,13 @@ class UsersService:
             return "2"
         return None
 
-    async def _ensure_metsights_profile_id(self, db: AsyncSession, *, user: User) -> None:
+    async def _ensure_metsights_profile_id(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        sync_context: MetsightsSyncContext | None = None,
+    ) -> None:
         if user.metsights_profile_id:
             return
         if self._metsights_service is None:
@@ -1193,6 +1200,7 @@ class UsersService:
                     gender=gender,
                     date_of_birth=dob,
                     age=user.age,
+                    sync_context=sync_context,
                 )
                 if profile_id:
                     break
@@ -1236,6 +1244,7 @@ class UsersService:
         *,
         user: User,
         engagement,
+        sync_context: MetsightsSyncContext | None = None,
     ) -> str | None:
         if self._metsights_service is None:
             return None
@@ -1268,6 +1277,7 @@ class UsersService:
                 gender=gender,
                 date_of_birth=dob,
                 age=user.age,
+                sync_context=sync_context,
             )
         else:
             profile_id = await self._metsights_service.get_or_create_profile_id(
@@ -1278,6 +1288,7 @@ class UsersService:
                 gender=gender,
                 date_of_birth=dob,
                 age=user.age,
+                sync_context=sync_context,
             )
             if profile_id and self._assessments_service is not None and engagement.assessment_package_id:
                 package = await self._assessments_service.get_package_by_id(db, engagement.assessment_package_id)
@@ -1287,6 +1298,7 @@ class UsersService:
                         await self._metsights_service.create_record_for_profile(
                             profile_id=profile_id,
                             assessment_type_code=assessment_type_code,
+                            sync_context=sync_context,
                         )
                     except Exception as exc:
                         logger.warning(
@@ -2327,15 +2339,28 @@ class UsersService:
             )
 
         metsights_record_id: str | None = None
+        sync_context = MetsightsSyncContext(
+            db=db,
+            engagement_id=int(engagement.engagement_id),
+            user_id=int(user.user_id),
+        )
         try:
-            profile_id = await self._create_metsights_profile_for_engagement(db, user=user, engagement=engagement)
+            profile_id = await self._create_metsights_profile_for_engagement(
+                db,
+                user=user,
+                engagement=engagement,
+                sync_context=sync_context,
+            )
             if profile_id:
                 await self._engagements_service.update_participant_sync_flags(
                     db,
                     participant=time_slot,
                     is_profile_created_on_metsights=True,
                 )
-                records_payload = await self._metsights_service.list_profile_records(profile_id=profile_id)
+                records_payload = await self._metsights_service.list_profile_records(
+                    profile_id=profile_id,
+                    sync_context=sync_context,
+                )
                 records = records_payload if isinstance(records_payload, list) else []
                 latest_record_id = self._select_latest_metsights_record_id(records)
                 if latest_record_id and assessment_instance is not None:
@@ -2360,6 +2385,7 @@ class UsersService:
                     fitprint_record_id = await self._metsights_service.create_record_for_profile(
                         profile_id=profile_id,
                         assessment_type_code="7",
+                        sync_context=sync_context,
                     )
                     fitprint_package = await self._assessments_service.get_package_by_assessment_type_code(
                         db,
@@ -2402,6 +2428,7 @@ class UsersService:
                     record_id = await self._metsights_service.create_record_for_profile(
                         profile_id=profile_id,
                         assessment_type_code=assessment_type_code,
+                        sync_context=sync_context,
                     )
                     assessment_instance = await self._assessments_service.ensure_instance_assigned(
                         db,
