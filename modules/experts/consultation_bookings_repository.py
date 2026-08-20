@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.engagements.models import EngagementParticipant
+from modules.engagements.models import Engagement, EngagementParticipant
 from modules.experts.consultations import empty_consent, normalize_preference
 from modules.experts.models import ConsultationBooking
 
@@ -73,6 +73,7 @@ class ConsultationBookingsRepository:
         consultation_cabin: str,
         consultation_date: Any,
         consultation_slot: str,
+        slot_detail_id: int | None = None,
     ) -> int:
         filtered_bookings = (
             select(ConsultationBooking.engagement_participant_id)
@@ -90,8 +91,14 @@ class ConsultationBookingsRepository:
                 EngagementParticipant.engagement_participant_id
                 == filtered_bookings.c.engagement_participant_id,
             )
-            .where(EngagementParticipant.engagement_id == engagement_id)
         )
+        if slot_detail_id is not None:
+            query = query.join(
+                Engagement,
+                Engagement.engagement_id == EngagementParticipant.engagement_id,
+            ).where(Engagement.slot_detail_id == slot_detail_id)
+        else:
+            query = query.where(EngagementParticipant.engagement_id == engagement_id)
         result = await db.execute(query)
         return int(result.scalar_one())
 
@@ -100,6 +107,7 @@ class ConsultationBookingsRepository:
         db: AsyncSession,
         *,
         engagement_id: int,
+        slot_detail_id: int | None = None,
     ) -> list[tuple]:
         query = (
             select(
@@ -113,16 +121,22 @@ class ConsultationBookingsRepository:
                 EngagementParticipant.engagement_participant_id
                 == ConsultationBooking.engagement_participant_id,
             )
-            .where(EngagementParticipant.engagement_id == engagement_id)
             .where(ConsultationBooking.want.is_(True))
             .where(ConsultationBooking.consultation_cabin.isnot(None))
             .where(ConsultationBooking.consultation_date.isnot(None))
             .where(ConsultationBooking.consultation_slot.isnot(None))
-            .group_by(
-                ConsultationBooking.consultation_cabin,
-                ConsultationBooking.consultation_date,
-                ConsultationBooking.consultation_slot,
-            )
+        )
+        if slot_detail_id is not None:
+            query = query.join(
+                Engagement,
+                Engagement.engagement_id == EngagementParticipant.engagement_id,
+            ).where(Engagement.slot_detail_id == slot_detail_id)
+        else:
+            query = query.where(EngagementParticipant.engagement_id == engagement_id)
+        query = query.group_by(
+            ConsultationBooking.consultation_cabin,
+            ConsultationBooking.consultation_date,
+            ConsultationBooking.consultation_slot,
         )
         result = await db.execute(query)
         return list(result.all())

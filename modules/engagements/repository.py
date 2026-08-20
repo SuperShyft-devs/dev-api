@@ -285,35 +285,51 @@ class EngagementsRepository:
         blood_collection_cabin: str,
         engagement_date: date,
         slot_start_time: time,
+        slot_detail_id: int | None = None,
     ) -> int:
         query = (
             select(func.count())
             .select_from(EngagementParticipant)
-            .where(EngagementParticipant.engagement_id == engagement_id)
             .where(EngagementParticipant.blood_collection_cabin == blood_collection_cabin)
             .where(EngagementParticipant.engagement_date == engagement_date)
             .where(EngagementParticipant.slot_start_time == slot_start_time)
         )
+        if slot_detail_id is not None:
+            query = query.join(
+                Engagement,
+                Engagement.engagement_id == EngagementParticipant.engagement_id,
+            ).where(Engagement.slot_detail_id == slot_detail_id)
+        else:
+            query = query.where(EngagementParticipant.engagement_id == engagement_id)
         result = await db.execute(query)
         return int(result.scalar_one())
 
-    async def list_cabin_slot_occupancy(self, db: AsyncSession, *, engagement_id: int) -> list[tuple]:
-        query = (
-            select(
-                EngagementParticipant.blood_collection_cabin,
-                EngagementParticipant.engagement_date,
-                EngagementParticipant.slot_start_time,
-                func.count(),
-            )
-            .where(EngagementParticipant.engagement_id == engagement_id)
-            .where(EngagementParticipant.blood_collection_cabin.isnot(None))
-            .where(EngagementParticipant.engagement_date.isnot(None))
-            .where(EngagementParticipant.slot_start_time.isnot(None))
-            .group_by(
-                EngagementParticipant.blood_collection_cabin,
-                EngagementParticipant.engagement_date,
-                EngagementParticipant.slot_start_time,
-            )
+    async def list_cabin_slot_occupancy(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        slot_detail_id: int | None = None,
+    ) -> list[tuple]:
+        query = select(
+            EngagementParticipant.blood_collection_cabin,
+            EngagementParticipant.engagement_date,
+            EngagementParticipant.slot_start_time,
+            func.count(),
+        ).where(EngagementParticipant.blood_collection_cabin.isnot(None)).where(
+            EngagementParticipant.engagement_date.isnot(None)
+        ).where(EngagementParticipant.slot_start_time.isnot(None))
+        if slot_detail_id is not None:
+            query = query.join(
+                Engagement,
+                Engagement.engagement_id == EngagementParticipant.engagement_id,
+            ).where(Engagement.slot_detail_id == slot_detail_id)
+        else:
+            query = query.where(EngagementParticipant.engagement_id == engagement_id)
+        query = query.group_by(
+            EngagementParticipant.blood_collection_cabin,
+            EngagementParticipant.engagement_date,
+            EngagementParticipant.slot_start_time,
         )
         result = await db.execute(query)
         return list(result.all())
