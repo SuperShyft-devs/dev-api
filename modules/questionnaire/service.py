@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from db.seed.metsights_sync_operations import reset_metsights_sync as run_reset_metsights_sync
 from db.seed.blood_parameters_operations import reload_blood_parameters_questions as run_reload_blood_parameters_questions
-from db.seed.questionnaire_field_config import QUESTION_TYPE_OVERRIDES
+from db.seed.questionnaire_field_config import MAX_MULTI_SELECT_CHOICES, QUESTION_TYPE_OVERRIDES
 from modules.audit.service import AuditService
 from modules.employee.service import EmployeeContext
 from modules.questionnaire.models import QuestionnaireCategory, QuestionnaireDefinition, QuestionnaireHealthyHabitRule
@@ -91,6 +91,17 @@ def _normalize_text(value: object) -> str:
 def _normalize_question_type(value: str | None) -> str:
     normalized = _normalize(value)
     return _QUESTION_TYPE_ALIASES.get(normalized, normalized)
+
+
+def _coerce_answer_for_question(question_key: str | None, answer: object) -> object:
+    """Normalize legacy stored shapes before validation or API responses."""
+    qkey = _normalize_text(question_key)
+    if qkey == "health_priorities" and isinstance(answer, str):
+        stripped = answer.strip()
+        if stripped:
+            return [stripped]
+        return []
+    return answer
 
 
 _VALID_QUESTION_FILTERS = {"all", "answered", "unanswered"}
@@ -434,6 +445,7 @@ class QuestionnaireService:
 
     def _validate_answer_by_type(self, *, question: dict, answer: object) -> None:
         question_type = _normalize_question_type(question.get("question_type"))
+        answer = _coerce_answer_for_question(question.get("question_key"), answer)
 
         if question_type == _SCALE_TYPE:
             if not isinstance(answer, dict):
@@ -479,6 +491,13 @@ class QuestionnaireService:
                         raise AppError(status_code=422, error_code="INVALID_STATE", message="Multiple choice answer items must be strings")
                     if _normalize_text(item) not in allowed_values:
                         raise AppError(status_code=422, error_code="INVALID_STATE", message="Multiple choice answer contains an invalid option")
+            max_allowed = MAX_MULTI_SELECT_CHOICES.get(_normalize_text(question.get("question_key")))
+            if max_allowed is not None and len(answer) > max_allowed:
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message=f"Select at most {max_allowed} options for this question",
+                )
             return
 
         if question_type == "text":
@@ -1479,6 +1498,8 @@ class QuestionnaireService:
             # Keep deterministic behavior from computed visibility map for consistency.
             is_visible = visibility.get(question_id, is_visible)
             answer = responses_map.get(question_id)
+            if answer is not None:
+                answer = _coerce_answer_for_question(question.get("question_key"), answer)
             answer_source = "none"
             if answer is not None:
                 answer_source = "draft"
@@ -1671,6 +1692,10 @@ class QuestionnaireService:
                     error_code="INVALID_STATE",
                     message="Question is read-only and cannot be modified",
                 )
+            response_item["answer"] = _coerce_answer_for_question(
+                question_def.get("question_key"),
+                response_item["answer"],
+            )
             self._validate_answer_by_type(
                 question=question_def,
                 answer=response_item["answer"],
@@ -1910,7 +1935,10 @@ class QuestionnaireService:
                     continue
                 if question_def.get("is_read_only"):
                     continue
-                answer = response_item.get("answer")
+                answer = _coerce_answer_for_question(
+                    question_def.get("question_key"),
+                    response_item.get("answer"),
+                )
                 if not self._try_validate_answer_by_type(question=question_def, answer=answer):
                     continue
                 accepted.append({"question_id": question_id, "answer": answer})

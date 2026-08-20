@@ -149,6 +149,9 @@ BLOOD_PARAMETER_INTERNAL_FALLBACKS: dict[str, tuple[float, str]] = {
     "ast_value": (20.0, "0"),  # U/L
     "uric_acid": (5.0, "0"),  # mg/dL
     "ggt_value": (20.0, "0"),  # U/L
+    "lh_value": (5.0, "0"),  # mIU/L
+    "fsh_value": (5.0, "0"),  # mIU/L
+    "testosterone": (400.0, "0"),  # ng/dl
 }
 
 

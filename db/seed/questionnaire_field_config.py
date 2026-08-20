@@ -214,6 +214,11 @@ METSIGHTS_PUSH_AS_LIST: frozenset[str] = frozenset({
     "health_priorities",
 })
 
+# Maximum selections allowed for specific multiple_choice questions in our UI/API.
+MAX_MULTI_SELECT_CHOICES: dict[str, int] = {
+    "health_priorities": 2,
+}
+
 # Change 7: caffeine_type
 #   Our DB stores all the user's selections as a multiple_choice list.
 #   Metsights only accepts a single value for this field, so when pushing we

@@ -3,15 +3,16 @@
 For participants in running engagements with MetSights Pro/Basic assessments
 where today >= engagement_date:
 1. Call getBookingReport first; on failure skip (no digital-value fetch).
-2. If blood_parameters_verified_at matches API verified_at, skip DB updates and
-   skip getBookingDigitalValue; otherwise refresh diagnostic_report_url plus
-   blood_parameters_full_report / blood_parameters_verified_at, then load digital values.
+2. If blood_parameters_verified_at matches API verified_at, skip getBookingDigitalValue
+   but still persist diagnostic_report_url / blood_parameters_full_report when those
+   fields changed; otherwise refresh all report metadata and load digital values.
 3. After a successful blood load, draft blood-parameter questionnaire responses.
 4. After blood values are available, check whether the engagement primary
    package's metsights ``blood-parameters`` / ``advanced-blood-parameters``
    categories are submitted. Push (or retry) any that are not, unless BioAI
-   is already generated. On push failure for a *full* blood report only, fill
-   missing mandatory answers from internal average fallbacks and retry once.
+   is already generated. For *full* reports, fill missing mandatory answers from
+   internal average fallbacks before push; on push failure, apply fallbacks again
+   and retry once. Partial reports never receive average fallbacks.
 5. Notifications only when full_report is true, and only when both blood fields
    are present, using engagement_notifications for blood_report_ready event
    (skipping services already sent).
@@ -171,9 +172,10 @@ async def _sync_unsubmitted_blood_to_metsights(
     Fresh blood loads re-push even if previously submitted, because values changed.
     Later cron runs retry only unsubmitted categories.
 
-    When push fails and ``is_full_report`` is true, missing mandatory blood
-    answers are filled from internal average fallbacks and the push is retried
-    once. Partial reports never receive average fallbacks.
+    When ``is_full_report`` is true, missing mandatory blood answers are filled
+    from internal average fallbacks before the first push attempt. On push
+    failure, fallbacks are applied again and the push is retried once. Partial
+    reports never receive average fallbacks.
     """
     category_keys = await _blood_metsights_category_keys_for_package(
         db,
@@ -270,6 +272,44 @@ async def _sync_unsubmitted_blood_to_metsights(
                 "user_id": user_id, "engagement_id": engagement_id,
                 "action": "skipped",
                 "reason": f"blood draft failed: {str(exc)[:120]}",
+            })
+
+    if is_full_report:
+        try:
+            proactive_result = await assessments_service.draft_blood_parameter_internal_fallbacks(
+                db,
+                user_id=user_id,
+                assessment_instance_id=instance_id,
+                category_keys=to_push,
+            )
+            await db.commit()
+            proactive_count = int(proactive_result.get("responses_drafted") or 0)
+            if proactive_count > 0:
+                details.append({
+                    "user_id": user_id,
+                    "engagement_id": engagement_id,
+                    "action": "drafted",
+                    "reason": (
+                        f"applied {proactive_count} internal average blood "
+                        "fallbacks before Metsights push (full report)"
+                    ),
+                })
+        except Exception as fallback_exc:
+            await db.rollback()
+            logger.warning(
+                "Proactive blood average fallback draft failed for user=%s instance=%s: %s",
+                user_id,
+                instance_id,
+                fallback_exc,
+            )
+            details.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "action": "skipped",
+                "reason": (
+                    "proactive average blood fallback draft failed: "
+                    f"{str(fallback_exc)[:100]}"
+                ),
             })
 
     for category_key in to_push:
@@ -812,7 +852,40 @@ async def load_blood_reports(
                 blood_loaded_this_run = False
                 blood_drafted_this_run = False
 
+                metadata_needs_update = (
+                    (api_full_report is not None and bool(stored_full_report) != api_full_report)
+                    or (fetched_diag_url != diag_url)
+                )
+
                 if skip_digital_reload:
+                    if metadata_needs_update:
+                        ihr = await _get_or_create_ihr(
+                            db,
+                            ihr_id=ihr_id,
+                            user_id=user_id,
+                            engagement_id=engagement_id,
+                            instance_id=instance_id,
+                        )
+                        ihr.diagnostic_report_url = fetched_diag_url
+                        if api_full_report is not None:
+                            ihr.blood_parameters_full_report = api_full_report
+                        if api_verified_at is not None:
+                            ihr.blood_parameters_verified_at = api_verified_at
+                        diagnostic_report_url = fetched_diag_url
+                        if ihr_id is None:
+                            await db.flush()
+                            ihr_id = ihr.report_id
+                        await db.flush()
+                        await db.commit()
+                        details.append({
+                            "user_id": user_id,
+                            "engagement_id": engagement_id,
+                            "action": "loaded",
+                            "reason": (
+                                "report metadata refreshed from Healthians "
+                                "(verified_at unchanged; skipped digital reload)"
+                            ),
+                        })
                     details.append({
                         "user_id": user_id, "engagement_id": engagement_id,
                         "action": "skipped",
