@@ -21,7 +21,7 @@ from modules.experts.service import ExpertAvailabilityService
 from modules.users.models import User
 
 
-def _consultation_slot_detail(*, expert_type: str = "nutritionist", cabin_key: str = "cc-001") -> dict:
+def _consultation_slot_detail(*, expert_type: str = "nutritionist", cabin_key: str = "consultation_cabin_1") -> dict:
     return {
         "consultation": {
             "2026-08-20": [
@@ -152,7 +152,7 @@ async def test_book_offline_requires_cabin_and_uses_slot_detail(test_db_session,
             engagement_id=engagement_id,
             expert_type="nutritionist",
             date=date(2026, 8, 20),
-            cabin="cc-001",
+            cabin="consultation_cabin_1",
             slot="09:00",
         ),
     )
@@ -189,7 +189,7 @@ async def test_book_offline_rejects_slot_not_in_engagement_slot_detail(test_db_s
                 engagement_id=engagement_id,
                 expert_type="nutritionist",
                 date=date(2026, 8, 20),
-                cabin="cc-001",
+                cabin="consultation_cabin_1",
                 slot="07:00",
             ),
         )
@@ -225,7 +225,7 @@ async def test_book_online_uses_expert_availability_and_ignores_cabin(test_db_se
             engagement_id=engagement_id,
             expert_type="nutritionist",
             date=date.today() + timedelta(days=1),
-            cabin="cc-001",
+            cabin="consultation_cabin_1",
             slot="07:00",
         ),
     )

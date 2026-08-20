@@ -55,7 +55,7 @@ def test_require_available_blood_collection_slot_rejects_break_and_unknown_cabin
             "2026-08-20": [
                 {
                     "cabin_name": "Blood Test Cabin 1",
-                    "cabin_key": "btc-001",
+                    "cabin_key": "blood_test_cabin_1",
                     "start_time": "09:00",
                     "end_time": "17:00",
                     "slot_duration": 30,
@@ -69,16 +69,16 @@ def test_require_available_blood_collection_slot_rejects_break_and_unknown_cabin
     cabin = require_available_blood_collection_slot(
         slot_detail,
         collection_date=date(2026, 8, 20),
-        cabin_key="btc-001",
+        cabin_key="blood_test_cabin_1",
         slot_time=time(9, 0),
     )
-    assert cabin["cabin_key"] == "btc-001"
+    assert cabin["cabin_key"] == "blood_test_cabin_1"
 
     with pytest.raises(AppError) as lunch:
         require_available_blood_collection_slot(
             slot_detail,
             collection_date=date(2026, 8, 20),
-            cabin_key="btc-001",
+            cabin_key="blood_test_cabin_1",
             slot_time=time(13, 0),
         )
     assert lunch.value.error_code == SLOT_UNAVAILABLE_CODE
@@ -100,7 +100,7 @@ def test_build_public_slot_detail_applies_occupancy_and_skips_inactive():
             "2026-08-20": [
                 {
                     "cabin_name": "Blood Test Cabin 1",
-                    "cabin_key": "btc-001",
+                    "cabin_key": "blood_test_cabin_1",
                     "start_time": "09:00",
                     "end_time": "10:00",
                     "slot_duration": 30,
@@ -110,7 +110,7 @@ def test_build_public_slot_detail_applies_occupancy_and_skips_inactive():
                 },
                 {
                     "cabin_name": "Inactive Cabin",
-                    "cabin_key": "btc-off",
+                    "cabin_key": "inactive_cabin",
                     "start_time": "09:00",
                     "end_time": "10:00",
                     "slot_duration": 30,
@@ -124,7 +124,7 @@ def test_build_public_slot_detail_applies_occupancy_and_skips_inactive():
             "2026-08-20": [
                 {
                     "cabin_name": "Consultation Cabin 1",
-                    "cabin_key": "cc-001",
+                    "cabin_key": "consultation_cabin_1",
                     "start_time": "09:00",
                     "end_time": "10:00",
                     "expert_type": "doctor",
@@ -136,11 +136,11 @@ def test_build_public_slot_detail_applies_occupancy_and_skips_inactive():
             ]
         },
     }
-    occupancy = {occupancy_key("btc-001", date(2026, 8, 20), time(9, 0)): 5}
-    consultation_occupancy = {occupancy_key("cc-001", date(2026, 8, 20), time(9, 0)): 1}
+    occupancy = {occupancy_key("blood_test_cabin_1", date(2026, 8, 20), time(9, 0)): 5}
+    consultation_occupancy = {occupancy_key("consultation_cabin_1", date(2026, 8, 20), time(9, 0)): 1}
     public = build_public_slot_detail(slot_detail, occupancy, consultation_occupancy)
     blood_cabins = public["blood_collection"]["2026-08-20"]
-    assert [cabin["cabin_key"] for cabin in blood_cabins] == ["btc-001"]
+    assert [cabin["cabin_key"] for cabin in blood_cabins] == ["blood_test_cabin_1"]
     assert blood_cabins[0]["available_slots"] == [
         {"slot": "09:00", "spot_left": 1},
         {"slot": "09:30", "spot_left": 6},
@@ -160,7 +160,7 @@ def test_require_available_consultation_slot_rejects_break_cabin_and_expert_type
             "2026-08-20": [
                 {
                     "cabin_name": "Consultation Cabin 1",
-                    "cabin_key": "cc-001",
+                    "cabin_key": "consultation_cabin_1",
                     "start_time": "09:00",
                     "end_time": "17:00",
                     "expert_type": "doctor",
@@ -176,16 +176,16 @@ def test_require_available_consultation_slot_rejects_break_cabin_and_expert_type
         slot_detail,
         expert_type="doctor",
         consultation_date=date(2026, 8, 20),
-        cabin_key="cc-001",
+        cabin_key="consultation_cabin_1",
         slot_time=time(9, 0),
     )
-    assert cabin["cabin_key"] == "cc-001"
+    assert cabin["cabin_key"] == "consultation_cabin_1"
 
     cases = [
-        {"consultation_date": date(2026, 8, 21), "cabin_key": "cc-001", "slot_time": time(9, 0), "expert_type": "doctor"},
+        {"consultation_date": date(2026, 8, 21), "cabin_key": "consultation_cabin_1", "slot_time": time(9, 0), "expert_type": "doctor"},
         {"consultation_date": date(2026, 8, 20), "cabin_key": "missing", "slot_time": time(9, 0), "expert_type": "doctor"},
-        {"consultation_date": date(2026, 8, 20), "cabin_key": "cc-001", "slot_time": time(13, 0), "expert_type": "doctor"},
-        {"consultation_date": date(2026, 8, 20), "cabin_key": "cc-001", "slot_time": time(9, 0), "expert_type": "nutritionist"},
+        {"consultation_date": date(2026, 8, 20), "cabin_key": "consultation_cabin_1", "slot_time": time(13, 0), "expert_type": "doctor"},
+        {"consultation_date": date(2026, 8, 20), "cabin_key": "consultation_cabin_1", "slot_time": time(9, 0), "expert_type": "nutritionist"},
     ]
     for kwargs in cases:
         with pytest.raises(AppError) as err:

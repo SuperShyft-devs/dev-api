@@ -22,3 +22,18 @@ def slugify_department(name: str) -> str:
     slug = _NON_ALNUM.sub("_", normalized)
     slug = _MULTI_UNDERSCORE.sub("_", slug).strip("_")
     return slug
+
+
+def slugify_cabin_key(name: str) -> str:
+    """Convert a cabin display name to a stable slug key (SlugKey format)."""
+    return slugify_department(name)
+
+
+def sanitize_cabin_key(value: str) -> str:
+    """Normalize an existing cabin key to SlugKey format (e.g. btc-001 -> btc_001)."""
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return ""
+    slug = _NON_ALNUM.sub("_", normalized)
+    slug = _MULTI_UNDERSCORE.sub("_", slug).strip("_")
+    return slug

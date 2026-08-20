@@ -19,6 +19,7 @@ from common.validation import (
     OptionalPinCode,
     OptionalSafeDisplayName,
     OptionalShortSafeText,
+    OptionalSlugKey,
     PersonName,
     PhoneStr,
     PinCode,
@@ -377,7 +378,7 @@ class EngagementUserOnboardRequest(BaseModel):
 
     blood_collection_date: date
     blood_collection_time_slot: ShortSafeText
-    blood_collection_cabin: OptionalSafeDisplayName = None
+    blood_collection_cabin: OptionalSlugKey = None
 
     participants_employee_id: OptionalSafeDisplayName = None
     participant_department: OptionalSafeDisplayName = None

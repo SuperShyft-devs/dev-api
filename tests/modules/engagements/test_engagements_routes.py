@@ -298,7 +298,7 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
             "2026-08-20": [
                 {
                     "cabin_name": "Blood Test Cabin 1",
-                    "cabin_key": "btc-001",
+                    "cabin_key": "blood_test_cabin_1",
                     "start_time": "09:00",
                     "end_time": "17:00",
                     "slot_duration": 30,
@@ -312,7 +312,7 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
             "2026-08-20": [
                 {
                     "cabin_name": "Consultation Cabin 1",
-                    "cabin_key": "cc-001",
+                    "cabin_key": "consultation_cabin_1",
                     "start_time": "10:00",
                     "end_time": "18:00",
                     "expert_type": "doctor",
@@ -345,7 +345,7 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
     details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7020))
     assert details.status_code == 200
     data = details.json()["data"]
-    assert data["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_key"] == "btc-001"
+    assert data["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_key"] == "blood_test_cabin_1"
     assert data["slot_detail"]["consultation"]["2026-08-20"][0]["cabin_name"] == "Consultation Cabin 1"
     assert data["slot_detail"]["consultation"]["2026-08-20"][0]["expert_type"] == "doctor"
     assert data["slot_detail"]["blood_collection"]["2026-08-20"][0]["breaks"][0]["start_time"] == "13:00"
@@ -355,7 +355,7 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
             "2026-08-20": [
                 {
                     "cabin_name": "Blood Test Cabin 1 Updated",
-                    "cabin_key": "btc-001",
+                    "cabin_key": "blood_test_cabin_1",
                     "start_time": "08:00",
                     "end_time": "16:00",
                     "slot_duration": 20,
@@ -404,7 +404,7 @@ async def test_create_engagements_with_same_metadata_share_slot_detail_id(async_
             "2026-08-20": [
                 {
                     "cabin_name": "Shared Cabin",
-                    "cabin_key": "btc-shared",
+                    "cabin_key": "shared_cabin",
                     "start_time": "09:00",
                     "end_time": "17:00",
                     "slot_duration": 30,
@@ -450,14 +450,14 @@ async def test_create_engagements_with_same_metadata_share_slot_detail_id(async_
 
     assert first_data["slot_detail_id"] is not None
     assert first_data["slot_detail_id"] == second_data["slot_detail_id"]
-    assert first_data["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_key"] == "btc-shared"
+    assert first_data["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_key"] == "shared_cabin"
 
     updated_slot = {
         "blood_collection": {
             "2026-08-20": [
                 {
                     "cabin_name": "Shared Cabin Updated",
-                    "cabin_key": "btc-shared",
+                    "cabin_key": "shared_cabin",
                     "start_time": "08:00",
                     "end_time": "16:00",
                     "slot_duration": 30,
@@ -510,7 +510,7 @@ async def test_create_engagement_rejects_invalid_slot_detail(async_client, test_
                 "2026-08-20": [
                     {
                         "cabin_name": "Cabin A",
-                        "cabin_key": "btc-001",
+                        "cabin_key": "blood_test_cabin_1",
                         "start_time": "17:00",
                         "end_time": "09:00",
                         "slot_duration": 30,
@@ -549,7 +549,7 @@ async def test_create_engagement_rejects_consultation_cabin_without_expert_type(
                 "2026-08-20": [
                     {
                         "cabin_name": "Consultation Cabin 1",
-                        "cabin_key": "cc-001",
+                        "cabin_key": "consultation_cabin_1",
                         "start_time": "09:00",
                         "end_time": "17:00",
                         "slot_duration": 30,
@@ -588,7 +588,7 @@ async def test_create_engagement_rejects_unknown_consultation_expert_type(async_
                 "2026-08-20": [
                     {
                         "cabin_name": "Consultation Cabin 1",
-                        "cabin_key": "cc-001",
+                        "cabin_key": "consultation_cabin_1",
                         "start_time": "09:00",
                         "end_time": "17:00",
                         "expert_type": "unknown_type",
@@ -2198,7 +2198,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
             "2026-08-20": [
                 {
                     "cabin_name": "Blood Test Cabin 1",
-                    "cabin_key": "btc-001",
+                    "cabin_key": "blood_test_cabin_1",
                     "start_time": "09:00",
                     "end_time": "17:00",
                     "slot_duration": 30,
@@ -2208,7 +2208,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
                 },
                 {
                     "cabin_name": "Inactive Cabin",
-                    "cabin_key": "btc-off",
+                    "cabin_key": "inactive_cabin",
                     "start_time": "09:00",
                     "end_time": "17:00",
                     "slot_duration": 30,
@@ -2222,7 +2222,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
             "2026-08-20": [
                 {
                     "cabin_name": "Consultation Cabin 1",
-                    "cabin_key": "cc-001",
+                    "cabin_key": "consultation_cabin_1",
                     "start_time": "09:00",
                     "end_time": "10:00",
                     "expert_type": "doctor",
@@ -2258,7 +2258,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
     assert public.status_code == 200, public.text
     data = public.json()["data"]
     blood = data["slot_detail"]["blood_collection"]["2026-08-20"]
-    assert [cabin["cabin_key"] for cabin in blood] == ["btc-001"]
+    assert [cabin["cabin_key"] for cabin in blood] == ["blood_test_cabin_1"]
     assert set(blood[0].keys()) == {"cabin_name", "cabin_key", "slot_duration", "available_slots"}
     assert [item["slot"] for item in blood[0]["available_slots"]] == _EXPECTED_BLOOD_SLOTS
     assert all(item["spot_left"] == 6 for item in blood[0]["available_slots"])
@@ -2287,12 +2287,12 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
             "city": "BLR",
             "blood_collection_date": "2026-08-20",
             "blood_collection_time_slot": "09:00",
-            "blood_collection_cabin": "btc-001",
+            "blood_collection_cabin": "blood_test_cabin_1",
             "consultations": {
                 "doctor": {
                     "want": True,
                     "date": "2026-08-20",
-                    "cabin": "cc-001",
+                    "cabin": "consultation_cabin_1",
                     "slot": "09:00",
                 }
             },
@@ -2324,7 +2324,7 @@ async def test_shared_slot_detail_spot_left_counts_across_engagements(async_clie
             "2026-08-20": [
                 {
                     "cabin_name": "Shared Blood Cabin",
-                    "cabin_key": "btc-shared-spot",
+                    "cabin_key": "shared_blood_cabin",
                     "start_time": "09:00",
                     "end_time": "10:00",
                     "slot_duration": 30,
@@ -2338,7 +2338,7 @@ async def test_shared_slot_detail_spot_left_counts_across_engagements(async_clie
             "2026-08-20": [
                 {
                     "cabin_name": "Shared Consult Cabin",
-                    "cabin_key": "cc-shared-spot",
+                    "cabin_key": "shared_consult_cabin",
                     "start_time": "09:00",
                     "end_time": "10:00",
                     "expert_type": "doctor",
@@ -2394,12 +2394,12 @@ async def test_shared_slot_detail_spot_left_counts_across_engagements(async_clie
             "city": "BLR",
             "blood_collection_date": "2026-08-20",
             "blood_collection_time_slot": "09:00",
-            "blood_collection_cabin": "btc-shared-spot",
+            "blood_collection_cabin": "shared_blood_cabin",
             "consultations": {
                 "doctor": {
                     "want": True,
                     "date": "2026-08-20",
-                    "cabin": "cc-shared-spot",
+                    "cabin": "shared_consult_cabin",
                     "slot": "09:00",
                 }
             },
@@ -2433,12 +2433,12 @@ async def test_shared_slot_detail_spot_left_counts_across_engagements(async_clie
             "city": "BLR",
             "blood_collection_date": "2026-08-20",
             "blood_collection_time_slot": "09:00",
-            "blood_collection_cabin": "btc-shared-spot",
+            "blood_collection_cabin": "shared_blood_cabin",
             "consultations": {
                 "doctor": {
                     "want": True,
                     "date": "2026-08-20",
-                    "cabin": "cc-shared-spot",
+                    "cabin": "shared_consult_cabin",
                     "slot": "09:30",
                 }
             },
@@ -2507,7 +2507,7 @@ async def test_get_engagement_by_code_includes_consultation_mode(async_client, t
                     "2026-08-20": [
                         {
                             "cabin_name": "Consultation Cabin 1",
-                            "cabin_key": "cc-001",
+                            "cabin_key": "consultation_cabin_1",
                             "start_time": "09:00",
                             "end_time": "17:00",
                             "expert_type": "doctor",
@@ -2527,7 +2527,7 @@ async def test_get_engagement_by_code_includes_consultation_mode(async_client, t
     assert public.status_code == 200, public.text
     data = public.json()["data"]
     assert data["consultation_mode"] == "offline"
-    assert data["slot_detail"]["consultation"]["2026-08-20"][0]["cabin_key"] == "cc-001"
+    assert data["slot_detail"]["consultation"]["2026-08-20"][0]["cabin_key"] == "consultation_cabin_1"
 
 
 @pytest.mark.asyncio
@@ -2559,7 +2559,7 @@ async def test_create_engagement_online_strips_consultation_slot_detail(async_cl
                     "2026-08-20": [
                         {
                             "cabin_name": "Should Be Stripped",
-                            "cabin_key": "cc-strip",
+                            "cabin_key": "should_be_stripped",
                             "start_time": "09:00",
                             "end_time": "17:00",
                             "expert_type": "doctor",

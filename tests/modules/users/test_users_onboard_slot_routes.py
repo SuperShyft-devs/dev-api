@@ -94,7 +94,7 @@ def _slot_detail(*, capacity: int = 6, is_active: bool = True, consultation: dic
             "2026-08-20": [
                 {
                     "cabin_name": "Blood Test Cabin 1",
-                    "cabin_key": "btc-001",
+                    "cabin_key": "blood_test_cabin_1",
                     "start_time": "09:00",
                     "end_time": "17:00",
                     "slot_duration": 30,
@@ -115,7 +115,7 @@ def _consultation_cabin(*, capacity: int = 1, expert_type: str = "doctor") -> di
         "2026-08-20": [
             {
                 "cabin_name": "Consultation Cabin 1",
-                "cabin_key": "cc-001",
+                "cabin_key": "consultation_cabin_1",
                 "start_time": "09:00",
                 "end_time": "17:00",
                 "expert_type": expert_type,
@@ -177,7 +177,7 @@ async def _create_slot_engagement(
     return response.json()["data"]["engagement_id"]
 
 
-def _onboard_payload(*, phone: str, slot: str = "09:00", cabin: str = "btc-001", date: str = "2026-08-20") -> dict:
+def _onboard_payload(*, phone: str, slot: str = "09:00", cabin: str = "blood_test_cabin_1", date: str = "2026-08-20") -> dict:
     return {
         "age": 30,
         "first_name": "On",
@@ -245,7 +245,7 @@ async def test_onboard_persists_blood_collection_cabin(async_client, test_db_ses
             {"pid": pid},
         )
     ).first()
-    assert row.blood_collection_cabin == "btc-001"
+    assert row.blood_collection_cabin == "blood_test_cabin_1"
     assert str(row.engagement_date) == "2026-08-20"
     assert str(row.slot_start_time)[:5] == "09:30"
     assert engagement_id == response.json()["data"]["engagement_id"]
@@ -306,7 +306,7 @@ def _consult_onboard_payload(
     *,
     phone: str,
     slot: str = "09:00",
-    cabin: str = "cc-001",
+    cabin: str = "consultation_cabin_1",
     date: str = "2026-08-20",
     blood_slot: str = "09:00",
 ) -> dict:
@@ -349,7 +349,7 @@ async def test_onboard_persists_consultation_cabin(async_client, test_db_session
             {"pid": pid},
         )
     ).first()
-    assert row.consultation_cabin == "cc-001"
+    assert row.consultation_cabin == "consultation_cabin_1"
     assert str(row.consultation_date) == "2026-08-20"
     assert row.consultation_slot == "09:30"
     assert row.expert_type == "doctor"
@@ -411,3 +411,51 @@ async def test_onboard_rejects_when_consultation_slot_capacity_is_full(async_cli
     assert second.status_code == 400
     assert second.json()["error_code"] == "SLOT_UNAVAILABLE"
     assert second.json()["message"] == "No such Slot Available"
+
+
+@pytest.mark.asyncio
+async def test_onboard_accepts_slug_cabin_key_with_underscores(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7427, employee_id=427)
+    await _seed_organization(test_db_session, organization_id=9208, name="Room Org")
+    await _seed_packages(test_db_session, package_id=9208)
+    type_id = await _engagement_type_id(test_db_session, "bio_ai")
+    slot_detail = {
+        "blood_collection": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Room 2",
+                    "cabin_key": "room_2",
+                    "start_time": "09:00",
+                    "end_time": "17:00",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 6,
+                    "breaks": [],
+                    "is_active": True,
+                }
+            ]
+        }
+    }
+    created = await async_client.post(
+        "/engagements",
+        headers=_auth_header(7427),
+        json={
+            "engagement_name": "Room Camp",
+            "organization_id": 9208,
+            "engagement_type": type_id,
+            "assessment_package_id": 9208,
+            "diagnostic_package_id": 9208,
+            "city": "BLR",
+            "slot_duration": 30,
+            "start_date": "2026-08-20",
+            "end_date": "2026-08-21",
+            "engagement_code": "ROOMKEY1",
+            "slot_detail": slot_detail,
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    response = await async_client.post(
+        "/users/code/ROOMKEY1/onboard",
+        json=_onboard_payload(phone="9208000001", cabin="room_2"),
+    )
+    assert response.status_code == 200, response.text
