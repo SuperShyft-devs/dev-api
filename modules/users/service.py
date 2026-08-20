@@ -1225,7 +1225,14 @@ class UsersService:
 
         await self._repository.update_user_partial(db, user.user_id, {"metsights_profile_id": profile_id})
 
-    def _select_latest_metsights_record_id(self, records: list[dict[str, Any]]) -> str | None:
+    def _select_latest_metsights_record_id(
+        self,
+        records: list[dict[str, Any]],
+        *,
+        assessment_type_code: str | None = None,
+    ) -> str | None:
+        """Return the newest Metsights record id, optionally filtered to one assessment type."""
+
         def _sort_key(row: dict[str, Any]) -> tuple[str, str]:
             date_value = str(row.get("date") or "").strip()
             created_value = str(row.get("created_at") or "").strip()
@@ -1234,9 +1241,55 @@ class UsersService:
         valid_rows = [row for row in records if isinstance(row, dict)]
         if not valid_rows:
             return None
+
+        wanted_type = (assessment_type_code or "").strip()
+        if wanted_type:
+            typed_rows = [
+                row
+                for row in valid_rows
+                if _normalize_metsights_type_code(row) == wanted_type
+            ]
+            if typed_rows:
+                valid_rows = typed_rows
+
         latest = max(valid_rows, key=_sort_key)
         record_id = str(latest.get("id") or "").strip()
         return record_id or None
+
+    async def _resolve_primary_metsights_record_id(
+        self,
+        *,
+        profile_id: str,
+        assessment_type_code: str,
+        sync_context: MetsightsSyncContext | None = None,
+        existing_records: list[dict[str, Any]] | None = None,
+    ) -> str | None:
+        """Pick or create the Metsights record for the engagement's primary assessment package."""
+        if self._metsights_service is None:
+            return None
+
+        pid = (profile_id or "").strip()
+        type_code = (assessment_type_code or "").strip()
+        if not pid or not type_code:
+            return None
+
+        records = existing_records
+        if records is None:
+            records_payload = await self._metsights_service.list_profile_records(
+                profile_id=pid,
+                sync_context=sync_context,
+            )
+            records = records_payload if isinstance(records_payload, list) else []
+
+        matched = self._select_latest_metsights_record_id(records, assessment_type_code=type_code)
+        if matched:
+            return matched
+
+        return await self._metsights_service.create_record_for_profile(
+            profile_id=pid,
+            assessment_type_code=type_code,
+            sync_context=sync_context,
+        )
 
     async def _create_metsights_profile_for_engagement(
         self,
@@ -2357,13 +2410,22 @@ class UsersService:
                     participant=time_slot,
                     is_profile_created_on_metsights=True,
                 )
+                package = await self._assessments_service.get_package_by_id(db, engagement.assessment_package_id)
+                primary_type_code = (
+                    (getattr(package, "assessment_type_code", None) or "").strip() if package is not None else ""
+                )
                 records_payload = await self._metsights_service.list_profile_records(
                     profile_id=profile_id,
                     sync_context=sync_context,
                 )
                 records = records_payload if isinstance(records_payload, list) else []
-                latest_record_id = self._select_latest_metsights_record_id(records)
-                if latest_record_id and assessment_instance is not None:
+                primary_record_id = await self._resolve_primary_metsights_record_id(
+                    profile_id=profile_id,
+                    assessment_type_code=primary_type_code,
+                    sync_context=sync_context,
+                    existing_records=records,
+                )
+                if primary_record_id and assessment_instance is not None:
                     assessment_instance = await self._assessments_service.ensure_instance_assigned(
                         db,
                         user_id=user.user_id,
@@ -2372,9 +2434,9 @@ class UsersService:
                         ip_address=ip_address,
                         user_agent=user_agent,
                         endpoint=endpoint,
-                        metsights_record_id=latest_record_id,
+                        metsights_record_id=primary_record_id,
                     )
-                    metsights_record_id = latest_record_id
+                    metsights_record_id = primary_record_id
                     await self._engagements_service.update_participant_sync_flags(
                         db,
                         participant=time_slot,
