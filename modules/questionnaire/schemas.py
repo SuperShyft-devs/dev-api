@@ -18,6 +18,7 @@ class QuestionnaireQuestionCreateRequest(BaseModel):
     is_required: bool = False
     is_read_only: bool = False
     help_text: Optional[str] = Field(default=None, max_length=2000)
+    sub_text: Optional[str] = Field(default=None, max_length=2000)
     options: Optional[list[dict[str, str | None]]] = Field(default=None)
     visibility_rules: Optional[dict[str, Any]] = Field(default=None)
     prefill_from: Optional[dict[str, Any]] = Field(default=None)
@@ -44,6 +45,7 @@ class QuestionnaireQuestionUpdateRequest(BaseModel):
     is_required: bool = False
     is_read_only: bool = False
     help_text: Optional[str] = Field(default=None, max_length=2000)
+    sub_text: Optional[str] = Field(default=None, max_length=2000)
     options: Optional[list[dict[str, str | None]]] = Field(default=None)
     visibility_rules: Optional[dict[str, Any]] = Field(default=None)
     prefill_from: Optional[dict[str, Any]] = Field(default=None)
@@ -118,6 +120,7 @@ class QuestionnaireQuestionResponse(BaseModel):
     is_required: bool
     is_read_only: bool
     help_text: str | None
+    sub_text: str | None
     options: Any | None
     visibility_rules: dict[str, Any] | None
     prefill_from: dict[str, Any] | None
@@ -138,6 +141,7 @@ class QuestionnaireQuestionWithAnswer(BaseModel):
     is_required: bool
     is_read_only: bool
     help_text: str | None
+    sub_text: str | None
     options: Any | None
     visibility_rules: dict[str, Any] | None
     prefill_from: dict[str, Any] | None

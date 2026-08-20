@@ -308,6 +308,7 @@ class QuestionnaireService:
             "is_required": bool(row.is_required),
             "is_read_only": bool(row.is_read_only),
             "help_text": row.help_text,
+            "sub_text": row.sub_text,
             "options": serialized_options if serialized_options else None,
             "visibility_rules": row.visibility_rules,
             "prefill_from": row.prefill_from,
@@ -748,6 +749,7 @@ class QuestionnaireService:
             is_required=payload.is_required,
             is_read_only=payload.is_read_only,
             help_text=(payload.help_text or "").strip() or None,
+            sub_text=(payload.sub_text or "").strip() or None,
             visibility_rules=visibility_rules,
             prefill_from=prefill_from,
             metsights_sync=payload.metsights_sync,
@@ -982,6 +984,7 @@ class QuestionnaireService:
         row.is_required = payload.is_required
         row.is_read_only = payload.is_read_only
         row.help_text = (payload.help_text or "").strip() or None
+        row.sub_text = (payload.sub_text or "").strip() or None
         row.visibility_rules = self._normalize_visibility_rules(payload.visibility_rules)
         row.prefill_from = self._normalize_prefill_from(payload.prefill_from)
         if payload.metsights_sync is not None:
@@ -1501,6 +1504,7 @@ class QuestionnaireService:
                     "is_required": bool(question.get("is_required")),
                     "is_read_only": bool(question.get("is_read_only")),
                     "help_text": question.get("help_text"),
+                    "sub_text": question.get("sub_text"),
                     "options": question.get("options"),
                     "visibility_rules": question.get("visibility_rules"),
                     "prefill_from": question.get("prefill_from"),
