@@ -14,6 +14,7 @@ from core.exceptions import AppError
 from db.seed.blood_parameters_registry import (
     ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
     BLOOD_PARAMETER_CATEGORY_KEY,
+    BLOOD_PARAMETER_INTERNAL_FALLBACKS,
     UNITLESS_BLOOD_PARAMETER_KEYS,
 )
 from modules.audit.service import AuditService
@@ -732,6 +733,136 @@ class AssessmentsService:
             "package_code": package_code,
             "responses_drafted": total_drafted,
             "categories": category_results,
+        }
+
+    async def draft_blood_parameter_internal_fallbacks(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        assessment_instance_id: int,
+        category_keys: list[str] | tuple[str, ...] | None = None,
+    ) -> dict[str, Any]:
+        """Fill missing mandatory blood answers with internal average fallbacks.
+
+        Only writes when a response is absent or has no usable ``value``. Existing
+        real values are left unchanged. Intended for full-report Metsights push
+        retries — not for partial reports.
+        """
+        if self._questionnaire is None:
+            raise RuntimeError(
+                "QuestionnaireRepository is required for draft_blood_parameter_internal_fallbacks"
+            )
+
+        instance = await self._repository.get_instance_by_id(
+            db, assessment_instance_id=assessment_instance_id
+        )
+        if instance is None:
+            raise AppError(
+                status_code=404,
+                error_code="ASSESSMENT_NOT_FOUND",
+                message="Assessment does not exist",
+            )
+        if int(instance.user_id) != int(user_id):
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
+
+        package = await self._repository.get_package_by_id(db, package_id=int(instance.package_id))
+        package_code = (getattr(package, "package_code", None) or "").strip() if package is not None else ""
+        if category_keys is None:
+            keys = list(_PACKAGE_BLOOD_CATEGORY_KEYS.get(package_code, ()))
+        else:
+            keys = [str(k).strip() for k in category_keys if str(k).strip()]
+
+        total_drafted = 0
+        drafted_keys: list[str] = []
+
+        for category_key in keys:
+            category = await self._questionnaire.get_category_by_key_and_category_of(
+                db,
+                category_key=category_key,
+                category_of="metsights",
+            )
+            if category is None:
+                continue
+
+            questions = await self._questionnaire.list_questions_by_category(
+                db,
+                category_id=int(category.category_id),
+            )
+            for question in questions:
+                question_key = (question.question_key or "").strip()
+                if not question_key or question_key not in BLOOD_PARAMETER_INTERNAL_FALLBACKS:
+                    continue
+                if (question.status or "").strip().lower() != "active":
+                    continue
+
+                existing = await self._questionnaire.get_response_by_instance_and_question_id(
+                    db,
+                    assessment_instance_id=int(instance.assessment_instance_id),
+                    question_id=int(question.question_id),
+                )
+                if existing is not None:
+                    existing_answer = existing.answer if isinstance(existing.answer, dict) else {}
+                    if existing_answer.get("value") is not None:
+                        continue
+
+                value, unit_code = BLOOD_PARAMETER_INTERNAL_FALLBACKS[question_key]
+                if question_key in UNITLESS_BLOOD_PARAMETER_KEYS:
+                    answer: dict[str, Any] = {"value": value, "unit": "0"}
+                else:
+                    options = await self._questionnaire.list_options_for_question(
+                        db,
+                        question_id=int(question.question_id),
+                    )
+                    option_value = _map_unit_to_option_value(unit_code, options)
+                    if option_value is None and options:
+                        # Fallbacks use Metsights option codes; if options are not
+                        # seeded yet, still push the configured code.
+                        option_value = unit_code
+                    if option_value is None:
+                        continue
+                    answer = {"value": value, "unit": option_value}
+
+                resolved_cat_ids = await self._questionnaire.resolve_category_ids_for_question(
+                    db,
+                    question_id=int(question.question_id),
+                    package_id=int(instance.package_id),
+                )
+                if not resolved_cat_ids:
+                    resolved_cat_ids = [int(category.category_id)]
+
+                if existing is not None:
+                    existing.answer = answer
+                    existing.category_ids = resolved_cat_ids
+                    await self._questionnaire.update_response(db, existing)
+                else:
+                    await self._questionnaire.create_response(
+                        db,
+                        QuestionnaireResponse(
+                            assessment_instance_id=int(instance.assessment_instance_id),
+                            question_id=int(question.question_id),
+                            category_ids=resolved_cat_ids,
+                            answer=answer,
+                        ),
+                    )
+                total_drafted += 1
+                drafted_keys.append(question_key)
+
+        if keys:
+            await self._sync_blood_category_progress(
+                db,
+                instance=instance,
+                category_keys=tuple(keys),
+            )
+
+        return {
+            "assessment_instance_id": int(instance.assessment_instance_id),
+            "responses_drafted": total_drafted,
+            "fallback_keys": drafted_keys,
         }
 
     async def _sync_blood_category_progress(

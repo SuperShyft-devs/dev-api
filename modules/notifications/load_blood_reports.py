@@ -10,7 +10,8 @@ where today >= engagement_date:
 4. After blood values are available, check whether the engagement primary
    package's metsights ``blood-parameters`` / ``advanced-blood-parameters``
    categories are submitted. Push (or retry) any that are not, unless BioAI
-   is already generated.
+   is already generated. On push failure for a *full* blood report only, fill
+   missing mandatory answers from internal average fallbacks and retry once.
 5. Notifications only when full_report is true, and only when both blood fields
    are present, using engagement_notifications for blood_report_ready event
    (skipping services already sent).
@@ -162,12 +163,17 @@ async def _sync_unsubmitted_blood_to_metsights(
     package_code: str,
     blood_loaded_this_run: bool,
     already_drafted: bool,
+    is_full_report: bool,
     details: list[dict[str, Any]],
 ) -> None:
     """Push primary-package metsights blood categories that are not yet submitted.
 
     Fresh blood loads re-push even if previously submitted, because values changed.
     Later cron runs retry only unsubmitted categories.
+
+    When push fails and ``is_full_report`` is true, missing mandatory blood
+    answers are filled from internal average fallbacks and the push is retried
+    once. Partial reports never receive average fallbacks.
     """
     category_keys = await _blood_metsights_category_keys_for_package(
         db,
@@ -289,11 +295,11 @@ async def _sync_unsubmitted_blood_to_metsights(
                 await db.commit()
             except Exception:
                 await db.rollback()
+            push_error = getattr(exc, "message", None) or str(exc)
             logger.warning(
                 "Metsights blood push failed for user=%s category=%s: %s",
                 user_id, category_key, exc,
             )
-            push_error = getattr(exc, "message", None) or str(exc)
             details.append({
                 "user_id": user_id, "engagement_id": engagement_id,
                 "action": "failed",
@@ -302,6 +308,78 @@ async def _sync_unsubmitted_blood_to_metsights(
                     f"{str(push_error)[:100]}"
                 ),
             })
+
+            if not is_full_report:
+                continue
+
+            try:
+                fallback_result = await assessments_service.draft_blood_parameter_internal_fallbacks(
+                    db,
+                    user_id=user_id,
+                    assessment_instance_id=instance_id,
+                    category_keys=[category_key],
+                )
+                await db.commit()
+                fallback_count = int(fallback_result.get("responses_drafted") or 0)
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "drafted",
+                    "reason": (
+                        f"applied {fallback_count} internal average blood "
+                        f"fallbacks for {category_key} after push failure"
+                    ),
+                })
+            except Exception as fallback_exc:
+                await db.rollback()
+                logger.warning(
+                    "Blood average fallback draft failed for user=%s category=%s: %s",
+                    user_id, category_key, fallback_exc,
+                )
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "skipped",
+                    "reason": (
+                        f"average blood fallback draft failed for {category_key}: "
+                        f"{str(fallback_exc)[:100]}"
+                    ),
+                })
+                continue
+
+            try:
+                push_result = await sync_service._push_category_to_metsights(
+                    db,
+                    assessment_instance_id=instance_id,
+                    user_id=user_id,
+                    category_key=category_key,
+                )
+                await db.commit()
+                fields_count = len(push_result.get("fields_pushed") or [])
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "pushed",
+                    "reason": (
+                        f"pushed {category_key} to Metsights after average "
+                        f"fallbacks ({fields_count} fields)"
+                    ),
+                })
+            except Exception as retry_exc:
+                try:
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                retry_error = getattr(retry_exc, "message", None) or str(retry_exc)
+                logger.warning(
+                    "Metsights blood push retry failed for user=%s category=%s: %s",
+                    user_id, category_key, retry_exc,
+                )
+                details.append({
+                    "user_id": user_id, "engagement_id": engagement_id,
+                    "action": "failed",
+                    "reason": (
+                        f"metsights push retry failed for {category_key} "
+                        f"after average fallbacks: {str(retry_error)[:100]}"
+                    ),
+                })
 
 
 async def _group_provider_blood(
@@ -871,6 +949,7 @@ async def load_blood_reports(
                         package_code=package_code,
                         blood_loaded_this_run=blood_loaded_this_run,
                         already_drafted=blood_drafted_this_run,
+                        is_full_report=is_full_report,
                         details=details,
                     )
 

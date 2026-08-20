@@ -128,6 +128,29 @@ FIELD_BY_KEY: dict[str, BloodParameterField] = {
     field.question_key: field for field in BLOOD_PARAMETER_FIELDS
 }
 
+# Internal average fallbacks used when a *full* blood report cannot be pushed to
+# Metsights (missing/rejected mandatory digital values). Values are
+# ``(numeric_value, metsights_unit_option_code)``. Never apply for partial reports.
+BLOOD_PARAMETER_INTERNAL_FALLBACKS: dict[str, tuple[float, str]] = {
+    "total_cholesterol": (170.0, "0"),  # mg/dL
+    "hdlc_value": (50.0, "0"),  # mg/dL
+    "ldlc_value": (100.0, "0"),  # mg/dL
+    "triglycerides": (100.0, "0"),  # mg/dL
+    "glucose_fasting": (90.0, "0"),  # mg/dL
+    "glycated_haemoglobin": (5.2, "0"),  # %
+    "insulin": (6.0, "0"),  # µIU/mL / uIU/mL
+    "triiodothyronine": (1.1, "1"),  # ng/mL
+    "thyroxine": (8.0, "1"),  # µg/dL
+    "tsh_value": (2.0, "0"),  # mIU/L
+    "wbc_value": (7.0, "3"),  # 10³/µL
+    "platelets": (250.0, "3"),  # 10³/µL
+    "monocytes": (6.0, "4"),  # %
+    "alt_value": (20.0, "0"),  # U/L
+    "ast_value": (20.0, "0"),  # U/L
+    "uric_acid": (5.0, "0"),  # mg/dL
+    "ggt_value": (20.0, "0"),  # U/L
+}
+
 
 def build_blood_parameter_metsights_sync(question_key: str) -> dict[str, Any]:
     """Return metsights_sync JSON for a blood parameter question."""
