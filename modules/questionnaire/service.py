@@ -280,7 +280,13 @@ class QuestionnaireService:
         if row is None:
             raise AppError(status_code=404, error_code="QUESTIONNAIRE_CATEGORY_NOT_FOUND", message="Category does not exist")
 
-    async def _serialize_question(self, db: AsyncSession, row: QuestionnaireDefinition) -> dict:
+    async def _serialize_question(
+        self,
+        db: AsyncSession,
+        row: QuestionnaireDefinition,
+        *,
+        apply_type_overrides: bool = True,
+    ) -> dict:
         options = await self._repository.list_options_for_question(db, question_id=row.question_id)
         serialized_options = [
             {
@@ -291,7 +297,7 @@ class QuestionnaireService:
             for opt in options
         ]
         question_type = row.question_type
-        if row.question_key and row.question_key in QUESTION_TYPE_OVERRIDES:
+        if apply_type_overrides and row.question_key and row.question_key in QUESTION_TYPE_OVERRIDES:
             question_type = QUESTION_TYPE_OVERRIDES[row.question_key]
 
         return {
@@ -315,12 +321,13 @@ class QuestionnaireService:
         db: AsyncSession,
         *,
         category_id: int,
+        apply_type_overrides: bool = True,
     ) -> list[dict]:
         rows = await self._repository.list_questions_by_category(db, category_id=category_id)
         active_rows = [row for row in rows if (row.status or "").lower() == "active"]
         payloads: list[dict] = []
         for row in active_rows:
-            question = await self._serialize_question(db, row)
+            question = await self._serialize_question(db, row, apply_type_overrides=apply_type_overrides)
             question["category_id"] = category_id
             payloads.append(question)
         return payloads
@@ -413,7 +420,8 @@ class QuestionnaireService:
         return (package.package_code or "").strip() or ""
 
     async def serialize_question_definition(self, db: AsyncSession, row: QuestionnaireDefinition) -> dict:
-        return await self._serialize_question(db, row)
+        """Serialize for employee/admin management APIs (raw DB question_type)."""
+        return await self._serialize_question(db, row, apply_type_overrides=False)
 
     def _validate_options_by_type(self, *, question_type: str, options: list[dict[str, str | None]]) -> None:
         if question_type in _CHOICE_TYPES and len(options) == 0:
@@ -1158,7 +1166,7 @@ class QuestionnaireService:
         rows = await self._repository.list_questions_by_category(db, category_id=category_id)
         data: list[dict] = []
         for row in rows:
-            payload = await self._serialize_question(db, row)
+            payload = await self._serialize_question(db, row, apply_type_overrides=False)
             payload["category_id"] = category_id
             data.append(payload)
         return data
