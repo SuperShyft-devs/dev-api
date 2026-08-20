@@ -487,11 +487,17 @@ def _extract_field_metadata_from_options(options_envelope: dict[str, Any]) -> di
         for field_key, field_info in method_actions.items():
             if not isinstance(field_info, dict):
                 continue
+            required = bool(field_info.get("required", False))
             choices = field_info.get("choices")
             child = field_info.get("child")
             if isinstance(child, dict) and child.get("choices"):
                 choices = child["choices"]
             if not isinstance(choices, list):
+                if required:
+                    if field_key not in result:
+                        result[field_key] = _FieldMeta(set(), True, {})
+                    else:
+                        result[field_key].required = True
                 continue
             valid: set[str] = set()
             label_map: dict[str, str] = {}
@@ -511,7 +517,6 @@ def _extract_field_metadata_from_options(options_envelope: dict[str, Any]) -> di
                 else:
                     valid.add(str(c).strip())
             if valid:
-                required = bool(field_info.get("required", False))
                 if field_key not in result:
                     result[field_key] = _FieldMeta(valid, required, label_map)
                 else:
@@ -791,6 +796,73 @@ def _resources_for_assessment_type(type_code: str) -> list[str]:
     if tc == "7":
         return ["fitness-parameters"]
     return []
+
+
+_ASSESSMENT_TYPE_LABELS: dict[str, str] = {
+    "1": "Metsights Basic",
+    "2": "Metsights Pro",
+    "7": "FitPrint Full",
+}
+
+# Scale / free-text fields may not expose ``choices`` in OPTIONS; keep explicit fallbacks.
+_FALLBACK_REQUIRED_FIELDS_BY_CATEGORY: dict[str, frozenset[str]] = {
+    "fitness-parameters": frozenset({"height", "weight", "waist_circumference"}),
+    "physical-measurement": frozenset({"height", "weight"}),
+}
+
+
+def _validate_category_for_assessment_type(*, type_code: str, category_key: str) -> None:
+    """Ensure the Metsights category is valid for the record's assessment type."""
+    allowed = _resources_for_assessment_type(type_code)
+    if category_key in allowed:
+        return
+    type_label = _ASSESSMENT_TYPE_LABELS.get(type_code, f"type {type_code}")
+    if type_code == "7":
+        hint = (
+            f"'{category_key}' must be submitted on your Metsights Basic/Pro assessment, "
+            "not FitPrint Full. FitPrint only accepts 'fitness-parameters'."
+        )
+    elif type_code in ("1", "2"):
+        hint = (
+            f"'{category_key}' is not available on {type_label}. "
+            f"Allowed categories: {', '.join(allowed)}."
+        )
+    else:
+        hint = f"Category '{category_key}' is not supported for assessment type {type_code!r}."
+    raise AppError(status_code=422, error_code="INVALID_STATE", message=hint)
+
+
+def _validate_required_metsights_fields(
+    payload: dict[str, Any],
+    field_meta: dict[str, _FieldMeta],
+    *,
+    category_key: str,
+) -> None:
+    """Reject pushes that omit Metsights-required fields (before calling the external API)."""
+    required: set[str] = set(_FALLBACK_REQUIRED_FIELDS_BY_CATEGORY.get(category_key, frozenset()))
+    for field_name, meta in field_meta.items():
+        if meta.required and not field_name.endswith("_unit"):
+            required.add(field_name)
+
+    missing = sorted(
+        field_name
+        for field_name in required
+        if payload.get(field_name) is None or payload.get(field_name) == ""
+    )
+    if not missing:
+        return
+
+    if category_key == "fitness-parameters":
+        detail = " Complete anthropometry (height, weight, waist circumference) in the questionnaire first."
+    elif category_key == "physical-measurement":
+        detail = " Complete height and weight in the questionnaire first."
+    else:
+        detail = ""
+    raise AppError(
+        status_code=422,
+        error_code="INVALID_INPUT",
+        message=f"Missing required fields for {category_key}: {', '.join(missing)}.{detail}",
+    )
 
 
 # Metsights returns ``405 Method Not Allowed`` for ``GET`` on some sub-resources
@@ -1824,6 +1896,44 @@ class MetsightsSyncService:
     # Strategy-based push (category-level submit)
     # ------------------------------------------------------------------
 
+    async def _resolve_metsights_record_type_code(self, record_id: str) -> str | None:
+        """Return Metsights assessment type code (1/2/7) from live record detail."""
+        mrid = (record_id or "").strip()
+        if not mrid:
+            return None
+        try:
+            detail = await self._metsights.get_record_detail(record_id=mrid)
+        except AppError:
+            return None
+        if not isinstance(detail, dict):
+            return None
+        return _normalize_metsights_type_code(detail)
+
+    async def _ensure_record_type_matches_package(
+        self,
+        *,
+        record_id: str,
+        local_type_code: str,
+        package_code: str | None = None,
+    ) -> str:
+        """Verify Metsights record type matches the local package; return effective type code."""
+        local = (local_type_code or "").strip()
+        metsights_type = await self._resolve_metsights_record_type_code(record_id)
+        if metsights_type and local and metsights_type != local:
+            pkg = (package_code or "assessment").strip()
+            metsights_label = _ASSESSMENT_TYPE_LABELS.get(metsights_type, f"type {metsights_type}")
+            local_label = _ASSESSMENT_TYPE_LABELS.get(local, f"type {local}")
+            raise AppError(
+                status_code=422,
+                error_code="METSIGHTS_RECORD_TYPE_MISMATCH",
+                message=(
+                    f"Metsights record {record_id} is {metsights_label}, but this {pkg} instance "
+                    f"expects {local_label}. Reconnect the correct Metsights record for this assessment "
+                    "(employee: Connect Metsights Records) before submitting."
+                ),
+            )
+        return metsights_type or local
+
     async def _ensure_bioai_report_not_generated(
         self,
         *,
@@ -1907,6 +2017,17 @@ class MetsightsSyncService:
         if not mrid:
             raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment has no Metsights record id")
 
+        package = await self._assessments.get_package_by_id(db, int(instance.package_id))
+        local_type_code = (package.assessment_type_code or "").strip() if package is not None else ""
+        package_code = (package.package_code or "").strip() if package is not None else None
+
+        effective_type_code = await self._ensure_record_type_matches_package(
+            record_id=mrid,
+            local_type_code=local_type_code,
+            package_code=package_code,
+        )
+        _validate_category_for_assessment_type(type_code=effective_type_code, category_key=category_key)
+
         engagement_id = int(instance.engagement_id) if instance.engagement_id else None
 
         all_instances = await assessments_repo.list_all_instances_for_engagement(db, engagement_id=engagement_id) if engagement_id else [instance]
@@ -1951,6 +2072,19 @@ class MetsightsSyncService:
 
         api_url = f"/records/{mrid}/{api_path}/"
 
+        field_meta = await self._fetch_field_metadata_for_resource(mrid, api_path, cache=None)
+        if field_meta:
+            metsights_payload = _validate_payload_against_options(metsights_payload, field_meta)
+        _validate_required_metsights_fields(metsights_payload, field_meta, category_key=category_key)
+        _validate_measurement_ranges(metsights_payload)
+
+        if not metsights_payload:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_INPUT",
+                message=f"No valid answers to push for category '{category_key}'",
+            )
+
         sync_log = await self._create_pending_sync_log(
             db,
             engagement_id=engagement_id,
@@ -1960,10 +2094,6 @@ class MetsightsSyncService:
         )
 
         try:
-            field_meta = await self._fetch_field_metadata_for_resource(mrid, api_path, cache=None)
-            if field_meta:
-                metsights_payload = _validate_payload_against_options(metsights_payload, field_meta)
-            _validate_measurement_ranges(metsights_payload)
             metsights_payload["is_complete"] = True
             await self._metsights.upsert_record_subresource(record_id=mrid, resource=api_path, body=metsights_payload)
             await self._finalize_sync_log(

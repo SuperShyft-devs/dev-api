@@ -674,3 +674,205 @@ async def test_submit_category_blocked_when_bioai_report_generated(async_client,
     assert body["error_code"] == "REPORT_ALREADY_GENERATED"
     assert "BioAI report has already been generated" in body["message"]
 
+
+def test_validate_category_for_fitprint_rejects_diet_lifestyle():
+    from modules.metsights.sync_service import _validate_category_for_assessment_type
+
+    with pytest.raises(Exception) as exc:
+        _validate_category_for_assessment_type(type_code="7", category_key="diet-lifestyle-parameters")
+    assert "FitPrint" in str(exc.value.message)
+
+
+def test_validate_required_fitness_fields():
+    from modules.metsights.sync_service import _validate_required_metsights_fields
+
+    with pytest.raises(Exception) as exc:
+        _validate_required_metsights_fields(
+            {"living_region": "0", "diet_preference": "1"},
+            {},
+            category_key="fitness-parameters",
+        )
+    assert "height" in str(exc.value.message)
+    assert "weight" in str(exc.value.message)
+
+
+@pytest.mark.asyncio
+async def test_submit_category_rejects_diet_lifestyle_on_fitprint_record(async_client, test_db_session, monkeypatch):
+    await _ensure_test_engagement(test_db_session)
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+
+    uid = 55260
+    await _seed_user(test_db_session, user_id=uid)
+
+    pkg_id = 55560
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pkg_id,
+            package_code="FP_DIET_REJECT",
+            display_name="FitPrint Diet Reject",
+            assessment_type_code="7",
+            status="active",
+        )
+    )
+    test_db_session.add(AssessmentPackageCategory(package_id=pkg_id, category_id=1))
+    await test_db_session.commit()
+
+    aid = 55561
+    rid = "MS-FP-DIET-01"
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=aid,
+            user_id=uid,
+            package_id=pkg_id,
+            engagement_id=1,
+            status="active",
+            metsights_record_id=rid,
+        )
+    )
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=aid,
+            question_id=10,
+            category_id=1,
+            answer="0",
+            submitted_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    async def _fake_detail(self, *, record_id: str):
+        return {"id": record_id, "assessment_code": "MY_FITNESS_PRINT", "assessment_type": "FitPrint Full"}
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.get_record_detail",
+        _fake_detail,
+    )
+
+    r = await async_client.post(
+        f"/assessments/{aid}/submit",
+        headers=_auth_header(uid),
+        json={"category": "diet-lifestyle-parameters", "category_of": "metsights"},
+    )
+    assert r.status_code == 422, r.text
+    assert "FitPrint" in r.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_submit_fitness_parameters_requires_anthropometry(async_client, test_db_session, monkeypatch):
+    await _ensure_test_engagement(test_db_session)
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+
+    uid = 55261
+    await _seed_user(test_db_session, user_id=uid)
+
+    pkg_id = 55562
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pkg_id,
+            package_code="FP_MISSING_PHYS",
+            display_name="FitPrint Missing Phys",
+            assessment_type_code="7",
+            status="active",
+        )
+    )
+    test_db_session.add(AssessmentPackageCategory(package_id=pkg_id, category_id=1))
+    await test_db_session.commit()
+
+    aid = 55563
+    rid = "MS-FP-NOPHYS-01"
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=aid,
+            user_id=uid,
+            package_id=pkg_id,
+            engagement_id=1,
+            status="active",
+            metsights_record_id=rid,
+        )
+    )
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=aid,
+            question_id=10,
+            category_id=1,
+            answer="0",
+            submitted_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    async def _fake_detail(self, *, record_id: str):
+        return {"id": record_id, "assessment_code": "MY_FITNESS_PRINT", "assessment_type": "FitPrint Full"}
+
+    async def _fake_options(self, *, record_id: str, resource: str):
+        return {}
+
+    monkeypatch.setattr("modules.metsights.service.MetsightsService.get_record_detail", _fake_detail)
+    monkeypatch.setattr("modules.metsights.service.MetsightsService.options_record_subresource", _fake_options)
+
+    r = await async_client.post(
+        f"/assessments/{aid}/submit",
+        headers=_auth_header(uid),
+        json={"category": "fitness-parameters", "category_of": "metsights"},
+    )
+    assert r.status_code == 422, r.text
+    assert "height" in r.json()["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_submit_category_rejects_record_type_mismatch(async_client, test_db_session, monkeypatch):
+    await _ensure_test_engagement(test_db_session)
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+
+    uid = 55262
+    await _seed_user(test_db_session, user_id=uid)
+
+    pkg_id = 55564
+    test_db_session.add(
+        AssessmentPackage(
+            package_id=pkg_id,
+            package_code="MET_MISMATCH",
+            display_name="Pro Mismatch",
+            assessment_type_code="2",
+            status="active",
+        )
+    )
+    test_db_session.add(AssessmentPackageCategory(package_id=pkg_id, category_id=1))
+    await test_db_session.commit()
+
+    aid = 55565
+    rid = "MS-TYPE-MISMATCH"
+    test_db_session.add(
+        AssessmentInstance(
+            assessment_instance_id=aid,
+            user_id=uid,
+            package_id=pkg_id,
+            engagement_id=1,
+            status="active",
+            metsights_record_id=rid,
+        )
+    )
+    test_db_session.add(
+        QuestionnaireResponse(
+            assessment_instance_id=aid,
+            question_id=10,
+            category_id=1,
+            answer="0",
+            submitted_at=None,
+        )
+    )
+    await test_db_session.commit()
+
+    async def _fake_detail(self, *, record_id: str):
+        return {"id": record_id, "assessment_code": "MY_FITNESS_PRINT", "assessment_type": "FitPrint Full"}
+
+    monkeypatch.setattr("modules.metsights.service.MetsightsService.get_record_detail", _fake_detail)
+
+    r = await async_client.post(
+        f"/assessments/{aid}/submit",
+        headers=_auth_header(uid),
+        json={"category": "diet-lifestyle-parameters", "category_of": "metsights"},
+    )
+    assert r.status_code == 422, r.text
+    assert r.json()["error_code"] == "METSIGHTS_RECORD_TYPE_MISMATCH"
+
