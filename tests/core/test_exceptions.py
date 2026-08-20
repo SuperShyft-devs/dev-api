@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import pytest
 
-from core.exceptions import AppError, add_exception_handlers
+from core.exceptions import AppError, add_exception_handlers, format_validation_error_message
 
 
 class _Payload(BaseModel):
@@ -58,10 +58,41 @@ async def test_validation_error_returns_standard_format():
         response = await client.post("/test/validation", json={"name": 123})
 
     assert response.status_code == 400
-    assert response.json() == {
-        "error_code": "INVALID_INPUT",
-        "message": "Invalid request",
-    }
+    body = response.json()
+    assert body["error_code"] == "INVALID_INPUT"
+    assert body["message"] == "name: Input should be a valid string"
+
+
+def test_format_validation_error_message_cleans_value_error_prefix():
+    message = format_validation_error_message(
+        [
+            {
+                "type": "value_error",
+                "loc": ("body", "blood_collection_cabin"),
+                "msg": "Value error, Value contains disallowed characters",
+                "input": "room2_2",
+            }
+        ]
+    )
+    assert message == "blood_collection_cabin: Value contains disallowed characters"
+
+
+def test_format_validation_error_message_joins_multiple_fields():
+    message = format_validation_error_message(
+        [
+            {
+                "type": "missing",
+                "loc": ("body", "blood_collection_date"),
+                "msg": "Field required",
+            },
+            {
+                "type": "missing",
+                "loc": ("body", "blood_collection_time_slot"),
+                "msg": "Field required",
+            },
+        ]
+    )
+    assert message == "blood_collection_date: Field required; blood_collection_time_slot: Field required"
 
 
 @pytest.mark.asyncio

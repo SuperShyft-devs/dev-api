@@ -29,7 +29,10 @@ async def test_public_onboard_requires_blood_fields(async_client, test_db_sessio
 
     response = await async_client.post("/users/public/onboard", json=payload)
     assert response.status_code == 400
-    assert response.json() == {"error_code": "INVALID_INPUT", "message": "Invalid request"}
+    body = response.json()
+    assert body["error_code"] == "INVALID_INPUT"
+    assert "blood_collection_date" in body["message"]
+    assert "Field required" in body["message"]
 
 
 @pytest.mark.asyncio

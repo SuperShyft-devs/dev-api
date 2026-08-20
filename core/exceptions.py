@@ -47,6 +47,29 @@ def _request_label(request: Request) -> str:
     return f"{request.method} {request.url.path}"
 
 
+def _format_validation_loc(loc: tuple[object, ...] | list[object]) -> str:
+    parts: list[str] = []
+    for item in loc:
+        if item in {"body", "query", "path", "header", "cookie"}:
+            continue
+        parts.append(str(item))
+    return ".".join(parts) if parts else "request"
+
+
+def _format_validation_error_item(error: dict[str, object]) -> str:
+    field = _format_validation_loc(tuple(error.get("loc") or ()))
+    msg = str(error.get("msg") or "Invalid value")
+    if msg.startswith("Value error, "):
+        msg = msg[len("Value error, ") :]
+    return f"{field}: {msg}"
+
+
+def format_validation_error_message(errors: list[dict[str, object]]) -> str:
+    if not errors:
+        return "Invalid request"
+    return "; ".join(_format_validation_error_item(error) for error in errors)
+
+
 def _log_error(
     *,
     request: Request,
@@ -95,19 +118,21 @@ def add_exception_handlers(app: FastAPI) -> None:
         request: Request,
         exc: RequestValidationError,
     ) -> JSONResponse:
+        errors = exc.errors()
+        message = format_validation_error_message(errors)
         _log_error(
             request=request,
             status_code=400,
             error_type="RequestValidationError",
             error_code="INVALID_INPUT",
-            message=str(exc.errors()),
+            message=str(errors),
             exc=exc,
         )
         return JSONResponse(
             status_code=400,
             content={
                 "error_code": "INVALID_INPUT",
-                "message": "Invalid request",
+                "message": message,
             },
         )
 

@@ -120,7 +120,9 @@ async def test_send_otp_rejects_non_supported_phone_suffix(async_client, test_db
     response = await async_client.post("/auth/send-otp", json={"phone": "7000000138abc"})
 
     assert response.status_code == 400
-    assert response.json() == {"error_code": "INVALID_INPUT", "message": "Invalid request"}
+    body = response.json()
+    assert body["error_code"] == "INVALID_INPUT"
+    assert body["message"] == "phone: Phone contains invalid characters"
 
 
 @pytest.mark.asyncio
