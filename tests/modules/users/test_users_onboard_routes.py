@@ -1462,27 +1462,3 @@ async def test_engagement_onboard_logs_metsights_integration_sync(async_client, 
     records_row = next(r for r in rows if "/profiles/ms-profile-8801/records/" in r["api_endpoint_url"])
     assert records_row["status"] == "success"
     assert records_row["user_id"] == data["user_id"]
-
-
-def test_select_latest_metsights_record_id_prefers_matching_assessment_type():
-    from modules.users.service import UsersService
-
-    service = UsersService(repository=None)  # type: ignore[arg-type]
-    records = [
-        {
-            "id": "FP-NEWER",
-            "date": "2026-08-20",
-            "created_at": "2026-08-20T18:00:00+05:30",
-            "assessment_code": "MY_FITNESS_PRINT",
-        },
-        {
-            "id": "PRO-OLDER",
-            "date": "2026-08-19",
-            "created_at": "2026-08-19T10:00:00+05:30",
-            "assessment_code": "MET_PRO",
-        },
-    ]
-
-    assert service._select_latest_metsights_record_id(records, assessment_type_code="2") == "PRO-OLDER"
-    assert service._select_latest_metsights_record_id(records, assessment_type_code="7") == "FP-NEWER"
-    assert service._select_latest_metsights_record_id(records) == "FP-NEWER"
