@@ -1,10 +1,12 @@
 """health_priorities multiple_choice and metsights sync
 
-Revision ID: 0125_health_priorities_multiple_choice
+Revision ID: 0125_hp_multiple_choice
 Revises: 0124_normalize_cabin_keys
 
 Updates health_priorities to multiple_choice with correct metsights_sync and
 coerces legacy single-choice string answers to one-element JSON arrays.
+
+Note: revision id must be <= 32 chars (alembic_version.version_num).
 
 Downgrade is intentionally a no-op (data shape change is not reversed).
 """
@@ -16,7 +18,7 @@ import json
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0125_health_priorities_multiple_choice"
+revision = "0125_hp_multiple_choice"
 down_revision = "0124_normalize_cabin_keys"
 branch_labels = None
 depends_on = None
