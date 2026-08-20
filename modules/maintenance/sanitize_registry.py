@@ -265,14 +265,12 @@ def all_column_specs() -> list[ColumnSpec]:
     for col, kind, req in (
         ("group_key", SanitizeKind.SLUG_KEY, True),
         ("group_name", SanitizeKind.SAFE_DISPLAY_NAME, True),
-        ("status", SanitizeKind.STATUS_STR, False),
     ):
         add("diagnostic_test_groups", col, kind, ("group_id",), required=req)
 
     for col, kind, req in (
         ("parameter_key", SanitizeKind.SLUG_KEY, True),
         ("test_name", SanitizeKind.SAFE_DISPLAY_NAME, True),
-        ("status", SanitizeKind.STATUS_STR, False),
     ):
         add("health_parameters", col, kind, ("test_id",), required=req)
 

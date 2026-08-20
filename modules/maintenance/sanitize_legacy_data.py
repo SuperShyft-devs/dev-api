@@ -45,6 +45,7 @@ class SanitizeReport:
     summary: dict[str, ColumnStats] = field(default_factory=dict)
     manual_review: list[dict[str, Any]] = field(default_factory=list)
     samples: list[dict[str, Any]] = field(default_factory=list)
+    skipped_columns: list[dict[str, str]] = field(default_factory=list)
 
     def stats_key(self, table: str, column: str) -> str:
         return f"{table}.{column}"
@@ -70,9 +71,52 @@ class SanitizeReport:
             },
             "manual_review": self.manual_review,
             "samples": self.samples,
+            "skipped_columns": self.skipped_columns,
         }
 
 
+async def _load_public_schema_columns(db: AsyncSession) -> dict[str, set[str]]:
+    result = await db.execute(
+        text(
+            """
+            SELECT table_name, column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+            """
+        )
+    )
+    schema: dict[str, set[str]] = {}
+    for table_name, column_name in result.all():
+        schema.setdefault(str(table_name), set()).add(str(column_name))
+    return schema
+
+
+def _filter_applicable_specs(
+    specs: list[ColumnSpec],
+    schema: dict[str, set[str]],
+    report: SanitizeReport,
+) -> list[ColumnSpec]:
+    applicable: list[ColumnSpec] = []
+    for spec in specs:
+        table_cols = schema.get(spec.table)
+        if not table_cols:
+            reason = "table not found"
+            logger.warning("Skipping %s.%s — %s", spec.table, spec.column, reason)
+            report.skipped_columns.append(
+                {"table": spec.table, "column": spec.column, "reason": reason}
+            )
+            continue
+        needed = {spec.column, *spec.pk_columns}
+        missing = needed - table_cols
+        if missing:
+            reason = f"missing columns: {', '.join(sorted(missing))}"
+            logger.warning("Skipping %s.%s — %s", spec.table, spec.column, reason)
+            report.skipped_columns.append(
+                {"table": spec.table, "column": spec.column, "reason": reason}
+            )
+            continue
+        applicable.append(spec)
+    return applicable
 
 def _record_sample(
     report: SanitizeReport,
@@ -509,7 +553,8 @@ async def sanitize_legacy_data(
 ) -> SanitizeReport:
     """Run full legacy data sanitization pass."""
     report = SanitizeReport(dry_run=dry_run)
-    specs = filter_specs(only=only)
+    schema = await _load_public_schema_columns(db)
+    specs = _filter_applicable_specs(filter_specs(only=only), schema, report)
 
     scalar_specs = [s for s in specs if s.handler == HandlerKind.SCALAR]
     special_specs = [

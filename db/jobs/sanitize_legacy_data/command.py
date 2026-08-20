@@ -111,6 +111,13 @@ def _print_summary(result: dict) -> None:
         )
     manual = result.get("manual_review") or []
     print(f"\nManual review items: {len(manual)}")
+    skipped = result.get("skipped_columns") or []
+    if skipped:
+        print(f"Skipped columns (schema mismatch): {len(skipped)}")
+        for item in skipped[:10]:
+            print(f"  {item['table']}.{item['column']}: {item.get('reason', 'skipped')}")
+        if len(skipped) > 10:
+            print(f"  ... and {len(skipped) - 10} more (see report file)")
     if manual:
         for item in manual[:10]:
             print(
