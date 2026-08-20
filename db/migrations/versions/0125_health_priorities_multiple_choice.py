@@ -42,7 +42,7 @@ def upgrade() -> None:
             UPDATE questionnaire_definitions
             SET question_type = 'multiple_choice',
                 sub_text = 'Choose your top two priorities.',
-                metsights_sync = CAST(:sync_json AS jsonb)
+                metsights_sync = CAST(:sync_json AS json)
             WHERE question_key = 'health_priorities'
             """
         ).bindparams(sync_json=sync_json)
@@ -51,11 +51,11 @@ def upgrade() -> None:
         sa.text(
             """
             UPDATE questionnaire_responses qr
-            SET answer = jsonb_build_array(qr.answer)
+            SET answer = json_build_array(qr.answer #>> '{}')
             FROM questionnaire_definitions qd
             WHERE qd.question_id = qr.question_id
               AND qd.question_key = 'health_priorities'
-              AND jsonb_typeof(qr.answer) = 'string'
+              AND json_typeof(qr.answer) = 'string'
             """
         )
     )
