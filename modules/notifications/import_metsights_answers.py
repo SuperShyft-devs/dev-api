@@ -35,8 +35,14 @@ _FITNESS_SUB_KEY = "fitness_parameter"
 
 async def _get_active_engagement_instances(
     db: AsyncSession,
+    *,
+    all_engagements: bool = False,
 ) -> list[tuple[AssessmentInstance, AssessmentPackage, int]]:
-    """Return all incomplete assessment instances for participants in scheduled or running engagements."""
+    """Return incomplete assessment instances with MetSights records.
+
+    By default, only scheduled or running engagements are included. When
+    ``all_engagements`` is true, every engagement status is included.
+    """
     query = (
         select(AssessmentInstance, AssessmentPackage, EngagementParticipant.user_id)
         .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
@@ -46,12 +52,13 @@ async def _get_active_engagement_instances(
             & (EngagementParticipant.user_id == AssessmentInstance.user_id),
         )
         .join(Engagement, Engagement.engagement_id == AssessmentInstance.engagement_id)
-        .where(EngagementsRepository._scheduled_or_running_engagement_status_filter())
         .where(AssessmentInstance.status != "completed")
         .where(AssessmentInstance.metsights_record_id.isnot(None))
         .where(AssessmentInstance.metsights_record_id != "")
         .order_by(AssessmentInstance.engagement_id.asc(), AssessmentInstance.user_id.asc())
     )
+    if not all_engagements:
+        query = query.where(EngagementsRepository._scheduled_or_running_engagement_status_filter())
     result = await db.execute(query)
     return [(row[0], row[1], int(row[2])) for row in result.all()]
 
@@ -119,6 +126,7 @@ async def import_metsights_answers(
     questionnaire_repository: QuestionnaireRepository | None = None,
     as_of: date | None = None,
     dry_run: bool = False,
+    all_engagements: bool = False,
     on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     """Check all incomplete assessment instances and import answers per-category from MetSights.
@@ -130,7 +138,7 @@ async def import_metsights_answers(
     q_repo = questionnaire_repository or QuestionnaireRepository()
     assessments_repo = AssessmentsRepository()
 
-    instances = await _get_active_engagement_instances(db)
+    instances = await _get_active_engagement_instances(db, all_engagements=all_engagements)
     matched = len(instances)
     imported = 0
     skipped = 0

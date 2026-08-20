@@ -627,6 +627,34 @@ class CampReportsService:
         """
         ensure_internal_employee(employee)
 
+        result = await self._init_all_camp_reports_core(db, camp_no=camp_no)
+
+        await self._audit_service.log_event(
+            db,
+            action="EMPLOYEE_INIT_ALL_CAMP_REPORTS",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=employee.user_id,
+            session_id=None,
+        )
+        return result
+
+    async def init_all_camp_reports_for_cron(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+    ) -> dict[str, Any]:
+        """Create missing camp report rows for cron/backfill jobs."""
+        return await self._init_all_camp_reports_core(db, camp_no=camp_no)
+
+    async def _init_all_camp_reports_core(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+    ) -> dict[str, Any]:
         context = await self._resolve_camp_context(db, camp_no=camp_no)
         organization_id = int(context["organization_id"])
         organization_name = context["organization_name"]
@@ -717,15 +745,6 @@ class CampReportsService:
                 else:
                     skipped["city_departments"] += 1
 
-        await self._audit_service.log_event(
-            db,
-            action="EMPLOYEE_INIT_ALL_CAMP_REPORTS",
-            endpoint=endpoint,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            user_id=employee.user_id,
-            session_id=None,
-        )
         return {
             "created": created,
             "skipped": skipped,

@@ -40,7 +40,12 @@ def _fitprint_report_url(*, record_id: str, pdf: bool = False) -> str:
     return f"{base}/reports/fitness-reports/{record_id}{suffix}"
 
 
-async def _get_eligible_participants(db: AsyncSession, today: date) -> list[tuple]:
+async def _get_eligible_participants(
+    db: AsyncSession,
+    today: date,
+    *,
+    all_engagements: bool = False,
+) -> list[tuple]:
     query = (
         select(
             EngagementParticipant.user_id,
@@ -64,13 +69,14 @@ async def _get_eligible_participants(db: AsyncSession, today: date) -> list[tupl
             IndividualHealthReport.assessment_instance_id
             == AssessmentInstance.assessment_instance_id,
         )
-        .where(Engagement.status.ilike("running"))
         .where(AssessmentInstance.status == "completed")
         .where(EngagementParticipant.engagement_date <= today)
         .where(AssessmentInstance.metsights_record_id.isnot(None))
         .where(AssessmentInstance.metsights_record_id != "")
         .where(AssessmentPackage.assessment_type_code == _FITPRINT_TYPE_CODE)
     )
+    if not all_engagements:
+        query = query.where(Engagement.status.ilike("running"))
     result = await db.execute(query)
     return result.all()
 
@@ -81,9 +87,14 @@ async def load_fitprint_reports(
     metsights_service: MetsightsService,
     as_of: date | None = None,
     dry_run: bool = False,
+    all_engagements: bool = False,
 ) -> dict[str, Any]:
     today = as_of or date.today()
-    participants = await _get_eligible_participants(db, today)
+    participants = await _get_eligible_participants(
+        db,
+        today,
+        all_engagements=all_engagements,
+    )
     matched = len(participants)
     loaded = 0
     skipped = 0

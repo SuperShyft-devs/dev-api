@@ -359,6 +359,16 @@ class CampReportsRepository:
         )
         return list(result.scalars().all())
 
+    async def list_distinct_camp_nos(self, db: AsyncSession) -> list[int]:
+        """Return every camp_no referenced by at least one engagement."""
+        result = await db.execute(
+            select(Engagement.camp_no)
+            .where(Engagement.camp_no.isnot(None))
+            .distinct()
+            .order_by(Engagement.camp_no.asc())
+        )
+        return [int(row[0]) for row in result.all()]
+
     async def has_running_engagement(self, db: AsyncSession, *, camp_no: int) -> bool:
         result = await db.execute(
             select(Engagement.engagement_id)

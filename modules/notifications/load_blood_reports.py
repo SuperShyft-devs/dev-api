@@ -471,6 +471,8 @@ def _match_customer_by_name(
 async def _get_eligible_participants(
     db: AsyncSession,
     today: date,
+    *,
+    all_engagements: bool = False,
 ) -> list[tuple]:
     """Return participants needing blood report loading.
 
@@ -535,7 +537,6 @@ async def _get_eligible_participants(
             en_sub,
             en_sub.c.engagement_id == Engagement.engagement_id,
         )
-        .where(Engagement.status.ilike("running"))
         .where(EngagementParticipant.engagement_date <= today)
         .where(AssessmentPackage.assessment_type_code.in_(_METSIGHTS_PRO_BASIC_TYPE_CODES))
         .where(
@@ -547,6 +548,8 @@ async def _get_eligible_participants(
         .where(AssessmentInstance.metsights_record_id.isnot(None))
         .where(AssessmentInstance.metsights_record_id != "")
     )
+    if not all_engagements:
+        query = query.where(Engagement.status.ilike("running"))
     result = await db.execute(query)
     return result.all()
 
@@ -634,6 +637,7 @@ async def load_blood_reports(
     sync_service: MetsightsSyncService,
     as_of: date | None = None,
     dry_run: bool = False,
+    all_engagements: bool = False,
     on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     """Load blood reports and notify participants.
@@ -642,7 +646,11 @@ async def load_blood_reports(
     after each participant is processed so CLI runners can show a live progress bar.
     """
     today = as_of or date.today()
-    participants = await _get_eligible_participants(db, today)
+    participants = await _get_eligible_participants(
+        db,
+        today,
+        all_engagements=all_engagements,
+    )
     matched = len(participants)
     loaded = 0
     notified = 0
