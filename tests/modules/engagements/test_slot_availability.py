@@ -139,13 +139,17 @@ def test_build_public_slot_detail_applies_occupancy_and_skips_inactive():
     occupancy = {occupancy_key("blood_test_cabin_1", date(2026, 8, 20), time(9, 0)): 5}
     consultation_occupancy = {occupancy_key("consultation_cabin_1", date(2026, 8, 20), time(9, 0)): 1}
     public = build_public_slot_detail(slot_detail, occupancy, consultation_occupancy)
-    blood_cabins = public["blood_collection"]["2026-08-20"]
+    blood_day = public["blood_collection"]["2026-08-20"]
+    assert blood_day["is_enable"] is True
+    blood_cabins = blood_day["cabins"]
     assert [cabin["cabin_key"] for cabin in blood_cabins] == ["blood_test_cabin_1"]
     assert blood_cabins[0]["available_slots"] == [
         {"slot": "09:00", "spot_left": 1},
         {"slot": "09:30", "spot_left": 6},
     ]
-    consult_cabin = public["consultation"]["2026-08-20"][0]
+    consult_day = public["consultation"]["2026-08-20"]
+    assert consult_day["is_enable"] is True
+    consult_cabin = consult_day["cabins"][0]
     assert consult_cabin["expert_type"] == "doctor"
     consult_slots = consult_cabin["available_slots"]
     assert consult_slots == [
@@ -197,3 +201,106 @@ def test_require_available_consultation_slot_rejects_break_cabin_and_expert_type
 def test_build_public_slot_detail_returns_none_when_unconfigured():
     assert build_public_slot_detail(None) is None
     assert build_public_slot_detail({}) is None
+
+
+def test_build_public_slot_detail_includes_disabled_dates_with_empty_cabins():
+    slot_detail = {
+        "blood_collection": {
+            "2026-08-20": {
+                "is_enable": False,
+                "cabins": [
+                    {
+                        "cabin_name": "Blood Test Cabin 1",
+                        "cabin_key": "blood_test_cabin_1",
+                        "start_time": "09:00",
+                        "end_time": "10:00",
+                        "slot_duration": 30,
+                        "capacity_per_slot": 6,
+                        "breaks": [],
+                        "is_active": True,
+                    }
+                ],
+            },
+            "2026-08-21": {
+                "is_enable": True,
+                "cabins": [
+                    {
+                        "cabin_name": "Blood Test Cabin 2",
+                        "cabin_key": "blood_test_cabin_2",
+                        "start_time": "09:00",
+                        "end_time": "10:00",
+                        "slot_duration": 30,
+                        "capacity_per_slot": 6,
+                        "breaks": [],
+                        "is_active": True,
+                    }
+                ],
+            },
+        }
+    }
+    public = build_public_slot_detail(slot_detail)
+    assert public["blood_collection"]["2026-08-20"] == {"is_enable": False, "cabins": []}
+    assert public["blood_collection"]["2026-08-21"]["is_enable"] is True
+    assert [c["cabin_key"] for c in public["blood_collection"]["2026-08-21"]["cabins"]] == [
+        "blood_test_cabin_2"
+    ]
+
+
+def test_require_available_blood_collection_slot_rejects_disabled_date():
+    slot_detail = {
+        "blood_collection": {
+            "2026-08-20": {
+                "is_enable": False,
+                "cabins": [
+                    {
+                        "cabin_name": "Blood Test Cabin 1",
+                        "cabin_key": "blood_test_cabin_1",
+                        "start_time": "09:00",
+                        "end_time": "17:00",
+                        "slot_duration": 30,
+                        "capacity_per_slot": 6,
+                        "breaks": [],
+                        "is_active": True,
+                    }
+                ],
+            }
+        }
+    }
+    with pytest.raises(AppError) as err:
+        require_available_blood_collection_slot(
+            slot_detail,
+            collection_date=date(2026, 8, 20),
+            cabin_key="blood_test_cabin_1",
+            slot_time=time(9, 0),
+        )
+    assert err.value.error_code == SLOT_UNAVAILABLE_CODE
+
+
+def test_build_public_slot_detail_accepts_wrapped_and_legacy_shapes():
+    legacy = {
+        "blood_collection": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Blood Test Cabin 1",
+                    "cabin_key": "blood_test_cabin_1",
+                    "start_time": "09:00",
+                    "end_time": "10:00",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 6,
+                    "breaks": [],
+                    "is_active": True,
+                }
+            ]
+        }
+    }
+    wrapped = {
+        "blood_collection": {
+            "2026-08-20": {
+                "is_enable": True,
+                "cabins": legacy["blood_collection"]["2026-08-20"],
+            }
+        }
+    }
+    public_legacy = build_public_slot_detail(legacy)
+    public_wrapped = build_public_slot_detail(wrapped)
+    assert public_legacy == public_wrapped

@@ -168,6 +168,7 @@ async def _create_slot_engagement(
     }
     if consultations is not None:
         payload["consultations"] = consultations
+        payload["consultation_mode"] = "offline"
     response = await async_client.post(
         "/engagements",
         headers=_auth_header(user_id),

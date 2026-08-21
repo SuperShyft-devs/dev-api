@@ -90,13 +90,46 @@ class ConsultationCabinSlotConfig(CabinSlotConfig):
     expert_type: SlugKey
 
 
+class DateSlotConfig(BaseModel):
+    is_enable: bool = True
+    cabins: list[CabinSlotConfig] = Field(default_factory=list)
+
+
+class ConsultationDateSlotConfig(BaseModel):
+    is_enable: bool = True
+    cabins: list[ConsultationCabinSlotConfig] = Field(default_factory=list)
+
+
+def _normalize_date_entry(value: Any) -> dict[str, Any]:
+    """Accept legacy date→[cabins] or new date→{is_enable, cabins}."""
+    if isinstance(value, list):
+        return {"is_enable": True, "cabins": value}
+    if isinstance(value, dict):
+        if "cabins" in value or "is_enable" in value:
+            return {
+                "is_enable": value.get("is_enable", True) is not False,
+                "cabins": value.get("cabins") if isinstance(value.get("cabins"), list) else [],
+            }
+        return {"is_enable": True, "cabins": []}
+    return {"is_enable": True, "cabins": []}
+
+
 class SlotDetail(BaseModel):
-    blood_collection: Optional[dict[str, list[CabinSlotConfig]]] = None
-    consultation: Optional[dict[str, list[ConsultationCabinSlotConfig]]] = None
+    blood_collection: Optional[dict[str, DateSlotConfig]] = None
+    consultation: Optional[dict[str, ConsultationDateSlotConfig]] = None
+
+    @field_validator("blood_collection", "consultation", mode="before")
+    @classmethod
+    def coerce_legacy_date_entries(cls, value: Any) -> Any:
+        if value is None:
+            return value
+        if not isinstance(value, dict):
+            return value
+        return {date_key: _normalize_date_entry(entry) for date_key, entry in value.items()}
 
     @field_validator("blood_collection", "consultation")
     @classmethod
-    def validate_date_keys(cls, value: Optional[dict[str, list[Any]]]) -> Optional[dict[str, list[Any]]]:
+    def validate_date_keys(cls, value: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
         if value is None:
             return value
         for date_key in value:
@@ -110,8 +143,8 @@ class SlotDetail(BaseModel):
         for section in (self.blood_collection, self.consultation):
             if not section:
                 continue
-            for cabins in section.values():
-                for cabin in cabins:
+            for date_entry in section.values():
+                for cabin in date_entry.cabins:
                     keys.append(cabin.cabin_key)
         if len(keys) != len(set(keys)):
             raise ValueError("cabin_key must be unique within slot_detail")
