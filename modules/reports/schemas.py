@@ -286,6 +286,7 @@ class CampParticipantResponse(BaseModel):
     age: int | None = None
     participant_blood_group: str | None = None
     participant_department: str | None = None
+    participants_employee_id: str | None = None
     questionnaires: dict[str, bool] = Field(default_factory=dict)
     reports: CampParticipantReports = Field(default_factory=CampParticipantReports)
     consultations: bool = False

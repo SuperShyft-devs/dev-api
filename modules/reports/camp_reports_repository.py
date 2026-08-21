@@ -2167,6 +2167,7 @@ class CampReportsRepository:
                 User.gender,
                 EngagementParticipant.participant_blood_group,
                 EngagementParticipant.participant_department,
+                EngagementParticipant.participants_employee_id,
             )
             .select_from(Engagement)
             .join(

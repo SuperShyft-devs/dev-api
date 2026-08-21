@@ -2188,6 +2188,7 @@ async def _seed_camp_participants_with_profile_fields(
             slot_start_time=time(10, 0),
             participant_department="engineering",
             participant_blood_group="O+",
+            participants_employee_id="EMP-96001",
         )
     )
     await test_db_session.commit()
@@ -2257,6 +2258,7 @@ async def test_list_camp_participants_includes_profile_fields(async_client, test
     assert row["gender"] == "female"
     assert row["participant_blood_group"] == "O+"
     assert row["participant_department"] == "engineering"
+    assert row["participants_employee_id"] == "EMP-96001"
     assert row["questionnaires"] == {}
     assert row["reports"] == {
         "blood_report_generated": False,
