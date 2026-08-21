@@ -880,6 +880,7 @@ class CampReportsService:
             gender,
             participant_blood_group,
             participant_department,
+            participants_employee_id,
         ) = row
         extra = enrichment
         reports = {
@@ -900,6 +901,7 @@ class CampReportsService:
             "age": age,
             "participant_blood_group": participant_blood_group,
             "participant_department": participant_department,
+            "participants_employee_id": participants_employee_id,
             "questionnaires": dict(extra.questionnaires) if extra else {},
             "reports": reports,
             "consultations": bool(extra.consultations) if extra else False,
