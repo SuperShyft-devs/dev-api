@@ -1,0 +1,473 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Nvidia Consultation Booking Alert\nSkips OA member alerts. Only notifies the participant by dispatching:\n- nvidia-consultation-confirmed-whatsapp-v1\n- nvidia-consultation-confirmed-email-v1\n\nExpects: {\n  notification_id, engagement_id,\n  participant_details: { participant_user_id, ... },\n  session_details: { date, slot, expert_type? },\n  members?: []  // ignored — not notified\n}",
+        "height": 720,
+        "width": 2200
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        7872,
+        2432
+      ],
+      "typeVersion": 1,
+      "id": "ncba-sticky-0001",
+      "name": "Sticky Note Nvidia Booking Alert"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nvidia-consultation-booking-alert-whatsapp-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        7984,
+        2912
+      ],
+      "id": "ncba-webhook-0001",
+      "name": "Nvidia Consultation Booking Alert Webhook",
+      "webhookId": "ncba-webhook-id-v1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ncba-val-001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ncba-val-002",
+              "leftValue": "={{ $json.body.engagement_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ncba-val-003",
+              "leftValue": "={{ $json.body.participant_details }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ncba-val-004",
+              "leftValue": "={{ $json.body.participant_details.participant_user_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        8224,
+        2912
+      ],
+      "id": "ncba-validate-0001",
+      "name": "Validate Nvidia Booking Payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst pd = body.participant_details || {};\n\n// Prefer top-level session_details; fall back to first member if present\nconst sessionDetails = body.session_details\n  || (Array.isArray(body.members) && body.members[0] && body.members[0].session_details)\n  || {};\n\nconst date = (sessionDetails.date || '').toString().trim();\nconst slot = (sessionDetails.slot || '').toString().trim();\n\nif (!date || !slot) {\n  return [{\n    json: {\n      notification_id: body.notification_id,\n      status: 'failed',\n      message: 'Payload validation failed: session_details.date and session_details.slot are required',\n      skip_dispatch: true\n    }\n  }];\n}\n\nconst userIdRaw = pd.participant_user_id;\nconst userId = Number(userIdRaw);\nif (!Number.isFinite(userId) || userId <= 0) {\n  return [{\n    json: {\n      notification_id: body.notification_id,\n      status: 'failed',\n      message: 'Payload validation failed: participant_details.participant_user_id is required',\n      skip_dispatch: true\n    }\n  }];\n}\n\n// members (OAs) are intentionally ignored — only notify the participant\nreturn [{\n  json: {\n    notification_id: body.notification_id,\n    engagement_id: body.engagement_id,\n    user_ids: [userId],\n    session_details: {\n      want: sessionDetails.want !== false,\n      date,\n      slot,\n      expert_type: sessionDetails.expert_type || 'doctor'\n    },\n    status: 'sent',\n    message: 'participant-only dispatch (OA members skipped)',\n    skip_dispatch: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8576,
+        2800
+      ],
+      "id": "ncba-prepare-0001",
+      "name": "Prepare Participant Dispatch"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ncba-skip-001",
+              "leftValue": "={{ $json.skip_dispatch }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        8800,
+        2800
+      ],
+      "id": "ncba-ready-0001",
+      "name": "Ready to Dispatch?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ncba-valfail-001",
+              "name": "notification_id",
+              "value": "={{ $('Nvidia Consultation Booking Alert Webhook').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "ncba-valfail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "ncba-valfail-003",
+              "name": "message",
+              "value": "Payload validation failed: notification_id, engagement_id, and participant_details.participant_user_id are required",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        8576,
+        3104
+      ],
+      "id": "ncba-valfail-resp-001",
+      "name": "Booking Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/dispatch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"service_key\": \"nvidia-consultation-confirmed-whatsapp-v1\",\n  \"user_ids\": {{ JSON.stringify($json.user_ids) }},\n  \"engagement_id\": {{ $json.engagement_id }},\n  \"session_details\": {{ JSON.stringify($json.session_details) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        9040,
+        2688
+      ],
+      "id": "ncba-dispatch-wa-0001",
+      "name": "Dispatch Nvidia Confirmed WhatsApp",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/dispatch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"service_key\": \"nvidia-consultation-confirmed-email-v1\",\n  \"user_ids\": {{ JSON.stringify($('Prepare Participant Dispatch').item.json.user_ids) }},\n  \"engagement_id\": {{ $('Prepare Participant Dispatch').item.json.engagement_id }},\n  \"session_details\": {{ JSON.stringify($('Prepare Participant Dispatch').item.json.session_details) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        9280,
+        2688
+      ],
+      "id": "ncba-dispatch-email-0001",
+      "name": "Dispatch Nvidia Confirmed Email",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ncba-ok-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "ncba-ok-002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "ncba-ok-003",
+              "name": "message",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.message }} | Participant Notification sent Successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        9520,
+        2608
+      ],
+      "id": "ncba-ok-resp-001",
+      "name": "Participant Notify Success"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ncba-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "ncba-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "ncba-fail-003",
+              "name": "message",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.message }} | Participant Notification Failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        9520,
+        2880
+      ],
+      "id": "ncba-fail-resp-001",
+      "name": "Participant Notify Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        9760,
+        2800
+      ],
+      "id": "ncba-callback-0001",
+      "name": "Nvidia Booking Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Nvidia Consultation Booking Alert Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Nvidia Booking Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Nvidia Booking Payload": {
+      "main": [
+        [
+          {
+            "node": "Prepare Participant Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Booking Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Participant Dispatch": {
+      "main": [
+        [
+          {
+            "node": "Ready to Dispatch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready to Dispatch?": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Nvidia Confirmed WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nvidia Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "Nvidia Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Nvidia Confirmed WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Nvidia Confirmed Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Participant Notify Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Nvidia Confirmed Email": {
+      "main": [
+        [
+          {
+            "node": "Participant Notify Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Participant Notify Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Participant Notify Success": {
+      "main": [
+        [
+          {
+            "node": "Nvidia Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Participant Notify Failed": {
+      "main": [
+        [
+          {
+            "node": "Nvidia Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}
