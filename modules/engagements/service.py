@@ -2452,6 +2452,116 @@ class EngagementsService:
                 message="Engagement does not exist",
             )
 
+        return await self._build_engagement_data_completeness_payload(
+            db,
+            engagement_id=engagement_id,
+            include_participants=True,
+        )
+
+    async def list_engagements_data_completeness_summary(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        organization_id: int | None,
+        camp_no: int | None,
+        status: str | None,
+        city: str | None,
+        on_date,
+        search: str | None = None,
+        engagement_type: str | None = None,
+        audience: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> dict:
+        """Return rollup + per-engagement completeness summaries for filtered engagements."""
+        ensure_admin(employee)
+
+        status_values = _parse_status_filter(status)
+
+        audience_value = None
+        if audience is not None:
+            normalized_audience = audience.strip().lower()
+            if normalized_audience not in {"b2b", "b2c"}:
+                raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+            audience_value = normalized_audience
+
+        engagements = await self._repository.list_engagements_for_filters(
+            db,
+            limit=500,
+            organization_id=organization_id,
+            camp_no=camp_no,
+            statuses=status_values,
+            city=city,
+            on_date=on_date,
+            search=search,
+            engagement_type=engagement_type,
+            audience=audience_value,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+
+        rollup = {
+            "engagement_count": 0,
+            "total_participants": 0,
+            "blood_report": 0,
+            "blood_values": 0,
+            "bio_ai_report": 0,
+            "bio_ai_json": 0,
+            "questionnaire_filled": 0,
+            "questionnaire_partially_filled": 0,
+            "questionnaire_not_started": 0,
+        }
+        engagement_rows: list[dict] = []
+
+        for engagement in engagements:
+            summary = await self._summarize_engagement_data_completeness(
+                db,
+                engagement_id=int(engagement.engagement_id),
+            )
+            engagement_rows.append(
+                {
+                    "engagement_id": int(engagement.engagement_id),
+                    "engagement_name": engagement.engagement_name,
+                    "engagement_code": engagement.engagement_code,
+                    "city": engagement.city,
+                    "status": engagement.status,
+                    "organization_id": engagement.organization_id,
+                    "summary": summary,
+                }
+            )
+            rollup["total_participants"] += summary["total_participants"]
+            rollup["blood_report"] += summary["blood_report"]
+            rollup["blood_values"] += summary["blood_values"]
+            rollup["bio_ai_report"] += summary["bio_ai_report"]
+            rollup["bio_ai_json"] += summary["bio_ai_json"]
+            rollup["questionnaire_filled"] += summary["questionnaire_filled"]
+            rollup["questionnaire_partially_filled"] += summary["questionnaire_partially_filled"]
+            rollup["questionnaire_not_started"] += summary["questionnaire_not_started"]
+
+        rollup["engagement_count"] = len(engagement_rows)
+        return {"rollup": rollup, "engagements": engagement_rows}
+
+    async def _summarize_engagement_data_completeness(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> dict:
+        payload = await self._build_engagement_data_completeness_payload(
+            db,
+            engagement_id=engagement_id,
+            include_participants=False,
+        )
+        return payload["summary"]
+
+    async def _build_engagement_data_completeness_payload(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        include_participants: bool,
+    ) -> dict:
         from modules.engagements.models import EngagementParticipant
         from modules.reports.blood_parameters_schemas import has_usable_provider_blood_parameters
         from modules.reports.camp_reports_repository import _coerce_reports_dict
@@ -2539,20 +2649,21 @@ class EngagementsService:
             flags = ihr_flags.get(uid, default_flags)
             q_state = q_state_by_user.get(uid, "not_started")
 
-            participants.append(
-                {
-                    "user_id": uid,
-                    "first_name": row.first_name,
-                    "last_name": row.last_name,
-                    "phone": row.phone,
-                    "email": row.email,
-                    "has_blood_report": flags["has_blood_report"],
-                    "has_blood_values": flags["has_blood_values"],
-                    "has_bio_ai_report": flags["has_bio_ai_report"],
-                    "has_bio_ai_json": flags["has_bio_ai_json"],
-                    "questionnaire_state": q_state,
-                }
-            )
+            if include_participants:
+                participants.append(
+                    {
+                        "user_id": uid,
+                        "first_name": row.first_name,
+                        "last_name": row.last_name,
+                        "phone": row.phone,
+                        "email": row.email,
+                        "has_blood_report": flags["has_blood_report"],
+                        "has_blood_values": flags["has_blood_values"],
+                        "has_bio_ai_report": flags["has_bio_ai_report"],
+                        "has_bio_ai_json": flags["has_bio_ai_json"],
+                        "questionnaire_state": q_state,
+                    }
+                )
 
             summary["total_participants"] += 1
             if flags["has_blood_report"]:
@@ -2570,7 +2681,9 @@ class EngagementsService:
             else:
                 summary["questionnaire_not_started"] += 1
 
-        return {"summary": summary, "participants": participants}
+        if include_participants:
+            return {"summary": summary, "participants": participants}
+        return {"summary": summary}
 
     async def _build_engagement_questionnaire_status(
         self,

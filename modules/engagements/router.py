@@ -259,6 +259,39 @@ async def list_engagements(
     return success_response(data, meta={"page": page, "limit": limit, "total": total})
 
 
+@router.get("/data-completeness-summary")
+async def list_engagements_data_completeness_summary(
+    org_id: int | None = None,
+    camp_no: int | None = None,
+    status: str | None = None,
+    city: str | None = None,
+    engagement_type: str | None = None,
+    audience: str | None = None,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
+    date: date | None = None,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """Rollup and per-engagement data completeness for filtered engagements."""
+    data = await engagements_service.list_engagements_data_completeness_summary(
+        db,
+        employee=employee,
+        organization_id=org_id,
+        camp_no=camp_no,
+        status=status,
+        city=city,
+        on_date=date,
+        search=search,
+        engagement_type=engagement_type,
+        audience=audience,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+    )
+    return success_response(data)
+
 
 @router.get("/me/{engagement_id}")
 async def get_engagement_for_user(

@@ -244,6 +244,46 @@ class EngagementsRepository:
         result = await db.execute(query)
         return list(result.scalars().all())
 
+    async def list_engagements_for_filters(
+        self,
+        db: AsyncSession,
+        *,
+        limit: int,
+        organization_id: int | None = None,
+        camp_no: int | None = None,
+        statuses: list[str] | None = None,
+        city: str | None = None,
+        on_date=None,
+        search: str | None = None,
+        engagement_type: str | None = None,
+        audience: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> list[Engagement]:
+        """List engagements matching filters without pagination (hard-capped)."""
+        query = select(Engagement)
+        query = self._apply_engagement_list_filters(
+            query,
+            organization_id=organization_id,
+            camp_no=camp_no,
+            statuses=statuses,
+            city=city,
+            on_date=on_date,
+            search=search,
+            engagement_type=engagement_type,
+            audience=audience,
+        )
+        query = apply_sort(
+            query,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            columns=self._ENGAGEMENT_SORT_COLUMNS,
+            default_column=Engagement.engagement_id,
+        )
+        query = query.limit(limit)
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
     async def list_distinct_engagement_types_and_cities(self, db: AsyncSession) -> tuple[list[str], list[str]]:
         type_result = await db.execute(
             select(func.distinct(EngagementType.code))

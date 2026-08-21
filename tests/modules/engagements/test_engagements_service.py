@@ -224,3 +224,93 @@ async def test_get_data_completeness_tracks_pdf_json_and_values_separately(test_
     assert by_user[1103]["has_blood_report"] is False
     assert by_user[1103]["has_bio_ai_report"] is True
     assert by_user[1103]["has_bio_ai_json"] is True
+
+
+@pytest.mark.asyncio
+async def test_list_engagements_data_completeness_summary_rollup(test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Test Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'Test Diagnostic', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES ('booking-alert-whatsapp', 'Booking Alert', 'whatsapp', 'booking-alert', true, false, false, false) "
+            "ON CONFLICT (service_key) DO NOTHING"
+        )
+    )
+    await test_db_session.commit()
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
+            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, "
+            "organization_id, onboarding_notification) VALUES "
+            "(9020, 'Camp A', 'ENGA', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', NULL, 'booking-alert-whatsapp'), "
+            "(9021, 'Camp B', 'ENGB', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running', NULL, 'booking-alert-whatsapp')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, age, phone, status) VALUES "
+            "(1201, 30, '9111111101', 'active'), "
+            "(1202, 31, '9111111102', 'active'), "
+            "(1203, 32, '9111111103', 'active')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagement_participants "
+            "(engagement_participant_id, engagement_id, user_id, engagement_date, slot_start_time, booked_by_user_id) VALUES "
+            "(90201, 9020, 1201, '2026-02-01', '10:00:00', 1201), "
+            "(90202, 9020, 1202, '2026-02-01', '10:20:00', 1202), "
+            "(90203, 9021, 1203, '2026-02-01', '10:40:00', 1203)"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO individual_health_report "
+            "(report_id, user_id, engagement_id, diagnostic_report_url, blood_parameters, report_url, reports) VALUES "
+            "(902001, 1201, 9020, 'https://example.com/blood-1201.pdf', NULL, NULL, NULL), "
+            "(902002, 1203, 9021, NULL, NULL, 'https://example.com/bio-1203.pdf', '{\"metabolic_score\": 80}')"
+        )
+    )
+    await test_db_session.commit()
+
+    service = EngagementsService(EngagementsRepository())
+    data = await service.list_engagements_data_completeness_summary(
+        test_db_session,
+        employee=EmployeeContext(employee_id=1, user_id=1, role="admin"),
+        organization_id=None,
+        camp_no=None,
+        status="running",
+        city="BLR",
+        on_date=None,
+        search=None,
+        engagement_type=None,
+        audience="b2c",
+        sort_by=None,
+        sort_dir=None,
+    )
+
+    assert data["rollup"]["engagement_count"] == 2
+    assert data["rollup"]["total_participants"] == 3
+    assert data["rollup"]["blood_report"] == 1
+    assert data["rollup"]["bio_ai_report"] == 1
+    assert data["rollup"]["bio_ai_json"] == 1
+
+    by_id = {row["engagement_id"]: row for row in data["engagements"]}
+    assert by_id[9020]["summary"]["total_participants"] == 2
+    assert by_id[9020]["summary"]["blood_report"] == 1
+    assert by_id[9021]["summary"]["total_participants"] == 1
+    assert by_id[9021]["summary"]["bio_ai_report"] == 1
+    assert by_id[9021]["summary"]["bio_ai_json"] == 1
