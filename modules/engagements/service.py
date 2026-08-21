@@ -2432,6 +2432,153 @@ class EngagementsService:
                 message="Engagement does not exist",
             )
 
+        return await self._build_engagement_questionnaire_status(db, engagement_id=engagement_id)
+
+    async def get_data_completeness_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+    ) -> dict:
+        """Return blood/Bio AI/questionnaire completeness for enrolled participants."""
+        ensure_admin(employee)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+
+        from modules.engagements.models import EngagementParticipant
+        from modules.reports.blood_parameters_schemas import has_usable_provider_blood_parameters
+        from modules.reports.camp_reports_repository import _coerce_reports_dict
+        from modules.reports.models import IndividualHealthReport
+        from modules.users.models import User
+
+        enrolled_query = (
+            select(
+                User.user_id,
+                User.first_name,
+                User.last_name,
+                User.phone,
+                User.email,
+            )
+            .select_from(EngagementParticipant)
+            .join(User, User.user_id == EngagementParticipant.user_id)
+            .where(EngagementParticipant.engagement_id == engagement_id)
+            .order_by(User.first_name.asc(), User.last_name.asc(), User.user_id.asc())
+        )
+        enrolled_result = await db.execute(enrolled_query)
+        enrolled_rows = enrolled_result.all()
+
+        q_status = await self._build_engagement_questionnaire_status(db, engagement_id=engagement_id)
+        q_state_by_user: dict[int, str] = {
+            int(participant["user_id"]): participant["questionnaire_state"]
+            for participant in q_status["participants"]
+        }
+
+        ihr_query = select(
+            IndividualHealthReport.user_id,
+            IndividualHealthReport.blood_parameters,
+            IndividualHealthReport.diagnostic_report_url,
+            IndividualHealthReport.report_url,
+            IndividualHealthReport.reports,
+        ).where(IndividualHealthReport.engagement_id == engagement_id)
+        ihr_result = await db.execute(ihr_query)
+
+        ihr_flags: dict[int, dict[str, bool]] = {}
+        for row in ihr_result.all():
+            uid = int(row.user_id)
+            flags = ihr_flags.setdefault(
+                uid,
+                {
+                    "has_blood_report": False,
+                    "has_blood_values": False,
+                    "has_bio_ai_report": False,
+                    "has_bio_ai_json": False,
+                },
+            )
+            if row.diagnostic_report_url and str(row.diagnostic_report_url).strip():
+                flags["has_blood_report"] = True
+            if has_usable_provider_blood_parameters(row.blood_parameters):
+                flags["has_blood_values"] = True
+            if row.report_url and str(row.report_url).strip():
+                flags["has_bio_ai_report"] = True
+            if _coerce_reports_dict(row.reports):
+                flags["has_bio_ai_json"] = True
+
+        default_flags = {
+            "has_blood_report": False,
+            "has_blood_values": False,
+            "has_bio_ai_report": False,
+            "has_bio_ai_json": False,
+        }
+
+        participants: list[dict] = []
+        summary = {
+            "total_participants": 0,
+            "blood_report": 0,
+            "blood_values": 0,
+            "bio_ai_report": 0,
+            "bio_ai_json": 0,
+            "questionnaire_filled": 0,
+            "questionnaire_partially_filled": 0,
+            "questionnaire_not_started": 0,
+        }
+
+        seen_users: set[int] = set()
+        for row in enrolled_rows:
+            uid = int(row.user_id)
+            if uid in seen_users:
+                continue
+            seen_users.add(uid)
+
+            flags = ihr_flags.get(uid, default_flags)
+            q_state = q_state_by_user.get(uid, "not_started")
+
+            participants.append(
+                {
+                    "user_id": uid,
+                    "first_name": row.first_name,
+                    "last_name": row.last_name,
+                    "phone": row.phone,
+                    "email": row.email,
+                    "has_blood_report": flags["has_blood_report"],
+                    "has_blood_values": flags["has_blood_values"],
+                    "has_bio_ai_report": flags["has_bio_ai_report"],
+                    "has_bio_ai_json": flags["has_bio_ai_json"],
+                    "questionnaire_state": q_state,
+                }
+            )
+
+            summary["total_participants"] += 1
+            if flags["has_blood_report"]:
+                summary["blood_report"] += 1
+            if flags["has_blood_values"]:
+                summary["blood_values"] += 1
+            if flags["has_bio_ai_report"]:
+                summary["bio_ai_report"] += 1
+            if flags["has_bio_ai_json"]:
+                summary["bio_ai_json"] += 1
+            if q_state == "filled":
+                summary["questionnaire_filled"] += 1
+            elif q_state == "partially_filled":
+                summary["questionnaire_partially_filled"] += 1
+            else:
+                summary["questionnaire_not_started"] += 1
+
+        return {"summary": summary, "participants": participants}
+
+    async def _build_engagement_questionnaire_status(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> dict:
+        """Build questionnaire status payload shared by admin completeness endpoints."""
         from modules.assessments.models import (
             AssessmentCategoryProgress,
             AssessmentInstance,

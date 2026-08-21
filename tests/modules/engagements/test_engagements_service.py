@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 from sqlalchemy import text
 
+from modules.employee.service import EmployeeContext
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService
 
@@ -122,3 +125,102 @@ async def test_enroll_user_in_engagement_explicit_booked_by(test_db_session):
 
     assert slot.user_id == 1002
     assert slot.booked_by_user_id == 1003
+
+
+@pytest.mark.asyncio
+async def test_get_data_completeness_tracks_pdf_json_and_values_separately(test_db_session):
+    blood_values = [
+        {
+            "group_name": "Lipid Profile",
+            "tests": [{"parameter_key": "hdl", "value": 52, "unit": "mg/dL"}],
+        }
+    ]
+    bio_json = {"metabolic_score": 78, "metabolic_age": 42}
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PKG1', 'Test Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, package_name, diagnostic_provider, status) "
+            "VALUES (1, 'Test Diagnostic', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO notification_services "
+            "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, require_participant_detail) "
+            "VALUES ('booking-alert-whatsapp', 'Booking Alert', 'whatsapp', 'booking-alert', true, false, false, false) "
+            "ON CONFLICT (service_key) DO NOTHING"
+        )
+    )
+    await test_db_session.commit()
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
+            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, "
+            "organization_id, onboarding_notification) "
+            "VALUES (9010, 'Completeness Camp', 'ENG9010', 'blood_test_with_consultation', 1, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-01', 'running', NULL, 'booking-alert-whatsapp')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, age, phone, status, first_name, last_name) VALUES "
+            "(1101, 30, '9111111111', 'active', 'Ada', 'Lovelace'), "
+            "(1102, 31, '9222222222', 'active', 'Alan', 'Turing'), "
+            "(1103, 32, '9333333333', 'active', 'Grace', 'Hopper')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagement_participants "
+            "(engagement_participant_id, engagement_id, user_id, engagement_date, slot_start_time, booked_by_user_id) "
+            "VALUES "
+            "(90101, 9010, 1101, '2026-02-01', '10:00:00', 1101), "
+            "(90102, 9010, 1102, '2026-02-01', '10:20:00', 1102), "
+            "(90103, 9010, 1103, '2026-02-01', '10:40:00', 1103)"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO individual_health_report "
+            "(report_id, user_id, engagement_id, diagnostic_report_url, blood_parameters, report_url, reports) "
+            "VALUES "
+            "(901001, 1101, 9010, 'https://example.com/blood-1101.pdf', NULL, NULL, NULL), "
+            "(901002, 1102, 9010, NULL, CAST(:blood_values AS jsonb), NULL, NULL), "
+            "(901003, 1103, 9010, NULL, NULL, 'https://example.com/bio-1103.pdf', CAST(:bio_json AS jsonb))"
+        ),
+        {"blood_values": json.dumps(blood_values), "bio_json": json.dumps(bio_json)},
+    )
+    await test_db_session.commit()
+
+    service = EngagementsService(EngagementsRepository())
+    data = await service.get_data_completeness_for_engagement(
+        test_db_session,
+        employee=EmployeeContext(employee_id=1, user_id=1, role="admin"),
+        engagement_id=9010,
+    )
+
+    assert data["summary"]["total_participants"] == 3
+    assert data["summary"]["blood_report"] == 1
+    assert data["summary"]["blood_values"] == 1
+    assert data["summary"]["bio_ai_report"] == 1
+    assert data["summary"]["bio_ai_json"] == 1
+
+    by_user = {row["user_id"]: row for row in data["participants"]}
+    assert by_user[1101]["has_blood_report"] is True
+    assert by_user[1101]["has_blood_values"] is False
+    assert by_user[1101]["has_bio_ai_report"] is False
+    assert by_user[1101]["has_bio_ai_json"] is False
+
+    assert by_user[1102]["has_blood_report"] is False
+    assert by_user[1102]["has_blood_values"] is True
+
+    assert by_user[1103]["has_blood_report"] is False
+    assert by_user[1103]["has_bio_ai_report"] is True
+    assert by_user[1103]["has_bio_ai_json"] is True
