@@ -16,6 +16,7 @@ from common.data_sanitize import (
 )
 from common.slug import (
     collect_cabin_keys_from_slot_detail,
+    iter_slot_detail_cabins,
     migrate_slot_detail_cabin_keys,
     sanitize_cabin_key,
 )
@@ -139,28 +140,20 @@ def sanitize_slot_detail(value: Any) -> SanitizeOutcome:
         return SanitizeOutcome(SanitizeStatus.NULL, None, "slot_detail must be object")
 
     updated = copy.deepcopy(value)
-    for section_name in ("blood_collection", "consultation"):
-        section = updated.get(section_name)
-        if not isinstance(section, dict):
-            continue
-        for cabins in section.values():
-            if not isinstance(cabins, list):
-                continue
-            for cabin in cabins:
-                if not isinstance(cabin, dict):
-                    continue
-                name_out = sanitize_value(cabin.get("cabin_name"), kind=SanitizeKind.SAFE_DISPLAY_NAME)
-                if name_out.status == SanitizeStatus.OK:
-                    cabin["cabin_name"] = name_out.value
-                elif name_out.status == SanitizeStatus.NULL:
-                    cabin["cabin_name"] = None
-                expert_type = cabin.get("expert_type")
-                if expert_type is not None:
-                    et_out = sanitize_value(expert_type, kind=SanitizeKind.SLUG_KEY)
-                    if et_out.status == SanitizeStatus.OK:
-                        cabin["expert_type"] = et_out.value
-                    elif et_out.status == SanitizeStatus.NULL:
-                        cabin.pop("expert_type", None)
+
+    for cabin in iter_slot_detail_cabins(updated):
+        name_out = sanitize_value(cabin.get("cabin_name"), kind=SanitizeKind.SAFE_DISPLAY_NAME)
+        if name_out.status == SanitizeStatus.OK:
+            cabin["cabin_name"] = name_out.value
+        elif name_out.status == SanitizeStatus.NULL:
+            cabin["cabin_name"] = None
+        expert_type = cabin.get("expert_type")
+        if expert_type is not None:
+            et_out = sanitize_value(expert_type, kind=SanitizeKind.SLUG_KEY)
+            if et_out.status == SanitizeStatus.OK:
+                cabin["expert_type"] = et_out.value
+            elif et_out.status == SanitizeStatus.NULL:
+                cabin.pop("expert_type", None)
 
     migrated, _ = migrate_slot_detail_cabin_keys(updated)
     if migrated == value:

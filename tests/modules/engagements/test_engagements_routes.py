@@ -345,10 +345,11 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
     details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7020))
     assert details.status_code == 200
     data = details.json()["data"]
-    assert data["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_key"] == "blood_test_cabin_1"
-    assert data["slot_detail"]["consultation"]["2026-08-20"][0]["cabin_name"] == "Consultation Cabin 1"
-    assert data["slot_detail"]["consultation"]["2026-08-20"][0]["expert_type"] == "doctor"
-    assert data["slot_detail"]["blood_collection"]["2026-08-20"][0]["breaks"][0]["start_time"] == "13:00"
+    assert data["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["cabin_key"] == "blood_test_cabin_1"
+    assert data["slot_detail"]["blood_collection"]["2026-08-20"]["is_enable"] is True
+    assert data["slot_detail"]["consultation"]["2026-08-20"]["cabins"][0]["cabin_name"] == "Consultation Cabin 1"
+    assert data["slot_detail"]["consultation"]["2026-08-20"]["cabins"][0]["expert_type"] == "doctor"
+    assert data["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["breaks"][0]["start_time"] == "13:00"
 
     updated_slot = {
         "blood_collection": {
@@ -386,8 +387,8 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
 
     details2 = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7020))
     data2 = details2.json()["data"]
-    assert data2["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_name"] == "Blood Test Cabin 1 Updated"
-    assert data2["slot_detail"]["blood_collection"]["2026-08-20"][0]["is_active"] is False
+    assert data2["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["cabin_name"] == "Blood Test Cabin 1 Updated"
+    assert data2["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["is_active"] is False
     assert data2["slot_detail"].get("consultation") in (None, {})
 
 
@@ -450,7 +451,7 @@ async def test_create_engagements_with_same_metadata_share_slot_detail_id(async_
 
     assert first_data["slot_detail_id"] is not None
     assert first_data["slot_detail_id"] == second_data["slot_detail_id"]
-    assert first_data["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_key"] == "shared_cabin"
+    assert first_data["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["cabin_key"] == "shared_cabin"
 
     updated_slot = {
         "blood_collection": {
@@ -486,7 +487,7 @@ async def test_create_engagements_with_same_metadata_share_slot_detail_id(async_
 
     second_after = await async_client.get(f"/engagements/{second_id}", headers=_auth_header(7030))
     assert (
-        second_after.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"][0]["cabin_name"]
+        second_after.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["cabin_name"]
         == "Shared Cabin Updated"
     )
 
@@ -2249,6 +2250,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
             "end_date": "2026-08-21",
             "engagement_code": "SLOTPUB1",
             "consultations": {"doctor": True},
+            "consultation_mode": "offline",
             "slot_detail": slot_detail,
         },
     )
@@ -2257,13 +2259,17 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
     public = await async_client.get("/engagements/code/SLOTPUB1")
     assert public.status_code == 200, public.text
     data = public.json()["data"]
-    blood = data["slot_detail"]["blood_collection"]["2026-08-20"]
+    blood_day = data["slot_detail"]["blood_collection"]["2026-08-20"]
+    assert blood_day["is_enable"] is True
+    blood = blood_day["cabins"]
     assert [cabin["cabin_key"] for cabin in blood] == ["blood_test_cabin_1"]
     assert set(blood[0].keys()) == {"cabin_name", "cabin_key", "slot_duration", "available_slots"}
     assert [item["slot"] for item in blood[0]["available_slots"]] == _EXPECTED_BLOOD_SLOTS
     assert all(item["spot_left"] == 6 for item in blood[0]["available_slots"])
 
-    consult = data["slot_detail"]["consultation"]["2026-08-20"][0]
+    consult_day = data["slot_detail"]["consultation"]["2026-08-20"]
+    assert consult_day["is_enable"] is True
+    consult = consult_day["cabins"][0]
     assert consult["expert_type"] == "doctor"
     assert consult["available_slots"] == [
         {"slot": "09:00", "spot_left": 1},
@@ -2271,7 +2277,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
     ]
 
     admin = await async_client.get("/engagements/" + str(create.json()["data"]["engagement_id"]), headers=_auth_header(7410))
-    raw_cabin = admin.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"][0]
+    raw_cabin = admin.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]
     assert "start_time" in raw_cabin
     assert "capacity_per_slot" in raw_cabin
     assert "available_slots" not in raw_cabin
@@ -2301,14 +2307,92 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
     assert onboard.status_code == 200, onboard.text
 
     after = await async_client.get("/engagements/code/SLOTPUB1")
-    after_slots = after.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"][0]["available_slots"]
+    after_slots = after.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["available_slots"]
     by_slot = {item["slot"]: item["spot_left"] for item in after_slots}
     assert by_slot["09:00"] == 5
     assert by_slot["09:30"] == 6
-    consult_after = after.json()["data"]["slot_detail"]["consultation"]["2026-08-20"][0]["available_slots"]
+    consult_after = after.json()["data"]["slot_detail"]["consultation"]["2026-08-20"]["cabins"][0]["available_slots"]
     consult_by_slot = {item["slot"]: item["spot_left"] for item in consult_after}
     assert consult_by_slot["09:00"] == 0
     assert consult_by_slot["09:30"] == 1
+
+
+@pytest.mark.asyncio
+async def test_get_engagement_by_code_includes_disabled_dates_with_empty_cabins(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=7415, employee_id=415)
+    await _seed_organization(test_db_session, organization_id=9105, name="Disabled Date Org")
+    await _seed_assessment_package(test_db_session, package_id=9105, package_code="PKG9105")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9105)
+    type_id = await _engagement_type_id(test_db_session, "blood_test_with_consultation")
+
+    slot_detail = {
+        "blood_collection": {
+            "2026-08-20": {
+                "is_enable": False,
+                "cabins": [
+                    {
+                        "cabin_name": "Blood Test Cabin 1",
+                        "cabin_key": "blood_test_cabin_1",
+                        "start_time": "09:00",
+                        "end_time": "10:00",
+                        "slot_duration": 30,
+                        "capacity_per_slot": 6,
+                        "breaks": [],
+                        "is_active": True,
+                    }
+                ],
+            },
+            "2026-08-21": {
+                "is_enable": True,
+                "cabins": [
+                    {
+                        "cabin_name": "Blood Test Cabin 2",
+                        "cabin_key": "blood_test_cabin_2",
+                        "start_time": "09:00",
+                        "end_time": "10:00",
+                        "slot_duration": 30,
+                        "capacity_per_slot": 6,
+                        "breaks": [],
+                        "is_active": True,
+                    }
+                ],
+            },
+        }
+    }
+    create = await async_client.post(
+        "/engagements",
+        headers=_auth_header(7415),
+        json={
+            "engagement_name": "Disabled Date Camp",
+            "organization_id": 9105,
+            "engagement_type": type_id,
+            "assessment_package_id": 9105,
+            "diagnostic_package_id": 9105,
+            "city": "BLR",
+            "slot_duration": 30,
+            "start_date": "2026-08-20",
+            "end_date": "2026-08-21",
+            "engagement_code": "DISDATE1",
+            "slot_detail": slot_detail,
+        },
+    )
+    assert create.status_code == 201, create.text
+
+    admin = await async_client.get(
+        f"/engagements/{create.json()['data']['engagement_id']}",
+        headers=_auth_header(7415),
+    )
+    assert admin.status_code == 200
+    admin_blood = admin.json()["data"]["slot_detail"]["blood_collection"]
+    assert admin_blood["2026-08-20"]["is_enable"] is False
+    assert admin_blood["2026-08-20"]["cabins"][0]["cabin_key"] == "blood_test_cabin_1"
+
+    public = await async_client.get("/engagements/code/DISDATE1")
+    assert public.status_code == 200, public.text
+    public_blood = public.json()["data"]["slot_detail"]["blood_collection"]
+    assert public_blood["2026-08-20"] == {"is_enable": False, "cabins": []}
+    assert public_blood["2026-08-21"]["is_enable"] is True
+    assert [c["cabin_key"] for c in public_blood["2026-08-21"]["cabins"]] == ["blood_test_cabin_2"]
 
 
 @pytest.mark.asyncio
@@ -2413,11 +2497,11 @@ async def test_shared_slot_detail_spot_left_counts_across_engagements(async_clie
         data = public.json()["data"]
         blood_slots = {
             item["slot"]: item["spot_left"]
-            for item in data["slot_detail"]["blood_collection"]["2026-08-20"][0]["available_slots"]
+            for item in data["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["available_slots"]
         }
         consult_slots = {
             item["slot"]: item["spot_left"]
-            for item in data["slot_detail"]["consultation"]["2026-08-20"][0]["available_slots"]
+            for item in data["slot_detail"]["consultation"]["2026-08-20"]["cabins"][0]["available_slots"]
         }
         assert blood_slots["09:00"] == 0
         assert consult_slots["09:00"] == 0
@@ -2527,7 +2611,7 @@ async def test_get_engagement_by_code_includes_consultation_mode(async_client, t
     assert public.status_code == 200, public.text
     data = public.json()["data"]
     assert data["consultation_mode"] == "offline"
-    assert data["slot_detail"]["consultation"]["2026-08-20"][0]["cabin_key"] == "consultation_cabin_1"
+    assert data["slot_detail"]["consultation"]["2026-08-20"]["cabins"][0]["cabin_key"] == "consultation_cabin_1"
 
 
 @pytest.mark.asyncio

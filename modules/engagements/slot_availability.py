@@ -114,6 +114,52 @@ def _cabin_is_active(cabin: dict[str, Any]) -> bool:
     return cabin.get("is_active", True) is not False
 
 
+def normalize_date_entry(raw: Any) -> dict[str, Any]:
+    """Normalize a date value to ``{is_enable, cabins}`` (legacy list → enabled)."""
+    if isinstance(raw, list):
+        return {"is_enable": True, "cabins": raw}
+    if isinstance(raw, dict) and ("cabins" in raw or "is_enable" in raw):
+        cabins = raw.get("cabins")
+        return {
+            "is_enable": raw.get("is_enable", True) is not False,
+            "cabins": cabins if isinstance(cabins, list) else [],
+        }
+    return {"is_enable": True, "cabins": []}
+
+
+def date_entry_is_enabled(entry: dict[str, Any] | None) -> bool:
+    if entry is None:
+        return True
+    return entry.get("is_enable", True) is not False
+
+
+def get_cabins_from_date_entry(entry: dict[str, Any] | None) -> list[Any]:
+    if entry is None:
+        return []
+    cabins = entry.get("cabins")
+    return cabins if isinstance(cabins, list) else []
+
+
+def get_date_entry(section_data: Any, date_key: str) -> dict[str, Any] | None:
+    if not isinstance(section_data, dict):
+        return None
+    raw = section_data.get(date_key)
+    if raw is None:
+        return None
+    return normalize_date_entry(raw)
+
+
+def iter_section_date_cabins(section: Any) -> list[tuple[str, dict[str, Any], list[Any]]]:
+    """Yield ``(date_key, entry, cabins)`` for each date in a section."""
+    if not isinstance(section, dict):
+        return []
+    result: list[tuple[str, dict[str, Any], list[Any]]] = []
+    for date_key, raw in section.items():
+        entry = normalize_date_entry(raw)
+        result.append((str(date_key), entry, get_cabins_from_date_entry(entry)))
+    return result
+
+
 def find_active_cabin(
     slot_detail: Any,
     *,
@@ -126,9 +172,10 @@ def find_active_cabin(
     section_data = slot_detail.get(section) or {}
     if not isinstance(section_data, dict):
         return None
-    cabins = section_data.get(date_key) or []
-    if not isinstance(cabins, list):
+    entry = get_date_entry(section_data, date_key)
+    if entry is None or not date_entry_is_enabled(entry):
         return None
+    cabins = get_cabins_from_date_entry(entry)
     wanted = (cabin_key or "").strip()
     if not wanted:
         return None
@@ -236,13 +283,14 @@ def build_public_slot_detail(
         section = slot_detail.get(section_key)
         if not isinstance(section, dict) or not section:
             continue
-        public_section: dict[str, list[dict[str, Any]]] = {}
-        for date_key, cabins in section.items():
+        public_section: dict[str, dict[str, Any]] = {}
+        for date_key, entry, cabins in iter_section_date_cabins(section):
+            if not date_entry_is_enabled(entry):
+                public_section[str(date_key)] = {"is_enable": False, "cabins": []}
+                continue
             try:
                 slot_date = date.fromisoformat(str(date_key))
             except ValueError:
-                continue
-            if not isinstance(cabins, list):
                 continue
             public_cabins: list[dict[str, Any]] = []
             for cabin in cabins:
@@ -279,8 +327,7 @@ def build_public_slot_detail(
                 if section_key == "consultation":
                     public_cabin["expert_type"] = (cabin.get("expert_type") or "").strip()
                 public_cabins.append(public_cabin)
-            if public_cabins:
-                public_section[str(date_key)] = public_cabins
+            public_section[str(date_key)] = {"is_enable": True, "cabins": public_cabins}
         if public_section:
             result[section_key] = public_section
     return result

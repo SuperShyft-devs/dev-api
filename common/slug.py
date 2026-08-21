@@ -58,6 +58,26 @@ def derive_cabin_base_key(cabin_name: str, cabin_key: str) -> str:
     return sanitize_cabin_key(cabin_key)
 
 
+def iter_slot_detail_cabins(slot_detail: dict) -> list[dict]:
+    """Collect cabin dicts from legacy list or {is_enable, cabins} date entries."""
+    cabins: list[dict] = []
+    for section_name in ("blood_collection", "consultation"):
+        section = slot_detail.get(section_name)
+        if not isinstance(section, dict):
+            continue
+        for raw in section.values():
+            if isinstance(raw, list):
+                cabin_list = raw
+            elif isinstance(raw, dict) and isinstance(raw.get("cabins"), list):
+                cabin_list = raw["cabins"]
+            else:
+                continue
+            for cabin in cabin_list:
+                if isinstance(cabin, dict):
+                    cabins.append(cabin)
+    return cabins
+
+
 def migrate_slot_detail_cabin_keys(slot_detail: dict) -> tuple[dict, dict[str, str]]:
     """Normalize cabin keys in slot_detail JSON; return updated doc and old->new mapping."""
     if not isinstance(slot_detail, dict):
@@ -67,19 +87,10 @@ def migrate_slot_detail_cabin_keys(slot_detail: dict) -> tuple[dict, dict[str, s
     used: set[str] = set()
     entries: list[tuple[dict, str, str]] = []
 
-    for section_name in ("blood_collection", "consultation"):
-        section = slot_detail.get(section_name)
-        if not isinstance(section, dict):
-            continue
-        for cabins in section.values():
-            if not isinstance(cabins, list):
-                continue
-            for cabin in cabins:
-                if not isinstance(cabin, dict):
-                    continue
-                old_key = (cabin.get("cabin_key") or "").strip()
-                cabin_name = (cabin.get("cabin_name") or "").strip()
-                entries.append((cabin, old_key, cabin_name))
+    for cabin in iter_slot_detail_cabins(slot_detail):
+        old_key = (cabin.get("cabin_key") or "").strip()
+        cabin_name = (cabin.get("cabin_name") or "").strip()
+        entries.append((cabin, old_key, cabin_name))
 
     for cabin, old_key, cabin_name in entries:
         base = derive_cabin_base_key(cabin_name, old_key)
@@ -106,17 +117,8 @@ def collect_cabin_keys_from_slot_detail(slot_detail: dict | None) -> set[str]:
     keys: set[str] = set()
     if not isinstance(slot_detail, dict):
         return keys
-    for section_name in ("blood_collection", "consultation"):
-        section = slot_detail.get(section_name)
-        if not isinstance(section, dict):
-            continue
-        for cabins in section.values():
-            if not isinstance(cabins, list):
-                continue
-            for cabin in cabins:
-                if not isinstance(cabin, dict):
-                    continue
-                key = sanitize_cabin_key(str(cabin.get("cabin_key") or ""))
-                if key:
-                    keys.add(key)
+    for cabin in iter_slot_detail_cabins(slot_detail):
+        key = sanitize_cabin_key(str(cabin.get("cabin_key") or ""))
+        if key:
+            keys.add(key)
     return keys

@@ -388,8 +388,8 @@ class EngagementsService:
         if slot_detail is None or not slot_detail.consultation:
             return
         seen: set[str] = set()
-        for cabins in slot_detail.consultation.values():
-            for cabin in cabins:
+        for date_entry in slot_detail.consultation.values():
+            for cabin in date_entry.cabins:
                 key = cabin.expert_type.strip()
                 if not key or key in seen:
                     continue
