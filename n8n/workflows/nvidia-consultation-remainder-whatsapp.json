@@ -1,0 +1,485 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Nvidia Consultation Remainder WhatsApp\nSends camp17 day-of eye checkup + doctor consultation reminder WhatsApp to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{ first_name, last_name, email, phone }],\n  engagement_id?: number\n}\n\nStatic today reminder copy; session_details may be present from the API but is not required by this workflow.",
+        "height": 640,
+        "width": 2336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4448,
+        5600
+      ],
+      "typeVersion": 1,
+      "id": "erw01-node-0000-87094608",
+      "name": "Sticky Note Nvidia Remainder WhatsApp"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nvidia-consultation-remainder-whatsapp-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4576,
+        5792
+      ],
+      "id": "erw01-node-0001-89ff4e67",
+      "name": "Nvidia Consultation Remainder WhatsApp",
+      "webhookId": "erw01-wh-4bdb05b43253"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "erw01-cond-f7f5d740",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "erw01-cond-c8075869",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "erw01-cond-d21c348d",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4784,
+        5792
+      ],
+      "id": "erw01-node-0002-6b351d86",
+      "name": "Validate WhatsApp Payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5008,
+        5680
+      ],
+      "id": "erw01-node-0003-7e036f60",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message = `camp17,${name},This is a reminder that your eye checkup and doctor consultation is scheduled for today.,Please attend the session with them at your scheduled time.,We look forward to supporting you on your health journey.,You can check the details below at your convenience,app.supershyft.com,Thanks for taking a moment to read this message`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5264,
+        5680
+      ],
+      "id": "erw01-node-0004-80d34e88",
+      "name": "Prepare Nvidia Remainder WhatsApp"
+    },
+    {
+      "parameters": {
+        "url": "https://webhook.whatapi.in/webhook/6a057e696f1a8bf9dd523d1f",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5488,
+        5680
+      ],
+      "id": "erw01-node-0005-c008d94d",
+      "name": "Send WhatsApp Message",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "erw01-cond-b42476a1",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5712,
+        5568
+      ],
+      "id": "erw01-node-0006-4e414f79",
+      "name": "WhatAPI Accepted?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "erw01-asgn-ab1a5ad2",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Nvidia Remainder WhatsApp').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "erw01-asgn-7382fce9",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "erw01-asgn-4183b6f1",
+              "name": "message",
+              "value": "Message sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6208,
+        5488
+      ],
+      "id": "erw01-node-0007-8b191617",
+      "name": "WhatsApp Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "erw01-asgn-8b1beba9",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Nvidia Remainder WhatsApp').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "erw01-asgn-229b4cd6",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "erw01-asgn-448265f9",
+              "name": "message",
+              "value": "WhatsApp sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5808,
+        5760
+      ],
+      "id": "erw01-node-0008-541219a6",
+      "name": "WhatsApp Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "erw01-asgn-2103366f",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Nvidia Remainder WhatsApp').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "erw01-asgn-3e513b67",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "erw01-asgn-a8468a44",
+              "name": "message",
+              "value": "WhatsApp sending failed: message not accepted",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6032,
+        5664
+      ],
+      "id": "erw01-node-0009-24c397a9",
+      "name": "WhatAPI Not Accepted"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "erw01-asgn-1ad7a030",
+              "name": "notification_id",
+              "value": "={{ $('Nvidia Consultation Remainder WhatsApp').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "erw01-asgn-a80ab6d5",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "erw01-asgn-56512f95",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5008,
+        5936
+      ],
+      "id": "erw01-node-0010-3ac7b588",
+      "name": "WhatsApp Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6576,
+        5952
+      ],
+      "id": "erw01-node-0011-a8d3e17f",
+      "name": "WhatsApp Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Validate WhatsApp Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Nvidia Remainder WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "WhatAPI Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Accepted?": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatAPI Not Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Sent Response": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Failed Response": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Not Accepted": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nvidia Consultation Remainder WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Validate WhatsApp Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Nvidia Remainder WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

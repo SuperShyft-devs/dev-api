@@ -1,0 +1,387 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Fan out: one output item per member\nconst body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email,\n    phone: member.phone || '',\n    external_link: member.external_link\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4944,
+        320
+      ],
+      "id": "bec01-node-0000-04ff1f67",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "content": "## Book Nvidia Consultation Email\nSends an eye checkup + doctor consultation booking email to each member.\nExpects: { notification_id, members: [{ first_name, last_name, email, phone, external_link }] }",
+        "height": 640,
+        "width": 1848
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4400,
+        160
+      ],
+      "typeVersion": 1,
+      "id": "bec01-node-0001-2427595b",
+      "name": "Sticky Note Book Nvidia Email"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-nvidia-consultation-email-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4496,
+        400
+      ],
+      "id": "bec01-node-0002-6db7b01a",
+      "name": "Book Nvidia Consultation Email",
+      "webhookId": "bec01-wh-63b52713dd4c"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bec01-cond-dab176dc",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "bec01-cond-99c54597",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "bec01-cond-5d3e5148",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4720,
+        400
+      ],
+      "id": "bec01-node-0003-70f14ed7",
+      "name": "Validate Email Payload"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst bookingLink = (member.external_link || '').trim();\n\nconst body = `Hi ${name},\\n\\nYour health assessment has been completed and you are now eligible for your eye checkup and doctor consultation.\\n\\nThe consultation will help you better understand your report findings and develop a personalized action plan.\\n\\nPlease book a convenient slot below:\\n${bookingLink}\\n\\nWarm regards,\\nTeam Supershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Book Your Eye checkup and doctor Consultation',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5152,
+        320
+      ],
+      "id": "bec01-node-0004-f1eddc6f",
+      "name": "Prepare Book Nvidia Email"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        5376,
+        320
+      ],
+      "id": "bec01-node-0005-d2d6c484",
+      "name": "Send Book Nvidia Email",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "bec01-wh-23633c09b332",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bec01-asgn-d5e53ca0",
+              "name": "notification_id",
+              "value": "={{ $('Book Nvidia Consultation Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "bec01-asgn-d7b9ea4e",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "bec01-asgn-1dbb5e03",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5728,
+        304
+      ],
+      "id": "bec01-node-0006-b726bda1",
+      "name": "Email Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bec01-asgn-70fd4658",
+              "name": "notification_id",
+              "value": "={{ $('Book Nvidia Consultation Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "bec01-asgn-7502c1f0",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "bec01-asgn-fb5c941a",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5584,
+        432
+      ],
+      "id": "bec01-node-0007-3b96c3a5",
+      "name": "Email Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bec01-asgn-bfc1ca62",
+              "name": "notification_id",
+              "value": "={{ $('Book Nvidia Consultation Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "bec01-asgn-36acb858",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "bec01-asgn-38fba5c3",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4944,
+        576
+      ],
+      "id": "bec01-node-0008-75fd9971",
+      "name": "Email Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6000,
+        576
+      ],
+      "id": "bec01-node-0009-6b98c1a3",
+      "name": "Email Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Book Nvidia Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book Nvidia Consultation Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Email Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Book Nvidia Email": {
+      "main": [
+        [
+          {
+            "node": "Send Book Nvidia Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Book Nvidia Email": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}
