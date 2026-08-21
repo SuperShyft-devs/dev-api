@@ -31,6 +31,7 @@ from modules.uploads.user_pdf_router import router as user_pdf_upload_router
 from modules.reports.router import router as reports_router
 from modules.reports.camp_report_sections_router import router as camp_report_sections_router
 from modules.reports.camp_reports_router import router as camp_reports_router
+from modules.bioai_report.router import router as bioai_report_router
 from modules.platform_settings.router import router as platform_settings_router
 from modules.payments.routes import router as payments_router
 from modules.bookings.router import router as bookings_router
@@ -118,6 +119,7 @@ app.include_router(uploads_router)
 app.include_router(user_pdf_upload_router)
 app.include_router(camp_reports_router)
 app.include_router(reports_router)
+app.include_router(bioai_report_router)
 app.include_router(camp_report_sections_router)
 app.include_router(platform_settings_router)
 app.include_router(payments_router)
