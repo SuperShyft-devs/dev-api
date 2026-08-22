@@ -6,9 +6,14 @@ from datetime import date
 
 from modules.reports.camp_report_section_builders import (
     build_band_percent_math,
+    build_blood_and_lab_intelligence,
+    build_blood_and_lab_intelligence_details,
+    build_blood_test_person_evaluation,
     build_category_average_math,
+    build_combined_in_range_percent_math,
     build_company_average_scores,
     build_company_average_scores_details,
+    build_in_range_percent_math,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_gender_by_metabolic_syndrome_details,
     build_distribution_by_oxidative_stress,
@@ -807,3 +812,107 @@ def test_build_company_average_scores_details_empty():
     assert payload["data"]["fitness"]["score"] == 0
     assert payload["data"]["lifestyle"]["score"] == 0
     assert details["summary"]["with_fitprint"] == 0
+
+
+def test_build_in_range_percent_math_basic():
+    math = build_in_range_percent_math(
+        test_name="HbA1c",
+        in_range=2,
+        total=4,
+        has_blood_participants=True,
+        in_range_names=["Alice", "Bob"],
+        out_of_range_names=["Carol", "Dan"],
+    )
+    assert math["rounded_percent"] == 50
+    assert any("2 ÷ 4" in step for step in math["steps"])
+
+
+def test_build_in_range_percent_math_zero_total():
+    math = build_in_range_percent_math(
+        test_name="HbA1c",
+        in_range=0,
+        total=0,
+        has_blood_participants=True,
+    )
+    assert math["rounded_percent"] == 0
+    assert any("0%" in step for step in math["steps"])
+
+
+def test_build_blood_test_person_evaluation_in_range():
+    evaluation = build_blood_test_person_evaluation(
+        test_name="HbA1c",
+        value=5.2,
+        lower_range=4.0,
+        higher_range=5.6,
+        person_name="Alice",
+    )
+    assert evaluation["status"] == "in_range"
+
+
+def test_build_blood_test_person_evaluation_not_counted():
+    evaluation = build_blood_test_person_evaluation(
+        test_name="HbA1c",
+        value=None,
+        lower_range=4.0,
+        higher_range=5.6,
+        person_name="Alice",
+    )
+    assert evaluation["status"] == "not_counted"
+
+
+def test_build_blood_and_lab_intelligence_details_basic():
+    group_stats = {
+        "diabetes_profile": {
+            "hba1c": {"in_range": 2, "total": 4},
+        }
+    }
+    group_parameter_details = {
+        "diabetes_profile": {
+            "group_name": "Diabetes Profile",
+            "parameters": {
+                "hba1c": {
+                    "test_name": "HbA1c",
+                    "parameter_key": "hba1c",
+                    "in_range": 2,
+                    "total": 4,
+                    "in_range_percent": 50,
+                    "is_combined": False,
+                    "percent_math": build_in_range_percent_math(
+                        test_name="HbA1c",
+                        in_range=2,
+                        total=4,
+                        has_blood_participants=True,
+                    ),
+                    "people": {
+                        "in_range": [{"user_id": 1, "name": "Alice"}],
+                        "out_of_range": [{"user_id": 2, "name": "Bob"}],
+                        "not_counted": [{"user_id": 3, "name": "Carol"}],
+                    },
+                }
+            },
+        }
+    }
+    payload, details = build_blood_and_lab_intelligence_details(
+        group_stats,
+        group_parameter_details=group_parameter_details,
+        scope_label="Whole camp",
+        total_enrolled=5,
+        excluded_no_blood=[{"user_id": 9, "name": "Jane", "reason": "No blood"}],
+        skipped_groups=[],
+    )
+    assert payload["data"]["diabetes_profile"]["hba1c"]["in_range_percent"] == 50
+    assert details["method"]["section_kind"] == "blood_and_lab_intelligence"
+    assert details["summary"]["with_blood_results"] == 3
+    assert details["summary"]["without_blood_results"] == 1
+
+
+def test_build_combined_in_range_percent_math():
+    math = build_combined_in_range_percent_math(
+        combined_labels=["Total Cholesterol", "Triglycerides", "LDL Cholesterol"],
+        in_range=1,
+        total=4,
+        has_blood_participants=True,
+        in_range_names=["Alice"],
+    )
+    assert math["rounded_percent"] == 25
+    assert any("all of" in step.lower() for step in math["steps"])

@@ -2648,6 +2648,319 @@ def build_blood_and_lab_intelligence(group_stats: dict[str, dict[str, dict[str, 
     return {"data": data}
 
 
+def _format_range_text(lower: float, higher: float) -> str:
+    lower_text = f"{lower:g}"
+    higher_text = f"{higher:g}"
+    return f"{lower_text} – {higher_text}"
+
+
+def build_blood_test_person_evaluation(
+    *,
+    test_name: str,
+    value: float | None,
+    lower_range: float | None,
+    higher_range: float | None,
+    person_name: str,
+) -> dict[str, Any]:
+    """Build per-person evaluation for one blood test."""
+    if value is None:
+        return {
+            "status": "not_counted",
+            "value": None,
+            "lower": None,
+            "higher": None,
+            "reason": f"We could not read a result for {test_name} from {person_name}'s blood report.",
+            "steps": [
+                f"We looked for {test_name} in {person_name}'s saved blood results.",
+                f"No usable result was found, so {person_name} was not counted for this test.",
+            ],
+        }
+
+    if lower_range is None or higher_range is None:
+        return {
+            "status": "not_counted",
+            "value": value,
+            "lower": lower_range,
+            "higher": higher_range,
+            "reason": (
+                f"We could not find a healthy range for {test_name} "
+                f"(gender may be missing or unknown)."
+            ),
+            "steps": [
+                f"We found {test_name} = {value:g} for {person_name}.",
+                "We could not look up the healthy range for this person, "
+                "so they were not counted for this test.",
+            ],
+        }
+
+    range_text = _format_range_text(lower_range, higher_range)
+    if lower_range <= value <= higher_range:
+        return {
+            "status": "in_range",
+            "value": value,
+            "lower": lower_range,
+            "higher": higher_range,
+            "reason": None,
+            "steps": [
+                f"{person_name}'s {test_name} result is {value:g}.",
+                f"The healthy range is {range_text}.",
+                f"{value:g} is within the healthy range, so {person_name} counts as in range.",
+            ],
+        }
+
+    if value > higher_range:
+        direction = "above"
+        compare_text = f"higher than the top of the healthy range ({higher_range:g})"
+    else:
+        direction = "below"
+        compare_text = f"lower than the bottom of the healthy range ({lower_range:g})"
+
+    return {
+        "status": "out_of_range",
+        "value": value,
+        "lower": lower_range,
+        "higher": higher_range,
+        "reason": f"Result is {direction} the healthy range.",
+        "steps": [
+            f"{person_name}'s {test_name} result is {value:g}.",
+            f"The healthy range is {range_text}.",
+            f"{value:g} is {compare_text}, so {person_name} counts as out of range.",
+        ],
+    }
+
+
+def build_in_range_percent_math(
+    *,
+    test_name: str,
+    in_range: int,
+    total: int,
+    has_blood_participants: bool,
+    in_range_names: list[str] | None = None,
+    out_of_range_names: list[str] | None = None,
+) -> dict[str, Any]:
+    """Primary-school style steps for one blood test in-range percent."""
+    if not has_blood_participants:
+        return {
+            "test_name": test_name,
+            "in_range": 0,
+            "total": 0,
+            "percent_exact": 0.0,
+            "rounded_percent": 0,
+            "steps": [
+                f"Step 1: Nobody in this scope has blood test results saved yet.",
+                f"Step 2: The {test_name} in-range percent on the chart is 0%.",
+            ],
+        }
+
+    if total <= 0:
+        return {
+            "test_name": test_name,
+            "in_range": 0,
+            "total": 0,
+            "percent_exact": 0.0,
+            "rounded_percent": 0,
+            "steps": [
+                f"Step 1: We looked at each enrolled person with blood results.",
+                f"Step 2: Nobody had a usable result for {test_name}, so the chart shows 0%.",
+            ],
+        }
+
+    out_of_range = total - in_range
+    percent_exact = in_range / total * 100
+    rounded_percent = round(percent_exact)
+    ratio_text = f"{(in_range / total):.10f}".rstrip("0").rstrip(".") or "0"
+    percent_raw_text = f"{percent_exact:.10f}".rstrip("0").rstrip(".") or "0"
+
+    in_range_list = ", ".join(in_range_names) if in_range_names else None
+    out_list = ", ".join(out_of_range_names) if out_of_range_names else None
+
+    steps = [
+        "Step 1: We looked at each enrolled person with blood results.",
+        f"Step 2: People we could use for {test_name}: {total}.",
+        f"Step 3: People in healthy range: {in_range}"
+        + (f" ({in_range_list})" if in_range_list else "")
+        + ".",
+        f"Step 4: People outside healthy range: {out_of_range}"
+        + (f" ({out_list})" if out_list else "")
+        + ".",
+        f"Step 5: Divide: {in_range} ÷ {total} = {ratio_text}.",
+        f"Step 6: Turn into a percent: {ratio_text} × 100 = {percent_raw_text}.",
+    ]
+
+    if rounded_percent == percent_exact:
+        steps.append(
+            f"Step 7: Round to nearest whole number: {rounded_percent}% "
+            f"— this is what appears on the chart."
+        )
+    else:
+        steps.append(
+            f"Step 7: Round to nearest whole number: {percent_raw_text}% → {rounded_percent}% "
+            f"— this is what appears on the chart."
+        )
+
+    return {
+        "test_name": test_name,
+        "in_range": int(in_range),
+        "total": int(total),
+        "percent_exact": percent_exact,
+        "rounded_percent": rounded_percent,
+        "steps": steps,
+    }
+
+
+def build_combined_in_range_percent_math(
+    *,
+    combined_labels: list[str],
+    in_range: int,
+    total: int,
+    has_blood_participants: bool,
+    in_range_names: list[str] | None = None,
+) -> dict[str, Any]:
+    """Primary-school style steps for a combined all-tests-must-be-healthy percent."""
+    labels_text = ", ".join(combined_labels)
+    if not has_blood_participants:
+        return {
+            "combined_labels": combined_labels,
+            "in_range": 0,
+            "total": 0,
+            "percent_exact": 0.0,
+            "rounded_percent": 0,
+            "steps": [
+                "Step 1: Nobody in this scope has blood test results saved yet.",
+                f"Step 2: The combined in-range percent for {labels_text} is 0%.",
+            ],
+        }
+
+    if total <= 0:
+        return {
+            "combined_labels": combined_labels,
+            "in_range": 0,
+            "total": 0,
+            "percent_exact": 0.0,
+            "rounded_percent": 0,
+            "steps": [
+                f"Step 1: We only count someone if they have valid results for all of: {labels_text}.",
+                f"Step 2: Nobody had all of these results, so the chart shows 0%.",
+            ],
+        }
+
+    percent_exact = in_range / total * 100
+    rounded_percent = round(percent_exact)
+    ratio_text = f"{(in_range / total):.10f}".rstrip("0").rstrip(".") or "0"
+    percent_raw_text = f"{percent_exact:.10f}".rstrip("0").rstrip(".") or "0"
+    in_range_list = ", ".join(in_range_names) if in_range_names else None
+
+    steps = [
+        f"Step 1: We only count someone if they have valid results for all of: {labels_text}.",
+        "Step 2: A person is in range only if every one of these tests is within its healthy range.",
+        f"Step 3: People with all results: {total}.",
+        f"Step 4: People in range on all tests: {in_range}"
+        + (f" ({in_range_list})" if in_range_list else "")
+        + ".",
+        f"Step 5: Divide: {in_range} ÷ {total} = {ratio_text}.",
+        f"Step 6: Turn into a percent: {ratio_text} × 100 = {percent_raw_text}.",
+    ]
+
+    if rounded_percent == percent_exact:
+        steps.append(
+            f"Step 7: Round to nearest whole number: {rounded_percent}% "
+            f"— this is what appears on the chart."
+        )
+    else:
+        steps.append(
+            f"Step 7: Round to nearest whole number: {percent_raw_text}% → {rounded_percent}% "
+            f"— this is what appears on the chart."
+        )
+
+    return {
+        "combined_labels": combined_labels,
+        "in_range": int(in_range),
+        "total": int(total),
+        "percent_exact": percent_exact,
+        "rounded_percent": rounded_percent,
+        "steps": steps,
+    }
+
+
+def build_blood_and_lab_intelligence_details(
+    group_stats: dict[str, dict[str, dict[str, int]]],
+    *,
+    group_parameter_details: dict[str, dict[str, Any]],
+    scope_label: str,
+    total_enrolled: int,
+    excluded_no_blood: list[dict[str, Any]],
+    skipped_groups: list[str],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build blood_and_lab_intelligence section payload + BTS details."""
+    payload = build_blood_and_lab_intelligence(group_stats)
+
+    participant_ids: set[int] = set()
+    for group in group_parameter_details.values():
+        params = group.get("parameters") if isinstance(group.get("parameters"), dict) else {}
+        for param in params.values():
+            if not isinstance(param, dict):
+                continue
+            people = param.get("people") if isinstance(param.get("people"), dict) else {}
+            for bucket in ("in_range", "out_of_range", "not_counted"):
+                for person in people.get(bucket) or []:
+                    if isinstance(person, dict) and person.get("user_id") is not None:
+                        participant_ids.add(int(person["user_id"]))
+    with_blood_results = len(participant_ids) if participant_ids else max(
+        0, total_enrolled - len(excluded_no_blood)
+    )
+
+    has_blood_participants = with_blood_results > 0
+
+    notes: list[str] = [
+        "In range uses the healthy low-risk range from our blood test catalog, "
+        "based on gender where available."
+    ]
+    if skipped_groups:
+        notes.append(
+            "Some profile groups were not found in the catalog and were skipped: "
+            + ", ".join(skipped_groups)
+            + "."
+        )
+    if not has_blood_participants and total_enrolled == 0:
+        notes.append("No one is enrolled in this camp scope yet.")
+    elif not has_blood_participants and total_enrolled > 0:
+        notes.append(
+            "People are enrolled, but nobody has blood test results saved yet, "
+            "so every in-range percent is 0."
+        )
+
+    details: dict[str, Any] = {
+        "method": {
+            "section_kind": "blood_and_lab_intelligence",
+            "scope_label": scope_label,
+            "who_is_included": (
+                "People enrolled in this camp who have blood test results saved on file. "
+                "We use each person's latest blood report."
+            ),
+            "who_is_excluded": (
+                "People enrolled in this camp but without any blood test results saved."
+            ),
+            "counting_rule": (
+                "For each blood test, we count only people whose result and healthy range "
+                "we could read. 'In range' means the result falls within the healthy "
+                "(low-risk) range for that person's gender."
+            ),
+        },
+        "summary": {
+            "total_enrolled": total_enrolled,
+            "with_blood_results": with_blood_results,
+            "without_blood_results": len(excluded_no_blood),
+        },
+        "groups": group_parameter_details,
+        "excluded": {
+            "no_blood_results": excluded_no_blood,
+        },
+        "notes": notes,
+    }
+
+    return payload, details
+
+
 SECTION_BUILDERS: dict[str, Callable[..., dict]] = {
     "participation_by_age": build_participation_by_age,
     "kpis": build_kpis,

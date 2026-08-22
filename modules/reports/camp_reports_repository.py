@@ -2029,19 +2029,25 @@ class CampReportsRepository:
             rows.append((gender, reports_dict))
         return rows
 
-    async def list_blood_parameters_by_gender(
+    async def list_blood_parameters_contexts(
         self,
         db: AsyncSession,
         *,
         camp_no: int,
         department: str | None = None,
         city: str | None = None,
-    ) -> list[tuple[str | None, Any]]:
-        """Return (gender, blood_parameters) for enrolled users with blood data."""
+    ) -> list[tuple[int, str | None, str | None, str | None, Any]]:
+        """Return blood context rows for enrolled users with blood data.
+
+        Each row is ``(user_id, first_name, last_name, gender, blood_parameters)``.
+        """
         enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
 
         ranked_reports = (
             select(
+                enrolled.c.user_id,
+                User.first_name,
+                User.last_name,
                 enrolled.c.gender,
                 IndividualHealthReport.blood_parameters,
                 func.row_number()
@@ -2052,6 +2058,7 @@ class CampReportsRepository:
                 .label("rn"),
             )
             .select_from(enrolled)
+            .join(User, User.user_id == enrolled.c.user_id)
             .join(
                 IndividualHealthReport,
                 and_(
@@ -2063,14 +2070,74 @@ class CampReportsRepository:
         ).subquery()
 
         result = await db.execute(
-            select(ranked_reports.c.gender, ranked_reports.c.blood_parameters).where(ranked_reports.c.rn == 1)
+            select(
+                ranked_reports.c.user_id,
+                ranked_reports.c.first_name,
+                ranked_reports.c.last_name,
+                ranked_reports.c.gender,
+                ranked_reports.c.blood_parameters,
+            ).where(ranked_reports.c.rn == 1)
         )
 
-        rows: list[tuple[str | None, Any]] = []
-        for gender, blood_params in result.all():
+        rows: list[tuple[int, str | None, str | None, str | None, Any]] = []
+        for user_id, first_name, last_name, gender, blood_params in result.all():
             if blood_params:
-                rows.append((gender, blood_params))
+                rows.append((int(user_id), first_name, last_name, gender, blood_params))
         return rows
+
+    async def list_blood_parameters_by_gender(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> list[tuple[str | None, Any]]:
+        """Return (gender, blood_parameters) for enrolled users with blood data."""
+        contexts = await self.list_blood_parameters_contexts(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        return [(gender, blood_params) for _uid, _fn, _ln, gender, blood_params in contexts]
+
+    async def list_enrolled_users_without_blood_results(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> list[tuple[int, str | None, str | None]]:
+        """Enrolled camp users who have NO stored blood_parameters on file.
+
+        Returns list of (user_id, first_name, last_name).
+        """
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
+
+        blood_users = (
+            select(enrolled.c.user_id)
+            .select_from(enrolled)
+            .join(
+                IndividualHealthReport,
+                and_(
+                    IndividualHealthReport.engagement_id == enrolled.c.engagement_id,
+                    IndividualHealthReport.user_id == enrolled.c.user_id,
+                ),
+            )
+            .where(IndividualHealthReport.blood_parameters.isnot(None))
+        ).subquery()
+
+        query = (
+            select(enrolled.c.user_id, User.first_name, User.last_name)
+            .select_from(enrolled)
+            .join(User, User.user_id == enrolled.c.user_id)
+            .where(enrolled.c.user_id.notin_(select(blood_users.c.user_id)))
+        )
+
+        result = await db.execute(query)
+        return [(int(r[0]), r[1], r[2]) for r in result.all()]
 
     async def list_physical_activity_frequency_by_gender(
         self,

@@ -36,7 +36,10 @@ from modules.organizations.service import get_department_slugs
 from modules.users.models import User
 from modules.reports.camp_report_section_builders import (
     SECTION_BUILDERS,
-    build_blood_and_lab_intelligence,
+    build_blood_and_lab_intelligence_details,
+    build_blood_test_person_evaluation,
+    build_combined_in_range_percent_math,
+    build_in_range_percent_math,
     build_company_average_scores_details,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_gender_by_metabolic_syndrome_details,
@@ -69,6 +72,7 @@ from modules.reports.camp_report_bts import (
     build_participation_by_age_bts,
     build_positive_wins_bts,
     build_company_average_scores_bts,
+    build_blood_and_lab_intelligence_bts,
     build_questionnaire_gender_distribution_bts,
 )
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
@@ -1326,6 +1330,7 @@ class CampReportsService:
         metabolic_gender_bts_details: dict[str, Any] | None = None
         positive_wins_bts_details: dict[str, Any] | None = None
         company_average_scores_bts_details: dict[str, Any] | None = None
+        blood_and_lab_intelligence_bts_details: dict[str, Any] | None = None
         pa_bts_details: dict[str, Any] | None = None
         sleep_bts_details: dict[str, Any] | None = None
         pa_bts_meta: dict[str, Any] | None = None
@@ -1381,6 +1386,15 @@ class CampReportsService:
         elif normalized_section == "company_average_scores":
             built_payload, company_average_scores_bts_details = (
                 await self._compute_company_average_scores_with_details(
+                    db,
+                    camp_no=camp_no,
+                    department=department,
+                    city=city,
+                )
+            )
+        elif normalized_section == "blood_and_lab_intelligence":
+            built_payload, blood_and_lab_intelligence_bts_details = (
+                await self._compute_blood_and_lab_intelligence_with_details(
                     db,
                     camp_no=camp_no,
                     department=department,
@@ -1543,6 +1557,17 @@ class CampReportsService:
                 expected_data=expected_data,
                 stored_data=expected_data,
                 details=cas_details,
+                checked_at=checked_at,
+            )
+        elif normalized_section == "blood_and_lab_intelligence":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            bli_details = dict(blood_and_lab_intelligence_bts_details or {})
+            if previous_data is not None:
+                bli_details["previous"] = previous_data
+            report_bts[normalized_section] = build_blood_and_lab_intelligence_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=bli_details,
                 checked_at=checked_at,
             )
         else:
@@ -2329,54 +2354,138 @@ class CampReportsService:
         "inflammatory": ["homocysteine", "hs-crp", "esr"],
     }
 
-    async def _compute_blood_and_lab_intelligence_payload(
+    async def _compute_blood_and_lab_intelligence_with_details(
         self,
         db: AsyncSession,
         *,
         camp_no: int,
         department: str | None,
         city: str | None = None,
-    ) -> dict:
-        participants = await self._repository.list_blood_parameters_by_gender(
+    ) -> tuple[dict, dict]:
+        scope_label = self._age_participation_scope_label(department=department, city=city)
+        contexts = await self._repository.list_blood_parameters_contexts(
             db,
             camp_no=camp_no,
             department=department,
             city=city,
         )
 
-        group_tests: list[tuple[str, list]] = []
+        participants: list[dict[str, Any]] = []
+        for user_id, first_name, last_name, gender, blood_params in contexts:
+            participants.append(
+                {
+                    "user_id": int(user_id),
+                    "name": _display_person_name(first_name, last_name),
+                    "gender": gender,
+                    "blood_parameters": blood_params,
+                }
+            )
+        participants.sort(key=lambda row: (row["name"].lower(), row["user_id"]))
+
+        group_tests: list[tuple[str, str, list]] = []
+        skipped_groups: list[str] = []
         for group_key in self._BLOOD_INTELLIGENCE_GROUP_KEYS:
             group = await self._diagnostics_repository.get_group_by_group_key(db, group_key=group_key)
             if group is None:
+                skipped_groups.append(group_key)
                 continue
-            tests = await self._diagnostics_repository.get_parameters_for_group(db, group_id=group.group_id)
-            group_tests.append((group_key, tests))
+            tests = await self._diagnostics_repository.get_parameters_for_group(
+                db, group_id=group.group_id
+            )
+            group_tests.append((group_key, group.group_name, tests))
 
         tests_by_group: dict[str, dict[str, object]] = {}
-        for group_key, tests in group_tests:
+        for group_key, _group_name, tests in group_tests:
             tests_by_group[group_key] = {t.parameter_key: t for t in tests if t.parameter_key}
 
+        eval_cache: dict[tuple[int, str], dict[str, Any]] = {}
         group_stats: dict[str, dict[str, dict[str, int]]] = {}
-        for group_key, tests in group_tests:
+        group_parameter_details: dict[str, dict[str, Any]] = {}
+        has_blood_participants = len(participants) > 0
+
+        for group_key, group_name, tests in group_tests:
             test_stats: dict[str, dict[str, int]] = {}
+            parameters_detail: dict[str, Any] = {}
+
             for test in tests:
                 param_key = test.parameter_key
                 if not param_key:
                     continue
-                in_range_count = 0
-                total_valid = 0
+                test_name = str(test.test_name or param_key)
+                people_in_range: list[dict[str, Any]] = []
+                people_out_of_range: list[dict[str, Any]] = []
+                people_not_counted: list[dict[str, Any]] = []
 
-                for gender, blood_params in participants:
-                    value, lower_range, higher_range = self._extract_test_value_and_range(
-                        blood_params, test, gender
-                    )
-                    if value is None or lower_range is None or higher_range is None:
-                        continue
-                    total_valid += 1
-                    if lower_range <= value <= higher_range:
-                        in_range_count += 1
+                for participant in participants:
+                    uid = int(participant["user_id"])
+                    name = str(participant["name"])
+                    cache_key = (uid, param_key)
+                    if cache_key not in eval_cache:
+                        value, lower_range, higher_range = self._extract_test_value_and_range(
+                            participant["blood_parameters"],
+                            test,
+                            participant.get("gender"),
+                        )
+                        evaluation = build_blood_test_person_evaluation(
+                            test_name=test_name,
+                            value=value,
+                            lower_range=lower_range,
+                            higher_range=higher_range,
+                            person_name=name,
+                        )
+                        eval_cache[cache_key] = {
+                            **evaluation,
+                            "user_id": uid,
+                            "name": name,
+                        }
+                    evaluation = dict(eval_cache[cache_key])
+                    status = evaluation.get("status")
+                    person_row = {
+                        "user_id": uid,
+                        "name": name,
+                        "value": evaluation.get("value"),
+                        "lower": evaluation.get("lower"),
+                        "higher": evaluation.get("higher"),
+                        "reason": evaluation.get("reason"),
+                        "steps": list(evaluation.get("steps") or []),
+                    }
+                    if status == "in_range":
+                        people_in_range.append(person_row)
+                    elif status == "out_of_range":
+                        people_out_of_range.append(person_row)
+                    else:
+                        people_not_counted.append(person_row)
 
+                in_range_count = len(people_in_range)
+                total_valid = in_range_count + len(people_out_of_range)
                 test_stats[param_key] = {"in_range": in_range_count, "total": total_valid}
+
+                in_range_names = [p["name"] for p in people_in_range]
+                out_of_range_names = [p["name"] for p in people_out_of_range]
+                percent_math = build_in_range_percent_math(
+                    test_name=test_name,
+                    in_range=in_range_count,
+                    total=total_valid,
+                    has_blood_participants=has_blood_participants,
+                    in_range_names=in_range_names,
+                    out_of_range_names=out_of_range_names,
+                )
+                rounded_percent = int(percent_math.get("rounded_percent") or 0)
+
+                parameters_detail[param_key] = {
+                    "test_name": test_name,
+                    "parameter_key": param_key,
+                    "in_range": in_range_count,
+                    "total": total_valid,
+                    "in_range_percent": rounded_percent,
+                    "is_combined": False,
+                    "percent_math": percent_math,
+                    "people": {
+                        "in_range": people_in_range,
+                        "out_of_range": people_out_of_range,
+                        "not_counted": people_not_counted,
+                    },
+                }
 
             combined_params = self._BLOOD_INTELLIGENCE_COMBINED_KEYS.get(group_key)
             if combined_params:
@@ -2385,32 +2494,193 @@ class CampReportsService:
                 combined_tests = [group_test_map[k] for k in combined_params if k in group_test_map]
 
                 if combined_tests:
+                    combined_labels = [
+                        str(group_test_map[k].test_name or k) for k in combined_params if k in group_test_map
+                    ]
                     combined_in_range = 0
                     combined_total = 0
+                    combined_in_range_people: list[dict[str, Any]] = []
+                    combined_out_of_range_people: list[dict[str, Any]] = []
+                    combined_not_counted_people: list[dict[str, Any]] = []
 
-                    for gender, blood_params in participants:
+                    for participant in participants:
+                        uid = int(participant["user_id"])
+                        name = str(participant["name"])
+                        sub_evaluations: list[dict[str, Any]] = []
                         all_valid = True
                         all_in_range = True
+
                         for ct in combined_tests:
-                            value, lower_range, higher_range = self._extract_test_value_and_range(
-                                blood_params, ct, gender
-                            )
-                            if value is None or lower_range is None or higher_range is None:
+                            param_key = str(ct.parameter_key or "")
+                            test_name = str(ct.test_name or param_key)
+                            cache_key = (uid, param_key)
+                            if cache_key not in eval_cache:
+                                value, lower_range, higher_range = self._extract_test_value_and_range(
+                                    participant["blood_parameters"],
+                                    ct,
+                                    participant.get("gender"),
+                                )
+                                evaluation = build_blood_test_person_evaluation(
+                                    test_name=test_name,
+                                    value=value,
+                                    lower_range=lower_range,
+                                    higher_range=higher_range,
+                                    person_name=name,
+                                )
+                                eval_cache[cache_key] = {
+                                    **evaluation,
+                                    "user_id": uid,
+                                    "name": name,
+                                }
+                            sub_eval = dict(eval_cache[cache_key])
+                            sub_evaluations.append(sub_eval)
+                            if sub_eval.get("status") == "not_counted":
                                 all_valid = False
                                 break
-                            if not (lower_range <= value <= higher_range):
+                            if sub_eval.get("status") != "in_range":
                                 all_in_range = False
+
                         if not all_valid:
+                            missing = [
+                                str(item.get("reason") or "Missing result")
+                                for item in sub_evaluations
+                                if item.get("status") == "not_counted"
+                            ]
+                            combined_not_counted_people.append(
+                                {
+                                    "user_id": uid,
+                                    "name": name,
+                                    "reason": (
+                                        "Missing one or more results needed for the combined check."
+                                    ),
+                                    "steps": [
+                                        f"We need all of these tests for {name}: "
+                                        + ", ".join(combined_labels)
+                                        + ".",
+                                        *(
+                                            missing[:3]
+                                            if missing
+                                            else [
+                                                "At least one required test could not be read."
+                                            ]
+                                        ),
+                                    ],
+                                }
+                            )
                             continue
+
                         combined_total += 1
+                        sub_steps = [
+                            step
+                            for item in sub_evaluations
+                            for step in (item.get("steps") or [])
+                        ]
                         if all_in_range:
                             combined_in_range += 1
+                            combined_in_range_people.append(
+                                {
+                                    "user_id": uid,
+                                    "name": name,
+                                    "reason": None,
+                                    "steps": [
+                                        f"{name} has all required tests in healthy range.",
+                                        *sub_steps,
+                                    ],
+                                }
+                            )
+                        else:
+                            combined_out_of_range_people.append(
+                                {
+                                    "user_id": uid,
+                                    "name": name,
+                                    "reason": "At least one required test is outside the healthy range.",
+                                    "steps": [
+                                        f"{name} has all required tests, but not all are in range.",
+                                        *sub_steps,
+                                    ],
+                                }
+                            )
 
-                    test_stats[combined_key] = {"in_range": combined_in_range, "total": combined_total}
+                    test_stats[combined_key] = {
+                        "in_range": combined_in_range,
+                        "total": combined_total,
+                    }
+                    combined_math = build_combined_in_range_percent_math(
+                        combined_labels=combined_labels,
+                        in_range=combined_in_range,
+                        total=combined_total,
+                        has_blood_participants=has_blood_participants,
+                        in_range_names=[p["name"] for p in combined_in_range_people],
+                    )
+                    parameters_detail[combined_key] = {
+                        "test_name": " + ".join(combined_labels),
+                        "parameter_key": combined_key,
+                        "in_range": combined_in_range,
+                        "total": combined_total,
+                        "in_range_percent": int(combined_math.get("rounded_percent") or 0),
+                        "is_combined": True,
+                        "combined_labels": combined_labels,
+                        "percent_math": combined_math,
+                        "people": {
+                            "in_range": combined_in_range_people,
+                            "out_of_range": combined_out_of_range_people,
+                            "not_counted": combined_not_counted_people,
+                        },
+                    }
 
             group_stats[group_key] = test_stats
+            group_parameter_details[group_key] = {
+                "group_name": group_name,
+                "parameters": parameters_detail,
+            }
 
-        return build_blood_and_lab_intelligence(group_stats)
+        no_blood_rows = await self._repository.list_enrolled_users_without_blood_results(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        excluded_no_blood = [
+            {
+                "user_id": uid,
+                "name": _display_person_name(first_name, last_name),
+                "reason": "Enrolled in the camp but has no blood test results saved.",
+            }
+            for uid, first_name, last_name in no_blood_rows
+        ]
+        excluded_no_blood.sort(key=lambda row: (row["name"].lower(), row["user_id"]))
+
+        total_enrolled = await self._repository.count_enrolled_users(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+
+        return build_blood_and_lab_intelligence_details(
+            group_stats,
+            group_parameter_details=group_parameter_details,
+            scope_label=scope_label,
+            total_enrolled=total_enrolled,
+            excluded_no_blood=excluded_no_blood,
+            skipped_groups=skipped_groups,
+        )
+
+    async def _compute_blood_and_lab_intelligence_payload(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None = None,
+    ) -> dict:
+        payload, _details = await self._compute_blood_and_lab_intelligence_with_details(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        return payload
 
     @staticmethod
     def _extract_test_value_and_range(

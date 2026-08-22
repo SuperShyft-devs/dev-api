@@ -2428,3 +2428,142 @@ def build_company_average_scores_bts(
         "details": details_payload,
         "message": message,
     }
+
+
+def _blood_lab_in_range_percent_reason(
+    *,
+    group_label: str,
+    test_label: str,
+    expected: int | None,
+    stored: int | None,
+    percent_math: dict[str, Any] | None,
+) -> str:
+    if stored is None:
+        return (
+            f"The saved report did not show an in-range percent for {test_label} "
+            f"({group_label}). When we recalculated, we got {expected}%."
+        )
+    if expected != stored:
+        math = percent_math if isinstance(percent_math, dict) else {}
+        in_range = _int_or_none(math.get("in_range"))
+        total = _int_or_none(math.get("total"))
+        if in_range is not None and total is not None and total > 0:
+            return (
+                f"The report shows {test_label} = {stored}% in range, but we now calculate "
+                f"{expected}% ({in_range} of {total} people in healthy range). "
+                f"See the step-by-step breakdown below."
+            )
+        return (
+            f"The report shows {test_label} = {stored}% in range, but we now calculate "
+            f"{expected}%. See the step-by-step breakdown below."
+        )
+    return ""
+
+
+def build_blood_and_lab_intelligence_bts(
+    *,
+    expected_data: dict[str, Any],
+    stored_data: dict[str, Any] | None,
+    details: dict[str, Any],
+    checked_at: str,
+) -> dict[str, Any]:
+    """Compare blood_and_lab_intelligence data to freshly computed expected values."""
+    stored = stored_data if isinstance(stored_data, dict) else {}
+    details_payload = dict(details or {})
+    groups_detail = (
+        details_payload.get("groups")
+        if isinstance(details_payload.get("groups"), dict)
+        else {}
+    )
+
+    if not stored:
+        return {
+            "status": "ok",
+            "checked_at": checked_at,
+            "expected": expected_data,
+            "stored": None,
+            "fields": {},
+            "details": details_payload,
+            "message": (
+                "This is the first check for Blood and Lab Intelligence. "
+                "We saved the latest in-range percentages and listed who contributed."
+            ),
+        }
+
+    fields: dict[str, Any] = {}
+    for group_key, group_block in groups_detail.items():
+        if not isinstance(group_block, dict):
+            continue
+        group_label = str(group_block.get("group_name") or group_key)
+        parameters = group_block.get("parameters")
+        if not isinstance(parameters, dict):
+            continue
+        for param_key, param_block in parameters.items():
+            if not isinstance(param_block, dict):
+                continue
+            test_label = str(param_block.get("test_name") or param_key)
+            expected_group = expected_data.get(group_key)
+            stored_group = stored.get(group_key)
+            expected_pct = None
+            stored_pct = None
+            if isinstance(expected_group, dict):
+                expected_param = expected_group.get(param_key)
+                if isinstance(expected_param, dict):
+                    expected_pct = _int_or_none(expected_param.get("in_range_percent"))
+            if isinstance(stored_group, dict):
+                stored_param = stored_group.get(param_key)
+                if isinstance(stored_param, dict):
+                    stored_pct = _int_or_none(stored_param.get("in_range_percent"))
+
+            recomputed = _int_or_none(param_block.get("in_range_percent"))
+            if recomputed is not None:
+                expected_pct = recomputed
+
+            field_key = f"{group_key}.{param_key}.in_range_percent"
+            reason = _blood_lab_in_range_percent_reason(
+                group_label=group_label,
+                test_label=test_label,
+                expected=expected_pct,
+                stored=stored_pct,
+                percent_math=param_block.get("percent_math")
+                if isinstance(param_block.get("percent_math"), dict)
+                else None,
+            )
+            fields[field_key] = _field_entry(
+                expected=expected_pct,
+                stored=stored_pct,
+                reason=reason or None,
+            )
+
+    all_match = all(bool(entry.get("match")) for entry in fields.values())
+    summary = details_payload.get("summary")
+    with_blood = (
+        _int_or_none(summary.get("with_blood_results"))
+        if isinstance(summary, dict)
+        else 0
+    ) or 0
+    if all_match and with_blood == 0:
+        message = (
+            "Blood and Lab Intelligence matches. "
+            "Nobody in this scope has blood results yet, so all percents are 0."
+        )
+    elif all_match:
+        message = (
+            "Blood and Lab Intelligence matches. "
+            "See the step-by-step breakdown below for each blood test."
+        )
+    else:
+        message = (
+            "Some Blood and Lab Intelligence numbers do not match. "
+            "See the notes below and the step-by-step breakdown."
+        )
+
+    return {
+        "status": "ok" if all_match else "mismatch",
+        "checked_at": checked_at,
+        "expected": expected_data,
+        "stored": stored_data,
+        "fields": fields,
+        "details": details_payload,
+        "message": message,
+    }

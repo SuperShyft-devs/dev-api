@@ -3,6 +3,7 @@
 from datetime import date
 
 from modules.reports.camp_report_bts import (
+    build_blood_and_lab_intelligence_bts,
     build_company_average_scores_bts,
     build_distribution_by_gender_by_metabolic_syndrome_bts,
     build_distribution_by_oxidative_stress_bts,
@@ -24,6 +25,8 @@ from modules.reports.camp_report_section_builders import (
     build_participation_by_age_details,
     build_positive_wins_details,
     build_company_average_scores_details,
+    build_blood_and_lab_intelligence_details,
+    build_in_range_percent_math,
     build_questionnaire_gender_distribution_details,
     physical_activity_answer_to_bucket,
 )
@@ -902,3 +905,108 @@ def test_build_company_average_scores_bts_mismatch():
     assert bts["status"] == "mismatch"
     assert bts["fields"]["nutrition.score"]["match"] is False
     assert bts["fields"]["nutrition.score"]["reason"]
+
+
+def test_build_blood_and_lab_intelligence_bts_ok():
+    group_stats = {"diabetes_profile": {"hba1c": {"in_range": 2, "total": 4}}}
+    group_parameter_details = {
+        "diabetes_profile": {
+            "group_name": "Diabetes Profile",
+            "parameters": {
+                "hba1c": {
+                    "test_name": "HbA1c",
+                    "parameter_key": "hba1c",
+                    "in_range": 2,
+                    "total": 4,
+                    "in_range_percent": 50,
+                    "is_combined": False,
+                    "percent_math": build_in_range_percent_math(
+                        test_name="HbA1c",
+                        in_range=2,
+                        total=4,
+                        has_blood_participants=True,
+                    ),
+                    "people": {"in_range": [], "out_of_range": [], "not_counted": []},
+                }
+            },
+        }
+    }
+    payload, details = build_blood_and_lab_intelligence_details(
+        group_stats,
+        group_parameter_details=group_parameter_details,
+        scope_label="Whole camp",
+        total_enrolled=4,
+        excluded_no_blood=[],
+        skipped_groups=[],
+    )
+    bts = build_blood_and_lab_intelligence_bts(
+        expected_data=payload["data"],
+        stored_data=payload["data"],
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["fields"]["diabetes_profile.hba1c.in_range_percent"]["match"] is True
+
+
+def test_build_blood_and_lab_intelligence_bts_first_validation():
+    payload, details = build_blood_and_lab_intelligence_details(
+        {},
+        group_parameter_details={},
+        scope_label="Whole camp",
+        total_enrolled=0,
+        excluded_no_blood=[],
+        skipped_groups=[],
+    )
+    bts = build_blood_and_lab_intelligence_bts(
+        expected_data=payload["data"],
+        stored_data=None,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["stored"] is None
+
+
+def test_build_blood_and_lab_intelligence_bts_mismatch():
+    group_stats = {"diabetes_profile": {"hba1c": {"in_range": 2, "total": 4}}}
+    group_parameter_details = {
+        "diabetes_profile": {
+            "group_name": "Diabetes Profile",
+            "parameters": {
+                "hba1c": {
+                    "test_name": "HbA1c",
+                    "parameter_key": "hba1c",
+                    "in_range": 2,
+                    "total": 4,
+                    "in_range_percent": 50,
+                    "is_combined": False,
+                    "percent_math": build_in_range_percent_math(
+                        test_name="HbA1c",
+                        in_range=2,
+                        total=4,
+                        has_blood_participants=True,
+                    ),
+                    "people": {"in_range": [], "out_of_range": [], "not_counted": []},
+                }
+            },
+        }
+    }
+    payload, details = build_blood_and_lab_intelligence_details(
+        group_stats,
+        group_parameter_details=group_parameter_details,
+        scope_label="Whole camp",
+        total_enrolled=4,
+        excluded_no_blood=[],
+        skipped_groups=[],
+    )
+    stored = dict(payload["data"])
+    stored["diabetes_profile"] = {"hba1c": {"in_range_percent": 99}}
+    bts = build_blood_and_lab_intelligence_bts(
+        expected_data=payload["data"],
+        stored_data=stored,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["diabetes_profile.hba1c.in_range_percent"]["match"] is False
