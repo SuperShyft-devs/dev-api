@@ -1981,3 +1981,325 @@ def build_distribution_by_gender_by_metabolic_syndrome_bts(
         "details": details_payload,
         "message": message,
     }
+
+
+def _positive_wins_low_risk_reason(
+    *,
+    index: int,
+    field: str,
+    expected: Any,
+    stored: Any,
+) -> str:
+    label = f"Healthy disease #{index + 1}"
+    if stored is None:
+        return f"The saved report did not show {label} ({field}). We now have {expected!r}."
+    return (
+        f"For {label}, {field} should be {expected!r} but the report shows {stored!r}. "
+        f"Someone may have a new Bio AI report or the camp ranking may have changed since last save."
+    )
+
+
+def _positive_wins_habit_reason(
+    *,
+    index: int,
+    field: str,
+    expected: Any,
+    stored: Any,
+) -> str:
+    label = f"Healthy habit #{index + 1}"
+    if stored is None:
+        return f"The saved report did not show {label} ({field}). We now have {expected!r}."
+    return (
+        f"For {label}, {field} should be {expected!r} but the report shows {stored!r}. "
+        f"Questionnaire answers or habit rule matches may have changed since last save."
+    )
+
+
+def _positive_wins_profile_reason(
+    *,
+    index: int,
+    expected: str,
+    stored: str | None,
+) -> str:
+    label = f"Healthy profile #{index + 1}"
+    if stored is None:
+        return f"The saved report did not show {label}. We now have {expected!r}."
+    return (
+        f"For {label}, the profile should be {expected!r} but the report shows {stored!r}. "
+        f"Blood profile rankings may have changed since last save."
+    )
+
+
+def build_positive_wins_bts(
+    *,
+    expected_data: dict[str, Any],
+    stored_data: dict[str, Any] | None,
+    details: dict[str, Any],
+    checked_at: str,
+) -> dict[str, Any]:
+    """Compare positive_wins data to freshly computed expected values."""
+    stored = stored_data if isinstance(stored_data, dict) else {}
+    details_payload = dict(details or {})
+
+    expected_low_risk = (
+        expected_data.get("low_risk") if isinstance(expected_data.get("low_risk"), list) else []
+    )
+    expected_habits = (
+        expected_data.get("healthy_habits")
+        if isinstance(expected_data.get("healthy_habits"), list)
+        else []
+    )
+    expected_profiles = (
+        expected_data.get("healthy_profiles")
+        if isinstance(expected_data.get("healthy_profiles"), list)
+        else []
+    )
+
+    stored_low_risk = stored.get("low_risk") if isinstance(stored.get("low_risk"), list) else []
+    stored_habits = (
+        stored.get("healthy_habits") if isinstance(stored.get("healthy_habits"), list) else []
+    )
+    stored_profiles = (
+        stored.get("healthy_profiles") if isinstance(stored.get("healthy_profiles"), list) else []
+    )
+
+    low_risk_details = (
+        details_payload.get("low_risk") if isinstance(details_payload.get("low_risk"), dict) else {}
+    )
+    habits_details = (
+        details_payload.get("healthy_habits")
+        if isinstance(details_payload.get("healthy_habits"), dict)
+        else {}
+    )
+    profiles_details = (
+        details_payload.get("healthy_profiles")
+        if isinstance(details_payload.get("healthy_profiles"), dict)
+        else {}
+    )
+
+    expected_low_codes = [
+        str(item.get("code") or "")
+        for item in expected_low_risk
+        if isinstance(item, dict) and item.get("code")
+    ]
+    expected_habit_labels = [
+        str(item.get("habit_label") or "")
+        for item in expected_habits
+        if isinstance(item, dict) and item.get("habit_label")
+    ]
+    expected_profile_names = [str(name) for name in expected_profiles if str(name).strip()]
+
+    if not stored:
+        message = (
+            "This is the first check for Positive Wins. "
+            "We saved the latest lists and who contributed to each one."
+        )
+        if not expected_low_codes and not expected_habit_labels and not expected_profile_names:
+            message = (
+                "This is the first check for Positive Wins. "
+                "No healthy diseases, habits, or profiles to show yet."
+            )
+        return {
+            "status": "ok",
+            "checked_at": checked_at,
+            "expected": expected_data,
+            "stored": None,
+            "fields": {},
+            "details": details_payload,
+            "message": message,
+        }
+
+    fields: dict[str, Any] = {}
+
+    fields["low_risk.length"] = _field_entry(
+        expected=len(expected_low_risk),
+        stored=len(stored_low_risk),
+        reason=(
+            f"The report lists {len(stored_low_risk)} healthy diseases but we now count "
+            f"{len(expected_low_risk)}."
+        )
+        if len(stored_low_risk) != len(expected_low_risk)
+        else None,
+    )
+
+    for index in range(max(len(expected_low_risk), len(stored_low_risk), 3)):
+        expected_item = expected_low_risk[index] if index < len(expected_low_risk) else None
+        stored_item = stored_low_risk[index] if index < len(stored_low_risk) else None
+        for field in ("code", "risk_score_scaled"):
+            exp_val = expected_item.get(field) if isinstance(expected_item, dict) else None
+            st_val = stored_item.get(field) if isinstance(stored_item, dict) else None
+            if exp_val is None and st_val is None:
+                continue
+            fields[f"low_risk.{index}.{field}"] = _field_entry(
+                expected=exp_val,
+                stored=st_val,
+                reason=_positive_wins_low_risk_reason(
+                    index=index,
+                    field=field,
+                    expected=exp_val,
+                    stored=st_val,
+                ),
+            )
+
+    stored_low_codes = [
+        str(item.get("code") or "")
+        for item in stored_low_risk
+        if isinstance(item, dict) and item.get("code")
+    ]
+    low_selection = low_risk_details.get("selection_math")
+    recomputed_low_codes = (
+        list(low_selection.get("selected_keys") or [])
+        if isinstance(low_selection, dict)
+        else expected_low_codes
+    )
+    low_ok = stored_low_codes == recomputed_low_codes
+    fields["low_risk.selection_consistency"] = {
+        "match": low_ok,
+        "expected": recomputed_low_codes,
+        "stored": stored_low_codes,
+        "reason": None
+        if low_ok
+        else (
+            f"The healthy disease list should be {recomputed_low_codes!r} based on who had "
+            f"each disease, but the report shows {stored_low_codes!r}. "
+            f"See the step-by-step ranking below."
+        ),
+    }
+
+    fields["healthy_habits.length"] = _field_entry(
+        expected=len(expected_habits),
+        stored=len(stored_habits),
+        reason=(
+            f"The report lists {len(stored_habits)} healthy habits but we now count "
+            f"{len(expected_habits)}."
+        )
+        if len(stored_habits) != len(expected_habits)
+        else None,
+    )
+
+    for index in range(max(len(expected_habits), len(stored_habits), 3)):
+        expected_item = expected_habits[index] if index < len(expected_habits) else None
+        stored_item = stored_habits[index] if index < len(stored_habits) else None
+        for field in ("habit_label", "habit_key"):
+            exp_val = expected_item.get(field) if isinstance(expected_item, dict) else None
+            st_val = stored_item.get(field) if isinstance(stored_item, dict) else None
+            if exp_val is None and st_val is None:
+                continue
+            fields[f"healthy_habits.{index}.{field}"] = _field_entry(
+                expected=exp_val,
+                stored=st_val,
+                reason=_positive_wins_habit_reason(
+                    index=index,
+                    field=field,
+                    expected=exp_val,
+                    stored=st_val,
+                ),
+            )
+
+    stored_habit_labels = [
+        str(item.get("habit_label") or "")
+        for item in stored_habits
+        if isinstance(item, dict) and item.get("habit_label")
+    ]
+    habits_selection = habits_details.get("selection_math")
+    recomputed_habit_labels = (
+        list(habits_selection.get("selected_keys") or [])
+        if isinstance(habits_selection, dict)
+        else expected_habit_labels
+    )
+    habits_ok = stored_habit_labels == recomputed_habit_labels
+    fields["healthy_habits.selection_consistency"] = {
+        "match": habits_ok,
+        "expected": recomputed_habit_labels,
+        "stored": stored_habit_labels,
+        "reason": None
+        if habits_ok
+        else (
+            f"The healthy habits list should be {recomputed_habit_labels!r} based on how "
+            f"many people had each habit, but the report shows {stored_habit_labels!r}."
+        ),
+    }
+
+    fields["healthy_profiles.length"] = _field_entry(
+        expected=len(expected_profiles),
+        stored=len(stored_profiles),
+        reason=(
+            f"The report lists {len(stored_profiles)} healthy profiles but we now count "
+            f"{len(expected_profiles)}."
+        )
+        if len(stored_profiles) != len(expected_profiles)
+        else None,
+    )
+
+    for index in range(max(len(expected_profiles), len(stored_profiles), 3)):
+        expected_name = str(expected_profiles[index]) if index < len(expected_profiles) else None
+        stored_name = str(stored_profiles[index]) if index < len(stored_profiles) else None
+        if expected_name is None and stored_name is None:
+            continue
+        fields[f"healthy_profiles.{index}"] = _field_entry(
+            expected=expected_name,
+            stored=stored_name,
+            reason=_positive_wins_profile_reason(
+                index=index,
+                expected=expected_name or "",
+                stored=stored_name,
+            ),
+        )
+
+    profiles_selection = profiles_details.get("selection_math")
+    recomputed_profiles = (
+        list(profiles_selection.get("selected_keys") or [])
+        if isinstance(profiles_selection, dict)
+        else expected_profile_names
+    )
+    profiles_ok = list(stored_profiles) == recomputed_profiles
+    fields["healthy_profiles.selection_consistency"] = {
+        "match": profiles_ok,
+        "expected": recomputed_profiles,
+        "stored": list(stored_profiles),
+        "reason": None
+        if profiles_ok
+        else (
+            f"The healthy profiles list should be {recomputed_profiles!r} based on how "
+            f"many people had each profile, but the report shows {list(stored_profiles)!r}."
+        ),
+    }
+
+    participants = (
+        details_payload.get("participants")
+        if isinstance(details_payload.get("participants"), list)
+        else []
+    )
+    with_any = sum(
+        1
+        for p in participants
+        if isinstance(p, dict)
+        and (p.get("low_risk") or p.get("healthy_habits") or p.get("healthy_profiles"))
+    )
+    fields["participants_with_any_win"] = {
+        "match": True,
+        "expected": with_any,
+        "stored": with_any,
+        "reason": None,
+    }
+
+    all_match = all(bool(entry.get("match")) for entry in fields.values())
+    if all_match and not expected_low_codes and not expected_habit_labels and not expected_profile_names:
+        message = "No healthy diseases, habits, or profiles to show yet."
+    elif all_match:
+        message = "All Positive Wins numbers match."
+    else:
+        message = (
+            "Some Positive Wins numbers do not match. "
+            "See the notes below for each one."
+        )
+
+    return {
+        "status": "ok" if all_match else "mismatch",
+        "checked_at": checked_at,
+        "expected": expected_data,
+        "stored": stored_data,
+        "fields": fields,
+        "details": details_payload,
+        "message": message,
+    }

@@ -3927,6 +3927,7 @@ async def test_refresh_camp_report_positive_wins(async_client, fastapi_app, test
     )
     assert response.status_code == 200
     section = response.json()["data"]["section"]
+    bts = response.json()["data"].get("report_bts")
     assert section["name"] == "Positive Wins"
     assert section["description"] == "Top healthy habits and profiles across the camp"
     assert [item["code"] for item in section["data"]["low_risk"]] == ["low_a", "low_b", "low_c"]
@@ -3945,6 +3946,10 @@ async def test_refresh_camp_report_positive_wins(async_client, fastapi_app, test
     ).scalar_one()
     assert row.report["positive_wins"]["name"] == "Positive Wins"
     assert row.report["positive_wins"]["data"]["healthy_habits"][0]["habit_label"] == "No Alcohol"
+    assert bts is not None
+    assert bts["status"] == "ok"
+    assert bts["details"]["method"]["section_kind"] == "positive_wins"
+    assert row.report_bts["positive_wins"]["status"] == "ok"
 
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 

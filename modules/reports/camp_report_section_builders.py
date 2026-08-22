@@ -1805,6 +1805,572 @@ def aggregate_top_low_risk(
     return [meta_by_code[code] for code, _ in ranked[:limit]]
 
 
+def _coerce_reports_dict_for_positive_wins(reports: Any) -> dict[str, Any]:
+    if isinstance(reports, dict):
+        return reports
+    return {}
+
+
+def _list_healthy_diseases_from_report(reports: dict[str, Any]) -> list[dict[str, Any]]:
+    """All Healthy diseases from a Bio AI report, sorted like low_risk selection."""
+    healthy: list[dict[str, Any]] = []
+    for entry in extract_diseases(reports):
+        if not isinstance(entry, dict):
+            continue
+        risk_status = str(entry.get("risk_status") or "")
+        if risk_status != "Healthy":
+            continue
+        code = str(entry.get("code") or "")
+        name = str(entry.get("name") or code)
+        rsc = entry.get("risk_score_scaled")
+        try:
+            risk_score_scaled = int(rsc) if rsc is not None else 0
+        except (TypeError, ValueError):
+            risk_score_scaled = 0
+        healthy.append(
+            {
+                "code": code,
+                "name": name,
+                "risk_status": risk_status,
+                "risk_score_scaled": risk_score_scaled,
+            }
+        )
+    healthy.sort(key=lambda x: (x["risk_score_scaled"], x["code"]))
+    return healthy
+
+
+_RISK_SCORE_BAND_LABELS: dict[str, str] = {
+    "healthy": "Healthy",
+    "increased": "Increased",
+    "high": "High",
+    "very_high": "Very High",
+}
+
+_RISK_SCORE_BAND_RANGES: dict[str, str] = {
+    "healthy": "0 to 25",
+    "increased": "26 to 42",
+    "high": "43 to 58",
+    "very_high": "59 and above",
+}
+
+
+def _coerce_risk_score_scaled(value: Any) -> int:
+    try:
+        return int(value) if value is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def build_risk_score_scaled_read_math(
+    *,
+    code: str,
+    name: str,
+    risk_score_scaled: Any,
+    risk_status: str = "Healthy",
+) -> dict[str, Any]:
+    """Primary-school steps for reading one disease's risk_score_scaled from Bio AI."""
+    score = _coerce_risk_score_scaled(risk_score_scaled)
+    band = risk_score_scaled_to_band(score)
+    band_label = _RISK_SCORE_BAND_LABELS[band]
+    band_range = _RISK_SCORE_BAND_RANGES[band]
+    display_name = name or code
+
+    steps = [
+        "Step 1: Open this person's cached Bio AI report (saved during camp report refresh)",
+        "Step 2: Look at the diseases list inside that report",
+        f'Step 3: Find the disease with code "{code}" ({display_name})',
+        f'Step 4: Check risk_status = "{risk_status}" (only Healthy diseases are used for Positive Wins)',
+        f"Step 5: Read risk_score_scaled from that disease entry = {score}",
+        "Step 6: This number is produced by Bio AI (Metsights). We copy it as-is; we do not recalculate it.",
+        f"Step 7: Map the score to a band: {score} is in {band_range} → {band_label} band",
+        f"Result: risk_score_scaled = {score}",
+    ]
+
+    return {
+        "code": code,
+        "name": display_name,
+        "result": score,
+        "band": band,
+        "band_label": band_label,
+        "band_range": band_range,
+        "steps": steps,
+    }
+
+
+def build_chart_risk_score_scaled_math(
+    *,
+    code: str,
+    name: str,
+    chart_score: Any,
+    people: list[dict[str, Any]],
+    source_user_id: int | None = None,
+    source_user_name: str | None = None,
+) -> dict[str, Any]:
+    """Primary-school steps for the risk_score_scaled shown on the camp Positive Wins chart."""
+    result = _coerce_risk_score_scaled(chart_score)
+    display_name = name or code
+    contributor_scores: list[dict[str, Any]] = []
+    for person in people:
+        contributor_scores.append(
+            {
+                "user_id": person.get("user_id"),
+                "name": person.get("name"),
+                "risk_score_scaled": _coerce_risk_score_scaled(person.get("risk_score_scaled")),
+            }
+        )
+    contributor_scores.sort(
+        key=lambda row: (str(row.get("name") or "").lower(), int(row.get("user_id") or 0))
+    )
+
+    unique_scores = sorted({int(row["risk_score_scaled"]) for row in contributor_scores})
+
+    steps = [
+        f"Step 1: Count people who have {display_name} ({code}) in their personal top-3 healthy diseases "
+        f"= {len(contributor_scores)}",
+        "Step 2: For each person, read risk_score_scaled from their own Bio AI report:",
+    ]
+    for index, row in enumerate(contributor_scores, start=1):
+        person_name = str(row.get("name") or "Unknown")
+        user_id = row.get("user_id")
+        person_score = row["risk_score_scaled"]
+        steps.append(
+            f"   {index}. {person_name} (ID {user_id}): risk_score_scaled = {person_score}"
+        )
+
+    if not contributor_scores:
+        steps.append("Step 3: No contributors, so the chart score is 0")
+        steps.append("Result: risk_score_scaled = 0")
+    elif len(unique_scores) == 1:
+        only_score = unique_scores[0]
+        steps.append(f"Step 3: Every contributor has the same score ({only_score})")
+        steps.append(f"Result: the camp chart shows risk_score_scaled = {result}")
+    else:
+        scores_text = ", ".join(str(score) for score in unique_scores)
+        steps.append(f"Step 3: Scores are not all the same: {scores_text}")
+        if source_user_id is not None:
+            source_name = source_user_name or "Unknown"
+            steps.append(
+                f"Step 4: The camp chart uses the entry saved from the first contributor we processed: "
+                f"{source_name} (ID {source_user_id}) → risk_score_scaled = {result}"
+            )
+        else:
+            steps.append(
+                f"Step 4: The camp chart uses the entry saved from the first contributor we processed "
+                f"→ risk_score_scaled = {result}"
+            )
+        steps.append(
+            "Note: Each person can have a different score for the same disease because Bio AI scores "
+            "are personal."
+        )
+
+    band = risk_score_scaled_to_band(result)
+    return {
+        "code": code,
+        "name": display_name,
+        "result": result,
+        "band": band,
+        "band_label": _RISK_SCORE_BAND_LABELS[band],
+        "band_range": _RISK_SCORE_BAND_RANGES[band],
+        "contributor_scores": contributor_scores,
+        "source_user_id": source_user_id,
+        "source_user_name": source_user_name,
+        "steps": steps,
+    }
+
+
+def build_per_person_low_risk_math(
+    all_healthy: list[dict[str, Any]],
+    selected: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Primary-school steps for one person's low_risk top 3."""
+    if not selected:
+        return {
+            "healthy_found": len(all_healthy),
+            "selected_count": 0,
+            "steps": ["This person has no healthy diseases to show on Positive Wins."],
+            "by_disease": {},
+        }
+
+    total = len(all_healthy)
+    sorted_labels = ", ".join(
+        f'{item.get("name") or item.get("code")} ({_coerce_risk_score_scaled(item.get("risk_score_scaled"))})'
+        for item in all_healthy
+    )
+    picked_labels = ", ".join(
+        f'{item.get("name") or item.get("code")} ({_coerce_risk_score_scaled(item.get("risk_score_scaled"))})'
+        for item in selected
+    )
+    steps = [
+        f"Step 1: Found {total} disease(s) marked Healthy in this person's Bio AI report",
+        f"Step 2: Sorted them by risk score (lower score = healthier, shown first): {sorted_labels}",
+        f"Step 3: Picked up to 3 with the lowest scores: {picked_labels}",
+    ]
+    if total > len(selected):
+        steps.append(
+            f"Step 4: {total - len(selected)} other healthy disease(s) were left out "
+            "because we only keep the top 3 per person."
+        )
+
+    by_disease: dict[str, dict[str, Any]] = {}
+    for item in selected:
+        code = str(item.get("code") or "").strip()
+        if not code:
+            continue
+        disease_math = build_risk_score_scaled_read_math(
+            code=code,
+            name=str(item.get("name") or code),
+            risk_score_scaled=item.get("risk_score_scaled"),
+            risk_status=str(item.get("risk_status") or "Healthy"),
+        )
+        by_disease[code] = disease_math
+        steps.append(
+            f"For {disease_math['name']} ({code}): see risk_score_scaled steps below "
+            f"(result = {disease_math['result']})"
+        )
+
+    return {
+        "healthy_found": total,
+        "selected_count": len(selected),
+        "steps": steps,
+        "by_disease": by_disease,
+    }
+
+
+def build_top_n_frequency_math(
+    *,
+    category_label: str,
+    counts: dict[str, int],
+    labels: dict[str, str],
+    people_by_key: dict[str, list[dict[str, Any]]],
+    limit: int = 3,
+) -> dict[str, Any]:
+    """Primary-school steps for camp-level top-N by participant frequency."""
+    ranked_pairs = sorted(
+        counts.items(),
+        key=lambda pair: (-pair[1], labels.get(pair[0], pair[0]).lower()),
+    )
+    selected_pairs = ranked_pairs[:limit]
+    selected_keys = [key for key, _ in selected_pairs]
+
+    ranked: list[dict[str, Any]] = []
+    for key, count in ranked_pairs:
+        people = list(people_by_key.get(key) or [])
+        people.sort(key=lambda p: (str(p.get("name") or "").lower(), int(p.get("user_id") or 0)))
+        ranked.append(
+            {
+                "key": key,
+                "label": labels.get(key, key),
+                "count": int(count),
+                "people": people,
+            }
+        )
+
+    if not ranked_pairs:
+        steps = [
+            f"No one in this camp had any {category_label} to count.",
+            f"So the {category_label} list on Positive Wins is empty.",
+        ]
+    else:
+        count_lines = [
+            f"{labels.get(key, key)}: {count} "
+            f"{'person' if count == 1 else 'people'}"
+            for key, count in ranked_pairs
+        ]
+        steps = [
+            f"Step 1: Count how many people had each {category_label}",
+            "Step 2: " + "; ".join(count_lines),
+            "Step 3: Sort by count (highest first). If counts tie, sort by name alphabetically",
+            f"Step 4: Pick the top {limit}",
+        ]
+        if len(ranked_pairs) > limit:
+            third_count = selected_pairs[-1][1] if selected_pairs else 0
+            tied = [
+                labels.get(key, key)
+                for key, count in ranked_pairs[limit:]
+                if count == third_count
+            ]
+            if tied:
+                steps.append(
+                    f"Note: {', '.join(tied)} also had {third_count} "
+                    f"{'person' if third_count == 1 else 'people'} but were not included "
+                    "because we only show the top 3."
+                )
+        selected_labels = [labels.get(key, key) for key in selected_keys]
+        steps.append(f"Result: {', '.join(selected_labels)}")
+
+    return {
+        "category_label": category_label,
+        "limit": int(limit),
+        "ranked": ranked,
+        "selected_keys": selected_keys,
+        "steps": steps,
+    }
+
+
+def build_positive_wins_details(
+    participant_rows: list[dict[str, Any]],
+    *,
+    scope_label: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build positive_wins section payload + BTS details from per-participant rows."""
+    participant_low_risk: list[list[dict[str, Any]]] = []
+    participant_habits: list[list[dict[str, str | None]]] = []
+    participant_profiles: list[list[str]] = []
+
+    low_risk_people_by_code: dict[str, list[dict[str, Any]]] = {}
+    low_risk_labels: dict[str, str] = {}
+    low_risk_counts: dict[str, int] = {}
+    low_risk_source_by_code: dict[str, dict[str, Any]] = {}
+
+    habit_people_by_label: dict[str, list[dict[str, Any]]] = {}
+    habit_counts: dict[str, int] = {}
+    habit_keys_by_label: dict[str, str | None] = {}
+
+    profile_people_by_name: dict[str, list[dict[str, Any]]] = {}
+    profile_counts: dict[str, int] = {}
+
+    participants_detail: list[dict[str, Any]] = []
+
+    for row in participant_rows:
+        user_id = int(row.get("user_id") or 0)
+        name = str(row.get("name") or "Unknown")
+        person_ref = {"user_id": user_id, "name": name}
+
+        low_risk = list(row.get("low_risk") or [])
+        habits = list(row.get("healthy_habits") or [])
+        profiles = list(row.get("healthy_profiles") or [])
+        notes = dict(row.get("notes") or {})
+        low_risk_math = row.get("low_risk_math")
+
+        participant_low_risk.append(low_risk)
+        participant_habits.append(habits)
+        participant_profiles.append(profiles)
+
+        for item in low_risk:
+            if not isinstance(item, dict):
+                continue
+            code = str(item.get("code") or "").strip()
+            if not code:
+                continue
+            low_risk_counts[code] = low_risk_counts.get(code, 0) + 1
+            if code not in low_risk_labels:
+                low_risk_labels[code] = str(item.get("name") or code)
+            if code not in low_risk_source_by_code:
+                low_risk_source_by_code[code] = {
+                    "user_id": user_id,
+                    "name": name,
+                    "risk_score_scaled": item.get("risk_score_scaled"),
+                }
+            low_risk_people_by_code.setdefault(code, []).append(
+                {
+                    **person_ref,
+                    "risk_score_scaled": item.get("risk_score_scaled"),
+                }
+            )
+
+        for habit in habits:
+            if not isinstance(habit, dict):
+                continue
+            label = str(habit.get("habit_label") or "").strip()
+            if not label:
+                continue
+            habit_counts[label] = habit_counts.get(label, 0) + 1
+            if label not in habit_keys_by_label:
+                habit_keys_by_label[label] = habit.get("habit_key")
+            habit_people_by_label.setdefault(label, []).append(dict(person_ref))
+
+        for profile_name in profiles:
+            label = str(profile_name or "").strip()
+            if not label:
+                continue
+            profile_counts[label] = profile_counts.get(label, 0) + 1
+            profile_people_by_name.setdefault(label, []).append(dict(person_ref))
+
+        participants_detail.append(
+            {
+                "user_id": user_id,
+                "name": name,
+                "low_risk": low_risk,
+                "healthy_habits": habits,
+                "healthy_profiles": profiles,
+                "notes": notes,
+                "low_risk_math": low_risk_math if isinstance(low_risk_math, dict) else None,
+            }
+        )
+
+    participants_detail.sort(key=lambda p: (p["name"].lower(), p["user_id"]))
+
+    aggregated_low_risk = aggregate_top_low_risk(participant_low_risk)
+    aggregated_habits = aggregate_top_healthy_habits(participant_habits)
+    aggregated_profiles = aggregate_top_healthy_profiles(participant_profiles)
+
+    low_risk_math = build_top_n_frequency_math(
+        category_label="healthy disease",
+        counts=low_risk_counts,
+        labels=low_risk_labels,
+        people_by_key=low_risk_people_by_code,
+        limit=3,
+    )
+    habits_math = build_top_n_frequency_math(
+        category_label="healthy habit",
+        counts=habit_counts,
+        labels={label: label for label in habit_counts},
+        people_by_key=habit_people_by_label,
+        limit=3,
+    )
+    profiles_math = build_top_n_frequency_math(
+        category_label="healthy blood profile",
+        counts=profile_counts,
+        labels={name: name for name in profile_counts},
+        people_by_key=profile_people_by_name,
+        limit=3,
+    )
+
+    def _selected_low_risk() -> list[dict[str, Any]]:
+        selected: list[dict[str, Any]] = []
+        for item in aggregated_low_risk:
+            code = str(item.get("code") or "")
+            people = low_risk_people_by_code.get(code, [])
+            source = low_risk_source_by_code.get(code) or {}
+            chart_score = item.get("risk_score_scaled")
+            selected.append(
+                {
+                    "code": code,
+                    "name": item.get("name"),
+                    "risk_status": item.get("risk_status"),
+                    "risk_score_scaled": chart_score,
+                    "count": low_risk_counts.get(code, 0),
+                    "people": people,
+                    "risk_score_scaled_math": build_chart_risk_score_scaled_math(
+                        code=code,
+                        name=str(item.get("name") or low_risk_labels.get(code, code)),
+                        chart_score=chart_score,
+                        people=people,
+                        source_user_id=source.get("user_id"),
+                        source_user_name=source.get("name"),
+                    ),
+                }
+            )
+        return selected
+
+    def _selected_habits() -> list[dict[str, Any]]:
+        selected: list[dict[str, Any]] = []
+        for item in aggregated_habits:
+            label = str(item.get("habit_label") or "")
+            selected.append(
+                {
+                    "habit_label": label,
+                    "habit_key": item.get("habit_key"),
+                    "count": habit_counts.get(label, 0),
+                    "people": habit_people_by_label.get(label, []),
+                }
+            )
+        return selected
+
+    def _selected_profiles() -> list[dict[str, Any]]:
+        selected: list[dict[str, Any]] = []
+        for name in aggregated_profiles:
+            label = str(name)
+            selected.append(
+                {
+                    "profile_name": label,
+                    "count": profile_counts.get(label, 0),
+                    "people": profile_people_by_name.get(label, []),
+                }
+            )
+        return selected
+
+    participant_count = len(participant_rows)
+    notes: list[str] = []
+    if participant_count == 0:
+        notes.append("No enrolled people have a Metsights Basic or Pro health assessment in this scope.")
+    empty_all = sum(
+        1
+        for p in participants_detail
+        if not p["low_risk"] and not p["healthy_habits"] and not p["healthy_profiles"]
+    )
+    if participant_count > 0 and empty_all == participant_count:
+        notes.append(
+            "Everyone in scope was checked, but no one had healthy diseases, habits, "
+            "or blood profiles to show yet."
+        )
+    elif empty_all > 0:
+        notes.append(
+            f"{empty_all} "
+            f"{'person has' if empty_all == 1 else 'people have'} "
+            "nothing on Positive Wins — see participant notes below."
+        )
+
+    section_payload = build_positive_wins(
+        low_risk=aggregated_low_risk,
+        healthy_habits=aggregated_habits,
+        healthy_profiles=aggregated_profiles,
+    )
+
+    details: dict[str, Any] = {
+        "method": {
+            "scope_label": scope_label,
+            "section_kind": "positive_wins",
+            "participant_count": participant_count,
+            "counting_rule": (
+                "For each enrolled person with a latest Metsights Basic or Pro assessment, "
+                "we build three personal lists (up to 3 items each). Then we count how often "
+                "each item appears across people and pick the top 3 for the camp chart."
+            ),
+            "who_is_included": (
+                "Enrolled people whose latest health assessment is Metsights Basic or Pro "
+                "(not FitPrint-only)."
+            ),
+            "who_is_excluded": (
+                "People without a health assessment, FitPrint-only assessments, or missing "
+                "cached data for Bio AI / blood / questionnaire answers."
+            ),
+            "data_sources": {
+                "low_risk": "Cached Bio AI report (no live Metsights call during camp refresh)",
+                "healthy_habits": "Questionnaire answers matched to healthy habit rules",
+                "healthy_profiles": (
+                    "Cached blood results or questionnaire blood fallback "
+                    "(no live lab fetch during camp refresh)"
+                ),
+            },
+        },
+        "low_risk": {
+            "label": "Top healthy diseases",
+            "per_person_rule": (
+                "From the Bio AI report, diseases marked Healthy are sorted by risk score "
+                "(lowest first). We keep up to 3 per person."
+            ),
+            "ranking": low_risk_math["ranked"],
+            "selection_math": low_risk_math,
+            "selected": _selected_low_risk(),
+        },
+        "healthy_habits": {
+            "label": "Top healthy habits",
+            "per_person_rule": (
+                "Questionnaire answers are checked against healthy habit rules. "
+                "Matched habits are ordered by rule display order. We keep up to 3 per person."
+            ),
+            "ranking": habits_math["ranked"],
+            "selection_math": habits_math,
+            "selected": _selected_habits(),
+        },
+        "healthy_profiles": {
+            "label": "Top healthy blood profiles",
+            "per_person_rule": (
+                "Blood test groups with in-range results are ranked by how many parameters "
+                "are in range. We keep up to 3 group names per person."
+            ),
+            "ranking": profiles_math["ranked"],
+            "selection_math": profiles_math,
+            "selected": _selected_profiles(),
+        },
+        "participants": participants_detail,
+        "notes": notes,
+    }
+
+    return section_payload, details
+
+
 def build_positive_wins(
     *,
     low_risk: list[dict[str, Any]],

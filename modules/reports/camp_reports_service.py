@@ -33,11 +33,9 @@ from modules.engagements.models import Engagement
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.service import get_department_slugs
+from modules.users.models import User
 from modules.reports.camp_report_section_builders import (
     SECTION_BUILDERS,
-    aggregate_top_healthy_habits,
-    aggregate_top_healthy_profiles,
-    aggregate_top_low_risk,
     build_blood_and_lab_intelligence,
     build_company_average_scores,
     build_distribution_by_gender_by_metabolic_syndrome,
@@ -48,8 +46,13 @@ from modules.reports.camp_report_section_builders import (
     build_overall_risk_score_details,
     build_participation_by_age_details,
     build_positive_wins,
+    build_positive_wins_details,
     build_questionnaire_gender_distribution_details,
     build_ranking,
+    _coerce_reports_dict_for_positive_wins,
+    _display_person_name,
+    _list_healthy_diseases_from_report,
+    build_per_person_low_risk_math,
     PHYSICAL_ACTIVITY_BUCKET_LABELS,
     PHYSICAL_ACTIVITY_BUCKETS,
     SLEEPING_HOURS_BUCKET_LABELS,
@@ -64,6 +67,7 @@ from modules.reports.camp_report_bts import (
     build_not_implemented_bts,
     build_overall_risk_score_bts,
     build_participation_by_age_bts,
+    build_positive_wins_bts,
     build_questionnaire_gender_distribution_bts,
 )
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
@@ -102,6 +106,13 @@ _DEFAULT_ESTIMATE_COST: tuple[float, float, str] = (3.0, 0.02, "participants")
 # Concurrent workers for positive_wins refresh / KPI Metsights checks (bounded by DB pool).
 _POSITIVE_WINS_CONCURRENCY = 4
 _KPI_BLOOD_METSIGHTS_CONCURRENCY = 4
+
+_POSITIVE_WINS_BLOOD_ERROR_LABELS: dict[str, str] = {
+    "BLOOD_PARAMETERS_NOT_FOUND": "Blood test results were not found in our saved records.",
+    "BLOOD_SAMPLE_NOT_COLLECTED": "Blood sample has not been collected yet.",
+    "INVALID_STATE": "Blood data could not be read from the saved health records.",
+    "EXTERNAL_SERVICE_UNAVAILABLE": "We could not check blood results right now.",
+}
 
 
 class CampReportsService:
@@ -1312,6 +1323,7 @@ class CampReportsService:
         ors_bts_details: dict[str, Any] | None = None
         oxidative_bts_details: dict[str, Any] | None = None
         metabolic_gender_bts_details: dict[str, Any] | None = None
+        positive_wins_bts_details: dict[str, Any] | None = None
         pa_bts_details: dict[str, Any] | None = None
         sleep_bts_details: dict[str, Any] | None = None
         pa_bts_meta: dict[str, Any] | None = None
@@ -1356,6 +1368,13 @@ class CampReportsService:
                     department=department,
                     city=city,
                 )
+            )
+        elif normalized_section == "positive_wins":
+            built_payload, positive_wins_bts_details = await self._compute_positive_wins_with_details(
+                db,
+                camp_no=camp_no,
+                department=department,
+                city=city,
             )
         elif normalized_section == "distribution_by_physical_activity_frequency":
             built_payload, pa_bts_details = await self._build_physical_activity_with_details(
@@ -1491,6 +1510,17 @@ class CampReportsService:
                 expected_data=expected_data,
                 stored_data=expected_data,
                 details=metabolic_details,
+                checked_at=checked_at,
+            )
+        elif normalized_section == "positive_wins":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            pw_details = dict(positive_wins_bts_details or {})
+            if previous_data is not None:
+                pw_details["previous"] = previous_data
+            report_bts[normalized_section] = build_positive_wins_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=pw_details,
                 checked_at=checked_at,
             )
         else:
@@ -1737,13 +1767,46 @@ class CampReportsService:
         db: AsyncSession,
         *,
         ctx: EnrolledAssessmentContext,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, str | None]], list[str]]:
+    ) -> dict[str, Any]:
         """Compute low-risk / habits / profiles for one health assessment context.
 
         Camp report refresh uses cached DB data only — no live Metsights/Healthians
         fan-out per participant (those calls belong on single-user overview/load).
         """
+        notes: dict[str, str | None] = {
+            "low_risk": None,
+            "healthy_habits": None,
+            "healthy_profiles": None,
+        }
+        package = ctx.package
+        engagement = ctx.engagement
         individual_report = ctx.individual_report
+
+        if package is None:
+            notes["low_risk"] = "This assessment has no package linked, so we cannot read a Bio AI report."
+            notes["healthy_habits"] = "This assessment has no package linked, so we cannot read questionnaire answers."
+            notes["healthy_profiles"] = "This assessment has no package linked, so we cannot read blood results."
+            return {
+                "low_risk": [],
+                "healthy_habits": [],
+                "healthy_profiles": [],
+                "notes": notes,
+                "low_risk_math": None,
+            }
+
+        assessment_type = (package.assessment_type_code or "").strip()
+        if assessment_type == "7":
+            notes["low_risk"] = "FitPrint assessments are not used for the healthy disease list."
+            notes["healthy_habits"] = "FitPrint assessments are not used for healthy habits."
+            notes["healthy_profiles"] = "FitPrint assessments are not used for healthy blood profiles."
+            return {
+                "low_risk": [],
+                "healthy_habits": [],
+                "healthy_profiles": [],
+                "notes": notes,
+                "low_risk_math": None,
+            }
+
         # Blood may live on a different IHR row for the same engagement.
         if individual_report is None or individual_report.blood_parameters is None:
             blood_report = await self._reports_service._get_blood_individual_report(
@@ -1758,10 +1821,14 @@ class CampReportsService:
                 elif individual_report.blood_parameters is None:
                     individual_report.blood_parameters = blood_report.blood_parameters
 
+        reports_dict: dict[str, Any] = {}
+        if individual_report is not None and individual_report.reports is not None:
+            reports_dict = _coerce_reports_dict_for_positive_wins(individual_report.reports)
+
         low_risk_items = await self._reports_service.compute_low_risk_for_instance(
             db,
             assessment_instance=ctx.assessment_instance,
-            package=ctx.package,
+            package=package,
             individual_report=individual_report,
             allow_remote_fetch=False,
         )
@@ -1774,12 +1841,30 @@ class CampReportsService:
             }
             for item in low_risk_items
         ]
+
+        all_healthy = _list_healthy_diseases_from_report(reports_dict) if reports_dict else []
+        low_risk_math = (
+            build_per_person_low_risk_math(all_healthy, low_risk) if low_risk or all_healthy else None
+        )
+
+        if not low_risk:
+            if individual_report is None or not reports_dict:
+                notes["low_risk"] = (
+                    "No cached Bio AI report was available during camp refresh "
+                    "(we do not call Metsights live on refresh)."
+                )
+            else:
+                notes["low_risk"] = (
+                    "The Bio AI report has no diseases marked Healthy, or none could be read."
+                )
+
+        profiles_error_code: str | None = None
         try:
             habits, profiles = await self._reports_service.compute_healthy_habits_and_profiles_for_instance(
                 db,
                 assessment_instance=ctx.assessment_instance,
-                package=ctx.package,
-                engagement=ctx.engagement,
+                package=package,
+                engagement=engagement,
                 individual_report=individual_report,
                 user_gender=ctx.user_gender,
                 allow_provider_fetch=False,
@@ -1787,27 +1872,70 @@ class CampReportsService:
         except AppError as exc:
             if exc.error_code not in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
                 raise
+            profiles_error_code = str(exc.error_code)
             habits, profiles = [], []
-        return (
-            low_risk,
-            [{"habit_key": h.habit_key, "habit_label": h.habit_label} for h in habits],
-            profiles,
-        )
+
+        healthy_habits = [{"habit_key": h.habit_key, "habit_label": h.habit_label} for h in habits]
+
+        if not healthy_habits:
+            if self._reports_service._healthy_habits_service is None:
+                notes["healthy_habits"] = "Healthy habit rules are not configured for this environment."
+            else:
+                notes["healthy_habits"] = (
+                    "No questionnaire answers matched a healthy habit rule for this person."
+                )
+
+        if not profiles:
+            if engagement is None or engagement.diagnostic_package_id is None:
+                notes["healthy_profiles"] = (
+                    "This camp session has no blood test package linked, so profile groups cannot be scored."
+                )
+            elif individual_report is None:
+                notes["healthy_profiles"] = (
+                    "No health report row was found to read blood results from."
+                )
+            elif profiles_error_code is not None:
+                notes["healthy_profiles"] = _POSITIVE_WINS_BLOOD_ERROR_LABELS.get(
+                    profiles_error_code,
+                    "Blood results were not available from cache during camp refresh.",
+                )
+            else:
+                notes["healthy_profiles"] = (
+                    "No blood profile groups had in-range results for this person, "
+                    "or blood data could not be scored."
+                )
+
+        return {
+            "low_risk": low_risk,
+            "healthy_habits": healthy_habits,
+            "healthy_profiles": profiles,
+            "notes": notes,
+            "low_risk_math": low_risk_math,
+        }
 
     async def _positive_wins_for_context_isolated(
         self,
         *,
         assessment_instance_id: int,
         user_gender: str | None,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, str | None]], list[str]]:
+    ) -> dict[str, Any]:
         """Run one participant's positive_wins work on a dedicated DB session."""
         async with AsyncSessionLocal() as session:
             ai = await session.get(AssessmentInstance, assessment_instance_id)
             if ai is None:
-                return [], [], []
+                return {
+                    "low_risk": [],
+                    "healthy_habits": [],
+                    "healthy_profiles": [],
+                    "notes": {
+                        "low_risk": "Assessment record was not found.",
+                        "healthy_habits": "Assessment record was not found.",
+                        "healthy_profiles": "Assessment record was not found.",
+                    },
+                    "low_risk_math": None,
+                }
             package = await session.get(AssessmentPackage, ai.package_id) if ai.package_id else None
             engagement = await session.get(Engagement, ai.engagement_id) if ai.engagement_id else None
-            # Multiple IHR rows per assessment are allowed; prefer blood, then latest.
             ihr_result = await session.execute(
                 select(IndividualHealthReport)
                 .where(
@@ -1831,6 +1959,99 @@ class CampReportsService:
             await session.commit()
             return result
 
+    async def _compute_positive_wins_with_details(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None = None,
+    ) -> tuple[dict, dict]:
+        scope_label = self._age_participation_scope_label(department=department, city=city)
+        contexts = await self._repository.list_health_assessment_contexts(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        if not contexts:
+            payload, details = build_positive_wins_details(
+                [],
+                scope_label=scope_label,
+            )
+            return payload, details
+
+        user_ids = [int(ctx.assessment_instance.user_id) for ctx in contexts]
+        users_result = await db.execute(select(User).where(User.user_id.in_(user_ids)))
+        users_by_id = {int(u.user_id): u for u in users_result.scalars().all()}
+
+        participant_rows: list[dict[str, Any]] = []
+
+        if len(contexts) <= _POSITIVE_WINS_CONCURRENCY:
+            for ctx in contexts:
+                uid = int(ctx.assessment_instance.user_id)
+                user = users_by_id.get(uid)
+                name = _display_person_name(
+                    user.first_name if user else None,
+                    user.last_name if user else None,
+                )
+                result = await self._positive_wins_for_context(db, ctx=ctx)
+                participant_rows.append(
+                    {
+                        "user_id": uid,
+                        "name": name,
+                        **result,
+                    }
+                )
+        else:
+            semaphore = asyncio.Semaphore(_POSITIVE_WINS_CONCURRENCY)
+
+            async def run_one(ctx: EnrolledAssessmentContext) -> dict[str, Any]:
+                async with semaphore:
+                    result = await self._positive_wins_for_context_isolated(
+                        assessment_instance_id=int(ctx.assessment_instance.assessment_instance_id),
+                        user_gender=ctx.user_gender,
+                    )
+                    return result
+
+            results = await asyncio.gather(
+                *[run_one(ctx) for ctx in contexts],
+                return_exceptions=True,
+            )
+
+            for ctx, result in zip(contexts, results, strict=True):
+                uid = int(ctx.assessment_instance.user_id)
+                user = users_by_id.get(uid)
+                name = _display_person_name(
+                    user.first_name if user else None,
+                    user.last_name if user else None,
+                )
+                if isinstance(result, BaseException):
+                    if isinstance(result, AppError) and result.error_code in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
+                        participant_rows.append(
+                            {
+                                "user_id": uid,
+                                "name": name,
+                                "low_risk": [],
+                                "healthy_habits": [],
+                                "healthy_profiles": [],
+                                "notes": {
+                                    "low_risk": None,
+                                    "healthy_habits": None,
+                                    "healthy_profiles": _POSITIVE_WINS_BLOOD_ERROR_LABELS.get(
+                                        str(result.error_code),
+                                        "Blood results were not available.",
+                                    ),
+                                },
+                                "low_risk_math": None,
+                            }
+                        )
+                        continue
+                    raise result
+                participant_rows.append({"user_id": uid, "name": name, **result})
+
+        return build_positive_wins_details(participant_rows, scope_label=scope_label)
+
     async def _compute_positive_wins_payload(
         self,
         db: AsyncSession,
@@ -1839,72 +2060,13 @@ class CampReportsService:
         department: str | None,
         city: str | None = None,
     ) -> dict:
-        contexts = await self._repository.list_health_assessment_contexts(
+        payload, _details = await self._compute_positive_wins_with_details(
             db,
             camp_no=camp_no,
             department=department,
             city=city,
         )
-        if not contexts:
-            return build_positive_wins(
-                low_risk=[],
-                healthy_habits=[],
-                healthy_profiles=[],
-            )
-
-        # Small camps: keep work on the request session (avoids pool churn).
-        if len(contexts) <= _POSITIVE_WINS_CONCURRENCY:
-            participant_habits: list[list[dict[str, str | None]]] = []
-            participant_profiles: list[list[str]] = []
-            participant_low_risk: list[list[dict[str, Any]]] = []
-            for ctx in contexts:
-                low_risk, habits, profiles = await self._positive_wins_for_context(db, ctx=ctx)
-                participant_low_risk.append(low_risk)
-                participant_habits.append(habits)
-                participant_profiles.append(profiles)
-            return build_positive_wins(
-                low_risk=aggregate_top_low_risk(participant_low_risk),
-                healthy_habits=aggregate_top_healthy_habits(participant_habits),
-                healthy_profiles=aggregate_top_healthy_profiles(participant_profiles),
-            )
-
-        semaphore = asyncio.Semaphore(_POSITIVE_WINS_CONCURRENCY)
-
-        async def run_one(
-            ctx: EnrolledAssessmentContext,
-        ) -> tuple[list[dict[str, Any]], list[dict[str, str | None]], list[str]]:
-            async with semaphore:
-                return await self._positive_wins_for_context_isolated(
-                    assessment_instance_id=int(ctx.assessment_instance.assessment_instance_id),
-                    user_gender=ctx.user_gender,
-                )
-
-        results = await asyncio.gather(
-            *[run_one(ctx) for ctx in contexts],
-            return_exceptions=True,
-        )
-
-        participant_habits = []
-        participant_profiles = []
-        participant_low_risk = []
-        for result in results:
-            if isinstance(result, BaseException):
-                if isinstance(result, AppError) and result.error_code in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
-                    participant_low_risk.append([])
-                    participant_habits.append([])
-                    participant_profiles.append([])
-                    continue
-                raise result
-            low_risk, habits, profiles = result
-            participant_low_risk.append(low_risk)
-            participant_habits.append(habits)
-            participant_profiles.append(profiles)
-
-        return build_positive_wins(
-            low_risk=aggregate_top_low_risk(participant_low_risk),
-            healthy_habits=aggregate_top_healthy_habits(participant_habits),
-            healthy_profiles=aggregate_top_healthy_profiles(participant_profiles),
-        )
+        return payload
 
     async def _compute_company_average_scores_payload(
         self,

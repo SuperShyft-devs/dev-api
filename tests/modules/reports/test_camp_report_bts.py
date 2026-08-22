@@ -9,6 +9,7 @@ from modules.reports.camp_report_bts import (
     build_not_implemented_bts,
     build_overall_risk_score_bts,
     build_participation_by_age_bts,
+    build_positive_wins_bts,
     build_questionnaire_gender_distribution_bts,
 )
 from modules.reports.camp_report_section_builders import (
@@ -20,6 +21,7 @@ from modules.reports.camp_report_section_builders import (
     build_overall_risk_score,
     build_overall_risk_score_details,
     build_participation_by_age_details,
+    build_positive_wins_details,
     build_questionnaire_gender_distribution_details,
     physical_activity_answer_to_bucket,
 )
@@ -742,3 +744,78 @@ def test_build_distribution_by_gender_by_metabolic_syndrome_bts_mismatch():
     assert bts["status"] == "mismatch"
     assert bts["fields"]["hypertension.male.elevated_percent"]["match"] is False
     assert bts["fields"]["hypertension.male.elevated_percent"]["reason"]
+
+
+def test_build_positive_wins_bts_ok():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "John",
+            "low_risk": [
+                {
+                    "code": "thyroid_health",
+                    "name": "Thyroid Health",
+                    "risk_status": "Healthy",
+                    "risk_score_scaled": 5,
+                }
+            ],
+            "healthy_habits": [{"habit_key": None, "habit_label": "Improved Sleep"}],
+            "healthy_profiles": ["Complete Hemogram"],
+            "notes": {"low_risk": None, "healthy_habits": None, "healthy_profiles": None},
+            "low_risk_math": None,
+        },
+    ]
+    payload, details = build_positive_wins_details(
+        participant_rows,
+        scope_label="Whole camp",
+    )
+    bts = build_positive_wins_bts(
+        expected_data=payload["data"],
+        stored_data=payload["data"],
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["fields"]["low_risk.selection_consistency"]["match"] is True
+
+
+def test_build_positive_wins_bts_mismatch():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "John",
+            "low_risk": [
+                {
+                    "code": "thyroid_health",
+                    "name": "Thyroid Health",
+                    "risk_status": "Healthy",
+                    "risk_score_scaled": 5,
+                }
+            ],
+            "healthy_habits": [],
+            "healthy_profiles": [],
+            "notes": {"low_risk": None, "healthy_habits": "No match", "healthy_profiles": "No blood"},
+            "low_risk_math": None,
+        },
+    ]
+    payload, details = build_positive_wins_details(
+        participant_rows,
+        scope_label="Whole camp",
+    )
+    stored = dict(payload["data"])
+    stored["low_risk"] = [
+        {
+            "code": "wrong",
+            "name": "Wrong",
+            "risk_status": "Healthy",
+            "risk_score_scaled": 99,
+        }
+    ]
+    bts = build_positive_wins_bts(
+        expected_data=payload["data"],
+        stored_data=stored,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["low_risk.0.code"]["match"] is False
