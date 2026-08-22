@@ -6,7 +6,9 @@ from datetime import date
 
 from modules.reports.camp_report_section_builders import (
     build_band_percent_math,
+    build_category_average_math,
     build_company_average_scores,
+    build_company_average_scores_details,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_gender_by_metabolic_syndrome_details,
     build_distribution_by_oxidative_stress,
@@ -680,3 +682,128 @@ def test_build_company_average_scores_rounds():
     assert payload["data"]["nutrition"]["score"] == 11
     assert payload["data"]["fitness"]["score"] == 11
     assert payload["data"]["lifestyle"]["score"] == 11
+
+
+def test_build_category_average_math_basic():
+    math = build_category_average_math(
+        category_key="nutrition",
+        scores_used=[
+            {"user_id": 1, "name": "Alice", "score": 60.0},
+            {"user_id": 2, "name": "Bob", "score": 70.0},
+            {"user_id": 3, "name": "Carol", "score": 65.0},
+        ],
+        has_fitprint_participants=True,
+    )
+    assert math["rounded_score"] == 65
+    assert math["count"] == 3
+    assert math["sum"] == 195.0
+    assert any("195" in step for step in math["steps"])
+    assert any("65" in step for step in math["steps"])
+
+
+def test_build_category_average_math_rounds_half_up():
+    math = build_category_average_math(
+        category_key="fitness",
+        scores_used=[
+            {"user_id": 1, "name": "Alice", "score": 64.0},
+            {"user_id": 2, "name": "Bob", "score": 65.0},
+        ],
+        has_fitprint_participants=True,
+    )
+    assert math["average_exact"] == 64.5
+    assert math["rounded_score"] == round(64.5)
+    assert any("64.5" in step for step in math["steps"])
+
+
+def test_build_category_average_math_no_scores():
+    math = build_category_average_math(
+        category_key="lifestyle",
+        scores_used=[],
+        has_fitprint_participants=True,
+    )
+    assert math["rounded_score"] == 0
+    assert any("Nobody had a Lifestyle score" in step for step in math["steps"])
+
+
+def test_build_company_average_scores_details_basic():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "Alice",
+            "assessment_instance_id": 101,
+            "nutrition": {"score": 64.0, "status": "included", "steps": ["Nutrition 64"]},
+            "fitness": {"score": 55.0, "status": "included", "steps": ["Fitness 55"]},
+            "lifestyle": {"score": 65.0, "status": "included", "steps": ["Lifestyle 65"]},
+        },
+        {
+            "user_id": 2,
+            "name": "Bob",
+            "assessment_instance_id": 102,
+            "nutrition": {"score": 70.0, "status": "included", "steps": ["Nutrition 70"]},
+            "fitness": {"score": 55.0, "status": "included", "steps": ["Fitness 55"]},
+            "lifestyle": {"score": 65.0, "status": "included", "steps": ["Lifestyle 65"]},
+        },
+    ]
+    payload, details = build_company_average_scores_details(
+        participant_rows,
+        scope_label="Whole camp",
+        total_enrolled=3,
+        excluded_no_fitprint=[{"user_id": 3, "name": "Carol", "reason": "No FitPrint"}],
+        excluded_report_load_failed=[],
+    )
+    assert payload["data"]["nutrition"]["score"] == 67
+    assert payload["data"]["fitness"]["score"] == 55
+    assert payload["data"]["lifestyle"]["score"] == 65
+    assert details["method"]["section_kind"] == "company_average_scores"
+    assert details["summary"]["total_enrolled"] == 3
+    assert details["summary"]["with_fitprint"] == 2
+    assert details["summary"]["without_fitprint"] == 1
+    assert len(details["participants"]) == 2
+    assert details["aggregation"]["nutrition"]["rounded_score"] == 67
+
+
+def test_build_company_average_scores_details_partial_none():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "Alice",
+            "assessment_instance_id": 101,
+            "nutrition": {"score": 64.0, "status": "included", "steps": []},
+            "fitness": {"score": None, "status": "missing", "steps": ["No fitness"]},
+            "lifestyle": {"score": 63.0, "status": "included", "steps": []},
+        },
+        {
+            "user_id": 2,
+            "name": "Bob",
+            "assessment_instance_id": 102,
+            "nutrition": {"score": None, "status": "missing", "steps": ["No nutrition"]},
+            "fitness": {"score": 58.0, "status": "included", "steps": []},
+            "lifestyle": {"score": 63.0, "status": "included", "steps": []},
+        },
+    ]
+    payload, details = build_company_average_scores_details(
+        participant_rows,
+        scope_label="Department: sales",
+        total_enrolled=2,
+        excluded_no_fitprint=[],
+        excluded_report_load_failed=[],
+    )
+    assert payload["data"]["nutrition"]["score"] == 64
+    assert payload["data"]["fitness"]["score"] == 58
+    assert payload["data"]["lifestyle"]["score"] == 63
+    assert details["aggregation"]["nutrition"]["count"] == 1
+    assert details["aggregation"]["fitness"]["count"] == 1
+
+
+def test_build_company_average_scores_details_empty():
+    payload, details = build_company_average_scores_details(
+        [],
+        scope_label="Whole camp",
+        total_enrolled=0,
+        excluded_no_fitprint=[],
+        excluded_report_load_failed=[],
+    )
+    assert payload["data"]["nutrition"]["score"] == 0
+    assert payload["data"]["fitness"]["score"] == 0
+    assert payload["data"]["lifestyle"]["score"] == 0
+    assert details["summary"]["with_fitprint"] == 0

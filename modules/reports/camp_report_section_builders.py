@@ -2387,6 +2387,19 @@ def build_positive_wins(
     }
 
 
+_COMPANY_AVERAGE_SCORE_LABELS: dict[str, str] = {
+    "nutrition": "Nutrition",
+    "fitness": "Fitness",
+    "lifestyle": "Lifestyle",
+}
+
+_COMPANY_AVERAGE_SCORE_SOURCE_STEPS: dict[str, str] = {
+    "nutrition": "We collected each person's Nutrition score from their health questionnaire answers.",
+    "fitness": "We collected each person's Fitness score from their FitPrint activity assessment.",
+    "lifestyle": "We collected each person's Lifestyle score from their FitPrint lifestyle assessment.",
+}
+
+
 def build_company_average_scores(scores: list[dict[str, float | None]]) -> dict:
     """Build company_average_scores section payload from per-participant score dicts.
 
@@ -2409,6 +2422,211 @@ def build_company_average_scores(scores: list[dict[str, float | None]]) -> dict:
         data[key] = {"score": avg}
 
     return {"data": data}
+
+
+def build_category_average_math(
+    *,
+    category_key: str,
+    scores_used: list[dict[str, Any]],
+    has_fitprint_participants: bool,
+) -> dict[str, Any]:
+    """Build step-by-step camp-level average math for one score category."""
+    label = _COMPANY_AVERAGE_SCORE_LABELS.get(category_key, category_key.title())
+    source_step = _COMPANY_AVERAGE_SCORE_SOURCE_STEPS.get(
+        category_key,
+        f"We collected each person's {label} score.",
+    )
+    steps: list[str] = [f"Step 1: {source_step}"]
+
+    if not has_fitprint_participants:
+        steps.append(
+            f"Step 2: Nobody in this scope has a FitPrint assessment, "
+            f"so the {label} score on the chart is 0."
+        )
+        return {
+            "label": label,
+            "steps": steps,
+            "scores_used": [],
+            "sum": 0.0,
+            "count": 0,
+            "average_exact": 0.0,
+            "rounded_score": 0,
+        }
+
+    if not scores_used:
+        steps.append(
+            f"Step 2: Nobody had a {label} score we could use, "
+            f"so the {label} score on the chart is 0."
+        )
+        return {
+            "label": label,
+            "steps": steps,
+            "scores_used": [],
+            "sum": 0.0,
+            "count": 0,
+            "average_exact": 0.0,
+            "rounded_score": 0,
+        }
+
+    score_lines = [
+        f"{item['score']:.0f} ({item['name']})"
+        if float(item["score"]) == int(item["score"])
+        else f"{item['score']} ({item['name']})"
+        for item in scores_used
+    ]
+    steps.append(
+        f"Step 2: Scores we have: {', '.join(score_lines)}."
+    )
+
+    total_sum = sum(float(item["score"]) for item in scores_used)
+    count = len(scores_used)
+    score_values = [float(item["score"]) for item in scores_used]
+    sum_parts = " + ".join(
+        f"{v:.0f}" if v == int(v) else str(v)
+        for v in score_values
+    )
+    steps.append(f"Step 3: Add them up: {sum_parts} = {total_sum:g}.")
+
+    steps.append(f"Step 4: Count people with a score: {count}.")
+
+    average_exact = total_sum / count
+    avg_display = f"{average_exact:g}"
+    steps.append(f"Step 5: Divide: {total_sum:g} ÷ {count} = {avg_display}.")
+
+    rounded_score = round(average_exact)
+    if rounded_score == average_exact:
+        steps.append(
+            f"Step 6: Round to nearest whole number: {rounded_score} "
+            f"— this is what appears on the chart."
+        )
+    else:
+        steps.append(
+            f"Step 6: Round to nearest whole number: {avg_display} → {rounded_score} "
+            f"— this is what appears on the chart."
+        )
+
+    return {
+        "label": label,
+        "steps": steps,
+        "scores_used": scores_used,
+        "sum": total_sum,
+        "count": count,
+        "average_exact": average_exact,
+        "rounded_score": rounded_score,
+    }
+
+
+def build_company_average_scores_details(
+    participant_rows: list[dict[str, Any]],
+    *,
+    scope_label: str,
+    total_enrolled: int,
+    excluded_no_fitprint: list[dict[str, Any]],
+    excluded_report_load_failed: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build company_average_scores section payload + BTS details."""
+    participant_rows_sorted = sorted(
+        participant_rows,
+        key=lambda row: (str(row.get("name") or "").lower(), int(row.get("user_id") or 0)),
+    )
+
+    score_rows: list[dict[str, float | None]] = []
+    for row in participant_rows_sorted:
+        score_rows.append(
+            {
+                "nutrition": _score_value(row.get("nutrition")),
+                "fitness": _score_value(row.get("fitness")),
+                "lifestyle": _score_value(row.get("lifestyle")),
+            }
+        )
+
+    payload = build_company_average_scores(score_rows)
+    has_fitprint_participants = len(participant_rows_sorted) > 0
+
+    aggregation: dict[str, Any] = {}
+    for category_key in ("nutrition", "fitness", "lifestyle"):
+        scores_used: list[dict[str, Any]] = []
+        for row in participant_rows_sorted:
+            category = row.get(category_key)
+            if not isinstance(category, dict):
+                continue
+            score = category.get("score")
+            if score is None:
+                continue
+            scores_used.append(
+                {
+                    "user_id": row.get("user_id"),
+                    "name": row.get("name"),
+                    "score": float(score),
+                }
+            )
+        aggregation[category_key] = build_category_average_math(
+            category_key=category_key,
+            scores_used=scores_used,
+            has_fitprint_participants=has_fitprint_participants,
+        )
+
+    with_fitprint = len(participant_rows_sorted)
+    without_fitprint = len(excluded_no_fitprint)
+    skipped_report_errors = len(excluded_report_load_failed)
+
+    notes: list[str] = [
+        "Fitness and Lifestyle come from the FitPrint health report. "
+        "The internal field names differ from the chart labels — this is expected."
+    ]
+    if not has_fitprint_participants and total_enrolled == 0:
+        notes.append("No one is enrolled in this camp scope yet.")
+    elif not has_fitprint_participants and total_enrolled > 0:
+        notes.append(
+            "People are enrolled, but nobody has completed a FitPrint assessment yet, "
+            "so all three scores are 0."
+        )
+
+    details: dict[str, Any] = {
+        "method": {
+            "section_kind": "company_average_scores",
+            "scope_label": scope_label,
+            "who_is_included": (
+                "People enrolled in this camp who completed a FitPrint health assessment. "
+                "We use each person's latest FitPrint result."
+            ),
+            "who_is_excluded": (
+                "People enrolled in this camp but without a FitPrint assessment."
+            ),
+            "counting_rule": (
+                "Nutrition, Fitness, and Lifestyle are averaged separately. "
+                "If someone is missing one score, they are left out of that average only — "
+                "not from the others."
+            ),
+        },
+        "summary": {
+            "total_enrolled": total_enrolled,
+            "with_fitprint": with_fitprint,
+            "without_fitprint": without_fitprint,
+            "skipped_report_errors": skipped_report_errors,
+        },
+        "aggregation": aggregation,
+        "participants": participant_rows_sorted,
+        "excluded": {
+            "no_fitprint": excluded_no_fitprint,
+            "report_load_failed": excluded_report_load_failed,
+        },
+        "notes": notes,
+    }
+
+    return payload, details
+
+
+def _score_value(category: Any) -> float | None:
+    if not isinstance(category, dict):
+        return None
+    score = category.get("score")
+    if score is None:
+        return None
+    try:
+        return float(score)
+    except (TypeError, ValueError):
+        return None
 
 
 def build_blood_and_lab_intelligence(group_stats: dict[str, dict[str, dict[str, int]]]) -> dict:

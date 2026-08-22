@@ -4284,6 +4284,13 @@ async def test_refresh_camp_report_company_average_scores(async_client, fastapi_
     assert row.report["company_average_scores"]["name"] == "Company Average Scores"
     assert row.report["company_average_scores"]["data"]["nutrition"]["score"] == 64
 
+    bts = row.report_bts["company_average_scores"]
+    assert bts["status"] == "ok"
+    assert bts["details"]["method"]["section_kind"] == "company_average_scores"
+    assert len(bts["details"]["participants"]) == 3
+    assert bts["details"]["aggregation"]["nutrition"]["rounded_score"] == 64
+    assert bts["fields"]["nutrition.score"]["match"] is True
+
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
 

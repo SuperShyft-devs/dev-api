@@ -2303,3 +2303,128 @@ def build_positive_wins_bts(
         "details": details_payload,
         "message": message,
     }
+
+
+def _company_average_score_reason(
+    *,
+    label: str,
+    expected: int | None,
+    stored: int | None,
+    aggregation: dict[str, Any] | None,
+) -> str:
+    if stored is None:
+        return (
+            f"The saved report did not show a {label} score. "
+            f"When we recalculated from participant data, we got {expected}."
+        )
+    if expected != stored:
+        agg = aggregation if isinstance(aggregation, dict) else {}
+        count = _int_or_none(agg.get("count")) or 0
+        total_sum = agg.get("sum")
+        if count > 0 and total_sum is not None:
+            return (
+                f"The report shows {label} = {stored}, but when we averaged "
+                f"{count} participant score(s) (total {total_sum:g}) we got {expected}. "
+                f"See the step-by-step breakdown below."
+            )
+        return (
+            f"The report shows {label} = {stored}, but we now calculate {expected}. "
+            f"See the step-by-step breakdown below."
+        )
+    return ""
+
+
+def build_company_average_scores_bts(
+    *,
+    expected_data: dict[str, Any],
+    stored_data: dict[str, Any] | None,
+    details: dict[str, Any],
+    checked_at: str,
+) -> dict[str, Any]:
+    """Compare company_average_scores data to freshly computed expected values."""
+    stored = stored_data if isinstance(stored_data, dict) else {}
+    details_payload = dict(details or {})
+    aggregation = (
+        details_payload.get("aggregation")
+        if isinstance(details_payload.get("aggregation"), dict)
+        else {}
+    )
+
+    if not stored:
+        return {
+            "status": "ok",
+            "checked_at": checked_at,
+            "expected": expected_data,
+            "stored": None,
+            "fields": {},
+            "details": details_payload,
+            "message": (
+                "This is the first check for Company Average Scores. "
+                "We saved the latest averages and listed who contributed to each one."
+            ),
+        }
+
+    fields: dict[str, Any] = {}
+    for category_key, label in (
+        ("nutrition", "Nutrition"),
+        ("fitness", "Fitness"),
+        ("lifestyle", "Lifestyle"),
+    ):
+        expected_block = expected_data.get(category_key)
+        stored_block = stored.get(category_key)
+        expected_score = (
+            _int_or_none(expected_block.get("score"))
+            if isinstance(expected_block, dict)
+            else None
+        )
+        stored_score = (
+            _int_or_none(stored_block.get("score")) if isinstance(stored_block, dict) else None
+        )
+        category_agg = (
+            aggregation.get(category_key)
+            if isinstance(aggregation.get(category_key), dict)
+            else {}
+        )
+        recomputed = _int_or_none(category_agg.get("rounded_score"))
+        if recomputed is not None and expected_score != recomputed:
+            expected_score = recomputed
+
+        reason = _company_average_score_reason(
+            label=label,
+            expected=expected_score,
+            stored=stored_score,
+            aggregation=category_agg,
+        )
+        fields[f"{category_key}.score"] = _field_entry(
+            expected=expected_score,
+            stored=stored_score,
+            reason=reason or None,
+        )
+
+    all_match = all(bool(entry.get("match")) for entry in fields.values())
+    participant_count = len(details_payload.get("participants") or [])
+    if all_match and participant_count == 0:
+        message = (
+            "Company Average Scores match. "
+            "Nobody in this scope has FitPrint data yet, so all three scores are 0."
+        )
+    elif all_match:
+        message = (
+            "Company Average Scores match. "
+            "See the step-by-step breakdown below for how each average was calculated."
+        )
+    else:
+        message = (
+            "Some Company Average Scores do not match. "
+            "See the notes below and the step-by-step breakdown."
+        )
+
+    return {
+        "status": "ok" if all_match else "mismatch",
+        "checked_at": checked_at,
+        "expected": expected_data,
+        "stored": stored_data,
+        "fields": fields,
+        "details": details_payload,
+        "message": message,
+    }

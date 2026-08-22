@@ -37,7 +37,7 @@ from modules.users.models import User
 from modules.reports.camp_report_section_builders import (
     SECTION_BUILDERS,
     build_blood_and_lab_intelligence,
-    build_company_average_scores,
+    build_company_average_scores_details,
     build_distribution_by_gender_by_metabolic_syndrome,
     build_distribution_by_gender_by_metabolic_syndrome_details,
     build_distribution_by_oxidative_stress,
@@ -68,6 +68,7 @@ from modules.reports.camp_report_bts import (
     build_overall_risk_score_bts,
     build_participation_by_age_bts,
     build_positive_wins_bts,
+    build_company_average_scores_bts,
     build_questionnaire_gender_distribution_bts,
 )
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
@@ -1324,6 +1325,7 @@ class CampReportsService:
         oxidative_bts_details: dict[str, Any] | None = None
         metabolic_gender_bts_details: dict[str, Any] | None = None
         positive_wins_bts_details: dict[str, Any] | None = None
+        company_average_scores_bts_details: dict[str, Any] | None = None
         pa_bts_details: dict[str, Any] | None = None
         sleep_bts_details: dict[str, Any] | None = None
         pa_bts_meta: dict[str, Any] | None = None
@@ -1375,6 +1377,15 @@ class CampReportsService:
                 camp_no=camp_no,
                 department=department,
                 city=city,
+            )
+        elif normalized_section == "company_average_scores":
+            built_payload, company_average_scores_bts_details = (
+                await self._compute_company_average_scores_with_details(
+                    db,
+                    camp_no=camp_no,
+                    department=department,
+                    city=city,
+                )
             )
         elif normalized_section == "distribution_by_physical_activity_frequency":
             built_payload, pa_bts_details = await self._build_physical_activity_with_details(
@@ -1521,6 +1532,17 @@ class CampReportsService:
                 expected_data=expected_data,
                 stored_data=expected_data,
                 details=pw_details,
+                checked_at=checked_at,
+            )
+        elif normalized_section == "company_average_scores":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            cas_details = dict(company_average_scores_bts_details or {})
+            if previous_data is not None:
+                cas_details["previous"] = previous_data
+            report_bts[normalized_section] = build_company_average_scores_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=cas_details,
                 checked_at=checked_at,
             )
         else:
@@ -2068,14 +2090,15 @@ class CampReportsService:
         )
         return payload
 
-    async def _compute_company_average_scores_payload(
+    async def _compute_company_average_scores_with_details(
         self,
         db: AsyncSession,
         *,
         camp_no: int,
         department: str | None,
         city: str | None = None,
-    ) -> dict:
+    ) -> tuple[dict, dict]:
+        scope_label = self._age_participation_scope_label(department=department, city=city)
         contexts = await self._repository.list_fitprint_assessment_contexts(
             db,
             camp_no=camp_no,
@@ -2083,9 +2106,24 @@ class CampReportsService:
             city=city,
         )
 
-        participant_scores: list[dict[str, float | None]] = []
+        user_ids = [int(ctx.assessment_instance.user_id) for ctx in contexts]
+        users_by_id: dict[int, User] = {}
+        if user_ids:
+            users_result = await db.execute(select(User).where(User.user_id.in_(user_ids)))
+            users_by_id = {int(u.user_id): u for u in users_result.scalars().all()}
+
+        participant_rows: list[dict[str, Any]] = []
+        excluded_report_load_failed: list[dict[str, Any]] = []
 
         for ctx in contexts:
+            uid = int(ctx.assessment_instance.user_id)
+            user = users_by_id.get(uid)
+            name = _display_person_name(
+                user.first_name if user else None,
+                user.last_name if user else None,
+            )
+            assessment_instance_id = int(ctx.assessment_instance.assessment_instance_id)
+
             try:
                 report_dict = await self._reports_service._resolve_report_dict_for_instance(
                     db,
@@ -2094,16 +2132,61 @@ class CampReportsService:
                     individual_report=ctx.individual_report,
                 )
             except Exception:
+                excluded_report_load_failed.append(
+                    {
+                        "user_id": uid,
+                        "name": name,
+                        "assessment_instance_id": assessment_instance_id,
+                        "reason": (
+                            "Has a FitPrint assessment but we could not open their health report. "
+                            "They were left out of all averages."
+                        ),
+                    }
+                )
                 continue
 
             fitness_spec = report_dict.get("fitness_specification") or {}
             activity_spec = report_dict.get("activity_specification") or {}
 
             raw_lifestyle = fitness_spec.get("score") if isinstance(fitness_spec, dict) else None
-            lifestyle_score = float(raw_lifestyle) if isinstance(raw_lifestyle, (int, float)) else None
+            lifestyle_score = (
+                float(raw_lifestyle) if isinstance(raw_lifestyle, (int, float)) else None
+            )
+            if lifestyle_score is not None:
+                lifestyle_detail = {
+                    "score": lifestyle_score,
+                    "status": "included",
+                    "steps": [
+                        f"From {name}'s FitPrint report, the lifestyle score is {lifestyle_score:g}."
+                    ],
+                }
+            else:
+                lifestyle_detail = {
+                    "score": None,
+                    "status": "missing",
+                    "steps": [
+                        f"{name}'s FitPrint report did not include a lifestyle score."
+                    ],
+                }
 
             raw_fitness = activity_spec.get("score") if isinstance(activity_spec, dict) else None
             fitness_score = float(raw_fitness) if isinstance(raw_fitness, (int, float)) else None
+            if fitness_score is not None:
+                fitness_detail = {
+                    "score": fitness_score,
+                    "status": "included",
+                    "steps": [
+                        f"From {name}'s FitPrint report, the activity (Fitness) score is {fitness_score:g}."
+                    ],
+                }
+            else:
+                fitness_detail = {
+                    "score": None,
+                    "status": "missing",
+                    "steps": [
+                        f"{name}'s FitPrint report did not include an activity (Fitness) score."
+                    ],
+                }
 
             all_instances = await self._assessments_repository.list_instances_for_user_engagement(
                 db,
@@ -2112,16 +2195,29 @@ class CampReportsService:
             )
             source_ids = [inst.assessment_instance_id for inst in all_instances]
 
-            nutrition_score: float | None = None
-            if source_ids:
+            nutrition_detail: dict[str, Any]
+            if not source_ids:
+                nutrition_detail = {
+                    "score": None,
+                    "status": "missing",
+                    "steps": [
+                        f"We could not find questionnaire answers for {name}, "
+                        f"so no Nutrition score was calculated."
+                    ],
+                }
+            else:
                 try:
                     lookup, key_to_qid = await self._reports_service._build_questionnaire_lookup(
                         db,
                         source_assessment_instance_ids=source_ids,
                     )
-                    option_reverse_map = await self._reports_service._build_option_reverse_map(db, key_to_qid)
+                    option_reverse_map = await self._reports_service._build_option_reverse_map(
+                        db, key_to_qid
+                    )
                     nutrition_payload = self._reports_service._build_nutrition_api_payload(
-                        lookup, user_gender=ctx.user_gender, option_reverse_map=option_reverse_map,
+                        lookup,
+                        user_gender=ctx.user_gender,
+                        option_reverse_map=option_reverse_map,
                     )
                     nutrition_response = await self._reports_service._call_nutrition_api(
                         db,
@@ -2130,17 +2226,96 @@ class CampReportsService:
                         engagement_id=ctx.assessment_instance.engagement_id,
                     )
                     raw_nutrition = nutrition_response.get("nutrition_score")
-                    nutrition_score = float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
+                    nutrition_score = (
+                        float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
+                    )
+                    if nutrition_score is not None:
+                        nutrition_detail = {
+                            "score": nutrition_score,
+                            "status": "included",
+                            "steps": [
+                                f"We read {name}'s health questionnaire answers.",
+                                f"The Nutrition scoring service returned {nutrition_score:g}.",
+                            ],
+                        }
+                    else:
+                        nutrition_detail = {
+                            "score": None,
+                            "status": "missing",
+                            "steps": [
+                                f"The Nutrition scoring service did not return a score for {name}."
+                            ],
+                        }
                 except Exception:
-                    nutrition_score = None
+                    nutrition_detail = {
+                        "score": None,
+                        "status": "missing",
+                        "steps": [
+                            f"We could not get a Nutrition score for {name} because their "
+                            f"questionnaire answers were incomplete or the scoring service "
+                            f"was unavailable."
+                        ],
+                    }
 
-            participant_scores.append({
-                "nutrition": nutrition_score,
-                "fitness": fitness_score,
-                "lifestyle": lifestyle_score,
-            })
+            participant_rows.append(
+                {
+                    "user_id": uid,
+                    "name": name,
+                    "assessment_instance_id": assessment_instance_id,
+                    "nutrition": nutrition_detail,
+                    "fitness": fitness_detail,
+                    "lifestyle": lifestyle_detail,
+                }
+            )
 
-        return build_company_average_scores(participant_scores)
+        no_fitprint_rows = await self._repository.list_enrolled_users_without_fitprint(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        excluded_no_fitprint = [
+            {
+                "user_id": uid,
+                "name": _display_person_name(first_name, last_name),
+                "reason": (
+                    "Enrolled in the camp but has not completed a FitPrint assessment."
+                ),
+            }
+            for uid, first_name, last_name in no_fitprint_rows
+        ]
+        excluded_no_fitprint.sort(key=lambda row: (row["name"].lower(), row["user_id"]))
+
+        total_enrolled = await self._repository.count_enrolled_users(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+
+        return build_company_average_scores_details(
+            participant_rows,
+            scope_label=scope_label,
+            total_enrolled=total_enrolled,
+            excluded_no_fitprint=excluded_no_fitprint,
+            excluded_report_load_failed=excluded_report_load_failed,
+        )
+
+    async def _compute_company_average_scores_payload(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None = None,
+    ) -> dict:
+        payload, _details = await self._compute_company_average_scores_with_details(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        return payload
 
     _BLOOD_INTELLIGENCE_GROUP_KEYS = (
         "vitamin_profile",

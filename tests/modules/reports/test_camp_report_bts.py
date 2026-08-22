@@ -3,6 +3,7 @@
 from datetime import date
 
 from modules.reports.camp_report_bts import (
+    build_company_average_scores_bts,
     build_distribution_by_gender_by_metabolic_syndrome_bts,
     build_distribution_by_oxidative_stress_bts,
     build_kpis_bts,
@@ -22,6 +23,7 @@ from modules.reports.camp_report_section_builders import (
     build_overall_risk_score_details,
     build_participation_by_age_details,
     build_positive_wins_details,
+    build_company_average_scores_details,
     build_questionnaire_gender_distribution_details,
     physical_activity_answer_to_bucket,
 )
@@ -819,3 +821,84 @@ def test_build_positive_wins_bts_mismatch():
     )
     assert bts["status"] == "mismatch"
     assert bts["fields"]["low_risk.0.code"]["match"] is False
+
+
+def test_build_company_average_scores_bts_ok():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "Alice",
+            "assessment_instance_id": 101,
+            "nutrition": {"score": 64.0, "status": "included", "steps": []},
+            "fitness": {"score": 55.0, "status": "included", "steps": []},
+            "lifestyle": {"score": 65.0, "status": "included", "steps": []},
+        },
+    ]
+    payload, details = build_company_average_scores_details(
+        participant_rows,
+        scope_label="Whole camp",
+        total_enrolled=1,
+        excluded_no_fitprint=[],
+        excluded_report_load_failed=[],
+    )
+    bts = build_company_average_scores_bts(
+        expected_data=payload["data"],
+        stored_data=payload["data"],
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["fields"]["nutrition.score"]["match"] is True
+    assert bts["fields"]["fitness.score"]["match"] is True
+    assert bts["fields"]["lifestyle.score"]["match"] is True
+    assert "step-by-step" in bts["message"].lower()
+
+
+def test_build_company_average_scores_bts_first_validation():
+    payload, details = build_company_average_scores_details(
+        [],
+        scope_label="Whole camp",
+        total_enrolled=0,
+        excluded_no_fitprint=[],
+        excluded_report_load_failed=[],
+    )
+    bts = build_company_average_scores_bts(
+        expected_data=payload["data"],
+        stored_data=None,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["stored"] is None
+    assert "first check" in bts["message"].lower()
+
+
+def test_build_company_average_scores_bts_mismatch():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "Alice",
+            "assessment_instance_id": 101,
+            "nutrition": {"score": 64.0, "status": "included", "steps": []},
+            "fitness": {"score": 55.0, "status": "included", "steps": []},
+            "lifestyle": {"score": 65.0, "status": "included", "steps": []},
+        },
+    ]
+    payload, details = build_company_average_scores_details(
+        participant_rows,
+        scope_label="Whole camp",
+        total_enrolled=1,
+        excluded_no_fitprint=[],
+        excluded_report_load_failed=[],
+    )
+    stored = dict(payload["data"])
+    stored["nutrition"] = {"score": 99}
+    bts = build_company_average_scores_bts(
+        expected_data=payload["data"],
+        stored_data=stored,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["nutrition.score"]["match"] is False
+    assert bts["fields"]["nutrition.score"]["reason"]
