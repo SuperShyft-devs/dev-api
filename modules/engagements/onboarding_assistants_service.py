@@ -22,23 +22,12 @@ from modules.users.models import User
 from modules.users.schemas import EmployeeCreateUserRequest
 from modules.users.service import UsersService
 
-_DEFAULT_PHLEBO_AGE = 25
-
 
 def _normalize_int(value: int) -> int:
     """Normalize and validate integer input."""
     if not isinstance(value, int) or value <= 0:
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
     return value
-
-
-def _split_display_name(name: str) -> tuple[str | None, str | None]:
-    parts = name.strip().split(None, 1)
-    if not parts:
-        return None, None
-    if len(parts) == 1:
-        return parts[0], None
-    return parts[0], parts[1]
 
 
 def _existing_user_payload(user: User, employee: Employee | None) -> dict:
@@ -288,14 +277,12 @@ class OnboardingAssistantsService:
                     )
             result_status = "assigned"
         else:
-            first_name, last_name = _split_display_name(name)
+            first_name = name.strip() or None
             user = await self._users_service.create_user_by_employee(
                 db,
                 employee=employee,
                 payload=EmployeeCreateUserRequest(
-                    age=_DEFAULT_PHLEBO_AGE,
                     first_name=first_name,
-                    last_name=last_name,
                     phone=phone,
                     status="active",
                 ),

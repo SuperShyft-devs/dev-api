@@ -26,7 +26,7 @@ class User(Base):
     user_id = Column(Integer, primary_key=True)
     first_name = Column(String)
     last_name = Column(String)
-    age = Column(Integer, nullable=False)
+    age = Column(Integer, nullable=True)
     phone = Column(String, nullable=False)
     email = Column(String)
     metsights_profile_id = Column(String, nullable=True)

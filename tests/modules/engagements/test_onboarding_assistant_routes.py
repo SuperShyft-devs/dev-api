@@ -722,8 +722,9 @@ async def test_create_phlebo_creates_user_employee_and_assignment(async_client, 
 
     created_user = await test_db_session.get(User, body["user_id"])
     assert created_user is not None
-    assert created_user.first_name == "New"
-    assert created_user.last_name == "Phlebo"
+    assert created_user.first_name == "New Phlebo"
+    assert created_user.last_name is None
+    assert created_user.age is None
 
     created_employee = await test_db_session.get(Employee, body["employee_id"])
     assert created_employee is not None
