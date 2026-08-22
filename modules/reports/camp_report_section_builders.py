@@ -1103,6 +1103,427 @@ def build_distribution_by_gender_by_metabolic_syndrome(
     return {"data": {"diseases": diseases}}
 
 
+_DISEASE_RISK_BAND_SCORE_RANGES: dict[str, str] = {
+    "healthy": "0 to 25",
+    "increased": "26 to 42",
+    "high": "43 to 58",
+    "very_high": "59 and above",
+}
+
+_DISEASE_RISK_BAND_LABELS: dict[str, str] = {
+    "healthy": "Healthy",
+    "increased": "Increased",
+    "high": "High",
+    "very_high": "Very High",
+}
+
+_CAMP_REPORT_DISEASE_LABELS: dict[str, str] = {
+    "type_2_diabetes": "Type 2 Diabetes",
+    "hypertension": "Hypertension",
+    "obesity": "Obesity",
+    "pcos_pcod": "PCOS/PCOD",
+    "nafld": "NAFLD",
+    "cardiac_health": "Cardiac Health",
+    "thyroid_health": "Thyroid Health",
+    "dyslipidemia": "Dyslipidemia",
+}
+
+_DISEASE_RISK_EXCLUSION_REASON_LABELS: dict[str, str] = {
+    "No Metsights Basic/Pro assessment instance for this camp": (
+        "No Metsights Basic or Pro health assessment for this camp"
+    ),
+    "Bio AI not generated — report row missing or reports JSON is null "
+    "(empty shell excluded from Disease Risk by Gender)": (
+        "Bio AI report was not generated yet"
+    ),
+    "Bio AI not generated — reports JSON is empty "
+    "(excluded from Disease Risk by Gender)": (
+        "Bio AI report was not generated yet (empty report)"
+    ),
+}
+
+
+def _friendly_disease_risk_exclusion_reason(reason: str | None) -> str:
+    if not reason:
+        return "Not included in this chart"
+    return _DISEASE_RISK_EXCLUSION_REASON_LABELS.get(reason, reason)
+
+
+def _extract_disease_risk_entries(reports: dict) -> dict[str, tuple[float, str]]:
+    """Return {dashboard_code: (risk_score_scaled, report_code)} from a Bio AI report."""
+    entries: dict[str, tuple[float, str]] = {}
+    for entry in extract_diseases(reports):
+        if not isinstance(entry, dict):
+            continue
+        code = entry.get("code")
+        if not isinstance(code, str):
+            continue
+        dashboard_code = match_dashboard_disease_code(code)
+        if dashboard_code is None:
+            continue
+        risk_score = entry.get("risk_score_scaled")
+        if not isinstance(risk_score, (int, float)):
+            continue
+        entries[dashboard_code] = (float(risk_score), code)
+    return entries
+
+
+def build_band_percent_math(
+    *,
+    band_label: str,
+    count: int,
+    total: int,
+) -> dict[str, Any]:
+    """Primary-school style steps for one band percent."""
+    result_percent = _percent(count, total)
+
+    if total <= 0:
+        return {
+            "band_label": band_label,
+            "count": int(count),
+            "total": 0,
+            "result_percent": 0.0,
+            "steps": [
+                f"No one has a score for this disease in this group ({band_label}),",
+                "so the share is 0%.",
+            ],
+        }
+
+    ratio = count / total
+    percent_raw = ratio * 100
+    ratio_text = f"{ratio:.10f}".rstrip("0").rstrip(".") or "0"
+    percent_raw_text = f"{percent_raw:.10f}".rstrip("0").rstrip(".") or "0"
+    steps = [
+        f"Step 1: Count people in {band_label} = {count}",
+        f"Step 2: Count everyone with a score for this disease = {total}",
+        f"Step 3: Divide: {count} ÷ {total} = {ratio_text}",
+        f"Step 4: Turn into a percent: {ratio_text} × 100 = {percent_raw_text}",
+        f"Step 5: Round to 1 decimal place: {result_percent}%",
+    ]
+
+    return {
+        "band_label": band_label,
+        "count": int(count),
+        "total": int(total),
+        "result_percent": result_percent,
+        "steps": steps,
+    }
+
+
+def build_elevated_disease_risk_math(
+    *,
+    high_count: int,
+    very_high_count: int,
+    high_percent: float,
+    very_high_percent: float,
+    total: int,
+) -> dict[str, Any]:
+    """Primary-school style steps for elevated_percent (sum of High% + Very High%)."""
+    elevated_from_percents = round(high_percent + very_high_percent, 1)
+    elevated_from_counts = _percent(high_count + very_high_count, total)
+
+    if total <= 0:
+        return {
+            "kind": "disease_risk_by_gender",
+            "high_count": int(high_count),
+            "very_high_count": int(very_high_count),
+            "high_percent": 0.0,
+            "very_high_percent": 0.0,
+            "elevated_count": int(high_count) + int(very_high_count),
+            "total": 0,
+            "result_percent": 0.0,
+            "alternate_from_counts": 0.0,
+            "steps": [
+                "No one has a score for this disease in this gender group yet.",
+                "So we cannot calculate an elevated percentage (there is nothing to divide).",
+                "Elevated risk = 0%.",
+            ],
+        }
+
+    sum_percents_text = f"{high_percent + very_high_percent:.10f}".rstrip("0").rstrip(".") or "0"
+    steps = [
+        f"Step 1: Count people in High = {high_count}",
+        f"Step 2: High share = {high_percent}% (from {high_count} ÷ {total}, rounded to 1 decimal)",
+        f"Step 3: Count people in Very High = {very_high_count}",
+        f"Step 4: Very High share = {very_high_percent}% "
+        f"(from {very_high_count} ÷ {total}, rounded to 1 decimal)",
+        f"Step 5: Add the two shares: {high_percent} + {very_high_percent} = {sum_percents_text}",
+        f"Step 6: Round to 1 decimal place: {elevated_from_percents}%",
+        (
+            f"Note: If you add the counts first ({high_count} + {very_high_count} = "
+            f"{high_count + very_high_count}) and divide by {total}, you would get "
+            f"{elevated_from_counts}%. We use the sum-of-shares method above."
+        ),
+    ]
+
+    return {
+        "kind": "disease_risk_by_gender",
+        "high_count": int(high_count),
+        "very_high_count": int(very_high_count),
+        "high_percent": float(high_percent),
+        "very_high_percent": float(very_high_percent),
+        "elevated_count": int(high_count) + int(very_high_count),
+        "total": int(total),
+        "result_percent": elevated_from_percents,
+        "alternate_from_counts": elevated_from_counts,
+        "steps": steps,
+    }
+
+
+def _build_disease_gender_bts_side(
+    *,
+    gender: str,
+    counts: dict[str, int],
+) -> dict[str, Any]:
+    total = sum(counts[band] for band in DISEASE_RISK_BANDS)
+    groups: dict[str, dict[str, Any]] = {}
+    percent_math: dict[str, Any] = {}
+
+    for band in DISEASE_RISK_BANDS:
+        band_label = _DISEASE_RISK_BAND_LABELS[band]
+        count = int(counts[band])
+        groups[band] = {
+            "count": count,
+            "score_range_label": _DISEASE_RISK_BAND_SCORE_RANGES[band],
+            "people": [],
+        }
+        percent_math[band] = build_band_percent_math(
+            band_label=band_label,
+            count=count,
+            total=total,
+        )
+
+    high_count = int(counts["high"])
+    very_high_count = int(counts["very_high"])
+    high_percent = _percent(high_count, total)
+    very_high_percent = _percent(very_high_count, total)
+    elevated_math = build_elevated_disease_risk_math(
+        high_count=high_count,
+        very_high_count=very_high_count,
+        high_percent=high_percent,
+        very_high_percent=very_high_percent,
+        total=total,
+    )
+
+    return {
+        "groups": groups,
+        "percent_math": percent_math,
+        "elevated_math": elevated_math,
+        "total_responded": total,
+    }
+
+
+def build_distribution_by_gender_by_metabolic_syndrome_details(
+    status_rows: list[tuple[int, str | None, str | None, str | None, dict[str, Any] | None, str | None]],
+    *,
+    total_enrolled: int,
+    bio_ai_reports: int,
+    scope_label: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build section payload + BTS details from disease risk status rows."""
+    rows_for_builder: list[tuple[str | None, dict]] = []
+    excluded_people: list[dict[str, Any]] = []
+    unknown_gender_people: list[dict[str, Any]] = []
+
+    disease_side_data: dict[str, dict[str, dict[str, Any]]] = {
+        code: {
+            "male": _build_disease_gender_bts_side(gender="male", counts={b: 0 for b in DISEASE_RISK_BANDS}),
+            "female": _build_disease_gender_bts_side(gender="female", counts={b: 0 for b in DISEASE_RISK_BANDS}),
+            "not_counted": [],
+            "notes": [],
+        }
+        for code in CAMP_REPORT_DISEASE_CODES
+    }
+
+    with_bio_ai = 0
+
+    for user_id, first_name, last_name, gender_raw, reports, reason in status_rows:
+        name = _display_person_name(first_name, last_name)
+        uid = int(user_id)
+
+        if reason is not None or reports is None:
+            excluded_people.append(
+                {
+                    "user_id": uid,
+                    "name": name,
+                    "reason": _friendly_disease_risk_exclusion_reason(reason),
+                }
+            )
+            continue
+
+        with_bio_ai += 1
+        gender = normalize_camp_gender(gender_raw)
+        disease_entries = _extract_disease_risk_entries(reports)
+
+        if gender is None:
+            unknown_gender_people.append(
+                {
+                    "user_id": uid,
+                    "name": name,
+                    "reason": (
+                        "This person has a Bio AI report, but their gender on file is "
+                        "not recorded as male or female, so they cannot be placed on "
+                        "the men/women chart."
+                    ),
+                }
+            )
+            continue
+
+        rows_for_builder.append((gender_raw, reports))
+        scored_codes = set(disease_entries.keys())
+
+        for dashboard_code in CAMP_REPORT_DISEASE_CODES:
+            if dashboard_code not in scored_codes:
+                disease_side_data[dashboard_code]["not_counted"].append(
+                    {
+                        "user_id": uid,
+                        "name": name,
+                        "gender": gender,
+                        "reason": (
+                            "This person has a Bio AI report, but it does not include a "
+                            f"numeric risk score for {_CAMP_REPORT_DISEASE_LABELS.get(dashboard_code, dashboard_code)}."
+                        ),
+                    }
+                )
+
+        for dashboard_code, (risk_score, report_code) in disease_entries.items():
+            band = risk_score_scaled_to_band(risk_score)
+            side = disease_side_data[dashboard_code][gender]
+            side["groups"][band]["count"] += 1
+            person_row: dict[str, Any] = {
+                "user_id": uid,
+                "name": name,
+                "risk_score": float(risk_score),
+                "band": band,
+            }
+            if report_code != dashboard_code:
+                person_row["report_code"] = report_code
+            side["groups"][band]["people"].append(person_row)
+
+    section_payload = build_distribution_by_gender_by_metabolic_syndrome(rows_for_builder)
+
+    diseases_details: dict[str, Any] = {}
+    for code in CAMP_REPORT_DISEASE_CODES:
+        male_side = disease_side_data[code]["male"]
+        female_side = disease_side_data[code]["female"]
+
+        for gender, side in (("male", male_side), ("female", female_side)):
+            counts = {band: int(side["groups"][band]["count"]) for band in DISEASE_RISK_BANDS}
+            people_by_band = {
+                band: list(side["groups"][band]["people"]) for band in DISEASE_RISK_BANDS
+            }
+            rebuilt = _build_disease_gender_bts_side(gender=gender, counts=counts)
+            for band in DISEASE_RISK_BANDS:
+                rebuilt["groups"][band]["people"] = sorted(
+                    people_by_band[band],
+                    key=lambda p: (p["name"].lower(), p["user_id"]),
+                )
+            side["groups"] = rebuilt["groups"]
+            side["percent_math"] = rebuilt["percent_math"]
+            side["elevated_math"] = rebuilt["elevated_math"]
+            side["total_responded"] = rebuilt["total_responded"]
+
+        male_total = int(male_side["total_responded"])
+        female_total = int(female_side["total_responded"])
+        if male_total + female_total == 0:
+            continue
+
+        not_counted = disease_side_data[code]["not_counted"]
+        not_counted.sort(key=lambda p: (p["name"].lower(), p["user_id"]))
+
+        disease_notes: list[str] = list(disease_side_data[code]["notes"])
+        if code == "pcos_pcod" and male_total == 0 and female_total > 0:
+            disease_notes.append(
+                "PCOS/PCOD scores are usually only present for women. "
+                "Men with zero counts are expected."
+            )
+        if not_counted:
+            disease_notes.append(
+                f"{len(not_counted)} "
+                f"{'person has' if len(not_counted) == 1 else 'people have'} "
+                "a Bio AI report but no score for this disease — see the list below."
+            )
+
+        diseases_details[code] = {
+            "label": _CAMP_REPORT_DISEASE_LABELS.get(code, code.replace("_", " ").title()),
+            "male": {
+                "groups": male_side["groups"],
+                "percent_math": male_side["percent_math"],
+                "elevated_math": male_side["elevated_math"],
+                "total_responded": male_total,
+            },
+            "female": {
+                "groups": female_side["groups"],
+                "percent_math": female_side["percent_math"],
+                "elevated_math": female_side["elevated_math"],
+                "total_responded": female_total,
+            },
+            "not_counted": not_counted,
+            "notes": disease_notes,
+        }
+
+    excluded_people.sort(key=lambda p: (p["name"].lower(), p["user_id"]))
+    unknown_gender_people.sort(key=lambda p: (p["name"].lower(), p["user_id"]))
+
+    notes: list[str] = []
+    if with_bio_ai == 0:
+        notes.append(
+            "Nobody has a usable Bio AI report yet, so every disease group is empty."
+        )
+    if excluded_people:
+        notes.append(
+            f"{len(excluded_people)} enrolled "
+            f"{'person was' if len(excluded_people) == 1 else 'people were'} "
+            "not included in this chart — see the list below for why."
+        )
+    if unknown_gender_people:
+        notes.append(
+            f"{len(unknown_gender_people)} "
+            f"{'person has' if len(unknown_gender_people) == 1 else 'people have'} "
+            "a Bio AI report but gender is not male or female."
+        )
+
+    details: dict[str, Any] = {
+        "method": {
+            "scope_label": scope_label,
+            "counting_rule": (
+                "For each disease, we count enrolled people by gender using the risk band "
+                "from their latest Metsights Basic or Pro Bio AI report. Each person is "
+                "counted separately for every disease that has a numeric risk score."
+            ),
+            "who_is_included": (
+                "Enrolled people with gender recorded as male or female and a numeric "
+                "risk_score_scaled for that disease in their latest Basic/Pro Bio AI report."
+            ),
+            "who_is_excluded": (
+                "People with no Basic/Pro assessment, no Bio AI report yet, an empty Bio AI "
+                "report, unknown gender, or a missing score for a specific disease."
+            ),
+            "band_rules": [
+                {"band": band, "score_range_label": _DISEASE_RISK_BAND_SCORE_RANGES[band]}
+                for band in DISEASE_RISK_BANDS
+            ],
+            "total_enrolled": int(total_enrolled),
+            "bio_ai_reports": int(bio_ai_reports),
+            "with_bio_ai_report": with_bio_ai,
+            "unknown_gender_count": len(unknown_gender_people),
+            "global_excluded_count": len(excluded_people),
+        },
+        "excluded": {
+            "count": len(excluded_people),
+            "people": excluded_people,
+        },
+        "unknown_gender": {
+            "count": len(unknown_gender_people),
+            "people": unknown_gender_people,
+        },
+        "diseases": diseases_details,
+        "notes": notes,
+    }
+
+    return section_payload, details
+
+
 _OXIDATIVE_BAND_SCORE_RANGES: dict[str, str] = {
     "low": "0 to 25",
     "moderate": "26 to 42",

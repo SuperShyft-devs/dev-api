@@ -41,6 +41,7 @@ from modules.reports.camp_report_section_builders import (
     build_blood_and_lab_intelligence,
     build_company_average_scores,
     build_distribution_by_gender_by_metabolic_syndrome,
+    build_distribution_by_gender_by_metabolic_syndrome_details,
     build_distribution_by_oxidative_stress,
     build_distribution_by_oxidative_stress_details,
     build_kpis,
@@ -57,6 +58,7 @@ from modules.reports.camp_report_section_builders import (
     sleeping_hours_answer_to_bucket,
 )
 from modules.reports.camp_report_bts import (
+    build_distribution_by_gender_by_metabolic_syndrome_bts,
     build_distribution_by_oxidative_stress_bts,
     build_kpis_bts,
     build_not_implemented_bts,
@@ -1309,6 +1311,7 @@ class CampReportsService:
         age_bts_details: dict[str, Any] | None = None
         ors_bts_details: dict[str, Any] | None = None
         oxidative_bts_details: dict[str, Any] | None = None
+        metabolic_gender_bts_details: dict[str, Any] | None = None
         pa_bts_details: dict[str, Any] | None = None
         sleep_bts_details: dict[str, Any] | None = None
         pa_bts_meta: dict[str, Any] | None = None
@@ -1339,6 +1342,15 @@ class CampReportsService:
         elif normalized_section == "distribution_by_oxidative_stress":
             built_payload, oxidative_bts_details = (
                 await self._build_distribution_by_oxidative_stress_with_details(
+                    db,
+                    camp_no=camp_no,
+                    department=department,
+                    city=city,
+                )
+            )
+        elif normalized_section == "distribution_by_gender_by_metabolic_syndrome":
+            built_payload, metabolic_gender_bts_details = (
+                await self._build_distribution_by_gender_by_metabolic_syndrome_with_details(
                     db,
                     camp_no=camp_no,
                     department=department,
@@ -1469,6 +1481,17 @@ class CampReportsService:
                 checked_at=checked_at,
                 section_title=str(meta.get("section_title") or "Sleeping hours"),
                 bucket_labels=dict(meta.get("bucket_labels") or SLEEPING_HOURS_BUCKET_LABELS),
+            )
+        elif normalized_section == "distribution_by_gender_by_metabolic_syndrome":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            metabolic_details = dict(metabolic_gender_bts_details or {})
+            if previous_data is not None:
+                metabolic_details["previous"] = previous_data
+            report_bts[normalized_section] = build_distribution_by_gender_by_metabolic_syndrome_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=metabolic_details,
+                checked_at=checked_at,
             )
         else:
             report_bts[normalized_section] = build_not_implemented_bts(checked_at=checked_at)
@@ -2309,6 +2332,42 @@ class CampReportsService:
             city=city,
         )
         return build_distribution_by_oxidative_stress_details(
+            status_rows,
+            total_enrolled=total_enrolled,
+            bio_ai_reports=bio_ai_reports,
+            scope_label=self._age_participation_scope_label(
+                department=department,
+                city=city,
+            ),
+        )
+
+    async def _build_distribution_by_gender_by_metabolic_syndrome_with_details(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None,
+    ) -> tuple[dict, dict]:
+        status_rows = await self._repository.list_disease_risk_status_rows(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        total_enrolled = await self._repository.count_enrolled_users(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        bio_ai_reports = await self._repository.count_bio_ai_reports(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        return build_distribution_by_gender_by_metabolic_syndrome_details(
             status_rows,
             total_enrolled=total_enrolled,
             bio_ai_reports=bio_ai_reports,

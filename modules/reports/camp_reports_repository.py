@@ -1787,6 +1787,145 @@ class CampReportsRepository:
                 rows.append((int(user_id), first_name, last_name, gender, score, None))
         return rows
 
+    async def list_disease_risk_status_rows(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ) -> list[tuple[int, str | None, str | None, str | None, dict[str, Any] | None, str | None]]:
+        """Return (user_id, first_name, last_name, gender, reports, reason) for enrolled users.
+
+        ``reports`` is the latest Basic/Pro Bio AI JSON when present.
+        ``reason`` is None when a usable Bio AI report exists.
+        """
+        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
+
+        ranked_reports = (
+            select(
+                enrolled.c.user_id,
+                IndividualHealthReport.reports,
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=_latest_report_order(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(AssessmentInstance, AssessmentInstance.user_id == enrolled.c.user_id)
+            .join(
+                Engagement,
+                and_(
+                    Engagement.engagement_id == AssessmentInstance.engagement_id,
+                    Engagement.camp_no == camp_no,
+                ),
+            )
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .join(
+                IndividualHealthReport,
+                IndividualHealthReport.assessment_instance_id
+                == AssessmentInstance.assessment_instance_id,
+            )
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        ).subquery()
+
+        latest_report = (
+            select(ranked_reports.c.user_id, ranked_reports.c.reports)
+            .where(ranked_reports.c.rn == 1)
+            .subquery()
+        )
+
+        ranked_instances = (
+            select(
+                enrolled.c.user_id,
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=AssessmentInstance.assessment_instance_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(AssessmentInstance, AssessmentInstance.user_id == enrolled.c.user_id)
+            .join(
+                Engagement,
+                and_(
+                    Engagement.engagement_id == AssessmentInstance.engagement_id,
+                    Engagement.camp_no == camp_no,
+                ),
+            )
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        ).subquery()
+
+        bio_ai_users = (
+            select(ranked_instances.c.user_id).where(ranked_instances.c.rn == 1).subquery()
+        )
+
+        query = (
+            select(
+                enrolled.c.user_id,
+                User.first_name,
+                User.last_name,
+                enrolled.c.gender,
+                latest_report.c.reports,
+                bio_ai_users.c.user_id.label("bio_ai_user_id"),
+            )
+            .select_from(enrolled)
+            .join(User, User.user_id == enrolled.c.user_id)
+            .outerjoin(latest_report, latest_report.c.user_id == enrolled.c.user_id)
+            .outerjoin(bio_ai_users, bio_ai_users.c.user_id == enrolled.c.user_id)
+        )
+
+        result = await db.execute(query)
+        rows: list[
+            tuple[int, str | None, str | None, str | None, dict[str, Any] | None, str | None]
+        ] = []
+        for user_id, first_name, last_name, gender, reports, bio_ai_user_id in result.all():
+            if bio_ai_user_id is None:
+                rows.append(
+                    (
+                        int(user_id),
+                        first_name,
+                        last_name,
+                        gender,
+                        None,
+                        "No Metsights Basic/Pro assessment instance for this camp",
+                    )
+                )
+                continue
+            if reports is None:
+                rows.append(
+                    (
+                        int(user_id),
+                        first_name,
+                        last_name,
+                        gender,
+                        None,
+                        "Bio AI not generated — report row missing or reports JSON is null "
+                        "(empty shell excluded from Disease Risk by Gender)",
+                    )
+                )
+                continue
+            reports_dict = _coerce_reports_dict(reports)
+            if not reports_dict:
+                rows.append(
+                    (
+                        int(user_id),
+                        first_name,
+                        last_name,
+                        gender,
+                        None,
+                        "Bio AI not generated — reports JSON is empty "
+                        "(excluded from Disease Risk by Gender)",
+                    )
+                )
+            else:
+                rows.append((int(user_id), first_name, last_name, gender, reports_dict, None))
+        return rows
+
     async def list_oxidative_stress_scores(
         self,
         db: AsyncSession,

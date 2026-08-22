@@ -5,13 +5,16 @@ from __future__ import annotations
 from datetime import date
 
 from modules.reports.camp_report_section_builders import (
+    build_band_percent_math,
     build_company_average_scores,
     build_distribution_by_gender_by_metabolic_syndrome,
+    build_distribution_by_gender_by_metabolic_syndrome_details,
     build_distribution_by_oxidative_stress,
     build_distribution_by_oxidative_stress_details,
     build_distribution_by_physical_activity_frequency,
     build_distribution_by_sleeping_hours,
     build_questionnaire_gender_distribution_details,
+    build_elevated_disease_risk_math,
     build_elevated_metabolic_math,
     build_elevated_oxidative_math,
     build_kpis,
@@ -521,6 +524,101 @@ def test_build_distribution_by_gender_by_metabolic_syndrome():
 def test_build_distribution_by_gender_by_metabolic_syndrome_empty():
     payload = build_distribution_by_gender_by_metabolic_syndrome([])
     assert payload["data"]["diseases"] == []
+
+
+def test_build_band_percent_math():
+    math = build_band_percent_math(band_label="High", count=5, total=36)
+    assert math["result_percent"] == 13.9
+    assert any("5 ÷ 36" in step for step in math["steps"])
+
+
+def test_build_elevated_disease_risk_math_sum_of_percents():
+    math = build_elevated_disease_risk_math(
+        high_count=5,
+        very_high_count=7,
+        high_percent=13.9,
+        very_high_percent=19.4,
+        total=36,
+    )
+    assert math["result_percent"] == 33.3
+    assert math["alternate_from_counts"] == 33.3
+    assert math["kind"] == "disease_risk_by_gender"
+
+    edge = build_elevated_disease_risk_math(
+        high_count=8,
+        very_high_count=7,
+        high_percent=22.2,
+        very_high_percent=19.4,
+        total=36,
+    )
+    assert edge["result_percent"] == 41.6
+    assert edge["alternate_from_counts"] == 41.7
+
+
+def test_build_distribution_by_gender_by_metabolic_syndrome_details():
+    status_rows = [
+        (
+            1,
+            "John",
+            "Doe",
+            "male",
+            {
+                "diseases": [
+                    {"code": "hypertension", "risk_score_scaled": 20},
+                    {"code": "diabetes", "risk_score_scaled": 10},
+                ],
+            },
+            None,
+        ),
+        (
+            2,
+            "Jane",
+            "Smith",
+            "female",
+            {"diseases": [{"code": "hypertension", "risk_score_scaled": 50}]},
+            None,
+        ),
+        (
+            3,
+            "Other",
+            "Person",
+            "other",
+            {"diseases": [{"code": "hypertension", "risk_score_scaled": 60}]},
+            None,
+        ),
+        (
+            4,
+            "No",
+            "Report",
+            "male",
+            None,
+            "No Metsights Basic/Pro assessment instance for this camp",
+        ),
+    ]
+    payload, details = build_distribution_by_gender_by_metabolic_syndrome_details(
+        status_rows,
+        total_enrolled=4,
+        bio_ai_reports=3,
+        scope_label="Whole camp",
+    )
+    diseases = payload["data"]["diseases"]
+    codes = [d["code"] for d in diseases]
+    assert codes == ["type_2_diabetes", "hypertension"]
+
+    hypertension = details["diseases"]["hypertension"]
+    assert hypertension["male"]["groups"]["healthy"]["count"] == 1
+    assert hypertension["male"]["groups"]["healthy"]["people"][0]["name"] == "John Doe"
+    assert hypertension["female"]["groups"]["increased"]["count"] == 1
+    assert hypertension["female"]["elevated_math"]["result_percent"] == 0.0
+
+    diabetes = details["diseases"]["type_2_diabetes"]
+    assert diabetes["male"]["groups"]["healthy"]["count"] == 1
+    assert diabetes["male"]["groups"]["healthy"]["people"][0]["report_code"] == "diabetes"
+    assert len(diabetes["not_counted"]) == 1
+
+    assert details["excluded"]["count"] == 1
+    assert details["unknown_gender"]["count"] == 1
+    assert details["method"]["with_bio_ai_report"] == 3
 
 
 def test_build_company_average_scores_basic():

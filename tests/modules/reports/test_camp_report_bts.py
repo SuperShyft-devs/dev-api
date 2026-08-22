@@ -3,6 +3,7 @@
 from datetime import date
 
 from modules.reports.camp_report_bts import (
+    build_distribution_by_gender_by_metabolic_syndrome_bts,
     build_distribution_by_oxidative_stress_bts,
     build_kpis_bts,
     build_not_implemented_bts,
@@ -13,6 +14,7 @@ from modules.reports.camp_report_bts import (
 from modules.reports.camp_report_section_builders import (
     PHYSICAL_ACTIVITY_BUCKET_LABELS,
     PHYSICAL_ACTIVITY_BUCKETS,
+    build_distribution_by_gender_by_metabolic_syndrome_details,
     build_distribution_by_oxidative_stress,
     build_distribution_by_oxidative_stress_details,
     build_overall_risk_score,
@@ -690,3 +692,53 @@ def test_build_questionnaire_gender_distribution_bts_unknown_answer():
     assert bts["status"] == "mismatch"
     assert bts["fields"]["unknown_answers"]["match"] is False
     assert bts["fields"]["unknown_answers"]["stored"] == 1
+
+
+def test_build_distribution_by_gender_by_metabolic_syndrome_bts_ok():
+    status_rows = [
+        (1, "John", "Doe", "male", {"diseases": [{"code": "hypertension", "risk_score_scaled": 50}]}, None),
+        (2, "Jane", "Smith", "female", {"diseases": [{"code": "hypertension", "risk_score_scaled": 20}]}, None),
+    ]
+    payload, details = build_distribution_by_gender_by_metabolic_syndrome_details(
+        status_rows,
+        total_enrolled=2,
+        bio_ai_reports=2,
+        scope_label="Whole camp",
+    )
+    bts = build_distribution_by_gender_by_metabolic_syndrome_bts(
+        expected_data=payload["data"],
+        stored_data=payload["data"],
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert "diseases" in bts["details"]
+    assert bts["fields"]["hypertension.male.elevated_consistency"]["match"] is True
+
+
+def test_build_distribution_by_gender_by_metabolic_syndrome_bts_mismatch():
+    status_rows = [
+        (1, "John", "Doe", "male", {"diseases": [{"code": "hypertension", "risk_score_scaled": 50}]}, None),
+    ]
+    payload, details = build_distribution_by_gender_by_metabolic_syndrome_details(
+        status_rows,
+        total_enrolled=1,
+        bio_ai_reports=1,
+        scope_label="Whole camp",
+    )
+    stored = dict(payload["data"])
+    diseases = list(stored["diseases"])
+    diseases[0] = dict(diseases[0])
+    diseases[0]["male"] = dict(diseases[0]["male"])
+    diseases[0]["male"]["elevated_percent"] = 99.9
+    stored["diseases"] = diseases
+
+    bts = build_distribution_by_gender_by_metabolic_syndrome_bts(
+        expected_data=payload["data"],
+        stored_data=stored,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["hypertension.male.elevated_percent"]["match"] is False
+    assert bts["fields"]["hypertension.male.elevated_percent"]["reason"]

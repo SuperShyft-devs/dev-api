@@ -6,8 +6,11 @@ from typing import Any
 
 from modules.reports.camp_report_section_builders import (
     AGE_GROUPS,
+    DISEASE_RISK_BANDS,
     METABOLIC_SCORE_BANDS,
     OXIDATIVE_STRESS_BANDS,
+    _CAMP_REPORT_DISEASE_LABELS,
+    _DISEASE_RISK_BAND_LABELS,
     _percent,
 )
 
@@ -1539,6 +1542,438 @@ def build_questionnaire_gender_distribution_bts(
 
     return {
         "status": status,
+        "checked_at": checked_at,
+        "expected": expected_data,
+        "stored": stored_data,
+        "fields": fields,
+        "details": details_payload,
+        "message": message,
+    }
+
+
+def _disease_label(code: str) -> str:
+    return _CAMP_REPORT_DISEASE_LABELS.get(code, code.replace("_", " ").title())
+
+
+def _disease_risk_band_label(band: str) -> str:
+    return _DISEASE_RISK_BAND_LABELS.get(band, band.replace("_", " ").title())
+
+
+def _disease_risk_gender_label(gender: str) -> str:
+    return "Men" if gender == "male" else "Women"
+
+
+def _disease_risk_count_reason(
+    *,
+    disease_code: str,
+    gender: str,
+    band: str,
+    expected: int,
+    stored: int | None,
+) -> str:
+    disease = _disease_label(disease_code)
+    group = _disease_risk_band_label(band)
+    who = _disease_risk_gender_label(gender)
+    if stored is None:
+        return (
+            f"The saved report did not show how many {who.lower()} are in {group} for {disease}. "
+            f"We now count {expected}."
+        )
+    return (
+        f"The report says {stored} {who.lower()} in {group} for {disease}, "
+        f"but we now count {expected}. "
+        f"Someone may have a new Bio AI report, an updated disease risk score, "
+        f"or may have been added or removed since the report was last saved."
+    )
+
+
+def _disease_risk_percent_reason(
+    *,
+    disease_code: str,
+    gender: str,
+    band: str,
+    expected: float,
+    stored: float | None,
+) -> str:
+    disease = _disease_label(disease_code)
+    group = _disease_risk_band_label(band)
+    who = _disease_risk_gender_label(gender)
+    if stored is None:
+        return (
+            f"The saved report did not show the share for {group} ({who}, {disease}). "
+            f"Based on the latest counts it should be {expected}%."
+        )
+    return (
+        f"The share for {group} ({who}, {disease}) should be {expected}% "
+        f"based on the latest counts, but the report shows {stored}%. "
+        f"Percents are calculated from the group counts and the total with a score "
+        f"for this disease."
+    )
+
+
+def _disease_risk_total_reason(
+    *,
+    disease_code: str,
+    gender: str,
+    expected: int,
+    stored: int | None,
+) -> str:
+    disease = _disease_label(disease_code)
+    who = _disease_risk_gender_label(gender)
+    if stored is None:
+        return (
+            f"The saved report did not show how many {who.lower()} have a score for {disease}. "
+            f"We now count {expected}."
+        )
+    return (
+        f"The report says {stored} {who.lower()} with a score for {disease}, "
+        f"but we now count {expected}. "
+        f"Only people with a numeric risk score for this disease are included."
+    )
+
+
+def _disease_risk_elevated_reason(
+    *,
+    disease_code: str,
+    gender: str,
+    expected: float,
+    stored: float | None,
+) -> str:
+    disease = _disease_label(disease_code)
+    who = _disease_risk_gender_label(gender)
+    if stored is None:
+        return (
+            f"The saved report did not show the elevated risk percent for {who} ({disease}). "
+            f"Based on High + Very High shares it should be {expected}%."
+        )
+    return (
+        f"The elevated risk percent for {who} ({disease}) should be {expected}%, "
+        f"but the report shows {stored}%. "
+        f"This percent is the High share plus the Very High share "
+        f"(each rounded to 1 decimal place), then rounded again."
+    )
+
+
+def _disease_risk_counts_sum_reason(
+    *,
+    disease_code: str,
+    gender: str,
+    stored_sum: int,
+    expected_total: int,
+) -> str:
+    disease = _disease_label(disease_code)
+    who = _disease_risk_gender_label(gender)
+    return (
+        f"The group counts for {who} ({disease}) add up to {stored_sum}, "
+        f"but the number of people with a score is {expected_total}. "
+        f"These should match. The report data looks incomplete or out of date — "
+        f"refresh this section."
+    )
+
+
+def _disease_risk_elevated_consistency_reason(
+    *,
+    disease_code: str,
+    gender: str,
+    high_percent: float,
+    very_high_percent: float,
+    expected_elevated: float,
+    stored_elevated: float | None,
+    alternate_from_counts: float,
+) -> str:
+    disease = _disease_label(disease_code)
+    who = _disease_risk_gender_label(gender)
+    stored_text = "missing" if stored_elevated is None else str(stored_elevated)
+    sum_text = f"{high_percent} + {very_high_percent}"
+    return (
+        f"Elevated risk for {who} ({disease}) should be {expected_elevated}% "
+        f"({sum_text} = {high_percent + very_high_percent}, rounded to 1 decimal). "
+        f"The report shows {stored_text}% instead. "
+        f"If you expected {alternate_from_counts}% from adding High and Very High counts "
+        f"first and dividing, note that we use the sum-of-shares method instead."
+    )
+
+
+def build_distribution_by_gender_by_metabolic_syndrome_bts(
+    *,
+    expected_data: dict[str, Any],
+    stored_data: dict[str, Any] | None,
+    details: dict[str, Any],
+    checked_at: str,
+) -> dict[str, Any]:
+    """Compare disease risk by gender data to freshly computed expected values."""
+    stored_root = stored_data if isinstance(stored_data, dict) else {}
+    details_payload = dict(details or {})
+    method = details_payload.get("method") if isinstance(details_payload.get("method"), dict) else {}
+    unknown_gender = details_payload.get("unknown_gender")
+    unknown_gender_count = (
+        int(unknown_gender.get("count") or 0)
+        if isinstance(unknown_gender, dict)
+        else 0
+    )
+    excluded = details_payload.get("excluded")
+    global_excluded_count = (
+        int(excluded.get("count") or 0)
+        if isinstance(excluded, dict)
+        else int(method.get("global_excluded_count") or 0)
+    )
+
+    expected_diseases = expected_data.get("diseases") if isinstance(expected_data.get("diseases"), list) else []
+    stored_diseases = (
+        stored_root.get("diseases") if isinstance(stored_root.get("diseases"), list) else []
+    )
+    stored_by_code = {
+        str(d.get("code")): d for d in stored_diseases if isinstance(d, dict) and d.get("code")
+    }
+
+    if not stored_root:
+        if not expected_diseases:
+            message = (
+                "This is the first check for Disease Risk by Gender. "
+                "No one has disease risk scores yet."
+            )
+        else:
+            message = (
+                "This is the first check for Disease Risk by Gender. "
+                "We saved the latest numbers and listed who is in each group."
+            )
+        return {
+            "status": "ok",
+            "checked_at": checked_at,
+            "expected": expected_data,
+            "stored": None,
+            "fields": {},
+            "details": details_payload,
+            "message": message,
+        }
+
+    fields: dict[str, Any] = {}
+
+    for expected_disease in expected_diseases:
+        if not isinstance(expected_disease, dict):
+            continue
+        code = str(expected_disease.get("code") or "")
+        if not code:
+            continue
+        stored_disease = stored_by_code.get(code) if isinstance(stored_by_code.get(code), dict) else {}
+
+        for gender in ("male", "female"):
+            expected_side = (
+                expected_disease.get(gender) if isinstance(expected_disease.get(gender), dict) else {}
+            )
+            stored_side = stored_disease.get(gender) if isinstance(stored_disease.get(gender), dict) else {}
+
+            expected_groups = list(expected_side.get("group") or list(DISEASE_RISK_BANDS))
+            stored_groups = stored_side.get("group") if "group" in stored_side else None
+            fields[f"{code}.{gender}.group"] = _field_entry(
+                expected=expected_groups,
+                stored=stored_groups,
+                reason=(
+                    f"The groups for {_disease_label(code)} ({_disease_risk_gender_label(gender)}) "
+                    f"do not match the expected list."
+                )
+                if expected_groups != stored_groups
+                else None,
+            )
+
+            expected_counts = (
+                expected_side.get("count") if isinstance(expected_side.get("count"), list) else []
+            )
+            stored_counts = (
+                stored_side.get("count") if isinstance(stored_side.get("count"), list) else None
+            )
+            expected_percents = (
+                expected_side.get("percent") if isinstance(expected_side.get("percent"), list) else []
+            )
+            stored_percents = (
+                stored_side.get("percent") if isinstance(stored_side.get("percent"), list) else None
+            )
+
+            for index, band in enumerate(expected_groups):
+                expected_c = _int_or_none(expected_counts[index]) if index < len(expected_counts) else 0
+                stored_c = (
+                    _int_or_none(stored_counts[index])
+                    if stored_counts is not None and index < len(stored_counts)
+                    else None
+                )
+                fields[f"{code}.count.{gender}.{band}"] = _field_entry(
+                    expected=expected_c if expected_c is not None else 0,
+                    stored=stored_c,
+                    reason=_disease_risk_count_reason(
+                        disease_code=code,
+                        gender=gender,
+                        band=band,
+                        expected=expected_c or 0,
+                        stored=stored_c,
+                    ),
+                )
+
+                expected_pct = (
+                    _float_or_none(expected_percents[index])
+                    if index < len(expected_percents)
+                    else 0.0
+                )
+                stored_pct = (
+                    _float_or_none(stored_percents[index])
+                    if stored_percents is not None and index < len(stored_percents)
+                    else None
+                )
+                fields[f"{code}.percent.{gender}.{band}"] = _field_entry(
+                    expected=expected_pct if expected_pct is not None else 0.0,
+                    stored=stored_pct,
+                    reason=_disease_risk_percent_reason(
+                        disease_code=code,
+                        gender=gender,
+                        band=band,
+                        expected=expected_pct or 0.0,
+                        stored=stored_pct,
+                    ),
+                )
+
+            expected_total = _int_or_none(expected_side.get("total_responded"))
+            stored_total = (
+                _int_or_none(stored_side.get("total_responded"))
+                if "total_responded" in stored_side
+                else None
+            )
+            fields[f"{code}.{gender}.total_responded"] = _field_entry(
+                expected=expected_total if expected_total is not None else 0,
+                stored=stored_total,
+                reason=_disease_risk_total_reason(
+                    disease_code=code,
+                    gender=gender,
+                    expected=expected_total or 0,
+                    stored=stored_total,
+                ),
+            )
+
+            count_source = (
+                stored_counts if isinstance(stored_counts, list) and stored_counts else expected_counts
+            )
+            stored_sum = (
+                sum(_int_or_none(v) or 0 for v in count_source)
+                if isinstance(count_source, list)
+                else 0
+            )
+            sum_matches = stored_sum == (expected_total or 0)
+            fields[f"{code}.{gender}.counts_sum"] = {
+                "match": sum_matches,
+                "expected": expected_total or 0,
+                "stored": stored_sum,
+                "reason": None
+                if sum_matches
+                else _disease_risk_counts_sum_reason(
+                    disease_code=code,
+                    gender=gender,
+                    stored_sum=stored_sum,
+                    expected_total=expected_total or 0,
+                ),
+            }
+
+            band_index = {band: i for i, band in enumerate(expected_groups)}
+            high_i = band_index.get("high")
+            very_high_i = band_index.get("very_high")
+            high_count = (
+                _int_or_none(expected_counts[high_i]) or 0
+                if high_i is not None and high_i < len(expected_counts)
+                else 0
+            )
+            very_high_count = (
+                _int_or_none(expected_counts[very_high_i]) or 0
+                if very_high_i is not None and very_high_i < len(expected_counts)
+                else 0
+            )
+            high_pct = (
+                _float_or_none(expected_percents[high_i]) or 0.0
+                if high_i is not None and high_i < len(expected_percents)
+                else 0.0
+            )
+            very_high_pct = (
+                _float_or_none(expected_percents[very_high_i]) or 0.0
+                if very_high_i is not None and very_high_i < len(expected_percents)
+                else 0.0
+            )
+            recomputed_elevated = round(high_pct + very_high_pct, 1)
+            alternate_from_counts = _percent(high_count + very_high_count, expected_total or 0)
+
+            stored_elevated = (
+                _float_or_none(stored_side.get("elevated_percent"))
+                if "elevated_percent" in stored_side
+                else None
+            )
+            expected_elevated = _float_or_none(expected_side.get("elevated_percent"))
+            elevated_value = stored_elevated if stored_elevated is not None else expected_elevated
+            elevated_ok = elevated_value == recomputed_elevated
+
+            fields[f"{code}.{gender}.elevated_percent"] = _field_entry(
+                expected=expected_elevated if expected_elevated is not None else 0.0,
+                stored=stored_elevated,
+                reason=_disease_risk_elevated_reason(
+                    disease_code=code,
+                    gender=gender,
+                    expected=expected_elevated or 0.0,
+                    stored=stored_elevated,
+                ),
+            )
+            fields[f"{code}.{gender}.elevated_consistency"] = {
+                "match": elevated_ok,
+                "expected": recomputed_elevated,
+                "stored": elevated_value,
+                "reason": None
+                if elevated_ok
+                else _disease_risk_elevated_consistency_reason(
+                    disease_code=code,
+                    gender=gender,
+                    high_percent=high_pct,
+                    very_high_percent=very_high_pct,
+                    expected_elevated=recomputed_elevated,
+                    stored_elevated=elevated_value,
+                    alternate_from_counts=alternate_from_counts,
+                ),
+            }
+
+    unknown_gender_match = unknown_gender_count == 0
+    fields["unknown_gender_count"] = {
+        "match": unknown_gender_match,
+        "expected": 0,
+        "stored": unknown_gender_count,
+        "reason": None
+        if unknown_gender_match
+        else (
+            f"{unknown_gender_count} "
+            f"{'person has' if unknown_gender_count == 1 else 'people have'} "
+            "a Bio AI report but gender is not recorded as male or female. "
+            "They are listed under Unknown gender below."
+        ),
+    }
+
+    global_excluded_match = global_excluded_count == 0
+    fields["global_excluded_count"] = {
+        "match": global_excluded_match,
+        "expected": 0,
+        "stored": global_excluded_count,
+        "reason": None
+        if global_excluded_match
+        else (
+            f"{global_excluded_count} enrolled "
+            f"{'person was' if global_excluded_count == 1 else 'people were'} "
+            "not included in this chart — see Not included below."
+        ),
+    }
+
+    all_match = all(bool(entry.get("match")) for entry in fields.values())
+    if all_match and not expected_diseases:
+        message = "No one has disease risk scores yet."
+    elif all_match:
+        message = "All Disease Risk by Gender numbers match."
+    else:
+        message = (
+            "Some Disease Risk by Gender numbers do not match. "
+            "See the notes below for each one."
+        )
+
+    return {
+        "status": "ok" if all_match else "mismatch",
         "checked_at": checked_at,
         "expected": expected_data,
         "stored": stored_data,

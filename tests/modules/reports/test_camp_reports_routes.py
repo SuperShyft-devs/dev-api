@@ -3465,6 +3465,12 @@ async def test_refresh_camp_report_distribution_by_gender_by_metabolic_syndrome(
     ).scalar_one()
     assert row.report["distribution_by_gender_by_metabolic_syndrome"]["data"]["diseases"][1]["code"] == "hypertension"
 
+    bts = payload.get("report_bts")
+    assert bts is not None
+    assert bts["status"] == "ok"
+    assert "diseases" in bts["details"]
+    assert row.report_bts["distribution_by_gender_by_metabolic_syndrome"]["status"] == "ok"
+
 
 @pytest.mark.asyncio
 async def test_refresh_department_camp_report_distribution_by_gender_by_metabolic_syndrome(
