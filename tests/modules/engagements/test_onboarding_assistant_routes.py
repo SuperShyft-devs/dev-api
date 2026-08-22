@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pytest
+from sqlalchemy import select
 
 from core.config import settings
 from core.security import create_jwt_token
@@ -653,3 +654,201 @@ async def test_add_onboarding_assistants_rejects_organization_manager_wrong_org(
     )
     assert response.status_code == 400
     assert response.json()["error_code"] == "INVALID_INPUT"
+
+
+async def _seed_engagement(test_db_session, *, engagement_id: int, engagement_code: str) -> None:
+    await _ensure_assessment_package(test_db_session)
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id,
+            engagement_name="Phlebo Test Engagement",
+            engagement_code=engagement_code,
+            engagement_type="doctor",
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            status="running",
+            start_date=date.today(),
+            end_date=date.today(),
+        )
+    )
+    await test_db_session.commit()
+
+
+# ============================================================================
+# POST /engagements/{engagement_id}/onboarding-assistants/create-phlebo
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_create_phlebo_requires_auth(async_client):
+    response = await async_client.post(
+        "/engagements/1/onboarding-assistants/create-phlebo",
+        json={"name": "Test Phlebo", "phone": "8800100001"},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_create_phlebo_requires_admin(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9100, employee_id=200, role="onboarding_assistant")
+    await _seed_engagement(test_db_session, engagement_id=5020, engagement_code="ENG020")
+
+    response = await async_client.post(
+        "/engagements/5020/onboarding-assistants/create-phlebo",
+        headers=_auth_header(9100),
+        json={"name": "Test Phlebo", "phone": "8800100001"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_phlebo_creates_user_employee_and_assignment(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9101, employee_id=201)
+    await _seed_engagement(test_db_session, engagement_id=5021, engagement_code="ENG021")
+
+    response = await async_client.post(
+        "/engagements/5021/onboarding-assistants/create-phlebo",
+        headers=_auth_header(9101),
+        json={"name": "New Phlebo", "phone": "8800100001"},
+    )
+    assert response.status_code == 201
+
+    body = response.json()["data"]
+    assert body["status"] == "created"
+    assert body["user_created"] is True
+    assert body["employee_created"] is True
+    assert body["added_employee_ids"] == [body["employee_id"]]
+    assert body["skipped_employee_ids"] == []
+
+    created_user = await test_db_session.get(User, body["user_id"])
+    assert created_user is not None
+    assert created_user.first_name == "New"
+    assert created_user.last_name == "Phlebo"
+
+    created_employee = await test_db_session.get(Employee, body["employee_id"])
+    assert created_employee is not None
+    assert created_employee.role == "onboarding_assistant"
+
+    assignment = await test_db_session.execute(
+        select(OnboardingAssistantAssignment).where(
+            OnboardingAssistantAssignment.engagement_id == 5021,
+            OnboardingAssistantAssignment.employee_id == body["employee_id"],
+        )
+    )
+    assert assignment.scalar_one_or_none() is not None
+
+
+@pytest.mark.asyncio
+async def test_create_phlebo_existing_phone_returns_confirmation(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9102, employee_id=202)
+    await _seed_engagement(test_db_session, engagement_id=5022, engagement_code="ENG022")
+
+    test_db_session.add(
+        User(
+            user_id=9200,
+            age=30,
+            phone="+918801020001",
+            first_name="Existing",
+            last_name="Phlebo",
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/engagements/5022/onboarding-assistants/create-phlebo",
+        headers=_auth_header(9102),
+        json={"name": "Ignored Name", "phone": "8801020001"},
+    )
+    assert response.status_code == 201
+
+    body = response.json()["data"]
+    assert body["status"] == "confirmation_required"
+    assert body["existing_user"]["user_id"] == 9200
+    assert body["existing_user"]["phone"] == "+918801020001"
+    assert body["existing_user"]["employee"] is None
+
+
+@pytest.mark.asyncio
+async def test_create_phlebo_confirm_existing_creates_employee_and_assigns(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9103, employee_id=203)
+    await _seed_engagement(test_db_session, engagement_id=5023, engagement_code="ENG023")
+
+    test_db_session.add(
+        User(
+            user_id=9201,
+            age=30,
+            phone="8801030001",
+            first_name="No",
+            last_name="Employee",
+            status="active",
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/engagements/5023/onboarding-assistants/create-phlebo",
+        headers=_auth_header(9103),
+        json={"name": "No Employee", "phone": "8801030001", "confirm_existing": True},
+    )
+    assert response.status_code == 201
+
+    body = response.json()["data"]
+    assert body["status"] == "assigned"
+    assert body["user_created"] is False
+    assert body["employee_created"] is True
+    assert body["added_employee_ids"] == [body["employee_id"]]
+
+    created_employee = await test_db_session.get(Employee, body["employee_id"])
+    assert created_employee is not None
+    assert created_employee.user_id == 9201
+    assert created_employee.role == "onboarding_assistant"
+
+
+@pytest.mark.asyncio
+async def test_create_phlebo_confirm_existing_assigns_existing_employee(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9104, employee_id=204)
+    await _seed_engagement(test_db_session, engagement_id=5024, engagement_code="ENG024")
+
+    test_db_session.add(User(user_id=9202, age=30, phone="8801040001", first_name="Admin", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=205, user_id=9202, role="admin", status="active"))
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/engagements/5024/onboarding-assistants/create-phlebo",
+        headers=_auth_header(9104),
+        json={"name": "Admin User", "phone": "8801040001", "confirm_existing": True},
+    )
+    assert response.status_code == 201
+
+    body = response.json()["data"]
+    assert body["status"] == "assigned"
+    assert body["employee_id"] == 205
+    assert body["employee_created"] is False
+    assert body["added_employee_ids"] == [205]
+
+
+@pytest.mark.asyncio
+async def test_create_phlebo_confirm_existing_skips_when_already_assigned(async_client, test_db_session):
+    await _seed_employee(test_db_session, user_id=9105, employee_id=206)
+    await _seed_employee(test_db_session, user_id=9106, employee_id=207, role="onboarding_assistant")
+    await _seed_engagement(test_db_session, engagement_id=5025, engagement_code="ENG025")
+
+    test_db_session.add(
+        OnboardingAssistantAssignment(onboarding_assistant_id=99, employee_id=207, engagement_id=5025)
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/engagements/5025/onboarding-assistants/create-phlebo",
+        headers=_auth_header(9105),
+        json={"name": "Already Assigned", "phone": "9106000000", "confirm_existing": True},
+    )
+    assert response.status_code == 201
+
+    body = response.json()["data"]
+    assert body["status"] == "assigned"
+    assert body["employee_id"] == 207
+    assert body["added_employee_ids"] == []
+    assert body["skipped_employee_ids"] == [207]

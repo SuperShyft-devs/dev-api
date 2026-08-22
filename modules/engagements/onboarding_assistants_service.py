@@ -7,13 +7,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.employee.access_control import (
+    ONBOARDING_ASSISTANT_ASSIGNEE_ROLES,
     ensure_admin,
     ensure_org_manager_assignable_to_engagement,
     ensure_valid_onboarding_assistant_assignee_role,
 )
+from modules.employee.models import Employee, EmployeeRole
+from modules.employee.repository import EmployeeRepository
+from modules.employee.schemas import EmployeeCreateRequest
 from modules.employee.service import EmployeeContext, EmployeeService
 from modules.engagements.models import OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
+from modules.users.models import User
+from modules.users.schemas import EmployeeCreateUserRequest
+from modules.users.service import UsersService
+
+_DEFAULT_PHLEBO_AGE = 25
 
 
 def _normalize_int(value: int) -> int:
@@ -23,6 +32,32 @@ def _normalize_int(value: int) -> int:
     return value
 
 
+def _split_display_name(name: str) -> tuple[str | None, str | None]:
+    parts = name.strip().split(None, 1)
+    if not parts:
+        return None, None
+    if len(parts) == 1:
+        return parts[0], None
+    return parts[0], parts[1]
+
+
+def _existing_user_payload(user: User, employee: Employee | None) -> dict:
+    payload: dict = {
+        "user_id": user.user_id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "phone": user.phone,
+        "employee": None,
+    }
+    if employee is not None:
+        payload["employee"] = {
+            "employee_id": employee.employee_id,
+            "role": employee.role.value if isinstance(employee.role, EmployeeRole) else employee.role,
+            "status": employee.status,
+        }
+    return payload
+
+
 class OnboardingAssistantsService:
     """Business logic for onboarding assistant assignment to engagements."""
 
@@ -30,10 +65,14 @@ class OnboardingAssistantsService:
         self,
         repository: EngagementsRepository,
         employee_service: EmployeeService,
+        employee_repository: EmployeeRepository,
+        users_service: UsersService,
         audit_service: AuditService | None = None,
     ):
         self._repository = repository
         self._employee_service = employee_service
+        self._employee_repository = employee_repository
+        self._users_service = users_service
         self._audit_service = audit_service
 
     def _require_audit_service(self) -> AuditService:
@@ -183,6 +222,122 @@ class OnboardingAssistantsService:
             "engagement_id": engagement_id,
             "added_employee_ids": added,
             "skipped_employee_ids": skipped,
+        }
+
+    async def create_and_assign_phlebo(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        name: str,
+        phone: str,
+        confirm_existing: bool,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> dict:
+        """Create or reuse a phlebo (onboarding assistant) and assign them to an engagement."""
+        ensure_admin(employee)
+
+        engagement_id = _normalize_int(engagement_id)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id=engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+
+        existing_user = await self._users_service.resolve_user_by_phone(db, phone)
+        if existing_user is not None and not confirm_existing:
+            existing_employee = await self._employee_repository.get_by_user_id(db, existing_user.user_id)
+            return {
+                "status": "confirmation_required",
+                "existing_user": _existing_user_payload(existing_user, existing_employee),
+            }
+
+        user_created = False
+        employee_created = False
+
+        if existing_user is not None:
+            user = existing_user
+            emp_row = await self._employee_repository.get_by_user_id(db, user.user_id)
+            if emp_row is None:
+                emp_row = await self._employee_service.create_employee(
+                    db,
+                    employee=employee,
+                    payload=EmployeeCreateRequest(
+                        user_id=user.user_id,
+                        role=EmployeeRole.onboarding_assistant,
+                        status="active",
+                    ),
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    endpoint=endpoint,
+                )
+                employee_created = True
+            else:
+                role = emp_row.role if isinstance(emp_row.role, EmployeeRole) else EmployeeRole(emp_row.role)
+                if role not in ONBOARDING_ASSISTANT_ASSIGNEE_ROLES:
+                    raise AppError(
+                        status_code=422,
+                        error_code="INVALID_STATE",
+                        message="Employee role cannot be assigned as an onboarding assistant",
+                    )
+            result_status = "assigned"
+        else:
+            first_name, last_name = _split_display_name(name)
+            user = await self._users_service.create_user_by_employee(
+                db,
+                employee=employee,
+                payload=EmployeeCreateUserRequest(
+                    age=_DEFAULT_PHLEBO_AGE,
+                    first_name=first_name,
+                    last_name=last_name,
+                    phone=phone,
+                    status="active",
+                ),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                endpoint=endpoint,
+            )
+            user_created = True
+            emp_row = await self._employee_service.create_employee(
+                db,
+                employee=employee,
+                payload=EmployeeCreateRequest(
+                    user_id=user.user_id,
+                    role=EmployeeRole.onboarding_assistant,
+                    status="active",
+                ),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                endpoint=endpoint,
+            )
+            employee_created = True
+            result_status = "created"
+
+        assign_result = await self.assign_onboarding_assistants_to_engagement(
+            db,
+            employee=employee,
+            engagement_id=engagement_id,
+            employee_ids=[emp_row.employee_id],
+            ip_address=ip_address,
+            user_agent=user_agent,
+            endpoint=endpoint,
+        )
+
+        return {
+            "status": result_status,
+            "user_id": user.user_id,
+            "employee_id": emp_row.employee_id,
+            "user_created": user_created,
+            "employee_created": employee_created,
+            "engagement_id": engagement_id,
+            "added_employee_ids": assign_result["added_employee_ids"],
+            "skipped_employee_ids": assign_result["skipped_employee_ids"],
         }
 
     async def remove_onboarding_assistant_from_engagement(

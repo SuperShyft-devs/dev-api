@@ -210,6 +210,10 @@ class UsersService:
     async def get_existing_user_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
         return await self._repository.get_user_by_phone(db, phone)
 
+    async def resolve_user_by_phone(self, db: AsyncSession, phone: str) -> User | None:
+        """Resolve a user by phone, matching +91 / 10-digit / E.164 variants."""
+        return await self._resolve_user_by_phone_for_import(db, phone)
+
     async def _has_phone_conflict(
         self,
         db: AsyncSession,

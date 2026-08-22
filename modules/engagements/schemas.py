@@ -16,6 +16,7 @@ from common.validation import (
     OptionalLandmarkText,
     OptionalPinCode,
     OptionalSafeDisplayName,
+    PhoneStr,
     PinCode,
     PositiveIntId,
     SafeDisplayName,
@@ -333,6 +334,14 @@ class OnboardingAssistantsAddRequest(BaseModel):
     """Request to assign employees as onboarding assistants."""
 
     employee_ids: list[int] = Field(..., min_length=1)
+
+
+class CreatePhleboRequest(BaseModel):
+    """Create (or reuse) a phlebo user/employee and assign to an engagement."""
+
+    name: SafeDisplayName
+    phone: PhoneStr
+    confirm_existing: bool = False
 
 
 class EngagementAssessmentPackageAddRequest(BaseModel):
