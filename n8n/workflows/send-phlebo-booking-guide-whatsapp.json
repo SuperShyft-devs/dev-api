@@ -1,0 +1,490 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "wa-accepted-001",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        11040,
+        880
+      ],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "WhatAPI Accepted?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "wa-notaccepted-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Phlebo Booking Guide Message').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "wa-notaccepted-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "wa-notaccepted-003",
+              "name": "message",
+              "value": "WhatsApp sending failed: message not accepted",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        11248,
+        976
+      ],
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Set Not Accepted Status"
+    },
+    {
+      "parameters": {
+        "content": "## Sends Phlebo Booking Guide on WhatsApp\nGuides phlebotomists on how to create bookings in the Engagement Console.\nAlways attaches: SuperShyft_Booking_Guide.pdf\nExpects: { notification_id, engagement_id?, members: [{ first_name, phone }] }",
+        "height": 672,
+        "width": 2192
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        9584,
+        736
+      ],
+      "typeVersion": 1,
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Sticky Note Phlebo Booking Guide"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-phlebo-booking-guide-whatsapp-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        9680,
+        928
+      ],
+      "id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+      "name": "Phlebo Booking Guide Whatsapp",
+      "webhookId": "e5f6a7b8-c9d0-1234-ef01-345678901234"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c4900e1a-6f0e-4bab-9041-f05ecde58fa9",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "499caaec-2faa-42db-a5a4-4b60f8f6c730",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "9691f373-dbaf-4cc6-a31f-ecbe901cf58a",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        9888,
+        928
+      ],
+      "id": "f6a7b8c9-d0e1-2345-f012-456789012345",
+      "name": "Validate Payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\nconst engagementId = body.engagement_id ?? null;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    engagement_id: engagementId,\n    first_name: member.first_name || 'Phlebotomist',\n    phone: member.phone || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10112,
+        912
+      ],
+      "id": "a7b8c9d0-e1f2-3456-0123-567890123456",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Phlebotomist').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst BOOKING_GUIDE_URL = 'https://api.supershyft.com/media/documents/SuperShyft_Booking_Guide.pdf';\n\nconst engagementId = member.engagement_id;\nconst hasEngagement = engagementId !== null && engagementId !== undefined && engagementId !== '' && Number(engagementId) > 0;\nconst consoleUrl = hasEngagement\n  ? `https://admin.supershyft.com/engagements/${engagementId}/console`\n  : 'https://admin.supershyft.com/engagements/console';\n\nconst message =\n`camp15,${name},\nWelcome! 👋,\nWe have shared a quick step-by-step guide to help you create bookings using the SuperShyft Engagement Console. Please refer to the attached guide before creating your first booking.,\nYou can access your Engagement Console using the link below:,\n${consoleUrl},\nPlease go through the guide and let us know if you have any questions or need any assistance.,\nThanks!`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    booking_guide_url: BOOKING_GUIDE_URL,\n    first_name: name,\n    phone,\n    message\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10352,
+        912
+      ],
+      "id": "b8c9d0e1-f2a3-4567-1234-678901234567",
+      "name": "Prepare Phlebo Booking Guide Message"
+    },
+    {
+      "parameters": {
+        "url": "https://webhook.whatapi.in/webhook/69ea095002e28c7ee412c02d",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Prepare Phlebo Booking Guide Message').item.json.phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $('Prepare Phlebo Booking Guide Message').item.json.message }}"
+            },
+            {
+              "name": "medialink",
+              "value": "={{ $('Prepare Phlebo Booking Guide Message').item.json.booking_guide_url }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        10800,
+        896
+      ],
+      "id": "c9d0e1f2-a3b4-5678-2345-789012345678",
+      "name": "Send Phlebo Booking Guide Whatsapp",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "37b41bde-ee96-4a60-a1a9-03f6336aceff",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Phlebo Booking Guide Message').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "c798708a-e137-4725-9ac3-762337ff1fce",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "f0f67fe0-9708-4bba-8d9b-da9aa61a75ba",
+              "name": "message",
+              "value": "Message sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        11248,
+        784
+      ],
+      "id": "d0e1f2a3-b4c5-6789-3456-890123456789",
+      "name": "Set Sent Status"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "phlebo-wa-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Phlebo Booking Guide Message').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "phlebo-wa-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "phlebo-wa-fail-003",
+              "name": "message",
+              "value": "WhatsApp sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        11040,
+        1056
+      ],
+      "id": "e1f2a3b4-c5d6-7890-4567-901234567890",
+      "name": "Set Failed Status"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8741d8fd-bfbf-46ce-bb41-c133fd398608",
+              "name": "notification_id",
+              "value": "={{ $('Phlebo Booking Guide Whatsapp').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "304a6765-ed6a-40cc-8df4-cd92af6dbe17",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "4232dba7-0d7f-4b95-b52d-d95a54d80953",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        10112,
+        1216
+      ],
+      "id": "f2a3b4c5-d6e7-8901-5678-012345678901",
+      "name": "Set Validation Failed Status"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        11536,
+        1232
+      ],
+      "id": "a3b4c5d6-e7f8-9012-6789-123456789012",
+      "name": "Notification Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "WhatAPI Accepted?": {
+      "main": [
+        [
+          {
+            "node": "Set Sent Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Not Accepted Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Not Accepted Status": {
+      "main": [
+        [
+          {
+            "node": "Notification Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phlebo Booking Guide Whatsapp": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Validation Failed Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Phlebo Booking Guide Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Phlebo Booking Guide Message": {
+      "main": [
+        [
+          {
+            "node": "Send Phlebo Booking Guide Whatsapp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Phlebo Booking Guide Whatsapp": {
+      "main": [
+        [
+          {
+            "node": "WhatAPI Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Failed Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Sent Status": {
+      "main": [
+        [
+          {
+            "node": "Notification Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Failed Status": {
+      "main": [
+        [
+          {
+            "node": "Notification Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Validation Failed Status": {
+      "main": [
+        [
+          {
+            "node": "Notification Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}
