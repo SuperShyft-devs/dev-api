@@ -2306,6 +2306,14 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
     )
     assert onboard.status_code == 200, onboard.text
 
+    engagement_id = create.json()["data"]["engagement_id"]
+    parts = await async_client.get(
+        f"/engagements/{engagement_id}/participants",
+        headers=_auth_header(7410),
+    )
+    assert parts.status_code == 200, parts.text
+    assert parts.json()["data"][0]["blood_collection_cabin"] == "blood_test_cabin_1"
+
     after = await async_client.get("/engagements/code/SLOTPUB1")
     after_slots = after.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["available_slots"]
     by_slot = {item["slot"]: item["spot_left"] for item in after_slots}
