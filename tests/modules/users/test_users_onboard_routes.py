@@ -542,6 +542,57 @@ async def test_engagement_onboard_overwrites_existing_address_fields(async_clien
 
 
 @pytest.mark.asyncio
+async def test_engagement_onboard_overwrites_existing_age_and_email(async_client, test_db_session):
+    """B2B onboard overwrites age and email even when already set."""
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
+            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
+            "VALUES (3302, 'Camp-AgeEmail', 'ENGAGEEM', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, first_name, age, phone, email, status) "
+            "VALUES (2102, 'Existing', 28, '7777777778', 'old@example.com', 'active')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 35,
+        "first_name": "Existing",
+        "phone": "7777777778",
+        "email": "new@example.com",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "11:00",
+    }
+
+    response = await async_client.post("/users/code/ENGAGEEM/onboard", json=payload)
+    assert response.status_code == 200
+
+    row = (
+        await test_db_session.execute(
+            text("SELECT age, email FROM users WHERE user_id = 2102")
+        )
+    ).first()
+    assert row.age == 35
+    assert row.email == "new@example.com"
+
+
+@pytest.mark.asyncio
 async def test_engagement_onboard_requires_active_engagement(async_client, test_db_session):
     await test_db_session.execute(
         text(

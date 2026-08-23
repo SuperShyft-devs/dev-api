@@ -2253,10 +2253,12 @@ class UsersService:
             create_data=create_data,
         )
 
-        # Address fields: always overwrite when provided (even if already set).
-        location_update = {
+        # Age, email, and address fields: always overwrite when provided (even if already set).
+        profile_update = {
             key: value
             for key, value in {
+                "age": payload.age,
+                "email": email,
                 "address": payload.address,
                 "pin_code": payload.pincode,
                 "city": payload.city,
@@ -2265,8 +2267,8 @@ class UsersService:
             }.items()
             if value is not None
         }
-        if location_update:
-            updated = await self._repository.update_user_partial(db, user.user_id, location_update)
+        if profile_update:
+            updated = await self._repository.update_user_partial(db, user.user_id, profile_update)
             if updated is not None:
                 user = updated
 
