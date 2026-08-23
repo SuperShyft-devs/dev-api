@@ -47,11 +47,16 @@ def get_engagements_service() -> EngagementsService:
 
 
 def get_onboarding_assistants_service() -> OnboardingAssistantsService:
+    from modules.users.dependencies import get_users_service
+
     audit_service = AuditService(AuditRepository())
-    employee_service = EmployeeService(EmployeeRepository())
+    employee_repository = EmployeeRepository()
+    employee_service = EmployeeService(employee_repository, audit_service=audit_service)
     return OnboardingAssistantsService(
         repository=EngagementsRepository(),
         employee_service=employee_service,
+        employee_repository=employee_repository,
+        users_service=get_users_service(),
         audit_service=audit_service,
     )
 

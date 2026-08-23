@@ -17,9 +17,11 @@ from modules.engagements.models import (
     Engagement,
     EngagementNotification,
     EngagementParticipant,
+    EngagementSlotInfo,
     EngagementType,
     OnboardingAssistantAssignment,
 )
+from modules.engagements.slot_detail_dates import engagement_collection_date_matches
 from modules.organizations.models import Organization
 from modules.engagement_notifications.service_config import (
     NotificationServiceConfigItem,
@@ -1214,6 +1216,52 @@ class EngagementsRepository:
             )
             for row in result.all()
         ]
+
+    async def list_engagements_for_booking_guide_reminder(
+        self,
+        db: AsyncSession,
+        *,
+        collection_date: date,
+    ) -> list[tuple[int, list[NotificationServiceConfigItem]]]:
+        """Return (engagement_id, service_configs) for scheduled/running engagements with collection on collection_date."""
+        query = (
+            select(
+                Engagement.engagement_id,
+                Engagement.start_date,
+                EngagementSlotInfo.slot_detail,
+                EngagementNotification.notification_services,
+            )
+            .join(
+                EngagementNotification,
+                EngagementNotification.engagement_id == Engagement.engagement_id,
+            )
+            .join(
+                AutoNotificationEvent,
+                AutoNotificationEvent.id == EngagementNotification.notification_event_id,
+            )
+            .outerjoin(
+                EngagementSlotInfo,
+                EngagementSlotInfo.slot_detail_id == Engagement.slot_detail_id,
+            )
+            .where(self._scheduled_or_running_engagement_status_filter())
+            .where(AutoNotificationEvent.event_code == "booking_guide")
+            .distinct()
+            .order_by(Engagement.engagement_id.asc())
+        )
+        result = await db.execute(query)
+        matches: list[tuple[int, list[NotificationServiceConfigItem]]] = []
+        for row in result.all():
+            service_configs = normalize_notification_services(row.notification_services)
+            if not service_configs:
+                continue
+            if not engagement_collection_date_matches(
+                start_date=row.start_date,
+                slot_detail=row.slot_detail,
+                collection_date=collection_date,
+            ):
+                continue
+            matches.append((int(row.engagement_id), service_configs))
+        return matches
 
     async def list_participants_for_questionnaire_reminder(
         self,

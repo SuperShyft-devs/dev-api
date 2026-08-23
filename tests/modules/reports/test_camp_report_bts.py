@@ -3,21 +3,30 @@
 from datetime import date
 
 from modules.reports.camp_report_bts import (
+    build_blood_and_lab_intelligence_bts,
+    build_company_average_scores_bts,
+    build_distribution_by_gender_by_metabolic_syndrome_bts,
     build_distribution_by_oxidative_stress_bts,
     build_kpis_bts,
     build_not_implemented_bts,
     build_overall_risk_score_bts,
     build_participation_by_age_bts,
+    build_positive_wins_bts,
     build_questionnaire_gender_distribution_bts,
 )
 from modules.reports.camp_report_section_builders import (
     PHYSICAL_ACTIVITY_BUCKET_LABELS,
     PHYSICAL_ACTIVITY_BUCKETS,
+    build_distribution_by_gender_by_metabolic_syndrome_details,
     build_distribution_by_oxidative_stress,
     build_distribution_by_oxidative_stress_details,
     build_overall_risk_score,
     build_overall_risk_score_details,
     build_participation_by_age_details,
+    build_positive_wins_details,
+    build_company_average_scores_details,
+    build_blood_and_lab_intelligence_details,
+    build_in_range_percent_math,
     build_questionnaire_gender_distribution_details,
     physical_activity_answer_to_bucket,
 )
@@ -690,3 +699,314 @@ def test_build_questionnaire_gender_distribution_bts_unknown_answer():
     assert bts["status"] == "mismatch"
     assert bts["fields"]["unknown_answers"]["match"] is False
     assert bts["fields"]["unknown_answers"]["stored"] == 1
+
+
+def test_build_distribution_by_gender_by_metabolic_syndrome_bts_ok():
+    status_rows = [
+        (1, "John", "Doe", "male", {"diseases": [{"code": "hypertension", "risk_score_scaled": 50}]}, None),
+        (2, "Jane", "Smith", "female", {"diseases": [{"code": "hypertension", "risk_score_scaled": 20}]}, None),
+    ]
+    payload, details = build_distribution_by_gender_by_metabolic_syndrome_details(
+        status_rows,
+        total_enrolled=2,
+        bio_ai_reports=2,
+        scope_label="Whole camp",
+    )
+    bts = build_distribution_by_gender_by_metabolic_syndrome_bts(
+        expected_data=payload["data"],
+        stored_data=payload["data"],
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert "diseases" in bts["details"]
+    assert bts["fields"]["hypertension.male.elevated_consistency"]["match"] is True
+
+
+def test_build_distribution_by_gender_by_metabolic_syndrome_bts_mismatch():
+    status_rows = [
+        (1, "John", "Doe", "male", {"diseases": [{"code": "hypertension", "risk_score_scaled": 50}]}, None),
+    ]
+    payload, details = build_distribution_by_gender_by_metabolic_syndrome_details(
+        status_rows,
+        total_enrolled=1,
+        bio_ai_reports=1,
+        scope_label="Whole camp",
+    )
+    stored = dict(payload["data"])
+    diseases = list(stored["diseases"])
+    diseases[0] = dict(diseases[0])
+    diseases[0]["male"] = dict(diseases[0]["male"])
+    diseases[0]["male"]["elevated_percent"] = 99.9
+    stored["diseases"] = diseases
+
+    bts = build_distribution_by_gender_by_metabolic_syndrome_bts(
+        expected_data=payload["data"],
+        stored_data=stored,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["hypertension.male.elevated_percent"]["match"] is False
+    assert bts["fields"]["hypertension.male.elevated_percent"]["reason"]
+
+
+def test_build_positive_wins_bts_ok():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "John",
+            "low_risk": [
+                {
+                    "code": "thyroid_health",
+                    "name": "Thyroid Health",
+                    "risk_status": "Healthy",
+                    "risk_score_scaled": 5,
+                }
+            ],
+            "healthy_habits": [{"habit_key": None, "habit_label": "Improved Sleep"}],
+            "healthy_profiles": ["Complete Hemogram"],
+            "notes": {"low_risk": None, "healthy_habits": None, "healthy_profiles": None},
+            "low_risk_math": None,
+        },
+    ]
+    payload, details = build_positive_wins_details(
+        participant_rows,
+        scope_label="Whole camp",
+    )
+    bts = build_positive_wins_bts(
+        expected_data=payload["data"],
+        stored_data=payload["data"],
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["fields"]["low_risk.selection_consistency"]["match"] is True
+
+
+def test_build_positive_wins_bts_mismatch():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "John",
+            "low_risk": [
+                {
+                    "code": "thyroid_health",
+                    "name": "Thyroid Health",
+                    "risk_status": "Healthy",
+                    "risk_score_scaled": 5,
+                }
+            ],
+            "healthy_habits": [],
+            "healthy_profiles": [],
+            "notes": {"low_risk": None, "healthy_habits": "No match", "healthy_profiles": "No blood"},
+            "low_risk_math": None,
+        },
+    ]
+    payload, details = build_positive_wins_details(
+        participant_rows,
+        scope_label="Whole camp",
+    )
+    stored = dict(payload["data"])
+    stored["low_risk"] = [
+        {
+            "code": "wrong",
+            "name": "Wrong",
+            "risk_status": "Healthy",
+            "risk_score_scaled": 99,
+        }
+    ]
+    bts = build_positive_wins_bts(
+        expected_data=payload["data"],
+        stored_data=stored,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["low_risk.0.code"]["match"] is False
+
+
+def test_build_company_average_scores_bts_ok():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "Alice",
+            "assessment_instance_id": 101,
+            "nutrition": {"score": 64.0, "status": "included", "steps": []},
+            "fitness": {"score": 55.0, "status": "included", "steps": []},
+            "lifestyle": {"score": 65.0, "status": "included", "steps": []},
+        },
+    ]
+    payload, details = build_company_average_scores_details(
+        participant_rows,
+        scope_label="Whole camp",
+        total_enrolled=1,
+        excluded_no_fitprint=[],
+        excluded_report_load_failed=[],
+    )
+    bts = build_company_average_scores_bts(
+        expected_data=payload["data"],
+        stored_data=payload["data"],
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["fields"]["nutrition.score"]["match"] is True
+    assert bts["fields"]["fitness.score"]["match"] is True
+    assert bts["fields"]["lifestyle.score"]["match"] is True
+    assert "step-by-step" in bts["message"].lower()
+
+
+def test_build_company_average_scores_bts_first_validation():
+    payload, details = build_company_average_scores_details(
+        [],
+        scope_label="Whole camp",
+        total_enrolled=0,
+        excluded_no_fitprint=[],
+        excluded_report_load_failed=[],
+    )
+    bts = build_company_average_scores_bts(
+        expected_data=payload["data"],
+        stored_data=None,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["stored"] is None
+    assert "first check" in bts["message"].lower()
+
+
+def test_build_company_average_scores_bts_mismatch():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "Alice",
+            "assessment_instance_id": 101,
+            "nutrition": {"score": 64.0, "status": "included", "steps": []},
+            "fitness": {"score": 55.0, "status": "included", "steps": []},
+            "lifestyle": {"score": 65.0, "status": "included", "steps": []},
+        },
+    ]
+    payload, details = build_company_average_scores_details(
+        participant_rows,
+        scope_label="Whole camp",
+        total_enrolled=1,
+        excluded_no_fitprint=[],
+        excluded_report_load_failed=[],
+    )
+    stored = dict(payload["data"])
+    stored["nutrition"] = {"score": 99}
+    bts = build_company_average_scores_bts(
+        expected_data=payload["data"],
+        stored_data=stored,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["nutrition.score"]["match"] is False
+    assert bts["fields"]["nutrition.score"]["reason"]
+
+
+def test_build_blood_and_lab_intelligence_bts_ok():
+    group_stats = {"diabetes_profile": {"hba1c": {"in_range": 2, "total": 4}}}
+    group_parameter_details = {
+        "diabetes_profile": {
+            "group_name": "Diabetes Profile",
+            "parameters": {
+                "hba1c": {
+                    "test_name": "HbA1c",
+                    "parameter_key": "hba1c",
+                    "in_range": 2,
+                    "total": 4,
+                    "in_range_percent": 50,
+                    "is_combined": False,
+                    "percent_math": build_in_range_percent_math(
+                        test_name="HbA1c",
+                        in_range=2,
+                        total=4,
+                        has_blood_participants=True,
+                    ),
+                    "people": {"in_range": [], "out_of_range": [], "not_counted": []},
+                }
+            },
+        }
+    }
+    payload, details = build_blood_and_lab_intelligence_details(
+        group_stats,
+        group_parameter_details=group_parameter_details,
+        scope_label="Whole camp",
+        total_enrolled=4,
+        excluded_no_blood=[],
+        skipped_groups=[],
+    )
+    bts = build_blood_and_lab_intelligence_bts(
+        expected_data=payload["data"],
+        stored_data=payload["data"],
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["fields"]["diabetes_profile.hba1c.in_range_percent"]["match"] is True
+
+
+def test_build_blood_and_lab_intelligence_bts_first_validation():
+    payload, details = build_blood_and_lab_intelligence_details(
+        {},
+        group_parameter_details={},
+        scope_label="Whole camp",
+        total_enrolled=0,
+        excluded_no_blood=[],
+        skipped_groups=[],
+    )
+    bts = build_blood_and_lab_intelligence_bts(
+        expected_data=payload["data"],
+        stored_data=None,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "ok"
+    assert bts["stored"] is None
+
+
+def test_build_blood_and_lab_intelligence_bts_mismatch():
+    group_stats = {"diabetes_profile": {"hba1c": {"in_range": 2, "total": 4}}}
+    group_parameter_details = {
+        "diabetes_profile": {
+            "group_name": "Diabetes Profile",
+            "parameters": {
+                "hba1c": {
+                    "test_name": "HbA1c",
+                    "parameter_key": "hba1c",
+                    "in_range": 2,
+                    "total": 4,
+                    "in_range_percent": 50,
+                    "is_combined": False,
+                    "percent_math": build_in_range_percent_math(
+                        test_name="HbA1c",
+                        in_range=2,
+                        total=4,
+                        has_blood_participants=True,
+                    ),
+                    "people": {"in_range": [], "out_of_range": [], "not_counted": []},
+                }
+            },
+        }
+    }
+    payload, details = build_blood_and_lab_intelligence_details(
+        group_stats,
+        group_parameter_details=group_parameter_details,
+        scope_label="Whole camp",
+        total_enrolled=4,
+        excluded_no_blood=[],
+        skipped_groups=[],
+    )
+    stored = dict(payload["data"])
+    stored["diabetes_profile"] = {"hba1c": {"in_range_percent": 99}}
+    bts = build_blood_and_lab_intelligence_bts(
+        expected_data=payload["data"],
+        stored_data=stored,
+        details=details,
+        checked_at="t",
+    )
+    assert bts["status"] == "mismatch"
+    assert bts["fields"]["diabetes_profile.hba1c.in_range_percent"]["match"] is False

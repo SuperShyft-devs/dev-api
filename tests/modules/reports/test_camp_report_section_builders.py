@@ -5,13 +5,23 @@ from __future__ import annotations
 from datetime import date
 
 from modules.reports.camp_report_section_builders import (
+    build_band_percent_math,
+    build_blood_and_lab_intelligence,
+    build_blood_and_lab_intelligence_details,
+    build_blood_test_person_evaluation,
+    build_category_average_math,
+    build_combined_in_range_percent_math,
     build_company_average_scores,
+    build_company_average_scores_details,
+    build_in_range_percent_math,
     build_distribution_by_gender_by_metabolic_syndrome,
+    build_distribution_by_gender_by_metabolic_syndrome_details,
     build_distribution_by_oxidative_stress,
     build_distribution_by_oxidative_stress_details,
     build_distribution_by_physical_activity_frequency,
     build_distribution_by_sleeping_hours,
     build_questionnaire_gender_distribution_details,
+    build_elevated_disease_risk_math,
     build_elevated_metabolic_math,
     build_elevated_oxidative_math,
     build_kpis,
@@ -523,6 +533,101 @@ def test_build_distribution_by_gender_by_metabolic_syndrome_empty():
     assert payload["data"]["diseases"] == []
 
 
+def test_build_band_percent_math():
+    math = build_band_percent_math(band_label="High", count=5, total=36)
+    assert math["result_percent"] == 13.9
+    assert any("5 ÷ 36" in step for step in math["steps"])
+
+
+def test_build_elevated_disease_risk_math_sum_of_percents():
+    math = build_elevated_disease_risk_math(
+        high_count=5,
+        very_high_count=7,
+        high_percent=13.9,
+        very_high_percent=19.4,
+        total=36,
+    )
+    assert math["result_percent"] == 33.3
+    assert math["alternate_from_counts"] == 33.3
+    assert math["kind"] == "disease_risk_by_gender"
+
+    edge = build_elevated_disease_risk_math(
+        high_count=8,
+        very_high_count=7,
+        high_percent=22.2,
+        very_high_percent=19.4,
+        total=36,
+    )
+    assert edge["result_percent"] == 41.6
+    assert edge["alternate_from_counts"] == 41.7
+
+
+def test_build_distribution_by_gender_by_metabolic_syndrome_details():
+    status_rows = [
+        (
+            1,
+            "John",
+            "Doe",
+            "male",
+            {
+                "diseases": [
+                    {"code": "hypertension", "risk_score_scaled": 20},
+                    {"code": "diabetes", "risk_score_scaled": 10},
+                ],
+            },
+            None,
+        ),
+        (
+            2,
+            "Jane",
+            "Smith",
+            "female",
+            {"diseases": [{"code": "hypertension", "risk_score_scaled": 50}]},
+            None,
+        ),
+        (
+            3,
+            "Other",
+            "Person",
+            "other",
+            {"diseases": [{"code": "hypertension", "risk_score_scaled": 60}]},
+            None,
+        ),
+        (
+            4,
+            "No",
+            "Report",
+            "male",
+            None,
+            "No Metsights Basic/Pro assessment instance for this camp",
+        ),
+    ]
+    payload, details = build_distribution_by_gender_by_metabolic_syndrome_details(
+        status_rows,
+        total_enrolled=4,
+        bio_ai_reports=3,
+        scope_label="Whole camp",
+    )
+    diseases = payload["data"]["diseases"]
+    codes = [d["code"] for d in diseases]
+    assert codes == ["type_2_diabetes", "hypertension"]
+
+    hypertension = details["diseases"]["hypertension"]
+    assert hypertension["male"]["groups"]["healthy"]["count"] == 1
+    assert hypertension["male"]["groups"]["healthy"]["people"][0]["name"] == "John Doe"
+    assert hypertension["female"]["groups"]["increased"]["count"] == 1
+    assert hypertension["female"]["elevated_math"]["result_percent"] == 0.0
+
+    diabetes = details["diseases"]["type_2_diabetes"]
+    assert diabetes["male"]["groups"]["healthy"]["count"] == 1
+    assert diabetes["male"]["groups"]["healthy"]["people"][0]["report_code"] == "diabetes"
+    assert len(diabetes["not_counted"]) == 1
+
+    assert details["excluded"]["count"] == 1
+    assert details["unknown_gender"]["count"] == 1
+    assert details["method"]["with_bio_ai_report"] == 3
+
+
 def test_build_company_average_scores_basic():
     scores = [
         {"nutrition": 60.0, "fitness": 50.0, "lifestyle": 70.0},
@@ -582,3 +687,232 @@ def test_build_company_average_scores_rounds():
     assert payload["data"]["nutrition"]["score"] == 11
     assert payload["data"]["fitness"]["score"] == 11
     assert payload["data"]["lifestyle"]["score"] == 11
+
+
+def test_build_category_average_math_basic():
+    math = build_category_average_math(
+        category_key="nutrition",
+        scores_used=[
+            {"user_id": 1, "name": "Alice", "score": 60.0},
+            {"user_id": 2, "name": "Bob", "score": 70.0},
+            {"user_id": 3, "name": "Carol", "score": 65.0},
+        ],
+        has_fitprint_participants=True,
+    )
+    assert math["rounded_score"] == 65
+    assert math["count"] == 3
+    assert math["sum"] == 195.0
+    assert any("195" in step for step in math["steps"])
+    assert any("65" in step for step in math["steps"])
+
+
+def test_build_category_average_math_rounds_half_up():
+    math = build_category_average_math(
+        category_key="fitness",
+        scores_used=[
+            {"user_id": 1, "name": "Alice", "score": 64.0},
+            {"user_id": 2, "name": "Bob", "score": 65.0},
+        ],
+        has_fitprint_participants=True,
+    )
+    assert math["average_exact"] == 64.5
+    assert math["rounded_score"] == round(64.5)
+    assert any("64.5" in step for step in math["steps"])
+
+
+def test_build_category_average_math_no_scores():
+    math = build_category_average_math(
+        category_key="lifestyle",
+        scores_used=[],
+        has_fitprint_participants=True,
+    )
+    assert math["rounded_score"] == 0
+    assert any("Nobody had a Lifestyle score" in step for step in math["steps"])
+
+
+def test_build_company_average_scores_details_basic():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "Alice",
+            "assessment_instance_id": 101,
+            "nutrition": {"score": 64.0, "status": "included", "steps": ["Nutrition 64"]},
+            "fitness": {"score": 55.0, "status": "included", "steps": ["Fitness 55"]},
+            "lifestyle": {"score": 65.0, "status": "included", "steps": ["Lifestyle 65"]},
+        },
+        {
+            "user_id": 2,
+            "name": "Bob",
+            "assessment_instance_id": 102,
+            "nutrition": {"score": 70.0, "status": "included", "steps": ["Nutrition 70"]},
+            "fitness": {"score": 55.0, "status": "included", "steps": ["Fitness 55"]},
+            "lifestyle": {"score": 65.0, "status": "included", "steps": ["Lifestyle 65"]},
+        },
+    ]
+    payload, details = build_company_average_scores_details(
+        participant_rows,
+        scope_label="Whole camp",
+        total_enrolled=3,
+        excluded_no_fitprint=[{"user_id": 3, "name": "Carol", "reason": "No FitPrint"}],
+        excluded_report_load_failed=[],
+    )
+    assert payload["data"]["nutrition"]["score"] == 67
+    assert payload["data"]["fitness"]["score"] == 55
+    assert payload["data"]["lifestyle"]["score"] == 65
+    assert details["method"]["section_kind"] == "company_average_scores"
+    assert details["summary"]["total_enrolled"] == 3
+    assert details["summary"]["with_fitprint"] == 2
+    assert details["summary"]["without_fitprint"] == 1
+    assert len(details["participants"]) == 2
+    assert details["aggregation"]["nutrition"]["rounded_score"] == 67
+
+
+def test_build_company_average_scores_details_partial_none():
+    participant_rows = [
+        {
+            "user_id": 1,
+            "name": "Alice",
+            "assessment_instance_id": 101,
+            "nutrition": {"score": 64.0, "status": "included", "steps": []},
+            "fitness": {"score": None, "status": "missing", "steps": ["No fitness"]},
+            "lifestyle": {"score": 63.0, "status": "included", "steps": []},
+        },
+        {
+            "user_id": 2,
+            "name": "Bob",
+            "assessment_instance_id": 102,
+            "nutrition": {"score": None, "status": "missing", "steps": ["No nutrition"]},
+            "fitness": {"score": 58.0, "status": "included", "steps": []},
+            "lifestyle": {"score": 63.0, "status": "included", "steps": []},
+        },
+    ]
+    payload, details = build_company_average_scores_details(
+        participant_rows,
+        scope_label="Department: sales",
+        total_enrolled=2,
+        excluded_no_fitprint=[],
+        excluded_report_load_failed=[],
+    )
+    assert payload["data"]["nutrition"]["score"] == 64
+    assert payload["data"]["fitness"]["score"] == 58
+    assert payload["data"]["lifestyle"]["score"] == 63
+    assert details["aggregation"]["nutrition"]["count"] == 1
+    assert details["aggregation"]["fitness"]["count"] == 1
+
+
+def test_build_company_average_scores_details_empty():
+    payload, details = build_company_average_scores_details(
+        [],
+        scope_label="Whole camp",
+        total_enrolled=0,
+        excluded_no_fitprint=[],
+        excluded_report_load_failed=[],
+    )
+    assert payload["data"]["nutrition"]["score"] == 0
+    assert payload["data"]["fitness"]["score"] == 0
+    assert payload["data"]["lifestyle"]["score"] == 0
+    assert details["summary"]["with_fitprint"] == 0
+
+
+def test_build_in_range_percent_math_basic():
+    math = build_in_range_percent_math(
+        test_name="HbA1c",
+        in_range=2,
+        total=4,
+        has_blood_participants=True,
+        in_range_names=["Alice", "Bob"],
+        out_of_range_names=["Carol", "Dan"],
+    )
+    assert math["rounded_percent"] == 50
+    assert any("2 ÷ 4" in step for step in math["steps"])
+
+
+def test_build_in_range_percent_math_zero_total():
+    math = build_in_range_percent_math(
+        test_name="HbA1c",
+        in_range=0,
+        total=0,
+        has_blood_participants=True,
+    )
+    assert math["rounded_percent"] == 0
+    assert any("0%" in step for step in math["steps"])
+
+
+def test_build_blood_test_person_evaluation_in_range():
+    evaluation = build_blood_test_person_evaluation(
+        test_name="HbA1c",
+        value=5.2,
+        lower_range=4.0,
+        higher_range=5.6,
+        person_name="Alice",
+    )
+    assert evaluation["status"] == "in_range"
+
+
+def test_build_blood_test_person_evaluation_not_counted():
+    evaluation = build_blood_test_person_evaluation(
+        test_name="HbA1c",
+        value=None,
+        lower_range=4.0,
+        higher_range=5.6,
+        person_name="Alice",
+    )
+    assert evaluation["status"] == "not_counted"
+
+
+def test_build_blood_and_lab_intelligence_details_basic():
+    group_stats = {
+        "diabetes_profile": {
+            "hba1c": {"in_range": 2, "total": 4},
+        }
+    }
+    group_parameter_details = {
+        "diabetes_profile": {
+            "group_name": "Diabetes Profile",
+            "parameters": {
+                "hba1c": {
+                    "test_name": "HbA1c",
+                    "parameter_key": "hba1c",
+                    "in_range": 2,
+                    "total": 4,
+                    "in_range_percent": 50,
+                    "is_combined": False,
+                    "percent_math": build_in_range_percent_math(
+                        test_name="HbA1c",
+                        in_range=2,
+                        total=4,
+                        has_blood_participants=True,
+                    ),
+                    "people": {
+                        "in_range": [{"user_id": 1, "name": "Alice"}],
+                        "out_of_range": [{"user_id": 2, "name": "Bob"}],
+                        "not_counted": [{"user_id": 3, "name": "Carol"}],
+                    },
+                }
+            },
+        }
+    }
+    payload, details = build_blood_and_lab_intelligence_details(
+        group_stats,
+        group_parameter_details=group_parameter_details,
+        scope_label="Whole camp",
+        total_enrolled=5,
+        excluded_no_blood=[{"user_id": 9, "name": "Jane", "reason": "No blood"}],
+        skipped_groups=[],
+    )
+    assert payload["data"]["diabetes_profile"]["hba1c"]["in_range_percent"] == 50
+    assert details["method"]["section_kind"] == "blood_and_lab_intelligence"
+    assert details["summary"]["with_blood_results"] == 3
+    assert details["summary"]["without_blood_results"] == 1
+
+
+def test_build_combined_in_range_percent_math():
+    math = build_combined_in_range_percent_math(
+        combined_labels=["Total Cholesterol", "Triglycerides", "LDL Cholesterol"],
+        in_range=1,
+        total=4,
+        has_blood_participants=True,
+        in_range_names=["Alice"],
+    )
+    assert math["rounded_percent"] == 25
+    assert any("all of" in step.lower() for step in math["steps"])

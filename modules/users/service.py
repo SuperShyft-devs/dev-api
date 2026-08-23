@@ -210,6 +210,10 @@ class UsersService:
     async def get_existing_user_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
         return await self._repository.get_user_by_phone(db, phone)
 
+    async def resolve_user_by_phone(self, db: AsyncSession, phone: str) -> User | None:
+        """Resolve a user by phone, matching +91 / 10-digit / E.164 variants."""
+        return await self._resolve_user_by_phone_for_import(db, phone)
+
     async def _has_phone_conflict(
         self,
         db: AsyncSession,
@@ -1675,22 +1679,22 @@ class UsersService:
         source: str,
         participant_user_id: int,
     ) -> dict[str, str]:
+        from modules.notifications.onboarding_notify import detail_or_hyphen
+
         first_name = payload.first_name or ""
         last_name = payload.last_name or ""
         name = f"{first_name} {last_name}".strip()
-        email_str = str(payload.email) if payload.email is not None else ""
-        age_str = str(payload.age) if payload.age is not None else ""
         return {
-            "name": name,
-            "email": email_str,
-            "phone": str(payload.phone or ""),
-            "age": age_str,
-            "gender": str(payload.gender or ""),
-            "address": str(payload.address or ""),
-            "pincode": str(payload.pincode or ""),
-            "collection_date": str(payload.blood_collection_date or ""),
-            "collection_time": str(payload.blood_collection_time_slot or ""),
-            "engagement": source,
+            "name": detail_or_hyphen(name),
+            "email": detail_or_hyphen(payload.email),
+            "phone": detail_or_hyphen(payload.phone),
+            "age": detail_or_hyphen(payload.age),
+            "gender": detail_or_hyphen(payload.gender),
+            "address": detail_or_hyphen(payload.address),
+            "pincode": detail_or_hyphen(payload.pincode),
+            "collection_date": detail_or_hyphen(payload.blood_collection_date),
+            "collection_time": detail_or_hyphen(payload.blood_collection_time_slot),
+            "engagement": detail_or_hyphen(source),
             "participant_user_id": str(participant_user_id),
         }
 

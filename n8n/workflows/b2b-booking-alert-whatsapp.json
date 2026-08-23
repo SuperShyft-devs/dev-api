@@ -1,0 +1,473 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## B2B Booking Alert\nSkips OA/internal team alerts. Only notifies the participant by dispatching:\n- welcome-whatsapp\n- welcome-email\n\nExpects: {\n  notification_id, engagement_id,\n  participant_details: { participant_user_id, ... },\n  members?: []  // ignored — not notified\n}",
+        "height": 720,
+        "width": 2200
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        7872,
+        2432
+      ],
+      "typeVersion": 1,
+      "id": "b2ba-sticky-0001",
+      "name": "Sticky Note B2B Booking Alert"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "b2b-booking-alert-whatsapp-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        7984,
+        2912
+      ],
+      "id": "b2ba-webhook-0001",
+      "name": "B2B Booking Alert Webhook",
+      "webhookId": "b2ba-webhook-id-v1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b2ba-val-001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b2ba-val-002",
+              "leftValue": "={{ $json.body.engagement_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b2ba-val-003",
+              "leftValue": "={{ $json.body.participant_details }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b2ba-val-004",
+              "leftValue": "={{ $json.body.participant_details.participant_user_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        8224,
+        2912
+      ],
+      "id": "b2ba-validate-0001",
+      "name": "Validate B2B Booking Payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst pd = body.participant_details || {};\n\nconst userIdRaw = pd.participant_user_id;\nconst userId = Number(userIdRaw);\nif (!Number.isFinite(userId) || userId <= 0) {\n  return [{\n    json: {\n      notification_id: body.notification_id,\n      status: 'failed',\n      message: 'Payload validation failed: participant_details.participant_user_id is required',\n      skip_dispatch: true\n    }\n  }];\n}\n\n// members (OAs/internal team) are intentionally ignored — only notify the participant\nreturn [{\n  json: {\n    notification_id: body.notification_id,\n    engagement_id: body.engagement_id,\n    user_ids: [userId],\n    status: 'sent',\n    message: 'participant-only dispatch (internal team skipped)',\n    skip_dispatch: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8576,
+        2800
+      ],
+      "id": "b2ba-prepare-0001",
+      "name": "Prepare Participant Dispatch"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b2ba-skip-001",
+              "leftValue": "={{ $json.skip_dispatch }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        8800,
+        2800
+      ],
+      "id": "b2ba-ready-0001",
+      "name": "Ready to Dispatch?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b2ba-valfail-001",
+              "name": "notification_id",
+              "value": "={{ $('B2B Booking Alert Webhook').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "b2ba-valfail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "b2ba-valfail-003",
+              "name": "message",
+              "value": "Payload validation failed: notification_id, engagement_id, and participant_details.participant_user_id are required",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        8576,
+        3104
+      ],
+      "id": "b2ba-valfail-resp-001",
+      "name": "Booking Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/dispatch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"service_key\": \"welcome-whatsapp\",\n  \"user_ids\": {{ JSON.stringify($json.user_ids) }},\n  \"engagement_id\": {{ $json.engagement_id }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        9040,
+        2688
+      ],
+      "id": "b2ba-dispatch-wa-0001",
+      "name": "Dispatch Welcome WhatsApp",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/dispatch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"service_key\": \"welcome-email\",\n  \"user_ids\": {{ JSON.stringify($('Prepare Participant Dispatch').item.json.user_ids) }},\n  \"engagement_id\": {{ $('Prepare Participant Dispatch').item.json.engagement_id }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        9280,
+        2688
+      ],
+      "id": "b2ba-dispatch-email-0001",
+      "name": "Dispatch Welcome Email",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b2ba-ok-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "b2ba-ok-002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "b2ba-ok-003",
+              "name": "message",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.message }} | Participant Notification sent Successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        9520,
+        2608
+      ],
+      "id": "b2ba-ok-resp-001",
+      "name": "Participant Notify Success"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b2ba-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "b2ba-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "b2ba-fail-003",
+              "name": "message",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.message }} | Participant Notification Failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        9520,
+        2880
+      ],
+      "id": "b2ba-fail-resp-0001",
+      "name": "Participant Notify Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        9760,
+        2800
+      ],
+      "id": "b2ba-callback-0001",
+      "name": "B2B Booking Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "B2B Booking Alert Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate B2B Booking Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate B2B Booking Payload": {
+      "main": [
+        [
+          {
+            "node": "Prepare Participant Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Booking Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Participant Dispatch": {
+      "main": [
+        [
+          {
+            "node": "Ready to Dispatch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready to Dispatch?": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Welcome WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "B2B Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "B2B Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Welcome WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Participant Notify Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Welcome Email": {
+      "main": [
+        [
+          {
+            "node": "Participant Notify Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Participant Notify Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Participant Notify Success": {
+      "main": [
+        [
+          {
+            "node": "B2B Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Participant Notify Failed": {
+      "main": [
+        [
+          {
+            "node": "B2B Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

@@ -88,6 +88,43 @@ async def test_employee_create_user_creates_user(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
+async def test_employee_create_user_without_age(async_client, test_db_session):
+    test_db_session.add(User(age=30, user_id=9002, phone="9002000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=10001, user_id=9002, role="admin", status="active"))
+    await test_db_session.commit()
+
+    payload = {"phone": "5550000999", "first_name": "A", "status": "active"}
+    response = await async_client.post("/users", headers=_auth_header(9002), json=payload)
+
+    assert response.status_code == 200
+    user_id = response.json()["data"]["user_id"]
+
+    created = await test_db_session.get(User, user_id)
+    assert created is not None
+    assert created.phone == "5550000999"
+    assert created.first_name == "A"
+    assert created.age is None
+
+
+@pytest.mark.asyncio
+async def test_employee_create_user_treats_zero_age_as_missing(async_client, test_db_session):
+    test_db_session.add(User(age=30, user_id=9002, phone="9002000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=10001, user_id=9002, role="admin", status="active"))
+    await test_db_session.commit()
+
+    payload = {"phone": "5550000888", "first_name": "B", "status": "active", "age": 0}
+    response = await async_client.post("/users", headers=_auth_header(9002), json=payload)
+
+    assert response.status_code == 200
+    user_id = response.json()["data"]["user_id"]
+    created = await test_db_session.get(User, user_id)
+    assert created is not None
+    assert created.age is None
+
+
+@pytest.mark.asyncio
 async def test_employee_list_users_paginates_and_filters(async_client, test_db_session):
     test_db_session.add(User(age=30, user_id=9003, phone="9003000000", status="active"))
     await test_db_session.flush()

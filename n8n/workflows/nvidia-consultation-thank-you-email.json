@@ -1,0 +1,397 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Fan out: one output item per member\nconst body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email,\n    phone: member.phone || '',\n    external_link: member.external_link\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4944,
+        960
+      ],
+      "id": "ete01-node-0000-6d4cbca9",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "content": "## Nvidia Consultation Thank You Email\nSends a post eye checkup + doctor consultation thank you email to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    external_link\n  }]\n}\n\nNotification service must have require_external_link enabled (API attaches feedback URL per member).",
+        "height": 640,
+        "width": 1848
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4400,
+        800
+      ],
+      "typeVersion": 1,
+      "id": "ete01-node-0001-b5315ab3",
+      "name": "Sticky Note Nvidia Thank You Email"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nvidia-consultation-thank-you-email-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4496,
+        1040
+      ],
+      "id": "ete01-node-0002-681e3be6",
+      "name": "Nvidia Consultation Thank You Email",
+      "webhookId": "ete01-wh-119f6189425c"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ete01-cond-e519fcff",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ete01-cond-9bbcb02c",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ete01-cond-be752c80",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "ete01-cond-18fc301f",
+              "leftValue": "={{ $json.body.members[0].external_link }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4720,
+        1040
+      ],
+      "id": "ete01-node-0003-27f573de",
+      "name": "Validate Email Payload"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst feedbackLink = (member.external_link || '').trim();\n\nconst body = `Hi ${name},\\n\\nThank you for attending your checkup and consultation with our doctor. We hope the session provided you with a clearer understanding of your Bio-AI Health Report, your current health status, and the recommendations discussed during the consultation.\\n\\nWe would love to hear your thoughts on your overall experience with Supershyft so far.\\nYour feedback helps us continue shaping a better preventive health journey for you and every member of our community.\\nYou can share your feedback using the link below.\\n${feedbackLink}\\n\\nShould you have any additional questions or require further assistance, please don't hesitate to reach out to us.\\n\\nWarm regards,\\nTeam Supershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Thank You for Attending Your Checkup and Doctor Consultation',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5152,
+        960
+      ],
+      "id": "ete01-node-0004-8d0016af",
+      "name": "Prepare Nvidia Thank You Email"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        5376,
+        960
+      ],
+      "id": "ete01-node-0005-3ef56cdc",
+      "name": "Send Nvidia Thank You Email",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "ete01-wh-ca01b312a21e",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ete01-asgn-b8761d4e",
+              "name": "notification_id",
+              "value": "={{ $('Nvidia Consultation Thank You Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "ete01-asgn-a9fcb363",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "ete01-asgn-aade786b",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5728,
+        944
+      ],
+      "id": "ete01-node-0006-adbe3a4b",
+      "name": "Email Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ete01-asgn-fafa128b",
+              "name": "notification_id",
+              "value": "={{ $('Nvidia Consultation Thank You Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "ete01-asgn-538fce85",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "ete01-asgn-f8242b1a",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5584,
+        1072
+      ],
+      "id": "ete01-node-0007-8c0c64ba",
+      "name": "Email Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ete01-asgn-1c54aa75",
+              "name": "notification_id",
+              "value": "={{ $('Nvidia Consultation Thank You Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "ete01-asgn-6516ad97",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "ete01-asgn-7cf40ef9",
+              "name": "message",
+              "value": "Payload validation failed: each member requires external_link (enable require_external_link on the notification service)",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4944,
+        1168
+      ],
+      "id": "ete01-node-0008-85d76012",
+      "name": "Email Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6000,
+        1168
+      ],
+      "id": "ete01-node-0009-6210884f",
+      "name": "Email Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Nvidia Thank You Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nvidia Consultation Thank You Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Email Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Nvidia Thank You Email": {
+      "main": [
+        [
+          {
+            "node": "Send Nvidia Thank You Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Nvidia Thank You Email": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}
