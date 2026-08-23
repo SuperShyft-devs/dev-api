@@ -962,6 +962,38 @@ class UsersService:
         user_agent = "post-payment-fulfillment"
         endpoint = "/payments/verify"
 
+        if profile_id and self._metsights_service is not None:
+            try:
+                fitprint_record_id = await self._metsights_service.create_record_for_profile(
+                    profile_id=profile_id,
+                    assessment_type_code="7",
+                )
+                fitprint_package = await self._assessments_service.get_package_by_assessment_type_code(
+                    db,
+                    assessment_type_code="7",
+                )
+                if fitprint_package is not None and fitprint_record_id:
+                    await self._assessments_service.ensure_instance_assigned(
+                        db,
+                        user_id=user.user_id,
+                        engagement_id=engagement.engagement_id,
+                        package_id=int(fitprint_package.package_id),
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        endpoint=endpoint,
+                        metsights_record_id=fitprint_record_id,
+                    )
+                    await self._engagements_service.update_participant_sync_flags(
+                        db,
+                        participant=time_slot,
+                        is_fitprint_record_id_synced=True,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Metsights FitPrint record creation failed for user_id=%s: %s",
+                    user.user_id, str(exc),
+                )
+
         metsights_record_id: str | None = None
         if profile_id and self._metsights_service is not None:
             try:
@@ -996,38 +1028,6 @@ class UsersService:
                     db,
                     participant=time_slot,
                     is_primary_record_id_synced=True,
-                )
-
-        if profile_id and self._metsights_service is not None:
-            try:
-                fitprint_record_id = await self._metsights_service.create_record_for_profile(
-                    profile_id=profile_id,
-                    assessment_type_code="7",
-                )
-                fitprint_package = await self._assessments_service.get_package_by_assessment_type_code(
-                    db,
-                    assessment_type_code="7",
-                )
-                if fitprint_package is not None and fitprint_record_id:
-                    await self._assessments_service.ensure_instance_assigned(
-                        db,
-                        user_id=user.user_id,
-                        engagement_id=engagement.engagement_id,
-                        package_id=int(fitprint_package.package_id),
-                        ip_address=ip_address,
-                        user_agent=user_agent,
-                        endpoint=endpoint,
-                        metsights_record_id=fitprint_record_id,
-                    )
-                    await self._engagements_service.update_participant_sync_flags(
-                        db,
-                        participant=time_slot,
-                        is_fitprint_record_id_synced=True,
-                    )
-            except Exception as exc:
-                logger.warning(
-                    "Metsights FitPrint record creation failed for user_id=%s: %s",
-                    user.user_id, str(exc),
                 )
 
         assessment_instance_id = (
@@ -1281,23 +1281,6 @@ class UsersService:
                 age=user.age,
                 sync_context=sync_context,
             )
-            if profile_id and self._assessments_service is not None and engagement.assessment_package_id:
-                package = await self._assessments_service.get_package_by_id(db, engagement.assessment_package_id)
-                assessment_type_code = (getattr(package, "assessment_type_code", None) or "").strip() if package else ""
-                if assessment_type_code:
-                    try:
-                        await self._metsights_service.create_record_for_profile(
-                            profile_id=profile_id,
-                            assessment_type_code=assessment_type_code,
-                            sync_context=sync_context,
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "Metsights record creation failed for profile_id=%s assessment_type_code=%s: %s",
-                            profile_id,
-                            assessment_type_code,
-                            str(exc),
-                        )
 
         await self._repository.update_user_partial(db, user.user_id, {"metsights_profile_id": profile_id})
         user.metsights_profile_id = profile_id
@@ -1951,6 +1934,41 @@ class UsersService:
                 is_profile_created_on_metsights=True,
             )
 
+        if profile_id and engagement.enroll_for_fitprint_full and self._metsights_service is not None:
+            try:
+                fitprint_package = await self._assessments_service.get_package_by_assessment_type_code(
+                    db,
+                    assessment_type_code="7",
+                )
+                if fitprint_package is None:
+                    raise RuntimeError("Active FitPrint Full assessment package is missing")
+                fitprint_record_id = await self._metsights_service.create_record_for_profile(
+                    profile_id=profile_id,
+                    assessment_type_code="7",
+                )
+                await self._assessments_service.ensure_instance_assigned(
+                    db,
+                    user_id=user.user_id,
+                    engagement_id=engagement.engagement_id,
+                    package_id=int(fitprint_package.package_id),
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    endpoint=endpoint,
+                    metsights_record_id=fitprint_record_id,
+                )
+                await self._engagements_service.update_participant_sync_flags(
+                    db,
+                    participant=time_slot,
+                    is_fitprint_record_id_synced=True,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Metsights FitPrint enrollment failed for user_id=%s engagement_id=%s: %s",
+                    user.user_id,
+                    engagement.engagement_id,
+                    str(exc),
+                )
+
         # Create the primary Metsights record whenever the user has a profile.
         if (
             profile_id
@@ -1983,41 +2001,6 @@ class UsersService:
             except Exception as exc:
                 logger.warning(
                     "Metsights record creation failed for user_id=%s engagement_id=%s: %s",
-                    user.user_id,
-                    engagement.engagement_id,
-                    str(exc),
-                )
-
-        if profile_id and engagement.enroll_for_fitprint_full and self._metsights_service is not None:
-            try:
-                fitprint_package = await self._assessments_service.get_package_by_assessment_type_code(
-                    db,
-                    assessment_type_code="7",
-                )
-                if fitprint_package is None:
-                    raise RuntimeError("Active FitPrint Full assessment package is missing")
-                fitprint_record_id = await self._metsights_service.create_record_for_profile(
-                    profile_id=profile_id,
-                    assessment_type_code="7",
-                )
-                await self._assessments_service.ensure_instance_assigned(
-                    db,
-                    user_id=user.user_id,
-                    engagement_id=engagement.engagement_id,
-                    package_id=int(fitprint_package.package_id),
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    endpoint=endpoint,
-                    metsights_record_id=fitprint_record_id,
-                )
-                await self._engagements_service.update_participant_sync_flags(
-                    db,
-                    participant=time_slot,
-                    is_fitprint_record_id_synced=True,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Metsights FitPrint enrollment failed for user_id=%s engagement_id=%s: %s",
                     user.user_id,
                     engagement.engagement_id,
                     str(exc),
@@ -2311,23 +2294,6 @@ class UsersService:
         assessment_instance = None
         if self._assessments_service is None:
             raise RuntimeError("Assessments service is required")
-        try:
-            assessment_instance = await self._assessments_service.ensure_instance_assigned(
-                db,
-                user_id=user.user_id,
-                engagement_id=engagement.engagement_id,
-                package_id=engagement.assessment_package_id,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                endpoint=endpoint,
-            )
-        except Exception as exc:
-            logger.warning(
-                "Assessment assignment failed for user_id=%s engagement_id=%s: %s",
-                user.user_id,
-                engagement.engagement_id,
-                str(exc),
-            )
 
         metsights_record_id: str | None = None
         sync_context = MetsightsSyncContext(
@@ -2335,6 +2301,7 @@ class UsersService:
             engagement_id=int(engagement.engagement_id),
             user_id=int(user.user_id),
         )
+        profile_id: str | None = None
         try:
             profile_id = await self._create_metsights_profile_for_engagement(
                 db,
@@ -2348,34 +2315,6 @@ class UsersService:
                     participant=time_slot,
                     is_profile_created_on_metsights=True,
                 )
-                package = await self._assessments_service.get_package_by_id(db, engagement.assessment_package_id)
-                primary_type_code = (
-                    (getattr(package, "assessment_type_code", None) or "").strip() if package is not None else ""
-                )
-                primary_record_id: str | None = None
-                if primary_type_code:
-                    primary_record_id = await self._metsights_service.create_record_for_profile(
-                        profile_id=profile_id,
-                        assessment_type_code=primary_type_code,
-                        sync_context=sync_context,
-                    )
-                if primary_record_id and assessment_instance is not None:
-                    assessment_instance = await self._assessments_service.ensure_instance_assigned(
-                        db,
-                        user_id=user.user_id,
-                        engagement_id=engagement.engagement_id,
-                        package_id=engagement.assessment_package_id,
-                        ip_address=ip_address,
-                        user_agent=user_agent,
-                        endpoint=endpoint,
-                        metsights_record_id=primary_record_id,
-                    )
-                    metsights_record_id = primary_record_id
-                    await self._engagements_service.update_participant_sync_flags(
-                        db,
-                        participant=time_slot,
-                        is_primary_record_id_synced=True,
-                    )
 
                 if bool(engagement.enroll_for_fitprint_full):
                     fitprint_record_id = await self._metsights_service.create_record_for_profile(
@@ -2410,6 +2349,62 @@ class UsersService:
                 engagement.engagement_id,
                 str(exc),
             )
+
+        try:
+            assessment_instance = await self._assessments_service.ensure_instance_assigned(
+                db,
+                user_id=user.user_id,
+                engagement_id=engagement.engagement_id,
+                package_id=engagement.assessment_package_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                endpoint=endpoint,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Assessment assignment failed for user_id=%s engagement_id=%s: %s",
+                user.user_id,
+                engagement.engagement_id,
+                str(exc),
+            )
+
+        if profile_id:
+            try:
+                package = await self._assessments_service.get_package_by_id(db, engagement.assessment_package_id)
+                primary_type_code = (
+                    (getattr(package, "assessment_type_code", None) or "").strip() if package is not None else ""
+                )
+                primary_record_id: str | None = None
+                if primary_type_code:
+                    primary_record_id = await self._metsights_service.create_record_for_profile(
+                        profile_id=profile_id,
+                        assessment_type_code=primary_type_code,
+                        sync_context=sync_context,
+                    )
+                if primary_record_id and assessment_instance is not None:
+                    assessment_instance = await self._assessments_service.ensure_instance_assigned(
+                        db,
+                        user_id=user.user_id,
+                        engagement_id=engagement.engagement_id,
+                        package_id=engagement.assessment_package_id,
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        endpoint=endpoint,
+                        metsights_record_id=primary_record_id,
+                    )
+                    metsights_record_id = primary_record_id
+                    await self._engagements_service.update_participant_sync_flags(
+                        db,
+                        participant=time_slot,
+                        is_primary_record_id_synced=True,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Metsights primary record sync failed for user_id=%s engagement_id=%s: %s",
+                    user.user_id,
+                    engagement.engagement_id,
+                    str(exc),
+                )
 
         if (
             self._metsights_service is not None
