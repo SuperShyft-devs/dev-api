@@ -1643,7 +1643,7 @@ class UsersService:
         patch_data: dict,
         create_data: dict,
     ) -> tuple[User, bool]:
-        existing = await self._repository.get_user_by_phone(db, phone)
+        existing = await self.resolve_user_by_phone(db, phone)
         if existing is None and email is not None:
             existing = await self._repository.get_user_by_email(db, email)
 
