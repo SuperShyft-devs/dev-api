@@ -1911,7 +1911,32 @@ class ReportsService:
     # and should default to "5" (Rarely or never) when missing.
     _VEGETARIAN_DIET_PREFERENCE_VALUES = frozenset({"0", "3", "4", "5"})
 
-    def _build_nutrition_api_payload(self, lookup: dict[str, Any], *, user_gender: str | None = None, option_reverse_map: dict[str, dict[str, str]] | None = None) -> dict[str, Any]:
+    @staticmethod
+    def _resolve_nutrition_age(
+        *,
+        user_age: int | None = None,
+        user_date_of_birth: date | None = None,
+        reference_date: date | None = None,
+    ) -> int | None:
+        """Prefer stored users.age; otherwise derive chronological age from date_of_birth."""
+        if user_age is not None:
+            return int(user_age)
+        if user_date_of_birth is None:
+            return None
+        ref = reference_date or date.today()
+        years = ref.year - user_date_of_birth.year
+        had_birthday = (ref.month, ref.day) >= (user_date_of_birth.month, user_date_of_birth.day)
+        return years if had_birthday else years - 1
+
+    def _build_nutrition_api_payload(
+        self,
+        lookup: dict[str, Any],
+        *,
+        user_gender: str | None = None,
+        user_age: int | None = None,
+        user_date_of_birth: date | None = None,
+        option_reverse_map: dict[str, dict[str, str]] | None = None,
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {}
         for key in self._NUTRITION_API_QUESTION_KEYS:
             val = lookup.get(key)
@@ -1941,6 +1966,13 @@ class ReportsService:
         normalized_height_unit = self._normalize_height_unit(height_unit)
         if normalized_height_unit is not None:
             payload["height_unit"] = normalized_height_unit
+
+        resolved_age = self._resolve_nutrition_age(
+            user_age=user_age,
+            user_date_of_birth=user_date_of_birth,
+        )
+        if resolved_age is not None:
+            payload["age"] = resolved_age
 
         return payload
 
@@ -2023,6 +2055,8 @@ class ReportsService:
         assessment_instance_id: int,
         user_id: int,
         user_gender: str | None,
+        user_age: int | None,
+        user_date_of_birth: date | None,
         source_assessment_instance_ids: list[int],
         include_details: bool,
     ) -> HealthSpanIndexResponse:
@@ -2120,7 +2154,13 @@ class ReportsService:
 
         # Step 5: Call the nutrition API
         option_reverse_map = await self._build_option_reverse_map(db, key_to_question_id)
-        nutrition_payload = self._build_nutrition_api_payload(lookup, user_gender=user_gender, option_reverse_map=option_reverse_map)
+        nutrition_payload = self._build_nutrition_api_payload(
+            lookup,
+            user_gender=user_gender,
+            user_age=user_age,
+            user_date_of_birth=user_date_of_birth,
+            option_reverse_map=option_reverse_map,
+        )
         nutrition_response = await self._call_nutrition_api(
             db,
             nutrition_payload,

@@ -89,6 +89,8 @@ class EnrolledAssessmentContext:
     engagement: Engagement
     individual_report: IndividualHealthReport | None
     user_gender: str | None
+    user_age: int | None
+    user_date_of_birth: date | None
 
 
 def _dedupe_enrolled_assessment_contexts(
@@ -96,7 +98,7 @@ def _dedupe_enrolled_assessment_contexts(
 ) -> list[EnrolledAssessmentContext]:
     """Collapse duplicate IHR outer-join rows; prefer a row that has blood_parameters."""
     by_id: dict[int, EnrolledAssessmentContext] = {}
-    for ai, pkg, eng, ihr, gender in rows:
+    for ai, pkg, eng, ihr, gender, age, date_of_birth in rows:
         aid = int(ai.assessment_instance_id)
         ctx = EnrolledAssessmentContext(
             assessment_instance=ai,
@@ -104,6 +106,8 @@ def _dedupe_enrolled_assessment_contexts(
             engagement=eng,
             individual_report=ihr,
             user_gender=gender,
+            user_age=int(age) if age is not None else None,
+            user_date_of_birth=date_of_birth,
         )
         existing = by_id.get(aid)
         if existing is None:
@@ -2665,6 +2669,8 @@ class CampReportsRepository:
             select(
                 AssessmentInstance.assessment_instance_id.label("assessment_instance_id"),
                 enrolled.c.gender.label("user_gender"),
+                enrolled.c.age.label("user_age"),
+                enrolled.c.date_of_birth.label("user_date_of_birth"),
                 func.row_number()
                 .over(
                     partition_by=enrolled.c.user_id,
@@ -2689,6 +2695,8 @@ class CampReportsRepository:
                 Engagement,
                 IndividualHealthReport,
                 ranked.c.user_gender,
+                ranked.c.user_age,
+                ranked.c.user_date_of_birth,
             )
             .select_from(ranked)
             .join(
@@ -2723,6 +2731,8 @@ class CampReportsRepository:
             select(
                 AssessmentInstance.assessment_instance_id.label("assessment_instance_id"),
                 enrolled.c.gender.label("user_gender"),
+                enrolled.c.age.label("user_age"),
+                enrolled.c.date_of_birth.label("user_date_of_birth"),
                 func.row_number()
                 .over(
                     partition_by=enrolled.c.user_id,
@@ -2752,6 +2762,8 @@ class CampReportsRepository:
                 Engagement,
                 IndividualHealthReport,
                 ranked.c.user_gender,
+                ranked.c.user_age,
+                ranked.c.user_date_of_birth,
             )
             .select_from(ranked)
             .join(
@@ -2826,6 +2838,8 @@ class CampReportsRepository:
             select(
                 AssessmentInstance.assessment_instance_id.label("assessment_instance_id"),
                 enrolled.c.gender.label("user_gender"),
+                enrolled.c.age.label("user_age"),
+                enrolled.c.date_of_birth.label("user_date_of_birth"),
                 func.row_number()
                 .over(
                     partition_by=enrolled.c.user_id,
@@ -2855,6 +2869,8 @@ class CampReportsRepository:
                 Engagement,
                 IndividualHealthReport,
                 ranked.c.user_gender,
+                ranked.c.user_age,
+                ranked.c.user_date_of_birth,
             )
             .select_from(ranked)
             .join(

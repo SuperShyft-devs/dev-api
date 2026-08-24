@@ -191,6 +191,8 @@ async def get_health_span_index(
         assessment_instance_id=assessment_instance_id,
         user_id=user.user_id,
         user_gender=getattr(user, "gender", None),
+        user_age=getattr(user, "age", None),
+        user_date_of_birth=getattr(user, "date_of_birth", None),
         source_assessment_instance_ids=body.source_assessment_instance_ids,
         include_details=body.include_details,
     )

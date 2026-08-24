@@ -2001,6 +2001,8 @@ class CampReportsService:
                 engagement=engagement,
                 individual_report=individual_report,
                 user_gender=user_gender,
+                user_age=None,
+                user_date_of_birth=None,
             )
             result = await self._positive_wins_for_context(session, ctx=ctx)
             await session.commit()
@@ -2242,6 +2244,8 @@ class CampReportsService:
                     nutrition_payload = self._reports_service._build_nutrition_api_payload(
                         lookup,
                         user_gender=ctx.user_gender,
+                        user_age=ctx.user_age,
+                        user_date_of_birth=ctx.user_date_of_birth,
                         option_reverse_map=option_reverse_map,
                     )
                     nutrition_response = await self._reports_service._call_nutrition_api(
