@@ -1,0 +1,1132 @@
+{
+  "knowledge_base_version": "1.0",
+  "disease_id": "pcos",
+  "display_name": "Polycystic Ovary Syndrome (PCOS)",
+  "overview": "PCOS is a common hormonal and metabolic condition that can affect periods, ovulation, fertility, and long-term metabolic health. It can occur at any body size and does not necessarily involve insulin resistance or higher weight.",
+  "risk_bands": {
+    "healthy": {
+      "range": "0-25",
+      "score_bands": {
+        "0_5": {
+          "score_range": "0-5",
+          "risk_interpretation": "Your profile is in the lowest PCOS-related risk range. This score does not diagnose PCOS; continue healthy habits and routine preventive care.",
+          "lifestyle_tips": [
+            "Maintain regular physical activity and reduce prolonged sitting.",
+            "Keep a consistent sleep routine.",
+            "Use sustainable habits rather than restrictive approaches.",
+            "Support stress management and emotional wellbeing.",
+            "Track menstrual patterns when useful."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Tailor food choices to personal preferences, culture, nutritional needs, and goals."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150–300 minutes of moderate aerobic activity weekly, or an equivalent combination of moderate and vigorous activity.",
+            "Include muscle-strengthening activity on at least two non-consecutive days each week.",
+            "Reduce prolonged sitting and add light movement throughout the day.",
+            "Choose activities that are enjoyable and sustainable."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Keep routine blood pressure and cardiometabolic screening up to date.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Discuss persistent irregular periods, new or worsening excess hair growth, significant acne, fertility concerns, or unexplained metabolic changes with your healthcare provider.",
+          "positive_takeaway": "Healthy lifestyle habits support metabolic, reproductive, and psychological wellbeing regardless of weight."
+        },
+        "6_10": {
+          "score_range": "6-10",
+          "risk_interpretation": "Your profile shows a low level of PCOS-related risk. Maintain healthy eating, regular activity, sleep, and routine health checks.",
+          "lifestyle_tips": [
+            "Maintain regular physical activity and reduce prolonged sitting.",
+            "Keep a consistent sleep routine.",
+            "Use sustainable habits rather than restrictive approaches.",
+            "Support stress management and emotional wellbeing.",
+            "Track menstrual patterns when useful."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Tailor food choices to personal preferences, culture, nutritional needs, and goals."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150–300 minutes of moderate aerobic activity weekly, or an equivalent combination of moderate and vigorous activity.",
+            "Include muscle-strengthening activity on at least two non-consecutive days each week.",
+            "Reduce prolonged sitting and add light movement throughout the day.",
+            "Choose activities that are enjoyable and sustainable."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Keep routine blood pressure and cardiometabolic screening up to date.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Discuss persistent irregular periods, new or worsening excess hair growth, significant acne, fertility concerns, or unexplained metabolic changes with your healthcare provider.",
+          "positive_takeaway": "Healthy lifestyle habits support metabolic, reproductive, and psychological wellbeing regardless of weight."
+        },
+        "11_15": {
+          "score_range": "11-15",
+          "risk_interpretation": "Your profile remains in a lower-risk range. Continue supportive lifestyle habits and pay attention to menstrual and metabolic health.",
+          "lifestyle_tips": [
+            "Maintain regular physical activity and reduce prolonged sitting.",
+            "Keep a consistent sleep routine.",
+            "Use sustainable habits rather than restrictive approaches.",
+            "Support stress management and emotional wellbeing.",
+            "Track menstrual patterns when useful."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Tailor food choices to personal preferences, culture, nutritional needs, and goals."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150–300 minutes of moderate aerobic activity weekly, or an equivalent combination of moderate and vigorous activity.",
+            "Include muscle-strengthening activity on at least two non-consecutive days each week.",
+            "Reduce prolonged sitting and add light movement throughout the day.",
+            "Choose activities that are enjoyable and sustainable."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Keep routine blood pressure and cardiometabolic screening up to date.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Discuss persistent irregular periods, new or worsening excess hair growth, significant acne, fertility concerns, or unexplained metabolic changes with your healthcare provider.",
+          "positive_takeaway": "Healthy lifestyle habits support metabolic, reproductive, and psychological wellbeing regardless of weight."
+        },
+        "16_20": {
+          "score_range": "16-20",
+          "risk_interpretation": "Your profile remains in the healthy range, although some PCOS-related factors may be present. Consistent lifestyle habits can support long-term health.",
+          "lifestyle_tips": [
+            "Maintain regular physical activity and reduce prolonged sitting.",
+            "Keep a consistent sleep routine.",
+            "Use sustainable habits rather than restrictive approaches.",
+            "Support stress management and emotional wellbeing.",
+            "Track menstrual patterns when useful."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Tailor food choices to personal preferences, culture, nutritional needs, and goals."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150–300 minutes of moderate aerobic activity weekly, or an equivalent combination of moderate and vigorous activity.",
+            "Include muscle-strengthening activity on at least two non-consecutive days each week.",
+            "Reduce prolonged sitting and add light movement throughout the day.",
+            "Choose activities that are enjoyable and sustainable."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Keep routine blood pressure and cardiometabolic screening up to date.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Discuss persistent irregular periods, new or worsening excess hair growth, significant acne, fertility concerns, or unexplained metabolic changes with your healthcare provider.",
+          "positive_takeaway": "Healthy lifestyle habits support metabolic, reproductive, and psychological wellbeing regardless of weight."
+        },
+        "21_25": {
+          "score_range": "21-25",
+          "risk_interpretation": "Your score is still in the lower-risk range but is approaching increased risk. Strengthening healthy habits and monitoring relevant symptoms may be helpful.",
+          "lifestyle_tips": [
+            "Maintain regular physical activity and reduce prolonged sitting.",
+            "Keep a consistent sleep routine.",
+            "Use sustainable habits rather than restrictive approaches.",
+            "Support stress management and emotional wellbeing.",
+            "Track menstrual patterns when useful."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Tailor food choices to personal preferences, culture, nutritional needs, and goals."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150–300 minutes of moderate aerobic activity weekly, or an equivalent combination of moderate and vigorous activity.",
+            "Include muscle-strengthening activity on at least two non-consecutive days each week.",
+            "Reduce prolonged sitting and add light movement throughout the day.",
+            "Choose activities that are enjoyable and sustainable."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Keep routine blood pressure and cardiometabolic screening up to date.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Discuss persistent irregular periods, new or worsening excess hair growth, significant acne, fertility concerns, or unexplained metabolic changes with your healthcare provider.",
+          "positive_takeaway": "Healthy lifestyle habits support metabolic, reproductive, and psychological wellbeing regardless of weight."
+        }
+      }
+    },
+    "increased_risk": {
+      "range": "26-50",
+      "score_bands": {
+        "26_30": {
+          "score_range": "26-30",
+          "risk_interpretation": "Your score indicates some increased PCOS-related risk. This is not a diagnosis; consider discussing persistent menstrual, androgen-related, or metabolic concerns with a healthcare professional.",
+          "lifestyle_tips": [
+            "Build regular physical activity into most days.",
+            "Break up prolonged sitting with light movement.",
+            "Prioritize consistent sleep and recovery.",
+            "Use realistic goals and track progress without excessive restriction.",
+            "Pay attention to menstrual and androgen-related symptoms."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Tailor food choices to personal preferences, culture, nutritional needs, and goals."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Aim toward 150–300 minutes of moderate aerobic activity weekly, as appropriate.",
+            "Include muscle-strengthening activity on at least two non-consecutive days each week.",
+            "Reduce prolonged sitting and add movement throughout the day.",
+            "Progress gradually according to fitness, preferences, and health status."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Clinical review is appropriate for persistent irregular periods, signs of androgen excess, fertility concerns, or metabolic abnormalities.",
+          "positive_takeaway": "Sustainable lifestyle changes can support metabolic and overall health, and benefits can occur even without weight loss."
+        },
+        "31_35": {
+          "score_range": "31-35",
+          "risk_interpretation": "Your profile shows increased PCOS-related risk. Focus on sustainable lifestyle habits and consider clinical review if symptoms such as irregular cycles, excess hair growth, acne, or metabolic concerns are present.",
+          "lifestyle_tips": [
+            "Build regular physical activity into most days.",
+            "Break up prolonged sitting with light movement.",
+            "Prioritize consistent sleep and recovery.",
+            "Use realistic goals and track progress without excessive restriction.",
+            "Pay attention to menstrual and androgen-related symptoms."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Tailor food choices to personal preferences, culture, nutritional needs, and goals."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Aim toward 150–300 minutes of moderate aerobic activity weekly, as appropriate.",
+            "Include muscle-strengthening activity on at least two non-consecutive days each week.",
+            "Reduce prolonged sitting and add movement throughout the day.",
+            "Progress gradually according to fitness, preferences, and health status."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Clinical review is appropriate for persistent irregular periods, signs of androgen excess, fertility concerns, or metabolic abnormalities.",
+          "positive_takeaway": "Sustainable lifestyle changes can support metabolic and overall health, and benefits can occur even without weight loss."
+        },
+        "36_40": {
+          "score_range": "36-40",
+          "risk_interpretation": "Your score suggests a moderate increase in PCOS-related risk. A healthcare professional can interpret this score alongside menstrual history, symptoms, examination, and appropriate tests.",
+          "lifestyle_tips": [
+            "Build regular physical activity into most days.",
+            "Break up prolonged sitting with light movement.",
+            "Prioritize consistent sleep and recovery.",
+            "Use realistic goals and track progress without excessive restriction.",
+            "Pay attention to menstrual and androgen-related symptoms."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Tailor food choices to personal preferences, culture, nutritional needs, and goals."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Aim toward 150–300 minutes of moderate aerobic activity weekly, as appropriate.",
+            "Include muscle-strengthening activity on at least two non-consecutive days each week.",
+            "Reduce prolonged sitting and add movement throughout the day.",
+            "Progress gradually according to fitness, preferences, and health status."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Clinical review is appropriate for persistent irregular periods, signs of androgen excess, fertility concerns, or metabolic abnormalities.",
+          "positive_takeaway": "Sustainable lifestyle changes can support metabolic and overall health, and benefits can occur even without weight loss."
+        },
+        "41_45": {
+          "score_range": "41-45",
+          "risk_interpretation": "Your score indicates a more noticeable PCOS-related risk pattern. Consider clinical assessment, particularly if menstrual irregularity or signs of androgen excess are present.",
+          "lifestyle_tips": [
+            "Build regular physical activity into most days.",
+            "Break up prolonged sitting with light movement.",
+            "Prioritize consistent sleep and recovery.",
+            "Use realistic goals and track progress without excessive restriction.",
+            "Pay attention to menstrual and androgen-related symptoms."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Tailor food choices to personal preferences, culture, nutritional needs, and goals."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Aim toward 150–300 minutes of moderate aerobic activity weekly, as appropriate.",
+            "Include muscle-strengthening activity on at least two non-consecutive days each week.",
+            "Reduce prolonged sitting and add movement throughout the day.",
+            "Progress gradually according to fitness, preferences, and health status."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Clinical review is appropriate for persistent irregular periods, signs of androgen excess, fertility concerns, or metabolic abnormalities.",
+          "positive_takeaway": "Sustainable lifestyle changes can support metabolic and overall health, and benefits can occur even without weight loss."
+        },
+        "46_50": {
+          "score_range": "46-50",
+          "risk_interpretation": "Your score is near the upper end of the increased-risk range. Clinical assessment may be appropriate if you have persistent cycle irregularity, androgen-related symptoms, fertility concerns, or metabolic risk factors.",
+          "lifestyle_tips": [
+            "Build regular physical activity into most days.",
+            "Break up prolonged sitting with light movement.",
+            "Prioritize consistent sleep and recovery.",
+            "Use realistic goals and track progress without excessive restriction.",
+            "Pay attention to menstrual and androgen-related symptoms."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Tailor food choices to personal preferences, culture, nutritional needs, and goals."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Aim toward 150–300 minutes of moderate aerobic activity weekly, as appropriate.",
+            "Include muscle-strengthening activity on at least two non-consecutive days each week.",
+            "Reduce prolonged sitting and add movement throughout the day.",
+            "Progress gradually according to fitness, preferences, and health status."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Clinical review is appropriate for persistent irregular periods, signs of androgen excess, fertility concerns, or metabolic abnormalities.",
+          "positive_takeaway": "Sustainable lifestyle changes can support metabolic and overall health, and benefits can occur even without weight loss."
+        }
+      }
+    },
+    "high_risk": {
+      "range": "51-75",
+      "score_bands": {
+        "51_55": {
+          "score_range": "51-55",
+          "risk_interpretation": "Your score indicates a higher PCOS-related risk pattern. The result is not diagnostic, but persistent symptoms should be reviewed by a qualified healthcare professional.",
+          "lifestyle_tips": [
+            "Use a sustainable combination of physical activity, healthy eating, and behavioural strategies.",
+            "Reduce prolonged sedentary time.",
+            "Prioritize sleep and recovery.",
+            "Set practical goals and review them regularly.",
+            "Seek support if symptoms, body-image concerns, or eating difficulties affect wellbeing."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Choose a sustainable eating pattern tailored to personal preferences, culture, nutritional needs, and goals; no single diet is proven superior for PCOS."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Work toward regular moderate or vigorous aerobic activity according to fitness and health status.",
+            "Include muscle-strengthening activity on at least two non-consecutive days weekly when appropriate.",
+            "Break up sedentary time throughout the day.",
+            "For weight-management goals, greater activity may be useful when appropriate and individually planned."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Arrange clinical assessment if symptoms persist or if you have menstrual irregularity, signs of androgen excess, fertility concerns, abnormal glucose or lipids, or significant sleep symptoms.",
+          "positive_takeaway": "PCOS is manageable, and individualized lifestyle and clinical care can improve long-term health outcomes."
+        },
+        "56_60": {
+          "score_range": "56-60",
+          "risk_interpretation": "Your profile shows elevated PCOS-related risk. Clinical review can help determine whether symptoms and findings are consistent with PCOS or another condition.",
+          "lifestyle_tips": [
+            "Use a sustainable combination of physical activity, healthy eating, and behavioural strategies.",
+            "Reduce prolonged sedentary time.",
+            "Prioritize sleep and recovery.",
+            "Set practical goals and review them regularly.",
+            "Seek support if symptoms, body-image concerns, or eating difficulties affect wellbeing."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Choose a sustainable eating pattern tailored to personal preferences, culture, nutritional needs, and goals; no single diet is proven superior for PCOS."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Work toward regular moderate or vigorous aerobic activity according to fitness and health status.",
+            "Include muscle-strengthening activity on at least two non-consecutive days weekly when appropriate.",
+            "Break up sedentary time throughout the day.",
+            "For weight-management goals, greater activity may be useful when appropriate and individually planned."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Arrange clinical assessment if symptoms persist or if you have menstrual irregularity, signs of androgen excess, fertility concerns, abnormal glucose or lipids, or significant sleep symptoms.",
+          "positive_takeaway": "PCOS is manageable, and individualized lifestyle and clinical care can improve long-term health outcomes."
+        },
+        "61_65": {
+          "score_range": "61-65",
+          "risk_interpretation": "Your score indicates substantial PCOS-related risk. Consider evaluation of menstrual patterns, androgen-related symptoms, blood pressure, glucose status, lipids, and other relevant health factors.",
+          "lifestyle_tips": [
+            "Use a sustainable combination of physical activity, healthy eating, and behavioural strategies.",
+            "Reduce prolonged sedentary time.",
+            "Prioritize sleep and recovery.",
+            "Set practical goals and review them regularly.",
+            "Seek support if symptoms, body-image concerns, or eating difficulties affect wellbeing."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Choose a sustainable eating pattern tailored to personal preferences, culture, nutritional needs, and goals; no single diet is proven superior for PCOS."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Work toward regular moderate or vigorous aerobic activity according to fitness and health status.",
+            "Include muscle-strengthening activity on at least two non-consecutive days weekly when appropriate.",
+            "Break up sedentary time throughout the day.",
+            "For weight-management goals, greater activity may be useful when appropriate and individually planned."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Arrange clinical assessment if symptoms persist or if you have menstrual irregularity, signs of androgen excess, fertility concerns, abnormal glucose or lipids, or significant sleep symptoms.",
+          "positive_takeaway": "PCOS is manageable, and individualized lifestyle and clinical care can improve long-term health outcomes."
+        },
+        "66_70": {
+          "score_range": "66-70",
+          "risk_interpretation": "Your profile shows a substantial PCOS-related risk pattern. Arrange appropriate clinical assessment rather than relying on the score alone for diagnosis or treatment decisions.",
+          "lifestyle_tips": [
+            "Use a sustainable combination of physical activity, healthy eating, and behavioural strategies.",
+            "Reduce prolonged sedentary time.",
+            "Prioritize sleep and recovery.",
+            "Set practical goals and review them regularly.",
+            "Seek support if symptoms, body-image concerns, or eating difficulties affect wellbeing."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Choose a sustainable eating pattern tailored to personal preferences, culture, nutritional needs, and goals; no single diet is proven superior for PCOS."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Work toward regular moderate or vigorous aerobic activity according to fitness and health status.",
+            "Include muscle-strengthening activity on at least two non-consecutive days weekly when appropriate.",
+            "Break up sedentary time throughout the day.",
+            "For weight-management goals, greater activity may be useful when appropriate and individually planned."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Arrange clinical assessment if symptoms persist or if you have menstrual irregularity, signs of androgen excess, fertility concerns, abnormal glucose or lipids, or significant sleep symptoms.",
+          "positive_takeaway": "PCOS is manageable, and individualized lifestyle and clinical care can improve long-term health outcomes."
+        },
+        "71_75": {
+          "score_range": "71-75",
+          "risk_interpretation": "Your score is at the upper end of the high-risk range. Prompt clinical review is appropriate, especially when menstrual, androgen-related, fertility, sleep, or metabolic concerns are present.",
+          "lifestyle_tips": [
+            "Use a sustainable combination of physical activity, healthy eating, and behavioural strategies.",
+            "Reduce prolonged sedentary time.",
+            "Prioritize sleep and recovery.",
+            "Set practical goals and review them regularly.",
+            "Seek support if symptoms, body-image concerns, or eating difficulties affect wellbeing."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Choose a sustainable eating pattern tailored to personal preferences, culture, nutritional needs, and goals; no single diet is proven superior for PCOS."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Work toward regular moderate or vigorous aerobic activity according to fitness and health status.",
+            "Include muscle-strengthening activity on at least two non-consecutive days weekly when appropriate.",
+            "Break up sedentary time throughout the day.",
+            "For weight-management goals, greater activity may be useful when appropriate and individually planned."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Arrange clinical assessment if symptoms persist or if you have menstrual irregularity, signs of androgen excess, fertility concerns, abnormal glucose or lipids, or significant sleep symptoms.",
+          "positive_takeaway": "PCOS is manageable, and individualized lifestyle and clinical care can improve long-term health outcomes."
+        }
+      }
+    },
+    "very_high_risk": {
+      "range": "76-100",
+      "score_bands": {
+        "76_80": {
+          "score_range": "76-80",
+          "risk_interpretation": "Your score indicates very high PCOS-related risk. This does not confirm PCOS, but comprehensive clinical assessment is recommended to clarify the cause of the findings and guide care.",
+          "lifestyle_tips": [
+            "Prioritize sustainable healthy eating and regular activity rather than extreme diets.",
+            "Reduce prolonged sedentary time as tolerated.",
+            "Protect sleep and recovery.",
+            "Use structured goals and professional support where helpful.",
+            "Seek support for persistent psychological, reproductive, or metabolic concerns."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Choose a sustainable eating pattern tailored to personal preferences, culture, nutritional needs, and goals; no single diet is proven superior for PCOS."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Use regular aerobic and muscle-strengthening activity as tolerated and appropriate.",
+            "Reduce prolonged sedentary time.",
+            "Increase activity gradually rather than using extreme exercise programs.",
+            "Discuss exercise limitations or significant symptoms with a healthcare professional."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Prompt clinical assessment is recommended for persistent menstrual irregularity, androgen-related symptoms, fertility concerns, metabolic abnormalities, or significant sleep or psychological symptoms.",
+          "positive_takeaway": "A higher risk score is not a diagnosis; appropriate clinical assessment and individualized care can clarify the findings and guide effective management."
+        },
+        "81_85": {
+          "score_range": "81-85",
+          "risk_interpretation": "Your profile shows very high PCOS-related risk. Seek clinical assessment for persistent menstrual, androgen-related, reproductive, metabolic, or sleep-related concerns.",
+          "lifestyle_tips": [
+            "Prioritize sustainable healthy eating and regular activity rather than extreme diets.",
+            "Reduce prolonged sedentary time as tolerated.",
+            "Protect sleep and recovery.",
+            "Use structured goals and professional support where helpful.",
+            "Seek support for persistent psychological, reproductive, or metabolic concerns."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Choose a sustainable eating pattern tailored to personal preferences, culture, nutritional needs, and goals; no single diet is proven superior for PCOS."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Use regular aerobic and muscle-strengthening activity as tolerated and appropriate.",
+            "Reduce prolonged sedentary time.",
+            "Increase activity gradually rather than using extreme exercise programs.",
+            "Discuss exercise limitations or significant symptoms with a healthcare professional."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Prompt clinical assessment is recommended for persistent menstrual irregularity, androgen-related symptoms, fertility concerns, metabolic abnormalities, or significant sleep or psychological symptoms.",
+          "positive_takeaway": "A higher risk score is not a diagnosis; appropriate clinical assessment and individualized care can clarify the findings and guide effective management."
+        },
+        "86_90": {
+          "score_range": "86-90",
+          "risk_interpretation": "Your score is in a very high PCOS-related risk range. Professional evaluation is important because PCOS diagnosis requires clinical assessment and exclusion of other causes.",
+          "lifestyle_tips": [
+            "Prioritize sustainable healthy eating and regular activity rather than extreme diets.",
+            "Reduce prolonged sedentary time as tolerated.",
+            "Protect sleep and recovery.",
+            "Use structured goals and professional support where helpful.",
+            "Seek support for persistent psychological, reproductive, or metabolic concerns."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Choose a sustainable eating pattern tailored to personal preferences, culture, nutritional needs, and goals; no single diet is proven superior for PCOS."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Use regular aerobic and muscle-strengthening activity as tolerated and appropriate.",
+            "Reduce prolonged sedentary time.",
+            "Increase activity gradually rather than using extreme exercise programs.",
+            "Discuss exercise limitations or significant symptoms with a healthcare professional."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Prompt clinical assessment is recommended for persistent menstrual irregularity, androgen-related symptoms, fertility concerns, metabolic abnormalities, or significant sleep or psychological symptoms.",
+          "positive_takeaway": "A higher risk score is not a diagnosis; appropriate clinical assessment and individualized care can clarify the findings and guide effective management."
+        },
+        "91_95": {
+          "score_range": "91-95",
+          "risk_interpretation": "Your score is near the highest PCOS-related risk level. Arrange a clinical evaluation, particularly if you have persistent irregular periods, androgen-related symptoms, fertility concerns, or metabolic abnormalities.",
+          "lifestyle_tips": [
+            "Prioritize sustainable healthy eating and regular activity rather than extreme diets.",
+            "Reduce prolonged sedentary time as tolerated.",
+            "Protect sleep and recovery.",
+            "Use structured goals and professional support where helpful.",
+            "Seek support for persistent psychological, reproductive, or metabolic concerns."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Choose a sustainable eating pattern tailored to personal preferences, culture, nutritional needs, and goals; no single diet is proven superior for PCOS."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Use regular aerobic and muscle-strengthening activity as tolerated and appropriate.",
+            "Reduce prolonged sedentary time.",
+            "Increase activity gradually rather than using extreme exercise programs.",
+            "Discuss exercise limitations or significant symptoms with a healthcare professional."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Prompt clinical assessment is recommended for persistent menstrual irregularity, androgen-related symptoms, fertility concerns, metabolic abnormalities, or significant sleep or psychological symptoms.",
+          "positive_takeaway": "A higher risk score is not a diagnosis; appropriate clinical assessment and individualized care can clarify the findings and guide effective management."
+        },
+        "96_100": {
+          "score_range": "96-100",
+          "risk_interpretation": "This is the highest PCOS-related risk band. The score alone cannot diagnose PCOS; comprehensive professional evaluation and appropriate follow-up are strongly recommended.",
+          "lifestyle_tips": [
+            "Prioritize sustainable healthy eating and regular activity rather than extreme diets.",
+            "Reduce prolonged sedentary time as tolerated.",
+            "Protect sleep and recovery.",
+            "Use structured goals and professional support where helpful.",
+            "Seek support for persistent psychological, reproductive, or metabolic concerns."
+          ],
+          "diet_recommendations": [
+            "Choose a balanced eating pattern built around vegetables, fruit, whole grains, legumes, and protein-rich foods.",
+            "Include fibre-rich carbohydrate sources and minimally processed foods.",
+            "Choose unsaturated fats such as nuts, seeds, and vegetable oils.",
+            "Drink water regularly and limit sugar-sweetened beverages.",
+            "Choose a sustainable eating pattern tailored to personal preferences, culture, nutritional needs, and goals; no single diet is proven superior for PCOS."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli and other vegetables",
+            "Berries or other whole fruit",
+            "Oats or other whole grains",
+            "Lentils",
+            "Chickpeas and beans",
+            "Nuts and seeds",
+            "Plain unsweetened yogurt or suitable alternatives",
+            "Fish or other protein-rich foods"
+          ],
+          "foods_to_avoid": [
+            "Sugar-sweetened beverages",
+            "Highly processed snack foods",
+            "Frequent deep-fried foods",
+            "Pastries and sweets in excess",
+            "Refined grains as the main carbohydrate source",
+            "Processed meats",
+            "Highly restrictive or nutritionally unbalanced diets"
+          ],
+          "exercise_recommendations": [
+            "Use regular aerobic and muscle-strengthening activity as tolerated and appropriate.",
+            "Reduce prolonged sedentary time.",
+            "Increase activity gradually rather than using extreme exercise programs.",
+            "Discuss exercise limitations or significant symptoms with a healthcare professional."
+          ],
+          "monitoring_recommendations": [
+            "Track menstrual cycle patterns and discuss persistent irregularity with a healthcare professional.",
+            "Monitor blood pressure and cardiometabolic health as recommended.",
+            "Review glucose status and lipid profile according to clinical risk and medical advice.",
+            "Seek support for persistent anxiety, depression, body-image distress, or disordered eating.",
+            "Review sleep quality and symptoms of possible sleep apnea when relevant."
+          ],
+          "clinical_warning": "Prompt clinical assessment is recommended for persistent menstrual irregularity, androgen-related symptoms, fertility concerns, metabolic abnormalities, or significant sleep or psychological symptoms.",
+          "positive_takeaway": "A higher risk score is not a diagnosis; appropriate clinical assessment and individualized care can clarify the findings and guide effective management."
+        }
+      }
+    }
+  },
+  "result_factor_sets": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Generally supportive lifestyle pattern",
+        "No strong PCOS-related risk signal in the available assessment",
+        "Routine reproductive and metabolic health maintenance"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Menstrual-cycle or reproductive health factors",
+        "Lifestyle or metabolic risk factors",
+        "Possible androgen-related features"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Menstrual or ovulatory irregularity",
+        "Metabolic risk factors",
+        "Possible androgen-related symptoms"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Persistent menstrual or ovulatory concerns",
+        "Metabolic health risk",
+        "Androgen-related features",
+        "Lifestyle or sleep-related contributors"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Marked menstrual or ovulatory concerns",
+        "Higher metabolic risk profile",
+        "Androgen-related features",
+        "Potential sleep or psychological health burden"
+      ]
+    }
+  }
+}

@@ -1,0 +1,1062 @@
+{
+  "knowledge_base_version": "1.0",
+  "disease_id": "oxidative_stress",
+  "display_name": "Oxidative Stress",
+  "overview": "Oxidative stress occurs when harmful free radicals outweigh the body's antioxidant defenses, leading to gradual damage of cells and tissues. Over time, this imbalance may contribute to aging and increase the risk of several chronic diseases.",
+  "risk_bands": {
+    "healthy": {
+      "range": "0-25",
+      "score_bands": {
+        "0_5": {
+          "score_range": "0-5",
+          "risk_interpretation": "Your profile shows minimal oxidative stress. Continue healthy habits to support your body's natural antioxidant defenses.",
+          "lifestyle_tips": [
+            "Maintain regular sleep and recovery.",
+            "Avoid smoking and harmful environmental exposures.",
+            "Stay physically active.",
+            "Choose minimally processed foods.",
+            "Maintain a healthy weight."
+          ],
+          "diet_recommendations": [
+            "Eat plenty of vegetables and fruits.",
+            "Choose whole grains and legumes.",
+            "Include nuts, seeds, and healthy fats.",
+            "Eat fish or other nutrient-rich proteins regularly.",
+            "Prefer whole foods over antioxidant supplements."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Oranges",
+            "Lentils",
+            "Oats",
+            "Walnuts",
+            "Fatty fish"
+          ],
+          "foods_to_avoid": [
+            "Tobacco",
+            "Sugary drinks",
+            "Fried foods",
+            "Processed meats",
+            "Trans fats",
+            "Excess alcohol",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of aerobic activity weekly.",
+            "Strength train at least twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Continue routine blood pressure, glucose, lipid, and weight checks.",
+            "Monitor waist circumference if needed.",
+            "Review lifestyle habits during routine health visits."
+          ],
+          "clinical_warning": "Seek medical advice if persistent symptoms develop. Routine oxidative-stress testing is generally unnecessary.",
+          "positive_takeaway": "Your current profile is reassuring. Maintaining these habits helps protect long-term health."
+        },
+        "6_10": {
+          "score_range": "6-10",
+          "risk_interpretation": "Your oxidative stress risk remains low. Consistent healthy habits can help preserve this favorable profile.",
+          "lifestyle_tips": [
+            "Maintain healthy sleep.",
+            "Stay physically active.",
+            "Avoid smoking.",
+            "Choose minimally processed foods.",
+            "Maintain a healthy weight."
+          ],
+          "diet_recommendations": [
+            "Eat a variety of colorful fruits and vegetables.",
+            "Choose whole grains over refined grains.",
+            "Include legumes, nuts, and healthy fats.",
+            "Eat fish regularly.",
+            "Avoid relying on antioxidant supplements."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Bell peppers",
+            "Berries",
+            "Oranges",
+            "Chickpeas",
+            "Oats",
+            "Almonds",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Tobacco",
+            "Sugary drinks",
+            "Fried foods",
+            "Processed meats",
+            "Trans fats",
+            "Excess alcohol",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Complete at least 150 minutes of aerobic exercise weekly.",
+            "Strength train twice weekly.",
+            "Include stretching exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Continue routine metabolic health screening.",
+            "Monitor waist if appropriate.",
+            "Review lifestyle habits during preventive visits."
+          ],
+          "clinical_warning": "Seek medical review for persistent symptoms or metabolic changes. Routine oxidative-stress testing is not usually needed.",
+          "positive_takeaway": "Small daily habits help maintain your body's antioxidant defenses."
+        },
+        "11_15": {
+          "score_range": "11-15",
+          "risk_interpretation": "Your score remains healthy but offers an opportunity to further strengthen antioxidant-supporting habits.",
+          "lifestyle_tips": [
+            "Prioritize restorative sleep.",
+            "Stay active throughout the day.",
+            "Avoid tobacco exposure.",
+            "Limit alcohol.",
+            "Maintain a healthy waist and weight."
+          ],
+          "diet_recommendations": [
+            "Increase vegetables and fruits.",
+            "Choose whole grains and legumes.",
+            "Use healthy fats from nuts and fish.",
+            "Reduce added sugars.",
+            "Limit processed foods."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Tomatoes",
+            "Blueberries",
+            "Oranges",
+            "Lentils",
+            "Barley",
+            "Walnuts",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Refined sweets",
+            "Trans fats",
+            "Excess alcohol",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of aerobic activity weekly.",
+            "Strength train twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose, and lipids.",
+            "Track weight if needed.",
+            "Review lifestyle factors during health visits."
+          ],
+          "clinical_warning": "Consult your doctor if metabolic markers become abnormal or symptoms persist.",
+          "positive_takeaway": "You remain in a healthy range, and reinforcing healthy habits now provides lasting benefits."
+        },
+        "16_20": {
+          "score_range": "16-20",
+          "risk_interpretation": "Your score is still healthy but nearing the upper end of this range. Improving lifestyle quality now can reduce future oxidative stress.",
+          "lifestyle_tips": [
+            "Maintain good sleep.",
+            "Reduce prolonged sitting.",
+            "Avoid tobacco.",
+            "Limit alcohol.",
+            "Maintain a healthy weight."
+          ],
+          "diet_recommendations": [
+            "Eat a plant-rich diet.",
+            "Choose whole grains and legumes.",
+            "Prefer healthy fats from fish and nuts.",
+            "Reduce refined sugars.",
+            "Avoid unnecessary supplements."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Citrus fruits",
+            "Chickpeas",
+            "Oats",
+            "Walnuts",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Refined sweets",
+            "Trans fats",
+            "Excess alcohol",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Complete at least 150 minutes of aerobic activity weekly.",
+            "Strength train twice weekly.",
+            "Include flexibility work.",
+            "Stay active throughout the day."
+          ],
+          "monitoring_recommendations": [
+            "Continue routine metabolic screening.",
+            "Monitor weight if needed.",
+            "Review cardiovascular risk factors."
+          ],
+          "clinical_warning": "Persistent symptoms or multiple abnormal metabolic markers should be discussed with your healthcare provider.",
+          "positive_takeaway": "Small improvements now can help keep oxidative stress low over time."
+        },
+        "21_25": {
+          "score_range": "21-25",
+          "risk_interpretation": "You remain in the healthy range but are approaching increased risk. Strengthening healthy habits now can prevent future progression.",
+          "lifestyle_tips": [
+            "Exercise regularly.",
+            "Maintain healthy sleep.",
+            "Avoid tobacco.",
+            "Limit alcohol.",
+            "Maintain a healthy weight."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, fruits, legumes, and whole grains.",
+            "Choose healthy fats and fish.",
+            "Reduce added sugars.",
+            "Limit processed meats.",
+            "Prefer whole foods over supplements."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Bell peppers",
+            "Berries",
+            "Oranges",
+            "Lentils",
+            "Barley",
+            "Almonds",
+            "Fatty fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Trans fats",
+            "Refined sweets",
+            "Excess alcohol",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of aerobic activity weekly.",
+            "Strength train twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Continue routine metabolic health screening.",
+            "Monitor weight and waist if appropriate.",
+            "Review cardiovascular risk factors."
+          ],
+          "clinical_warning": "Seek medical advice if metabolic markers worsen or persistent symptoms develop.",
+          "positive_takeaway": "Acting now can help maintain low oxidative stress and protect long-term health."
+        }
+      }
+    },
+    "increased_risk": {
+      "range": "26-50",
+      "score_bands": {
+        "26_30": {
+          "score_range": "26-30",
+          "risk_interpretation": "Your score indicates increased oxidative stress risk. Improving diet, activity, sleep, and metabolic health can help reduce this risk.",
+          "lifestyle_tips": [
+            "Exercise regularly.",
+            "Reduce prolonged sitting.",
+            "Prioritize good sleep.",
+            "Avoid smoking and limit alcohol.",
+            "Maintain a healthy weight."
+          ],
+          "diet_recommendations": [
+            "Follow a plant-rich, whole-food diet.",
+            "Choose whole grains and legumes.",
+            "Include nuts, seeds, fish, and healthy oils.",
+            "Limit added sugars and processed foods.",
+            "Obtain antioxidants mainly from food."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Citrus fruits",
+            "Lentils",
+            "Oats",
+            "Walnuts",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Ultra-processed snacks",
+            "Refined sweets",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic exercise weekly.",
+            "Strength training twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Review lifestyle habits during routine check-ups."
+          ],
+          "clinical_warning": "Consult your doctor if metabolic risk factors worsen or persistent symptoms develop.",
+          "positive_takeaway": "This stage responds well to consistent lifestyle improvements."
+        },
+        "31_35": {
+          "score_range": "31-35",
+          "risk_interpretation": "Your oxidative stress risk is increasing. Consistent improvements in lifestyle can significantly reduce long-term risk.",
+          "lifestyle_tips": [
+            "Exercise consistently.",
+            "Strength train regularly.",
+            "Reduce sitting time.",
+            "Maintain healthy sleep.",
+            "Aim for gradual weight loss if needed."
+          ],
+          "diet_recommendations": [
+            "Eat more vegetables, fruits, legumes, and whole grains.",
+            "Choose healthy fats and lean proteins.",
+            "Reduce sugars and processed foods.",
+            "Avoid relying on antioxidant supplements."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Tomatoes",
+            "Blueberries",
+            "Oranges",
+            "Chickpeas",
+            "Barley",
+            "Walnuts",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Packaged snacks",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic activity weekly.",
+            "Strength training twice weekly.",
+            "Stretch regularly.",
+            "Stay active throughout the day."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose, lipids, weight, and waist.",
+            "Review abnormal metabolic findings with your doctor."
+          ],
+          "clinical_warning": "Seek medical advice if multiple metabolic markers become abnormal.",
+          "positive_takeaway": "Healthy lifestyle changes can meaningfully improve your oxidative balance."
+        },
+        "36_40": {
+          "score_range": "36-40",
+          "risk_interpretation": "Your score reflects a moderate increase in oxidative stress. A structured lifestyle approach can still substantially lower risk.",
+          "lifestyle_tips": [
+            "Exercise consistently.",
+            "Reduce sitting.",
+            "Sleep adequately.",
+            "Avoid smoking.",
+            "Maintain a healthy weight."
+          ],
+          "diet_recommendations": [
+            "Choose a vegetable-rich diet.",
+            "Eat whole grains, legumes, fish, and healthy fats.",
+            "Reduce refined carbohydrates and processed foods.",
+            "Prioritize food-based antioxidants."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Citrus fruits",
+            "Lentils",
+            "Oats",
+            "Almonds",
+            "Fatty fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Refined desserts",
+            "Ultra-processed foods",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic activity weekly.",
+            "Strength train twice weekly.",
+            "Include flexibility exercises.",
+            "Break up prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Repeat abnormal tests as advised."
+          ],
+          "clinical_warning": "Medical review is recommended if metabolic abnormalities or persistent symptoms occur.",
+          "positive_takeaway": "Improving daily habits can significantly reduce oxidative stress."
+        },
+        "41_45": {
+          "score_range": "41-45",
+          "risk_interpretation": "Your oxidative stress risk is approaching the upper end of the increased-risk range. Lifestyle optimization is increasingly important.",
+          "lifestyle_tips": [
+            "Exercise regularly.",
+            "Reduce sedentary time.",
+            "Maintain healthy sleep.",
+            "Avoid smoking.",
+            "Achieve gradual weight reduction if needed."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, fruits, legumes, and whole grains.",
+            "Choose fish and healthy fats.",
+            "Reduce processed foods and added sugars.",
+            "Avoid unnecessary antioxidant supplements."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Tomatoes",
+            "Blueberries",
+            "Oranges",
+            "Lentils",
+            "Barley",
+            "Walnuts",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Packaged snacks",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic exercise weekly.",
+            "Strength training twice weekly.",
+            "Stretch regularly.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose, lipids, and waist circumference.",
+            "Repeat metabolic testing as recommended."
+          ],
+          "clinical_warning": "Consult your doctor if several metabolic risk factors are elevated.",
+          "positive_takeaway": "Consistent healthy habits can still substantially improve your risk profile."
+        },
+        "46_50": {
+          "score_range": "46-50",
+          "risk_interpretation": "You are approaching the high-risk category. Structured lifestyle changes and regular monitoring are strongly recommended.",
+          "lifestyle_tips": [
+            "Exercise consistently.",
+            "Strength train twice weekly.",
+            "Reduce sitting.",
+            "Prioritize quality sleep.",
+            "Aim for gradual weight reduction."
+          ],
+          "diet_recommendations": [
+            "Follow a whole-food, plant-rich diet.",
+            "Eat vegetables, legumes, whole grains, fish, and healthy fats.",
+            "Avoid sugary drinks and ultra-processed foods.",
+            "Choose food-based antioxidants."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Citrus fruits",
+            "Chickpeas",
+            "Oats",
+            "Walnuts",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Ultra-processed snacks",
+            "Refined sweets",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic activity weekly.",
+            "Strength training twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Continue routine clinical follow-up."
+          ],
+          "clinical_warning": "Medical review is advisable if several metabolic risk factors are abnormal or worsening.",
+          "positive_takeaway": "Taking action now can help prevent progression into the high-risk category."
+        }
+      }
+    },
+    "high_risk": {
+      "range": "51-75",
+      "score_bands": {
+        "51_55": {
+          "score_range": "51-55",
+          "risk_interpretation": "Your score is in the high-risk range, indicating elevated oxidative stress. Improving metabolic health, diet, activity, sleep, and weight can significantly reduce future risk.",
+          "lifestyle_tips": [
+            "Exercise regularly with aerobic and strength training.",
+            "Reduce prolonged sitting.",
+            "Prioritize quality sleep.",
+            "Avoid smoking and limit alcohol.",
+            "Aim for gradual weight reduction if needed."
+          ],
+          "diet_recommendations": [
+            "Follow a plant-rich, whole-food diet.",
+            "Choose vegetables, fruits, legumes, whole grains, fish, and healthy fats.",
+            "Reduce processed meats, refined carbohydrates, and added sugars.",
+            "Limit fried and ultra-processed foods.",
+            "Get antioxidants mainly from foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Oranges",
+            "Lentils",
+            "Oats",
+            "Walnuts",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Ultra-processed snacks",
+            "Refined sweets",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic exercise weekly.",
+            "Strength training at least twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Continue routine medical follow-up."
+          ],
+          "clinical_warning": "Medical review is recommended if metabolic markers remain elevated or symptoms persist.",
+          "positive_takeaway": "Targeted lifestyle changes can still meaningfully reduce your risk."
+        },
+        "56_60": {
+          "score_range": "56-60",
+          "risk_interpretation": "Your oxidative stress risk is increasing and requires a structured lifestyle approach with regular monitoring.",
+          "lifestyle_tips": [
+            "Exercise consistently.",
+            "Strength train regularly.",
+            "Reduce sitting time.",
+            "Maintain healthy sleep.",
+            "Aim for gradual weight loss."
+          ],
+          "diet_recommendations": [
+            "Eat a plant-rich, minimally processed diet.",
+            "Include vegetables, fruits, legumes, nuts, seeds, and whole grains.",
+            "Choose fish and healthy fats.",
+            "Reduce sugars, refined carbohydrates, and processed foods.",
+            "Avoid relying on antioxidant supplements."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Tomatoes",
+            "Blueberries",
+            "Citrus fruits",
+            "Chickpeas",
+            "Barley",
+            "Almonds",
+            "Fatty fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Packaged snacks",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic exercise weekly.",
+            "Strength training twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Repeat abnormal tests as advised."
+          ],
+          "clinical_warning": "Closer follow-up is appropriate if metabolic abnormalities persist.",
+          "positive_takeaway": "Steady improvements in metabolic health can still lower your risk."
+        },
+        "61_65": {
+          "score_range": "61-65",
+          "risk_interpretation": "Your results indicate high oxidative stress risk that benefits from structured lifestyle changes and closer metabolic monitoring.",
+          "lifestyle_tips": [
+            "Maintain regular exercise.",
+            "Reduce sedentary time.",
+            "Prioritize sleep.",
+            "Maintain a healthy weight.",
+            "Avoid smoking."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, fruits, legumes, and whole grains.",
+            "Choose fish and healthy fats.",
+            "Reduce added sugars and processed foods.",
+            "Limit refined grains and fried foods.",
+            "Prefer food-based antioxidants."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Oranges",
+            "Lentils",
+            "Oats",
+            "Walnuts",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Ultra-processed snacks",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic activity weekly.",
+            "Strength training at least twice weekly.",
+            "Stretch regularly.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Continue routine metabolic follow-up."
+          ],
+          "clinical_warning": "Regular medical follow-up is recommended if metabolic markers remain abnormal.",
+          "positive_takeaway": "Consistent lifestyle improvements can still significantly reduce risk."
+        },
+        "66_70": {
+          "score_range": "66-70",
+          "risk_interpretation": "Your score is toward the upper high-risk range and requires coordinated management of metabolic and lifestyle factors.",
+          "lifestyle_tips": [
+            "Exercise regularly.",
+            "Strength train consistently.",
+            "Reduce sitting.",
+            "Maintain healthy sleep.",
+            "Lose excess abdominal weight gradually."
+          ],
+          "diet_recommendations": [
+            "Follow a whole-food, plant-rich diet.",
+            "Eat vegetables, fruits, legumes, whole grains, fish, and healthy fats.",
+            "Strongly reduce sugars and processed foods.",
+            "Limit fried foods.",
+            "Avoid depending on supplements."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Tomatoes",
+            "Blueberries",
+            "Oranges",
+            "Chickpeas",
+            "Barley",
+            "Almonds",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Ultra-processed meals",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "Regular moderate aerobic exercise.",
+            "Strength training twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Review abnormal metabolic markers regularly."
+          ],
+          "clinical_warning": "Prompt medical review is recommended if metabolic abnormalities or symptoms worsen.",
+          "positive_takeaway": "Coordinated lifestyle changes can still improve your overall risk profile."
+        },
+        "71_75": {
+          "score_range": "71-75",
+          "risk_interpretation": "Your score is at the upper end of the high-risk category. Structured prevention and close follow-up are important to reduce future complications.",
+          "lifestyle_tips": [
+            "Maintain regular exercise.",
+            "Include strength training.",
+            "Reduce sitting time.",
+            "Prioritize quality sleep.",
+            "Work toward gradual weight reduction."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, fruits, legumes, and whole grains.",
+            "Include fish, nuts, and healthy fats.",
+            "Reduce sugars, refined carbohydrates, and processed foods.",
+            "Choose water over sugary drinks.",
+            "Obtain antioxidants from food."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Citrus fruits",
+            "Lentils",
+            "Oats",
+            "Walnuts",
+            "Fatty fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Ultra-processed snacks",
+            "Refined sweets",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "Maintain moderate aerobic activity.",
+            "Strength training twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Closely monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Continue routine preventive screening."
+          ],
+          "clinical_warning": "Timely medical follow-up is important if metabolic abnormalities persist or symptoms worsen.",
+          "positive_takeaway": "Although your risk is high, sustained lifestyle changes can still meaningfully improve your health."
+        }
+      }
+    },
+    "very_high_risk": {
+      "range": "76-100",
+      "score_bands": {
+        "76_80": {
+          "score_range": "76-80",
+          "risk_interpretation": "Your score is in the very-high-risk range, indicating markedly elevated oxidative stress. Prompt medical review and sustained lifestyle changes are recommended.",
+          "lifestyle_tips": [
+            "Stay physically active within your ability.",
+            "Include strength training if appropriate.",
+            "Reduce prolonged sitting.",
+            "Prioritize sleep and recovery.",
+            "Aim for gradual weight loss if needed."
+          ],
+          "diet_recommendations": [
+            "Follow a whole-food, plant-rich diet.",
+            "Eat vegetables, fruits, legumes, whole grains, fish, nuts, and healthy fats.",
+            "Reduce sugars, refined carbohydrates, and processed foods.",
+            "Limit fried and ultra-processed foods.",
+            "Obtain antioxidants from foods rather than supplements."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Oranges",
+            "Lentils",
+            "Oats",
+            "Walnuts",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Ultra-processed snacks",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "Regular moderate aerobic activity.",
+            "Strength training if suitable.",
+            "Include flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose/HbA1c, lipids, weight, and waist circumference.",
+            "Continue regular medical follow-up."
+          ],
+          "clinical_warning": "Prompt medical review is recommended if metabolic abnormalities or symptoms persist.",
+          "positive_takeaway": "Lifestyle changes and medical care can still significantly improve your risk."
+        },
+        "81_85": {
+          "score_range": "81-85",
+          "risk_interpretation": "Your score indicates very high oxidative stress risk requiring structured medical follow-up and lifestyle management.",
+          "lifestyle_tips": [
+            "Exercise regularly.",
+            "Reduce sitting time.",
+            "Maintain healthy sleep.",
+            "Manage weight gradually.",
+            "Avoid smoking."
+          ],
+          "diet_recommendations": [
+            "Base meals on whole plant foods.",
+            "Include fish, nuts, and healthy fats.",
+            "Reduce processed foods and added sugars.",
+            "Drink water instead of sugary beverages.",
+            "Prefer food-based antioxidants."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Tomatoes",
+            "Blueberries",
+            "Citrus fruits",
+            "Chickpeas",
+            "Barley",
+            "Almonds",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Packaged snacks",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "Regular moderate aerobic exercise.",
+            "Strength training twice weekly.",
+            "Stretch regularly.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Repeat abnormal tests as advised."
+          ],
+          "clinical_warning": "Timely medical follow-up is recommended if metabolic risk factors remain abnormal.",
+          "positive_takeaway": "Structured lifestyle changes can still improve your metabolic health."
+        },
+        "86_90": {
+          "score_range": "86-90",
+          "risk_interpretation": "Your score is very high and requires close attention to modifiable metabolic risk factors with medical guidance.",
+          "lifestyle_tips": [
+            "Exercise safely.",
+            "Reduce sedentary time.",
+            "Prioritize sleep.",
+            "Maintain a healthy weight.",
+            "Avoid smoking."
+          ],
+          "diet_recommendations": [
+            "Follow a plant-rich diet.",
+            "Eat vegetables, fruits, legumes, fish, and healthy fats.",
+            "Reduce processed foods, sugars, and refined carbohydrates.",
+            "Limit fried foods.",
+            "Avoid unnecessary antioxidant supplements."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Oranges",
+            "Lentils",
+            "Oats",
+            "Walnuts",
+            "Fatty fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Ultra-processed foods",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "Moderate aerobic exercise.",
+            "Strength training if appropriate.",
+            "Stretch regularly.",
+            "Reduce sitting time."
+          ],
+          "monitoring_recommendations": [
+            "Closely monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Continue routine medical follow-up."
+          ],
+          "clinical_warning": "Persistent metabolic abnormalities require close medical review.",
+          "positive_takeaway": "Targeting measurable risk factors can still substantially improve health."
+        },
+        "91_95": {
+          "score_range": "91-95",
+          "risk_interpretation": "Your score is near the highest risk level and requires prompt evaluation of metabolic and cardiovascular health.",
+          "lifestyle_tips": [
+            "Stay active within your ability.",
+            "Reduce sitting.",
+            "Sleep adequately.",
+            "Manage weight gradually.",
+            "Avoid crash diets."
+          ],
+          "diet_recommendations": [
+            "Eat vegetables, fruits, legumes, whole grains, fish, and healthy fats.",
+            "Reduce processed foods and added sugars.",
+            "Avoid sugary drinks.",
+            "Limit alcohol.",
+            "Choose whole foods."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Tomatoes",
+            "Blueberries",
+            "Citrus fruits",
+            "Chickpeas",
+            "Barley",
+            "Almonds",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Ultra-processed foods",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "Moderate aerobic activity.",
+            "Strength training if appropriate.",
+            "Stretch regularly.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Closely monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Repeat abnormal tests as advised."
+          ],
+          "clinical_warning": "Prompt medical review is recommended if symptoms or metabolic abnormalities worsen.",
+          "positive_takeaway": "Timely intervention can still improve many modifiable health risks."
+        },
+        "96_100": {
+          "score_range": "96-100",
+          "risk_interpretation": "Your score is in the highest risk category. Prompt medical assessment and comprehensive lifestyle management are strongly recommended.",
+          "lifestyle_tips": [
+            "Stay physically active within safe limits.",
+            "Reduce sitting.",
+            "Prioritize sleep and hydration.",
+            "Maintain regular meals.",
+            "Seek professional weight-management support if needed."
+          ],
+          "diet_recommendations": [
+            "Follow a whole-food, plant-rich diet.",
+            "Choose vegetables, fruits, legumes, whole grains, fish, nuts, and healthy fats.",
+            "Reduce sugars, processed foods, and refined carbohydrates.",
+            "Limit alcohol.",
+            "Avoid relying on antioxidant supplements."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Oranges",
+            "Lentils",
+            "Oats",
+            "Walnuts",
+            "Fatty fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Ultra-processed snacks",
+            "Trans fats",
+            "Excess alcohol"
+          ],
+          "exercise_recommendations": [
+            "Safe aerobic activity.",
+            "Strength training if appropriate.",
+            "Flexibility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Closely monitor blood pressure, glucose, lipids, weight, and waist circumference.",
+            "Continue regular clinical follow-up."
+          ],
+          "clinical_warning": "Prompt medical assessment is strongly recommended, particularly if symptoms or multiple metabolic abnormalities are present.",
+          "positive_takeaway": "Even at this highest risk level, consistent medical care and lifestyle improvements can still produce meaningful health benefits."
+        }
+      }
+    }
+  },
+  "result_factor_sets": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Mild nutritional gaps",
+        "Occasional poor recovery",
+        "Increased day-to-day stress"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Possible vitamin D insufficiency",
+        "Limited dietary variety",
+        "Inconsistent recovery"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Vitamin B12 insufficiency",
+        "Increased stress"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Vitamin B12 deficiency",
+        "Increased inflammatory activity"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Vitamin B12 deficiency",
+        "Elevated IgE",
+        "Increased systemic inflammation"
+      ]
+    }
+  }
+}

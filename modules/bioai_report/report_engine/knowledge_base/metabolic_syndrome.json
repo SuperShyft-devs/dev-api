@@ -1,0 +1,984 @@
+{
+  "knowledge_base_version": "1.0",
+  "disease_id": "metabolic_syndrome",
+  "display_name": "Metabolic Syndrome",
+  "overview": "Metabolic syndrome is a cluster of conditions including increased waist circumference, high blood sugar, elevated blood pressure, abnormal cholesterol, and high triglycerides.",
+  "risk_bands": {
+    "healthy": {
+      "range": "0-25",
+      "score_bands": {
+        "0_5": {
+          "score_range": "0-5",
+          "risk_interpretation": "Your metabolic health is excellent with minimal evidence of metabolic syndrome risk.",
+          "lifestyle_tips": [
+            "Maintain regular physical activity.",
+            "Sleep 7–9 hours consistently.",
+            "Avoid tobacco and limit alcohol.",
+            "Maintain a healthy waist circumference."
+          ],
+          "diet_recommendations": [
+            "Eat vegetables, fruits, whole grains, legumes, and lean proteins.",
+            "Choose healthy fats like nuts, seeds, and fish.",
+            "Limit processed foods, sugar, and excess salt."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Berries",
+            "Oats",
+            "Lentils",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Deep-fried foods",
+            "Refined sweets"
+          ],
+          "exercise_recommendations": [
+            "150 minutes of moderate exercise weekly.",
+            "Strength training twice a week."
+          ],
+          "monitoring_recommendations": [
+            "Annual BP, glucose, and lipid screening.",
+            "Track weight and waist circumference."
+          ],
+          "clinical_warning": "Continue routine preventive health check-ups.",
+          "positive_takeaway": "Excellent metabolic health—maintain your current lifestyle."
+        },
+        "6_10": {
+          "score_range": "6-10",
+          "risk_interpretation": "Your metabolic health remains good with only minor risk factors emerging.",
+          "lifestyle_tips": [
+            "Increase daily movement.",
+            "Maintain healthy sleep.",
+            "Reduce sedentary time."
+          ],
+          "diet_recommendations": [
+            "Increase fibre intake.",
+            "Reduce refined carbohydrates and sugary foods."
+          ],
+          "foods_to_include": [
+            "Broccoli",
+            "Beans",
+            "Oats",
+            "Almonds",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Fast food",
+            "Pastries",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "150 minutes aerobic activity weekly.",
+            "Strength training twice weekly."
+          ],
+          "monitoring_recommendations": [
+            "Monitor BP, glucose, and waist periodically."
+          ],
+          "clinical_warning": "Watch for gradual increases in blood pressure, glucose, or waist size.",
+          "positive_takeaway": "Small lifestyle improvements now can preserve long-term metabolic health."
+        },
+        "11_15": {
+          "score_range": "11-15",
+          "risk_interpretation": "Your risk is increasing but remains within the healthy range.",
+          "lifestyle_tips": [
+            "Increase physical activity.",
+            "Reduce prolonged sitting.",
+            "Prioritize weight management."
+          ],
+          "diet_recommendations": [
+            "Choose high-fibre meals.",
+            "Limit refined carbohydrates and saturated fats."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Whole grains",
+            "Lentils",
+            "Walnuts",
+            "Fatty fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary beverages",
+            "Processed foods",
+            "Refined grains",
+            "Deep-fried foods"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic exercise weekly.",
+            "Strength training twice weekly."
+          ],
+          "monitoring_recommendations": [
+            "Monitor BP, glucose, lipids, and waist circumference."
+          ],
+          "clinical_warning": "Consider medical review if multiple metabolic markers trend upward.",
+          "positive_takeaway": "Early action can prevent progression toward metabolic syndrome."
+        },
+        "16_20": {
+          "score_range": "16-20",
+          "risk_interpretation": "Your metabolic profile is approaching increased risk and deserves closer attention.",
+          "lifestyle_tips": [
+            "Exercise consistently.",
+            "Reduce abdominal fat.",
+            "Avoid prolonged inactivity."
+          ],
+          "diet_recommendations": [
+            "Follow a whole-food, high-fibre diet.",
+            "Reduce added sugars, processed foods, and sodium."
+          ],
+          "foods_to_include": [
+            "Leafy vegetables",
+            "Legumes",
+            "Whole grains",
+            "Nuts",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Fast food",
+            "Sugary drinks",
+            "Processed meats",
+            "Refined snacks"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes aerobic exercise.",
+            "Strength training 2–3 times weekly."
+          ],
+          "monitoring_recommendations": [
+            "Regular BP, glucose, lipid, and waist monitoring."
+          ],
+          "clinical_warning": "Consult a healthcare professional if several metabolic markers remain elevated.",
+          "positive_takeaway": "Lifestyle changes at this stage can significantly reduce future disease risk."
+        },
+        "21_25": {
+          "score_range": "21-25",
+          "risk_interpretation": "Your score is near the upper limit of the healthy range and approaching higher metabolic risk.",
+          "lifestyle_tips": [
+            "Prioritize weight reduction if needed.",
+            "Exercise most days.",
+            "Minimize sedentary time."
+          ],
+          "diet_recommendations": [
+            "Adopt a Mediterranean-style eating pattern.",
+            "Reduce processed foods, sugar, and saturated fat."
+          ],
+          "foods_to_include": [
+            "Vegetables",
+            "Fruits",
+            "Whole grains",
+            "Beans",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Deep-fried foods",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "300 minutes of moderate activity if feasible.",
+            "Strength training twice weekly."
+          ],
+          "monitoring_recommendations": [
+            "Regular clinical assessment of BP, glucose, lipids, and waist circumference."
+          ],
+          "clinical_warning": "Early medical evaluation is recommended if multiple risk factors are abnormal.",
+          "positive_takeaway": "Timely lifestyle changes can prevent progression to metabolic syndrome."
+        }
+      }
+    },
+    "increased_risk": {
+      "range": "26-50",
+      "score_bands": {
+        "26_30": {
+          "score_range": "26-30",
+          "risk_interpretation": "Your score indicates early increased metabolic risk. Focus on improving weight, physical activity, diet quality, and regular monitoring to prevent progression.",
+          "lifestyle_tips": [
+            "Exercise regularly throughout the week.",
+            "Include strength training to improve glucose regulation.",
+            "Reduce prolonged sitting.",
+            "Maintain consistent sleep.",
+            "Aim for gradual waist reduction if needed."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean or DASH-style diet.",
+            "Increase vegetables, fruits, legumes, and whole grains.",
+            "Choose fish, nuts, seeds, and healthy oils.",
+            "Limit sugar, refined carbs, processed meats, saturated fat, and excess sodium."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Berries",
+            "Oats",
+            "Legumes",
+            "Walnuts",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Deep-fried foods",
+            "Refined grains",
+            "Salty snacks",
+            "Fast food"
+          ],
+          "exercise_recommendations": [
+            "≥150 minutes of moderate aerobic activity weekly.",
+            "Strength training at least twice weekly.",
+            "Include flexibility exercises.",
+            "Break up prolonged sitting.",
+            "Increase activity gradually."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure regularly.",
+            "Check glucose or HbA1c as advised.",
+            "Review lipid profile.",
+            "Track waist circumference and weight.",
+            "Consult a clinician if multiple markers worsen."
+          ],
+          "clinical_warning": "Seek medical review if elevated waist size, blood pressure, glucose, or triglycerides occur together.",
+          "positive_takeaway": "This is an early, highly reversible stage with timely lifestyle changes."
+        },
+        "31_35": {
+          "score_range": "31-35",
+          "risk_interpretation": "Your metabolic risk is increasing and requires a more structured lifestyle approach to prevent further progression.",
+          "lifestyle_tips": [
+            "Follow a consistent exercise schedule.",
+            "Strength train twice weekly.",
+            "Reduce sedentary time.",
+            "Prioritize quality sleep.",
+            "Work toward gradual waist reduction."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, legumes, fruits, and whole grains.",
+            "Choose high-fibre carbohydrates.",
+            "Replace saturated fats with healthy fats.",
+            "Greatly reduce sugary foods, refined grains, processed meats, and excess sodium."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Berries",
+            "Chickpeas",
+            "Oats",
+            "Almonds"
+          ],
+          "foods_to_avoid": [
+            "Sugary beverages",
+            "Pastries",
+            "Processed meats",
+            "White bread",
+            "Fast food",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic exercise weekly.",
+            "Strength training twice weekly.",
+            "Include flexibility exercises.",
+            "Take movement breaks.",
+            "Increase activity progressively."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure.",
+            "Check glucose or HbA1c.",
+            "Review complete lipid profile.",
+            "Track weight and waist circumference.",
+            "Arrange clinical review if abnormalities persist."
+          ],
+          "clinical_warning": "Persistent abnormalities often develop silently and should be medically evaluated.",
+          "positive_takeaway": "Consistent improvements in diet, activity, and weight can significantly reduce risk."
+        },
+        "36_40": {
+          "score_range": "36-40",
+          "risk_interpretation": "Your score reflects moderate metabolic risk. Improving multiple risk factors together is more effective than focusing on only one.",
+          "lifestyle_tips": [
+            "Exercise consistently.",
+            "Strength train regularly.",
+            "Reduce sedentary time.",
+            "Prioritize sleep.",
+            "Aim for gradual abdominal weight loss."
+          ],
+          "diet_recommendations": [
+            "Eat a high-fibre, minimally processed diet.",
+            "Increase vegetables, legumes, and whole grains.",
+            "Choose healthy fats over saturated fats.",
+            "Limit sugary foods, refined starches, processed meats, and sodium."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Berries",
+            "Barley",
+            "Walnuts",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Deep-fried foods",
+            "White bread",
+            "Salty snacks",
+            "Fast food"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic exercise weekly.",
+            "Strength training twice weekly.",
+            "Include stretching.",
+            "Move frequently throughout the day.",
+            "Progress gradually."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure regularly.",
+            "Check glucose or HbA1c.",
+            "Review lipid profile.",
+            "Track weight and waist circumference.",
+            "Discuss persistent abnormalities with your clinician."
+          ],
+          "clinical_warning": "Multiple elevated metabolic markers warrant clinical evaluation even if you feel well.",
+          "positive_takeaway": "Lifestyle improvements can still substantially reduce your overall metabolic risk."
+        },
+        "41_45": {
+          "score_range": "41-45",
+          "risk_interpretation": "Your score is approaching the high-risk range, making proactive management of metabolic health increasingly important.",
+          "lifestyle_tips": [
+            "Maintain regular aerobic exercise.",
+            "Strength train twice weekly.",
+            "Increase daily movement.",
+            "Prioritize quality sleep.",
+            "Reduce abdominal fat gradually."
+          ],
+          "diet_recommendations": [
+            "Adopt a whole-food, high-fibre eating pattern.",
+            "Increase vegetables, fruits, legumes, and whole grains.",
+            "Choose healthy fats.",
+            "Avoid added sugars, refined carbs, processed meats, fried foods, and excess sodium."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Berries",
+            "Lentils",
+            "Oats",
+            "Walnuts",
+            "Fatty fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Refined desserts",
+            "White bread",
+            "Fast food",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic activity weekly.",
+            "Strength training twice weekly.",
+            "Include mobility exercises.",
+            "Take frequent movement breaks.",
+            "Increase activity progressively."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure regularly.",
+            "Check glucose or HbA1c.",
+            "Review lipid profile.",
+            "Track waist circumference and body weight.",
+            "Arrange clinical follow-up if abnormalities persist."
+          ],
+          "clinical_warning": "Combined elevations in blood pressure, glucose, lipids, and waist circumference require medical review.",
+          "positive_takeaway": "Taking action now can prevent progression into the high-risk category."
+        },
+        "46_50": {
+          "score_range": "46-50",
+          "risk_interpretation": "Your score is close to the high-risk category, suggesting multiple metabolic factors require structured management and close monitoring.",
+          "lifestyle_tips": [
+            "Exercise consistently rather than occasionally.",
+            "Strength train at least twice weekly.",
+            "Reduce sitting and increase walking.",
+            "Maintain healthy sleep habits.",
+            "Aim for gradual waist reduction."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, legumes, fruits, and whole grains.",
+            "Choose high-fibre carbohydrates.",
+            "Prefer fish, nuts, seeds, and healthy oils.",
+            "Strongly limit sugar, refined carbohydrates, processed foods, saturated fat, and sodium."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Berries",
+            "Chickpeas",
+            "Barley",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary beverages",
+            "Processed meats",
+            "Deep-fried foods",
+            "White bread",
+            "Fast food",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic exercise weekly as tolerated.",
+            "Strength training twice weekly.",
+            "Include flexibility exercises.",
+            "Break up prolonged sitting.",
+            "Increase activity gradually."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure regularly.",
+            "Check glucose or HbA1c.",
+            "Review complete lipid profile.",
+            "Track weight and waist circumference.",
+            "Discuss all abnormal findings with a healthcare professional."
+          ],
+          "clinical_warning": "Because you are close to the high-risk range, persistent abnormalities should be assessed promptly by a healthcare professional.",
+          "positive_takeaway": "Although risk is increasing, timely intervention can still prevent progression to high-risk metabolic disease."
+        }
+      }
+    },
+    "high_risk": {
+      "range": "51-75",
+      "score_bands": {
+        "51_55": {
+          "score_range": "51-55",
+          "risk_interpretation": "Your score is in the high-risk range, indicating multiple metabolic risk factors require active management. Improving weight, physical activity, diet, blood pressure, glucose, and lipid levels together is the most effective approach.",
+          "lifestyle_tips": [
+            "Maintain regular aerobic exercise.",
+            "Include strength training to improve insulin sensitivity.",
+            "Reduce prolonged sitting.",
+            "Prioritize consistent sleep and recovery.",
+            "Aim for gradual abdominal weight loss if needed."
+          ],
+          "diet_recommendations": [
+            "Follow a whole-food, high-fibre diet.",
+            "Eat more vegetables, fruits, legumes, whole grains, nuts, and seeds.",
+            "Choose fish and healthy fats over processed meats and saturated fats.",
+            "Limit sugary drinks, refined carbohydrates, fried foods, processed foods, and excess sodium."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Berries",
+            "Lentils",
+            "Oats",
+            "Walnuts",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Deep-fried foods",
+            "Refined sweets",
+            "White bread",
+            "Fast food"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of moderate aerobic exercise weekly.",
+            "Strength training at least twice weekly.",
+            "Include flexibility exercises.",
+            "Break up sitting regularly.",
+            "Increase activity gradually."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure.",
+            "Check glucose or HbA1c.",
+            "Review lipid profile.",
+            "Track waist circumference and weight.",
+            "Arrange clinical follow-up for persistent abnormalities."
+          ],
+          "clinical_warning": "Persistent abnormalities in blood pressure, glucose, lipids, or waist size should be medically assessed.",
+          "positive_takeaway": "Although your risk is high, many contributing factors remain reversible with focused action."
+        },
+        "56_60": {
+          "score_range": "56-60",
+          "risk_interpretation": "Your metabolic risk has increased further and requires a structured lifestyle plan with regular monitoring.",
+          "lifestyle_tips": [
+            "Exercise consistently.",
+            "Strength train to preserve muscle mass.",
+            "Reduce sedentary time.",
+            "Maintain healthy sleep.",
+            "Aim for gradual abdominal weight reduction."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, fruits, legumes, and whole grains.",
+            "Choose fibre-rich carbohydrates.",
+            "Include fish, nuts, seeds, and healthy oils.",
+            "Minimize sugar, refined grains, processed foods, and sodium."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Berries",
+            "Chickpeas",
+            "Oats",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Deep-fried foods",
+            "White bread",
+            "Fast food",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic activity weekly.",
+            "Strength training twice weekly.",
+            "Include mobility exercises.",
+            "Move regularly throughout the day.",
+            "Increase activity gradually."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure regularly.",
+            "Check glucose or HbA1c.",
+            "Review lipid profile.",
+            "Track weight and waist circumference.",
+            "Review overall cardiovascular risk with your clinician."
+          ],
+          "clinical_warning": "Persistent metabolic abnormalities require a clear management plan rather than observation alone.",
+          "positive_takeaway": "Consistent lifestyle improvements can still significantly improve your metabolic health."
+        },
+        "61_65": {
+          "score_range": "61-65",
+          "risk_interpretation": "Your results indicate a higher metabolic risk with multiple contributing factors requiring closer attention.",
+          "lifestyle_tips": [
+            "Exercise regularly at a comfortable intensity.",
+            "Strength train when appropriate.",
+            "Reduce prolonged sitting.",
+            "Prioritize quality sleep.",
+            "Work toward gradual waist reduction."
+          ],
+          "diet_recommendations": [
+            "Choose a vegetable-rich, minimally processed diet.",
+            "Increase legumes and whole grains.",
+            "Prefer fish and healthy fats.",
+            "Avoid sugary drinks, refined carbohydrates, fried foods, processed meats, and excess sodium."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Berries",
+            "Lentils",
+            "Barley",
+            "Almonds",
+            "Fatty fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary beverages",
+            "Processed meats",
+            "Deep-fried foods",
+            "White bread",
+            "Fast food",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic activity weekly.",
+            "Strength training twice weekly.",
+            "Include flexibility exercises.",
+            "Take regular walking breaks.",
+            "Increase activity gradually."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure closely.",
+            "Check glucose or HbA1c.",
+            "Review lipid profile.",
+            "Track weight and waist circumference.",
+            "Assess progress regularly with your healthcare provider."
+          ],
+          "clinical_warning": "Persistent or worsening metabolic abnormalities should be medically reviewed even without symptoms.",
+          "positive_takeaway": "Focused lifestyle improvements can still meaningfully reduce your overall metabolic risk."
+        },
+        "66_70": {
+          "score_range": "66-70",
+          "risk_interpretation": "Your score reflects substantial metabolic risk, requiring coordinated lifestyle changes and close monitoring.",
+          "lifestyle_tips": [
+            "Maintain regular aerobic exercise.",
+            "Strength train to support metabolic health.",
+            "Reduce prolonged sitting.",
+            "Prioritize recovery and sleep.",
+            "Aim for gradual weight loss if overweight."
+          ],
+          "diet_recommendations": [
+            "Build meals around vegetables, legumes, fruits, and whole grains.",
+            "Choose fibre-rich carbohydrates.",
+            "Prefer fish, nuts, seeds, and healthy oils.",
+            "Strongly limit sugar, refined carbohydrates, fried foods, processed foods, and sodium."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Berries",
+            "Chickpeas",
+            "Walnuts",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary beverages",
+            "Processed meats",
+            "Deep-fried foods",
+            "Refined bakery foods",
+            "Fast food",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Regular moderate aerobic exercise.",
+            "Strength training twice weekly.",
+            "Include stretching exercises.",
+            "Move frequently throughout the day.",
+            "Avoid sudden increases in exercise intensity."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure regularly.",
+            "Check glucose or HbA1c.",
+            "Review lipid profile.",
+            "Track weight and waist circumference.",
+            "Arrange closer medical follow-up if abnormalities persist."
+          ],
+          "clinical_warning": "Multiple persistent metabolic abnormalities require timely clinical assessment.",
+          "positive_takeaway": "Although risk is substantial, sustained improvements can still improve your long-term outlook."
+        },
+        "71_75": {
+          "score_range": "71-75",
+          "risk_interpretation": "Your score is at the upper end of the high-risk range, indicating significant metabolic risk that requires structured management.",
+          "lifestyle_tips": [
+            "Maintain regular moderate exercise within your tolerance.",
+            "Include strength training when appropriate.",
+            "Reduce sedentary behaviour.",
+            "Prioritize sleep and recovery.",
+            "Work toward sustainable abdominal weight reduction."
+          ],
+          "diet_recommendations": [
+            "Follow a whole-food, high-fibre eating pattern.",
+            "Increase vegetables, legumes, fruits, whole grains, nuts, and seeds.",
+            "Choose fish and healthy fats.",
+            "Avoid sugary drinks, refined carbohydrates, processed foods, fried foods, and excess sodium."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Berries",
+            "Lentils",
+            "Walnuts",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Sugary beverages",
+            "Processed meats",
+            "Deep-fried foods",
+            "White bread",
+            "Fast food",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Maintain safe, moderate aerobic activity.",
+            "Strength training twice weekly if suitable.",
+            "Include flexibility exercises.",
+            "Take frequent movement breaks.",
+            "Increase activity gradually."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure regularly.",
+            "Check glucose or HbA1c.",
+            "Review lipid profile.",
+            "Track waist circumference and weight.",
+            "Follow your clinician's recommendations for repeat testing."
+          ],
+          "clinical_warning": "Persistent or worsening metabolic abnormalities require timely clinical evaluation and follow-up.",
+          "positive_takeaway": "Your score calls for focused intervention, but coordinated lifestyle changes can still meaningfully improve your metabolic health."
+        }
+      }
+    },
+    "very_high_risk": {
+      "range": "76-100",
+      "score_bands": {
+        "76_80": {
+          "score_range": "76-80",
+          "risk_interpretation": "Your score is in the very high-risk range, indicating multiple metabolic concerns that require close monitoring and structured lifestyle changes.",
+          "lifestyle_tips": [
+            "Maintain safe, moderate aerobic activity.",
+            "Include strength training if appropriate.",
+            "Reduce prolonged sitting.",
+            "Prioritize sleep and recovery.",
+            "Aim for gradual abdominal weight reduction."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, fruits, legumes, whole grains, nuts, and seeds.",
+            "Choose fibre-rich carbohydrates and healthy fats.",
+            "Prefer fish over processed meats.",
+            "Limit sugary drinks, refined carbohydrates, fried foods, processed foods, and excess sodium."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Berries",
+            "Lentils",
+            "Oats",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary beverages",
+            "Processed meats",
+            "Deep-fried foods",
+            "Refined sweets",
+            "White bread",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Moderate aerobic activity as tolerated.",
+            "Strength training when appropriate.",
+            "Include flexibility exercises.",
+            "Break up prolonged sitting.",
+            "Increase activity gradually."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure regularly.",
+            "Check glucose or HbA1c.",
+            "Review lipid profile.",
+            "Track waist circumference and weight.",
+            "Discuss overall metabolic risk with your healthcare provider."
+          ],
+          "clinical_warning": "Persistent abnormalities in blood pressure, glucose, lipids, or waist circumference require clinical evaluation.",
+          "positive_takeaway": "Although your risk is very high, several metabolic factors remain modifiable with timely intervention."
+        },
+        "81_85": {
+          "score_range": "81-85",
+          "risk_interpretation": "Your score reflects marked metabolic risk and requires structured lifestyle management with closer clinical monitoring.",
+          "lifestyle_tips": [
+            "Exercise regularly within your tolerance.",
+            "Include strength training when safe.",
+            "Reduce sedentary time.",
+            "Maintain healthy sleep.",
+            "Work toward gradual waist reduction."
+          ],
+          "diet_recommendations": [
+            "Increase vegetables, legumes, fruits, and whole grains.",
+            "Choose fibre-rich carbohydrates.",
+            "Include fish, nuts, seeds, and healthy oils.",
+            "Reduce processed foods, refined carbohydrates, sugars, fried foods, and sodium."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Berries",
+            "Chickpeas",
+            "Oats",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Deep-fried foods",
+            "White bread",
+            "Fast food",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Moderate aerobic activity as tolerated.",
+            "Strength training twice weekly if appropriate.",
+            "Include mobility exercises.",
+            "Move frequently throughout the day.",
+            "Increase activity gradually."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure closely.",
+            "Check glucose or HbA1c.",
+            "Review lipid profile.",
+            "Track weight and waist circumference.",
+            "Review progress regularly with your clinician."
+          ],
+          "clinical_warning": "Persistent or worsening metabolic abnormalities require timely medical review.",
+          "positive_takeaway": "A structured lifestyle plan can still improve many of the factors contributing to your risk."
+        },
+        "86_90": {
+          "score_range": "86-90",
+          "risk_interpretation": "Your score is very high and suggests multiple metabolic risk factors require close attention rather than focusing on a single measurement.",
+          "lifestyle_tips": [
+            "Exercise safely according to your health.",
+            "Strength train when appropriate.",
+            "Reduce sedentary behaviour.",
+            "Prioritize sleep and recovery.",
+            "Aim for sustainable abdominal weight reduction."
+          ],
+          "diet_recommendations": [
+            "Follow a whole-food, high-fibre diet.",
+            "Eat vegetables, fruits, legumes, whole grains, nuts, and seeds.",
+            "Choose fish and healthy fats.",
+            "Strongly limit sugary drinks, refined carbohydrates, fried foods, processed foods, and sodium."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Berries",
+            "Lentils",
+            "Walnuts",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary beverages",
+            "Processed meats",
+            "Deep-fried foods",
+            "White bread",
+            "Fast food",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Moderate aerobic exercise.",
+            "Strength training when suitable.",
+            "Gentle flexibility exercises.",
+            "Break up prolonged sitting.",
+            "Avoid sudden intense exercise."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure closely.",
+            "Check glucose or HbA1c.",
+            "Review lipid profile.",
+            "Track waist circumference and weight.",
+            "Follow up regularly with your healthcare provider."
+          ],
+          "clinical_warning": "Persistent metabolic abnormalities or worsening symptoms require prompt clinical review.",
+          "positive_takeaway": "Even at this stage, improving modifiable risk factors can positively influence long-term health."
+        },
+        "91_95": {
+          "score_range": "91-95",
+          "risk_interpretation": "Your score is near the highest end of the risk scale and indicates a substantial metabolic risk burden requiring prompt attention.",
+          "lifestyle_tips": [
+            "Stay physically active within your limits.",
+            "Strength train only when appropriate.",
+            "Reduce prolonged sitting.",
+            "Maintain good sleep habits.",
+            "Aim for gradual waist reduction."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, legumes, fruits, and whole grains.",
+            "Choose fibre-rich carbohydrates.",
+            "Include fish and healthy fats.",
+            "Avoid sugary drinks, refined carbohydrates, fried foods, processed foods, and excess sodium."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Berries",
+            "Lentils",
+            "Oats",
+            "Fatty fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Deep-fried foods",
+            "White bread",
+            "Fast food",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Moderate aerobic exercise.",
+            "Strength training if suitable.",
+            "Include flexibility exercises.",
+            "Take regular movement breaks.",
+            "Avoid sudden strenuous activity."
+          ],
+          "monitoring_recommendations": [
+            "Arrange prompt blood pressure review.",
+            "Monitor glucose or HbA1c.",
+            "Review lipid profile.",
+            "Track weight and waist circumference.",
+            "Discuss your overall metabolic risk with your healthcare provider."
+          ],
+          "clinical_warning": "Prompt clinical review is recommended for multiple abnormal metabolic markers or new symptoms.",
+          "positive_takeaway": "Timely action can still meaningfully improve measurable metabolic risk factors."
+        },
+        "96_100": {
+          "score_range": "96-100",
+          "risk_interpretation": "Your score is at the highest end of the risk framework and indicates a very substantial metabolic risk profile requiring prompt medical evaluation and comprehensive lifestyle management.",
+          "lifestyle_tips": [
+            "Stay physically active at a safe pace.",
+            "Strength train only if appropriate.",
+            "Reduce prolonged sitting.",
+            "Prioritize sleep, hydration, and recovery.",
+            "Seek support for gradual weight reduction if needed."
+          ],
+          "diet_recommendations": [
+            "Follow a whole-food, high-fibre eating pattern.",
+            "Increase vegetables, legumes, whole grains, fruits, fish, nuts, and seeds.",
+            "Choose water or unsweetened beverages.",
+            "Strongly limit processed meats, refined carbohydrates, sugars, fried foods, alcohol, and sodium."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Berries",
+            "Lentils",
+            "Walnuts",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary beverages",
+            "Processed meats",
+            "Deep-fried foods",
+            "White bread",
+            "Fast food",
+            "Ultra-processed foods"
+          ],
+          "exercise_recommendations": [
+            "Moderate aerobic activity appropriate to your health.",
+            "Strength training when medically suitable.",
+            "Gentle flexibility exercises.",
+            "Break up prolonged sitting.",
+            "Avoid strenuous exercise until medically reviewed."
+          ],
+          "monitoring_recommendations": [
+            "Arrange prompt blood pressure assessment.",
+            "Monitor glucose or HbA1c.",
+            "Review complete lipid profile.",
+            "Track waist circumference and weight.",
+            "Maintain close follow-up with your healthcare provider."
+          ],
+          "clinical_warning": "Prompt medical assessment is strongly recommended for this risk level, particularly if accompanied by abnormal metabolic measurements or concerning symptoms.",
+          "positive_takeaway": "Although this is the highest risk category, timely medical care and sustained lifestyle changes can still produce meaningful improvements."
+        }
+      }
+    }
+  },
+  "result_factor_sets": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional inactivity",
+        "Inconsistent meal timing",
+        "Mild stress"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Lower daily movement",
+        "Frequent snacking",
+        "Irregular sleep"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Sedentary routine",
+        "Higher refined-carbohydrate intake",
+        "Increased stress"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Lack of daily movement",
+        "Unhealthy eating patterns",
+        "Persistent stress"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Prolonged inactivity",
+        "Frequent processed/refined foods",
+        "Poor dietary pattern",
+        "High ongoing stress"
+      ]
+    }
+  }
+}

@@ -1,0 +1,1020 @@
+{
+  "knowledge_base_version": "1.0",
+  "disease_id": "type2_diabetes",
+  "display_name": "Type 2 Diabetes",
+  "overview": "Type 2 diabetes is a metabolic disorder in which the body becomes resistant to insulin or does not produce enough insulin to maintain healthy blood sugar levels. Persistently elevated blood glucose can damage the eyes, kidneys, nerves, heart, and blood vessels over time.",
+  "risk_bands": {
+    "healthy": {
+      "range": "0-25",
+      "score_bands": {
+        "0_5": {
+          "score_range": "0-5",
+          "risk_interpretation": "Your blood sugar control and insulin sensitivity are excellent, with no evidence of impaired glucose regulation. Continue your healthy routine.",
+          "lifestyle_tips": [
+            "Maintain a healthy weight.",
+            "Stay physically active.",
+            "Limit sugary drinks.",
+            "Prioritize good sleep.",
+            "Manage daily stress."
+          ],
+          "diet_recommendations": [
+            "Choose high-fibre foods.",
+            "Prefer whole grains over refined carbohydrates.",
+            "Pair carbohydrates with protein.",
+            "Limit added sugars.",
+            "Choose whole fruit instead of juice."
+          ],
+          "foods_to_include": [
+            "Lentils",
+            "Spinach",
+            "Broccoli",
+            "Oats",
+            "Beans",
+            "Salmon",
+            "Walnuts",
+            "Berries"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fruit juice",
+            "White bread",
+            "Pastries",
+            "Candy",
+            "Fried foods"
+          ],
+          "exercise_recommendations": [
+            "150 minutes of moderate aerobic activity weekly.",
+            "Strength training twice weekly.",
+            "Walk after meals.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Routine fasting glucose or HbA1c.",
+            "Monitor weight and waist.",
+            "Continue blood pressure and cholesterol checks."
+          ],
+          "clinical_warning": "Routine preventive care is sufficient.",
+          "positive_takeaway": "Your glucose control is excellent—keep up the good work."
+        },
+        "6_10": {
+          "score_range": "6-10",
+          "risk_interpretation": "Your glucose regulation remains healthy. Consistency is the key to maintaining this profile.",
+          "lifestyle_tips": [
+            "Maintain your weight.",
+            "Exercise regularly.",
+            "Limit sweets.",
+            "Sleep consistently.",
+            "Manage stress."
+          ],
+          "diet_recommendations": [
+            "Eat whole grains and legumes.",
+            "Fill meals with vegetables.",
+            "Choose whole fruit.",
+            "Reduce added sugars.",
+            "Keep processed foods limited."
+          ],
+          "foods_to_include": [
+            "Beans",
+            "Kale",
+            "Quinoa",
+            "Apples",
+            "Almonds",
+            "Olive oil",
+            "Fish",
+            "Yogurt"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Cookies",
+            "Sugary cereals",
+            "Fried snacks",
+            "Pastries",
+            "Sweetened coffee"
+          ],
+          "exercise_recommendations": [
+            "150 minutes of aerobic activity.",
+            "Strength training twice weekly.",
+            "Walk after meals.",
+            "Break up sitting time."
+          ],
+          "monitoring_recommendations": [
+            "Routine glucose screening.",
+            "Monitor weight.",
+            "Continue cardiovascular screening."
+          ],
+          "clinical_warning": "No additional medical follow-up is needed.",
+          "positive_takeaway": "Healthy habits continue to support excellent glucose control."
+        },
+        "11_15": {
+          "score_range": "11-15",
+          "risk_interpretation": "Your blood sugar remains well controlled, with only minor markers worth monitoring over time.",
+          "lifestyle_tips": [
+            "Prevent gradual weight gain.",
+            "Stay active daily.",
+            "Reduce sugary drinks.",
+            "Watch carbohydrate portions.",
+            "Maintain regular sleep."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables and legumes.",
+            "Increase fibre intake.",
+            "Choose low-GI carbohydrates.",
+            "Pair carbohydrates with protein.",
+            "Limit desserts."
+          ],
+          "foods_to_include": [
+            "Lentils",
+            "Spinach",
+            "Oats",
+            "Brown rice",
+            "Sardines",
+            "Flaxseeds",
+            "Strawberries",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Fruit juice",
+            "Cakes",
+            "Candy",
+            "Sugary yogurt",
+            "Fried snacks"
+          ],
+          "exercise_recommendations": [
+            "150+ minutes of aerobic activity.",
+            "Strength training twice weekly.",
+            "Walk after meals.",
+            "Reduce sitting."
+          ],
+          "monitoring_recommendations": [
+            "Routine glucose checks.",
+            "Monitor weight and waist.",
+            "Continue lipid screening."
+          ],
+          "clinical_warning": "Routine monitoring is appropriate.",
+          "positive_takeaway": "Small healthy habits today help preserve long-term metabolic health."
+        },
+        "16_20": {
+          "score_range": "16-20",
+          "risk_interpretation": "Your results remain healthy, although some markers are beginning to trend upward. Small lifestyle improvements can help prevent future insulin resistance.",
+          "lifestyle_tips": [
+            "Maintain or gradually reduce weight if needed.",
+            "Increase daily activity.",
+            "Avoid sugary drinks.",
+            "Reduce refined carbohydrates.",
+            "Protect sleep."
+          ],
+          "diet_recommendations": [
+            "Choose high-fibre meals.",
+            "Reduce added sugar.",
+            "Prefer whole grains.",
+            "Include lean protein.",
+            "Limit processed foods."
+          ],
+          "foods_to_include": [
+            "Beans",
+            "Swiss chard",
+            "Steel-cut oats",
+            "Trout",
+            "Chia seeds",
+            "Raspberries",
+            "Olive oil",
+            "Cucumber"
+          ],
+          "foods_to_avoid": [
+            "Regular soda",
+            "Sweetened juices",
+            "French fries",
+            "Chocolate",
+            "Sweet cereals",
+            "Packaged cakes"
+          ],
+          "exercise_recommendations": [
+            "150–200 minutes of aerobic activity.",
+            "Strength training 2–3 times weekly.",
+            "Walk after meals.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Track fasting glucose or HbA1c.",
+            "Monitor weight and waist.",
+            "Continue blood pressure and cholesterol checks."
+          ],
+          "clinical_warning": "No urgent action is required, but monitor trends.",
+          "positive_takeaway": "Small adjustments now can keep you in the healthy range."
+        },
+        "21_25": {
+          "score_range": "21-25",
+          "risk_interpretation": "You remain in the healthy category but are approaching increased risk. Strengthening preventive habits now can help delay or prevent insulin resistance.",
+          "lifestyle_tips": [
+            "Reduce abdominal weight if needed.",
+            "Exercise consistently.",
+            "Avoid sugary drinks.",
+            "Replace refined carbohydrates with whole grains.",
+            "Maintain regular sleep."
+          ],
+          "diet_recommendations": [
+            "Follow a high-fibre, low-GI eating pattern.",
+            "Limit sweets and sugary drinks.",
+            "Fill half your plate with vegetables.",
+            "Choose legumes, fish, and nuts.",
+            "Avoid ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Lentils",
+            "Chickpeas",
+            "Salmon",
+            "Pumpkin seeds",
+            "Brown rice",
+            "Apples",
+            "Greek yogurt",
+            "Carrots"
+          ],
+          "foods_to_avoid": [
+            "Sugary sodas",
+            "Fruit juice",
+            "Pastries",
+            "White bread",
+            "Fast food",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Around 200 minutes of aerobic activity weekly.",
+            "Strength training 2–3 times weekly.",
+            "Walk after meals.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Check fasting glucose or HbA1c yearly.",
+            "Monitor weight, waist, blood pressure, and cholesterol.",
+            "Discuss additional screening if advised."
+          ],
+          "clinical_warning": "A routine discussion with your healthcare provider is appropriate.",
+          "positive_takeaway": "Acting now offers excellent long-term protection against diabetes."
+        }
+      }
+    },
+    "increased_risk": {
+      "range": "26-50",
+      "score_bands": {
+        "26_30": {
+          "score_range": "26-30",
+          "risk_interpretation": "Early insulin resistance is developing, but this stage responds very well to lifestyle changes. Improving weight, activity, and diet can restore healthy blood sugar control.",
+          "lifestyle_tips": [
+            "Lose around 5% body weight if overweight.",
+            "Exercise most days with cardio and strength training.",
+            "Avoid sugary drinks and refined carbohydrates.",
+            "Sleep 7–9 hours consistently."
+          ],
+          "diet_recommendations": [
+            "Choose a high-fibre, low-glycaemic diet.",
+            "Eat more legumes, vegetables, and whole grains.",
+            "Pair carbohydrates with protein or healthy fats.",
+            "Limit processed and sugary foods."
+          ],
+          "foods_to_include": [
+            "Beans",
+            "Lentils",
+            "Leafy greens",
+            "Oats",
+            "Whole grains",
+            "Fish",
+            "Nuts",
+            "Berries",
+            "Plain yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "White bread",
+            "Refined rice",
+            "Sweet cereals",
+            "Fried foods",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "200 min/week moderate aerobic exercise.",
+            "Strength training 2–3 times/week.",
+            "Walk 10–15 minutes after meals."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c and fasting glucose in 6–12 months.",
+            "Monitor weight, waist circumference, blood pressure, and cholesterol."
+          ],
+          "clinical_warning": "Discuss preventive management with your doctor. This is not an emergency.",
+          "positive_takeaway": "Early insulin resistance is highly reversible with consistent lifestyle changes."
+        },
+        "31_35": {
+          "score_range": "31-35",
+          "risk_interpretation": "Your likelihood of developing blood sugar problems is increasing, but timely lifestyle changes can significantly improve your metabolic health.",
+          "lifestyle_tips": [
+            "Aim to lose 5–7% body weight if overweight.",
+            "Exercise regularly with cardio and resistance training.",
+            "Avoid sugary foods and drinks.",
+            "Maintain regular sleep and meal timing."
+          ],
+          "diet_recommendations": [
+            "Follow a fibre-rich, low-glycaemic diet.",
+            "Increase vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Reduce fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Chickpeas",
+            "Beans",
+            "Vegetables",
+            "Oats",
+            "Quinoa",
+            "Fish",
+            "Almonds",
+            "Greek yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Cakes",
+            "White bread",
+            "Sugary cereals",
+            "Candy",
+            "Packaged snacks"
+          ],
+          "exercise_recommendations": [
+            "200–250 min/week moderate exercise.",
+            "Strength training 3 times/week.",
+            "Walk after meals."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c and fasting glucose in 6–12 months.",
+            "Track blood pressure, weight, waist, and lipids."
+          ],
+          "clinical_warning": "Discuss these results with your doctor for preventive care.",
+          "positive_takeaway": "Consistent healthy habits can substantially improve these markers."
+        },
+        "36_40": {
+          "score_range": "36-40",
+          "risk_interpretation": "Your results suggest significant insulin resistance and rising blood sugar. Early intervention can still prevent progression.",
+          "lifestyle_tips": [
+            "Aim for about 7% weight loss if overweight.",
+            "Exercise on most days.",
+            "Avoid sugary drinks and refined carbohydrates.",
+            "Improve sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Maintain a high-fibre, low-glycaemic diet.",
+            "Prioritise vegetables, legumes, whole grains, and healthy fats.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Lentils",
+            "Beans",
+            "Leafy greens",
+            "Oats",
+            "Barley",
+            "Salmon",
+            "Walnuts",
+            "Berries",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "White bread",
+            "Refined grains",
+            "Sweetened cereals",
+            "Fried foods"
+          ],
+          "exercise_recommendations": [
+            "250 min/week aerobic activity.",
+            "Strength training 3 times/week.",
+            "Daily post-meal walks."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c and fasting glucose in about 6 months.",
+            "Monitor weight, blood pressure, lipids, and kidney health."
+          ],
+          "clinical_warning": "Consult your doctor for monitoring and lifestyle guidance.",
+          "positive_takeaway": "Blood sugar often improves significantly with sustained healthy habits."
+        },
+        "41_45": {
+          "score_range": "41-45",
+          "risk_interpretation": "Your blood sugar regulation is becoming noticeably impaired. Focused lifestyle changes are important to reduce future diabetes risk.",
+          "lifestyle_tips": [
+            "Aim for 7–10% weight loss if overweight.",
+            "Exercise consistently with cardio and strength training.",
+            "Minimise added sugars and refined carbohydrates.",
+            "Maintain healthy sleep and stress control."
+          ],
+          "diet_recommendations": [
+            "Follow a high-fibre, low-glycaemic eating pattern.",
+            "Increase legumes, oats, vegetables, and healthy proteins.",
+            "Avoid processed and fried foods."
+          ],
+          "foods_to_include": [
+            "Lentils",
+            "Chickpeas",
+            "Leafy vegetables",
+            "Quinoa",
+            "Fish",
+            "Almonds",
+            "Greek yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Cakes",
+            "Pastries",
+            "White bread",
+            "Sugary cereals",
+            "Fast foods"
+          ],
+          "exercise_recommendations": [
+            "250+ min/week aerobic activity.",
+            "Strength training 3 times/week.",
+            "Walk after meals and reduce sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c and fasting glucose in about 6 months.",
+            "Monitor blood pressure, lipids, kidney, and eye health."
+          ],
+          "clinical_warning": "Arrange a routine review with your doctor to monitor progression.",
+          "positive_takeaway": "Lifestyle improvements can still reverse much of this metabolic risk."
+        },
+        "46_50": {
+          "score_range": "46-50",
+          "risk_interpretation": "You are at the upper end of the increased-risk range with a substantial likelihood of impaired blood sugar control. Early action can prevent progression to diabetes.",
+          "lifestyle_tips": [
+            "Target 7–10% weight loss if overweight.",
+            "Maintain regular aerobic and strength exercise.",
+            "Eliminate sugary drinks.",
+            "Prioritise quality sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Commit to a high-fibre, low-glycaemic diet.",
+            "Base meals on vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Avoid processed, fried, and sugary foods."
+          ],
+          "foods_to_include": [
+            "Lentils",
+            "Beans",
+            "Spinach",
+            "Oats",
+            "Barley",
+            "Fish",
+            "Walnuts",
+            "Blueberries",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "White bread",
+            "Refined grains",
+            "Sweetened cereals",
+            "Deep-fried foods",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "250–300 min/week moderate exercise.",
+            "Strength training 3 times/week.",
+            "Walk daily after meals."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c, fasting glucose, and lipids in 3–6 months.",
+            "Monitor weight, blood pressure, kidney, eye, and foot health."
+          ],
+          "clinical_warning": "Work with your doctor to develop a structured monitoring and prevention plan.",
+          "positive_takeaway": "Taking action now can significantly reduce your future diabetes risk."
+        }
+      }
+    },
+    "high_risk": {
+      "range": "51-75",
+      "score_bands": {
+        "51_55": {
+          "score_range": "51-55",
+          "risk_interpretation": "Your blood sugar is significantly above the healthy range, placing you at high risk. Close medical follow-up and consistent lifestyle changes can still substantially improve your glucose control.",
+          "lifestyle_tips": [
+            "Aim for around 10% weight loss if overweight.",
+            "Exercise regularly with cardio and strength training.",
+            "Avoid sugary drinks and added sugars.",
+            "Base meals on vegetables, legumes, and whole grains.",
+            "Prioritise sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Follow a high-fibre, low-glycaemic diet.",
+            "Choose legumes, vegetables, and whole grains.",
+            "Prefer fish and plant proteins.",
+            "Avoid processed, fried, and sugary foods."
+          ],
+          "foods_to_include": [
+            "Lentils",
+            "Chickpeas",
+            "Leafy greens",
+            "Oats",
+            "Barley",
+            "Salmon",
+            "Almonds",
+            "Greek yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "White bread",
+            "Refined grains",
+            "Sweet cereals",
+            "Fried foods",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "300 min/week moderate aerobic activity.",
+            "Strength training 3 times/week.",
+            "Walk after meals and reduce sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c, fasting glucose, kidney function, and lipids every 3–6 months.",
+            "Monitor blood pressure, weight, and begin eye, foot, and kidney screening."
+          ],
+          "clinical_warning": "Consult your doctor to develop a structured treatment and monitoring plan.",
+          "positive_takeaway": "Consistent lifestyle improvements can still produce major benefits."
+        },
+        "56_60": {
+          "score_range": "56-60",
+          "risk_interpretation": "Your blood sugar is markedly elevated, requiring close monitoring and medical guidance. Lifestyle changes remain highly effective alongside appropriate medical care.",
+          "lifestyle_tips": [
+            "Target about 10% weight loss if overweight.",
+            "Maintain structured aerobic and strength exercise.",
+            "Eliminate sugary drinks.",
+            "Eat whole, minimally processed foods.",
+            "Maintain healthy sleep and stress control."
+          ],
+          "diet_recommendations": [
+            "Maintain a strict high-fibre, low-glycaemic diet.",
+            "Increase vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Avoid fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Beans",
+            "Spinach",
+            "Cauliflower",
+            "Oats",
+            "Quinoa",
+            "Sardines",
+            "Walnuts",
+            "Plain yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "White bread",
+            "Sweet cereals",
+            "Deep-fried foods",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "300 min/week aerobic exercise.",
+            "Strength training 3 times/week.",
+            "Walk daily after meals."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c, glucose, kidney function, and lipids every 3–6 months.",
+            "Continue regular eye, foot, kidney, and blood pressure monitoring."
+          ],
+          "clinical_warning": "Arrange ongoing follow-up with your doctor to optimise blood sugar control.",
+          "positive_takeaway": "Healthy habits combined with medical care can significantly improve outcomes."
+        },
+        "61_65": {
+          "score_range": "61-65",
+          "risk_interpretation": "Your results indicate clear insulin resistance and persistently elevated blood sugar. Medical supervision and sustained lifestyle changes are strongly recommended.",
+          "lifestyle_tips": [
+            "Aim for about 10% weight loss.",
+            "Exercise consistently with professional guidance if needed.",
+            "Avoid added sugars completely.",
+            "Follow a whole-food diet.",
+            "Prioritise sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a high-fibre, low-glycaemic diet.",
+            "Increase vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Avoid processed and fried foods."
+          ],
+          "foods_to_include": [
+            "Lentils",
+            "Chickpeas",
+            "Leafy greens",
+            "Oats",
+            "Quinoa",
+            "Mackerel",
+            "Almonds",
+            "Greek yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "White bread",
+            "Pastries",
+            "Refined grains",
+            "Fried foods",
+            "Packaged snacks"
+          ],
+          "exercise_recommendations": [
+            "300 min/week aerobic activity.",
+            "Strength training 3 times/week.",
+            "Daily post-meal walks."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c, glucose, kidney function, and lipids about every 3 months.",
+            "Continue eye, foot, kidney, blood pressure, and weight monitoring."
+          ],
+          "clinical_warning": "Consult your doctor to establish a comprehensive treatment and monitoring plan.",
+          "positive_takeaway": "Meaningful improvement remains achievable with consistent care."
+        },
+        "66_70": {
+          "score_range": "66-70",
+          "risk_interpretation": "Your blood sugar is substantially elevated with significant insulin resistance. Prompt medical review and a structured management plan are recommended.",
+          "lifestyle_tips": [
+            "Work toward 10% weight loss.",
+            "Exercise regularly under medical guidance.",
+            "Eliminate added sugars.",
+            "Follow a whole-food, high-fibre diet.",
+            "Manage stress and sleep consistently."
+          ],
+          "diet_recommendations": [
+            "Maintain a strict low-glycaemic eating pattern.",
+            "Prioritise vegetables, legumes, whole grains, and fish.",
+            "Avoid fried, processed, and sugary foods."
+          ],
+          "foods_to_include": [
+            "Beans",
+            "Spinach",
+            "Cauliflower",
+            "Oats",
+            "Quinoa",
+            "Salmon",
+            "Walnuts",
+            "Plain yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "White bread",
+            "Sweet cereals",
+            "Deep-fried foods",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "Up to 300 min/week aerobic exercise.",
+            "Strength training 3 times/week.",
+            "Walk after meals and reduce sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c, glucose, kidney function, and lipids every 3 months.",
+            "Continue regular eye, foot, kidney, blood pressure, and weight checks."
+          ],
+          "clinical_warning": "Seek timely medical review for structured diabetes prevention or treatment.",
+          "positive_takeaway": "Ongoing medical support and lifestyle changes can substantially improve your health."
+        },
+        "71_75": {
+          "score_range": "71-75",
+          "risk_interpretation": "You are at the upper end of the high-risk range with marked insulin resistance and increased risk of long-term complications. Prompt medical management and intensive lifestyle changes are essential.",
+          "lifestyle_tips": [
+            "Target at least 10% weight loss if appropriate.",
+            "Exercise under professional guidance.",
+            "Completely avoid sugary drinks and added sugars.",
+            "Follow a high-fibre whole-food diet.",
+            "Maintain healthy sleep and stress control."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a high-fibre, low-glycaemic diet.",
+            "Prioritise legumes, vegetables, whole grains, and fish.",
+            "Avoid processed, fried, and sugary foods."
+          ],
+          "foods_to_include": [
+            "Chickpeas",
+            "Lentils",
+            "Leafy greens",
+            "Oats",
+            "Barley",
+            "Sardines",
+            "Almonds",
+            "Greek yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "White bread",
+            "Refined grains",
+            "Sweet cereals",
+            "Fried foods",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "Progress toward 300 min/week aerobic activity.",
+            "Strength training 3 times/week.",
+            "Walk after meals and minimise prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c, glucose, kidney function, and lipids every 3 months.",
+            "Maintain regular eye, foot, kidney, blood pressure, and weight monitoring."
+          ],
+          "clinical_warning": "See your doctor promptly for comprehensive assessment and ongoing management.",
+          "positive_takeaway": "Even at this stage, consistent treatment and lifestyle improvements can protect long-term health."
+        }
+      }
+    },
+    "very_high_risk": {
+      "range": "76-100",
+      "score_bands": {
+        "76_80": {
+          "score_range": "76-80",
+          "risk_interpretation": "Your blood sugar is in the very high-risk range with an increased likelihood of complications affecting the heart, kidneys, eyes, and nerves. Prompt medical evaluation and structured management are strongly recommended.",
+          "lifestyle_tips": [
+            "Follow a doctor-guided weight-loss plan.",
+            "Exercise regularly within safe limits.",
+            "Eliminate sugary drinks and added sugars.",
+            "Follow a whole-food, high-fibre diet.",
+            "Prioritise sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Maintain a strict high-fibre, low-glycaemic diet.",
+            "Eat more vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Avoid processed, fried, and sugary foods."
+          ],
+          "foods_to_include": [
+            "Lentils",
+            "Beans",
+            "Spinach",
+            "Oats",
+            "Quinoa",
+            "Salmon",
+            "Walnuts",
+            "Berries",
+            "Plain yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "White bread",
+            "Refined grains",
+            "Sweet cereals",
+            "Deep-fried foods",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "Progress toward 300 min/week aerobic activity.",
+            "Strength training 2–3 times/week.",
+            "Walk after meals and minimise sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check HbA1c, fasting glucose, kidney function, and lipids every 3 months.",
+            "Begin regular eye, foot, kidney, blood pressure, and weight monitoring."
+          ],
+          "clinical_warning": "See your doctor promptly for comprehensive evaluation and ongoing management.",
+          "positive_takeaway": "With structured care and lifestyle changes, meaningful improvement is still possible."
+        },
+        "81_85": {
+          "score_range": "81-85",
+          "risk_interpretation": "You are at very high risk of persistent high blood sugar and diabetes-related complications. Prompt medical care and consistent lifestyle changes are essential.",
+          "lifestyle_tips": [
+            "Follow a doctor-supervised nutrition and weight plan.",
+            "Exercise safely and consistently.",
+            "Avoid all sugary drinks and added sugars.",
+            "Eat a whole-food, high-fibre diet.",
+            "Manage sleep and stress."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a low-glycaemic, high-fibre diet.",
+            "Prioritise legumes, vegetables, whole grains, and fish.",
+            "Avoid processed, fried, and sugary foods."
+          ],
+          "foods_to_include": [
+            "Chickpeas",
+            "Lentils",
+            "Leafy greens",
+            "Oats",
+            "Quinoa",
+            "Sardines",
+            "Almonds",
+            "Greek yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Cakes",
+            "White bread",
+            "Refined grains",
+            "Sweet cereals",
+            "Fried foods",
+            "Packaged snacks"
+          ],
+          "exercise_recommendations": [
+            "Build toward 300 min/week aerobic activity.",
+            "Strength training 2–3 times/week.",
+            "Walk after meals daily."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c, glucose, kidney function, and lipids every 3 months.",
+            "Continue regular eye, foot, kidney, blood pressure, and weight monitoring."
+          ],
+          "clinical_warning": "Arrange prompt medical review to develop a comprehensive treatment plan.",
+          "positive_takeaway": "Guided treatment and healthy habits can significantly improve long-term outcomes."
+        },
+        "86_90": {
+          "score_range": "86-90",
+          "risk_interpretation": "Your blood sugar is very high with a substantial risk of complications. Close medical supervision and intensive lifestyle management are recommended.",
+          "lifestyle_tips": [
+            "Follow your doctor's weight and lifestyle recommendations.",
+            "Exercise under professional guidance.",
+            "Completely avoid added sugars.",
+            "Maintain a whole-food diet.",
+            "Prioritise sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a high-fibre, low-glycaemic diet.",
+            "Eat more vegetables, legumes, whole grains, and fish.",
+            "Avoid processed, fried, and sugary foods."
+          ],
+          "foods_to_include": [
+            "Lentils",
+            "Beans",
+            "Spinach",
+            "Oats",
+            "Quinoa",
+            "Salmon",
+            "Walnuts",
+            "Berries",
+            "Plain yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "White bread",
+            "Refined grains",
+            "Sweet cereals",
+            "Deep-fried foods",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "Moderate aerobic exercise as tolerated.",
+            "Strength training 2–3 times/week.",
+            "Daily post-meal walks."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c, glucose, kidney function, and lipids every 3 months.",
+            "Maintain regular eye, foot, kidney, blood pressure, and weight assessments."
+          ],
+          "clinical_warning": "Seek prompt medical assessment for intensive diabetes management.",
+          "positive_takeaway": "Consistent treatment can still improve blood sugar and reduce future complications."
+        },
+        "91_95": {
+          "score_range": "91-95",
+          "risk_interpretation": "Your results indicate severely elevated blood sugar with a high likelihood of diabetes-related complications. Immediate medical follow-up is strongly recommended.",
+          "lifestyle_tips": [
+            "Prioritise doctor-directed lifestyle changes.",
+            "Exercise only as advised by your healthcare team.",
+            "Completely eliminate added sugars.",
+            "Follow a strict whole-food diet.",
+            "Maintain healthy sleep and stress control."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a high-fibre, low-glycaemic eating plan.",
+            "Increase legumes, vegetables, whole grains, and fish.",
+            "Avoid fried, processed, and sugary foods."
+          ],
+          "foods_to_include": [
+            "Chickpeas",
+            "Lentils",
+            "Leafy greens",
+            "Oats",
+            "Quinoa",
+            "Sardines",
+            "Almonds",
+            "Greek yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "White bread",
+            "Refined grains",
+            "Sweet cereals",
+            "Fried foods",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "Perform approved moderate activity.",
+            "Strength training under supervision.",
+            "Stay active with gentle daily walks."
+          ],
+          "monitoring_recommendations": [
+            "Repeat HbA1c, glucose, kidney function, and lipids every 3 months.",
+            "Continue regular eye, foot, kidney, blood pressure, and weight monitoring."
+          ],
+          "clinical_warning": "Consult your doctor urgently for comprehensive assessment and treatment planning.",
+          "positive_takeaway": "Appropriate medical care and healthy habits can still improve your overall health."
+        },
+        "96_100": {
+          "score_range": "96-100",
+          "risk_interpretation": "You are at the highest level of risk for persistent high blood sugar and diabetes-related complications. Prompt specialist evaluation and intensive management are strongly advised.",
+          "lifestyle_tips": [
+            "Make doctor-directed lifestyle changes your highest priority.",
+            "Exercise only within medically recommended limits.",
+            "Avoid all added sugars.",
+            "Maintain a strict whole-food diet.",
+            "Focus on healthy sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a high-fibre, low-glycaemic diet.",
+            "Base meals on legumes, vegetables, whole grains, and fish.",
+            "Completely avoid processed, fried, and sugary foods."
+          ],
+          "foods_to_include": [
+            "Lentils",
+            "Beans",
+            "Spinach",
+            "Oats",
+            "Quinoa",
+            "Salmon",
+            "Walnuts",
+            "Berries",
+            "Plain yoghurt",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "White bread",
+            "Refined grains",
+            "Sweet cereals",
+            "Deep-fried foods",
+            "Processed snacks"
+          ],
+          "exercise_recommendations": [
+            "Perform gentle to moderate activity as approved by your doctor.",
+            "Light resistance exercises if medically appropriate.",
+            "Stay active with short walks whenever possible."
+          ],
+          "monitoring_recommendations": [
+            "Frequent HbA1c, glucose, kidney function, and lipid monitoring as advised.",
+            "Continue comprehensive eye, foot, kidney, blood pressure, and cardiovascular monitoring."
+          ],
+          "clinical_warning": "Seek prompt specialist medical evaluation and ongoing diabetes management.",
+          "positive_takeaway": "Even at this stage, structured treatment and lifestyle improvements can meaningfully improve long-term health."
+        }
+      }
+    }
+  },
+  "result_factor_sets": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional high-sugar intake",
+        "Lower physical activity",
+        "Irregular meal pattern"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Higher refined-carbohydrate intake",
+        "Lower physical activity",
+        "Possible vitamin D insufficiency"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Reduced physical activity",
+        "Increased systemic inflammation"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Systemic inflammation",
+        "Low-normal fasting insulin"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Vitamin D insufficiency",
+        "Systemic inflammation",
+        "Low-normal fasting insulin",
+        "Sedentary lifestyle"
+      ]
+    }
+  }
+}

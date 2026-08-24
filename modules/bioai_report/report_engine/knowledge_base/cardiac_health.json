@@ -1,0 +1,1015 @@
+{
+  "knowledge_base_version": "1.0",
+  "disease_id": "cardiac_health",
+  "display_name": "Cardiac Health",
+  "overview": "Cardiac health reflects how well your heart and blood vessels support healthy blood circulation. This score estimates your cardiovascular risk based on factors like blood pressure, cholesterol, blood sugar, weight, and lifestyle.",
+  "risk_bands": {
+    "healthy": {
+      "range": "0-25",
+      "score_bands": {
+        "0_5": {
+          "score_range": "0-5",
+          "risk_interpretation": "Your cardiovascular health is excellent. Blood pressure, cholesterol, and blood sugar are all within healthy ranges, with no signs of strain on your heart or blood vessels.",
+          "lifestyle_tips": [
+            "Stay away from secondhand smoke.",
+            "Keep moving through the day rather than sitting for long stretches.",
+            "Hold your weight and waist measurement steady.",
+            "Keep alcohol within low-risk limits, or less.",
+            "Take 7 to 9 hours of quality sleep."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean or DASH-style diet.",
+            "Limit salt to support healthy blood pressure.",
+            "Choose healthy fats like olive oil.",
+            "Eat oily fish 2–3 times a week.",
+            "Include plenty of fruits, vegetables, and whole grains."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Oily fish like salmon",
+            "Walnuts",
+            "Almonds",
+            "Oats",
+            "Beans",
+            "Berries",
+            "Olive oil",
+            "Tomatoes",
+            "Avocado",
+            "Whole grains"
+          ],
+          "foods_to_avoid": [
+            "Processed and cured meats",
+            "Deep-fried foods",
+            "Salty packaged snacks",
+            "Sugary sodas",
+            "Pastries and cakes",
+            "Fast food",
+            "White bread",
+            "Sweetened cereals",
+            "Full-fat processed cheese in excess",
+            "Instant noodles"
+          ],
+          "exercise_recommendations": [
+            "Get at least 150 minutes of moderate exercise each week.",
+            "Include strength training twice a week.",
+            "Add stretching or mobility exercises regularly.",
+            "Avoid sitting for long periods."
+          ],
+          "monitoring_recommendations": [
+            "Check blood pressure and cholesterol during routine visits.",
+            "Monitor weight and waist size yearly.",
+            "Continue regular blood sugar screening."
+          ],
+          "clinical_warning": "No immediate concerns. Continue routine health check-ups.",
+          "positive_takeaway": ""
+        },
+        "6_10": {
+          "score_range": "6-10",
+          "risk_interpretation": "Your heart health is very good, with healthy blood pressure, cholesterol, and circulation. Staying consistent with your current habits will help maintain these results.",
+          "lifestyle_tips": [
+            "Stay smoke-free.",
+            "Be physically active every day.",
+            "Maintain a healthy weight.",
+            "Limit alcohol.",
+            "Manage stress regularly."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean or DASH-style diet.",
+            "Reduce salt and processed foods.",
+            "Eat more fruits and vegetables.",
+            "Choose healthy fats, fish, and nuts.",
+            "Limit fried and sugary foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Mackerel",
+            "Almonds",
+            "Lentils",
+            "Blueberries",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Fried foods",
+            "Salty snacks",
+            "Sugary drinks",
+            "Fast food",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Exercise for at least 150 minutes each week.",
+            "Strength train twice weekly.",
+            "Stretch regularly.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check blood pressure and cholesterol routinely.",
+            "Monitor weight periodically.",
+            "Continue regular blood sugar screening."
+          ],
+          "clinical_warning": "No additional follow-up is needed beyond routine check-ups. Seek medical advice if you develop chest pain or unexplained breathlessness.",
+          "positive_takeaway": "Your heart is in great shape, keep up your healthy lifestyle."
+        },
+        "11_15": {
+          "score_range": "11-15",
+          "risk_interpretation": "Your heart health is good, with most cardiovascular markers well controlled.",
+          "lifestyle_tips": [
+            "Stay smoke-free.",
+            "Be active every day.",
+            "Maintain a healthy weight.",
+            "Limit salty and sugary foods.",
+            "Get adequate sound sleep."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean or DASH-style diet.",
+            "Eat more fruits, vegetables, and whole grains.",
+            "Choose healthy fats and oily fish.",
+            "Reduce salt and processed foods.",
+            "Limit fried and sugary foods."
+          ],
+          "foods_to_include": [
+            "Sardines",
+            "Flaxseeds",
+            "Chickpeas",
+            "Quinoa",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Fried foods",
+            "Sugary drinks",
+            "Refined grains",
+            "Fast food",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Exercise for at least 150 minutes each week.",
+            "Strength train twice weekly.",
+            "Stretch regularly.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check blood pressure and cholesterol routinely.",
+            "Monitor weight periodically.",
+            "Continue regular blood sugar screening."
+          ],
+          "clinical_warning": "No additional testing is needed beyond routine health check-ups.",
+          "positive_takeaway": "Your heart is in good health—stay consistent with your healthy habits."
+        },
+        "16_20": {
+          "score_range": "16-20",
+          "risk_interpretation": "Your heart health remains good, though a few markers are beginning to trend upward. Healthy lifestyle changes now can help prevent future risk.",
+          "lifestyle_tips": [
+            "Stay smoke-free.",
+            "Increase daily physical activity.",
+            "Maintain a healthy weight.",
+            "Reduce salt and processed foods.",
+            "Manage stress."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean or DASH-style diet.",
+            "Eat more fruits, vegetables, and whole grains.",
+            "Choose healthy fats, fish, and nuts.",
+            "Reduce salt intake.",
+            "Limit fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Swiss chard",
+            "Trout",
+            "Chia seeds",
+            "White beans",
+            "Carrots",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed snacks",
+            "Pastries",
+            "Processed meats",
+            "French fries",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Exercise 150–200 minutes each week.",
+            "Strength train 2–3 times weekly.",
+            "Stretch regularly.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure and cholesterol routinely.",
+            "Track weight and waist size.",
+            "Continue regular blood sugar screening."
+          ],
+          "clinical_warning": "No urgent action is needed. Follow routine check-ups and discuss any changes with your doctor.",
+          "positive_takeaway": "Small lifestyle improvements now can keep your heart healthy for years to come."
+        },
+        "21_25": {
+          "score_range": "21-25",
+          "risk_interpretation": "Your heart health is still within the healthy range, but some markers are approaching higher-risk levels. Taking action now can help prevent future cardiovascular disease.",
+          "lifestyle_tips": [
+            "Quit smoking if you smoke.",
+            "Exercise regularly.",
+            "Work toward a healthy weight.",
+            "Limit salt and alcohol.",
+            "Choose fresh, whole foods."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean or DASH-style diet.",
+            "Fill half your plate with vegetables.",
+            "Eat fish, legumes, and nuts regularly.",
+            "Reduce salt intake.",
+            "Limit fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Salmon",
+            "Spinach",
+            "Lentils",
+            "Walnuts",
+            "Brown rice",
+            "Tomatoes"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Pastries",
+            "Fast food",
+            "Refined grains",
+            "High-salt ready meals"
+          ],
+          "exercise_recommendations": [
+            "Exercise at least 200 minutes each week.",
+            "Strength train 2–3 times weekly.",
+            "Stretch or practice yoga.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check blood pressure and cholesterol annually.",
+            "Monitor weight and blood sugar.",
+            "Review your heart risk with your doctor."
+          ],
+          "clinical_warning": "A routine discussion with your doctor is recommended to optimize your heart health.",
+          "positive_takeaway": "Acting now can significantly reduce your future cardiovascular risk."
+        }
+      }
+    },
+    "increased_risk": {
+      "range": "26-50",
+      "score_bands": {
+        "26_30": {
+          "score_range": "26-30",
+          "risk_interpretation": "Your results show early signs of increased cardiovascular risk. The good news is that these changes are often reversible with consistent lifestyle improvements.",
+          "lifestyle_tips": [
+            "Quit smoking if you smoke.",
+            "Exercise most days of the week.",
+            "Work toward a healthy weight.",
+            "Reduce salt and sugary drinks.",
+            "Prioritize sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean or DASH-style diet.",
+            "Increase fruits, vegetables, and whole grains.",
+            "Choose healthy fats, fish, and legumes.",
+            "Reduce salt intake.",
+            "Limit processed and fast foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Sardines",
+            "Walnuts",
+            "Chickpeas",
+            "Oats",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Salty snacks",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Exercise at least 200 minutes weekly.",
+            "Strength train 2–3 times per week.",
+            "Include stretching or mobility work.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor blood pressure and cholesterol regularly.",
+            "Track weight, waist size, and blood sugar.",
+            "Review your cardiovascular risk with your doctor."
+          ],
+          "clinical_warning": "Discuss these results with your doctor and repeat testing within 6–12 months.",
+          "positive_takeaway": "Early action can significantly improve your heart health and reduce future risk."
+        },
+        "31_35": {
+          "score_range": "31-35",
+          "risk_interpretation": "Your cardiovascular risk is moderately elevated, with one or more markers above the ideal range. Focused lifestyle changes can still make a meaningful difference.",
+          "lifestyle_tips": [
+            "Quit smoking if you smoke.",
+            "Exercise consistently every week.",
+            "Aim for gradual weight loss if needed.",
+            "Reduce salt and sugary foods.",
+            "Manage stress and sleep quality."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean or DASH-style diet.",
+            "Increase fiber-rich foods such as oats and legumes.",
+            "Choose fish and plant-based proteins more often.",
+            "Reduce salt intake.",
+            "Limit processed and fried foods."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Mackerel",
+            "Lentils",
+            "Barley",
+            "Apples",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt ready meals"
+          ],
+          "exercise_recommendations": [
+            "Exercise 200–250 minutes weekly.",
+            "Strength train 2–3 times per week.",
+            "Include stretching and mobility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Recheck blood pressure and cholesterol within 6–12 months.",
+            "Monitor weight, waist size, and blood sugar.",
+            "Discuss treatment goals with your doctor."
+          ],
+          "clinical_warning": "A preventive consultation with your doctor is recommended to reduce long-term cardiovascular risk.",
+          "positive_takeaway": "With consistent effort, many cardiovascular risk factors can improve within a few months."
+        },
+        "36_40": {
+          "score_range": "36-40",
+          "risk_interpretation": "Your cardiovascular risk is moderately increased, with signs that your heart and blood vessels are under greater strain. Acting now can significantly improve your long-term heart health.",
+          "lifestyle_tips": [
+            "Quit smoking if you smoke.",
+            "Exercise most days of the week.",
+            "Aim for gradual weight loss if needed.",
+            "Reduce salt and sugary drinks.",
+            "Prioritize sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean or DASH-style diet.",
+            "Eat more vegetables, fruits, legumes, and whole grains.",
+            "Choose fish, nuts, and olive oil.",
+            "Reduce salt intake.",
+            "Avoid fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Salmon",
+            "Spinach",
+            "Walnuts",
+            "Oats",
+            "Lentils",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Exercise about 250 minutes each week.",
+            "Strength train 3 times weekly.",
+            "Include stretching or mobility work.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Recheck blood pressure, cholesterol, and blood sugar in about 6 months.",
+            "Monitor weight and waist size.",
+            "Discuss your heart risk with your doctor."
+          ],
+          "clinical_warning": "Schedule a preventive review with your doctor to discuss these results and your heart health plan.",
+          "positive_takeaway": "Healthy lifestyle changes can still substantially reduce your cardiovascular risk."
+        },
+        "41_45": {
+          "score_range": "41-45",
+          "risk_interpretation": "Your cardiovascular risk is clearly elevated, and several markers may require closer attention. Lifestyle changes combined with regular medical follow-up are recommended.",
+          "lifestyle_tips": [
+            "Quit smoking if you smoke.",
+            "Follow a structured exercise routine.",
+            "Work toward gradual weight loss.",
+            "Limit salt, alcohol, and sugary foods.",
+            "Prioritize sleep and stress control."
+          ],
+          "diet_recommendations": [
+            "Maintain a Mediterranean or DASH-style diet.",
+            "Eat more fiber-rich foods and vegetables.",
+            "Choose fish and plant-based proteins.",
+            "Reduce salt intake.",
+            "Avoid processed and fried foods."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Sardines",
+            "Lentils",
+            "Quinoa",
+            "Tomatoes",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Processed meats",
+            "Fast food",
+            "Pastries",
+            "Refined grains",
+            "High-salt ready meals"
+          ],
+          "exercise_recommendations": [
+            "Exercise at least 250 minutes weekly.",
+            "Strength train 3 times weekly.",
+            "Include stretching or mobility work.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Repeat blood pressure, cholesterol, and blood sugar testing in about 6 months.",
+            "Track weight and waist size.",
+            "Review your cardiovascular risk with your doctor."
+          ],
+          "clinical_warning": "A medical review is recommended to assess your cardiovascular risk and discuss preventive treatment if needed.",
+          "positive_takeaway": "Consistent lifestyle changes can still produce meaningful improvements in heart health."
+        },
+        "46_50": {
+          "score_range": "46-50",
+          "risk_interpretation": "Your cardiovascular risk is high, and early medical guidance is recommended alongside lifestyle changes to help prevent future heart disease.",
+          "lifestyle_tips": [
+            "Quit smoking immediately if you smoke.",
+            "Exercise regularly as advised by your doctor.",
+            "Aim for gradual weight loss if appropriate.",
+            "Strictly limit salt and sugary drinks.",
+            "Improve sleep and manage stress."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean or DASH-style diet.",
+            "Base meals on vegetables, fruits, legumes, and whole grains.",
+            "Choose fish and healthy fats.",
+            "Reduce salt intake.",
+            "Avoid processed, fried, and fast foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Mackerel",
+            "Chickpeas",
+            "Oats",
+            "Blueberries",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Aim for 250–300 minutes of exercise weekly.",
+            "Strength train 3 times weekly.",
+            "Include flexibility exercises.",
+            "Minimize prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat blood pressure, cholesterol, and blood sugar tests every 3–6 months.",
+            "Monitor weight and waist size regularly.",
+            "Discuss whether additional heart tests are appropriate."
+          ],
+          "clinical_warning": "Arrange a medical review soon to develop a personalized plan to reduce your cardiovascular risk.",
+          "positive_takeaway": "With timely action and regular follow-up, your cardiovascular risk can be significantly reduced."
+        }
+      }
+    },
+    "high_risk": {
+      "range": "51-75",
+      "score_bands": {
+        "51_55": {
+          "score_range": "51-55",
+          "risk_interpretation": "Your cardiovascular risk is high. Working closely with your doctor and making healthy lifestyle changes can significantly lower your future risk.",
+          "lifestyle_tips": [
+            "Quit smoking if you smoke.",
+            "Exercise regularly.",
+            "Aim for gradual weight loss if needed.",
+            "Reduce salt and sugary drinks.",
+            "Prioritize sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean or DASH-style diet.",
+            "Eat more vegetables, legumes, and whole grains.",
+            "Choose fish and healthy fats.",
+            "Reduce salt intake.",
+            "Avoid processed and fried foods."
+          ],
+          "foods_to_include": [
+            "Salmon",
+            "Kale",
+            "Lentils",
+            "Barley",
+            "Olive oil",
+            "Almonds"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Aim for up to 300 minutes of exercise weekly.",
+            "Strength train 3 times weekly.",
+            "Include stretching or mobility work.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Repeat blood pressure, cholesterol, blood sugar, and kidney tests every 3–6 months.",
+            "Monitor weight and waist size.",
+            "Discuss ECG or additional heart tests with your doctor."
+          ],
+          "clinical_warning": "Arrange a medical review to develop a personalized heart health plan.",
+          "positive_takeaway": "With early treatment and healthy habits, your cardiovascular risk can still be significantly reduced."
+        },
+        "56_60": {
+          "score_range": "56-60",
+          "risk_interpretation": "Your cardiovascular risk is significantly elevated and requires regular medical follow-up alongside lifestyle changes.",
+          "lifestyle_tips": [
+            "Quit smoking with support if needed.",
+            "Follow a structured exercise routine.",
+            "Aim for medically guided weight loss.",
+            "Limit salt and sugary foods.",
+            "Manage stress and sleep consistently."
+          ],
+          "diet_recommendations": [
+            "Maintain a strict Mediterranean or DASH-style diet.",
+            "Increase fiber-rich foods.",
+            "Choose fish and plant proteins.",
+            "Reduce salt intake.",
+            "Avoid processed and fried foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Sardines",
+            "Chickpeas",
+            "Oats",
+            "Olive oil",
+            "Berries"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Build toward 300 minutes of exercise each week.",
+            "Strength train 3 times weekly.",
+            "Stretch regularly.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat blood pressure, cholesterol, blood sugar, and kidney tests every 3–6 months.",
+            "Track weight and waist size.",
+            "Review your cardiovascular risk with your doctor."
+          ],
+          "clinical_warning": "Prompt medical follow-up is recommended to reduce your long-term cardiovascular risk.",
+          "positive_takeaway": "Steady lifestyle improvements and medical care can lead to meaningful heart health gains."
+        },
+        "61_65": {
+          "score_range": "61-65",
+          "risk_interpretation": "Your results indicate high cardiovascular risk with several markers requiring close attention. A structured treatment plan and regular monitoring are recommended.",
+          "lifestyle_tips": [
+            "Quit smoking with medical support.",
+            "Exercise safely under professional guidance.",
+            "Follow a medically supervised weight-loss plan.",
+            "Strictly limit salt and sugary drinks.",
+            "Prioritize quality sleep and stress control."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean or DASH-style diet.",
+            "Eat more vegetables, legumes, and whole grains.",
+            "Choose fish over red and processed meats.",
+            "Reduce salt intake.",
+            "Avoid processed and fried foods."
+          ],
+          "foods_to_include": [
+            "Mackerel",
+            "Kale",
+            "Lentils",
+            "Quinoa",
+            "Olive oil",
+            "Tomatoes"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Work toward 300 minutes of exercise weekly as tolerated.",
+            "Strength train 3 times weekly.",
+            "Include flexibility exercises.",
+            "Stay active throughout the day."
+          ],
+          "monitoring_recommendations": [
+            "Repeat blood pressure, cholesterol, blood sugar, and kidney tests every 3 months.",
+            "Monitor weight and symptoms closely.",
+            "Follow your doctor's recommendations for heart testing."
+          ],
+          "clinical_warning": "Please schedule a medical review soon to assess your cardiovascular health and discuss treatment options.",
+          "positive_takeaway": "With consistent medical care and lifestyle changes, meaningful improvements are still achievable."
+        },
+        "66_70": {
+          "score_range": "66-70",
+          "risk_interpretation": "Your cardiovascular risk is very high, with clear signs that your heart and blood vessels need closer attention. Prompt medical review and lifestyle changes are strongly recommended.",
+          "lifestyle_tips": [
+            "Quit smoking with medical support.",
+            "Exercise under professional guidance.",
+            "Follow a medically supervised weight-loss plan.",
+            "Strictly limit salt and sugary drinks.",
+            "Prioritize sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean or DASH-style diet.",
+            "Eat more vegetables, legumes, and whole grains.",
+            "Choose fish and healthy fats.",
+            "Keep salt intake very low.",
+            "Avoid processed and fried foods."
+          ],
+          "foods_to_include": [
+            "Salmon",
+            "Spinach",
+            "Walnuts",
+            "Oats",
+            "Chickpeas",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Exercise up to 300 minutes weekly as tolerated.",
+            "Strength train 2–3 times weekly.",
+            "Include stretching or mobility work.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Repeat blood pressure, cholesterol, blood sugar, and kidney tests every 3 months.",
+            "Follow your doctor's advice on ECG or additional heart tests.",
+            "Monitor symptoms, weight, and waist size."
+          ],
+          "clinical_warning": "Arrange a medical review promptly to develop a personalized treatment and monitoring plan.",
+          "positive_takeaway": "With consistent medical care and lifestyle changes, your heart health can still improve."
+        },
+        "71_75": {
+          "score_range": "71-75",
+          "risk_interpretation": "Your cardiovascular risk is very high and requires prompt medical assessment. Close follow-up and early intervention can help reduce the risk of future heart disease.",
+          "lifestyle_tips": [
+            "Quit smoking immediately with medical support.",
+            "Exercise only as advised by your healthcare team.",
+            "Follow a supervised weight-management plan.",
+            "Strictly avoid excess salt and sugary drinks.",
+            "Maintain healthy sleep and stress control."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean or DASH-style diet.",
+            "Base meals on vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Keep salt intake to a minimum.",
+            "Avoid processed, fried, and fast foods."
+          ],
+          "foods_to_include": [
+            "Sardines",
+            "Kale",
+            "Lentils",
+            "Barley",
+            "Olive oil",
+            "Tomatoes"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt ready meals"
+          ],
+          "exercise_recommendations": [
+            "Stay physically active under medical guidance.",
+            "Strength train if approved by your doctor.",
+            "Include flexibility exercises.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat cardiovascular and metabolic testing every 3 months.",
+            "Follow recommendations for ECG or specialist evaluation.",
+            "Report chest pain, breathlessness, or dizziness immediately."
+          ],
+          "clinical_warning": "Please arrange a medical review soon. Seek urgent medical care if you experience chest pain, severe breathlessness, fainting, or other concerning symptoms.",
+          "positive_takeaway": "Early medical care and consistent lifestyle changes can still make a meaningful difference to your heart health."
+        }
+      }
+    },
+    "very_high_risk": {
+      "range": "76-100",
+      "score_bands": {
+        "76_80": {
+          "score_range": "76-80",
+          "risk_interpretation": "Your results indicate very high cardiovascular risk and require prompt medical evaluation. Early treatment and ongoing monitoring are important to reduce the risk of serious heart complications.",
+          "lifestyle_tips": [
+            "Stop smoking with medical support.",
+            "Exercise only under professional guidance.",
+            "Follow a doctor-supervised weight-loss plan.",
+            "Strictly limit salt and sugary foods.",
+            "Prioritize sleep, stress management, and medication adherence."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean or DASH-style diet.",
+            "Eat mostly vegetables, legumes, whole grains, and fish.",
+            "Choose healthy fats such as olive oil.",
+            "Minimize salt intake.",
+            "Avoid processed, fried, and fast foods."
+          ],
+          "foods_to_include": [
+            "Salmon",
+            "Spinach",
+            "Lentils",
+            "Oats",
+            "Walnuts",
+            "Olive oil"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Remain active only within your doctor's recommendations.",
+            "Include gentle strength and flexibility exercises if appropriate.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Regular blood pressure, cholesterol, blood sugar, and kidney function testing every 3 months.",
+            "Follow specialist advice for ECG or further heart evaluation.",
+            "Monitor symptoms closely and seek care if they worsen."
+          ],
+          "clinical_warning": "Prompt medical evaluation is recommended. Seek immediate medical attention for chest pain, severe breathlessness, fainting, or sudden weakness.",
+          "positive_takeaway": "With timely treatment and sustained lifestyle changes, you can still improve your heart health and reduce future complications."
+        },
+        "81_85": {
+          "score_range": "81-85",
+          "risk_interpretation": "Your cardiovascular risk is very high and requires prompt medical evaluation. A structured treatment plan and close monitoring can help reduce future heart complications.",
+          "lifestyle_tips": [
+            "Stop smoking with medical support.",
+            "Exercise only under medical guidance.",
+            "Follow a supervised weight-management plan.",
+            "Strictly limit salt and sugary foods.",
+            "Take medications exactly as prescribed."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean or DASH-style diet.",
+            "Eat more vegetables, legumes, and whole grains.",
+            "Choose fish and healthy fats.",
+            "Keep salt intake very low.",
+            "Avoid processed and fried foods."
+          ],
+          "foods_to_include": [
+            "Salmon",
+            "Kale",
+            "Lentils",
+            "Olive oil",
+            "Oats",
+            "Walnuts"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Exercise only as advised by your doctor.",
+            "Include gentle strength and flexibility exercises if appropriate.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat cardiovascular tests every 3 months.",
+            "Follow specialist recommendations for ECG or imaging.",
+            "Monitor symptoms closely."
+          ],
+          "clinical_warning": "Arrange a medical review as soon as possible. Seek urgent care for chest pain, severe breathlessness, fainting, or sudden weakness.",
+          "positive_takeaway": "Timely treatment and healthy lifestyle changes can still significantly improve your heart health."
+        },
+        "86_90": {
+          "score_range": "86-90",
+          "risk_interpretation": "Your results indicate very high cardiovascular risk that requires ongoing specialist care. Early treatment and close follow-up are important to lower the risk of serious heart events.",
+          "lifestyle_tips": [
+            "Quit smoking immediately.",
+            "Remain physically active only within medical advice.",
+            "Follow your treatment and weight-management plan.",
+            "Strictly limit salt and sugary foods.",
+            "Take medications consistently."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean or DASH-style diet.",
+            "Base meals on vegetables, legumes, whole grains, and fish.",
+            "Use healthy fats such as olive oil.",
+            "Keep salt intake minimal.",
+            "Avoid processed and fried foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Salmon",
+            "Chickpeas",
+            "Oats",
+            "Olive oil",
+            "Berries"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fast food",
+            "Pastries",
+            "Refined grains",
+            "High-salt foods"
+          ],
+          "exercise_recommendations": [
+            "Stay active within your doctor's recommendations.",
+            "Include light resistance and flexibility exercises if appropriate.",
+            "Avoid prolonged inactivity."
+          ],
+          "monitoring_recommendations": [
+            "Continue regular heart and metabolic testing every 3 months.",
+            "Attend all specialist appointments.",
+            "Report any new symptoms immediately."
+          ],
+          "clinical_warning": "Prompt medical follow-up is essential. Seek emergency care immediately if you develop chest pain, severe breathlessness, fainting, or stroke-like symptoms.",
+          "positive_takeaway": "Consistent treatment and healthy habits can still lower your future cardiovascular risk."
+        },
+        "91_95": {
+          "score_range": "91-95",
+          "risk_interpretation": "Your cardiovascular risk is extremely high and needs comprehensive medical management. Close monitoring and timely treatment are essential to help prevent serious complications.",
+          "lifestyle_tips": [
+            "Stop smoking immediately.",
+            "Exercise only with medical clearance.",
+            "Follow your treatment plan closely.",
+            "Strictly limit salt and processed foods.",
+            "Take all prescribed medications regularly."
+          ],
+          "diet_recommendations": [
+            "Strictly maintain a Mediterranean or DASH-style diet.",
+            "Prioritize vegetables, legumes, fish, and whole grains.",
+            "Choose healthy fats.",
+            "Minimize salt intake.",
+            "Avoid processed, fried, and fast foods."
+          ],
+          "foods_to_include": [
+            "Sardines",
+            "Kale",
+            "Lentils",
+            "Olive oil",
+            "Tomatoes",
+            "Oats"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt foods"
+          ],
+          "exercise_recommendations": [
+            "Remain active only if approved by your healthcare team.",
+            "Include gentle mobility exercises.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Maintain regular specialist follow-up and repeat testing every 3 months or as advised.",
+            "Closely monitor blood pressure and symptoms.",
+            "Seek medical attention promptly if symptoms worsen."
+          ],
+          "clinical_warning": "Close medical supervision is strongly recommended. Seek emergency care immediately for chest pain, severe breathlessness, fainting, or sudden weakness.",
+          "positive_takeaway": "Even at this stage, early treatment and sustained lifestyle changes can improve your long-term outlook."
+        },
+        "96_100": {
+          "score_range": "96-100",
+          "risk_interpretation": "Your results indicate the highest level of cardiovascular risk. Prompt specialist evaluation and comprehensive medical management are essential to reduce the risk of serious heart complications.",
+          "lifestyle_tips": [
+            "Stop smoking immediately.",
+            "Follow your doctor's treatment plan carefully.",
+            "Stay physically active only within medically recommended limits.",
+            "Strictly avoid excess salt and processed foods.",
+            "Take all prescribed medications consistently."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean or DASH-style diet.",
+            "Focus on vegetables, legumes, fish, and whole grains.",
+            "Choose healthy fats such as olive oil.",
+            "Keep salt intake as low as possible.",
+            "Avoid processed, fried, and fast foods."
+          ],
+          "foods_to_include": [
+            "Salmon",
+            "Spinach",
+            "Walnuts",
+            "Lentils",
+            "Olive oil",
+            "Oats"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Refined grains",
+            "High-salt packaged foods"
+          ],
+          "exercise_recommendations": [
+            "Exercise only under medical supervision.",
+            "Include gentle mobility exercises if approved.",
+            "Avoid prolonged inactivity."
+          ],
+          "monitoring_recommendations": [
+            "Follow your specialist's monitoring schedule closely.",
+            "Complete all recommended heart investigations.",
+            "Report any new or worsening symptoms immediately."
+          ],
+          "clinical_warning": "Urgent specialist assessment is recommended. Seek emergency medical care immediately for chest pain, severe breathlessness, fainting, stroke symptoms, or sudden weakness.",
+          "positive_takeaway": "With prompt treatment, ongoing medical care, and healthy lifestyle changes, meaningful improvements are still possible."
+        }
+      }
+    }
+  },
+  "result_factor_sets": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Sedentary Routine",
+        "Mild dietary imbalance",
+        "Periodic stress"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Lower physical activity",
+        "Occasional high-sodium foods",
+        "Inconsistent stress management"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Reduced physical activity",
+        "Higher sodium intake",
+        "Ongoing stress"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Long-term fatigue and burnout",
+        "High sodium consumption",
+        "Low physical activity"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Prolonged inactivity",
+        "High sodium consumption",
+        "Persistent stress/burnout",
+        "Unhealthy dietary pattern"
+      ]
+    }
+  }
+}

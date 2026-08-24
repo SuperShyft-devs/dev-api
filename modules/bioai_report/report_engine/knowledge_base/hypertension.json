@@ -1,0 +1,1165 @@
+{
+  "knowledge_base_version": "1.0",
+  "disease_id": "hypertension",
+  "display_name": "Hypertension",
+  "overview": "Hypertension is a condition in which blood pressure remains consistently higher than normal, placing increased strain on the heart and blood vessels. Uncontrolled hypertension can cause organ damage over time and increase the risk of heart disease, stroke, and kidney issues.",
+  "risk_bands": {
+    "healthy": {
+      "range": "0-25",
+      "score_bands": {
+        "0_5": {
+          "score_range": "0-5",
+          "risk_interpretation": "Your current profile places you in the lowest hypertension-risk category. Continue your healthy habits to maintain normal blood pressure and support long-term heart and vascular health.",
+          "lifestyle_tips": [
+            "Limit added salt.",
+            "Stay physically active most days.",
+            "Maintain a healthy weight.",
+            "Prioritise good sleep and stress management.",
+            "Avoid tobacco and limit alcohol."
+          ],
+          "diet_recommendations": [
+            "Follow a diet rich in vegetables, fruits and whole grains",
+            "Limit sodium intake where appropriate.",
+            "Choose fresh foods over processed options.",
+            "Use herbs and spices instead of extra salt.",
+            "Include potassium-rich foods unless advised otherwise."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Tomatoes",
+            "Oranges",
+            "Bananas",
+            "Oats",
+            "Lentils",
+            "Unsalted almonds",
+            "Plain yogurt",
+            "Beans",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Instant noodles",
+            "Salty chips",
+            "Pickles",
+            "Packaged soups",
+            "Salted nuts",
+            "Papad",
+            "Salty sauces",
+            "Fast food",
+            "Highly salted snacks"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150 minutes of moderate aerobic activity each week.",
+            "Include strength training at least twice weekly.",
+            "Stretch regularly and reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check your blood pressure during routine health visits.",
+            "Monitor your weight and waist circumference.",
+            "Review your diet and cardiovascular health regularly."
+          ],
+          "clinical_warning": "Arrange a medical review if your blood pressure remains consistently above your usual range. Seek urgent care for chest pain, breathlessness, sudden weakness, or stroke-like symptoms.",
+          "positive_takeaway": "Your current profile provides a strong foundation for maintaining healthy blood pressure."
+        },
+        "6_10": {
+          "score_range": "6-10",
+          "risk_interpretation": "Your blood pressure risk remains low. Consistent healthy habits can help preserve this favourable profile over time.",
+          "lifestyle_tips": [
+            "Reduce added salt.",
+            "Stay active throughout the week.",
+            "Include regular strength training.",
+            "Break up long sitting periods.",
+            "Maintain good sleep and manage stress."
+          ],
+          "diet_recommendations": [
+            "Build meals around vegetables, fruits, whole grains, legumes, and lean proteins.",
+            "Limit high-sodium packaged foods.",
+            "Choose low-fat dairy products.",
+            "Prefer unsalted nuts and seeds.",
+            "Choose water over sugary drinks."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Berries",
+            "Oranges",
+            "Oats",
+            "Barley",
+            "Chickpeas",
+            "Unsalted walnuts",
+            "Plain yogurt",
+            "Tomatoes",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Salty soups",
+            "Packaged snacks",
+            "Pickles",
+            "Papad",
+            "Soy sauce",
+            "Salted crackers",
+            "Fast food",
+            "Processed cheese",
+            "High-sodium seasonings"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150 minutes of moderate exercise weekly.",
+            "Include strength training twice a week.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check your blood pressure periodically.",
+            "Monitor weight and activity levels.",
+            "Review cardiovascular risk during routine health visits."
+          ],
+          "clinical_warning": "Consult your healthcare provider if blood pressure readings remain consistently elevated. Seek urgent care if severe symptoms develop.",
+          "positive_takeaway": "Your healthy lifestyle is helping protect your long-term cardiovascular health."
+        },
+        "11_15": {
+          "score_range": "11-15",
+          "risk_interpretation": "Your profile remains within the healthy range, although maintaining healthy habits is important to prevent future increases in blood pressure.",
+          "lifestyle_tips": [
+            "Reduce salt intake.",
+            "Stay physically active.",
+            "Maintain a healthy weight.",
+            "Avoid tobacco and limit alcohol.",
+            "Manage stress and sleep well."
+          ],
+          "diet_recommendations": [
+            "Eat plenty of vegetables, fruits, whole grains, and legumes.",
+            "Choose lower-sodium packaged foods.",
+            "Prefer fish and plant-based proteins.",
+            "Limit processed meats and saturated fats.",
+            "Use healthy unsaturated oils."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Citrus fruits",
+            "Bananas",
+            "Brown rice",
+            "Lentils",
+            "Unsalted seeds",
+            "Low-fat yogurt",
+            "Beans",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Instant noodles",
+            "Salty chips",
+            "Pickles",
+            "Packaged soups",
+            "Papad",
+            "Salted nuts",
+            "Salty sauces",
+            "Fast food",
+            "Highly processed snacks"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150-300 minutes of moderate exercise weekly.",
+            "Strength train at least twice a week.",
+            "Stay mobile and avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Continue routine blood pressure checks.",
+            "Monitor weight and waist circumference.",
+            "Arrange earlier follow-up if blood pressure begins to rise."
+          ],
+          "clinical_warning": "Seek medical advice if blood pressure remains consistently elevated or if concerning symptoms occur.",
+          "positive_takeaway": "Maintaining healthy habits now can help keep your blood pressure within a healthy range."
+        },
+        "16_20": {
+          "score_range": "16-20",
+          "risk_interpretation": "Your profile remains within the healthy range, but there is less margin for preventable risk. Strengthening healthy habits now can help maintain normal blood pressure and reduce future cardiovascular risk.",
+          "lifestyle_tips": [
+            "Reduce salt intake.",
+            "Stay active throughout the week.",
+            "Maintain a healthy weight.",
+            "Move regularly during long sitting periods.",
+            "Prioritise good sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style diet rich in vegetables, fruits, and whole grains.",
+            "Choose fresh foods over processed options.",
+            "Include potassium-rich foods unless advised otherwise.",
+            "Choose unsalted nuts, seeds, and legumes.",
+            "Limit packaged and restaurant foods high in sodium."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Oranges",
+            "Apples",
+            "Oats",
+            "Barley",
+            "Chickpeas",
+            "Unsalted almonds",
+            "Plain yogurt",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Packaged snacks",
+            "Pickles",
+            "Papad",
+            "Instant noodles",
+            "Processed cheese",
+            "Fast food",
+            "Salty sauces",
+            "Salted crackers",
+            "Bouillon cubes"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of moderate aerobic activity each week.",
+            "Include strength training at least twice weekly.",
+            "Stretch regularly and avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check your blood pressure during routine health visits.",
+            "Monitor your weight and waist circumference.",
+            "Review your diet and lifestyle every few months."
+          ],
+          "clinical_warning": "Arrange a medical review if your blood pressure remains consistently elevated. Seek urgent care if severe symptoms such as chest pain, breathlessness, confusion, or sudden weakness occur.",
+          "positive_takeaway": "Small, consistent lifestyle improvements can help maintain healthy blood pressure and protect your heart."
+        },
+        "21_25": {
+          "score_range": "21-25",
+          "risk_interpretation": "Your overall profile remains healthy, although you are approaching the upper end of the healthy range. Strengthening healthy habits now can help prevent future increases in blood pressure.",
+          "lifestyle_tips": [
+            "Choose lower-sodium meals.",
+            "Exercise regularly.",
+            "Maintain a healthy weight and waist size.",
+            "Reduce prolonged sitting.",
+            "Avoid tobacco and limit alcohol."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style eating pattern.",
+            "Choose fresh, naturally low-sodium foods.",
+            "Include vegetables, fruits, legumes, and whole grains daily.",
+            "Choose low-fat dairy where appropriate.",
+            "Use healthy plant oils instead of saturated fats."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Bananas",
+            "Oranges",
+            "Oats",
+            "Whole-wheat roti",
+            "Lentils",
+            "Unsalted walnuts",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Salted chips",
+            "Pickles",
+            "Papad",
+            "Instant soups",
+            "Packaged noodles",
+            "Salted nuts",
+            "Processed cheese",
+            "Fast food",
+            "Salty sauces"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of moderate aerobic activity each week.",
+            "Include strength training on at least two days weekly.",
+            "Stay active throughout the day."
+          ],
+          "monitoring_recommendations": [
+            "Monitor your blood pressure regularly.",
+            "Track weight and waist circumference.",
+            "Review your cardiovascular health during routine check-ups."
+          ],
+          "clinical_warning": "Consult your healthcare provider if blood pressure readings remain consistently elevated. Seek urgent medical care if severe symptoms develop.",
+          "positive_takeaway": "Maintaining healthy habits now can help keep your blood pressure in the healthy range for years to come."
+        }
+      }
+    },
+    "increased_risk": {
+      "range": "26-50",
+      "score_bands": {
+        "26_30": {
+          "score_range": "26-30",
+          "risk_interpretation": "Your profile suggests an increased risk of developing hypertension. Early lifestyle changes can help improve blood pressure and reduce future cardiovascular risk.",
+          "lifestyle_tips": [
+            "Reduce salt intake.",
+            "Aim for regular physical activity.",
+            "Maintain a healthy weight.",
+            "Manage stress daily.",
+            "Check your blood pressure regularly."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style diet rich in vegetables, fruits, and whole grains.",
+            "Limit processed and high-sodium foods.",
+            "Choose lean proteins and legumes.",
+            "Snack on unsalted nuts or plain dairy.",
+            "Replace salty snacks with fresh foods."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Citrus fruits",
+            "Guava",
+            "Oats",
+            "Brown rice",
+            "Beans",
+            "Unsalted peanuts",
+            "Plain yogurt",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Namkeen",
+            "Pickles",
+            "Papad",
+            "Instant noodles",
+            "Packaged soups",
+            "Salted biscuits",
+            "Salty chutneys",
+            "Fast food",
+            "Salted nuts"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150 minutes of moderate aerobic activity weekly.",
+            "Include strength training twice a week.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor your blood pressure regularly.",
+            "Track blood pressure trends rather than isolated readings.",
+            "Review cholesterol, blood sugar, and kidney health during routine check-ups."
+          ],
+          "clinical_warning": "Arrange a medical review if blood pressure remains consistently elevated. Seek urgent care if severe symptoms develop.",
+          "positive_takeaway": "Consistent lifestyle changes can significantly reduce your future hypertension risk."
+        },
+        "31_35": {
+          "score_range": "31-35",
+          "risk_interpretation": "Your blood pressure risk is moderately increased. Consistent lifestyle improvements and regular monitoring can help prevent progression.",
+          "lifestyle_tips": [
+            "Choose fresh foods over processed meals.",
+            "Exercise regularly.",
+            "Maintain a healthy weight.",
+            "Reduce prolonged sitting.",
+            "Avoid tobacco and limit alcohol."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style eating pattern.",
+            "Reduce sodium intake.",
+            "Choose potassium-rich foods unless advised otherwise.",
+            "Eat more whole grains and legumes.",
+            "Choose lean proteins instead of processed meats."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Bananas",
+            "Oranges",
+            "Barley",
+            "Lentils",
+            "Chickpeas",
+            "Unsalted almonds",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Salty snacks",
+            "Pickles",
+            "Papad",
+            "Instant meals",
+            "Packaged soups",
+            "Processed cheese",
+            "Fast food",
+            "Salty sauces",
+            "Salted crackers"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of moderate exercise weekly.",
+            "Include strength training at least twice weekly.",
+            "Stay active throughout the day."
+          ],
+          "monitoring_recommendations": [
+            "Check your blood pressure regularly.",
+            "Monitor weight and waist circumference.",
+            "Review cardiovascular risk during routine health visits."
+          ],
+          "clinical_warning": "Persistent elevated blood pressure should be discussed with your healthcare provider.",
+          "positive_takeaway": "Healthy lifestyle choices can slow or prevent the progression of hypertension."
+        },
+        "36_40": {
+          "score_range": "36-40",
+          "risk_interpretation": "Your profile suggests multiple risk factors for hypertension. A structured lifestyle plan and regular blood pressure monitoring are recommended.",
+          "lifestyle_tips": [
+            "Reduce sodium intake.",
+            "Exercise consistently.",
+            "Aim for a healthy weight.",
+            "Take regular movement breaks.",
+            "Prioritise good sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style diet consistently.",
+            "Limit processed and packaged foods.",
+            "Eat more vegetables, fruits, and whole grains.",
+            "Include legumes, nuts, and seeds regularly.",
+            "Choose foods low in saturated fat."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Guava",
+            "Apples",
+            "Oats",
+            "Brown rice",
+            "Beans",
+            "Unsalted walnuts",
+            "Plain yogurt",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Bacon",
+            "Sausages",
+            "Namkeen",
+            "Pickles",
+            "Papad",
+            "Instant noodles",
+            "Packaged sauces",
+            "Salted nuts",
+            "Fast food",
+            "Bouillon cubes"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of moderate aerobic activity weekly.",
+            "Strength train at least twice weekly.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor your blood pressure regularly.",
+            "Review cardiovascular risk factors during follow-up.",
+            "Seek earlier review if blood pressure continues to rise."
+          ],
+          "clinical_warning": "Consult your healthcare provider if blood pressure remains consistently elevated or continues to increase.",
+          "positive_takeaway": "Early intervention can help prevent progression to established hypertension."
+        },
+        "41_45": {
+          "score_range": "41-45",
+          "risk_interpretation": "Your profile places you in the upper end of the increased-risk range for hypertension. Consistent lifestyle changes and regular blood pressure monitoring can help prevent progression.",
+          "lifestyle_tips": [
+            "Reduce sodium intake consistently.",
+            "Exercise most days of the week.",
+            "Maintain a healthy weight.",
+            "Reduce prolonged sitting.",
+            "Avoid tobacco and limit alcohol."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style diet.",
+            "Choose fresh vegetables, fruits, legumes, and whole grains.",
+            "Replace processed meats with lean proteins or fish.",
+            "Choose unsalted nuts and low-fat dairy.",
+            "Limit sugary drinks and high-sodium foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Oranges",
+            "Bananas",
+            "Barley",
+            "Chickpeas",
+            "Lentils",
+            "Unsalted seeds",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Salty chips",
+            "Pickles",
+            "Papad",
+            "Instant soups",
+            "Packaged noodles",
+            "Processed cheese",
+            "Fast food",
+            "Salty condiments",
+            "Salted crackers"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of moderate aerobic activity weekly.",
+            "Include strength training at least twice weekly.",
+            "Stay active throughout the day."
+          ],
+          "monitoring_recommendations": [
+            "Check your blood pressure regularly.",
+            "Review cholesterol, blood sugar, and kidney health during routine check-ups.",
+            "Discuss persistent elevated readings with your healthcare provider."
+          ],
+          "clinical_warning": "Persistent high blood pressure should be medically evaluated. Seek urgent care if severe symptoms such as chest pain, breathlessness, confusion, or sudden weakness occur.",
+          "positive_takeaway": "Consistent lifestyle improvements can help prevent hypertension and lower future cardiovascular risk."
+        },
+        "46_50": {
+          "score_range": "46-50",
+          "risk_interpretation": "Your score is approaching the high-risk range for hypertension. Early medical review and sustained lifestyle changes can help reduce your risk and protect long-term cardiovascular health.",
+          "lifestyle_tips": [
+            "Make sodium reduction a daily priority.",
+            "Exercise regularly at a sustainable pace.",
+            "Aim for gradual weight loss if overweight.",
+            "Break up long periods of sitting.",
+            "Monitor your blood pressure as advised."
+          ],
+          "diet_recommendations": [
+            "Follow a structured DASH-style eating plan.",
+            "Base meals on vegetables, fruits, legumes, and whole grains.",
+            "Choose lean proteins and fish over processed meats.",
+            "Prefer fresh foods to packaged or processed options.",
+            "Limit salty snacks, restaurant foods, and processed meals."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Citrus fruits",
+            "Guava",
+            "Oats",
+            "Whole-wheat roti",
+            "Beans",
+            "Unsalted almonds",
+            "Plain yogurt",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Namkeen",
+            "Pickled vegetables",
+            "Papad",
+            "Instant noodles",
+            "Packaged soups",
+            "Salted nuts",
+            "Processed cheese",
+            "Fast food",
+            "Salty sauces"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150 minutes of moderate aerobic activity weekly.",
+            "Include strength training at least twice weekly.",
+            "Reduce prolonged sitting with regular movement."
+          ],
+          "monitoring_recommendations": [
+            "Monitor your blood pressure regularly at home or during clinic visits.",
+            "Review cholesterol, blood sugar, and kidney function as advised.",
+            "Arrange medical follow-up if blood pressure remains consistently elevated."
+          ],
+          "clinical_warning": "Because your score is close to the high-risk range, persistent elevated blood pressure should be assessed promptly. Seek urgent medical care if severe symptoms develop.",
+          "positive_takeaway": "Timely lifestyle changes and regular follow-up can significantly reduce your future hypertension risk."
+        }
+      }
+    },
+    "high_risk": {
+      "range": "51-75",
+      "score_bands": {
+        "51_55": {
+          "score_range": "51-55",
+          "risk_interpretation": "Your score falls in a high-risk range, meaning your current profile warrants active attention to blood-pressure control and cardiovascular risk factors. Lifestyle changes should be consistent, and clinical review is appropriate when readings are repeatedly elevated.",
+          "lifestyle_tips": [
+            "Adopt a consistent DASH-style eating pattern with strong sodium awareness.",
+            "Aim for 150–300 minutes of moderate aerobic activity weekly when appropriate.",
+            "Address excess weight gradually rather than using rapid diets.",
+            "Break up sedentary time throughout the day.",
+            "Use stress-reduction and sleep routines that you can maintain."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style pattern with deliberate sodium reduction at each meal.",
+            "Favor vegetables, fruit, whole grains, legumes, nuts, seeds, and low-fat dairy.",
+            "Choose potassium-rich foods when kidney function and other clinical factors allow.",
+            "Replace processed meats, salty snacks, and instant foods with fresh protein and produce.",
+            "Use unsaturated oils in place of butter, ghee, or foods high in saturated fat."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Oranges",
+            "Bananas",
+            "Oats",
+            "Barley",
+            "Lentils",
+            "Chickpeas",
+            "Unsalted walnuts",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Bacon",
+            "Sausages",
+            "Salty chips",
+            "Pickles",
+            "Papad",
+            "Instant soups",
+            "Packaged noodles",
+            "Salted cheese",
+            "Fast food",
+            "High-sodium sauces"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of moderate aerobic activity weekly if appropriate for your health status.",
+            "Perform resistance training on at least two days each week.",
+            "Include flexibility or mobility exercises several times weekly.",
+            "Interrupt sitting frequently throughout the day.",
+            "If your current fitness is low, start with shorter sessions and build gradually."
+          ],
+          "monitoring_recommendations": [
+            "Keep a structured record of home blood-pressure readings when advised, including dates and times.",
+            "Arrange clinical follow-up to review persistent elevation and overall cardiovascular risk.",
+            "Monitor kidney function, glucose, cholesterol, and weight according to individualized care.",
+            "Review adherence to sodium reduction and activity goals at each follow-up.",
+            "Do not use a single normal reading to dismiss a pattern of elevated measurements."
+          ],
+          "clinical_warning": "Clinical review is important when readings are repeatedly high so your overall cardiovascular risk can be assessed. Seek urgent care for severe chest pain, major breathing difficulty, confusion, or sudden neurological symptoms.",
+          "positive_takeaway": "Your current risk can be addressed step by step, and sustained habits can make a meaningful difference."
+        },
+        "56_60": {
+          "score_range": "56-60",
+          "risk_interpretation": "This score suggests a substantial blood-pressure risk burden that should not be managed by lifestyle changes alone if measurements are persistently high. Keep a reliable record of readings and arrange timely healthcare follow-up to review the full picture.",
+          "lifestyle_tips": [
+            "Make lower-sodium meals, regular exercise, and weight management central weekly goals.",
+            "Combine aerobic activity with resistance training on at least two days each week.",
+            "Favor steady weight reduction if excess weight is contributing to risk.",
+            "Avoid prolonged sitting by scheduling movement breaks.",
+            "Keep a home blood-pressure log if recommended by your clinician."
+          ],
+          "diet_recommendations": [
+            "Make sodium awareness part of every meal, including packaged staples and restaurant foods.",
+            "Emphasize fibre-rich vegetables, fruit, legumes, and whole grains.",
+            "Choose fish, poultry, beans, and lentils instead of cured meats.",
+            "Include unsalted nuts and seeds and lower-sodium dairy where suitable.",
+            "Avoid relying on pickles, chutneys, sauces, instant mixes, or packaged soups for flavor."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Guava",
+            "Citrus fruit",
+            "Brown rice",
+            "Oats",
+            "Beans",
+            "Unsalted almonds",
+            "Plain yogurt",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Namkeen",
+            "Pickles",
+            "Papad",
+            "Instant noodles",
+            "Packaged soups",
+            "Salted crackers",
+            "Salted nuts",
+            "Fast food",
+            "Soy-based salty sauces"
+          ],
+          "exercise_recommendations": [
+            "Combine regular aerobic exercise with twice-weekly resistance training.",
+            "Work toward 150–300 minutes of moderate activity weekly as tolerated.",
+            "Add mobility and stretching to support adherence and comfort.",
+            "Avoid long uninterrupted periods of sitting.",
+            "Monitor how you feel during exercise and choose sustainable intensity."
+          ],
+          "monitoring_recommendations": [
+            "Check blood pressure regularly at home if recommended and share the trend with your healthcare professional.",
+            "Follow a risk-based schedule for kidney function, glucose, cholesterol, and weight assessment.",
+            "Review sodium intake and physical activity at each follow-up.",
+            "Use repeated measurements to confirm patterns rather than relying on symptoms.",
+            "Increase clinical follow-up if readings remain above target ranges."
+          ],
+          "clinical_warning": "Timely healthcare follow-up is appropriate if home readings remain elevated or are rising. Urgent assessment is needed when severe symptoms occur with a very high reading.",
+          "positive_takeaway": "Active monitoring plus consistent lifestyle changes can help you regain better control of modifiable risk factors."
+        },
+        "61_65": {
+          "score_range": "61-65",
+          "risk_interpretation": "Your results indicate a higher level of concern within the high-risk category. Focus closely on sodium reduction, healthy weight, regular activity, and home blood-pressure tracking, with clinical follow-up based on your actual readings and other risk factors.",
+          "lifestyle_tips": [
+            "Limit restaurant, packaged, and preserved foods that can quietly raise sodium intake.",
+            "Maintain consistent aerobic activity and add resistance exercise regularly.",
+            "Use a structured calorie-aware eating pattern if weight reduction is needed.",
+            "Reduce sedentary time during work and leisure.",
+            "Prioritize reliable sleep and practical stress-management habits."
+          ],
+          "diet_recommendations": [
+            "Use a consistent low-sodium, DASH-style meal pattern and plan meals ahead.",
+            "Increase vegetables and fruit while keeping portions of refined starches moderate.",
+            "Choose minimally processed proteins and avoid cured, smoked, or salted meats.",
+            "Select unsalted nuts, seeds, beans, and whole grains for fibre and satiety.",
+            "Use herbs, spices, citrus, and vinegar in place of salty condiments."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Bananas",
+            "Oranges",
+            "Barley",
+            "Lentils",
+            "Chickpeas",
+            "Unsalted seeds",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Cured meats",
+            "Salty snacks",
+            "Pickles",
+            "Papad",
+            "Bouillon cubes",
+            "Instant noodles",
+            "Processed cheese",
+            "Salted nuts",
+            "Fast food",
+            "Packaged sauces"
+          ],
+          "exercise_recommendations": [
+            "Prioritize consistent moderate aerobic activity and build toward 150–300 minutes weekly.",
+            "Strength-train major muscle groups at least twice each week.",
+            "Include flexibility sessions on nonconsecutive days if helpful.",
+            "Use short walking breaks to reduce sedentary time.",
+            "Increase activity gradually rather than exercising intensely only on weekends."
+          ],
+          "monitoring_recommendations": [
+            "Maintain frequent, consistent blood-pressure tracking if advised by your clinician.",
+            "Arrange clinical assessment of cardiovascular risk and related factors.",
+            "Monitor kidney function, glucose, cholesterol, and weight based on individual risk.",
+            "Review diet and exercise changes with a healthcare professional.",
+            "Do not delay review when repeated measurements are clearly above your usual range."
+          ],
+          "clinical_warning": "Arrange clinical review rather than relying on lifestyle changes alone when readings stay high. Seek urgent care for severe chest pain, breathlessness, confusion, or sudden weakness.",
+          "positive_takeaway": "Focused prevention now can reduce the chance that your risk continues to progress."
+        },
+        "66_70": {
+          "score_range": "66-70",
+          "risk_interpretation": "Your profile places you near the upper end of the high-risk range for hypertension. Prompt medical review, regular blood pressure monitoring, and consistent lifestyle changes are important to reduce future cardiovascular risk.",
+          "lifestyle_tips": [
+            "Follow a low-sodium eating plan.",
+            "Exercise regularly at a moderate intensity.",
+            "Aim for gradual weight loss if overweight.",
+            "Reduce prolonged sitting.",
+            "Monitor your blood pressure as advised."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style diet with reduced sodium.",
+            "Choose vegetables, fruits, legumes, whole grains, and lean proteins.",
+            "Prefer fresh foods over processed options.",
+            "Include unsalted nuts and low-fat dairy.",
+            "Limit processed meats, salty snacks, and packaged foods."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Guava",
+            "Apples",
+            "Oats",
+            "Whole-wheat roti",
+            "Beans",
+            "Unsalted walnuts",
+            "Plain yogurt",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Bacon",
+            "Sausages",
+            "Namkeen",
+            "Pickles",
+            "Papad",
+            "Instant soups",
+            "Salted biscuits",
+            "Processed cheese",
+            "Fast food",
+            "High-sodium sauces"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of moderate aerobic activity weekly.",
+            "Include strength training at least twice weekly.",
+            "Reduce prolonged sitting with regular movement."
+          ],
+          "monitoring_recommendations": [
+            "Monitor your blood pressure regularly.",
+            "Review cardiovascular risk, kidney function, cholesterol, and blood sugar with your healthcare provider.",
+            "Arrange follow-up if blood pressure remains elevated."
+          ],
+          "clinical_warning": "Persistent high blood pressure requires timely medical assessment. Seek urgent medical care if severe symptoms occur.",
+          "positive_takeaway": "Regular monitoring and healthy lifestyle changes can significantly improve long-term blood pressure control."
+        },
+        "71_75": {
+          "score_range": "71-75",
+          "risk_interpretation": "Your profile is at the upper end of the high-risk category for hypertension. Prompt medical assessment, regular monitoring, and sustained lifestyle changes are strongly recommended to reduce cardiovascular risk.",
+          "lifestyle_tips": [
+            "Follow a low-sodium DASH-style eating pattern.",
+            "Exercise regularly within your ability.",
+            "Aim for gradual weight loss if needed.",
+            "Stay active and reduce prolonged sitting.",
+            "Avoid tobacco and limit alcohol."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style diet consistently.",
+            "Choose vegetables, fruits, legumes, whole grains, fish, and lean proteins.",
+            "Include potassium-rich foods unless advised otherwise.",
+            "Replace processed foods with fresh alternatives.",
+            "Limit packaged foods, restaurant meals, and high-sodium snacks."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Oranges",
+            "Bananas",
+            "Brown rice",
+            "Barley",
+            "Lentils",
+            "Unsalted almonds",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Salty chips",
+            "Pickles",
+            "Papad",
+            "Instant noodles",
+            "Packaged soups",
+            "Salted nuts",
+            "Processed cheese",
+            "Fast food",
+            "High-sodium sauces"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of moderate aerobic activity weekly.",
+            "Include strength training at least twice weekly.",
+            "Stay active and minimise prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor your blood pressure regularly and keep a home record if advised.",
+            "Review kidney function, cholesterol, blood sugar, and cardiovascular risk with your healthcare provider.",
+            "Attend follow-up appointments as recommended."
+          ],
+          "clinical_warning": "Arrange prompt medical review if blood pressure remains consistently elevated. Seek urgent medical care if severe chest pain, breathlessness, confusion, sudden weakness, or stroke-like symptoms occur.",
+          "positive_takeaway": "Early treatment and sustained healthy habits can help improve blood pressure control and reduce long-term cardiovascular risk."
+        }
+      }
+    },
+    "very_high_risk": {
+      "range": "76-100",
+      "score_bands": {
+        "76_80": {
+          "score_range": "76-80",
+          "risk_interpretation": "Your profile places you in the very high-risk category for hypertension. Prompt medical review, regular monitoring, and consistent lifestyle changes are important to reduce cardiovascular risk.",
+          "lifestyle_tips": [
+            "Follow a low-sodium eating plan.",
+            "Stay physically active within your ability.",
+            "Aim for gradual weight loss if needed.",
+            "Reduce prolonged sitting.",
+            "Monitor your blood pressure regularly."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style diet with reduced sodium.",
+            "Choose vegetables, fruits, whole grains, legumes, and lean proteins.",
+            "Prefer fresh foods over processed meals.",
+            "Include unsalted nuts and low-fat dairy.",
+            "Limit processed meats, salty snacks, and packaged foods."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Guava",
+            "Citrus fruits",
+            "Oats",
+            "Lentils",
+            "Chickpeas",
+            "Unsalted walnuts",
+            "Plain yogurt",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Namkeen",
+            "Pickles",
+            "Papad",
+            "Instant noodles",
+            "Packaged soups",
+            "Salted crackers",
+            "Processed cheese",
+            "Fast food",
+            "High-sodium sauces"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of moderate aerobic activity weekly if appropriate.",
+            "Include strength training at least twice weekly.",
+            "Reduce prolonged sitting with regular movement."
+          ],
+          "monitoring_recommendations": [
+            "Monitor your blood pressure regularly.",
+            "Review cardiovascular risk, kidney function, cholesterol, and blood sugar with your healthcare provider.",
+            "Continue prescribed treatment and follow-up."
+          ],
+          "clinical_warning": "Arrange prompt medical review if blood pressure remains consistently elevated. Seek urgent care if severe symptoms occur.",
+          "positive_takeaway": "Early treatment and healthy lifestyle changes can help improve blood pressure control and lower future cardiovascular risk."
+        },
+        "81_85": {
+          "score_range": "81-85",
+          "risk_interpretation": "Your profile indicates a marked risk of hypertension and cardiovascular disease. Prompt medical assessment and regular follow-up are strongly recommended.",
+          "lifestyle_tips": [
+            "Reduce sodium intake every day.",
+            "Exercise regularly within your fitness level.",
+            "Aim for a healthy weight.",
+            "Avoid tobacco and limit alcohol.",
+            "Monitor your blood pressure consistently."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style diet.",
+            "Choose fresh, minimally processed foods.",
+            "Eat more vegetables, fruits, legumes, and whole grains.",
+            "Choose lean proteins instead of processed meats.",
+            "Limit salty snacks and processed foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Bananas",
+            "Oranges",
+            "Barley",
+            "Brown rice",
+            "Beans",
+            "Unsalted seeds",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Bacon",
+            "Sausages",
+            "Salty snacks",
+            "Pickles",
+            "Papad",
+            "Instant meals",
+            "Processed cheese",
+            "Salted nuts",
+            "Fast food",
+            "Packaged sauces"
+          ],
+          "exercise_recommendations": [
+            "Aim for regular moderate aerobic exercise.",
+            "Include strength training at least twice weekly.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor your blood pressure regularly.",
+            "Review kidney function and cardiovascular risk with your healthcare provider.",
+            "Attend follow-up appointments as recommended."
+          ],
+          "clinical_warning": "Persistent high blood pressure requires prompt medical evaluation. Seek urgent medical care if severe symptoms develop.",
+          "positive_takeaway": "Consistent treatment and lifestyle improvements can significantly reduce your long-term cardiovascular risk."
+        },
+        "86_90": {
+          "score_range": "86-90",
+          "risk_interpretation": "Your profile indicates very high hypertension risk. Medical assessment, regular monitoring, and structured lifestyle changes are essential to reduce future complications.",
+          "lifestyle_tips": [
+            "Maintain a low-sodium eating pattern.",
+            "Exercise regularly within your medical limits.",
+            "Aim for a healthy weight.",
+            "Stay active throughout the day.",
+            "Monitor your blood pressure closely."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style diet consistently.",
+            "Choose vegetables, fruits, legumes, and whole grains daily.",
+            "Replace processed meats with lean proteins.",
+            "Use herbs and spices instead of salt.",
+            "Limit processed and restaurant foods."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Guava",
+            "Citrus fruits",
+            "Oats",
+            "Whole-wheat roti",
+            "Lentils",
+            "Unsalted almonds",
+            "Plain yogurt",
+            "Sardines"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Namkeen",
+            "Pickles",
+            "Papad",
+            "Instant noodles",
+            "Packaged soups",
+            "Salted crackers",
+            "Processed cheese",
+            "Fast food",
+            "Salty sauces"
+          ],
+          "exercise_recommendations": [
+            "Stay physically active with moderate exercise as advised.",
+            "Include strength training if medically appropriate.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor your blood pressure regularly.",
+            "Review kidney health and cardiovascular risk with your healthcare provider.",
+            "Arrange follow-up promptly if readings remain elevated."
+          ],
+          "clinical_warning": "Persistent high blood pressure should not be delayed for review. Seek urgent care if severe symptoms occur.",
+          "positive_takeaway": "A structured treatment plan and healthy lifestyle can improve blood pressure control over time."
+        },
+        "91_95": {
+          "score_range": "91-95",
+          "risk_interpretation": "Your profile is at the upper end of the very high-risk range for hypertension. Prompt medical care and close monitoring are essential to reduce serious cardiovascular complications.",
+          "lifestyle_tips": [
+            "Maintain a strict low-sodium diet.",
+            "Exercise safely within your healthcare provider's advice.",
+            "Aim for gradual weight loss if needed.",
+            "Reduce prolonged sitting.",
+            "Monitor your blood pressure regularly."
+          ],
+          "diet_recommendations": [
+            "Follow a DASH-style eating pattern.",
+            "Choose fresh vegetables, fruits, legumes, and whole grains.",
+            "Include lean proteins and unsalted nuts.",
+            "Avoid processed meats and packaged foods.",
+            "Limit alcohol and sugary drinks."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Oranges",
+            "Bananas",
+            "Barley",
+            "Chickpeas",
+            "Beans",
+            "Unsalted walnuts",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Salty chips",
+            "Pickles",
+            "Papad",
+            "Instant noodles",
+            "Packaged soups",
+            "Salted nuts",
+            "Processed cheese",
+            "Fast food",
+            "High-sodium sauces"
+          ],
+          "exercise_recommendations": [
+            "Stay active with moderate exercise as tolerated.",
+            "Include flexibility and strength exercises if appropriate.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor your blood pressure closely.",
+            "Review cardiovascular risk and kidney function regularly.",
+            "Discuss persistent high readings with your healthcare provider promptly."
+          ],
+          "clinical_warning": "Prompt medical assessment is strongly recommended for persistent elevated blood pressure. Seek urgent medical care if severe symptoms occur.",
+          "positive_takeaway": "Even at this stage, consistent treatment and healthy lifestyle changes can improve long-term cardiovascular health."
+        },
+        "96_100": {
+          "score_range": "96-100",
+          "risk_interpretation": "Your profile falls within the highest hypertension-risk category. Prompt medical assessment, ongoing treatment, and close monitoring are essential alongside lifestyle changes.",
+          "lifestyle_tips": [
+            "Follow your treatment plan carefully.",
+            "Maintain a low-sodium, heart-healthy diet.",
+            "Stay active within medically advised limits.",
+            "Aim for a healthy weight.",
+            "Monitor your blood pressure consistently."
+          ],
+          "diet_recommendations": [
+            "Follow a strict DASH-style eating pattern.",
+            "Choose fresh, minimally processed foods.",
+            "Eat more vegetables, fruits, whole grains, and legumes.",
+            "Limit processed meats, packaged foods, and salty snacks.",
+            "Keep alcohol intake minimal."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Guava",
+            "Citrus fruits",
+            "Oats",
+            "Brown rice",
+            "Lentils",
+            "Unsalted seeds",
+            "Plain yogurt",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Bacon",
+            "Sausages",
+            "Namkeen",
+            "Pickles",
+            "Papad",
+            "Instant soups",
+            "Processed cheese",
+            "Fast food",
+            "Salted snacks",
+            "High-sodium sauces"
+          ],
+          "exercise_recommendations": [
+            "Stay active with medically appropriate exercise.",
+            "Increase activity gradually if advised.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor your blood pressure closely.",
+            "Attend all scheduled medical follow-up appointments.",
+            "Continue regular assessment of kidney function and cardiovascular risk."
+          ],
+          "clinical_warning": "Persistent high blood pressure requires prompt medical management. Seek urgent medical care immediately if severe symptoms or a very high blood pressure reading occur.",
+          "positive_takeaway": "Prompt treatment, regular monitoring, and sustained healthy habits can meaningfully improve your long-term cardiovascular health."
+        }
+      }
+    }
+  },
+  "result_factor_sets": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional high-sodium meals",
+        "Lower physical activity",
+        "Periodic stress"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Higher sodium intake",
+        "Limited daily movement",
+        "Low-normal magnesium"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Higher sodium intake",
+        "Low-normal magnesium",
+        "Blood sugar as a future risk"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Low-normal magnesium",
+        "Higher sodium consumption",
+        "Blood sugar as future risk",
+        "Sedentary lifestyle"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "High sodium consumption",
+        "Low-normal magnesium",
+        "Blood sugar as future risk",
+        "Prolonged inactivity"
+      ]
+    }
+  }
+}

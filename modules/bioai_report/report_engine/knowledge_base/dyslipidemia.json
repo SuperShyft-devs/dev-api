@@ -1,0 +1,1070 @@
+{
+  "knowledge_base_version": "1.0",
+  "disease_id": "dyslipidemia",
+  "display_name": "Dyslipidemia",
+  "overview": "Dyslipidemia is a condition in which the levels of cholesterol or triglycerides in the blood become unhealthy. If left unmanaged, it can gradually increase the risk of heart attack, stroke, and other cardiovascular diseases.",
+  "risk_bands": {
+    "healthy": {
+      "range": "0-25",
+      "score_bands": {
+        "0_5": {
+          "score_range": "0-5",
+          "risk_interpretation": "Your cholesterol and triglyceride levels are excellent, supporting a healthy heart and blood vessels.",
+          "lifestyle_tips": [
+            "Maintain a healthy weight.",
+            "Stay physically active.",
+            "Avoid smoking.",
+            "Limit alcohol.",
+            "Choose healthy fats over saturated fats."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Eat more oats, legumes, and whole grains.",
+            "Choose olive oil, nuts, and oily fish.",
+            "Limit added sugar and refined carbs.",
+            "Reduce saturated fats."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Salmon",
+            "Lentils",
+            "Walnuts",
+            "Olive oil",
+            "Leafy greens"
+          ],
+          "foods_to_avoid": [
+            "Fried foods",
+            "Processed meats",
+            "Pastries",
+            "Sugary drinks",
+            "Fast food",
+            "Ice cream"
+          ],
+          "exercise_recommendations": [
+            "Exercise at least 150 minutes weekly.",
+            "Strength train twice a week.",
+            "Stay active throughout the day."
+          ],
+          "monitoring_recommendations": [
+            "Check your cholesterol during routine health visits.",
+            "Monitor weight and waist size.",
+            "Continue regular blood pressure and blood sugar checks."
+          ],
+          "clinical_warning": "No specific concerns. Continue routine health check-ups.",
+          "positive_takeaway": "Your cholesterol profile is excellent—keep up your healthy habits."
+        },
+        "6_10": {
+          "score_range": "6-10",
+          "risk_interpretation": "Your cholesterol levels remain healthy, with no signs of significant imbalance. Staying consistent will help keep them that way.",
+          "lifestyle_tips": [
+            "Maintain a healthy weight.",
+            "Stay active every day.",
+            "Avoid smoking.",
+            "Limit alcohol.",
+            "Choose healthy fats."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Eat more fiber-rich whole grains and legumes.",
+            "Choose olive oil, nuts, and oily fish.",
+            "Limit sugar and refined carbs.",
+            "Reduce saturated fats."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Mackerel",
+            "Beans",
+            "Flaxseeds",
+            "Olive oil",
+            "Spinach"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Sugary drinks",
+            "Fast food",
+            "Sweetened cereals"
+          ],
+          "exercise_recommendations": [
+            "Exercise at least 150 minutes weekly.",
+            "Strength train twice a week.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat cholesterol testing during routine check-ups.",
+            "Monitor weight and waist size.",
+            "Continue regular blood pressure and blood sugar checks."
+          ],
+          "clinical_warning": "Routine medical follow-up is sufficient unless advised otherwise.",
+          "positive_takeaway": "Your cholesterol is well controlled—consistent habits will help keep it that way."
+        },
+        "11_15": {
+          "score_range": "11-15",
+          "risk_interpretation": "Your cholesterol levels remain healthy, with only minor changes that are worth monitoring. Maintaining your current healthy habits will help keep them on track.",
+          "lifestyle_tips": [
+            "Maintain a healthy weight.",
+            "Stay active every day.",
+            "Avoid smoking.",
+            "Limit alcohol.",
+            "Choose healthy fats."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Eat more fiber-rich whole grains and legumes.",
+            "Choose olive oil, nuts, and oily fish.",
+            "Limit added sugar and refined carbs.",
+            "Reduce saturated fats."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Sardines",
+            "Lentils",
+            "Walnuts",
+            "Olive oil",
+            "Kale"
+          ],
+          "foods_to_avoid": [
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Sugary drinks",
+            "Fast food",
+            "Cream-based dishes"
+          ],
+          "exercise_recommendations": [
+            "Exercise at least 150 minutes weekly.",
+            "Strength train twice a week.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat cholesterol testing during routine check-ups.",
+            "Monitor weight and waist size.",
+            "Continue regular blood pressure and blood sugar checks."
+          ],
+          "clinical_warning": "Routine medical follow-up is sufficient.",
+          "positive_takeaway": "Your cholesterol remains well controlled—stay consistent with your healthy routine."
+        },
+        "16_20": {
+          "score_range": "16-20",
+          "risk_interpretation": "Your cholesterol remains within the healthy range, although some values are beginning to rise. Small lifestyle changes now can help prevent future problems.",
+          "lifestyle_tips": [
+            "Aim for a healthy weight.",
+            "Increase daily physical activity.",
+            "Avoid smoking.",
+            "Limit alcohol.",
+            "Choose healthy fats over saturated fats."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase oats, beans, vegetables, and whole grains.",
+            "Choose fish, nuts, and olive oil.",
+            "Limit sugar and refined carbohydrates.",
+            "Reduce saturated fats."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Trout",
+            "Beans",
+            "Flaxseeds",
+            "Olive oil",
+            "Swiss chard"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Fast food",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "Exercise 150–200 minutes weekly.",
+            "Strength train 2–3 times weekly.",
+            "Stay active throughout the day."
+          ],
+          "monitoring_recommendations": [
+            "Check cholesterol at routine visits.",
+            "Monitor weight, waist size, blood pressure, and blood sugar.",
+            "Discuss your overall heart risk with your doctor if levels continue to rise."
+          ],
+          "clinical_warning": "No urgent action is needed, but continue regular follow-up.",
+          "positive_takeaway": "A few simple lifestyle changes can help keep your cholesterol in a healthy range."
+        },
+        "21_25": {
+          "score_range": "21-25",
+          "risk_interpretation": "Your cholesterol is still within the healthy range but is approaching levels that deserve closer attention. Strengthening your lifestyle habits now can help prevent future imbalance.",
+          "lifestyle_tips": [
+            "Work toward a healthy weight if needed.",
+            "Exercise regularly.",
+            "Avoid smoking.",
+            "Limit alcohol.",
+            "Choose healthy fats every day."
+          ],
+          "diet_recommendations": [
+            "Maintain a Mediterranean-style diet.",
+            "Eat more fiber-rich foods daily.",
+            "Choose fish, nuts, and olive oil.",
+            "Reduce sugar and refined carbohydrates.",
+            "Limit saturated and processed fats."
+          ],
+          "foods_to_include": [
+            "Salmon",
+            "Oats",
+            "Chickpeas",
+            "Walnuts",
+            "Olive oil",
+            "Apples"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Processed meats",
+            "Fried foods",
+            "Pastries",
+            "Fast food",
+            "Cream-based dishes"
+          ],
+          "exercise_recommendations": [
+            "Exercise at least 200 minutes weekly.",
+            "Strength train 2–3 times weekly.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat a cholesterol test within the next year.",
+            "Monitor weight, waist size, blood pressure, and blood sugar.",
+            "Review your cardiovascular risk during routine check-ups."
+          ],
+          "clinical_warning": "A routine discussion with your doctor about cholesterol prevention is recommended.",
+          "positive_takeaway": "Taking action now is the best way to maintain healthy cholesterol and protect your heart."
+        }
+      }
+    },
+    "increased_risk": {
+      "range": "26-50",
+      "score_bands": {
+        "26_30": {
+          "score_range": "26-30",
+          "risk_interpretation": "Your results show early signs of unhealthy cholesterol or triglyceride levels. This is an increased-risk stage, not a diagnosis, and is often reversible with healthy lifestyle changes.",
+          "lifestyle_tips": [
+            "Aim for 5% weight loss if overweight.",
+            "Exercise regularly with cardio and strength training.",
+            "Avoid smoking.",
+            "Limit alcohol intake.",
+            "Choose healthy unsaturated fats."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Eat more soluble fibre.",
+            "Replace saturated fats with olive oil and fish.",
+            "Reduce sugar and refined carbs.",
+            "Include nuts and seeds daily."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Beans",
+            "Lentils",
+            "Fish",
+            "Olive oil",
+            "Nuts",
+            "Flaxseeds",
+            "Leafy greens",
+            "Berries",
+            "Avocado"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Creamy sauces",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "200+ minutes of moderate exercise weekly.",
+            "Strength training 2-3 times/week.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile in 6-12 months.",
+            "Monitor weight, waist, blood pressure, and blood sugar.",
+            "Discuss cardiovascular risk with your doctor."
+          ],
+          "clinical_warning": "Consult your doctor for preventive guidance. This is not an emergency.",
+          "positive_takeaway": "Healthy habits can significantly improve your cholesterol levels."
+        },
+        "31_35": {
+          "score_range": "31-35",
+          "risk_interpretation": "Your cholesterol or triglycerides are moderately above the ideal range. Lifestyle changes can often improve these markers within a few months.",
+          "lifestyle_tips": [
+            "Aim for 5-7% weight loss if needed.",
+            "Exercise consistently.",
+            "Avoid smoking.",
+            "Limit alcohol.",
+            "Replace saturated fats with healthier fats."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase fibre intake.",
+            "Choose fish and plant proteins over red meat.",
+            "Reduce sugar and refined carbs.",
+            "Eat nuts and oily fish regularly."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Beans",
+            "Lentils",
+            "Fish",
+            "Almonds",
+            "Chia seeds",
+            "Olive oil",
+            "Leafy greens",
+            "Apples"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Fried snacks",
+            "Cakes",
+            "Processed meats",
+            "Sugary cereals",
+            "Fast food",
+            "Cream-based dishes"
+          ],
+          "exercise_recommendations": [
+            "200-250 minutes of moderate exercise weekly.",
+            "Strength training 3 times/week.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile in 6-12 months.",
+            "Monitor weight, waist, blood pressure, and blood sugar.",
+            "Review cholesterol goals with your doctor."
+          ],
+          "clinical_warning": "A routine medical review is recommended. This is preventive, not urgent.",
+          "positive_takeaway": "Consistent lifestyle improvements can lower your risk."
+        },
+        "36_40": {
+          "score_range": "36-40",
+          "risk_interpretation": "Your blood fat levels are clearly above the healthy range. This increased-risk stage requires focused lifestyle changes to reduce future heart disease risk.",
+          "lifestyle_tips": [
+            "Aim for about 7% weight loss if overweight.",
+            "Exercise most days.",
+            "Avoid smoking.",
+            "Limit alcohol.",
+            "Replace saturated fats with healthy fats."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre.",
+            "Choose fish, nuts, and olive oil.",
+            "Reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Beans",
+            "Lentils",
+            "Salmon",
+            "Walnuts",
+            "Flaxseeds",
+            "Olive oil",
+            "Spinach",
+            "Berries",
+            "Avocado"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Creamy sauces",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "250 minutes of moderate exercise weekly.",
+            "Strength training 3 times/week.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile and blood sugar in about 6 months.",
+            "Monitor weight, waist, and blood pressure.",
+            "Discuss cardiovascular risk with your doctor."
+          ],
+          "clinical_warning": "Consult your doctor to plan appropriate monitoring and lifestyle management.",
+          "positive_takeaway": "Improvement is achievable with consistent healthy habits."
+        },
+        "41_45": {
+          "score_range": "41-45",
+          "risk_interpretation": "Your cholesterol or triglycerides are noticeably above the healthy range. This increased-risk stage calls for consistent lifestyle changes and regular monitoring to reduce future cardiovascular risk.",
+          "lifestyle_tips": [
+            "Aim for 7-10% weight loss if overweight.",
+            "Exercise regularly with cardio and strength training.",
+            "Avoid smoking.",
+            "Limit alcohol intake.",
+            "Choose healthy unsaturated fats."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre intake.",
+            "Choose fish, legumes, and lean proteins.",
+            "Reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Chickpeas",
+            "Lentils",
+            "Fish",
+            "Almonds",
+            "Chia seeds",
+            "Olive oil",
+            "Leafy greens",
+            "Apples",
+            "Avocado"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Cakes",
+            "Processed meats",
+            "Sugary cereals",
+            "Fast food",
+            "Creamy sauces",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "250+ minutes of moderate exercise weekly.",
+            "Strength training 3 times/week.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile and blood sugar in about 6 months.",
+            "Monitor weight, waist, and blood pressure.",
+            "Review cardiovascular risk with your doctor."
+          ],
+          "clinical_warning": "Consult your doctor for regular monitoring. This is a preventive step, not an emergency.",
+          "positive_takeaway": "Healthy lifestyle changes can significantly improve your cholesterol levels."
+        },
+        "46_50": {
+          "score_range": "46-50",
+          "risk_interpretation": "Your cholesterol or triglycerides are significantly above the healthy range. Early medical review and sustained lifestyle changes can help lower your future cardiovascular risk.",
+          "lifestyle_tips": [
+            "Aim for 7-10% weight loss if overweight.",
+            "Exercise consistently with cardio and strength training.",
+            "Avoid smoking.",
+            "Limit alcohol intake.",
+            "Replace saturated fats with healthier fats."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre intake.",
+            "Choose fish and plant-based proteins.",
+            "Strictly reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Beans",
+            "Lentils",
+            "Mackerel",
+            "Walnuts",
+            "Flaxseeds",
+            "Olive oil",
+            "Spinach",
+            "Blueberries",
+            "Avocado"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Sugary cereals",
+            "Fast food",
+            "Cream-based sauces",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "250-300 minutes of moderate exercise weekly.",
+            "Strength training 3 times/week.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile, blood sugar, and liver function in 3-6 months.",
+            "Monitor weight, waist, and blood pressure.",
+            "Discuss cardiovascular risk with your doctor."
+          ],
+          "clinical_warning": "A medical review is recommended to plan ongoing monitoring and management.",
+          "positive_takeaway": "Timely lifestyle changes can substantially improve your cholesterol and reduce future risk."
+        }
+      }
+    },
+    "high_risk": {
+      "range": "51-75",
+      "score_bands": {
+        "51_55": {
+          "score_range": "51-55",
+          "risk_interpretation": "Your cholesterol or triglycerides are significantly above the healthy range, increasing your cardiovascular risk. Medical review and consistent lifestyle changes are recommended to improve your heart health.",
+          "lifestyle_tips": [
+            "Aim for about 10% weight loss if overweight.",
+            "Exercise regularly with cardio and strength training.",
+            "Avoid smoking.",
+            "Limit alcohol intake.",
+            "Choose healthy unsaturated fats."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre intake.",
+            "Choose fish and plant-based proteins.",
+            "Strictly reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Lentils",
+            "Beans",
+            "Salmon",
+            "Olive oil",
+            "Nuts",
+            "Chia seeds",
+            "Leafy greens",
+            "Avocado"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Creamy sauces",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "300 minutes of moderate exercise weekly.",
+            "Strength training 3 times/week.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile, blood sugar, liver, and kidney tests every 3-6 months.",
+            "Monitor weight, waist, and blood pressure.",
+            "Discuss cardiovascular risk with your doctor."
+          ],
+          "clinical_warning": "Consult your doctor to plan treatment and regular follow-up. This is important but not an emergency.",
+          "positive_takeaway": "Healthy lifestyle changes can still produce significant improvements."
+        },
+        "56_60": {
+          "score_range": "56-60",
+          "risk_interpretation": "Your blood fat levels are high and increase your risk of heart disease. Close medical follow-up and sustained lifestyle changes are strongly recommended.",
+          "lifestyle_tips": [
+            "Aim for about 10% weight loss if overweight.",
+            "Follow a regular exercise routine.",
+            "Avoid smoking.",
+            "Limit alcohol.",
+            "Choose whole foods and healthy fats."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre.",
+            "Choose fish and plant proteins.",
+            "Strictly reduce sugar and refined carbs.",
+            "Avoid fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Beans",
+            "Lentils",
+            "Sardines",
+            "Walnuts",
+            "Flaxseeds",
+            "Olive oil",
+            "Spinach",
+            "Berries"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Cream-based dishes",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "300 minutes of moderate exercise weekly.",
+            "Strength training 3 times/week.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile and related blood tests every 3-6 months.",
+            "Monitor weight, waist, and blood pressure.",
+            "Review cardiovascular risk with your doctor."
+          ],
+          "clinical_warning": "Medical follow-up is recommended to monitor your cholesterol and overall heart health.",
+          "positive_takeaway": "Consistent lifestyle changes can still improve your cholesterol levels."
+        },
+        "61_65": {
+          "score_range": "61-65",
+          "risk_interpretation": "Your cholesterol or triglycerides are markedly elevated, placing you at high cardiovascular risk. Ongoing medical care and lifestyle changes are essential to lower your future risk.",
+          "lifestyle_tips": [
+            "Aim for about 10% weight loss if overweight.",
+            "Exercise regularly under medical guidance if needed.",
+            "Avoid smoking.",
+            "Limit alcohol.",
+            "Follow a whole-food, heart-healthy lifestyle."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Eat more soluble fibre.",
+            "Replace red meat with fish and plant proteins.",
+            "Strictly reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Beans",
+            "Lentils",
+            "Mackerel",
+            "Olive oil",
+            "Almonds",
+            "Chia seeds",
+            "Leafy greens",
+            "Avocado"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Creamy sauces",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "Work towards 300 minutes of moderate exercise weekly.",
+            "Strength training 3 times/week.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile and related blood tests every 3 months.",
+            "Monitor weight, waist, and blood pressure.",
+            "Follow your doctor's advice on further assessment."
+          ],
+          "clinical_warning": "Arrange a medical review to assess your cardiovascular risk and treatment plan.",
+          "positive_takeaway": "With medical support and healthy habits, meaningful improvement is still achievable."
+        },
+        "66_70": {
+          "score_range": "66-70",
+          "risk_interpretation": "Your cholesterol or triglycerides are substantially above the healthy range, placing you at high cardiovascular risk. Prompt medical review and a structured treatment plan are recommended.",
+          "lifestyle_tips": [
+            "Aim for about 10% weight loss under medical guidance.",
+            "Exercise regularly with professional advice if needed.",
+            "Avoid smoking.",
+            "Limit alcohol intake.",
+            "Follow a heart-healthy, whole-food diet."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre intake.",
+            "Choose fish and plant-based proteins.",
+            "Strictly reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Beans",
+            "Lentils",
+            "Salmon",
+            "Walnuts",
+            "Flaxseeds",
+            "Olive oil",
+            "Spinach",
+            "Berries"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Creamy sauces",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "Up to 300 minutes of moderate exercise weekly.",
+            "Strength training 3 times/week.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile and related blood tests every 3 months.",
+            "Monitor weight, waist, and blood pressure.",
+            "Follow your doctor's advice on further evaluation."
+          ],
+          "clinical_warning": "Arrange a medical review soon to discuss treatment and ongoing monitoring.",
+          "positive_takeaway": "With medical support and healthy habits, your cholesterol levels can still improve."
+        },
+        "71_75": {
+          "score_range": "71-75",
+          "risk_interpretation": "Your cholesterol or triglycerides are severely elevated, placing you at very high cardiovascular risk. Early medical assessment and ongoing monitoring are strongly recommended.",
+          "lifestyle_tips": [
+            "Follow a medically supervised weight-loss plan.",
+            "Exercise regularly under professional guidance.",
+            "Avoid smoking.",
+            "Limit alcohol intake.",
+            "Maintain a heart-healthy, whole-food diet."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre intake.",
+            "Choose fish and plant-based proteins.",
+            "Strictly reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Beans",
+            "Lentils",
+            "Sardines",
+            "Almonds",
+            "Chia seeds",
+            "Olive oil",
+            "Leafy greens",
+            "Avocado"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Cream-based dishes",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "Work towards 300 minutes of moderate exercise weekly.",
+            "Strength training 3 times/week.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile and related blood tests every 3 months.",
+            "Monitor weight, waist, and blood pressure closely.",
+            "Follow your doctor's advice on further testing or specialist referral."
+          ],
+          "clinical_warning": "Consult your doctor promptly to plan treatment and regular follow-up.",
+          "positive_takeaway": "Even at this stage, sustained treatment and lifestyle changes can significantly reduce future cardiovascular risk."
+        }
+      }
+    },
+    "very_high_risk": {
+      "range": "76-100",
+      "score_bands": {
+        "76_80": {
+          "score_range": "76-80",
+          "risk_interpretation": "Your cholesterol or triglycerides are severely elevated, placing you at very high cardiovascular risk. Prompt medical assessment and regular follow-up are strongly recommended.",
+          "lifestyle_tips": [
+            "Follow a doctor-guided weight-loss plan if needed.",
+            "Exercise regularly as advised by your healthcare provider.",
+            "Avoid smoking.",
+            "Limit alcohol intake.",
+            "Follow a heart-healthy, whole-food diet."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre intake.",
+            "Choose fish and plant-based proteins.",
+            "Strictly reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Beans",
+            "Lentils",
+            "Salmon",
+            "Walnuts",
+            "Flaxseeds",
+            "Olive oil",
+            "Spinach",
+            "Berries"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Cream-based sauces",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "Work towards 300 minutes of moderate exercise weekly if medically appropriate.",
+            "Strength training 2-3 times/week.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile and related blood tests every 3 months or as advised.",
+            "Monitor weight, waist, and blood pressure.",
+            "Follow your doctor's recommendations for cardiovascular risk assessment."
+          ],
+          "clinical_warning": "Consult your doctor promptly to evaluate your cholesterol levels and begin appropriate management.",
+          "positive_takeaway": "With timely treatment and healthy lifestyle changes, your cardiovascular risk can be reduced."
+        },
+        "81_85": {
+          "score_range": "81-85",
+          "risk_interpretation": "Your blood fat levels are very severely elevated, placing you at very high cardiovascular risk. Early medical care and close monitoring are essential.",
+          "lifestyle_tips": [
+            "Follow a doctor-guided nutrition and weight-loss plan.",
+            "Exercise safely under medical guidance.",
+            "Avoid smoking.",
+            "Limit alcohol intake.",
+            "Maintain a heart-healthy diet."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre intake.",
+            "Choose fish and plant-based proteins.",
+            "Strictly reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Beans",
+            "Lentils",
+            "Sardines",
+            "Almonds",
+            "Chia seeds",
+            "Olive oil",
+            "Leafy greens",
+            "Avocado"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Cream-based dishes",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "Increase activity gradually as advised by your doctor.",
+            "Strength training 2-3 times/week if appropriate.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile and related blood tests every 3 months or as advised.",
+            "Monitor weight, waist, and blood pressure closely.",
+            "Follow your doctor's treatment and monitoring plan."
+          ],
+          "clinical_warning": "Seek medical evaluation promptly to discuss treatment and ongoing follow-up.",
+          "positive_takeaway": "Consistent medical care and healthy habits can still significantly improve your long-term heart health."
+        },
+        "86_90": {
+          "score_range": "86-90",
+          "risk_interpretation": "Your cholesterol or triglycerides are very severely elevated, placing you at very high cardiovascular risk. Prompt medical evaluation and close follow-up are essential.",
+          "lifestyle_tips": [
+            "Follow your doctor's weight and lifestyle plan.",
+            "Exercise under medical guidance.",
+            "Avoid smoking.",
+            "Limit alcohol intake.",
+            "Maintain a heart-healthy, whole-food diet."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre intake.",
+            "Choose fish and plant-based proteins.",
+            "Strictly reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Beans",
+            "Lentils",
+            "Salmon",
+            "Walnuts",
+            "Flaxseeds",
+            "Olive oil",
+            "Spinach",
+            "Berries"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Cream-based sauces",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "Exercise regularly as tolerated and medically advised.",
+            "Strength training 2-3 times/week if appropriate.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile and related blood tests every 3 months or as advised.",
+            "Monitor weight, waist, and blood pressure closely.",
+            "Follow your doctor's treatment and monitoring plan."
+          ],
+          "clinical_warning": "Seek prompt medical evaluation to discuss treatment and ongoing care.",
+          "positive_takeaway": "With consistent medical care and lifestyle changes, your cardiovascular risk can still be reduced."
+        },
+        "91_95": {
+          "score_range": "91-95",
+          "risk_interpretation": "Your blood fat levels are critically elevated, placing you at very high cardiovascular risk. Prompt medical evaluation and specialist-guided care are strongly recommended.",
+          "lifestyle_tips": [
+            "Follow your doctor's treatment and weight-management plan.",
+            "Exercise only as advised by your healthcare provider.",
+            "Avoid smoking.",
+            "Limit alcohol intake.",
+            "Maintain a heart-healthy diet."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre intake.",
+            "Choose fish and plant-based proteins.",
+            "Strictly reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Beans",
+            "Lentils",
+            "Sardines",
+            "Almonds",
+            "Chia seeds",
+            "Olive oil",
+            "Leafy greens",
+            "Avocado"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Cream-based dishes",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "Exercise under medical supervision.",
+            "Strength training only if medically appropriate.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Repeat lipid profile and related blood tests every 3 months or as advised.",
+            "Monitor weight, waist, and blood pressure closely.",
+            "Follow specialist recommendations and treatment."
+          ],
+          "clinical_warning": "Consult your doctor promptly to begin comprehensive treatment and ongoing follow-up.",
+          "positive_takeaway": "Timely treatment and healthy lifestyle changes can still improve your long-term heart health."
+        },
+        "96_100": {
+          "score_range": "96-100",
+          "risk_interpretation": "Your cholesterol or triglycerides are extremely elevated, placing you at the highest cardiovascular risk. Immediate medical evaluation and comprehensive treatment are strongly recommended.",
+          "lifestyle_tips": [
+            "Make your doctor's treatment plan your top priority.",
+            "Exercise only within medically approved limits.",
+            "Avoid smoking.",
+            "Limit alcohol intake.",
+            "Follow a strict heart-healthy diet."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Increase soluble fibre intake.",
+            "Choose fish and plant-based proteins.",
+            "Strictly reduce sugar and refined carbs.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Oats",
+            "Barley",
+            "Beans",
+            "Lentils",
+            "Salmon",
+            "Walnuts",
+            "Flaxseeds",
+            "Olive oil",
+            "Spinach",
+            "Berries"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fried foods",
+            "Pastries",
+            "Processed meats",
+            "Fast food",
+            "Cream-based sauces",
+            "Butter-rich foods"
+          ],
+          "exercise_recommendations": [
+            "Remain physically active only as approved by your healthcare provider.",
+            "Light resistance or mobility exercises if advised.",
+            "Reduce prolonged sitting where possible."
+          ],
+          "monitoring_recommendations": [
+            "Follow your doctor's schedule for lipid profile and related blood tests.",
+            "Monitor weight, waist, and blood pressure regularly.",
+            "Continue specialist care and ongoing cardiovascular monitoring."
+          ],
+          "clinical_warning": "Seek medical care without delay to begin comprehensive evaluation and treatment.",
+          "positive_takeaway": "Even at this stage, early treatment and sustained healthy habits can improve your cardiovascular health."
+        }
+      }
+    }
+  },
+  "result_factor_sets": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional Inactivity",
+        "Inconsistent physical activity",
+        "Moderate dietary imbalance"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Limited daily movement",
+        "Inconsistent healthy-fat intake",
+        "Frequent processed foods"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Sedentary habits",
+        "Insufficient healthy dietary fats",
+        "Higher refined-carbohydrate intake"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Prolonged sedentary lifestyle",
+        "Poor dietary fat quality",
+        "Frequent processed foods"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Very low physical activity",
+        "Unfavorable dietary fat pattern",
+        "Frequent refined/processed foods",
+        "Poor overall dietary pattern"
+      ]
+    }
+  }
+}

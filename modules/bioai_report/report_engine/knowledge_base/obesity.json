@@ -1,0 +1,1088 @@
+{
+  "knowledge_base_version": "1.0",
+  "disease_id": "obesity",
+  "display_name": "Obesity",
+  "overview": "Obesity is a chronic condition characterized by excessive body fat accumulation that can affect overall health. It may result from genetic, lifestyle, environmental, and metabolic factors, and can increase the risk of conditions such as diabetes, heart disease, and hypertension.",
+  "risk_bands": {
+    "healthy": {
+      "range": "0-25",
+      "score_bands": {
+        "0_5": {
+          "score_range": "0-5",
+          "risk_interpretation": "Your profile is in the lowest obesity-risk range. Continue healthy habits to maintain a healthy weight and metabolism.",
+          "lifestyle_tips": [
+            "Maintain regular meals, sleep, and activity.",
+            "Stay active throughout the day.",
+            "Include strength training.",
+            "Practice mindful eating.",
+            "Reduce prolonged sitting."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, fruit, whole grains, legumes, and lean protein.",
+            "Choose minimally processed foods.",
+            "Include protein and fibre with meals.",
+            "Drink water instead of sugary beverages.",
+            "Limit highly processed foods."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Apples",
+            "Oats",
+            "Lentils",
+            "Chickpeas",
+            "Almonds",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Deep-fried snacks",
+            "Pastries",
+            "Candy",
+            "Processed meats",
+            "Fast food",
+            "Sugary cereals"
+          ],
+          "exercise_recommendations": [
+            "At least 150 minutes of moderate aerobic activity weekly.",
+            "Strength training twice weekly.",
+            "Include flexibility exercises.",
+            "Break up prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor weight periodically.",
+            "Track waist circumference.",
+            "Keep blood pressure, glucose, and cholesterol checks up to date."
+          ],
+          "clinical_warning": "Discuss persistent unexplained weight gain or appetite changes with your healthcare provider.",
+          "positive_takeaway": "You have a strong foundation for maintaining healthy weight and metabolism."
+        },
+        "6_10": {
+          "score_range": "6-10",
+          "risk_interpretation": "Your weight-related risk remains low. Consistent healthy habits will help maintain long-term metabolic health.",
+          "lifestyle_tips": [
+            "Maintain regular meals.",
+            "Stay active most days.",
+            "Strength train regularly.",
+            "Prioritize quality sleep.",
+            "Control portions."
+          ],
+          "diet_recommendations": [
+            "Eat more vegetables and fibre-rich foods.",
+            "Choose whole grains.",
+            "Include protein at meals.",
+            "Limit sugary drinks and desserts.",
+            "Choose healthy snacks."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Berries",
+            "Guava",
+            "Oats",
+            "Beans",
+            "Walnuts",
+            "Plain yogurt",
+            "Eggs"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Milkshakes",
+            "Chips",
+            "Cookies",
+            "Pastries",
+            "Fast food",
+            "Sugary cereals"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic activity weekly.",
+            "Strength training twice weekly.",
+            "Stretch regularly.",
+            "Reduce sitting time."
+          ],
+          "monitoring_recommendations": [
+            "Review weight and waist periodically.",
+            "Continue blood pressure, glucose, and cholesterol screening.",
+            "Monitor lifestyle changes if weight increases."
+          ],
+          "clinical_warning": "Seek review if weight increases steadily despite healthy habits.",
+          "positive_takeaway": "Small consistent habits help preserve a healthy weight."
+        },
+        "11_15": {
+          "score_range": "11-15",
+          "risk_interpretation": "You remain in the healthy range, but reinforcing healthy habits now helps prevent future weight gain.",
+          "lifestyle_tips": [
+            "Choose whole foods more often.",
+            "Exercise regularly.",
+            "Include strength training.",
+            "Avoid distracted eating.",
+            "Maintain healthy sleep."
+          ],
+          "diet_recommendations": [
+            "Eat high-fibre foods.",
+            "Include protein at meals.",
+            "Choose whole fruit over juice.",
+            "Limit refined, high-fat foods.",
+            "Control portions."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Oats",
+            "Brown rice",
+            "Lentils",
+            "Chickpeas",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fast food",
+            "Cookies",
+            "Cakes",
+            "Chips",
+            "Processed meats",
+            "Sugary cereals"
+          ],
+          "exercise_recommendations": [
+            "At least 150 minutes of aerobic exercise weekly.",
+            "Strength train twice weekly.",
+            "Add flexibility exercises.",
+            "Reduce sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor weight and waist.",
+            "Continue glucose, blood pressure, and lipid screening.",
+            "Review appetite and activity if weight rises."
+          ],
+          "clinical_warning": "Persistent weight gain should be discussed with your healthcare provider.",
+          "positive_takeaway": "Strengthening healthy habits now protects your long-term health."
+        },
+        "16_20": {
+          "score_range": "16-20",
+          "risk_interpretation": "You remain in the healthy range but are approaching higher risk. Small lifestyle improvements now can prevent future weight gain.",
+          "lifestyle_tips": [
+            "Maintain regular meals.",
+            "Exercise consistently.",
+            "Control portions.",
+            "Walk more and sit less.",
+            "Prioritize sleep."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, legumes, whole grains, and lean protein.",
+            "Choose water over sugary drinks.",
+            "Replace processed snacks with fruit.",
+            "Limit fast food.",
+            "Reduce added sugars."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Guava",
+            "Berries",
+            "Oats",
+            "Beans",
+            "Lentils",
+            "Almonds",
+            "Plain yogurt"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Pastries",
+            "Cookies",
+            "Candy",
+            "Fast food",
+            "Processed meats",
+            "Ice cream"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic exercise weekly.",
+            "Strength train twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Track weight and waist.",
+            "Continue routine metabolic screening.",
+            "Review habits if weight rises steadily."
+          ],
+          "clinical_warning": "Discuss persistent weight gain or metabolic changes with your healthcare provider.",
+          "positive_takeaway": "Early lifestyle improvements are easier than reversing later weight gain."
+        },
+        "21_25": {
+          "score_range": "21-25",
+          "risk_interpretation": "You remain in the healthy range but are close to increased risk. Strengthening healthy habits now can help prevent future obesity.",
+          "lifestyle_tips": [
+            "Exercise regularly.",
+            "Watch portions.",
+            "Include strength training.",
+            "Stay active throughout the day.",
+            "Prioritize sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Choose vegetables, lean protein, legumes, and whole grains.",
+            "Eat whole fruit instead of juice.",
+            "Limit sweets, fried foods, and refined carbohydrates.",
+            "Control portions of calorie-dense foods.",
+            "Plan meals ahead."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Berries",
+            "Oats",
+            "Whole-wheat roti",
+            "Lentils",
+            "Chickpeas",
+            "Walnuts",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Milkshakes",
+            "Fast food",
+            "Chips",
+            "Pastries",
+            "Cookies",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic exercise weekly.",
+            "Strength training twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Track weight and waist.",
+            "Continue blood pressure, glucose, and lipid screening.",
+            "Review lifestyle if weight steadily increases."
+          ],
+          "clinical_warning": "Seek medical advice if weight continues to increase or metabolic abnormalities develop.",
+          "positive_takeaway": "Timely lifestyle changes can help you stay in the healthy range."
+        }
+      }
+    },
+    "increased_risk": {
+      "range": "26-50",
+      "score_bands": {
+        "26_30": {
+          "score_range": "26-30",
+          "risk_interpretation": "Your score indicates a mildly increased risk of obesity-related health problems. Strengthening healthy eating and physical activity habits now can help prevent further weight gain.",
+          "lifestyle_tips": [
+            "Aim for regular meal timings.",
+            "Increase daily physical activity.",
+            "Limit prolonged sitting.",
+            "Prioritize 7–9 hours of sleep.",
+            "Practice mindful eating."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, whole grains, legumes, and lean protein.",
+            "Increase fibre intake.",
+            "Reduce sugary drinks.",
+            "Limit processed snacks.",
+            "Watch portion sizes."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Apples",
+            "Guava",
+            "Oats",
+            "Lentils",
+            "Chickpeas",
+            "Plain yogurt",
+            "Almonds"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Chips",
+            "Cookies",
+            "Pastries",
+            "Fast food",
+            "Processed meats",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150 minutes of moderate aerobic exercise weekly.",
+            "Strength train twice weekly.",
+            "Increase daily walking.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Track weight and waist circumference.",
+            "Monitor blood pressure and blood glucose.",
+            "Review lifestyle habits every few months."
+          ],
+          "clinical_warning": "Discuss persistent weight gain or metabolic concerns with your healthcare provider.",
+          "positive_takeaway": "Small lifestyle improvements made now can prevent progression to higher-risk obesity."
+        },
+        "31_35": {
+          "score_range": "31-35",
+          "risk_interpretation": "Your score suggests an increased risk of obesity-related metabolic conditions. Consistent lifestyle changes can significantly reduce future health risks.",
+          "lifestyle_tips": [
+            "Plan meals ahead.",
+            "Exercise most days of the week.",
+            "Reduce sedentary time.",
+            "Improve sleep quality.",
+            "Manage stress effectively."
+          ],
+          "diet_recommendations": [
+            "Increase vegetables and fibre-rich foods.",
+            "Choose whole grains.",
+            "Include protein with every meal.",
+            "Reduce added sugars.",
+            "Control portions."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Berries",
+            "Oats",
+            "Beans",
+            "Lentils",
+            "Plain yogurt",
+            "Walnuts"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Sweetened juices",
+            "Fast food",
+            "Pastries",
+            "Cookies",
+            "Fried foods",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "150–300 minutes of aerobic activity weekly.",
+            "Strength training at least twice weekly.",
+            "Include flexibility exercises.",
+            "Walk after meals."
+          ],
+          "monitoring_recommendations": [
+            "Monitor weight and waist.",
+            "Check blood pressure, glucose, and cholesterol regularly.",
+            "Review progress every 3–6 months."
+          ],
+          "clinical_warning": "Seek medical advice if weight continues to increase or metabolic abnormalities develop.",
+          "positive_takeaway": "Consistent healthy habits can reverse early metabolic risk."
+        },
+        "36_40": {
+          "score_range": "36-40",
+          "risk_interpretation": "Your score indicates a moderate increase in obesity-related health risk. Early intervention can help prevent progression to more serious complications.",
+          "lifestyle_tips": [
+            "Follow a structured exercise routine.",
+            "Practice portion control.",
+            "Reduce emotional eating.",
+            "Prioritize healthy sleep.",
+            "Stay active throughout the day."
+          ],
+          "diet_recommendations": [
+            "Eat vegetables, legumes, whole grains, and lean protein.",
+            "Increase fibre intake.",
+            "Limit refined carbohydrates.",
+            "Reduce sugary beverages.",
+            "Avoid highly processed foods."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Tomatoes",
+            "Guava",
+            "Oats",
+            "Lentils",
+            "Chickpeas",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fast food",
+            "Chips",
+            "Pastries",
+            "Cookies",
+            "Processed meats",
+            "Ice cream"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of aerobic exercise weekly.",
+            "Strength train twice weekly.",
+            "Increase daily walking.",
+            "Include stretching exercises."
+          ],
+          "monitoring_recommendations": [
+            "Track weight and waist circumference.",
+            "Monitor blood pressure, glucose, and cholesterol.",
+            "Review lifestyle progress regularly."
+          ],
+          "clinical_warning": "Consult your healthcare provider if weight gain continues despite lifestyle changes.",
+          "positive_takeaway": "Gradual, sustainable changes can substantially reduce future health risks."
+        },
+        "41_45": {
+          "score_range": "41-45",
+          "risk_interpretation": "Your score indicates a moderate-to-high obesity-related risk. A structured weight-management approach is recommended to improve long-term metabolic health.",
+          "lifestyle_tips": [
+            "Aim for gradual weight loss.",
+            "Exercise consistently.",
+            "Reduce prolonged sitting.",
+            "Improve sleep quality.",
+            "Manage stress and emotional eating."
+          ],
+          "diet_recommendations": [
+            "Choose vegetables, legumes, whole grains, and lean protein.",
+            "Increase dietary fibre.",
+            "Reduce added sugars.",
+            "Limit fried and processed foods.",
+            "Plan meals in advance."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Berries",
+            "Oats",
+            "Beans",
+            "Lentils",
+            "Plain yogurt",
+            "Almonds"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Milkshakes",
+            "Fast food",
+            "Chips",
+            "Cookies",
+            "Pastries",
+            "Processed meats"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150 minutes of aerobic activity weekly.",
+            "Strength training twice weekly.",
+            "Choose enjoyable physical activities.",
+            "Break up sitting every hour."
+          ],
+          "monitoring_recommendations": [
+            "Track weight and waist circumference.",
+            "Monitor blood pressure, glucose, and lipid profile.",
+            "Review progress with your healthcare provider if needed."
+          ],
+          "clinical_warning": "Medical review is advisable if weight gain persists or metabolic risk factors worsen.",
+          "positive_takeaway": "Structured lifestyle changes can meaningfully reduce obesity-related health risks."
+        },
+        "46_50": {
+          "score_range": "46-50",
+          "risk_interpretation": "Your score places you at the upper end of the increased-risk category. Taking action now can help prevent progression to high-risk obesity and related complications.",
+          "lifestyle_tips": [
+            "Set realistic weight-management goals.",
+            "Exercise regularly with aerobic and strength training.",
+            "Reduce sedentary behaviour.",
+            "Prioritize sleep.",
+            "Seek support to maintain healthy habits."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, legumes, whole grains, and lean protein.",
+            "Increase fibre-rich foods.",
+            "Avoid sugary drinks.",
+            "Reduce processed snacks and desserts.",
+            "Control portions consistently."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Oats",
+            "Lentils",
+            "Chickpeas",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fast food",
+            "Chips",
+            "Pastries",
+            "Cookies",
+            "Processed meats",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of aerobic activity weekly.",
+            "Strength train at least twice weekly.",
+            "Increase daily movement.",
+            "Include flexibility exercises."
+          ],
+          "monitoring_recommendations": [
+            "Monitor weight and waist regularly.",
+            "Check blood pressure, blood glucose, and cholesterol.",
+            "Consider a structured weight-management review if weight continues to increase."
+          ],
+          "clinical_warning": "Discuss persistent weight gain or obesity-related health concerns with your healthcare provider.",
+          "positive_takeaway": "Early action at this stage can significantly reduce the likelihood of future metabolic disease."
+        }
+      }
+    },
+    "high_risk": {
+      "range": "51-75",
+      "score_bands": {
+        "51_55": {
+          "score_range": "51-55",
+          "risk_interpretation": "Your score indicates high obesity-related metabolic risk. A structured weight-management plan with medical support can improve your health.",
+          "lifestyle_tips": [
+            "Aim for gradual weight loss.",
+            "Combine aerobic and strength exercise.",
+            "Reduce sugary drinks and processed snacks.",
+            "Practice mindful eating and portion control.",
+            "Prioritize sleep and reduce sitting time."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, legumes, whole grains, and lean protein.",
+            "Increase fibre intake.",
+            "Choose minimally processed foods.",
+            "Limit added sugars and saturated fat.",
+            "Control portions of calorie-dense foods."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Oats",
+            "Lentils",
+            "Chickpeas",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Milkshakes",
+            "Fried foods",
+            "Chips",
+            "Pastries",
+            "Processed meats",
+            "Candy",
+            "Fast food"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of aerobic activity weekly.",
+            "Strength train at least twice weekly.",
+            "Walk after meals.",
+            "Include flexibility exercises."
+          ],
+          "monitoring_recommendations": [
+            "Track weight and waist circumference.",
+            "Monitor blood pressure, HbA1c, and cholesterol.",
+            "Assess liver health if indicated."
+          ],
+          "clinical_warning": "Consult your healthcare provider if metabolic markers are abnormal or weight loss remains difficult.",
+          "positive_takeaway": "A sustainable lifestyle plan can improve multiple metabolic risk factors."
+        },
+        "56_60": {
+          "score_range": "56-60",
+          "risk_interpretation": "Your score suggests substantial obesity-related metabolic risk. Structured weight management and regular medical follow-up are recommended.",
+          "lifestyle_tips": [
+            "Plan meals, activity, and sleep each week.",
+            "Aim for gradual weight loss.",
+            "Exercise regularly with cardio and strength training.",
+            "Reduce emotional eating.",
+            "Seek support if progress stalls."
+          ],
+          "diet_recommendations": [
+            "Eat more vegetables and fibre-rich foods.",
+            "Include protein with every meal.",
+            "Replace refined foods with whole foods.",
+            "Limit fried and processed foods.",
+            "Control portions."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Cauliflower",
+            "Apples",
+            "Guava",
+            "Oats",
+            "Beans",
+            "Lentils",
+            "Almonds"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Sweetened juices",
+            "Fast food",
+            "Chips",
+            "Pastries",
+            "Cookies",
+            "Processed meats",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150 minutes of aerobic exercise weekly.",
+            "Strength train twice weekly.",
+            "Choose low-impact exercise if needed.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Track weight and waist.",
+            "Monitor blood pressure, HbA1c, and lipids.",
+            "Assess liver health and sleep when appropriate."
+          ],
+          "clinical_warning": "Regular medical review is recommended, particularly if metabolic complications are present.",
+          "positive_takeaway": "Steady progress can improve health even before major weight loss occurs."
+        },
+        "61_65": {
+          "score_range": "61-65",
+          "risk_interpretation": "Your score reflects high obesity-related metabolic risk. Structured weight management and ongoing medical support are recommended.",
+          "lifestyle_tips": [
+            "Follow a gradual weight-loss plan.",
+            "Exercise regularly with cardio and strength training.",
+            "Eat high-fibre, protein-rich meals.",
+            "Address poor sleep and stress.",
+            "Review progress regularly."
+          ],
+          "diet_recommendations": [
+            "Prioritize vegetables, legumes, whole grains, and lean protein.",
+            "Reduce added sugars and refined carbohydrates.",
+            "Limit processed foods and saturated fat.",
+            "Control portions.",
+            "Choose water over sugary drinks."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Oats",
+            "Lentils",
+            "Chickpeas",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Milkshakes",
+            "Fried foods",
+            "Chips",
+            "Pastries",
+            "Processed meats",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of aerobic activity weekly.",
+            "Strength train twice weekly.",
+            "Choose low-impact exercise if needed.",
+            "Include flexibility exercises."
+          ],
+          "monitoring_recommendations": [
+            "Monitor weight and waist.",
+            "Check blood pressure, HbA1c, and lipids.",
+            "Assess liver health if indicated."
+          ],
+          "clinical_warning": "Seek medical support if obesity-related complications or difficulty losing weight persist.",
+          "positive_takeaway": "A coordinated lifestyle plan can improve weight, fitness, and metabolic health."
+        },
+        "66_70": {
+          "score_range": "66-70",
+          "risk_interpretation": "Your score is near the upper end of the high-risk range. Close attention to weight management and metabolic health is important.",
+          "lifestyle_tips": [
+            "Set measurable weight and activity goals.",
+            "Exercise consistently.",
+            "Reduce sugary drinks and processed snacks.",
+            "Maintain healthy sleep.",
+            "Seek professional support if needed."
+          ],
+          "diet_recommendations": [
+            "Eat vegetables, legumes, whole grains, and lean protein.",
+            "Choose whole fruit over juice.",
+            "Limit fried foods and processed meats.",
+            "Control portions.",
+            "Plan meals ahead."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Cabbage",
+            "Guava",
+            "Berries",
+            "Oats",
+            "Beans",
+            "Lentils",
+            "Plain yogurt"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fast food",
+            "Chips",
+            "Pastries",
+            "Processed meats",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 150 minutes of aerobic exercise weekly.",
+            "Strength train twice weekly.",
+            "Choose low-impact activities if needed.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Track weight and waist.",
+            "Monitor blood pressure, glucose, and cholesterol.",
+            "Review liver health if indicated."
+          ],
+          "clinical_warning": "Medical review is recommended if weight remains difficult to manage or metabolic complications develop.",
+          "positive_takeaway": "Early action can help prevent further health complications."
+        },
+        "71_75": {
+          "score_range": "71-75",
+          "risk_interpretation": "Your score is at the upper end of the high-risk range. Comprehensive weight management and medical monitoring are strongly recommended.",
+          "lifestyle_tips": [
+            "Follow a structured weight-management plan.",
+            "Exercise regularly within your ability.",
+            "Reduce processed foods and sugary drinks.",
+            "Improve sleep and reduce stress.",
+            "Seek professional support if progress is limited."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, legumes, lean protein, and whole grains.",
+            "Reduce added sugars and refined carbohydrates.",
+            "Limit fried foods and processed meats.",
+            "Control portions.",
+            "Plan meals in advance."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Oats",
+            "Lentils",
+            "Chickpeas",
+            "Almonds",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Milkshakes",
+            "Fast food",
+            "Chips",
+            "Pastries",
+            "Processed meats",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of aerobic exercise weekly.",
+            "Strength train twice weekly.",
+            "Choose low-impact exercise if needed.",
+            "Include stretching and mobility work."
+          ],
+          "monitoring_recommendations": [
+            "Track weight and waist regularly.",
+            "Monitor blood pressure, HbA1c, cholesterol, and liver health.",
+            "Consider structured weight-management support."
+          ],
+          "clinical_warning": "Prompt medical review is advised if obesity-related complications or persistent weight-management difficulties are present.",
+          "positive_takeaway": "Consistent lifestyle changes with professional support can still significantly improve long-term health."
+        }
+      }
+    },
+    "very_high_risk": {
+      "range": "76-100",
+      "score_bands": {
+        "76_80": {
+          "score_range": "76-80",
+          "risk_interpretation": "Your score indicates very high obesity-related metabolic risk. Prompt medical review and structured weight management are recommended.",
+          "lifestyle_tips": [
+            "Follow a structured, gradual weight-loss plan.",
+            "Stay physically active with exercises suited to your fitness.",
+            "Include resistance training to preserve muscle.",
+            "Reduce sitting time and improve sleep.",
+            "Address stress and emotional eating."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, whole grains, legumes, lean protein, and fruit.",
+            "Avoid sugary drinks and ultra-processed foods.",
+            "Increase fibre intake.",
+            "Limit fried foods and refined snacks.",
+            "Control portions of calorie-dense foods."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Tomatoes",
+            "Berries",
+            "Guava",
+            "Oats",
+            "Lentils",
+            "Beans",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Sweetened juices",
+            "Milkshakes",
+            "Fried foods",
+            "Chips",
+            "Pastries",
+            "Processed meats",
+            "Candy",
+            "Fast food"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–300 minutes of aerobic activity weekly as tolerated.",
+            "Strength train at least twice weekly.",
+            "Choose low-impact exercise if needed.",
+            "Include flexibility exercises."
+          ],
+          "monitoring_recommendations": [
+            "Monitor weight and waist circumference.",
+            "Check blood pressure, HbA1c, and cholesterol.",
+            "Assess liver health when indicated.",
+            "Arrange regular clinical follow-up."
+          ],
+          "clinical_warning": "Prompt medical assessment is recommended, especially if metabolic complications are present.",
+          "positive_takeaway": "Structured support and sustained lifestyle changes can still improve metabolic health."
+        },
+        "81_85": {
+          "score_range": "81-85",
+          "risk_interpretation": "Your score indicates marked obesity-related metabolic risk. Timely medical review and structured lifestyle management are strongly recommended.",
+          "lifestyle_tips": [
+            "Aim for gradual weight loss.",
+            "Exercise regularly within your ability.",
+            "Include strength training.",
+            "Reduce sitting time.",
+            "Improve sleep and manage stress."
+          ],
+          "diet_recommendations": [
+            "Choose vegetables, legumes, whole grains, lean protein, and fruit.",
+            "Avoid sugary drinks.",
+            "Eat minimally processed foods.",
+            "Limit fried and refined foods.",
+            "Control portions."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Cauliflower",
+            "Tomatoes",
+            "Apples",
+            "Oats",
+            "Barley",
+            "Chickpeas",
+            "Walnuts",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Milkshakes",
+            "Fast food",
+            "Chips",
+            "Pastries",
+            "Processed meats",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Progress toward regular aerobic exercise.",
+            "Strength train twice weekly.",
+            "Choose joint-friendly activities if needed.",
+            "Include mobility exercises."
+          ],
+          "monitoring_recommendations": [
+            "Track weight and waist.",
+            "Monitor blood pressure, HbA1c, cholesterol, and liver health.",
+            "Arrange timely medical follow-up."
+          ],
+          "clinical_warning": "Professional assessment is recommended when weight or metabolic health continues to worsen.",
+          "positive_takeaway": "A coordinated treatment plan can produce meaningful improvements."
+        },
+        "86_90": {
+          "score_range": "86-90",
+          "risk_interpretation": "Your score reflects very high obesity-related metabolic risk. Close medical supervision is recommended alongside lifestyle changes.",
+          "lifestyle_tips": [
+            "Follow a structured weight-loss plan.",
+            "Stay active within your fitness level.",
+            "Include muscle-strengthening exercise.",
+            "Reduce sedentary time.",
+            "Prioritize sleep."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, lean protein, legumes, and whole grains.",
+            "Limit added sugars and refined foods.",
+            "Avoid fried and highly processed foods.",
+            "Practice portion control.",
+            "Choose sustainable eating habits."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Guava",
+            "Berries",
+            "Oats",
+            "Lentils",
+            "Beans",
+            "Plain yogurt",
+            "Salmon"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Milkshakes",
+            "Fast food",
+            "Chips",
+            "Pastries",
+            "Processed meats",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Build aerobic activity gradually.",
+            "Strength train when appropriate.",
+            "Prefer low-impact exercise.",
+            "Stretch regularly."
+          ],
+          "monitoring_recommendations": [
+            "Track weight and waist.",
+            "Monitor blood pressure, HbA1c, cholesterol, and liver health.",
+            "Maintain regular medical follow-up."
+          ],
+          "clinical_warning": "Medical assessment should be prioritized if obesity-related complications are present.",
+          "positive_takeaway": "Steady lifestyle improvements can still improve health outcomes."
+        },
+        "91_95": {
+          "score_range": "91-95",
+          "risk_interpretation": "Your score is near the highest risk level for obesity-related complications. Prompt medical review is strongly recommended.",
+          "lifestyle_tips": [
+            "Follow a structured weight-management plan.",
+            "Exercise safely within your ability.",
+            "Include strength training if suitable.",
+            "Reduce sedentary time.",
+            "Improve sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Eat vegetables, legumes, whole grains, lean protein, and fruit.",
+            "Avoid sugary drinks.",
+            "Limit fried, processed, and refined foods.",
+            "Control portions.",
+            "Choose sustainable eating habits."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Tomatoes",
+            "Guava",
+            "Berries",
+            "Oats",
+            "Barley",
+            "Lentils",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fast food",
+            "Chips",
+            "Pastries",
+            "Processed meats",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Exercise regularly as medically appropriate.",
+            "Strength train if suitable.",
+            "Choose low-impact activities.",
+            "Break up prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor weight, waist, blood pressure, HbA1c, cholesterol, and liver health.",
+            "Maintain close medical follow-up."
+          ],
+          "clinical_warning": "Prompt professional assessment is recommended to evaluate complications and treatment options.",
+          "positive_takeaway": "Timely intervention can still improve long-term health."
+        },
+        "96_100": {
+          "score_range": "96-100",
+          "risk_interpretation": "Your score falls within the highest obesity-related risk category. Comprehensive medical evaluation and structured long-term management are strongly recommended.",
+          "lifestyle_tips": [
+            "Prioritize gradual weight loss.",
+            "Stay active within safe limits.",
+            "Preserve muscle with resistance exercise.",
+            "Reduce sitting time.",
+            "Focus on healthy sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables, whole grains, legumes, lean protein, and fruit.",
+            "Avoid sugary drinks and processed foods.",
+            "Control portions.",
+            "Limit calorie-dense foods.",
+            "Choose sustainable eating patterns."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Cauliflower",
+            "Tomatoes",
+            "Guava",
+            "Berries",
+            "Oats",
+            "Lentils",
+            "Plain yogurt",
+            "Fish"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fast food",
+            "Chips",
+            "Pastries",
+            "Processed meats",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Exercise safely according to your health status.",
+            "Include resistance training if appropriate.",
+            "Prefer low-impact activities.",
+            "Increase activity gradually."
+          ],
+          "monitoring_recommendations": [
+            "Monitor weight, waist, blood pressure, HbA1c, cholesterol, and liver health.",
+            "Maintain regular specialist follow-up."
+          ],
+          "clinical_warning": "Prompt medical evaluation is important, particularly if obesity-related complications are already present.",
+          "positive_takeaway": "Even in this highest-risk category, sustained lifestyle changes with professional support can meaningfully improve long-term health."
+        }
+      }
+    }
+  },
+  "result_factor_sets": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional inactivity",
+        "Irregular exercise",
+        "Occasional calorie-dense foods"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Lower daily activity",
+        "Inconsistent exercise",
+        "Frequent calorie-dense foods"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Sedentary lifestyle",
+        "Higher calorie-dense food intake",
+        "Reduced physical activity"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Sedentary lifestyle",
+        "Frequent calorie-dense foods",
+        "Low physical activity"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Prolonged sedentary lifestyle",
+        "Frequent calorie-dense foods",
+        "Very low physical activity",
+        "Unfavorable body-composition pattern"
+      ]
+    }
+  }
+}

@@ -1,0 +1,1183 @@
+{
+  "knowledge_base_version": "1.0",
+  "disease_id": "nafld",
+  "display_name": "Non-Alcoholic Fatty Liver Disease (NAFLD)",
+  "overview": "Non-Alcoholic Fatty Liver Disease (NAFLD) is a condition where excess fat builds up in the liver in people who drink little or no alcohol, commonly linked to obesity, diabetes, and metabolic syndrome. If left untreated, it can progress from simple fatty liver to inflammation, fibrosis, cirrhosis, and even liver failure.",
+  "risk_bands": {
+    "healthy": {
+      "range": "0-25",
+      "score_bands": {
+        "0_5": {
+          "score_range": "0-5",
+          "risk_interpretation": "Your results show little to no evidence of excess fat in the liver. Your metabolic profile is healthy, and your liver is functioning well. Continue your current habits to maintain this healthy state.",
+          "lifestyle_tips": [
+            "Maintain a healthy body weight.",
+            "Limit sugary drinks and desserts.",
+            "Stay physically active most days.",
+            "Keep alcohol intake minimal or avoid it.",
+            "Prioritize quality sleep and stress management."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Limit added sugars, especially fructose.",
+            "Choose whole, minimally processed foods.",
+            "Include lean protein or legumes regularly.",
+            "Unsweetened coffee may support liver health."
+          ],
+          "foods_to_include": [
+            "Leafy greens",
+            "Broccoli",
+            "Olive oil",
+            "Salmon or sardines",
+            "Walnuts",
+            "Lentils",
+            "Oats",
+            "Berries",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Sugary soft drinks",
+            "Sweetened fruit juices",
+            "Pastries and cakes",
+            "Deep-fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Energy drinks",
+            "Packaged chips",
+            "Ice cream"
+          ],
+          "exercise_recommendations": [
+            "Complete at least 150 minutes of aerobic exercise weekly.",
+            "Strength train at least twice weekly.",
+            "Include stretching or mobility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check ALT and AST during routine health visits.",
+            "Monitor weight and waist circumference yearly.",
+            "Continue routine blood sugar and lipid screening."
+          ],
+          "clinical_warning": "Routine preventive care is sufficient. Consult your doctor if liver tests become abnormal or symptoms develop.",
+          "positive_takeaway": "Your liver health is excellent. Maintaining these habits will help keep it that way."
+        },
+        "6_10": {
+          "score_range": "6-10",
+          "risk_interpretation": "Your liver health remains reassuring with minimal evidence of fat accumulation. Consistent healthy habits will help preserve this favorable profile.",
+          "lifestyle_tips": [
+            "Maintain a stable body weight.",
+            "Limit sugary drinks.",
+            "Stay physically active most days.",
+            "Limit alcohol intake.",
+            "Maintain healthy sleep and manage stress."
+          ],
+          "diet_recommendations": [
+            "Continue a Mediterranean-style diet.",
+            "Choose whole fruit instead of fruit juice.",
+            "Limit refined grains.",
+            "Include healthy fats regularly.",
+            "Reduce fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Cauliflower",
+            "Extra virgin olive oil",
+            "Mackerel",
+            "Almonds",
+            "Kidney beans",
+            "Barley",
+            "Blueberries",
+            "Tomatoes",
+            "Plain yogurt"
+          ],
+          "foods_to_avoid": [
+            "Sugary sodas",
+            "Sweetened iced tea",
+            "Doughnuts",
+            "Fried chicken",
+            "Processed meats",
+            "White pasta",
+            "Sugary cereals",
+            "Sweetened coffee drinks",
+            "Cookies",
+            "Chocolate bars"
+          ],
+          "exercise_recommendations": [
+            "Complete at least 150 minutes of aerobic exercise weekly.",
+            "Strength train twice weekly.",
+            "Include flexibility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Continue routine liver enzyme testing.",
+            "Monitor weight and waist circumference.",
+            "Continue blood sugar and cholesterol screening."
+          ],
+          "clinical_warning": "Routine care is sufficient unless symptoms develop or liver tests become abnormal.",
+          "positive_takeaway": "Your liver remains healthy, and consistent habits will help keep it that way."
+        },
+        "11_15": {
+          "score_range": "11-15",
+          "risk_interpretation": "Your liver health remains within the healthy range with little evidence of excess liver fat. Reinforcing healthy habits now helps reduce future risk.",
+          "lifestyle_tips": [
+            "Prevent gradual weight gain.",
+            "Reduce sugary drinks.",
+            "Stay physically active daily.",
+            "Limit refined carbohydrates.",
+            "Maintain healthy sleep."
+          ],
+          "diet_recommendations": [
+            "Base meals on vegetables and whole grains.",
+            "Reduce added sugars.",
+            "Choose whole grains over refined grains.",
+            "Eat oily fish regularly.",
+            "Limit fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Brussels sprouts",
+            "Olive oil",
+            "Sardines",
+            "Flaxseeds",
+            "Black beans",
+            "Quinoa",
+            "Strawberries",
+            "Bell peppers",
+            "Green tea"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Sweetened juices",
+            "Pastries",
+            "Fried snacks",
+            "Processed meats",
+            "White rice",
+            "Sugary granola",
+            "Sweetened smoothies",
+            "Candy",
+            "Condensed milk"
+          ],
+          "exercise_recommendations": [
+            "Exercise at least 150 minutes weekly.",
+            "Strength train twice weekly.",
+            "Stretch regularly.",
+            "Reduce sitting time."
+          ],
+          "monitoring_recommendations": [
+            "Continue routine liver enzyme testing.",
+            "Monitor weight and waist circumference.",
+            "Maintain routine glucose and lipid screening."
+          ],
+          "clinical_warning": "Routine health checks remain appropriate unless liver tests become abnormal.",
+          "positive_takeaway": "Your liver health is strong, and maintaining these habits will help keep it that way."
+        },
+        "16_20": {
+          "score_range": "16-20",
+          "risk_interpretation": "Your results remain within the healthy range, although a few markers are beginning to trend upward. Small lifestyle improvements now can help prevent future liver fat accumulation.",
+          "lifestyle_tips": [
+            "Maintain or gradually reduce weight.",
+            "Avoid sugary drinks.",
+            "Increase daily physical activity.",
+            "Reduce refined carbohydrates.",
+            "Limit alcohol."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Reduce added sugars and fructose.",
+            "Choose whole grains.",
+            "Eat more vegetables and legumes.",
+            "Limit fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Swiss chard",
+            "Zucchini",
+            "Olive oil",
+            "Trout",
+            "Chia seeds",
+            "Whole grains",
+            "Raspberries",
+            "Cucumber",
+            "Ginger",
+            "Kefir"
+          ],
+          "foods_to_avoid": [
+            "Sugary sodas",
+            "Sweetened juices",
+            "Pastries",
+            "French fries",
+            "Processed meats",
+            "White bread",
+            "Chocolate spreads",
+            "Sweet cereal bars",
+            "Sugary yogurt drinks",
+            "Packaged cakes"
+          ],
+          "exercise_recommendations": [
+            "Aim for 150–200 minutes of aerobic exercise weekly.",
+            "Strength train 2–3 times weekly.",
+            "Include flexibility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check liver enzymes routinely.",
+            "Monitor weight, waist circumference, and blood pressure.",
+            "Continue glucose and cholesterol screening."
+          ],
+          "clinical_warning": "No urgent action is needed, but discuss rising liver enzymes or new symptoms with your doctor.",
+          "positive_takeaway": "You remain in the healthy range, and small improvements now can protect your liver for years."
+        },
+        "21_25": {
+          "score_range": "21-25",
+          "risk_interpretation": "You remain in the healthy category but are approaching higher risk. Strengthening healthy habits now can help prevent future liver fat accumulation.",
+          "lifestyle_tips": [
+            "Lose excess abdominal weight if needed.",
+            "Eliminate sugary drinks.",
+            "Exercise consistently.",
+            "Choose whole grains over refined carbohydrates.",
+            "Keep alcohol intake minimal."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Reduce fructose-rich drinks and desserts.",
+            "Fill half your plate with vegetables.",
+            "Choose fish, legumes, and nuts regularly.",
+            "Limit fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Arugula",
+            "Green beans",
+            "Olive oil",
+            "Salmon",
+            "Pumpkin seeds",
+            "Lentils",
+            "Brown rice",
+            "Apples",
+            "Carrots",
+            "Green tea"
+          ],
+          "foods_to_avoid": [
+            "Sugary sodas",
+            "Sweetened juices",
+            "Cakes",
+            "Fast food",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Flavored milk drinks",
+            "Biscuits",
+            "Candy bars"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 200 minutes of aerobic exercise weekly.",
+            "Strength train 2–3 times weekly.",
+            "Include stretching or yoga.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Check liver enzymes yearly.",
+            "Monitor weight, waist circumference, blood pressure, and blood sugar.",
+            "Keep cholesterol and triglyceride testing up to date."
+          ],
+          "clinical_warning": "A routine discussion with your healthcare provider about liver health and prevention is appropriate.",
+          "positive_takeaway": "You're still in a healthy range, and strengthening your lifestyle now offers excellent long-term liver protection."
+        }
+      }
+    },
+    "increased_risk": {
+      "range": "26-50",
+      "score_bands": {
+        "26_30": {
+          "score_range": "26-30",
+          "risk_interpretation": "Your results suggest early liver fat accumulation. This increased-risk stage is often reversible with timely lifestyle changes.",
+          "lifestyle_tips": [
+            "Aim for 5% weight loss if overweight.",
+            "Avoid sugary drinks.",
+            "Exercise regularly with aerobic and strength training.",
+            "Choose whole grains and legumes over refined carbohydrates.",
+            "Limit or avoid alcohol."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Reduce added sugar and fructose.",
+            "Eat more vegetables, legumes, and whole grains.",
+            "Choose olive oil and oily fish.",
+            "Limit fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Broccoli",
+            "Spinach",
+            "Extra virgin olive oil",
+            "Sardines",
+            "Walnuts",
+            "Chickpeas",
+            "Oats",
+            "Blueberries",
+            "Garlic",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Sweetened fruit juice",
+            "Pastries",
+            "Fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sweetened yogurt",
+            "Chips",
+            "Milk chocolate"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 200 minutes of aerobic exercise weekly.",
+            "Strength train 2–3 times weekly.",
+            "Include flexibility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check ALT and AST as advised.",
+            "Monitor weight, waist, blood pressure, and fasting glucose.",
+            "Continue cholesterol and triglyceride screening."
+          ],
+          "clinical_warning": "Discuss these results with your doctor during a routine visit.",
+          "positive_takeaway": "Early liver fat is often reversible with consistent lifestyle changes."
+        },
+        "31_35": {
+          "score_range": "31-35",
+          "risk_interpretation": "Your results indicate a modest increase in liver fat risk. Consistent lifestyle improvements can often reverse these early changes.",
+          "lifestyle_tips": [
+            "Aim for 5–7% weight loss if overweight.",
+            "Avoid sugary drinks and excess fructose.",
+            "Maintain regular aerobic and strength exercise.",
+            "Choose fibre-rich foods over refined grains.",
+            "Limit or avoid alcohol."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Reduce added sugar and fructose.",
+            "Increase vegetables, legumes, and oats.",
+            "Choose fish and plant proteins.",
+            "Limit fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Cauliflower",
+            "Kale",
+            "Olive oil",
+            "Mackerel",
+            "Almonds",
+            "Lentils",
+            "Barley",
+            "Apples",
+            "Tomatoes",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Cookies and cakes",
+            "Deep-fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary granola",
+            "Packaged snacks",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Aim for 200–250 minutes of aerobic exercise weekly.",
+            "Strength train three times weekly.",
+            "Include stretching and mobility exercises.",
+            "Avoid prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check ALT, AST, and consider FIB-4.",
+            "Repeat liver tests as advised.",
+            "Monitor weight, waist, blood pressure, glucose, and lipids."
+          ],
+          "clinical_warning": "Discuss liver and metabolic health with your doctor.",
+          "positive_takeaway": "Steady lifestyle improvements can significantly improve liver health."
+        },
+        "36_40": {
+          "score_range": "36-40",
+          "risk_interpretation": "Your results suggest early liver fat accumulation. Weight management and healthy lifestyle changes can often reverse this stage.",
+          "lifestyle_tips": [
+            "Aim for about 7% weight loss if overweight.",
+            "Avoid sugary drinks and fructose.",
+            "Exercise most days.",
+            "Choose whole grains over refined carbohydrates.",
+            "Avoid alcohol."
+          ],
+          "diet_recommendations": [
+            "Maintain a Mediterranean-style diet.",
+            "Reduce added sugar.",
+            "Choose high-fibre, low-GI foods.",
+            "Eat fish, legumes, nuts, and olive oil.",
+            "Avoid fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Broccoli",
+            "Olive oil",
+            "Salmon",
+            "Walnuts",
+            "Black beans",
+            "Oats",
+            "Berries",
+            "Peppers",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fruit juices",
+            "Pastries",
+            "Fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sweetened coffee",
+            "Chips",
+            "Chocolate"
+          ],
+          "exercise_recommendations": [
+            "Aim for around 250 minutes of aerobic exercise weekly.",
+            "Strength train three times weekly.",
+            "Include flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Check ALT, AST, GGT, and FIB-4.",
+            "Repeat liver tests as advised.",
+            "Monitor weight, waist, blood pressure, glucose, and lipids."
+          ],
+          "clinical_warning": "Consult your doctor to plan liver monitoring.",
+          "positive_takeaway": "Early liver fat often improves with sustained healthy habits."
+        },
+        "41_45": {
+          "score_range": "41-45",
+          "risk_interpretation": "Your results indicate a meaningful likelihood of liver fat accumulation. Focused lifestyle changes can significantly improve liver health.",
+          "lifestyle_tips": [
+            "Aim for 7–10% weight loss if overweight.",
+            "Eliminate sugary drinks.",
+            "Follow regular cardio and strength training.",
+            "Base meals on vegetables and whole grains.",
+            "Avoid alcohol."
+          ],
+          "diet_recommendations": [
+            "Maintain a Mediterranean-style diet.",
+            "Reduce added sugar and fructose.",
+            "Increase dietary fibre.",
+            "Choose fish and legumes over processed meats.",
+            "Avoid fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Cauliflower",
+            "Olive oil",
+            "Sardines",
+            "Almonds",
+            "Lentils",
+            "Quinoa",
+            "Apples",
+            "Carrots",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Sweetened juices",
+            "Doughnuts",
+            "Fast food",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Chips",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Aim for at least 250 minutes of aerobic exercise weekly.",
+            "Strength train three times weekly.",
+            "Include flexibility exercises.",
+            "Stay active throughout the day."
+          ],
+          "monitoring_recommendations": [
+            "Check liver enzymes and FIB-4.",
+            "Repeat testing as advised.",
+            "Monitor weight, waist, blood pressure, glucose, and lipids."
+          ],
+          "clinical_warning": "Arrange a routine medical review for liver monitoring.",
+          "positive_takeaway": "Lifestyle improvements can still produce meaningful liver recovery."
+        },
+        "46_50": {
+          "score_range": "46-50",
+          "risk_interpretation": "Your results place you near the high-risk range, suggesting a higher likelihood of liver fat. Early medical guidance and lifestyle changes can help prevent progression.",
+          "lifestyle_tips": [
+            "Aim for 7–10% weight loss if overweight.",
+            "Eliminate sugary drinks.",
+            "Exercise consistently with cardio and strength training.",
+            "Choose high-fibre foods over refined carbohydrates.",
+            "Avoid alcohol."
+          ],
+          "diet_recommendations": [
+            "Commit to a Mediterranean-style diet.",
+            "Strictly reduce added sugar and fructose.",
+            "Prioritize vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Avoid fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Brussels sprouts",
+            "Olive oil",
+            "Mackerel",
+            "Walnuts",
+            "Chickpeas",
+            "Oats",
+            "Blueberries",
+            "Tomatoes",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Sugary drinks",
+            "Fruit juices",
+            "Cakes",
+            "Deep-fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Flavoured drinks",
+            "Chips",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Aim for 250–300 minutes of aerobic exercise weekly.",
+            "Strength train three times weekly.",
+            "Include stretching and mobility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Check ALT, AST, GGT, and FIB-4.",
+            "Repeat liver assessment as advised.",
+            "Monitor weight, waist, blood pressure, HbA1c, and lipids."
+          ],
+          "clinical_warning": "Review these results with your doctor to establish a monitoring plan.",
+          "positive_takeaway": "Focused action at this stage can often halt or reverse early liver fat."
+        }
+      }
+    },
+    "high_risk": {
+      "range": "51-75",
+      "score_bands": {
+        "51_55": {
+          "score_range": "51-55",
+          "risk_interpretation": "Your results indicate significant liver fat accumulation, placing you in the high-risk range. With medical guidance and consistent lifestyle changes, meaningful improvement is still possible.",
+          "lifestyle_tips": [
+            "Aim for about 10% weight loss under medical guidance.",
+            "Eliminate sugary drinks and added sugars.",
+            "Exercise regularly with aerobic and strength training.",
+            "Base meals on vegetables, legumes, and whole grains.",
+            "Avoid alcohol completely."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Avoid fructose-rich drinks and added sugars.",
+            "Increase fibre from vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins over processed meats.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Extra virgin olive oil",
+            "Salmon",
+            "Almonds",
+            "Lentils",
+            "Barley",
+            "Apples",
+            "Peppers",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Sweetened juices",
+            "Cakes",
+            "Fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sweetened beverages",
+            "Packaged snacks",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Aim for around 300 minutes of aerobic exercise weekly.",
+            "Strength train three times weekly.",
+            "Include flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Monitor liver enzymes, FIB-4, and consider FibroScan.",
+            "Repeat liver assessment every 3–6 months.",
+            "Track weight, waist, blood pressure, HbA1c, and lipids."
+          ],
+          "clinical_warning": "Arrange a medical review to assess liver health and establish ongoing monitoring.",
+          "positive_takeaway": "Meaningful improvement is still achievable with sustained lifestyle changes."
+        },
+        "56_60": {
+          "score_range": "56-60",
+          "risk_interpretation": "Your results suggest significant liver fat requiring structured medical follow-up. Healthy lifestyle changes can still reverse much of the liver fat.",
+          "lifestyle_tips": [
+            "Aim for about 10% weight loss with medical guidance.",
+            "Avoid sugary drinks and added sugars.",
+            "Follow regular aerobic and strength training.",
+            "Adopt a whole-food, high-fibre diet.",
+            "Avoid alcohol completely."
+          ],
+          "diet_recommendations": [
+            "Maintain a Mediterranean-style diet.",
+            "Eliminate fructose-rich drinks and added sugars.",
+            "Eat more vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Cauliflower",
+            "Extra virgin olive oil",
+            "Sardines",
+            "Walnuts",
+            "Chickpeas",
+            "Oats",
+            "Berries",
+            "Tomatoes",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Sugary sodas",
+            "Fruit juices",
+            "Pastries",
+            "Deep-fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sugary drinks",
+            "Chips",
+            "Chocolate"
+          ],
+          "exercise_recommendations": [
+            "Build toward 300 minutes of aerobic exercise weekly.",
+            "Strength train three times weekly.",
+            "Include flexibility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Monitor liver enzymes, FIB-4, and FibroScan.",
+            "Repeat liver assessment every 3–6 months.",
+            "Track weight, waist, blood pressure, HbA1c, and lipids."
+          ],
+          "clinical_warning": "Prompt follow-up with your doctor is recommended.",
+          "positive_takeaway": "Your liver can recover significantly with consistent healthy choices."
+        },
+        "61_65": {
+          "score_range": "61-65",
+          "risk_interpretation": "Your profile suggests considerable liver fat with possible early inflammation. A proactive medical plan and dedicated lifestyle changes are recommended.",
+          "lifestyle_tips": [
+            "Aim for about 10% weight loss under medical supervision.",
+            "Remove sugary drinks and added sugars.",
+            "Maintain a structured exercise routine.",
+            "Follow a whole-food diet rich in vegetables and legumes.",
+            "Avoid alcohol."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Avoid fructose-rich drinks and added sugars.",
+            "Increase fibre intake.",
+            "Choose fish and plant proteins.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Olive oil",
+            "Mackerel",
+            "Almonds",
+            "Lentils",
+            "Quinoa",
+            "Apples",
+            "Peppers",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Sweetened juices",
+            "Cakes",
+            "Fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sweetened beverages",
+            "Chips",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Work toward 300 minutes of aerobic exercise weekly.",
+            "Strength train three times weekly.",
+            "Include stretching and mobility exercises.",
+            "Keep sedentary time low."
+          ],
+          "monitoring_recommendations": [
+            "Monitor liver enzymes, FIB-4, and FibroScan.",
+            "Repeat liver assessment about every 3 months.",
+            "Track weight, waist, blood pressure, HbA1c, and lipids."
+          ],
+          "clinical_warning": "Arrange a medical review for structured liver follow-up.",
+          "positive_takeaway": "Meaningful improvement remains achievable with medical guidance."
+        },
+        "66_70": {
+          "score_range": "66-70",
+          "risk_interpretation": "Your findings suggest substantial liver fat with an increased risk of inflammation or early scarring. Prompt medical review is recommended.",
+          "lifestyle_tips": [
+            "Aim for about 10% weight loss under medical guidance.",
+            "Eliminate sugary drinks and added sugars.",
+            "Follow a structured exercise program.",
+            "Maintain a whole-food, high-fibre diet.",
+            "Avoid alcohol completely."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Reduce fructose and added sugars.",
+            "Increase fibre intake.",
+            "Choose fish and plant proteins.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Cauliflower",
+            "Olive oil",
+            "Salmon",
+            "Walnuts",
+            "Chickpeas",
+            "Oats",
+            "Berries",
+            "Tomatoes",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Sugary sodas",
+            "Fruit juices",
+            "Pastries",
+            "Deep-fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sweetened drinks",
+            "Chips",
+            "Chocolate"
+          ],
+          "exercise_recommendations": [
+            "Aim for up to 300 minutes of aerobic exercise weekly.",
+            "Strength train three times weekly.",
+            "Include flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Monitor liver enzymes, FIB-4, and FibroScan.",
+            "Repeat liver assessment every 3 months.",
+            "Track weight, waist, blood pressure, HbA1c, and lipids."
+          ],
+          "clinical_warning": "Timely medical review is recommended for ongoing liver monitoring.",
+          "positive_takeaway": "With consistent care, your liver health can still improve."
+        },
+        "71_75": {
+          "score_range": "71-75",
+          "risk_interpretation": "Your results indicate a high likelihood of significant liver fat with possible inflammation or fibrosis. Close medical follow-up and structured lifestyle management are recommended.",
+          "lifestyle_tips": [
+            "Aim for at least 10% weight loss under medical supervision.",
+            "Eliminate added sugars and sugary drinks.",
+            "Maintain a structured exercise routine.",
+            "Follow a whole-food, high-fibre eating pattern.",
+            "Avoid alcohol completely."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean-style diet.",
+            "Eliminate fructose-rich drinks and added sugars.",
+            "Eat vegetables, legumes, and whole grains daily.",
+            "Choose fish and plant proteins.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Olive oil",
+            "Sardines",
+            "Almonds",
+            "Lentils",
+            "Barley",
+            "Apples",
+            "Peppers",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Sweetened juices",
+            "Pastries",
+            "Fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sweetened beverages",
+            "Packaged snacks",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Work toward 300 minutes of aerobic exercise weekly.",
+            "Strength train three times weekly.",
+            "Include flexibility exercises.",
+            "Stay active throughout the day."
+          ],
+          "monitoring_recommendations": [
+            "Monitor liver enzymes, FIB-4, and FibroScan.",
+            "Repeat liver assessment every 3 months or as advised.",
+            "Closely monitor weight, waist, blood pressure, HbA1c, and lipids."
+          ],
+          "clinical_warning": "Arrange timely medical review for comprehensive liver assessment.",
+          "positive_takeaway": "Guided lifestyle changes and medical care can still slow or reverse liver damage."
+        }
+      }
+    },
+    "very_high_risk": {
+      "range": "76-100",
+      "score_bands": {
+        "76_80": {
+          "score_range": "76-80",
+          "risk_interpretation": "Your results suggest a high burden of liver fat with possible inflammation or early scarring. Prompt medical assessment, regular monitoring, and lifestyle changes are recommended.",
+          "lifestyle_tips": [
+            "Aim for significant weight loss under specialist guidance.",
+            "Eliminate added sugars and sugary drinks.",
+            "Follow an exercise plan suited to your health.",
+            "Maintain a whole-food, high-fibre diet.",
+            "Avoid alcohol completely."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean-style diet.",
+            "Avoid fructose-rich drinks and added sugars.",
+            "Eat more vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Cauliflower",
+            "Extra virgin olive oil",
+            "Salmon",
+            "Walnuts",
+            "Chickpeas",
+            "Oats",
+            "Berries",
+            "Tomatoes",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Sugary sodas",
+            "Fruit juices",
+            "Pastries",
+            "Deep-fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sweetened drinks",
+            "Chips",
+            "Chocolate"
+          ],
+          "exercise_recommendations": [
+            "Build toward 300 minutes of moderate aerobic activity weekly as tolerated.",
+            "Strength train 2–3 times weekly.",
+            "Include flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Arrange liver assessment with liver enzymes, FIB-4, and FibroScan.",
+            "Repeat monitoring every 3 months or as advised.",
+            "Monitor weight, waist, blood pressure, HbA1c, and lipids."
+          ],
+          "clinical_warning": "Arrange prompt review with your doctor or liver specialist.",
+          "positive_takeaway": "Specialist-guided care and lifestyle changes can still significantly improve liver health."
+        },
+        "81_85": {
+          "score_range": "81-85",
+          "risk_interpretation": "Your results indicate a heavy burden of liver fat with increased risk of inflammation or fibrosis. Prompt specialist assessment and regular follow-up are recommended.",
+          "lifestyle_tips": [
+            "Follow a specialist-guided weight loss plan.",
+            "Eliminate sugary drinks and added sugars.",
+            "Exercise under supervision.",
+            "Maintain a whole-food, high-fibre diet.",
+            "Avoid alcohol completely."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean-style diet.",
+            "Avoid fructose-rich drinks and added sugars.",
+            "Increase vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Extra virgin olive oil",
+            "Sardines",
+            "Almonds",
+            "Lentils",
+            "Quinoa",
+            "Apples",
+            "Peppers",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Sweetened juices",
+            "Doughnuts",
+            "Fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sweetened beverages",
+            "Chips",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Increase moderate aerobic activity as tolerated.",
+            "Strength train 2–3 times weekly.",
+            "Include flexibility exercises.",
+            "Reduce prolonged sitting."
+          ],
+          "monitoring_recommendations": [
+            "Arrange liver assessment with liver enzymes, FIB-4, and FibroScan.",
+            "Repeat evaluation every 3 months or as advised.",
+            "Monitor weight, waist, blood pressure, HbA1c, and lipids."
+          ],
+          "clinical_warning": "Prompt specialist review is recommended.",
+          "positive_takeaway": "With specialist care, liver changes can often improve or stabilize."
+        },
+        "86_90": {
+          "score_range": "86-90",
+          "risk_interpretation": "Your results suggest very high liver fat with likely inflammation or scarring. Timely specialist care and close follow-up are important.",
+          "lifestyle_tips": [
+            "Follow a specialist-directed weight management plan.",
+            "Eliminate added sugars and sugary drinks.",
+            "Exercise under medical guidance.",
+            "Maintain a whole-food, high-fibre diet.",
+            "Avoid alcohol completely."
+          ],
+          "diet_recommendations": [
+            "Follow a Mediterranean-style diet.",
+            "Avoid fructose-rich drinks and added sugars.",
+            "Base meals on vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Avoid fried and processed foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Cauliflower",
+            "Extra virgin olive oil",
+            "Salmon",
+            "Walnuts",
+            "Chickpeas",
+            "Oats",
+            "Berries",
+            "Tomatoes",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Sugary sodas",
+            "Fruit juices",
+            "Pastries",
+            "Deep-fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sweetened drinks",
+            "Chips",
+            "Chocolate"
+          ],
+          "exercise_recommendations": [
+            "Perform moderate aerobic activity as tolerated.",
+            "Include resistance training if appropriate.",
+            "Add flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Arrange comprehensive liver assessment including liver enzymes, FIB-4, and FibroScan.",
+            "Follow specialist-recommended monitoring.",
+            "Track weight, waist, blood pressure, HbA1c, and lipids."
+          ],
+          "clinical_warning": "Seek prompt specialist assessment.",
+          "positive_takeaway": "Dedicated medical care and healthy habits can still protect your liver."
+        },
+        "91_95": {
+          "score_range": "91-95",
+          "risk_interpretation": "Your findings suggest very high liver fat with likely advanced inflammation or fibrosis. Prompt specialist evaluation and close follow-up are recommended.",
+          "lifestyle_tips": [
+            "Prioritize specialist-directed weight management.",
+            "Eliminate added sugars and sugary drinks.",
+            "Follow a supervised exercise program.",
+            "Maintain a whole-food, high-fibre diet.",
+            "Avoid alcohol completely."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean-style diet.",
+            "Avoid fructose-rich drinks and added sugars.",
+            "Eat vegetables, legumes, and whole grains daily.",
+            "Choose fish and plant proteins.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Kale",
+            "Broccoli",
+            "Extra virgin olive oil",
+            "Sardines",
+            "Almonds",
+            "Lentils",
+            "Quinoa",
+            "Apples",
+            "Peppers",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Soft drinks",
+            "Sweetened juices",
+            "Pastries",
+            "Fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sweetened beverages",
+            "Chips",
+            "Candy"
+          ],
+          "exercise_recommendations": [
+            "Maintain moderate activity as tolerated.",
+            "Include gentle resistance training if approved.",
+            "Perform flexibility exercises.",
+            "Reduce sedentary time."
+          ],
+          "monitoring_recommendations": [
+            "Arrange comprehensive specialist liver evaluation.",
+            "Continue close follow-up as advised.",
+            "Monitor weight, waist, blood pressure, HbA1c, and lipids."
+          ],
+          "clinical_warning": "Prompt liver specialist evaluation is recommended.",
+          "positive_takeaway": "Specialist care and sustained lifestyle changes can still slow progression and improve liver health."
+        },
+        "96_100": {
+          "score_range": "96-100",
+          "risk_interpretation": "Your results suggest advanced liver fat with possible significant inflammation or scarring. Prompt specialist evaluation and comprehensive management are strongly recommended.",
+          "lifestyle_tips": [
+            "Make specialist-guided lifestyle changes your top priority.",
+            "Eliminate added sugars and sugary drinks.",
+            "Follow an individualized exercise plan.",
+            "Maintain a whole-food, high-fibre diet.",
+            "Avoid alcohol completely."
+          ],
+          "diet_recommendations": [
+            "Strictly follow a Mediterranean-style diet.",
+            "Avoid fructose-rich drinks and added sugars.",
+            "Base meals on vegetables, legumes, and whole grains.",
+            "Choose fish and plant proteins.",
+            "Avoid fried and ultra-processed foods."
+          ],
+          "foods_to_include": [
+            "Spinach",
+            "Cauliflower",
+            "Extra virgin olive oil",
+            "Salmon",
+            "Walnuts",
+            "Chickpeas",
+            "Oats",
+            "Berries",
+            "Tomatoes",
+            "Green tea",
+            "Unsweetened coffee"
+          ],
+          "foods_to_avoid": [
+            "Sugary sodas",
+            "Fruit juices",
+            "Pastries",
+            "Deep-fried foods",
+            "Processed meats",
+            "White bread",
+            "Sugary cereals",
+            "Sweetened drinks",
+            "Chips",
+            "Chocolate"
+          ],
+          "exercise_recommendations": [
+            "Perform gentle to moderate activity as medically approved.",
+            "Include light resistance training if appropriate.",
+            "Practice stretching and mobility exercises.",
+            "Reduce prolonged sitting safely."
+          ],
+          "monitoring_recommendations": [
+            "Undergo comprehensive specialist liver assessment.",
+            "Follow the monitoring schedule advised by your specialist.",
+            "Monitor weight, blood pressure, HbA1c, lipids, and liver health."
+          ],
+          "clinical_warning": "Arrange prompt evaluation by a liver specialist.",
+          "positive_takeaway": "Timely specialist care and sustained healthy habits can help preserve liver function and improve long-term outcomes."
+        }
+      }
+    }
+  },
+  "result_factor_sets": {
+    "set_1": {
+      "score_range": "0-20",
+      "factors": [
+        "Occasional high-sugar intake",
+        "Lower physical activity",
+        "Irregular eating pattern"
+      ]
+    },
+    "set_2": {
+      "score_range": "21-40",
+      "factors": [
+        "Increased refined-carbohydrate intake",
+        "Lower daily movement",
+        "Early blood-sugar concerns"
+      ]
+    },
+    "set_3": {
+      "score_range": "41-60",
+      "factors": [
+        "Elevated blood sugar",
+        "Sedentary lifestyle",
+        "Higher refined-carbohydrate intake"
+      ]
+    },
+    "set_4": {
+      "score_range": "61-80",
+      "factors": [
+        "Elevated blood sugar",
+        "Mildly altered protein markers",
+        "Sedentary lifestyle"
+      ]
+    },
+    "set_5": {
+      "score_range": "81-100",
+      "factors": [
+        "Elevated blood sugar",
+        "Mildly low total protein and globulin",
+        "Sedentary lifestyle",
+        "Unhealthy dietary pattern"
+      ]
+    }
+  }
+}
