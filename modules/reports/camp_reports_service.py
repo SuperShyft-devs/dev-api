@@ -33,22 +33,29 @@ from modules.engagements.models import Engagement
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.service import get_department_slugs
+from modules.users.models import User
 from modules.reports.camp_report_section_builders import (
     SECTION_BUILDERS,
-    aggregate_top_healthy_habits,
-    aggregate_top_healthy_profiles,
-    aggregate_top_low_risk,
-    build_blood_and_lab_intelligence,
-    build_company_average_scores,
+    build_blood_and_lab_intelligence_details,
+    build_blood_test_person_evaluation,
+    build_combined_in_range_percent_math,
+    build_in_range_percent_math,
+    build_company_average_scores_details,
     build_distribution_by_gender_by_metabolic_syndrome,
+    build_distribution_by_gender_by_metabolic_syndrome_details,
     build_distribution_by_oxidative_stress,
     build_distribution_by_oxidative_stress_details,
     build_kpis,
     build_overall_risk_score_details,
     build_participation_by_age_details,
     build_positive_wins,
+    build_positive_wins_details,
     build_questionnaire_gender_distribution_details,
     build_ranking,
+    _coerce_reports_dict_for_positive_wins,
+    _display_person_name,
+    _list_healthy_diseases_from_report,
+    build_per_person_low_risk_math,
     PHYSICAL_ACTIVITY_BUCKET_LABELS,
     PHYSICAL_ACTIVITY_BUCKETS,
     SLEEPING_HOURS_BUCKET_LABELS,
@@ -57,11 +64,15 @@ from modules.reports.camp_report_section_builders import (
     sleeping_hours_answer_to_bucket,
 )
 from modules.reports.camp_report_bts import (
+    build_distribution_by_gender_by_metabolic_syndrome_bts,
     build_distribution_by_oxidative_stress_bts,
     build_kpis_bts,
     build_not_implemented_bts,
     build_overall_risk_score_bts,
     build_participation_by_age_bts,
+    build_positive_wins_bts,
+    build_company_average_scores_bts,
+    build_blood_and_lab_intelligence_bts,
     build_questionnaire_gender_distribution_bts,
 )
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
@@ -100,6 +111,13 @@ _DEFAULT_ESTIMATE_COST: tuple[float, float, str] = (3.0, 0.02, "participants")
 # Concurrent workers for positive_wins refresh / KPI Metsights checks (bounded by DB pool).
 _POSITIVE_WINS_CONCURRENCY = 4
 _KPI_BLOOD_METSIGHTS_CONCURRENCY = 4
+
+_POSITIVE_WINS_BLOOD_ERROR_LABELS: dict[str, str] = {
+    "BLOOD_PARAMETERS_NOT_FOUND": "Blood test results were not found in our saved records.",
+    "BLOOD_SAMPLE_NOT_COLLECTED": "Blood sample has not been collected yet.",
+    "INVALID_STATE": "Blood data could not be read from the saved health records.",
+    "EXTERNAL_SERVICE_UNAVAILABLE": "We could not check blood results right now.",
+}
 
 
 class CampReportsService:
@@ -1309,6 +1327,10 @@ class CampReportsService:
         age_bts_details: dict[str, Any] | None = None
         ors_bts_details: dict[str, Any] | None = None
         oxidative_bts_details: dict[str, Any] | None = None
+        metabolic_gender_bts_details: dict[str, Any] | None = None
+        positive_wins_bts_details: dict[str, Any] | None = None
+        company_average_scores_bts_details: dict[str, Any] | None = None
+        blood_and_lab_intelligence_bts_details: dict[str, Any] | None = None
         pa_bts_details: dict[str, Any] | None = None
         sleep_bts_details: dict[str, Any] | None = None
         pa_bts_meta: dict[str, Any] | None = None
@@ -1339,6 +1361,40 @@ class CampReportsService:
         elif normalized_section == "distribution_by_oxidative_stress":
             built_payload, oxidative_bts_details = (
                 await self._build_distribution_by_oxidative_stress_with_details(
+                    db,
+                    camp_no=camp_no,
+                    department=department,
+                    city=city,
+                )
+            )
+        elif normalized_section == "distribution_by_gender_by_metabolic_syndrome":
+            built_payload, metabolic_gender_bts_details = (
+                await self._build_distribution_by_gender_by_metabolic_syndrome_with_details(
+                    db,
+                    camp_no=camp_no,
+                    department=department,
+                    city=city,
+                )
+            )
+        elif normalized_section == "positive_wins":
+            built_payload, positive_wins_bts_details = await self._compute_positive_wins_with_details(
+                db,
+                camp_no=camp_no,
+                department=department,
+                city=city,
+            )
+        elif normalized_section == "company_average_scores":
+            built_payload, company_average_scores_bts_details = (
+                await self._compute_company_average_scores_with_details(
+                    db,
+                    camp_no=camp_no,
+                    department=department,
+                    city=city,
+                )
+            )
+        elif normalized_section == "blood_and_lab_intelligence":
+            built_payload, blood_and_lab_intelligence_bts_details = (
+                await self._compute_blood_and_lab_intelligence_with_details(
                     db,
                     camp_no=camp_no,
                     department=department,
@@ -1469,6 +1525,50 @@ class CampReportsService:
                 checked_at=checked_at,
                 section_title=str(meta.get("section_title") or "Sleeping hours"),
                 bucket_labels=dict(meta.get("bucket_labels") or SLEEPING_HOURS_BUCKET_LABELS),
+            )
+        elif normalized_section == "distribution_by_gender_by_metabolic_syndrome":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            metabolic_details = dict(metabolic_gender_bts_details or {})
+            if previous_data is not None:
+                metabolic_details["previous"] = previous_data
+            report_bts[normalized_section] = build_distribution_by_gender_by_metabolic_syndrome_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=metabolic_details,
+                checked_at=checked_at,
+            )
+        elif normalized_section == "positive_wins":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            pw_details = dict(positive_wins_bts_details or {})
+            if previous_data is not None:
+                pw_details["previous"] = previous_data
+            report_bts[normalized_section] = build_positive_wins_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=pw_details,
+                checked_at=checked_at,
+            )
+        elif normalized_section == "company_average_scores":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            cas_details = dict(company_average_scores_bts_details or {})
+            if previous_data is not None:
+                cas_details["previous"] = previous_data
+            report_bts[normalized_section] = build_company_average_scores_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=cas_details,
+                checked_at=checked_at,
+            )
+        elif normalized_section == "blood_and_lab_intelligence":
+            expected_data = section_payload.get("data") if isinstance(section_payload.get("data"), dict) else {}
+            bli_details = dict(blood_and_lab_intelligence_bts_details or {})
+            if previous_data is not None:
+                bli_details["previous"] = previous_data
+            report_bts[normalized_section] = build_blood_and_lab_intelligence_bts(
+                expected_data=expected_data,
+                stored_data=expected_data,
+                details=bli_details,
+                checked_at=checked_at,
             )
         else:
             report_bts[normalized_section] = build_not_implemented_bts(checked_at=checked_at)
@@ -1714,13 +1814,46 @@ class CampReportsService:
         db: AsyncSession,
         *,
         ctx: EnrolledAssessmentContext,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, str | None]], list[str]]:
+    ) -> dict[str, Any]:
         """Compute low-risk / habits / profiles for one health assessment context.
 
         Camp report refresh uses cached DB data only — no live Metsights/Healthians
         fan-out per participant (those calls belong on single-user overview/load).
         """
+        notes: dict[str, str | None] = {
+            "low_risk": None,
+            "healthy_habits": None,
+            "healthy_profiles": None,
+        }
+        package = ctx.package
+        engagement = ctx.engagement
         individual_report = ctx.individual_report
+
+        if package is None:
+            notes["low_risk"] = "This assessment has no package linked, so we cannot read a Bio AI report."
+            notes["healthy_habits"] = "This assessment has no package linked, so we cannot read questionnaire answers."
+            notes["healthy_profiles"] = "This assessment has no package linked, so we cannot read blood results."
+            return {
+                "low_risk": [],
+                "healthy_habits": [],
+                "healthy_profiles": [],
+                "notes": notes,
+                "low_risk_math": None,
+            }
+
+        assessment_type = (package.assessment_type_code or "").strip()
+        if assessment_type == "7":
+            notes["low_risk"] = "FitPrint assessments are not used for the healthy disease list."
+            notes["healthy_habits"] = "FitPrint assessments are not used for healthy habits."
+            notes["healthy_profiles"] = "FitPrint assessments are not used for healthy blood profiles."
+            return {
+                "low_risk": [],
+                "healthy_habits": [],
+                "healthy_profiles": [],
+                "notes": notes,
+                "low_risk_math": None,
+            }
+
         # Blood may live on a different IHR row for the same engagement.
         if individual_report is None or individual_report.blood_parameters is None:
             blood_report = await self._reports_service._get_blood_individual_report(
@@ -1735,10 +1868,14 @@ class CampReportsService:
                 elif individual_report.blood_parameters is None:
                     individual_report.blood_parameters = blood_report.blood_parameters
 
+        reports_dict: dict[str, Any] = {}
+        if individual_report is not None and individual_report.reports is not None:
+            reports_dict = _coerce_reports_dict_for_positive_wins(individual_report.reports)
+
         low_risk_items = await self._reports_service.compute_low_risk_for_instance(
             db,
             assessment_instance=ctx.assessment_instance,
-            package=ctx.package,
+            package=package,
             individual_report=individual_report,
             allow_remote_fetch=False,
         )
@@ -1751,12 +1888,30 @@ class CampReportsService:
             }
             for item in low_risk_items
         ]
+
+        all_healthy = _list_healthy_diseases_from_report(reports_dict) if reports_dict else []
+        low_risk_math = (
+            build_per_person_low_risk_math(all_healthy, low_risk) if low_risk or all_healthy else None
+        )
+
+        if not low_risk:
+            if individual_report is None or not reports_dict:
+                notes["low_risk"] = (
+                    "No cached Bio AI report was available during camp refresh "
+                    "(we do not call Metsights live on refresh)."
+                )
+            else:
+                notes["low_risk"] = (
+                    "The Bio AI report has no diseases marked Healthy, or none could be read."
+                )
+
+        profiles_error_code: str | None = None
         try:
             habits, profiles = await self._reports_service.compute_healthy_habits_and_profiles_for_instance(
                 db,
                 assessment_instance=ctx.assessment_instance,
-                package=ctx.package,
-                engagement=ctx.engagement,
+                package=package,
+                engagement=engagement,
                 individual_report=individual_report,
                 user_gender=ctx.user_gender,
                 allow_provider_fetch=False,
@@ -1764,27 +1919,70 @@ class CampReportsService:
         except AppError as exc:
             if exc.error_code not in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
                 raise
+            profiles_error_code = str(exc.error_code)
             habits, profiles = [], []
-        return (
-            low_risk,
-            [{"habit_key": h.habit_key, "habit_label": h.habit_label} for h in habits],
-            profiles,
-        )
+
+        healthy_habits = [{"habit_key": h.habit_key, "habit_label": h.habit_label} for h in habits]
+
+        if not healthy_habits:
+            if self._reports_service._healthy_habits_service is None:
+                notes["healthy_habits"] = "Healthy habit rules are not configured for this environment."
+            else:
+                notes["healthy_habits"] = (
+                    "No questionnaire answers matched a healthy habit rule for this person."
+                )
+
+        if not profiles:
+            if engagement is None or engagement.diagnostic_package_id is None:
+                notes["healthy_profiles"] = (
+                    "This camp session has no blood test package linked, so profile groups cannot be scored."
+                )
+            elif individual_report is None:
+                notes["healthy_profiles"] = (
+                    "No health report row was found to read blood results from."
+                )
+            elif profiles_error_code is not None:
+                notes["healthy_profiles"] = _POSITIVE_WINS_BLOOD_ERROR_LABELS.get(
+                    profiles_error_code,
+                    "Blood results were not available from cache during camp refresh.",
+                )
+            else:
+                notes["healthy_profiles"] = (
+                    "No blood profile groups had in-range results for this person, "
+                    "or blood data could not be scored."
+                )
+
+        return {
+            "low_risk": low_risk,
+            "healthy_habits": healthy_habits,
+            "healthy_profiles": profiles,
+            "notes": notes,
+            "low_risk_math": low_risk_math,
+        }
 
     async def _positive_wins_for_context_isolated(
         self,
         *,
         assessment_instance_id: int,
         user_gender: str | None,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, str | None]], list[str]]:
+    ) -> dict[str, Any]:
         """Run one participant's positive_wins work on a dedicated DB session."""
         async with AsyncSessionLocal() as session:
             ai = await session.get(AssessmentInstance, assessment_instance_id)
             if ai is None:
-                return [], [], []
+                return {
+                    "low_risk": [],
+                    "healthy_habits": [],
+                    "healthy_profiles": [],
+                    "notes": {
+                        "low_risk": "Assessment record was not found.",
+                        "healthy_habits": "Assessment record was not found.",
+                        "healthy_profiles": "Assessment record was not found.",
+                    },
+                    "low_risk_math": None,
+                }
             package = await session.get(AssessmentPackage, ai.package_id) if ai.package_id else None
             engagement = await session.get(Engagement, ai.engagement_id) if ai.engagement_id else None
-            # Multiple IHR rows per assessment are allowed; prefer blood, then latest.
             ihr_result = await session.execute(
                 select(IndividualHealthReport)
                 .where(
@@ -1803,10 +2001,105 @@ class CampReportsService:
                 engagement=engagement,
                 individual_report=individual_report,
                 user_gender=user_gender,
+                user_age=None,
+                user_date_of_birth=None,
             )
             result = await self._positive_wins_for_context(session, ctx=ctx)
             await session.commit()
             return result
+
+    async def _compute_positive_wins_with_details(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None = None,
+    ) -> tuple[dict, dict]:
+        scope_label = self._age_participation_scope_label(department=department, city=city)
+        contexts = await self._repository.list_health_assessment_contexts(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        if not contexts:
+            payload, details = build_positive_wins_details(
+                [],
+                scope_label=scope_label,
+            )
+            return payload, details
+
+        user_ids = [int(ctx.assessment_instance.user_id) for ctx in contexts]
+        users_result = await db.execute(select(User).where(User.user_id.in_(user_ids)))
+        users_by_id = {int(u.user_id): u for u in users_result.scalars().all()}
+
+        participant_rows: list[dict[str, Any]] = []
+
+        if len(contexts) <= _POSITIVE_WINS_CONCURRENCY:
+            for ctx in contexts:
+                uid = int(ctx.assessment_instance.user_id)
+                user = users_by_id.get(uid)
+                name = _display_person_name(
+                    user.first_name if user else None,
+                    user.last_name if user else None,
+                )
+                result = await self._positive_wins_for_context(db, ctx=ctx)
+                participant_rows.append(
+                    {
+                        "user_id": uid,
+                        "name": name,
+                        **result,
+                    }
+                )
+        else:
+            semaphore = asyncio.Semaphore(_POSITIVE_WINS_CONCURRENCY)
+
+            async def run_one(ctx: EnrolledAssessmentContext) -> dict[str, Any]:
+                async with semaphore:
+                    result = await self._positive_wins_for_context_isolated(
+                        assessment_instance_id=int(ctx.assessment_instance.assessment_instance_id),
+                        user_gender=ctx.user_gender,
+                    )
+                    return result
+
+            results = await asyncio.gather(
+                *[run_one(ctx) for ctx in contexts],
+                return_exceptions=True,
+            )
+
+            for ctx, result in zip(contexts, results, strict=True):
+                uid = int(ctx.assessment_instance.user_id)
+                user = users_by_id.get(uid)
+                name = _display_person_name(
+                    user.first_name if user else None,
+                    user.last_name if user else None,
+                )
+                if isinstance(result, BaseException):
+                    if isinstance(result, AppError) and result.error_code in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
+                        participant_rows.append(
+                            {
+                                "user_id": uid,
+                                "name": name,
+                                "low_risk": [],
+                                "healthy_habits": [],
+                                "healthy_profiles": [],
+                                "notes": {
+                                    "low_risk": None,
+                                    "healthy_habits": None,
+                                    "healthy_profiles": _POSITIVE_WINS_BLOOD_ERROR_LABELS.get(
+                                        str(result.error_code),
+                                        "Blood results were not available.",
+                                    ),
+                                },
+                                "low_risk_math": None,
+                            }
+                        )
+                        continue
+                    raise result
+                participant_rows.append({"user_id": uid, "name": name, **result})
+
+        return build_positive_wins_details(participant_rows, scope_label=scope_label)
 
     async def _compute_positive_wins_payload(
         self,
@@ -1816,71 +2109,225 @@ class CampReportsService:
         department: str | None,
         city: str | None = None,
     ) -> dict:
-        contexts = await self._repository.list_health_assessment_contexts(
+        payload, _details = await self._compute_positive_wins_with_details(
             db,
             camp_no=camp_no,
             department=department,
             city=city,
         )
-        if not contexts:
-            return build_positive_wins(
-                low_risk=[],
-                healthy_habits=[],
-                healthy_profiles=[],
-            )
+        return payload
 
-        # Small camps: keep work on the request session (avoids pool churn).
-        if len(contexts) <= _POSITIVE_WINS_CONCURRENCY:
-            participant_habits: list[list[dict[str, str | None]]] = []
-            participant_profiles: list[list[str]] = []
-            participant_low_risk: list[list[dict[str, Any]]] = []
-            for ctx in contexts:
-                low_risk, habits, profiles = await self._positive_wins_for_context(db, ctx=ctx)
-                participant_low_risk.append(low_risk)
-                participant_habits.append(habits)
-                participant_profiles.append(profiles)
-            return build_positive_wins(
-                low_risk=aggregate_top_low_risk(participant_low_risk),
-                healthy_habits=aggregate_top_healthy_habits(participant_habits),
-                healthy_profiles=aggregate_top_healthy_profiles(participant_profiles),
-            )
-
-        semaphore = asyncio.Semaphore(_POSITIVE_WINS_CONCURRENCY)
-
-        async def run_one(
-            ctx: EnrolledAssessmentContext,
-        ) -> tuple[list[dict[str, Any]], list[dict[str, str | None]], list[str]]:
-            async with semaphore:
-                return await self._positive_wins_for_context_isolated(
-                    assessment_instance_id=int(ctx.assessment_instance.assessment_instance_id),
-                    user_gender=ctx.user_gender,
-                )
-
-        results = await asyncio.gather(
-            *[run_one(ctx) for ctx in contexts],
-            return_exceptions=True,
+    async def _compute_company_average_scores_with_details(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None = None,
+    ) -> tuple[dict, dict]:
+        scope_label = self._age_participation_scope_label(department=department, city=city)
+        contexts = await self._repository.list_fitprint_assessment_contexts(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
         )
 
-        participant_habits = []
-        participant_profiles = []
-        participant_low_risk = []
-        for result in results:
-            if isinstance(result, BaseException):
-                if isinstance(result, AppError) and result.error_code in BLOOD_DATA_UNAVAILABLE_ERROR_CODES:
-                    participant_low_risk.append([])
-                    participant_habits.append([])
-                    participant_profiles.append([])
-                    continue
-                raise result
-            low_risk, habits, profiles = result
-            participant_low_risk.append(low_risk)
-            participant_habits.append(habits)
-            participant_profiles.append(profiles)
+        user_ids = [int(ctx.assessment_instance.user_id) for ctx in contexts]
+        users_by_id: dict[int, User] = {}
+        if user_ids:
+            users_result = await db.execute(select(User).where(User.user_id.in_(user_ids)))
+            users_by_id = {int(u.user_id): u for u in users_result.scalars().all()}
 
-        return build_positive_wins(
-            low_risk=aggregate_top_low_risk(participant_low_risk),
-            healthy_habits=aggregate_top_healthy_habits(participant_habits),
-            healthy_profiles=aggregate_top_healthy_profiles(participant_profiles),
+        participant_rows: list[dict[str, Any]] = []
+        excluded_report_load_failed: list[dict[str, Any]] = []
+
+        for ctx in contexts:
+            uid = int(ctx.assessment_instance.user_id)
+            user = users_by_id.get(uid)
+            name = _display_person_name(
+                user.first_name if user else None,
+                user.last_name if user else None,
+            )
+            assessment_instance_id = int(ctx.assessment_instance.assessment_instance_id)
+
+            try:
+                report_dict = await self._reports_service._resolve_report_dict_for_instance(
+                    db,
+                    assessment_instance=ctx.assessment_instance,
+                    package=ctx.package,
+                    individual_report=ctx.individual_report,
+                )
+            except Exception:
+                excluded_report_load_failed.append(
+                    {
+                        "user_id": uid,
+                        "name": name,
+                        "assessment_instance_id": assessment_instance_id,
+                        "reason": (
+                            "Has a FitPrint assessment but we could not open their health report. "
+                            "They were left out of all averages."
+                        ),
+                    }
+                )
+                continue
+
+            fitness_spec = report_dict.get("fitness_specification") or {}
+            activity_spec = report_dict.get("activity_specification") or {}
+
+            raw_lifestyle = fitness_spec.get("score") if isinstance(fitness_spec, dict) else None
+            lifestyle_score = (
+                float(raw_lifestyle) if isinstance(raw_lifestyle, (int, float)) else None
+            )
+            if lifestyle_score is not None:
+                lifestyle_detail = {
+                    "score": lifestyle_score,
+                    "status": "included",
+                    "steps": [
+                        f"From {name}'s FitPrint report, the lifestyle score is {lifestyle_score:g}."
+                    ],
+                }
+            else:
+                lifestyle_detail = {
+                    "score": None,
+                    "status": "missing",
+                    "steps": [
+                        f"{name}'s FitPrint report did not include a lifestyle score."
+                    ],
+                }
+
+            raw_fitness = activity_spec.get("score") if isinstance(activity_spec, dict) else None
+            fitness_score = float(raw_fitness) if isinstance(raw_fitness, (int, float)) else None
+            if fitness_score is not None:
+                fitness_detail = {
+                    "score": fitness_score,
+                    "status": "included",
+                    "steps": [
+                        f"From {name}'s FitPrint report, the activity (Fitness) score is {fitness_score:g}."
+                    ],
+                }
+            else:
+                fitness_detail = {
+                    "score": None,
+                    "status": "missing",
+                    "steps": [
+                        f"{name}'s FitPrint report did not include an activity (Fitness) score."
+                    ],
+                }
+
+            all_instances = await self._assessments_repository.list_instances_for_user_engagement(
+                db,
+                user_id=ctx.assessment_instance.user_id,
+                engagement_id=ctx.assessment_instance.engagement_id,
+            )
+            source_ids = [inst.assessment_instance_id for inst in all_instances]
+
+            nutrition_detail: dict[str, Any]
+            if not source_ids:
+                nutrition_detail = {
+                    "score": None,
+                    "status": "missing",
+                    "steps": [
+                        f"We could not find questionnaire answers for {name}, "
+                        f"so no Nutrition score was calculated."
+                    ],
+                }
+            else:
+                try:
+                    lookup, key_to_qid = await self._reports_service._build_questionnaire_lookup(
+                        db,
+                        source_assessment_instance_ids=source_ids,
+                    )
+                    option_reverse_map = await self._reports_service._build_option_reverse_map(
+                        db, key_to_qid
+                    )
+                    nutrition_payload = self._reports_service._build_nutrition_api_payload(
+                        lookup,
+                        user_gender=ctx.user_gender,
+                        user_age=ctx.user_age,
+                        user_date_of_birth=ctx.user_date_of_birth,
+                        option_reverse_map=option_reverse_map,
+                    )
+                    nutrition_response = await self._reports_service._call_nutrition_api(
+                        db,
+                        nutrition_payload,
+                        user_id=ctx.assessment_instance.user_id,
+                        engagement_id=ctx.assessment_instance.engagement_id,
+                    )
+                    raw_nutrition = nutrition_response.get("nutrition_score")
+                    nutrition_score = (
+                        float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
+                    )
+                    if nutrition_score is not None:
+                        nutrition_detail = {
+                            "score": nutrition_score,
+                            "status": "included",
+                            "steps": [
+                                f"We read {name}'s health questionnaire answers.",
+                                f"The Nutrition scoring service returned {nutrition_score:g}.",
+                            ],
+                        }
+                    else:
+                        nutrition_detail = {
+                            "score": None,
+                            "status": "missing",
+                            "steps": [
+                                f"The Nutrition scoring service did not return a score for {name}."
+                            ],
+                        }
+                except Exception:
+                    nutrition_detail = {
+                        "score": None,
+                        "status": "missing",
+                        "steps": [
+                            f"We could not get a Nutrition score for {name} because their "
+                            f"questionnaire answers were incomplete or the scoring service "
+                            f"was unavailable."
+                        ],
+                    }
+
+            participant_rows.append(
+                {
+                    "user_id": uid,
+                    "name": name,
+                    "assessment_instance_id": assessment_instance_id,
+                    "nutrition": nutrition_detail,
+                    "fitness": fitness_detail,
+                    "lifestyle": lifestyle_detail,
+                }
+            )
+
+        no_fitprint_rows = await self._repository.list_enrolled_users_without_fitprint(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        excluded_no_fitprint = [
+            {
+                "user_id": uid,
+                "name": _display_person_name(first_name, last_name),
+                "reason": (
+                    "Enrolled in the camp but has not completed a FitPrint assessment."
+                ),
+            }
+            for uid, first_name, last_name in no_fitprint_rows
+        ]
+        excluded_no_fitprint.sort(key=lambda row: (row["name"].lower(), row["user_id"]))
+
+        total_enrolled = await self._repository.count_enrolled_users(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+
+        return build_company_average_scores_details(
+            participant_rows,
+            scope_label=scope_label,
+            total_enrolled=total_enrolled,
+            excluded_no_fitprint=excluded_no_fitprint,
+            excluded_report_load_failed=excluded_report_load_failed,
         )
 
     async def _compute_company_average_scores_payload(
@@ -1891,71 +2338,13 @@ class CampReportsService:
         department: str | None,
         city: str | None = None,
     ) -> dict:
-        contexts = await self._repository.list_fitprint_assessment_contexts(
+        payload, _details = await self._compute_company_average_scores_with_details(
             db,
             camp_no=camp_no,
             department=department,
             city=city,
         )
-
-        participant_scores: list[dict[str, float | None]] = []
-
-        for ctx in contexts:
-            try:
-                report_dict = await self._reports_service._resolve_report_dict_for_instance(
-                    db,
-                    assessment_instance=ctx.assessment_instance,
-                    package=ctx.package,
-                    individual_report=ctx.individual_report,
-                )
-            except Exception:
-                continue
-
-            fitness_spec = report_dict.get("fitness_specification") or {}
-            activity_spec = report_dict.get("activity_specification") or {}
-
-            raw_lifestyle = fitness_spec.get("score") if isinstance(fitness_spec, dict) else None
-            lifestyle_score = float(raw_lifestyle) if isinstance(raw_lifestyle, (int, float)) else None
-
-            raw_fitness = activity_spec.get("score") if isinstance(activity_spec, dict) else None
-            fitness_score = float(raw_fitness) if isinstance(raw_fitness, (int, float)) else None
-
-            all_instances = await self._assessments_repository.list_instances_for_user_engagement(
-                db,
-                user_id=ctx.assessment_instance.user_id,
-                engagement_id=ctx.assessment_instance.engagement_id,
-            )
-            source_ids = [inst.assessment_instance_id for inst in all_instances]
-
-            nutrition_score: float | None = None
-            if source_ids:
-                try:
-                    lookup, key_to_qid = await self._reports_service._build_questionnaire_lookup(
-                        db,
-                        source_assessment_instance_ids=source_ids,
-                    )
-                    option_reverse_map = await self._reports_service._build_option_reverse_map(db, key_to_qid)
-                    nutrition_payload = self._reports_service._build_nutrition_api_payload(
-                        lookup, user_gender=ctx.user_gender, option_reverse_map=option_reverse_map,
-                    )
-                    nutrition_response = await self._reports_service._call_nutrition_api(
-                        db,
-                        nutrition_payload,
-                        user_id=ctx.assessment_instance.user_id,
-                        engagement_id=ctx.assessment_instance.engagement_id,
-                    )
-                    raw_nutrition = nutrition_response.get("nutrition_score")
-                    nutrition_score = float(raw_nutrition) if isinstance(raw_nutrition, (int, float)) else None
-                except Exception:
-                    nutrition_score = None
-
-            participant_scores.append({
-                "nutrition": nutrition_score,
-                "fitness": fitness_score,
-                "lifestyle": lifestyle_score,
-            })
-
-        return build_company_average_scores(participant_scores)
+        return payload
 
     _BLOOD_INTELLIGENCE_GROUP_KEYS = (
         "vitamin_profile",
@@ -1969,54 +2358,138 @@ class CampReportsService:
         "inflammatory": ["homocysteine", "hs-crp", "esr"],
     }
 
-    async def _compute_blood_and_lab_intelligence_payload(
+    async def _compute_blood_and_lab_intelligence_with_details(
         self,
         db: AsyncSession,
         *,
         camp_no: int,
         department: str | None,
         city: str | None = None,
-    ) -> dict:
-        participants = await self._repository.list_blood_parameters_by_gender(
+    ) -> tuple[dict, dict]:
+        scope_label = self._age_participation_scope_label(department=department, city=city)
+        contexts = await self._repository.list_blood_parameters_contexts(
             db,
             camp_no=camp_no,
             department=department,
             city=city,
         )
 
-        group_tests: list[tuple[str, list]] = []
+        participants: list[dict[str, Any]] = []
+        for user_id, first_name, last_name, gender, blood_params in contexts:
+            participants.append(
+                {
+                    "user_id": int(user_id),
+                    "name": _display_person_name(first_name, last_name),
+                    "gender": gender,
+                    "blood_parameters": blood_params,
+                }
+            )
+        participants.sort(key=lambda row: (row["name"].lower(), row["user_id"]))
+
+        group_tests: list[tuple[str, str, list]] = []
+        skipped_groups: list[str] = []
         for group_key in self._BLOOD_INTELLIGENCE_GROUP_KEYS:
             group = await self._diagnostics_repository.get_group_by_group_key(db, group_key=group_key)
             if group is None:
+                skipped_groups.append(group_key)
                 continue
-            tests = await self._diagnostics_repository.get_parameters_for_group(db, group_id=group.group_id)
-            group_tests.append((group_key, tests))
+            tests = await self._diagnostics_repository.get_parameters_for_group(
+                db, group_id=group.group_id
+            )
+            group_tests.append((group_key, group.group_name, tests))
 
         tests_by_group: dict[str, dict[str, object]] = {}
-        for group_key, tests in group_tests:
+        for group_key, _group_name, tests in group_tests:
             tests_by_group[group_key] = {t.parameter_key: t for t in tests if t.parameter_key}
 
+        eval_cache: dict[tuple[int, str], dict[str, Any]] = {}
         group_stats: dict[str, dict[str, dict[str, int]]] = {}
-        for group_key, tests in group_tests:
+        group_parameter_details: dict[str, dict[str, Any]] = {}
+        has_blood_participants = len(participants) > 0
+
+        for group_key, group_name, tests in group_tests:
             test_stats: dict[str, dict[str, int]] = {}
+            parameters_detail: dict[str, Any] = {}
+
             for test in tests:
                 param_key = test.parameter_key
                 if not param_key:
                     continue
-                in_range_count = 0
-                total_valid = 0
+                test_name = str(test.test_name or param_key)
+                people_in_range: list[dict[str, Any]] = []
+                people_out_of_range: list[dict[str, Any]] = []
+                people_not_counted: list[dict[str, Any]] = []
 
-                for gender, blood_params in participants:
-                    value, lower_range, higher_range = self._extract_test_value_and_range(
-                        blood_params, test, gender
-                    )
-                    if value is None or lower_range is None or higher_range is None:
-                        continue
-                    total_valid += 1
-                    if lower_range <= value <= higher_range:
-                        in_range_count += 1
+                for participant in participants:
+                    uid = int(participant["user_id"])
+                    name = str(participant["name"])
+                    cache_key = (uid, param_key)
+                    if cache_key not in eval_cache:
+                        value, lower_range, higher_range = self._extract_test_value_and_range(
+                            participant["blood_parameters"],
+                            test,
+                            participant.get("gender"),
+                        )
+                        evaluation = build_blood_test_person_evaluation(
+                            test_name=test_name,
+                            value=value,
+                            lower_range=lower_range,
+                            higher_range=higher_range,
+                            person_name=name,
+                        )
+                        eval_cache[cache_key] = {
+                            **evaluation,
+                            "user_id": uid,
+                            "name": name,
+                        }
+                    evaluation = dict(eval_cache[cache_key])
+                    status = evaluation.get("status")
+                    person_row = {
+                        "user_id": uid,
+                        "name": name,
+                        "value": evaluation.get("value"),
+                        "lower": evaluation.get("lower"),
+                        "higher": evaluation.get("higher"),
+                        "reason": evaluation.get("reason"),
+                        "steps": list(evaluation.get("steps") or []),
+                    }
+                    if status == "in_range":
+                        people_in_range.append(person_row)
+                    elif status == "out_of_range":
+                        people_out_of_range.append(person_row)
+                    else:
+                        people_not_counted.append(person_row)
 
+                in_range_count = len(people_in_range)
+                total_valid = in_range_count + len(people_out_of_range)
                 test_stats[param_key] = {"in_range": in_range_count, "total": total_valid}
+
+                in_range_names = [p["name"] for p in people_in_range]
+                out_of_range_names = [p["name"] for p in people_out_of_range]
+                percent_math = build_in_range_percent_math(
+                    test_name=test_name,
+                    in_range=in_range_count,
+                    total=total_valid,
+                    has_blood_participants=has_blood_participants,
+                    in_range_names=in_range_names,
+                    out_of_range_names=out_of_range_names,
+                )
+                rounded_percent = int(percent_math.get("rounded_percent") or 0)
+
+                parameters_detail[param_key] = {
+                    "test_name": test_name,
+                    "parameter_key": param_key,
+                    "in_range": in_range_count,
+                    "total": total_valid,
+                    "in_range_percent": rounded_percent,
+                    "is_combined": False,
+                    "percent_math": percent_math,
+                    "people": {
+                        "in_range": people_in_range,
+                        "out_of_range": people_out_of_range,
+                        "not_counted": people_not_counted,
+                    },
+                }
 
             combined_params = self._BLOOD_INTELLIGENCE_COMBINED_KEYS.get(group_key)
             if combined_params:
@@ -2025,32 +2498,193 @@ class CampReportsService:
                 combined_tests = [group_test_map[k] for k in combined_params if k in group_test_map]
 
                 if combined_tests:
+                    combined_labels = [
+                        str(group_test_map[k].test_name or k) for k in combined_params if k in group_test_map
+                    ]
                     combined_in_range = 0
                     combined_total = 0
+                    combined_in_range_people: list[dict[str, Any]] = []
+                    combined_out_of_range_people: list[dict[str, Any]] = []
+                    combined_not_counted_people: list[dict[str, Any]] = []
 
-                    for gender, blood_params in participants:
+                    for participant in participants:
+                        uid = int(participant["user_id"])
+                        name = str(participant["name"])
+                        sub_evaluations: list[dict[str, Any]] = []
                         all_valid = True
                         all_in_range = True
+
                         for ct in combined_tests:
-                            value, lower_range, higher_range = self._extract_test_value_and_range(
-                                blood_params, ct, gender
-                            )
-                            if value is None or lower_range is None or higher_range is None:
+                            param_key = str(ct.parameter_key or "")
+                            test_name = str(ct.test_name or param_key)
+                            cache_key = (uid, param_key)
+                            if cache_key not in eval_cache:
+                                value, lower_range, higher_range = self._extract_test_value_and_range(
+                                    participant["blood_parameters"],
+                                    ct,
+                                    participant.get("gender"),
+                                )
+                                evaluation = build_blood_test_person_evaluation(
+                                    test_name=test_name,
+                                    value=value,
+                                    lower_range=lower_range,
+                                    higher_range=higher_range,
+                                    person_name=name,
+                                )
+                                eval_cache[cache_key] = {
+                                    **evaluation,
+                                    "user_id": uid,
+                                    "name": name,
+                                }
+                            sub_eval = dict(eval_cache[cache_key])
+                            sub_evaluations.append(sub_eval)
+                            if sub_eval.get("status") == "not_counted":
                                 all_valid = False
                                 break
-                            if not (lower_range <= value <= higher_range):
+                            if sub_eval.get("status") != "in_range":
                                 all_in_range = False
+
                         if not all_valid:
+                            missing = [
+                                str(item.get("reason") or "Missing result")
+                                for item in sub_evaluations
+                                if item.get("status") == "not_counted"
+                            ]
+                            combined_not_counted_people.append(
+                                {
+                                    "user_id": uid,
+                                    "name": name,
+                                    "reason": (
+                                        "Missing one or more results needed for the combined check."
+                                    ),
+                                    "steps": [
+                                        f"We need all of these tests for {name}: "
+                                        + ", ".join(combined_labels)
+                                        + ".",
+                                        *(
+                                            missing[:3]
+                                            if missing
+                                            else [
+                                                "At least one required test could not be read."
+                                            ]
+                                        ),
+                                    ],
+                                }
+                            )
                             continue
+
                         combined_total += 1
+                        sub_steps = [
+                            step
+                            for item in sub_evaluations
+                            for step in (item.get("steps") or [])
+                        ]
                         if all_in_range:
                             combined_in_range += 1
+                            combined_in_range_people.append(
+                                {
+                                    "user_id": uid,
+                                    "name": name,
+                                    "reason": None,
+                                    "steps": [
+                                        f"{name} has all required tests in healthy range.",
+                                        *sub_steps,
+                                    ],
+                                }
+                            )
+                        else:
+                            combined_out_of_range_people.append(
+                                {
+                                    "user_id": uid,
+                                    "name": name,
+                                    "reason": "At least one required test is outside the healthy range.",
+                                    "steps": [
+                                        f"{name} has all required tests, but not all are in range.",
+                                        *sub_steps,
+                                    ],
+                                }
+                            )
 
-                    test_stats[combined_key] = {"in_range": combined_in_range, "total": combined_total}
+                    test_stats[combined_key] = {
+                        "in_range": combined_in_range,
+                        "total": combined_total,
+                    }
+                    combined_math = build_combined_in_range_percent_math(
+                        combined_labels=combined_labels,
+                        in_range=combined_in_range,
+                        total=combined_total,
+                        has_blood_participants=has_blood_participants,
+                        in_range_names=[p["name"] for p in combined_in_range_people],
+                    )
+                    parameters_detail[combined_key] = {
+                        "test_name": " + ".join(combined_labels),
+                        "parameter_key": combined_key,
+                        "in_range": combined_in_range,
+                        "total": combined_total,
+                        "in_range_percent": int(combined_math.get("rounded_percent") or 0),
+                        "is_combined": True,
+                        "combined_labels": combined_labels,
+                        "percent_math": combined_math,
+                        "people": {
+                            "in_range": combined_in_range_people,
+                            "out_of_range": combined_out_of_range_people,
+                            "not_counted": combined_not_counted_people,
+                        },
+                    }
 
             group_stats[group_key] = test_stats
+            group_parameter_details[group_key] = {
+                "group_name": group_name,
+                "parameters": parameters_detail,
+            }
 
-        return build_blood_and_lab_intelligence(group_stats)
+        no_blood_rows = await self._repository.list_enrolled_users_without_blood_results(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        excluded_no_blood = [
+            {
+                "user_id": uid,
+                "name": _display_person_name(first_name, last_name),
+                "reason": "Enrolled in the camp but has no blood test results saved.",
+            }
+            for uid, first_name, last_name in no_blood_rows
+        ]
+        excluded_no_blood.sort(key=lambda row: (row["name"].lower(), row["user_id"]))
+
+        total_enrolled = await self._repository.count_enrolled_users(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+
+        return build_blood_and_lab_intelligence_details(
+            group_stats,
+            group_parameter_details=group_parameter_details,
+            scope_label=scope_label,
+            total_enrolled=total_enrolled,
+            excluded_no_blood=excluded_no_blood,
+            skipped_groups=skipped_groups,
+        )
+
+    async def _compute_blood_and_lab_intelligence_payload(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None = None,
+    ) -> dict:
+        payload, _details = await self._compute_blood_and_lab_intelligence_with_details(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        return payload
 
     @staticmethod
     def _extract_test_value_and_range(
@@ -2309,6 +2943,42 @@ class CampReportsService:
             city=city,
         )
         return build_distribution_by_oxidative_stress_details(
+            status_rows,
+            total_enrolled=total_enrolled,
+            bio_ai_reports=bio_ai_reports,
+            scope_label=self._age_participation_scope_label(
+                department=department,
+                city=city,
+            ),
+        )
+
+    async def _build_distribution_by_gender_by_metabolic_syndrome_with_details(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+        department: str | None,
+        city: str | None,
+    ) -> tuple[dict, dict]:
+        status_rows = await self._repository.list_disease_risk_status_rows(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        total_enrolled = await self._repository.count_enrolled_users(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        bio_ai_reports = await self._repository.count_bio_ai_reports(
+            db,
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+        return build_distribution_by_gender_by_metabolic_syndrome_details(
             status_rows,
             total_enrolled=total_enrolled,
             bio_ai_reports=bio_ai_reports,

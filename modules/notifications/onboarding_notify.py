@@ -14,6 +14,17 @@ from modules.notifications.service import NotificationsService
 
 logger = logging.getLogger(__name__)
 
+# DispatchRequest.validate_nested_strings rejects empty strings; use a hyphen placeholder.
+_MISSING_DETAIL = "-"
+
+
+def detail_or_hyphen(value: object | None) -> str:
+    """Return a non-empty string for notification participant_details fields."""
+    if value is None:
+        return _MISSING_DETAIL
+    text = str(value).strip()
+    return text if text else _MISSING_DETAIL
+
 
 def participant_details_from_user(
     user,
@@ -27,28 +38,20 @@ def participant_details_from_user(
     last_name = getattr(user, "last_name", None) or ""
     name = f"{first_name} {last_name}".strip()
     details: dict[str, str] = {
-        "name": name,
-        "email": str(getattr(user, "email", None) or ""),
-        "phone": str(getattr(user, "phone", None) or ""),
-        "engagement": source,
+        "name": detail_or_hyphen(name),
+        "email": detail_or_hyphen(getattr(user, "email", None)),
+        "phone": detail_or_hyphen(getattr(user, "phone", None)),
+        "engagement": detail_or_hyphen(source),
         "participant_user_id": str(participant_user_id),
+        "age": detail_or_hyphen(getattr(user, "age", None)),
+        "gender": detail_or_hyphen(getattr(user, "gender", None)),
+        "address": detail_or_hyphen(getattr(user, "address", None)),
+        "pincode": detail_or_hyphen(
+            getattr(user, "pin_code", None) or getattr(user, "pincode", None)
+        ),
+        "collection_date": detail_or_hyphen(collection_date),
+        "collection_time": detail_or_hyphen(collection_time),
     }
-    if collection_date is not None:
-        details["collection_date"] = collection_date
-    if collection_time is not None:
-        details["collection_time"] = collection_time
-    age = getattr(user, "age", None)
-    if age is not None:
-        details["age"] = str(age)
-    gender = getattr(user, "gender", None)
-    if gender:
-        details["gender"] = str(gender)
-    address = getattr(user, "address", None)
-    if address:
-        details["address"] = str(address)
-    pincode = getattr(user, "pin_code", None) or getattr(user, "pincode", None)
-    if pincode:
-        details["pincode"] = str(pincode)
     return details
 
 

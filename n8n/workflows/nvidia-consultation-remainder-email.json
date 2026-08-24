@@ -1,0 +1,417 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Nvidia Consultation Remainder Email\nSends day-of eye checkup + doctor consultation reminder email to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    session_details: { want, date, slot, expert_type }\n  }],\n  engagement_id?: number\n}\n\nEach member carries its own session_details (API attaches per user on dispatch).",
+        "height": 560,
+        "width": 1984
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4432,
+        1856
+      ],
+      "typeVersion": 1,
+      "id": "ere01-node-0000-222b6d8d",
+      "name": "Sticky Note Nvidia Remainder Email"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nvidia-consultation-remainder-email-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4544,
+        2080
+      ],
+      "id": "ere01-node-0001-094d0409",
+      "name": "Nvidia Consultation Remainder Email",
+      "webhookId": "ere01-wh-5ad45f799680"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ere01-cond-eda3ac7a",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ere01-cond-939e2c8e",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ere01-cond-f339670c",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "ere01-cond-faf24559",
+              "leftValue": "={{ $json.body.members[0].session_details }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ere01-cond-6ce1454a",
+              "leftValue": "={{ $json.body.members[0].session_details.expert_type }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ere01-cond-791451e6",
+              "leftValue": "={{ $json.body.members[0].session_details.date }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4784,
+        2080
+      ],
+      "id": "ere01-node-0002-e02c69cb",
+      "name": "Validate Email Payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members\n  .filter((member) => member.session_details && member.session_details.want !== false)\n  .map((member) => ({\n    json: {\n      notification_id: notificationId,\n      first_name: member.first_name || 'Participant',\n      last_name: member.last_name || '',\n      email: member.email || '',\n      phone: member.phone || '',\n      session_details: {\n        want: Boolean(member.session_details.want),\n        date: member.session_details.date || '',\n        slot: member.session_details.slot || '',\n        expert_type: member.session_details.expert_type || 'doctor'\n      }\n    }\n  }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4992,
+        1968
+      ],
+      "id": "ere01-node-0003-22027e40",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nconst body = `Hi ${name},\\n\\nThis is a reminder that your eye checkup followed by doctor consultation is scheduled for today.\\n\\nPlease keep your phone available during the scheduled time and have your Bio-AI Health Report accessible so the discussion can be as productive as possible.\\n\\nYou can check the details below at your convenience\\napp.supershyft.com\\n\\nWe look forward to helping you take the next step toward better health.\\n\\nWarm regards,\\nSupport Team\\nSupershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Reminder Your Eye checkup and Doctor consultation is Today',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5216,
+        1968
+      ],
+      "id": "ere01-node-0004-d28d6fa0",
+      "name": "Prepare Nvidia Remainder Email"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        5456,
+        1968
+      ],
+      "id": "ere01-node-0005-7548d3c6",
+      "name": "Send Nvidia Remainder Email",
+      "webhookId": "ere01-wh-49242360f508",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ere01-asgn-896406f6",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Nvidia Remainder Email').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "ere01-asgn-6673535e",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "ere01-asgn-18cdee98",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5696,
+        1888
+      ],
+      "id": "ere01-node-0006-1305830d",
+      "name": "Email Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ere01-asgn-924f1a98",
+              "name": "notification_id",
+              "value": "={{ $json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "ere01-asgn-e2dc9025",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "ere01-asgn-961f2ef4",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5696,
+        2064
+      ],
+      "id": "ere01-node-0007-496009bb",
+      "name": "Email Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ere01-asgn-8fedd4ca",
+              "name": "notification_id",
+              "value": "={{ $('Nvidia Consultation Remainder Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "ere01-asgn-066c555e",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "ere01-asgn-8bedf956",
+              "name": "message",
+              "value": "Payload validation failed: each member requires session_details with date and expert_type",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4992,
+        2208
+      ],
+      "id": "ere01-node-0008-acaaf504",
+      "name": "Email Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6128,
+        2208
+      ],
+      "id": "ere01-node-0009-0ce07663",
+      "name": "Email Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Validate Email Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Nvidia Remainder Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nvidia Consultation Remainder Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Email Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Nvidia Remainder Email": {
+      "main": [
+        [
+          {
+            "node": "Send Nvidia Remainder Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Nvidia Remainder Email": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

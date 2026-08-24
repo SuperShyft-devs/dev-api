@@ -46,7 +46,7 @@ class UserProfileResponse(BaseModel):
     user_id: int
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    age: int
+    age: Optional[int] = None
     phone: str
     email: Optional[EmailStr] = None
     profile_photo: Optional[str] = None
@@ -505,7 +505,7 @@ class UserStatusResponse(BaseModel):
 
 
 class EmployeeCreateUserRequest(BaseModel):
-    age: int
+    age: Optional[int] = None
     first_name: OptionalPersonName = None
     last_name: OptionalPersonName = None
     phone: PhoneStr
@@ -522,8 +522,16 @@ class EmployeeCreateUserRequest(BaseModel):
     is_participant: Optional[bool] = None
     status: StatusStr | None = "active"
 
+    @validator("age", pre=True)
+    def normalize_optional_age(cls, v):
+        if v is None or v == "" or v == 0:
+            return None
+        return v
+
     @validator("age")
     def age_must_be_valid(cls, v):
+        if v is None:
+            return v
         if v < 1 or v > 120:
             raise ValueError("Age must be between 1 and 120")
         return v
@@ -536,7 +544,7 @@ class UpdateMetsightsProfileIdRequest(BaseModel):
 
 
 class EmployeeUpdateUserRequest(BaseModel):
-    age: int
+    age: Optional[int] = None
     first_name: OptionalPersonName = None
     last_name: OptionalPersonName = None
     phone: PhoneStr
@@ -553,8 +561,16 @@ class EmployeeUpdateUserRequest(BaseModel):
     is_participant: Optional[bool] = None
     status: StatusStr = "active"
 
+    @validator("age", pre=True)
+    def normalize_optional_age(cls, v):
+        if v is None or v == "" or v == 0:
+            return None
+        return v
+
     @validator("age")
     def age_must_be_valid(cls, v):
+        if v is None:
+            return v
         if v < 1 or v > 120:
             raise ValueError("Age must be between 1 and 120")
         return v
@@ -606,7 +622,7 @@ class EmployeeUserListItem(BaseModel):
     user_id: int
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    age: int
+    age: Optional[int] = None
     phone: str
     email: Optional[EmailStr] = None
     profile_photo: Optional[str] = None

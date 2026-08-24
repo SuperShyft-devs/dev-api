@@ -226,6 +226,7 @@ def _participant_enrollment_to_dict(row: tuple, *, consultations: dict[str, Any]
         status,
         slot_start_time,
         engagement_date,
+        blood_collection_cabin,
         participants_employee_id,
         participant_department,
         participant_blood_group,
@@ -255,6 +256,7 @@ def _participant_enrollment_to_dict(row: tuple, *, consultations: dict[str, Any]
         "status": status,
         "slot_start_time": slot_start_time.isoformat() if slot_start_time is not None else None,
         "engagement_date": engagement_date.isoformat() if engagement_date is not None else None,
+        "blood_collection_cabin": blood_collection_cabin,
         "participants_employee_id": participants_employee_id,
         "participant_department": participant_department,
         "participant_blood_group": participant_blood_group,
@@ -354,7 +356,7 @@ class EngagementsService:
     async def _participant_rows_to_dicts(self, db: AsyncSession, rows: list[tuple]) -> list[dict[str, Any]]:
         all_booking_ids: list[int] = []
         for row in rows:
-            ids = row[19] or []
+            ids = row[20] or []
             all_booking_ids.extend(int(i) for i in ids)
 
         bookings = await self._consultation_bookings.get_by_ids(db, list(dict.fromkeys(all_booking_ids)))
@@ -362,7 +364,7 @@ class EngagementsService:
 
         result: list[dict[str, Any]] = []
         for row in rows:
-            ids = row[19] or []
+            ids = row[20] or []
             participant_bookings = [bookings_by_id[i] for i in ids if i in bookings_by_id]
             consultations = bookings_to_consultations_map(participant_bookings)
             result.append(_participant_enrollment_to_dict(row, consultations=consultations))

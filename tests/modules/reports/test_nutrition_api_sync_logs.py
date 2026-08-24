@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 import httpx
+from datetime import date
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -243,6 +244,7 @@ def test_build_nutrition_api_payload_remaps_legacy_intensity_labels():
     payload = service._build_nutrition_api_payload(
         lookup,
         user_gender="female",
+        user_age=32,
         option_reverse_map=reverse_map,
     )
     assert payload["exercise_level"] == "1"
@@ -250,3 +252,44 @@ def test_build_nutrition_api_payload_remaps_legacy_intensity_labels():
     assert payload["height"] == 175
     assert payload["height_unit"] == "cm"
     assert payload["gender"] == "female"
+    assert payload["age"] == 32
+
+
+def test_resolve_nutrition_age_prefers_stored_age():
+    assert ReportsService._resolve_nutrition_age(user_age=40, user_date_of_birth=date(1990, 1, 1)) == 40
+
+
+def test_resolve_nutrition_age_from_date_of_birth():
+    dob = date(1990, 6, 15)
+    ref = date(2026, 8, 24)
+    assert ReportsService._resolve_nutrition_age(
+        user_age=None,
+        user_date_of_birth=dob,
+        reference_date=ref,
+    ) == 36
+
+
+def test_resolve_nutrition_age_returns_none_when_missing():
+    assert ReportsService._resolve_nutrition_age(user_age=None, user_date_of_birth=None) is None
+
+
+def test_build_nutrition_api_payload_omits_age_when_unresolvable():
+    service = _build_reports_service()
+    payload = service._build_nutrition_api_payload(
+        {},
+        user_gender="male",
+        user_age=None,
+        user_date_of_birth=None,
+    )
+    assert "age" not in payload
+
+
+def test_build_nutrition_api_payload_computes_age_from_date_of_birth():
+    service = _build_reports_service()
+    dob = date(1990, 6, 15)
+    payload = service._build_nutrition_api_payload(
+        {},
+        user_date_of_birth=dob,
+    )
+    expected = ReportsService._resolve_nutrition_age(user_age=None, user_date_of_birth=dob)
+    assert payload["age"] == expected

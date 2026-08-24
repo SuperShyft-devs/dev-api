@@ -424,6 +424,73 @@ async def test_engagement_onboard_attaches_by_engagement_code(async_client, test
 
 
 @pytest.mark.asyncio
+async def test_engagement_onboard_reuses_user_when_phone_format_differs(async_client, test_db_session):
+    """10-digit payload must attach to an existing +91 primary, not create a second account."""
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO organizations (organization_id, name, status, departments) "
+            "VALUES (8011, 'Phone Format Org', 'active', "
+            "'[{\"department\": \"HR\", \"slug\": \"hr\"}]'::json)"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, organization_id, "
+            "engagement_type, assessment_package_id, diagnostic_package_id, city, slot_duration, "
+            "start_date, end_date, status, participant_count) "
+            "VALUES (3011, 'Camp', 'ENGPLUS91', 8011, 'bio_ai', 1, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-01', 'running', 0)"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, age, first_name, last_name, phone, email, status, is_participant) "
+            "VALUES (88101, 30, 'Format', 'User', '+917000008899', 'format88101@example.com', 'active', true)"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 30,
+        "first_name": "Format",
+        "last_name": "User",
+        "phone": "7000008899",
+        "email": "format88101-onboard@example.com",
+        "city": "BLR",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "11:00",
+        "participant_department": "hr",
+        "participant_blood_group": "B+",
+    }
+    response = await async_client.post("/users/code/ENGPLUS91/onboard", json=payload)
+    assert response.status_code == 200, response.text
+    data = response.json()["data"]
+    assert data["created"] is False
+    assert data["user_id"] == 88101
+
+    count = (
+        await test_db_session.execute(
+            text(
+                "SELECT count(*) FROM users WHERE right(regexp_replace(phone, '[^0-9]', '', 'g'), 10) = '7000008899'"
+            )
+        )
+    ).scalar_one()
+    assert count == 1
+
+
+@pytest.mark.asyncio
 async def test_engagement_onboard_prefers_payload_referred_by(async_client, test_db_session):
     # Seed active assessment package used by engagements.
     await test_db_session.execute(
@@ -539,6 +606,57 @@ async def test_engagement_onboard_overwrites_existing_address_fields(async_clien
     assert row.city == "Bengaluru"
     assert row.state == "KA"
     assert row.country == "IN"
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_overwrites_existing_age_and_email(async_client, test_db_session):
+    """B2B onboard overwrites age and email even when already set."""
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'PK1', 'Package', 'active') ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, status) "
+            "VALUES (1, 'REF1', 'Diag Package', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
+            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
+            "VALUES (3302, 'Camp-AgeEmail', 'ENGAGEEM', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, first_name, age, phone, email, status) "
+            "VALUES (2102, 'Existing', 28, '7777777778', 'old@example.com', 'active')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 35,
+        "first_name": "Existing",
+        "phone": "7777777778",
+        "email": "new@example.com",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "11:00",
+    }
+
+    response = await async_client.post("/users/code/ENGAGEEM/onboard", json=payload)
+    assert response.status_code == 200
+
+    row = (
+        await test_db_session.execute(
+            text("SELECT age, email FROM users WHERE user_id = 2102")
+        )
+    ).first()
+    assert row.age == 35
+    assert row.email == "new@example.com"
 
 
 @pytest.mark.asyncio
