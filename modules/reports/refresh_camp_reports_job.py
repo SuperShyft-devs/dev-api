@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,22 @@ logger = logging.getLogger(__name__)
 ProgressCallback = Callable[[int, int, int, int, int], None]
 # on_event({event, ...}) — plan / skip_camp / start / finish
 EventCallback = Callable[[dict[str, Any]], None]
+
+
+@dataclass(frozen=True)
+class CampReportScope:
+    """Plain snapshot of a camp_reports row (safe after session rollback)."""
+
+    report_id: int
+    department: str | None
+    city: str | None
+
+
+def snapshot_camp_report_scopes(rows: list[CampReport]) -> list[CampReportScope]:
+    return [
+        CampReportScope(int(row.report_id), row.department, row.city)
+        for row in rows
+    ]
 
 
 def _scope_label(*, department: str | None, city: str | None) -> str:
@@ -83,11 +100,11 @@ async def refresh_camp_reports(
     camps_skipped = 0
     skipped_camp_nos: list[int] = []
 
-    eligible: list[tuple[int, list[CampReport]]] = []
+    eligible: list[tuple[int, list[CampReportScope]]] = []
     for camp, rows in sorted(by_camp.items()):
         if await reports_repo.has_running_engagement(db, camp_no=camp):
             camps_running += 1
-            eligible.append((camp, rows))
+            eligible.append((camp, snapshot_camp_report_scopes(rows)))
         else:
             camps_skipped += 1
             skipped_camp_nos.append(camp)
@@ -130,10 +147,10 @@ async def refresh_camp_reports(
                         "camp_no": camp,
                         "report_rows": len(rows),
                         "scopes": [
-                            _scope_label(department=r.department, city=r.city) for r in rows
+                            _scope_label(department=s.department, city=s.city) for s in scopes
                         ],
                     }
-                    for camp, rows in eligible
+                    for camp, scopes in eligible
                 ],
             }
         )
@@ -155,14 +172,12 @@ async def refresh_camp_reports(
             "details": [],
         }
 
-    for camp, rows in eligible:
-        for row in rows:
-            # Snapshot ORM attrs before refresh/rollback so except never lazy-loads
-            # expired attributes (MissingGreenlet on asyncpg).
-            report_id = int(row.report_id)
-            department = row.department
-            city = row.city
-            scope = _scope_label(department=department, city=city)
+    for camp, scopes in eligible:
+        for scope in scopes:
+            report_id = scope.report_id
+            department = scope.department
+            city = scope.city
+            scope_label = _scope_label(department=department, city=city)
             for section_key in section_keys:
                 step_index = done + 1
                 if on_event is not None:
@@ -173,7 +188,7 @@ async def refresh_camp_reports(
                             "total": total,
                             "camp_no": camp,
                             "report_id": report_id,
-                            "scope": scope,
+                            "scope": scope_label,
                             "section": section_key,
                             "dry_run": dry_run,
                         }
@@ -185,7 +200,7 @@ async def refresh_camp_reports(
                     detail = {
                         "camp_no": camp,
                         "report_id": report_id,
-                        "scope": scope,
+                        "scope": scope_label,
                         "section": section_key,
                         "action": "would_refresh",
                         "reason": "",
@@ -216,7 +231,7 @@ async def refresh_camp_reports(
                     detail = {
                         "camp_no": camp,
                         "report_id": report_id,
-                        "scope": scope,
+                        "scope": scope_label,
                         "section": section_key,
                         "action": "refreshed",
                         "reason": "",
@@ -238,14 +253,14 @@ async def refresh_camp_reports(
                     logger.exception(
                         "Failed refreshing camp_no=%s %s section=%s: %s",
                         camp,
-                        scope,
+                        scope_label,
                         section_key,
                         reason,
                     )
                     error_entry = {
                         "camp_no": camp,
                         "report_id": report_id,
-                        "scope": scope,
+                        "scope": scope_label,
                         "section": section_key,
                         "reason": reason,
                     }

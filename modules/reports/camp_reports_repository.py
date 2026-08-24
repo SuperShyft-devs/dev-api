@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import and_, case, delete, extract, func, select
+from sqlalchemy import and_, case, delete, exists, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -2350,6 +2350,43 @@ class CampReportsRepository:
             .where(Engagement.camp_no == camp_no)
         )
         return int(result.scalar_one())
+
+    @staticmethod
+    def _orphan_camp_report_exists_clause():
+        """True when at least one engagement exists for the camp_reports row's camp_no."""
+        return (
+            select(1)
+            .select_from(Engagement)
+            .where(Engagement.camp_no == CampReport.camp_no)
+            .correlate(CampReport)
+        )
+
+    async def list_orphan_camp_nos(self, db: AsyncSession) -> list[int]:
+        """Return camp_no values that have camp_reports rows but no engagements."""
+        engagement_exists = self._orphan_camp_report_exists_clause()
+        result = await db.execute(
+            select(CampReport.camp_no)
+            .where(~exists(engagement_exists))
+            .distinct()
+            .order_by(CampReport.camp_no.asc())
+        )
+        return [int(row[0]) for row in result.all()]
+
+    async def count_orphan_camp_report_rows(self, db: AsyncSession) -> int:
+        """Count camp_reports rows whose camp_no has no engagements."""
+        engagement_exists = self._orphan_camp_report_exists_clause()
+        result = await db.execute(
+            select(func.count())
+            .select_from(CampReport)
+            .where(~exists(engagement_exists))
+        )
+        return int(result.scalar_one() or 0)
+
+    async def delete_orphaned_camp_reports(self, db: AsyncSession) -> int:
+        """Delete all camp_reports rows whose camp_no has no engagements."""
+        engagement_exists = self._orphan_camp_report_exists_clause()
+        result = await db.execute(delete(CampReport).where(~exists(engagement_exists)))
+        return int(result.rowcount or 0)
 
     async def list_participants_by_camp_no(
         self,

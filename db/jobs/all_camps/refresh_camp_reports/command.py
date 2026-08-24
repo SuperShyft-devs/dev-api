@@ -49,6 +49,37 @@ def _format_progress(
 def _make_event_printer():
     def on_event(event: dict[str, Any]) -> None:
         kind = event.get("event")
+        if kind == "purge_plan":
+            mode = "dry-run" if event.get("dry_run") else "apply"
+            orphan_camp_nos = event.get("orphan_camp_nos") or []
+            print(
+                f"Purge plan ({mode}): orphan_camps={len(orphan_camp_nos)} "
+                f"orphan_rows={event.get('orphan_row_count', 0)}",
+                flush=True,
+            )
+            if orphan_camp_nos:
+                print(f"  orphan camp_nos: {', '.join(str(c) for c in orphan_camp_nos)}", flush=True)
+            return
+
+        if kind == "purge_finish":
+            action = event.get("action") or "deleted"
+            if event.get("dry_run"):
+                if event.get("orphan_row_count", 0) > 0:
+                    print(
+                        f"  would delete {event['orphan_row_count']} orphan camp_reports row(s)",
+                        flush=True,
+                    )
+                else:
+                    print("  no orphan camp_reports rows to delete", flush=True)
+            elif event.get("orphan_rows_deleted", 0) > 0:
+                print(
+                    f"  deleted {event['orphan_rows_deleted']} orphan camp_reports row(s)",
+                    flush=True,
+                )
+            else:
+                print("  no orphan camp_reports rows to delete", flush=True)
+            return
+
         if kind == "init_plan":
             mode = "dry-run" if event.get("dry_run") else "apply"
             print(
@@ -214,6 +245,8 @@ def main(argv: list[str] | None = None) -> int:
     mode = "dry-run" if result["dry_run"] else "applied"
     print(
         f"\nInitialize and refresh all camp reports ({mode}):\n"
+        f"  orphan_camps={len(result.get('orphan_camp_nos') or [])} "
+        f"orphan_rows_deleted={result.get('orphan_rows_deleted', 0)}\n"
         f"  camps_total={result['camps_total']} "
         f"camps_initialized={result['camps_initialized']} "
         f"camps_init_failed={result['camps_init_failed']}\n"

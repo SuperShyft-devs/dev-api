@@ -17,7 +17,12 @@ from modules.reports.camp_report_sections_repository import CampReportSectionsRe
 from modules.reports.camp_reports_repository import CampReportsRepository
 from modules.reports.camp_reports_service import CampReportsService
 from modules.reports.models import CampReport
-from modules.reports.refresh_camp_reports_job import _error_reason, _scope_label
+from modules.reports.refresh_camp_reports_job import (
+    CampReportScope,
+    _error_reason,
+    _scope_label,
+    snapshot_camp_report_scopes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +48,45 @@ async def initialize_and_refresh_all_camp_reports(
     """
     reports_repo = repository or CampReportsRepository()
     sections_repo = sections_repository or CampReportSectionsRepository()
+
+    purge_result = await service.purge_orphaned_camp_reports(db, dry_run=dry_run)
+    orphan_camp_nos: list[int] = purge_result["orphan_camp_nos"]
+    orphan_row_count: int = purge_result["orphan_row_count"]
+    orphan_rows_deleted: int = purge_result["orphan_rows_deleted"]
+
+    if on_event is not None:
+        on_event(
+            {
+                "event": "purge_plan",
+                "dry_run": dry_run,
+                "orphan_camp_nos": list(orphan_camp_nos),
+                "orphan_row_count": orphan_row_count,
+            }
+        )
+
+    if not dry_run and orphan_rows_deleted > 0:
+        await db.commit()
+        if on_event is not None:
+            on_event(
+                {
+                    "event": "purge_finish",
+                    "dry_run": False,
+                    "orphan_camp_nos": list(orphan_camp_nos),
+                    "orphan_rows_deleted": orphan_rows_deleted,
+                }
+            )
+    elif on_event is not None:
+        action = "would_delete" if dry_run and orphan_row_count > 0 else "none"
+        on_event(
+            {
+                "event": "purge_finish",
+                "dry_run": dry_run,
+                "action": action,
+                "orphan_camp_nos": list(orphan_camp_nos),
+                "orphan_row_count": orphan_row_count,
+                "orphan_rows_deleted": 0,
+            }
+        )
 
     available_camp_nos = await reports_repo.list_distinct_camp_nos(db)
     if camp_no is not None:
@@ -134,11 +178,14 @@ async def initialize_and_refresh_all_camp_reports(
     for row in all_rows:
         by_camp[int(row.camp_no)].append(row)
 
-    eligible = sorted(by_camp.items(), key=lambda item: item[0])
+    eligible: list[tuple[int, list[CampReportScope]]] = [
+        (camp, snapshot_camp_report_scopes(rows))
+        for camp, rows in sorted(by_camp.items())
+    ]
     camps_with_reports = len(eligible)
     camps_without_reports = max(camps_total - camps_with_reports, 0)
 
-    total = sum(len(rows) * len(section_keys) for _, rows in eligible)
+    total = sum(len(scopes) * len(section_keys) for _, scopes in eligible)
     done = 0
     refreshed = 0
     skipped = 0
@@ -149,6 +196,13 @@ async def initialize_and_refresh_all_camp_reports(
     def _emit_progress() -> None:
         if on_progress is not None:
             on_progress(done, total, refreshed, skipped, failed)
+
+    def _purge_fields() -> dict[str, Any]:
+        return {
+            "orphan_camp_nos": list(orphan_camp_nos),
+            "orphan_row_count": orphan_row_count,
+            "orphan_rows_deleted": orphan_rows_deleted,
+        }
 
     if on_event is not None:
         on_event(
@@ -166,12 +220,12 @@ async def initialize_and_refresh_all_camp_reports(
                 "eligible_camps": [
                     {
                         "camp_no": camp,
-                        "report_rows": len(rows),
+                        "report_rows": len(scopes),
                         "scopes": [
-                            _scope_label(department=r.department, city=r.city) for r in rows
+                            _scope_label(department=s.department, city=s.city) for s in scopes
                         ],
                     }
-                    for camp, rows in eligible
+                    for camp, scopes in eligible
                 ],
             }
         )
@@ -194,14 +248,15 @@ async def initialize_and_refresh_all_camp_reports(
             "init_errors": init_errors,
             "errors": [],
             "details": [],
+            **_purge_fields(),
         }
 
-    for camp, rows in eligible:
-        for row in rows:
-            report_id = int(row.report_id)
-            department = row.department
-            city = row.city
-            scope = _scope_label(department=department, city=city)
+    for camp, scopes in eligible:
+        for scope in scopes:
+            report_id = scope.report_id
+            department = scope.department
+            city = scope.city
+            scope_label = _scope_label(department=department, city=city)
             for section_key in section_keys:
                 step_index = done + 1
                 if on_event is not None:
@@ -212,7 +267,7 @@ async def initialize_and_refresh_all_camp_reports(
                             "total": total,
                             "camp_no": camp,
                             "report_id": report_id,
-                            "scope": scope,
+                            "scope": scope_label,
                             "section": section_key,
                             "dry_run": dry_run,
                         }
@@ -224,7 +279,7 @@ async def initialize_and_refresh_all_camp_reports(
                     detail = {
                         "camp_no": camp,
                         "report_id": report_id,
-                        "scope": scope,
+                        "scope": scope_label,
                         "section": section_key,
                         "action": "would_refresh",
                         "reason": "",
@@ -255,7 +310,7 @@ async def initialize_and_refresh_all_camp_reports(
                     detail = {
                         "camp_no": camp,
                         "report_id": report_id,
-                        "scope": scope,
+                        "scope": scope_label,
                         "section": section_key,
                         "action": "refreshed",
                         "reason": "",
@@ -277,14 +332,14 @@ async def initialize_and_refresh_all_camp_reports(
                     logger.exception(
                         "Failed refreshing camp_no=%s %s section=%s: %s",
                         camp,
-                        scope,
+                        scope_label,
                         section_key,
                         reason,
                     )
                     error_entry = {
                         "camp_no": camp,
                         "report_id": report_id,
-                        "scope": scope,
+                        "scope": scope_label,
                         "section": section_key,
                         "reason": reason,
                     }
@@ -321,4 +376,5 @@ async def initialize_and_refresh_all_camp_reports(
         "init_errors": init_errors,
         "errors": errors,
         "details": details,
+        **_purge_fields(),
     }

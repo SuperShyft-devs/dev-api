@@ -472,3 +472,74 @@ async def test_refresh_camp_reports_emits_detailed_events(test_db_session):
     assert start["section"] == "participation_by_age" or start["section"] in SECTION_BUILDERS
     finish = next(e for e in events if e["event"] == "finish")
     assert finish["action"] == "refreshed"
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_reports_continues_after_failure_across_report_rows(
+    test_db_session,
+    monkeypatch,
+):
+    camp_no = await _seed_org_and_engagement(
+        test_db_session,
+        organization_id=9308,
+        engagement_id=9308,
+        status="running",
+        engagement_code="CRONROW1",
+    )
+    await _seed_report(test_db_session, camp_no=camp_no, organization_id=9308)
+    await _seed_report(
+        test_db_session,
+        camp_no=camp_no,
+        organization_id=9308,
+        department="sales",
+    )
+    await _ensure_section(
+        test_db_session,
+        report_sections=9310,
+        section_key="participation_by_age",
+        section="Participation by Age",
+        description="Enrollment distribution across age groups",
+    )
+    await _ensure_section(
+        test_db_session,
+        report_sections=9311,
+        section_key="kpis",
+        section="KPIs",
+        description="Camp enrollment and health KPI summary",
+    )
+
+    service = _service()
+    original = service.refresh_camp_report_section_for_cron
+
+    async def _flaky(db, *, camp_no, section, department=None, city=None):
+        if department is None and city is None and section == "participation_by_age":
+            raise RuntimeError("boom")
+        return await original(
+            db,
+            camp_no=camp_no,
+            section=section,
+            department=department,
+            city=city,
+        )
+
+    monkeypatch.setattr(service, "refresh_camp_report_section_for_cron", _flaky)
+
+    result = await refresh_camp_reports(
+        test_db_session,
+        service=service,
+        dry_run=False,
+        camp_no=camp_no,
+    )
+
+    assert result["failed"] >= 1
+    assert result["refreshed"] >= 1
+
+    dept_row = (
+        await test_db_session.execute(
+            select(CampReport).where(
+                CampReport.camp_no == camp_no,
+                CampReport.department == "sales",
+            )
+        )
+    ).scalar_one()
+    assert "kpis" in (dept_row.report or {})

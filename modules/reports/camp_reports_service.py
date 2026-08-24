@@ -854,6 +854,30 @@ class CampReportsService:
             return 0
         return await self._repository.delete_all_for_camp_no(db, camp_no=camp_no)
 
+    async def purge_orphaned_camp_reports(
+        self,
+        db: AsyncSession,
+        *,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Delete camp_reports rows whose camp_no has no engagements."""
+        orphan_camp_nos = await self._repository.list_orphan_camp_nos(db)
+        orphan_row_count = await self._repository.count_orphan_camp_report_rows(db)
+        if dry_run or orphan_row_count == 0:
+            return {
+                "orphan_camp_nos": orphan_camp_nos,
+                "orphan_rows_deleted": 0,
+                "orphan_row_count": orphan_row_count,
+                "dry_run": dry_run,
+            }
+        deleted = await self._repository.delete_orphaned_camp_reports(db)
+        return {
+            "orphan_camp_nos": orphan_camp_nos,
+            "orphan_rows_deleted": deleted,
+            "orphan_row_count": orphan_row_count,
+            "dry_run": False,
+        }
+
     @staticmethod
     def _serialize_camp_report(row: CampReport) -> dict:
         return {
