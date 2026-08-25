@@ -2447,6 +2447,38 @@ class UsersService:
                     str(exc),
                 )
 
+        if (
+            bool(engagement.load_prev_assessment_questionnaires)
+            and assessment_instance is not None
+            and self._questionnaire_service is not None
+        ):
+            try:
+                from modules.assessments.repository import AssessmentsRepository
+
+                assessments_repo = AssessmentsRepository()
+                source_instance = await assessments_repo.get_latest_metsights_instance_excluding(
+                    db,
+                    user_id=int(user.user_id),
+                    exclude_assessment_instance_id=int(assessment_instance.assessment_instance_id),
+                )
+                if source_instance is not None:
+                    await self._questionnaire_service.copy_responses_from_previous_instance(
+                        db,
+                        user_id=int(user.user_id),
+                        source_assessment_instance_id=int(source_instance.assessment_instance_id),
+                        dest_assessment_instance_id=int(assessment_instance.assessment_instance_id),
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        endpoint=endpoint,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Load previous assessment questionnaires failed for user_id=%s engagement_id=%s: %s",
+                    user.user_id,
+                    engagement.engagement_id,
+                    str(exc),
+                )
+
         # Record onboarding audit log.
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")

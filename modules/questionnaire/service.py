@@ -2042,6 +2042,108 @@ class QuestionnaireService:
         instance.completed_at = now
         await assessments_repo.update_instance(db, instance)
 
+    async def copy_responses_from_previous_instance(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        source_assessment_instance_id: int,
+        dest_assessment_instance_id: int,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> int:
+        """Duplicate questionnaire responses from a prior instance onto a new one."""
+        from modules.assessments.repository import AssessmentsRepository
+        from modules.questionnaire.models import QuestionnaireResponse
+
+        if source_assessment_instance_id == dest_assessment_instance_id:
+            return 0
+
+        assessments_repo = AssessmentsRepository()
+        dest_row = await assessments_repo.get_instance_for_user(
+            db,
+            assessment_instance_id=dest_assessment_instance_id,
+            user_id=user_id,
+        )
+        if dest_row is None:
+            return 0
+        dest_instance, dest_package = dest_row
+        if dest_package is None:
+            return 0
+
+        current_status = (dest_instance.status or "").lower()
+        if current_status == "completed" or current_status != "active":
+            return 0
+
+        source_responses = await self._repository.list_responses_for_instance(
+            db,
+            assessment_instance_id=source_assessment_instance_id,
+        )
+        if not source_responses:
+            return 0
+
+        dest_existing = await self._repository.list_responses_for_instance(
+            db,
+            assessment_instance_id=dest_assessment_instance_id,
+        )
+        dest_existing_qids = {int(r.question_id) for r in dest_existing}
+
+        source_qids = [int(r.question_id) for r in source_responses]
+        cat_ids_map = await self._repository.resolve_category_ids_for_questions_bulk(
+            db,
+            question_ids=source_qids,
+            package_id=int(dest_package.package_id),
+        )
+
+        copied = 0
+        affected_category_ids: set[int] = set()
+
+        for source_row in source_responses:
+            question_id = int(source_row.question_id)
+            if question_id in dest_existing_qids:
+                continue
+            if source_row.answer is None:
+                continue
+
+            resolved_ids = cat_ids_map.get(question_id, [])
+            if not resolved_ids:
+                continue
+
+            new_response = QuestionnaireResponse(
+                assessment_instance_id=dest_assessment_instance_id,
+                question_id=question_id,
+                category_ids=resolved_ids,
+                answer=source_row.answer,
+            )
+            await self._repository.create_response(db, new_response)
+            dest_existing_qids.add(question_id)
+            affected_category_ids.update(int(cid) for cid in resolved_ids)
+            copied += 1
+
+        if copied == 0:
+            return 0
+
+        for category_id in sorted(affected_category_ids):
+            await self._sync_category_progress_after_responses(
+                db,
+                instance=dest_instance,
+                category_id=category_id,
+                user_id=user_id,
+            )
+
+        audit = self._require_audit_service()
+        await audit.log_event(
+            db,
+            action="USER_ENGAGEMENT_ONBOARD_LOAD_PREV_QUESTIONNAIRES",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=user_id,
+            session_id=None,
+        )
+        return copied
+
     def _try_validate_answer_by_type(self, *, question: dict, answer: object) -> bool:
         """Return True when answer passes type validation; never raises."""
         try:

@@ -156,6 +156,8 @@ def _participant_move_mismatch_reasons(source: Engagement, target: Engagement) -
         mismatches.append("Consultations")
     if bool(source.enroll_for_fitprint_full) != bool(target.enroll_for_fitprint_full):
         mismatches.append("Enroll for FitPrint Full")
+    if bool(source.load_prev_assessment_questionnaires) != bool(target.load_prev_assessment_questionnaires):
+        mismatches.append("Load previous assessment questionnaires")
     return mismatches
 
 
@@ -589,6 +591,7 @@ class EngagementsService:
             consultation_mode=payload.consultation_mode,
             create_profile_on_metsights=payload.create_profile_on_metsights,
             enroll_for_fitprint_full=payload.enroll_for_fitprint_full,
+            load_prev_assessment_questionnaires=payload.load_prev_assessment_questionnaires,
         )
 
         engagement = await self._repository.create_engagement(db, engagement)
@@ -1067,6 +1070,7 @@ class EngagementsService:
         engagement.metsights_engagement_id = payload.metsights_engagement_id
         engagement.create_profile_on_metsights = payload.create_profile_on_metsights
         engagement.enroll_for_fitprint_full = payload.enroll_for_fitprint_full
+        engagement.load_prev_assessment_questionnaires = payload.load_prev_assessment_questionnaires
 
         engagement = await self._repository.update_engagement(db, engagement)
 
@@ -1207,6 +1211,7 @@ class EngagementsService:
         longitude: float | None = None,
         create_profile_on_metsights: bool = False,
         enroll_for_fitprint_full: bool = False,
+        load_prev_assessment_questionnaires: bool = False,
     ) -> Engagement:
         """Create a B2C engagement and auto-assign default onboarding assistants from platform settings.
 
@@ -1261,6 +1266,7 @@ class EngagementsService:
             consultation_mode=ConsultationMode.online if _consultations_enabled(consultations) else None,
             create_profile_on_metsights=create_profile_on_metsights,
             enroll_for_fitprint_full=enroll_for_fitprint_full,
+            load_prev_assessment_questionnaires=load_prev_assessment_questionnaires,
         )
         engagement = await self._repository.create_engagement(db, engagement)
 

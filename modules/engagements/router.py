@@ -94,6 +94,7 @@ def _engagement_to_dict(
         "consultation_mode": engagement.consultation_mode.value if engagement.consultation_mode else None,
         "create_profile_on_metsights": engagement.create_profile_on_metsights,
         "enroll_for_fitprint_full": engagement.enroll_for_fitprint_full,
+        "load_prev_assessment_questionnaires": engagement.load_prev_assessment_questionnaires,
         "notifications": notifications or [],
     }
     if readiness is not None:

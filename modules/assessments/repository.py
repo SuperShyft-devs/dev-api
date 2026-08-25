@@ -472,6 +472,27 @@ class AssessmentsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_latest_metsights_instance_excluding(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+        exclude_assessment_instance_id: int,
+    ) -> AssessmentInstance | None:
+        """Latest Metsights Basic/Pro instance for user, excluding one instance id."""
+        metsights_type_codes = ("1", "2")
+        query = (
+            select(AssessmentInstance)
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .where(AssessmentInstance.user_id == user_id)
+            .where(AssessmentInstance.assessment_instance_id != exclude_assessment_instance_id)
+            .where(AssessmentPackage.assessment_type_code.in_(metsights_type_codes))
+            .order_by(AssessmentInstance.assessment_instance_id.desc())
+            .limit(1)
+        )
+        result = await db.execute(query)
+        return result.scalar_one_or_none()
+
     async def set_metsights_record_id(
         self,
         db: AsyncSession,

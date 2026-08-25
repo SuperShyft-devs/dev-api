@@ -67,6 +67,7 @@ class Engagement(Base):
     status = Column(String)
     create_profile_on_metsights = Column(Boolean, nullable=False, default=False, server_default="false")
     enroll_for_fitprint_full = Column(Boolean, nullable=False, default=False, server_default="false")
+    load_prev_assessment_questionnaires = Column(Boolean, nullable=False, default=False, server_default="false")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     healthians_zone_id = Column(String, nullable=True)
     external_camp_id = Column(Integer, nullable=True)
