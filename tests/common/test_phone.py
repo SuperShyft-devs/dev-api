@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from common.phone import phone_lookup_candidates
+from common.phone import phone_lookup_candidates, to_healthians_mobile
 from core.exceptions import AppError
 
 
@@ -30,3 +30,24 @@ def test_phone_lookup_candidates_strict_rejects_too_short():
 
 def test_phone_lookup_candidates_non_strict_empty_for_invalid_chars():
     assert phone_lookup_candidates("abc") == []
+
+
+def test_to_healthians_mobile_plus91():
+    assert to_healthians_mobile("+918882025050") == "8882025050"
+
+
+def test_to_healthians_mobile_91_prefix():
+    assert to_healthians_mobile("918882025050") == "8882025050"
+
+
+def test_to_healthians_mobile_ten_digit():
+    assert to_healthians_mobile("8882025050") == "8882025050"
+
+
+def test_to_healthians_mobile_too_short():
+    assert to_healthians_mobile("12345") == "12345"
+
+
+def test_to_healthians_mobile_empty():
+    assert to_healthians_mobile("") == ""
+    assert to_healthians_mobile(None) == ""

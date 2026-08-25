@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.masking import mask_email, mask_phone
+from common.phone import to_healthians_mobile
 from core.config import settings
 from core.exceptions import AppError
 from modules.diagnostics.healthians import client as healthians_client
@@ -501,14 +502,22 @@ class ConsoleService:
 
         first_name = (user.first_name or "").strip()
         last_name = (user.last_name or "").strip()
-        phone = (user.phone or "").strip()
+        phone_raw = (user.phone or "").strip()
         gender = _to_healthians_gender(user.gender)
         dob = _format_healthians_dob(user)
-        if not first_name or not last_name or not phone or gender is None or (user.age is None and dob is None):
+        if not first_name or not last_name or not phone_raw or gender is None or (user.age is None and dob is None):
             raise AppError(
                 status_code=422,
                 error_code="INCOMPLETE_PARTICIPANT_PROFILE",
                 message="Participant profile is missing required fields (name, phone, gender, age or date of birth)",
+            )
+
+        phone = to_healthians_mobile(phone_raw)
+        if len(phone) != 10:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_PHONE",
+                message="Participant phone must be a valid 10-digit mobile number",
             )
 
         customer_name = f"{first_name} {last_name}".strip().upper()
@@ -1262,14 +1271,22 @@ class ConsoleService:
 
         first_name = (user.first_name or "").strip()
         last_name = (user.last_name or "").strip()
-        phone = (user.phone or "").strip()
+        phone_raw = (user.phone or "").strip()
         gender = _to_healthians_gender(user.gender)
         dob = _format_healthians_dob(user)
-        if not first_name or not last_name or not phone or gender is None or (user.age is None and dob is None):
+        if not first_name or not last_name or not phone_raw or gender is None or (user.age is None and dob is None):
             raise AppError(
                 status_code=422,
                 error_code="INCOMPLETE_PARTICIPANT_PROFILE",
                 message="Participant profile is missing required fields (name, phone, gender, age or date of birth)",
+            )
+
+        phone = to_healthians_mobile(phone_raw)
+        if len(phone) != 10:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_PHONE",
+                message="Participant phone must be a valid 10-digit mobile number",
             )
 
         customer_name = f"{first_name} {last_name}".strip().upper()

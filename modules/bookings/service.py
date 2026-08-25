@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.phone import to_healthians_mobile
 from core.config import settings
 from core.exceptions import AppError
 from modules.diagnostics.healthians import client as healthians_client
@@ -765,6 +766,16 @@ async def create_healthians_booking_after_payment(
         relation = (user.relationship or "self").strip() or "self"
         vendor_billing_user_id = str(participant.booked_by_user_id)
 
+        phone = to_healthians_mobile((user.phone or "").strip())
+        if len(phone) != 10:
+            results.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "status": "error",
+                "message": "Participant phone must be a valid 10-digit mobile number",
+            })
+            continue
+
         booking_payload = {
             "customer": [{
                 "customer_id": str(user_id),
@@ -776,10 +787,10 @@ async def create_healthians_booking_after_payment(
             }],
             "slot": {"slot_id": slot_id},
             "package": [{"deal_id": [f"package_{external_package_id}"]}],
-            "customer_calling_number": user.phone or "",
+            "customer_calling_number": phone,
             "billing_cust_name": full_name.upper(),
             "gender": gender_code,
-            "mobile": user.phone or "",
+            "mobile": phone,
             "email": user.email or "",
             "sub_locality": engagement.sub_locality or "",
             "latitude": str(engagement.latitude or ""),

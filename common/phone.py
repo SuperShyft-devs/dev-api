@@ -58,3 +58,11 @@ def phone_lookup_candidates(phone: str, *, strict: bool = False) -> list[str]:
         _add(f"+{digits}", digits)
 
     return ordered
+
+
+def to_healthians_mobile(phone: str | None) -> str:
+    """Return last 10 digits for Healthians mobile/calling fields."""
+    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    if len(digits) >= 10:
+        return digits[-10:]
+    return digits
