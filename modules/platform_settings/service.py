@@ -334,22 +334,6 @@ class PlatformSettingsService:
                 )
         return ",".join(keys)
 
-    @staticmethod
-    def _validate_questionnaire_reminders_disjoint(qr1: str | None, qr2: str | None) -> None:
-        keys1 = {k.strip() for k in (qr1 or "").split(",") if k.strip()}
-        keys2 = {k.strip() for k in (qr2 or "").split(",") if k.strip()}
-        overlap = keys1 & keys2
-        if overlap:
-            joined = ", ".join(sorted(overlap))
-            raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message=(
-                    f"Notification service(s) {joined} cannot be used in both "
-                    "questionnaire_reminder_1 and questionnaire_reminder_2"
-                ),
-            )
-
     async def get_engagement_notification_defaults(self, db: AsyncSession) -> EngagementNotificationDefaultsRead:
         return EngagementNotificationDefaultsRead()
 

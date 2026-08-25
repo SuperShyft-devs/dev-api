@@ -2141,31 +2141,80 @@ async def test_update_engagement_onboarding_assistant_403(async_client, test_db_
 
 
 @pytest.mark.asyncio
-async def test_create_engagement_rejects_overlapping_questionnaire_reminders(async_client, test_db_session):
+async def test_create_engagement_allows_same_service_on_questionnaire_reminders(
+    async_client, test_db_session
+):
     await _seed_employee(test_db_session, user_id=7050, employee_id=50)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
-    await _seed_notification_service(test_db_session, service_key="service-a")
-    await _seed_notification_service(test_db_session, service_key="service-b")
+    await _seed_notification_service(test_db_session, service_key="shared-qr-service")
+    type_id = await _engagement_type_id(test_db_session, "bio_ai")
+
+    for event_code, display_name in (
+        ("questionnaire_reminder_before", "Questionnaire Reminder Before"),
+        ("questionnaire_reminder_after", "Questionnaire Reminder After"),
+    ):
+        await test_db_session.execute(
+            text(
+                "INSERT INTO auto_notification_events (event_code, display_name, engagement_type_ids, description) "
+                "VALUES (:code, :dn, :type_ids, 'Test questionnaire reminder event') "
+                "ON CONFLICT (event_code) DO UPDATE SET display_name = EXCLUDED.display_name"
+            ),
+            {"code": event_code, "dn": display_name, "type_ids": [type_id]},
+        )
+    await test_db_session.commit()
+
+    before_event_id = (
+        await test_db_session.execute(
+            text("SELECT id FROM auto_notification_events WHERE event_code = 'questionnaire_reminder_before'")
+        )
+    ).scalar_one()
+    after_event_id = (
+        await test_db_session.execute(
+            text("SELECT id FROM auto_notification_events WHERE event_code = 'questionnaire_reminder_after'")
+        )
+    ).scalar_one()
 
     payload = {
-        "engagement_name": "Overlap Camp",
+        "engagement_name": "Shared Reminder Camp",
         "organization_id": 1,
-        "engagement_type": "bio_ai",
+        "engagement_type": type_id,
         "assessment_package_id": 1,
         "diagnostic_package_id": 1,
         "city": "BLR",
         "slot_duration": 20,
         "start_date": "2026-02-01",
         "end_date": "2026-02-02",
-        "questionnaire_reminder_1": "service-a,service-b",
-        "questionnaire_reminder_2": "service-b",
+        "notifications": [
+            {
+                "notification_event_id": before_event_id,
+                "notification_services": [{"service_key": "shared-qr-service", "external_link": None}],
+            },
+            {
+                "notification_event_id": after_event_id,
+                "notification_services": [{"service_key": "shared-qr-service", "external_link": None}],
+            },
+        ],
     }
 
     response = await async_client.post("/engagements", headers=_auth_header(7050), json=payload)
-    assert response.status_code == 400
-    assert "service-b" in response.json()["message"]
+    assert response.status_code == 201, response.text
+
+    engagement_id = response.json()["data"]["engagement_id"]
+    rows = (
+        await test_db_session.execute(
+            text(
+                "SELECT notification_event_id, notification_services "
+                "FROM engagement_notifications WHERE engagement_id = :eid "
+                "ORDER BY notification_event_id"
+            ),
+            {"eid": engagement_id},
+        )
+    ).all()
+    assert len(rows) == 2
+    for _, services in rows:
+        assert services == [{"service_key": "shared-qr-service", "external_link": None}]
 
 
 _EXPECTED_BLOOD_SLOTS = [

@@ -13,7 +13,7 @@ from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.assessments.package_questions_service import AssessmentPackageCategoriesService
 from modules.engagements.repository import EngagementsRepository
 from modules.metsights.service import MetsightsService
-from modules.notifications.dedup import should_skip_notification
+from modules.notifications.dedup import should_skip_notification_on_date
 from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
 
@@ -22,8 +22,9 @@ logger = logging.getLogger(__name__)
 _METSIGHTS_PRO_BASIC_TYPE_CODES = {"1", "2"}
 _FITPRINT_TYPE_CODES = {"7"}
 
-_PRIMARY_RESOURCES = ("diet-lifestyle-parameters", "physical-measurement", "vitals")
+_PRIMARY_RESOURCES = ("diet-lifestyle-parameters", "physical-measurement")
 _FITNESS_RESOURCE = "fitness-parameters"
+_OPTIONAL_INTERNAL_CATEGORY_KEYS = frozenset({"health_vitals"})
 
 
 def _resolve_today(*, as_of: date | None = None) -> date:
@@ -122,7 +123,15 @@ async def _check_internal_complete(
     if not categories:
         return False
 
-    return all(cat.get("status") == "complete" for cat in categories)
+    required = [
+        cat
+        for cat in categories
+        if (cat.get("category_key") or "").strip() not in _OPTIONAL_INTERNAL_CATEGORY_KEYS
+    ]
+    if not required:
+        return True
+
+    return all(cat.get("status") == "complete" for cat in required)
 
 
 async def dispatch_questionnaire_reminders(
@@ -256,11 +265,12 @@ async def dispatch_questionnaire_reminders(
             skipped_all = True
             for cfg in service_configs:
                 sk = cfg.service_key
-                skip_reason = await should_skip_notification(
+                skip_reason = await should_skip_notification_on_date(
                     db,
                     service_key=sk,
                     user_id=user_id,
                     engagement_id=engagement_id,
+                    reference_date=today,
                 )
                 if skip_reason:
                     details.append({

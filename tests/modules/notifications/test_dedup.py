@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 from sqlalchemy import text
 
 from modules.engagements.models import Engagement
-from modules.notifications.dedup import has_notification_been_sent, should_skip_notification
+from modules.notifications.dedup import (
+    has_notification_been_sent,
+    should_skip_notification,
+    should_skip_notification_on_date,
+)
 from modules.notifications.models import Notification
 from modules.users.models import User
 
@@ -239,3 +243,62 @@ async def test_multi_service_independent_dedup(test_db_session):
 
     assert email_skip == "already sent"
     assert whatsapp_skip is None
+
+
+@pytest.mark.asyncio
+async def test_should_skip_notification_on_date_allows_resend_on_next_day(test_db_session):
+    await _seed_service(test_db_session, service_key="dedup-on-date-a")
+    await _seed_engagement(test_db_session, engagement_id=9707)
+    yesterday = date(2026, 6, 9)
+    today = date(2026, 6, 10)
+    await _seed_notification(
+        test_db_session,
+        service_key="dedup-on-date-a",
+        user_id=42,
+        engagement_id=9707,
+        status="sent",
+        dispatched_at=datetime.combine(yesterday, time(12, 0), tzinfo=timezone.utc),
+    )
+
+    yesterday_skip = await should_skip_notification_on_date(
+        test_db_session,
+        service_key="dedup-on-date-a",
+        user_id=42,
+        engagement_id=9707,
+        reference_date=yesterday,
+    )
+    today_skip = await should_skip_notification_on_date(
+        test_db_session,
+        service_key="dedup-on-date-a",
+        user_id=42,
+        engagement_id=9707,
+        reference_date=today,
+    )
+
+    assert yesterday_skip == "already sent"
+    assert today_skip is None
+
+
+@pytest.mark.asyncio
+async def test_should_skip_notification_on_date_blocks_same_day_resend(test_db_session):
+    await _seed_service(test_db_session, service_key="dedup-on-date-b")
+    await _seed_engagement(test_db_session, engagement_id=9708)
+    reference_date = date(2026, 6, 10)
+    await _seed_notification(
+        test_db_session,
+        service_key="dedup-on-date-b",
+        user_id=42,
+        engagement_id=9708,
+        status="sent",
+        dispatched_at=datetime.combine(reference_date, time(6, 30), tzinfo=timezone.utc),
+    )
+
+    result = await should_skip_notification_on_date(
+        test_db_session,
+        service_key="dedup-on-date-b",
+        user_id=42,
+        engagement_id=9708,
+        reference_date=reference_date,
+    )
+
+    assert result == "already sent"

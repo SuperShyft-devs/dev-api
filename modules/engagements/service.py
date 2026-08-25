@@ -180,10 +180,6 @@ def _parse_status_filter(status: str | None) -> list[str] | None:
     return normalized_values
 
 
-def _parse_comma_separated_keys(raw: str | None) -> set[str]:
-    return {k.strip() for k in (raw or "").split(",") if k.strip()}
-
-
 def _normalize_phone_for_metsights(raw: str | None) -> str | None:
     value = (raw or "").strip().replace(" ", "").replace("-", "")
     if not value:
@@ -436,21 +432,6 @@ class EngagementsService:
                     message=f"Notification service '{key}' is not active",
                 )
         return ",".join(keys)
-
-    @staticmethod
-    def _validate_questionnaire_reminders_disjoint(qr1: str | None, qr2: str | None) -> None:
-        overlap = _parse_comma_separated_keys(qr1) & _parse_comma_separated_keys(qr2)
-        if overlap:
-            joined = ", ".join(sorted(overlap))
-            raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message=(
-                    f"Notification service(s) {joined} cannot be used in both "
-                    "questionnaire_reminder_1 and questionnaire_reminder_2"
-                ),
-            )
-
 
     async def count_participants_for_engagement(self, db: AsyncSession, *, engagement_id: int) -> int:
         return await self._repository.count_distinct_participants_for_engagement(
