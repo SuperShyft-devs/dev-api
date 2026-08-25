@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 
 import pytest
@@ -657,6 +658,141 @@ async def test_engagement_onboard_overwrites_existing_age_and_email(async_client
     ).first()
     assert row.age == 35
     assert row.email == "new@example.com"
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_reclaims_email_from_own_sub_profile(async_client, test_db_session):
+    """When email is on a sub-profile of the phone-matched primary, reclaim it and alias the sub."""
+    await _seed_onboard_packages(test_db_session)
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagement_types (code, display_name, is_active) "
+            "VALUES ('bio_ai', 'Bio AI', true) "
+            "ON CONFLICT (code) DO UPDATE SET is_active = true"
+        )
+    )
+    bio_ai_type_id = (
+        await test_db_session.execute(
+            text("SELECT id FROM engagement_types WHERE code = 'bio_ai'")
+        )
+    ).scalar_one()
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
+            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
+            "status) "
+            "VALUES (3393, 'Camp-SubEmail', 'ENGSUBEM', :etype, 1, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-01', 'running')"
+        ),
+        {"etype": bio_ai_type_id},
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, first_name, age, phone, email, status, parent_id, relationship) "
+            "VALUES (2103, 'Primary', 40, '7777777779', 'primary-old@example.com', 'active', NULL, 'self')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, first_name, age, phone, email, status, parent_id, relationship) "
+            "VALUES (2104, 'Child', 12, '7777777779', 'target@example.com', 'active', 2103, 'child')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 41,
+        "first_name": "Primary",
+        "phone": "7777777779",
+        "email": "target@example.com",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "11:00",
+    }
+
+    response = await async_client.post("/users/code/ENGSUBEM/onboard", json=payload)
+    assert response.status_code == 200, response.text
+
+    primary = (
+        await test_db_session.execute(
+            text("SELECT email FROM users WHERE user_id = 2103")
+        )
+    ).first()
+    child = (
+        await test_db_session.execute(
+            text("SELECT email FROM users WHERE user_id = 2104")
+        )
+    ).first()
+    assert primary.email == "target@example.com"
+    assert re.fullmatch(r"target\+\d{4}@example\.com", child.email)
+
+
+@pytest.mark.asyncio
+async def test_engagement_onboard_email_owned_by_unrelated_user_returns_409(async_client, test_db_session):
+    """Phone-matched user cannot steal an email owned by an unrelated account."""
+    await _seed_onboard_packages(test_db_session)
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagement_types (code, display_name, is_active) "
+            "VALUES ('bio_ai', 'Bio AI', true) "
+            "ON CONFLICT (code) DO UPDATE SET is_active = true"
+        )
+    )
+    bio_ai_type_id = (
+        await test_db_session.execute(
+            text("SELECT id FROM engagement_types WHERE code = 'bio_ai'")
+        )
+    ).scalar_one()
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
+            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
+            "status) "
+            "VALUES (3394, 'Camp-EmailConflict', 'ENGEMCONF', :etype, 1, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-01', 'running')"
+        ),
+        {"etype": bio_ai_type_id},
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, first_name, age, phone, email, status) "
+            "VALUES (2105, 'PhoneUser', 30, '7777777780', 'phone-user@example.com', 'active')"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, first_name, age, phone, email, status) "
+            "VALUES (2106, 'EmailOwner', 30, '7777777781', 'taken@example.com', 'active')"
+        )
+    )
+    await test_db_session.commit()
+
+    payload = {
+        "age": 31,
+        "first_name": "PhoneUser",
+        "phone": "7777777780",
+        "email": "taken@example.com",
+        "blood_collection_date": "2026-02-01",
+        "blood_collection_time_slot": "11:00",
+    }
+
+    response = await async_client.post("/users/code/ENGEMCONF/onboard", json=payload)
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error_code"] == "CONFLICT"
+    assert "email" in body["message"].lower()
+
+    phone_user = (
+        await test_db_session.execute(
+            text("SELECT email FROM users WHERE user_id = 2105")
+        )
+    ).first()
+    email_owner = (
+        await test_db_session.execute(
+            text("SELECT email FROM users WHERE user_id = 2106")
+        )
+    ).first()
+    assert phone_user.email == "phone-user@example.com"
+    assert email_owner.email == "taken@example.com"
 
 
 @pytest.mark.asyncio

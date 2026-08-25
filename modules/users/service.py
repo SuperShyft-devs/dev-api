@@ -1634,6 +1634,21 @@ class UsersService:
 
         return {"deleted_user_id": user_id, "deleted_user_count": deleted_count}
 
+    async def _allocate_plus_alias_email(self, db: AsyncSession, base_email: str) -> str:
+        """Allocate a free `{local}+{1000-9999}@{domain}` alias derived from *base_email*."""
+        if not base_email or "@" not in base_email:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+        local_part, domain = base_email.split("@", 1)
+        for _ in range(200):
+            suffix = random.randint(1000, 9999)
+            candidate = f"{local_part}+{suffix}@{domain}"
+            existing = await self._repository.get_user_by_email(db, candidate)
+            if existing is None:
+                return candidate
+
+        raise AppError(status_code=409, error_code="CONFLICT", message="Unable to create profile")
+
     async def _get_or_create_user_for_onboarding(
         self,
         db: AsyncSession,
@@ -2254,6 +2269,30 @@ class UsersService:
         )
 
         # Age, email, and address fields: always overwrite when provided (even if already set).
+        # If email is owned by a sub-profile of this user, reclaim it (alias the sub first).
+        # Unrelated owners → 409; IntegrityError → 409 (never raw 500).
+        if email is not None:
+            owner = await self._repository.get_user_by_email(db, email)
+            if owner is not None and int(owner.user_id) != int(user.user_id):
+                if owner.parent_id is not None and int(owner.parent_id) == int(user.user_id):
+                    try:
+                        alias = await self._allocate_plus_alias_email(db, email)
+                        await self._repository.update_user_partial(
+                            db, int(owner.user_id), {"email": alias}
+                        )
+                    except IntegrityError as exc:
+                        raise AppError(
+                            status_code=409,
+                            error_code="CONFLICT",
+                            message=_integrity_error_reason(exc),
+                        ) from exc
+                else:
+                    raise AppError(
+                        status_code=409,
+                        error_code="CONFLICT",
+                        message="Email already belongs to another user",
+                    )
+
         profile_update = {
             key: value
             for key, value in {
@@ -2268,7 +2307,16 @@ class UsersService:
             if value is not None
         }
         if profile_update:
-            updated = await self._repository.update_user_partial(db, user.user_id, profile_update)
+            try:
+                updated = await self._repository.update_user_partial(
+                    db, user.user_id, profile_update
+                )
+            except IntegrityError as exc:
+                raise AppError(
+                    status_code=409,
+                    error_code="CONFLICT",
+                    message=_integrity_error_reason(exc),
+                ) from exc
             if updated is not None:
                 user = updated
 
