@@ -192,7 +192,9 @@ async def test_engagement_onboard_load_prev_false_does_not_copy(async_client, te
 
     response = await async_client.post("/users/code/LOADPREV1/onboard", json=_onboard_payload())
     assert response.status_code == 200
-    new_instance_id = response.json()["data"]["assessment_instance_id"]
+    data = response.json()["data"]
+    assert data.get("preview_available") is False
+    new_instance_id = data["assessment_instance_id"]
     assert new_instance_id is not None
 
     count = (
@@ -275,7 +277,9 @@ async def test_engagement_onboard_load_prev_true_copies_from_prior_basic(async_c
         json=_onboard_payload(phone="7777000102", email="load.prev2@example.com"),
     )
     assert response.status_code == 200
-    new_instance_id = response.json()["data"]["assessment_instance_id"]
+    data = response.json()["data"]
+    assert data.get("preview_available") is True
+    new_instance_id = data["assessment_instance_id"]
 
     row = (
         await test_db_session.execute(
@@ -368,7 +372,9 @@ async def test_engagement_onboard_load_prev_ignores_fitprint_only_prior(async_cl
         json=_onboard_payload(phone="7777000103", email="load.prev3@example.com"),
     )
     assert response.status_code == 200
-    new_instance_id = response.json()["data"]["assessment_instance_id"]
+    data = response.json()["data"]
+    assert data.get("preview_available") is False
+    new_instance_id = data["assessment_instance_id"]
 
     count = (
         await test_db_session.execute(

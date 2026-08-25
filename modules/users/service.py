@@ -2294,6 +2294,7 @@ class UsersService:
         )
 
         assessment_instance = None
+        preview_available = False
         if self._assessments_service is None:
             raise RuntimeError("Assessments service is required")
 
@@ -2462,7 +2463,7 @@ class UsersService:
                     exclude_assessment_instance_id=int(assessment_instance.assessment_instance_id),
                 )
                 if source_instance is not None:
-                    await self._questionnaire_service.copy_responses_from_previous_instance(
+                    copied_count = await self._questionnaire_service.copy_responses_from_previous_instance(
                         db,
                         user_id=int(user.user_id),
                         source_assessment_instance_id=int(source_instance.assessment_instance_id),
@@ -2471,6 +2472,7 @@ class UsersService:
                         user_agent=user_agent,
                         endpoint=endpoint,
                     )
+                    preview_available = copied_count > 0
             except Exception as exc:
                 logger.warning(
                     "Load previous assessment questionnaires failed for user_id=%s engagement_id=%s: %s",
@@ -2510,6 +2512,7 @@ class UsersService:
             engagement_participant_id=time_slot.engagement_participant_id,
             assessment_instance_id=int(assessment_instance.assessment_instance_id) if assessment_instance is not None else None,
             metsights_record_id=metsights_record_id or mid,
+            preview_available=preview_available,
         )
 
     def _split_csv_name(self, raw_name: str) -> tuple[str | None, str | None]:

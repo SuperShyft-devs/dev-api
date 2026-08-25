@@ -429,6 +429,7 @@ class UserOnboardResponse(BaseModel):
     engagement_participant_id: Optional[int] = None
     assessment_instance_id: Optional[int] = None
     metsights_record_id: Optional[str] = None
+    preview_available: bool = False
 
 
 class VifcQuickStartRequest(BaseModel):
