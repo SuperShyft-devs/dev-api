@@ -99,6 +99,13 @@ class Settings:
     METSIGHTS_TIMEOUT_SECONDS: int = int(os.getenv("METSIGHTS_TIMEOUT_SECONDS", "15"))
     METSIGHTS_IMPORT_TIMEOUT_SECONDS: int = int(os.getenv("METSIGHTS_IMPORT_TIMEOUT_SECONDS", "60"))
 
+    # Bio-AI permanent report links (PDF registration service)
+    BIO_AI_REPORTS_BASE_URL: str = os.getenv(
+        "BIO_AI_REPORTS_BASE_URL",
+        "https://bio-ai-reports.supershyft.com",
+    )
+    BIO_AI_REPORTS_TIMEOUT_SECONDS: int = int(os.getenv("BIO_AI_REPORTS_TIMEOUT_SECONDS", "60"))
+
     # Nutrition API settings
     NUTRITION_API_URL: str = os.getenv("NUTRITION_API_URL", "https://nutrition.supershyft.com/calculate")
     NUTRITION_API_KEY: str = os.getenv("NUTRITION_API_KEY", "metsights-secret-2024")

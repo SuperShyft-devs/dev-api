@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config import settings
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.audit.cron_sync_logging import tracked_integration_call
+from modules.bioai_report.pdf_registration import register_permanent_bio_ai_report_url
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.metsights.service import MetsightsService
 from modules.engagement_notifications.service_config import (
@@ -53,16 +54,6 @@ def _metsights_blood_parameters_url(*, record_id: str) -> str:
 
 def _report_data_complete(reports: Any, report_url: Any) -> bool:
     return reports is not None and report_url is not None
-
-
-def _extract_report_file_url(report_data: Any) -> str | None:
-    if not isinstance(report_data, dict):
-        return None
-    file_url = report_data.get("file") or report_data.get("url")
-    if file_url is None:
-        return None
-    normalized = str(file_url).strip()
-    return normalized or None
 
 
 async def _get_eligible_participants(
@@ -294,8 +285,6 @@ async def load_bioai_reports(
                         if report_data is not None:
                             if report_data:
                                 fetched_reports = report_data
-                                if fetched_url is None:
-                                    fetched_url = _extract_report_file_url(report_data)
                         else:
                             logger.warning(
                                 "MetSights get_report failed for record=%s",
@@ -303,41 +292,26 @@ async def load_bioai_reports(
                             )
 
                     if report_url is None:
-                        pdf_data = await tracked_integration_call(
-                            db,
-                            provider="metsights",
-                            api_url=_metsights_report_url(
-                                record_id=record_id,
-                                assessment_type_code=type_code,
-                                pdf=True,
-                            ),
-                            engagement_id=engagement_id,
-                            user_id=user_id,
-                            request_payload={
-                                "record_id": record_id,
-                                "assessment_type_code": type_code,
-                            },
-                            operation=lambda: metsights_service.get_report_pdf(
-                                record_id=record_id,
-                                assessment_type_code=type_code,
-                            ),
-                            reraise=False,
-                        )
-                        if pdf_data is not None:
-                            file_url = pdf_data.get("file") or pdf_data.get("url")
-                            if file_url:
-                                fetched_url = file_url
-                        else:
-                            logger.warning(
-                                "MetSights get_report_pdf failed for record=%s",
-                                record_id,
+                        try:
+                            fetched_url = await register_permanent_bio_ai_report_url(
+                                db,
+                                assessment_instance_id=instance_id,
+                                engagement_id=engagement_id,
+                                user_id=user_id,
                             )
+                        except Exception as exc:
+                            logger.warning(
+                                "bio-ai-reports registration failed for instance=%s: %s",
+                                instance_id,
+                                exc,
+                            )
+                            fetched_url = None
 
                     if fetched_reports is None and fetched_url is None:
                         skipped += 1
                         details.append({
                             "user_id": user_id, "engagement_id": engagement_id,
-                            "action": "skipped", "reason": "no report data returned from MetSights",
+                            "action": "skipped", "reason": "no report data returned from MetSights or bio-ai-reports",
                         })
                         continue
 

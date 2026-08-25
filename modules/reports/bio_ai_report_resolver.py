@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
+from modules.bioai_report.pdf_registration import register_permanent_bio_ai_report_url
 from modules.metsights.service import MetsightsService
 from modules.reports.models import IndividualHealthReport
 from modules.reports.repository import ReportsRepository
@@ -36,19 +35,6 @@ def _normalize_report_url(url: str) -> str:
     stripped = url.strip()
     return _BIO_AI_METSIGHTS_REPORT_URL_OVERRIDES.get(stripped, stripped)
 
-
-def _extract_file_url(payload: Any) -> str | None:
-    if not isinstance(payload, dict):
-        return None
-    data = payload.get("data")
-    if isinstance(data, dict):
-        file_url = data.get("file") or data.get("url")
-        if file_url:
-            return str(file_url).strip() or None
-    file_url = payload.get("file") or payload.get("url")
-    if file_url:
-        return str(file_url).strip() or None
-    return None
 
 
 async def resolve_bio_ai_report_url(
@@ -95,14 +81,6 @@ async def resolve_bio_ai_report_url(
         if cached_ihr is None:
             cached_ihr = candidate
 
-    if cached_ihr is not None and cached_ihr.reports is not None:
-        url_from_reports = _extract_file_url(cached_ihr.reports)
-        if url_from_reports:
-            report_url = _normalize_report_url(url_from_reports)
-            cached_ihr.report_url = report_url
-            await repo.update_individual_report(db, cached_ihr)
-            return report_url
-
     record_id = (metsights_record_id or "").strip()
     if not record_id:
         raise AppError(
@@ -116,21 +94,13 @@ async def resolve_bio_ai_report_url(
         assessment_type_code=type_code,
     )
     fetched_reports = report_payload if isinstance(report_payload, dict) else None
-    fetched_url = _extract_file_url(report_payload)
 
-    if not fetched_url:
-        pdf_payload = await metsights_service.get_report_pdf(
-            record_id=record_id,
-            assessment_type_code=type_code,
-        )
-        fetched_url = _extract_file_url(pdf_payload)
-
-    if not fetched_url:
-        raise AppError(
-            status_code=422,
-            error_code="INVALID_STATE",
-            message="Metsights did not return a BioAI report URL for this record",
-        )
+    fetched_url = await register_permanent_bio_ai_report_url(
+        db,
+        assessment_instance_id=assessment_instance_id,
+        engagement_id=engagement_id,
+        user_id=user_id,
+    )
 
     report_url = _normalize_report_url(fetched_url)
 

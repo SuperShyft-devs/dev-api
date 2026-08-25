@@ -13,12 +13,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.dependencies import get_current_user
 from core.exceptions import AppError
 from db.session import get_db
 from modules.bioai_report.report_engine.api.dependencies import get_bioreport_service
 from modules.bioai_report.report_engine.exceptions import KnowledgeBaseError, ReportEngineError
 from modules.bioai_report.report_engine.services.report_service import BioReportService
+from modules.employee.access_control import ensure_internal_employee
+from modules.employee.dependencies import get_current_employee
+from modules.employee.service import EmployeeContext
 
 router = APIRouter(prefix="/bioai-report", tags=["bioai-report"])
 
@@ -27,10 +29,13 @@ router = APIRouter(prefix="/bioai-report", tags=["bioai-report"])
 async def get_bioreport_content(
     assessment_instance_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    employee: EmployeeContext = Depends(get_current_employee),
     report_service: BioReportService = Depends(get_bioreport_service),
 ):
     """Return one complete BioReport for ``assessment_instance_id``.
+
+    Restricted to internal employees (admin / onboarding assistant). Cron jobs
+    use ``BioReportService`` in-process via ``register_permanent_bio_ai_report_url``.
 
     Pipeline (all server-side):
     1. Resolve Metsights ``record_id`` from DB using ``assessment_instance_id``
@@ -40,6 +45,8 @@ async def get_bioreport_content(
     5. Build BioReport (patient → summary → disease sections + KB)
     6. Return the raw ``BioReport`` JSON object
     """
+    ensure_internal_employee(employee)
+
     if assessment_instance_id is None:
         raise AppError(
             status_code=422,

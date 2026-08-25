@@ -223,10 +223,10 @@ async def test_dispatch_fetches_bio_ai_report_when_cache_missing(
             return _FakeResponse()
 
     async def _fake_get_report(self, *, record_id: str, assessment_type_code: str | None):
-        return {"file": f"https://example.com/bio-ai/{record_id}.pdf"}
+        return {"record_id": record_id}
 
-    async def _fake_get_report_pdf(self, *, record_id: str, assessment_type_code: str | None):
-        raise AssertionError("PDF fallback should not be needed when report detail has file")
+    async def _fake_register(*args, **kwargs):
+        return "https://bio-ai-reports.supershyft.com/r/FETCH-ME-BIOAI"
 
     monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
     monkeypatch.setattr(
@@ -234,8 +234,8 @@ async def test_dispatch_fetches_bio_ai_report_when_cache_missing(
         _fake_get_report,
     )
     monkeypatch.setattr(
-        "modules.metsights.service.MetsightsService.get_report_pdf",
-        _fake_get_report_pdf,
+        "modules.reports.bio_ai_report_resolver.register_permanent_bio_ai_report_url",
+        _fake_register,
     )
 
     response = await async_client.post(
@@ -250,7 +250,7 @@ async def test_dispatch_fetches_bio_ai_report_when_cache_missing(
     assert response.status_code == 201, response.text
     assert webhook_calls
     member = webhook_calls[0]["json"]["members"][0]
-    assert member["bio_ai_report_url"] == "https://example.com/bio-ai/FETCH-ME-BIOAI.pdf"
+    assert member["bio_ai_report_url"] == "https://bio-ai-reports.supershyft.com/r/FETCH-ME-BIOAI"
 
     cached = await test_db_session.execute(
         text(
@@ -258,7 +258,7 @@ async def test_dispatch_fetches_bio_ai_report_when_cache_missing(
             "WHERE assessment_instance_id = 9568"
         )
     )
-    assert cached.scalar_one() == "https://example.com/bio-ai/FETCH-ME-BIOAI.pdf"
+    assert cached.scalar_one() == "https://bio-ai-reports.supershyft.com/r/FETCH-ME-BIOAI"
 
 
 @pytest.mark.asyncio
@@ -1382,18 +1382,18 @@ async def test_prepare_reports_refreshes_journey_instances(
     await test_db_session.commit()
 
     async def _fake_get_report(self, *, record_id: str, assessment_type_code: str | None):
-        return {"file": f"https://example.com/bio-ai/{record_id}.pdf"}
+        return {"record_id": record_id}
 
-    async def _fake_get_report_pdf(self, *, record_id: str, assessment_type_code: str | None):
-        raise AssertionError("PDF fallback should not be needed")
+    async def _fake_register(*args, **kwargs):
+        return "https://bio-ai-reports.supershyft.com/r/PREPARE-BIOAI"
 
     monkeypatch.setattr(
         "modules.metsights.service.MetsightsService.get_report",
         _fake_get_report,
     )
     monkeypatch.setattr(
-        "modules.metsights.service.MetsightsService.get_report_pdf",
-        _fake_get_report_pdf,
+        "modules.reports.bio_ai_report_resolver.register_permanent_bio_ai_report_url",
+        _fake_register,
     )
 
     response = await async_client.post(
@@ -1475,10 +1475,10 @@ async def test_prepare_reports_dual_report_uses_single_ihr_row(
         }
 
     async def _fake_get_report(self, *, record_id: str, assessment_type_code: str | None):
-        return {"file": f"https://example.com/bio-ai/{record_id}.pdf"}
+        return {"record_id": record_id}
 
-    async def _fake_get_report_pdf(self, *, record_id: str, assessment_type_code: str | None):
-        raise AssertionError("PDF fallback should not be needed")
+    async def _fake_register(*args, **kwargs):
+        return "https://bio-ai-reports.supershyft.com/r/DUAL-REPORT"
 
     monkeypatch.setattr(
         "modules.reports.blood_report_resolver.resolve_healthians_booking_id",
@@ -1497,8 +1497,8 @@ async def test_prepare_reports_dual_report_uses_single_ihr_row(
         _fake_get_report,
     )
     monkeypatch.setattr(
-        "modules.metsights.service.MetsightsService.get_report_pdf",
-        _fake_get_report_pdf,
+        "modules.reports.bio_ai_report_resolver.register_permanent_bio_ai_report_url",
+        _fake_register,
     )
 
     response = await async_client.post(
@@ -1531,11 +1531,56 @@ async def test_prepare_reports_dual_report_uses_single_ihr_row(
         )
     ).one()
     assert row[0] == "https://example.com/blood/BOOK-9773.pdf"
-    assert row[1] == "https://example.com/bio-ai/DUAL-REPORT.pdf"
+    assert row[1] == "https://bio-ai-reports.supershyft.com/r/DUAL-REPORT"
 
 
 @pytest.mark.asyncio
-async def test_bio_ai_resolver_uses_cached_reports_json(test_db_session):
+async def test_bio_ai_resolver_registers_via_bio_ai_reports(test_db_session, monkeypatch):
+    from modules.metsights.client import MetsightsClient
+    from modules.metsights.service import MetsightsService
+    from modules.reports.bio_ai_report_resolver import resolve_bio_ai_report_url
+
+    test_db_session.add(User(user_id=9782, age=30, phone="9782000000", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=9782,
+            user_id=9782,
+            engagement_id=9783,
+            assessment_instance_id=9784,
+            reports={"record_id": "REGISTER-ME"},
+            report_url=None,
+        )
+    )
+    await test_db_session.commit()
+
+    async def _fake_get_report(*, record_id: str, assessment_type_code: str | None = None):
+        return {"record_id": record_id}
+
+    async def _fake_register(*args, **kwargs):
+        return "https://bio-ai-reports.supershyft.com/r/registered-slug"
+
+    metsights_service = MetsightsService(client=MetsightsClient())
+    metsights_service.get_report = _fake_get_report  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        "modules.reports.bio_ai_report_resolver.register_permanent_bio_ai_report_url",
+        _fake_register,
+    )
+
+    url = await resolve_bio_ai_report_url(
+        test_db_session,
+        user_id=9782,
+        engagement_id=9783,
+        assessment_instance_id=9784,
+        metsights_record_id="REGISTER-ME",
+        assessment_type_code="1",
+        metsights_service=metsights_service,
+    )
+    assert url == "https://bio-ai-reports.supershyft.com/r/registered-slug"
+
+
+@pytest.mark.asyncio
+async def test_bio_ai_resolver_uses_cached_report_url(test_db_session):
     from modules.metsights.client import MetsightsClient
     from modules.metsights.service import MetsightsService
     from modules.reports.bio_ai_report_resolver import resolve_bio_ai_report_url
@@ -1549,7 +1594,7 @@ async def test_bio_ai_resolver_uses_cached_reports_json(test_db_session):
             engagement_id=9782,
             assessment_instance_id=9783,
             reports={"file": "https://example.com/bio-ai/cached.pdf"},
-            report_url=None,
+            report_url="https://example.com/bio-ai/cached.pdf",
         )
     )
     await test_db_session.commit()

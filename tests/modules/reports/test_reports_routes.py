@@ -614,6 +614,7 @@ async def test_get_bio_ai_pdf_fetches_and_caches_on_miss(
     async_client,
     fastapi_app,
     test_db_session,
+    monkeypatch,
 ):
     await _seed_assessment(
         test_db_session,
@@ -627,6 +628,15 @@ async def test_get_bio_ai_pdf_fetches_and_caches_on_miss(
         payload={},
         pdf_payload={"file": "https://cdn.metsights.com/reports/PDFMISS02.pdf"},
     )
+
+    async def _fake_register(*args, **kwargs):
+        return "https://bio-ai-reports.supershyft.com/r/PDFMISS02slug"
+
+    monkeypatch.setattr(
+        "modules.reports.service.register_permanent_bio_ai_report_url",
+        _fake_register,
+    )
+
     reports_service = ReportsService(
         repository=ReportsRepository(),
         assessments_repository=AssessmentsRepository(),
@@ -639,19 +649,18 @@ async def test_get_bio_ai_pdf_fetches_and_caches_on_miss(
 
     r1 = await async_client.get("/reports/98102/bio-ai/pdf", headers=_auth_header(38102))
     assert r1.status_code == 200
-    assert r1.json()["data"]["report_url"] == "https://cdn.metsights.com/reports/PDFMISS02.pdf"
-    assert fake_metsights.pdf_calls == 1
+    assert r1.json()["data"]["report_url"] == "https://bio-ai-reports.supershyft.com/r/PDFMISS02slug"
+    assert fake_metsights.pdf_calls == 0
 
     r2 = await async_client.get("/reports/98102/bio-ai/pdf", headers=_auth_header(38102))
     assert r2.status_code == 200
-    assert fake_metsights.pdf_calls == 1
 
     saved = await test_db_session.execute(
         select(IndividualHealthReport).where(IndividualHealthReport.assessment_instance_id == 98102)
     )
     report = saved.scalar_one_or_none()
     assert report is not None
-    assert report.report_url == "https://cdn.metsights.com/reports/PDFMISS02.pdf"
+    assert report.report_url == "https://bio-ai-reports.supershyft.com/r/PDFMISS02slug"
     fastapi_app.dependency_overrides.pop(get_reports_service, None)
 
 

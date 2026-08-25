@@ -24,6 +24,7 @@ from modules.audit.models import IntegrationSyncLog
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
 from modules.diagnostics.service import DiagnosticsService
+from modules.bioai_report.pdf_registration import register_permanent_bio_ai_report_url
 from modules.metsights.service import MetsightsService
 from modules.metsights.sync_service import MetsightsSyncService
 from modules.reports.blood_parameters_normalizer import build_grouped_from_healthians
@@ -873,19 +874,13 @@ class ReportsService:
                 message="Metsights record id is missing for this assessment",
             )
 
-        pdf_payload = await self._metsights_service.get_report_pdf(
-            record_id=record_id,
-            assessment_type_code=package.assessment_type_code,
+        report_url = await register_permanent_bio_ai_report_url(
+            db,
+            assessment_instance_id=assessment_id,
+            engagement_id=int(assessment_instance.engagement_id) if assessment_instance.engagement_id else None,
+            user_id=user_id,
         )
-        pdf_dict = pdf_payload if isinstance(pdf_payload, dict) else {}
-        file_url = pdf_dict.get("file")
-        if not isinstance(file_url, str) or not file_url.strip():
-            raise AppError(
-                status_code=422,
-                error_code="INVALID_STATE",
-                message="Metsights did not return a PDF URL for this record",
-            )
-        report_url = _BIO_AI_METSIGHTS_REPORT_URL_OVERRIDES.get(file_url.strip(), file_url.strip())
+        report_url = _BIO_AI_METSIGHTS_REPORT_URL_OVERRIDES.get(report_url, report_url)
 
         if existing_report is None:
             report = IndividualHealthReport(

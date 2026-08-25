@@ -182,12 +182,15 @@ async def test_load_bioai_reports_creates_metsights_sync_logs(test_db_session, m
     async def _fake_report(*, record_id: str, assessment_type_code: str | None):
         return {"file": "https://example.com/bioai.pdf", "record_id": record_id}
 
-    async def _fake_report_pdf(*, record_id: str, assessment_type_code: str | None):
-        return {"file": "https://example.com/bioai.pdf"}
+    async def _fake_register(*args, **kwargs):
+        return "https://bio-ai-reports.supershyft.com/r/testslug"
 
     monkeypatch.setattr(metsights_service, "get_blood_parameters", _fake_blood_params)
     monkeypatch.setattr(metsights_service, "get_report", _fake_report)
-    monkeypatch.setattr(metsights_service, "get_report_pdf", _fake_report_pdf)
+    monkeypatch.setattr(
+        "modules.notifications.load_bioai_reports.register_permanent_bio_ai_report_url",
+        _fake_register,
+    )
 
     result = await load_bioai_reports(
         test_db_session,
@@ -196,7 +199,7 @@ async def test_load_bioai_reports_creates_metsights_sync_logs(test_db_session, m
     )
 
     assert result["loaded"] == 1
-    rows = (
+    metsights_rows = (
         await test_db_session.execute(
             text(
                 "SELECT provider, status, api_endpoint_url "
@@ -205,12 +208,13 @@ async def test_load_bioai_reports_creates_metsights_sync_logs(test_db_session, m
             )
         )
     ).all()
-    assert len(rows) >= 2
-    assert all(row.provider == "metsights" for row in rows)
-    assert all(row.status == "success" for row in rows)
-    endpoints = " ".join(row.api_endpoint_url for row in rows)
-    assert "blood-parameters" in endpoints
-    assert "/reports/" in endpoints
+    assert len(metsights_rows) >= 2
+    assert all(row.provider == "metsights" for row in metsights_rows)
+    assert all(row.status == "success" for row in metsights_rows)
+    metsights_endpoints = " ".join(row.api_endpoint_url for row in metsights_rows)
+    assert "blood-parameters" in metsights_endpoints
+    assert "/reports/" in metsights_endpoints
+    assert "/pdf/" not in metsights_endpoints
 
 
 @pytest.mark.asyncio
@@ -225,12 +229,15 @@ async def test_load_bioai_reports_sends_notifications_when_configured(test_db_se
     async def _fake_report(*, record_id: str, assessment_type_code: str | None):
         return {"file": "https://example.com/bioai.pdf"}
 
-    async def _fake_report_pdf(*, record_id: str, assessment_type_code: str | None):
-        return {"file": "https://example.com/bioai.pdf"}
+    async def _fake_register(*args, **kwargs):
+        return "https://bio-ai-reports.supershyft.com/r/testslug"
 
     monkeypatch.setattr(metsights_service, "get_blood_parameters", _fake_blood_params)
     monkeypatch.setattr(metsights_service, "get_report", _fake_report)
-    monkeypatch.setattr(metsights_service, "get_report_pdf", _fake_report_pdf)
+    monkeypatch.setattr(
+        "modules.notifications.load_bioai_reports.register_permanent_bio_ai_report_url",
+        _fake_register,
+    )
 
     dispatch_calls: list[dict] = []
 
