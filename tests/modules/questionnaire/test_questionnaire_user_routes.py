@@ -1421,12 +1421,48 @@ async def test_upsert_single_choice_rejects_invalid_option(async_client, test_db
     bad = {"responses": [{"question_id": 4051, "answer": "green"}]}
     resp = await async_client.put("/questionnaire/9051/category/8051/responses", headers=_auth_header(5081), json=bad)
     assert resp.status_code == 422
-    assert "not a valid option" in resp.json()["message"].lower()
+    body = resp.json()
+    assert "not a valid option" in body["message"].lower()
+    assert body["question_id"] == 4051
 
     good = {"responses": [{"question_id": 4051, "answer": "red"}]}
     resp = await async_client.put("/questionnaire/9051/category/8051/responses", headers=_auth_header(5081), json=good)
     assert resp.status_code == 200
 
+
+@pytest.mark.asyncio
+async def test_upsert_single_choice_rejects_non_string_with_question_id(async_client, test_db_session):
+    """Type validation errors include the failing question_id."""
+    await _seed_user(test_db_session, user_id=5089)
+    await _ensure_test_engagement(test_db_session)
+    package = AssessmentPackage(package_id=9059, package_code="PKG9059", display_name="Choice Pkg", status="active")
+    category = QuestionnaireCategory(category_id=8059, category_key="cat_8059", display_name="Cat 8059", status="active")
+    q_sc = QuestionnaireDefinition(
+        question_id=4059, question_key="q4059_sc", question_text="Pick one",
+        question_type="single_choice", status="active",
+    )
+    test_db_session.add_all([package, category, q_sc])
+    await test_db_session.commit()
+    test_db_session.add_all([
+        QuestionnaireOption(question_id=4059, option_value="1", display_name="One"),
+        QuestionnaireOption(question_id=4059, option_value="2", display_name="Two"),
+    ])
+    await _map_question_to_category(test_db_session, mapping_id=8959, category_id=8059, question_id=4059)
+    await test_db_session.commit()
+    test_db_session.add(AssessmentPackageCategory(package_id=9059, category_id=8059))
+    test_db_session.add(AssessmentInstance(
+        assessment_instance_id=9059, user_id=5089, package_id=9059, engagement_id=1, status="active",
+    ))
+    await test_db_session.commit()
+
+    bad = {"responses": [{"question_id": 4059, "answer": 1}]}
+    resp = await async_client.put("/questionnaire/9059/category/8059/responses", headers=_auth_header(5089), json=bad)
+    assert resp.status_code == 422
+    assert resp.json() == {
+        "error_code": "INVALID_STATE",
+        "message": "Single choice answer must be a string",
+        "question_id": 4059,
+    }
 
 @pytest.mark.asyncio
 async def test_upsert_multiple_choice_rejects_invalid_option(async_client, test_db_session):

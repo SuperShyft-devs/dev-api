@@ -20,11 +20,15 @@ class AppError(Exception):
 
     Must not use ``frozen=True``: Python sets ``__traceback__`` when raising,
     and frozen dataclasses reject that assignment (500 + FrozenInstanceError).
+
+    Optional ``details`` are merged into the JSON response at the top level
+    (e.g. ``question_id``) so clients can identify the failing field.
     """
 
     status_code: int
     error_code: str
     message: str
+    details: Dict[str, object] | None = None
 
 
 def _map_status_to_error_code(status_code: int) -> str:
@@ -105,12 +109,18 @@ def add_exception_handlers(app: FastAPI) -> None:
             message=exc.message,
             exc=exc,
         )
+        content: Dict[str, object] = {
+            "error_code": exc.error_code,
+            "message": exc.message,
+        }
+        if exc.details:
+            for key, value in exc.details.items():
+                if key in {"error_code", "message"}:
+                    continue
+                content[key] = value
         return JSONResponse(
             status_code=exc.status_code,
-            content={
-                "error_code": exc.error_code,
-                "message": exc.message,
-            },
+            content=content,
         )
 
     @app.exception_handler(RequestValidationError)

@@ -46,6 +46,31 @@ async def test_app_error_handler_returns_standard_format():
 
 
 @pytest.mark.asyncio
+async def test_app_error_handler_includes_details_fields():
+    """Optional AppError details are merged into the response body."""
+    app = _create_test_app()
+
+    @app.get("/test/app-error-details")
+    async def _app_error_details_route():
+        raise AppError(
+            status_code=422,
+            error_code="INVALID_STATE",
+            message="Single choice answer must be a string",
+            details={"question_id": 14},
+        )
+
+    async with await _get_async_client(app) as client:
+        response = await client.get("/test/app-error-details")
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error_code": "INVALID_STATE",
+        "message": "Single choice answer must be a string",
+        "question_id": 14,
+    }
+
+
+@pytest.mark.asyncio
 async def test_validation_error_returns_standard_format():
     """Validation errors should return standard error format."""
     app = _create_test_app()

@@ -12,6 +12,7 @@ from modules.users.repository import UsersRepository
 
 def _health_priorities_question() -> dict:
     return {
+        "question_id": 42,
         "question_key": "health_priorities",
         "question_type": "multiple_choice",
         "options": [
@@ -50,7 +51,7 @@ def test_validate_health_priorities_rejects_more_than_two():
         )
     assert exc.value.error_code == "INVALID_STATE"
     assert "at most 2" in str(exc.value.message).lower()
-
+    assert exc.value.details == {"question_id": 42}
 
 def test_validate_health_priorities_coerces_legacy_string_before_check():
     svc = QuestionnaireService(

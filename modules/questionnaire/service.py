@@ -444,44 +444,67 @@ class QuestionnaireService:
         if question_type not in _CHOICE_TYPES and question_type != _SCALE_TYPE and len(options) > 0:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
+    def _answer_validation_error(self, *, question: dict, message: str, error_code: str = "INVALID_STATE") -> AppError:
+        details: dict[str, object] | None = None
+        qid = question.get("question_id")
+        if qid is not None:
+            try:
+                details = {"question_id": int(qid)}
+            except (TypeError, ValueError):
+                details = None
+        return AppError(status_code=422, error_code=error_code, message=message, details=details)
+
     def _validate_answer_by_type(self, *, question: dict, answer: object) -> None:
         question_type = _normalize_question_type(question.get("question_type"))
         answer = _coerce_answer_for_question(question.get("question_key"), answer)
 
         if question_type == _SCALE_TYPE:
             if not isinstance(answer, dict):
-                raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must be an object")
+                raise self._answer_validation_error(question=question, message="Scale answer must be an object")
             value = answer.get("value")
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
-                raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must include a valid number")
+                raise self._answer_validation_error(
+                    question=question, message="Scale answer must include a valid number"
+                )
             unit = _normalize_text(answer.get("unit"))
             if not unit:
-                raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer must include a unit")
+                raise self._answer_validation_error(question=question, message="Scale answer must include a unit")
             allowed_units = {
                 _normalize_text(option.get("option_value"))
                 for option in (question.get("options") or [])
                 if isinstance(option, dict)
             }
             if unit not in allowed_units:
-                raise AppError(status_code=422, error_code="INVALID_STATE", message="Scale answer unit is not allowed")
-            validate_scale_answer(_normalize_text(question.get("question_key")), answer)
+                raise self._answer_validation_error(question=question, message="Scale answer unit is not allowed")
+            try:
+                validate_scale_answer(_normalize_text(question.get("question_key")), answer)
+            except AppError as exc:
+                raise self._answer_validation_error(
+                    question=question, message=exc.message, error_code=exc.error_code
+                ) from exc
             return
 
         if question_type == "single_choice":
             if not isinstance(answer, str):
-                raise AppError(status_code=422, error_code="INVALID_STATE", message="Single choice answer must be a string")
+                raise self._answer_validation_error(
+                    question=question, message="Single choice answer must be a string"
+                )
             allowed_values = {
                 _normalize_text(option.get("option_value"))
                 for option in (question.get("options") or [])
                 if isinstance(option, dict)
             }
             if allowed_values and _normalize_text(answer) not in allowed_values:
-                raise AppError(status_code=422, error_code="INVALID_STATE", message="Single choice answer is not a valid option")
+                raise self._answer_validation_error(
+                    question=question, message="Single choice answer is not a valid option"
+                )
             return
 
         if question_type == "multiple_choice":
             if not isinstance(answer, list):
-                raise AppError(status_code=422, error_code="INVALID_STATE", message="Multiple choice answer must be a list")
+                raise self._answer_validation_error(
+                    question=question, message="Multiple choice answer must be a list"
+                )
             allowed_values = {
                 _normalize_text(option.get("option_value"))
                 for option in (question.get("options") or [])
@@ -490,21 +513,24 @@ class QuestionnaireService:
             if allowed_values:
                 for item in answer:
                     if not isinstance(item, str):
-                        raise AppError(status_code=422, error_code="INVALID_STATE", message="Multiple choice answer items must be strings")
+                        raise self._answer_validation_error(
+                            question=question, message="Multiple choice answer items must be strings"
+                        )
                     if _normalize_text(item) not in allowed_values:
-                        raise AppError(status_code=422, error_code="INVALID_STATE", message="Multiple choice answer contains an invalid option")
+                        raise self._answer_validation_error(
+                            question=question, message="Multiple choice answer contains an invalid option"
+                        )
             max_allowed = MAX_MULTI_SELECT_CHOICES.get(_normalize_text(question.get("question_key")))
             if max_allowed is not None and len(answer) > max_allowed:
-                raise AppError(
-                    status_code=422,
-                    error_code="INVALID_STATE",
+                raise self._answer_validation_error(
+                    question=question,
                     message=f"Select at most {max_allowed} options for this question",
                 )
             return
 
         if question_type == "text":
             if not isinstance(answer, str):
-                raise AppError(status_code=422, error_code="INVALID_STATE", message="Text answer must be a string")
+                raise self._answer_validation_error(question=question, message="Text answer must be a string")
 
     @staticmethod
     def _is_answer_provided(*, question: dict, answer: object) -> bool:
@@ -1662,24 +1688,28 @@ class QuestionnaireService:
         # Validate all question IDs and ensure they're active
         for response_item in responses:
             question_id = int(response_item["question_id"])
+            question_details: dict[str, object] = {"question_id": question_id}
 
             if question_id not in valid_question_ids:
                 raise AppError(
                     status_code=422,
                     error_code="INVALID_STATE",
                     message="Question does not belong to this category",
+                    details=question_details,
                 )
             if question_id not in active_question_ids:
                 raise AppError(
                     status_code=422,
                     error_code="INVALID_STATE",
                     message="Question is not available",
+                    details=question_details,
                 )
             if not visible_questions.get(question_id, False):
                 raise AppError(
                     status_code=422,
                     error_code="INVALID_STATE",
                     message="Question is not currently visible",
+                    details=question_details,
                 )
             question_def = questions_by_id.get(question_id)
             if question_def is None:
@@ -1687,12 +1717,14 @@ class QuestionnaireService:
                     status_code=422,
                     error_code="INVALID_STATE",
                     message="Question is not available",
+                    details=question_details,
                 )
             if question_def.get("is_read_only"):
                 raise AppError(
                     status_code=422,
                     error_code="INVALID_STATE",
                     message="Question is read-only and cannot be modified",
+                    details=question_details,
                 )
             response_item["answer"] = _coerce_answer_for_question(
                 question_def.get("question_key"),
