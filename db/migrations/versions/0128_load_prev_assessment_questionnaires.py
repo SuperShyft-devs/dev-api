@@ -1,6 +1,6 @@
 """Add load_prev_assessment_questionnaires to engagements.
 
-Revision ID: 0128_load_prev_assessment_questionnaires
+Revision ID: 0128_eng_load_prev_qnr
 Revises: 0127_users_age_nullable
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy import inspect
 
-revision = "0128_load_prev_assessment_questionnaires"
+revision = "0128_eng_load_prev_qnr"
 down_revision = "0127_users_age_nullable"
 branch_labels = None
 depends_on = None
