@@ -384,6 +384,28 @@ class AssessmentsRepository:
         )
         return int(result.scalar_one())
 
+    async def list_completed_instances_for_user(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: int,
+    ) -> list[tuple[AssessmentInstance, AssessmentPackage | None]]:
+        """Return completed assessment instances with a Metsights record for a user.
+
+        Bio-AI scores are only available once ``metsights_record_id`` is set and
+        the instance is completed. Not paginated — used by historical trends.
+        """
+        result = await db.execute(
+            select(AssessmentInstance, AssessmentPackage)
+            .outerjoin(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .where(AssessmentInstance.user_id == user_id)
+            .where(func.lower(AssessmentInstance.status) == "completed")
+            .where(AssessmentInstance.metsights_record_id.is_not(None))
+            .where(AssessmentInstance.metsights_record_id != "")
+            .order_by(AssessmentInstance.completed_at.asc().nulls_last(), AssessmentInstance.assessment_instance_id.asc())
+        )
+        return list(result.all())
+
     async def list_instances_for_user(
         self,
         db: AsyncSession,
