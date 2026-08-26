@@ -226,6 +226,12 @@ class CampReportRefreshRequest(BaseModel):
     section: SlugKey
 
 
+class CampReportEnrichRequest(BaseModel):
+    """Request a single HR-dashboard intelligence/concern section."""
+
+    section: SlugKey
+
+
 class CampReportSectionPayloadUpdateRequest(BaseModel):
     """Manually overwrite a stored camp report section JSON blob."""
 

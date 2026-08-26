@@ -13,6 +13,7 @@ from modules.employee.service import EmployeeContext
 from modules.reports.camp_reports_service import CampReportsService
 from modules.reports.dependencies import get_camp_reports_service
 from modules.reports.schemas import (
+    CampReportEnrichRequest,
     CampReportEstimateRequest,
     CampReportRefreshRequest,
     CampReportSectionPayloadUpdateRequest,
@@ -212,6 +213,102 @@ async def update_city_department_camp_report_dashboard_section(
         camp_no=camp_no,
         section=payload.section,
         payload=payload.payload,
+        department=slug,
+        city=city,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.put("/{camp_no}/enrich")
+async def enrich_camp_report_section(
+    camp_no: int,
+    payload: CampReportEnrichRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.enrich_camp_report_section(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.put("/{camp_no}/department/{slug}/enrich")
+async def enrich_department_camp_report_section(
+    camp_no: int,
+    slug: str,
+    payload: CampReportEnrichRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.enrich_camp_report_section(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
+        department=slug,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.put("/{camp_no}/{city}/enrich")
+async def enrich_city_camp_report_section(
+    camp_no: int,
+    city: str,
+    payload: CampReportEnrichRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.enrich_camp_report_section(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
+        city=city,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.put("/{camp_no}/{city}/department/{slug}/enrich")
+async def enrich_city_department_camp_report_section(
+    camp_no: int,
+    city: str,
+    slug: str,
+    payload: CampReportEnrichRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: CampReportsService = Depends(get_camp_reports_service),
+):
+    result = await service.enrich_camp_report_section(
+        db,
+        employee=employee,
+        camp_no=camp_no,
+        section=payload.section,
         department=slug,
         city=city,
         ip_address=_client_ip(request),
