@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -174,11 +174,16 @@ class IdealRangeDetail(BaseModel):
     unit: str | None = None
 
 
+class WaistMeasurement(BaseModel):
+    value: float | None = None
+    unit: Literal["in", "cm"] | None = None
+
+
 class HealthSpanFitnessDetail(BaseModel):
     systolic_blood_pressure: str | None = None
     diastolic_blood_pressure: str | None = None
     basal_metabolic_rate: FitPrintParameter | None = None
-    waist: str | None = None
+    waist: WaistMeasurement | None = None
     estimated_body_fat: FitPrintParameter | None = None
     ideal_waist: IdealRangeDetail | None = None
     ideal_bmr: IdealRangeDetail | None = None

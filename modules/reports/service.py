@@ -7,7 +7,7 @@ import logging
 import re
 from collections.abc import Callable, Coroutine
 from datetime import date, datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from sqlalchemy import select
@@ -66,6 +66,7 @@ from modules.reports.schemas import (
     FitPrintParameterRange,
     HealthSpanFitnessDetail,
     HealthSpanIndexResponse,
+    WaistMeasurement,
     HealthSpanLifestyleDetail,
     HealthSpanNutritionDetail,
     HealthyHabitItem,
@@ -1824,6 +1825,25 @@ class ReportsService:
         return value.strip() or None
 
     @staticmethod
+    def _normalize_waist_unit(value: str | None) -> Literal["in", "cm"] | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if normalized in {"0", "cm"}:
+            return "cm"
+        if normalized in {"1", "in", "inch", "inches"}:
+            return "in"
+        return None
+
+    @staticmethod
+    def _extract_waist_measurement(lookup: dict[str, Any]) -> WaistMeasurement | None:
+        waist_value, waist_unit = ReportsService._extract_scale_answer(lookup.get("waist_circumference"))
+        if waist_value is None:
+            return None
+        normalized_unit = ReportsService._normalize_waist_unit(waist_unit)
+        return WaistMeasurement(value=waist_value, unit=normalized_unit)
+
+    @staticmethod
     def _normalize_choice_label(value: str) -> str:
         text = (value or "").strip().lower()
         text = text.replace("–", "-").replace("—", "-")
@@ -2177,7 +2197,7 @@ class ReportsService:
         # Fitness details
         systolic_blood_pressure = self._extract_questionnaire_value(lookup, "systolic_blood_pressure")
         diastolic_blood_pressure = self._extract_questionnaire_value(lookup, "diastolic_blood_pressure")
-        waist = self._extract_questionnaire_value(lookup, "waist_circumference")
+        waist = self._extract_waist_measurement(lookup)
 
         activity_params = activity_spec.get("parameters") if isinstance(activity_spec, dict) else None
         bmr_param = self._extract_fitprint_parameter(activity_params, "Basal Metabolic Rate")
