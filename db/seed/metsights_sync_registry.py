@@ -233,7 +233,12 @@ def build_metsights_sync(question_key: str) -> dict[str, Any]:
 
     if question_key in _SKIP_IF_ONLY_KEYS:
         return {
-            "pull": {"enabled": True, "strategy": "passthrough"},
+            # Metsights stores [] to mean "None"; map to local ["none"] on pull.
+            "pull": {
+                "enabled": True,
+                "strategy": "passthrough",
+                "empty_list_as": ["none"],
+            },
             "push": {"enabled": True, "strategy": "skip_if_only", "skip_values": ["none"]},
         }
 
@@ -257,6 +262,8 @@ def build_metsights_sync(question_key: str) -> dict[str, Any]:
         }
 
     if question_key == "iodized_salt_status":
+        # Metsights diet-lifestyle returns display labels "Yes"/"No" (not bool).
+        # string_boolean accepts Yes/No/true/false/1/0.
         return {
             "pull": {"enabled": True, "strategy": "string_boolean"},
             "push": {"enabled": True, "strategy": "boolean_string"},

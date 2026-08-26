@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import random
 import re
@@ -106,6 +107,16 @@ _METADATA_FIELDS = frozenset(
         "created_at",
         "updated_at",
         "is_complete",
+    }
+)
+
+# Metsights stores ``[]`` for these multi-choice fields to mean "None".
+# Import must not skip empty lists for them (see pull_passthrough).
+_EMPTY_LIST_IMPORT_KEYS = frozenset(
+    {
+        "diagnosed_diseases",
+        "family_health_history",
+        "diagnosed_diseases_medications",
     }
 )
 
@@ -2277,12 +2288,18 @@ class MetsightsSyncService:
 
         imported = 0
         skipped: list[str] = []
-        now = datetime.now(timezone.utc)
+        metsights_section_complete = bool(
+            isinstance(metsights_payload, dict) and metsights_payload.get("is_complete")
+        )
 
         for field_name, raw_val in metsights_payload.items():
             if field_name in _METADATA_FIELDS or str(field_name).endswith("_unit"):
                 continue
-            if raw_val is None or raw_val == [] or raw_val == "":
+            if raw_val is None or raw_val == "":
+                continue
+            # Empty lists normally mean "no answer", but disease/history fields
+            # use [] to mean "None" and must be pulled as ["none"].
+            if raw_val == [] and str(field_name) not in _EMPTY_LIST_IMPORT_KEYS:
                 continue
 
             qdef = await self._questionnaire.get_definition_by_key(db, question_key=str(field_name))
@@ -2291,6 +2308,13 @@ class MetsightsSyncService:
                 continue
 
             sync_cfg = qdef.metsights_sync or {}
+            if isinstance(sync_cfg, str):
+                try:
+                    sync_cfg = json.loads(sync_cfg)
+                except Exception:
+                    sync_cfg = {}
+            if not isinstance(sync_cfg, dict):
+                sync_cfg = {}
             pull_cfg = sync_cfg.get("pull") or {}
             if not pull_cfg.get("enabled", False):
                 skipped.append(f"{field_name}:pull_not_enabled")
@@ -2336,6 +2360,18 @@ class MetsightsSyncService:
             mark_submitted=True,
         )
 
+        # Metsights FitPrint (and some Pro sections) can be ``is_complete`` without
+        # every SuperShyft-required field (e.g. living_region / salt questions are
+        # absent from fitness-parameters). Trust Metsights section completeness so
+        # admin journey does not stay Partial after a successful import.
+        if metsights_section_complete:
+            await self._mark_imported_category_complete(
+                db,
+                assessments_repo=assessments_repo,
+                instance=instance,
+                category_id=int(category.category_id),
+            )
+
         await self._mark_related_categories_submitted(
             db, assessments_repo=assessments_repo,
             instance=instance, metsights_category_key=category_key,
@@ -2347,7 +2383,47 @@ class MetsightsSyncService:
             "metsights_record_id": mrid,
             "responses_imported": imported,
             "skipped": skipped,
+            "metsights_section_complete": metsights_section_complete,
         }
+
+    async def _mark_imported_category_complete(
+        self,
+        db: AsyncSession,
+        *,
+        assessments_repo: "AssessmentsRepository",
+        instance: AssessmentInstance,
+        category_id: int,
+    ) -> None:
+        """Force-complete a category after Metsights reports ``is_complete`` for the section."""
+        now = datetime.now(timezone.utc)
+        progress = await assessments_repo.get_category_progress(
+            db,
+            assessment_instance_id=int(instance.assessment_instance_id),
+            category_id=category_id,
+        )
+        if progress is None:
+            await assessments_repo.create_category_progress(
+                db,
+                AssessmentCategoryProgress(
+                    assessment_instance_id=int(instance.assessment_instance_id),
+                    category_id=category_id,
+                    status="complete",
+                    is_submitted=True,
+                    completed_at=now,
+                ),
+            )
+            return
+
+        changed = False
+        if (progress.status or "").strip().lower() != "complete":
+            progress.status = "complete"
+            progress.completed_at = now
+            changed = True
+        if not progress.is_submitted:
+            progress.is_submitted = True
+            changed = True
+        if changed:
+            await assessments_repo.update_category_progress(db, progress)
 
     async def _update_all_category_progress_for_instance(
         self,

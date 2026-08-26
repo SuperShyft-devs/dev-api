@@ -246,19 +246,48 @@ def pull_scale_ingest_unitless(key: str, payload: dict[str, Any], params: dict) 
     return {"value": val, "unit": "0"}
 
 
+# Multi-choice fields where Metsights stores ``[]`` to mean "None selected".
+# Local questionnaires require the explicit ``none`` option value.
+_EMPTY_LIST_AS_NONE_KEYS = frozenset(
+    {
+        "diagnosed_diseases",
+        "family_health_history",
+        "diagnosed_diseases_medications",
+    }
+)
+
+
+def _empty_list_as_none(key: str, params: dict) -> list[str] | None:
+    """Resolve empty-list → ``["none"]`` for disease/history multi-choice pulls."""
+    override = params.get("empty_list_as")
+    if override is not None:
+        return list(override) if isinstance(override, (list, tuple)) else [str(override)]
+    if key in _EMPTY_LIST_AS_NONE_KEYS:
+        return ["none"]
+    return None
+
+
 def pull_passthrough(key: str, payload: dict[str, Any], params: dict) -> Any:
-    """Return the value as-is from the Metsights response."""
+    """Return the value as-is from the Metsights response.
+
+    Empty lists normally mean "no value". For disease/history multi-choice
+    fields Metsights uses ``[]`` to mean "None", which we map to ``["none"]``.
+    """
     val = payload.get(key)
-    if val is None or val == "" or val == []:
+    if val is None or val == "":
         return None
+    if val == []:
+        return _empty_list_as_none(key, params)
     return val
 
 
 def pull_choice_ingest(key: str, payload: dict[str, Any], params: dict) -> Any:
     """Pull choice value. Same as passthrough for now -- reserved for future mapping."""
     val = payload.get(key)
-    if val is None or val == "" or val == []:
+    if val is None or val == "":
         return None
+    if val == []:
+        return _empty_list_as_none(key, params)
     return val
 
 
@@ -305,16 +334,21 @@ def pull_scale_to_bucket(key: str, payload: dict[str, Any], params: dict) -> Any
 
 
 def pull_string_boolean(key: str, payload: dict[str, Any], params: dict) -> Any:
-    """Metsights boolean -> our string ``"true"``/``"false"``."""
+    """Metsights boolean / Yes-No label -> our string ``"true"``/``"false"``.
+
+    Metsights diet-lifestyle returns display labels ``\"Yes\"`` / ``\"No\"`` for
+    ``iodized_salt_status`` (not native booleans). Accept those too so imports
+    do not leave required questions unanswered.
+    """
     val = payload.get(key)
     if val is None:
         return None
     if isinstance(val, bool):
         return "true" if val else "false"
     low = str(val).strip().lower()
-    if low in ("true", "1"):
+    if low in ("true", "1", "yes", "y"):
         return "true"
-    if low in ("false", "0"):
+    if low in ("false", "0", "no", "n"):
         return "false"
     return None
 
