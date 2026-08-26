@@ -18,6 +18,7 @@ from modules.assessments.models import (
     AssessmentPackage,
     AssessmentPackageCategory,
 )
+from modules.engagement_notifications.service_config import extract_service_keys
 from modules.engagements.models import (
     AutoNotificationEvent,
     Engagement,
@@ -145,7 +146,15 @@ def _notification_user_ids(raw_user: Any) -> set[int]:
     ids = raw_user.get("user_ids")
     if not isinstance(ids, list):
         return set()
-    return {int(uid) for uid in ids if uid is not None}
+    result: set[int] = set()
+    for uid in ids:
+        if uid is None:
+            continue
+        try:
+            result.add(int(uid))
+        except (TypeError, ValueError):
+            continue
+    return result
 
 
 def _notification_counts_as_sent(status: str | None, dispatched_at: datetime | None) -> bool:
@@ -2541,7 +2550,8 @@ class CampReportsRepository:
             )
             all_service_keys: set[str] = set()
             for engagement_id, event_code, services in event_result.all():
-                keys = [str(sk).strip() for sk in (services or []) if sk and str(sk).strip()]
+                # notification_services is JSON list of {service_key, ...} (or legacy strings).
+                keys = extract_service_keys(services if isinstance(services, list) else None)
                 if not keys:
                     continue
                 all_service_keys.update(keys)

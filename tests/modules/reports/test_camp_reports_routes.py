@@ -2479,13 +2479,14 @@ async def _seed_camp_participants_enriched(test_db_session, *, organization_id: 
                 id=organization_id + 600,
                 engagement_id=engagement_id,
                 notification_event_id=blood_event.id,
-                notification_services=[blood_service],
+                # Production stores JSON objects after migration 0118.
+                notification_services=[{"service_key": blood_service, "external_link": None}],
             ),
             EngagementNotification(
                 id=organization_id + 601,
                 engagement_id=engagement_id,
                 notification_event_id=bio_event.id,
-                notification_services=[bio_service],
+                notification_services=[{"service_key": bio_service, "external_link": None}],
             ),
         ]
     )
