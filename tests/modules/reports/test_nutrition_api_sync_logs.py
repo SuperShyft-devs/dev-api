@@ -255,6 +255,32 @@ def test_build_nutrition_api_payload_remaps_legacy_intensity_labels():
     assert payload["age"] == 32
 
 
+def test_build_nutrition_api_payload_includes_health_priorities():
+    service = _build_reports_service()
+    reverse_map = {
+        "health_priorities": {
+            "0": "0",
+            "4": "4",
+            "Weight Loss": "0",
+            "Increasing Strength": "4",
+        },
+    }
+    lookup = {
+        "health_priorities": ["Weight Loss", "Increasing Strength"],
+    }
+    payload = service._build_nutrition_api_payload(
+        lookup,
+        option_reverse_map=reverse_map,
+    )
+    assert payload["health_priorities"] == ["0", "4"]
+
+
+def test_build_nutrition_api_payload_omits_health_priorities_when_missing():
+    service = _build_reports_service()
+    payload = service._build_nutrition_api_payload({})
+    assert "health_priorities" not in payload
+
+
 def test_resolve_nutrition_age_prefers_stored_age():
     assert ReportsService._resolve_nutrition_age(user_age=40, user_date_of_birth=date(1990, 1, 1)) == 40
 

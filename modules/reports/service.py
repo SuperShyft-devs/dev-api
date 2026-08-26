@@ -1601,6 +1601,7 @@ class ReportsService:
         "water_intake_frequency",
         "tobacco_frequency",
         "alcohol_frequency",
+        "health_priorities",
         "sickness_frequency",
     ]
 
