@@ -349,6 +349,7 @@ class UsersRepository:
             select(
                 EngagementParticipant.slot_start_time.label("slot_start_time"),
                 EngagementParticipant.engagement_date.label("engagement_date"),
+                EngagementParticipant.booking_id.label("booking_id"),
                 Engagement.engagement_type.label("engagement_type"),
                 Engagement.slot_duration.label("slot_duration"),
                 Engagement.city.label("engagement_city"),

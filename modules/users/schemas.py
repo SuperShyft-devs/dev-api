@@ -141,6 +141,7 @@ class UpcomingSlotTiming(BaseModel):
     slot_start_time: str
     slot_end_time: str
     engagement_date: date
+    is_booked: bool
 
 
 class UpcomingSlotLocation(BaseModel):

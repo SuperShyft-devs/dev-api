@@ -266,6 +266,7 @@ class UsersService:
                         "slot_start_time": slot_start_dt.strftime("%I:%M %p").lstrip("0"),
                         "slot_end_time": slot_end_dt.strftime("%I:%M %p").lstrip("0"),
                         "engagement_date": row.engagement_date,
+                        "is_booked": row.booking_id is not None,
                     },
                     "location": {
                         "type": "venue" if is_b2b else "home_collection",
