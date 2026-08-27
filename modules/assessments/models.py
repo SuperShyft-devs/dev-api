@@ -14,6 +14,10 @@ class AssessmentPackage(Base):
     """SQLAlchemy model for `assessment_packages` table."""
 
     __tablename__ = "assessment_packages"
+    __table_args__ = (
+        Index("ix_assessment_packages_package_code", "package_code"),
+        Index("ix_assessment_packages_type_status", "assessment_type_code", "status"),
+    )
 
     package_id = Column(Integer, primary_key=True)
     package_code = Column(String)

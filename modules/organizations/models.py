@@ -7,7 +7,7 @@ Schema must match `instructions/db-schema.txt`.
 
 from __future__ import annotations
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, Integer, String, Text, func
 
 from db.base import Base
 
@@ -26,6 +26,11 @@ class Organization(Base):
     """SQLAlchemy model for `organizations` table."""
 
     __tablename__ = "organizations"
+    __table_args__ = (
+        Index("ix_organizations_status", "status"),
+        Index("ix_organizations_bd_employee_id", "bd_employee_id"),
+        Index("ix_organizations_industry_key", "industry_key"),
+    )
 
     organization_id = Column(Integer, primary_key=True)
     name = Column(String)

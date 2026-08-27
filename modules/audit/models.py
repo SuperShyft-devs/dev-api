@@ -5,7 +5,7 @@ Audit logs are immutable.
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 
 from db.base import Base
@@ -15,6 +15,7 @@ class DataAuditLog(Base):
     """SQLAlchemy model for `data_audit_logs` table."""
 
     __tablename__ = "data_audit_logs"
+    __table_args__ = (Index("ix_data_audit_logs_user_id", "user_id"),)
 
     audit_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
@@ -30,6 +31,10 @@ class IntegrationSyncLog(Base):
     """SQLAlchemy model for `integration_sync_logs` table."""
 
     __tablename__ = "integration_sync_logs"
+    __table_args__ = (
+        Index("ix_integration_sync_logs_provider_status_created", "provider", "status", "created_at"),
+        Index("ix_integration_sync_logs_request_payload_gin", "request_payload", postgresql_using="gin"),
+    )
 
     sync_log_id = Column(Integer, primary_key=True, autoincrement=True)
     engagement_id = Column(Integer, ForeignKey("engagements.engagement_id", ondelete="SET NULL"), nullable=True)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, Time, UniqueConstraint, func
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, Time, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 
@@ -19,6 +19,10 @@ class ExpertTypeModel(Base):
 
 class Expert(Base):
     __tablename__ = "experts"
+    __table_args__ = (
+        Index("ix_experts_status_type", "status", "expert_type"),
+        Index("ix_experts_user_id", "user_id"),
+    )
 
     expert_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
@@ -60,6 +64,7 @@ class ExpertExpertiseTag(Base):
 
 class ExpertReview(Base):
     __tablename__ = "expert_reviews"
+    __table_args__ = (Index("ix_expert_reviews_expert_created", "expert_id", "created_at"),)
 
     review_id = Column(Integer, primary_key=True, autoincrement=True)
     expert_id = Column(Integer, ForeignKey("experts.expert_id", ondelete="CASCADE"), nullable=False)
@@ -85,6 +90,7 @@ class ExpertAvailabilityModel(Base):
 
 class ExpertAvailabilityOverrideModel(Base):
     __tablename__ = "expert_availability_overrides"
+    __table_args__ = (Index("ix_expert_availability_overrides_expert_date", "expert_id", "override_date"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     expert_id = Column(Integer, ForeignKey("experts.expert_id", ondelete="CASCADE"), nullable=False)

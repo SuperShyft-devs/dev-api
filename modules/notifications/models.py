@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String, Text, func, text
 
 from db.base import Base
 
@@ -31,6 +31,16 @@ class Notification(Base):
     """SQLAlchemy model for `notifications` table."""
 
     __tablename__ = "notifications"
+    __table_args__ = (
+        Index(
+            "ix_notifications_pending_dispatched_at",
+            "dispatched_at",
+            postgresql_where=text("status = 'pending' AND dispatched_at IS NOT NULL"),
+        ),
+        Index("ix_notifications_svc_eng_status", "service_key", "engagement_id", "status"),
+        Index("ix_notifications_engagement_id", "engagement_id"),
+        Index("ix_notifications_assessment_instance_id", "assessment_instance_id"),
+    )
 
     notification_id = Column(Integer, primary_key=True, autoincrement=True)
     service_key = Column(String, ForeignKey("notification_services.service_key"), nullable=False)

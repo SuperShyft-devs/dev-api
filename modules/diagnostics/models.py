@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func, text
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship
 
@@ -20,6 +20,14 @@ class DiagnosticPackage(Base):
     """SQLAlchemy model for `diagnostic_package` table."""
 
     __tablename__ = "diagnostic_package"
+    __table_args__ = (
+        Index("ix_diagnostic_package_status_package_for", "status", "package_for"),
+        Index(
+            "ix_diagnostic_package_created_by_user_id",
+            "created_by_user_id",
+            postgresql_where=text("created_by_user_id IS NOT NULL"),
+        ),
+    )
 
     diagnostic_package_id = Column(Integer, primary_key=True)
     reference_id = Column(String)
@@ -84,6 +92,9 @@ class DiagnosticPackageFilterChip(Base):
     """SQLAlchemy model for `diagnostic_package_filters_chips` catalog table."""
 
     __tablename__ = "diagnostic_package_filters_chips"
+    __table_args__ = (
+        Index("ix_diag_filter_chips_status_chip_for_order", "status", "chip_for", "display_order"),
+    )
 
     filter_chip_id = Column(Integer, primary_key=True)
     chip_key = Column(String, nullable=False)
@@ -200,6 +211,14 @@ class HealthParameter(Base):
     """SQLAlchemy model for `health_parameters` table."""
 
     __tablename__ = "health_parameters"
+    __table_args__ = (
+        Index("ix_health_parameters_parameter_type", "parameter_type"),
+        Index(
+            "ix_health_parameters_parameter_key_lower",
+            text("lower(parameter_key)"),
+            postgresql_where=text("parameter_key IS NOT NULL"),
+        ),
+    )
 
     test_id = Column(Integer, primary_key=True)
     parameter_type = Column(

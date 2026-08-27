@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, func, text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, func, text
 from sqlalchemy.dialects.postgresql import JSON
 
 from db.base import Base
@@ -12,6 +12,10 @@ class Booking(Base):
     """A reserved slot / package / consultation with price snapshot at booking time."""
 
     __tablename__ = "bookings"
+    __table_args__ = (
+        Index("ix_bookings_user_entity", "user_id", "entity_type", "entity_id"),
+        Index("ix_bookings_status", "status"),
+    )
 
     booking_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)

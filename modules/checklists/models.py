@@ -33,6 +33,7 @@ class ChecklistTemplate(Base):
 
 class ChecklistTemplateItem(Base):
     __tablename__ = "checklist_template_items"
+    __table_args__ = (Index("ix_checklist_template_items_template_id", "template_id"),)
 
     item_id = Column(Integer, primary_key=True)
     template_id = Column(Integer, ForeignKey("checklist_templates.template_id", ondelete="CASCADE"), nullable=False)
