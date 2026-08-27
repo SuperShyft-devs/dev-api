@@ -1345,6 +1345,12 @@ class CampReportsService:
         # or perform heavy aggregation so Postgres connections are not idle in transaction.
         await db.commit()
 
+        # Snapshot ORM attrs before builders that may call release_request_transaction
+        # (read-only rollback expires the identity map — sync lazy loads raise MissingGreenlet).
+        report_id = int(row.report_id)
+        section_name = section_row.section
+        section_description = section_row.description
+
         checked_at = datetime.now(timezone.utc).isoformat()
         report = dict(row.report or {})
         previous_section = report.get(normalized_section)
@@ -1470,11 +1476,15 @@ class CampReportsService:
 
         section_payload = {
             **built_payload,
-            "name": section_row.section,
-            "description": section_row.description,
+            "name": section_name,
+            "description": section_description,
         }
         report[normalized_section] = section_payload
 
+        reload_result = await db.execute(
+            select(CampReport).where(CampReport.report_id == report_id)
+        )
+        row = reload_result.scalar_one()
         report_bts = dict(row.report_bts or {})
         # Refresh/validate always writes ``section_payload`` first. BTS must validate
         # that just-written data — not the pre-refresh snapshot. Comparing to
@@ -1615,7 +1625,7 @@ class CampReportsService:
         )
 
         return {
-            "report_id": row.report_id,
+            "report_id": report_id,
             "section": section_payload,
             "report_bts": report_bts.get(normalized_section),
         }
@@ -2168,17 +2178,34 @@ class CampReportsService:
             users_result = await db.execute(select(User).where(User.user_id.in_(user_ids)))
             users_by_id = {int(u.user_id): u for u in users_result.scalars().all()}
 
-        participant_rows: list[dict[str, Any]] = []
-        excluded_report_load_failed: list[dict[str, Any]] = []
-
+        participant_snapshots: list[dict[str, Any]] = []
         for ctx in contexts:
             uid = int(ctx.assessment_instance.user_id)
             user = users_by_id.get(uid)
-            name = _display_person_name(
-                user.first_name if user else None,
-                user.last_name if user else None,
+            participant_snapshots.append(
+                {
+                    "ctx": ctx,
+                    "user_id": uid,
+                    "engagement_id": int(ctx.assessment_instance.engagement_id),
+                    "assessment_instance_id": int(ctx.assessment_instance.assessment_instance_id),
+                    "name": _display_person_name(
+                        user.first_name if user else None,
+                        user.last_name if user else None,
+                    ),
+                    "user_gender": ctx.user_gender,
+                    "user_age": ctx.user_age,
+                    "user_date_of_birth": ctx.user_date_of_birth,
+                }
             )
-            assessment_instance_id = int(ctx.assessment_instance.assessment_instance_id)
+
+        participant_rows: list[dict[str, Any]] = []
+        excluded_report_load_failed: list[dict[str, Any]] = []
+
+        for snap in participant_snapshots:
+            ctx = snap["ctx"]
+            uid = snap["user_id"]
+            name = snap["name"]
+            assessment_instance_id = snap["assessment_instance_id"]
 
             try:
                 report_dict = await self._reports_service._resolve_report_dict_for_instance(
@@ -2246,8 +2273,8 @@ class CampReportsService:
 
             all_instances = await self._assessments_repository.list_instances_for_user_engagement(
                 db,
-                user_id=ctx.assessment_instance.user_id,
-                engagement_id=ctx.assessment_instance.engagement_id,
+                user_id=snap["user_id"],
+                engagement_id=snap["engagement_id"],
             )
             source_ids = [inst.assessment_instance_id for inst in all_instances]
 
@@ -2272,16 +2299,16 @@ class CampReportsService:
                     )
                     nutrition_payload = self._reports_service._build_nutrition_api_payload(
                         lookup,
-                        user_gender=ctx.user_gender,
-                        user_age=ctx.user_age,
-                        user_date_of_birth=ctx.user_date_of_birth,
+                        user_gender=snap["user_gender"],
+                        user_age=snap["user_age"],
+                        user_date_of_birth=snap["user_date_of_birth"],
                         option_reverse_map=option_reverse_map,
                     )
                     nutrition_response = await self._reports_service._call_nutrition_api(
                         db,
                         nutrition_payload,
-                        user_id=ctx.assessment_instance.user_id,
-                        engagement_id=ctx.assessment_instance.engagement_id,
+                        user_id=snap["user_id"],
+                        engagement_id=snap["engagement_id"],
                     )
                     raw_nutrition = nutrition_response.get("nutrition_score")
                     nutrition_score = (

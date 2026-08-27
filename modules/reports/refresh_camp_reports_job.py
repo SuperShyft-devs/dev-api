@@ -1,4 +1,4 @@
-"""Refresh all camp report sections for camps with a running engagement.
+"""Refresh all camp report sections for camps with a scheduled or running engagement.
 
 Intended for CLI cron: ``python -m db.jobs.refresh_camp_reports --yes``.
 """
@@ -71,11 +71,11 @@ async def refresh_camp_reports(
     on_progress: ProgressCallback | None = None,
     on_event: EventCallback | None = None,
 ) -> dict[str, Any]:
-    """Refresh every implemented section for every camp_reports row on running camps.
+    """Refresh every implemented section for every camp_reports row on active camps.
 
     Progress ``total`` is the number of ``(report_row × section)`` attempts among
-    camps that have at least one running engagement. Skipped camps are counted in
-    the summary only.
+    camps that have at least one engagement with status scheduled or running.
+    Skipped camps are counted in the summary only.
     """
     reports_repo = repository or CampReportsRepository()
     sections_repo = sections_repository or CampReportSectionsRepository()
@@ -102,7 +102,7 @@ async def refresh_camp_reports(
 
     eligible: list[tuple[int, list[CampReportScope]]] = []
     for camp, rows in sorted(by_camp.items()):
-        if await reports_repo.has_running_engagement(db, camp_no=camp):
+        if await reports_repo.has_scheduled_or_running_engagement(db, camp_no=camp):
             camps_running += 1
             eligible.append((camp, snapshot_camp_report_scopes(rows)))
         else:
@@ -114,7 +114,7 @@ async def refresh_camp_reports(
                         "event": "skip_camp",
                         "camp_no": camp,
                         "report_rows": len(rows),
-                        "reason": "no running engagement",
+                        "reason": "no scheduled or running engagement",
                     }
                 )
 

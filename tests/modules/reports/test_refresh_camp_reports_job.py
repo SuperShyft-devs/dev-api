@@ -143,7 +143,7 @@ async def _seed_report(
 
 
 @pytest.mark.asyncio
-async def test_refresh_camp_reports_skips_non_running_camp(test_db_session):
+async def test_refresh_camp_reports_skips_non_active_camp(test_db_session):
     camp_no = await _seed_org_and_engagement(
         test_db_session,
         organization_id=9301,
@@ -179,6 +179,70 @@ async def test_refresh_camp_reports_skips_non_running_camp(test_db_session):
         await test_db_session.execute(select(CampReport).where(CampReport.camp_no == camp_no))
     ).scalar_one()
     assert "participation_by_age" not in (row.report or {})
+
+
+@pytest.mark.asyncio
+async def test_refresh_camp_reports_refreshes_scheduled_camp(test_db_session):
+    organization_id = 9312
+    engagement_id = 9312
+    test_db_session.add(
+        Organization(
+            organization_id=organization_id,
+            name=f"Refresh Cron Org {organization_id}",
+            organization_type="corporate",
+            status="active",
+            departments=[{"department": "Sales", "slug": "sales"}],
+        )
+    )
+    await test_db_session.flush()
+
+    start = date(2026, 6, 23)
+    end = date(2026, 6, 30)
+    camp_no = compute_camp_no(organization_id, start)
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id,
+            engagement_name=f"Eng {engagement_id}",
+            organization_id=organization_id,
+            camp_no=camp_no,
+            engagement_code="CRONSCHED1",
+            engagement_type=None,
+            assessment_package_id=None,
+            diagnostic_package_id=None,
+            city="BLR",
+            slot_duration=20,
+            start_date=start,
+            end_date=end,
+            status="scheduled",
+        )
+    )
+    await test_db_session.commit()
+
+    await _seed_report(test_db_session, camp_no=camp_no, organization_id=organization_id)
+    await _ensure_section(
+        test_db_session,
+        report_sections=9312,
+        section_key="participation_by_age",
+        section="Participation by Age",
+        description="Enrollment distribution across age groups",
+    )
+
+    result = await refresh_camp_reports(
+        test_db_session,
+        service=_service(),
+        dry_run=False,
+        camp_no=camp_no,
+    )
+
+    assert result["camps_running"] == 1
+    assert result["camps_skipped"] == 0
+    assert result["failed"] == 0
+    assert result["refreshed"] >= 1
+
+    row = (
+        await test_db_session.execute(select(CampReport).where(CampReport.camp_no == camp_no))
+    ).scalar_one()
+    assert "participation_by_age" in (row.report or {})
 
 
 @pytest.mark.asyncio

@@ -389,7 +389,20 @@ class CampReportsRepository:
         )
         return [int(row[0]) for row in result.all()]
 
+    async def has_scheduled_or_running_engagement(self, db: AsyncSession, *, camp_no: int) -> bool:
+        normalized = func.lower(func.trim(Engagement.status))
+        result = await db.execute(
+            select(Engagement.engagement_id)
+            .where(
+                Engagement.camp_no == camp_no,
+                normalized.in_(("scheduled", "running")),
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none() is not None
+
     async def has_running_engagement(self, db: AsyncSession, *, camp_no: int) -> bool:
+        """Return True when the camp has at least one running engagement."""
         result = await db.execute(
             select(Engagement.engagement_id)
             .where(

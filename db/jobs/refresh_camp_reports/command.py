@@ -1,8 +1,8 @@
-"""Refresh camp report sections for camps with a running engagement.
+"""Refresh camp report sections for camps with a scheduled or running engagement.
 
 Rebuilds every implemented section on every camp_reports row (overall,
 department, city, city×department) when at least one engagement for that
-camp_no has status=running.
+camp_no has status scheduled or running.
 
 Entrypoint: ``python -m db.jobs.refresh_camp_reports --yes``
 
@@ -182,7 +182,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Refresh all implemented camp report sections for camps that have at least "
-            "one running engagement. Safe to re-run (idempotent rebuild)."
+            "one scheduled or running engagement. Safe to re-run (idempotent rebuild)."
         )
     )
     parser.add_argument(
