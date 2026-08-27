@@ -24,6 +24,7 @@ from modules.bioai_report.report_engine.models.trends import (
 )
 from modules.bioai_report.report_engine.services.assessment_service import AssessmentFetchService
 from modules.bioai_report.report_engine.utils.disease_codes import normalize_disease_code
+from modules.bioai_report.report_engine.utils.patient_enrichment import normalize_gender_label
 from modules.bioai_report.report_engine.utils.score_bands import (
     clamp_score,
     risk_band_range,
@@ -105,6 +106,14 @@ def _instance_fallback_date(instance: AssessmentInstance) -> str | None:
     return None
 
 
+def _is_male_label(*values: object) -> bool:
+    """True only when existing sex/gender data clearly resolves to male."""
+    for value in values:
+        if normalize_gender_label(value) == "male":
+            return True
+    return False
+
+
 def empty_trend_response(user_id: int) -> BioAITrendResponse:
     return BioAITrendResponse(
         user_id=user_id,
@@ -136,6 +145,7 @@ class BioAITrendService:
         user_id: int,
         through_date: str | None = None,
         through_instance_id: int | None = None,
+        patient_gender: str | None = None,
     ) -> BioAITrendResponse:
         user = await self._users.get_user_by_id(db, user_id)
         if user is None:
@@ -147,14 +157,17 @@ class BioAITrendService:
 
         assessments: list[BioAITrendAssessment] = []
         series: dict[str, list[BioAITrendPoint]] = {key: [] for key in TREND_DISEASE_IDS}
+        payload_genders: list[object] = []
 
         for instance, package in rows:
             if not _is_bioai_trend_package(package):
                 continue
-            point_date, scores_by_disease = await self._scores_for_instance(
+            point_date, scores_by_disease, payload_gender = await self._scores_for_instance(
                 instance=instance,
                 package=package,
             )
+            if payload_gender is not None:
+                payload_genders.append(payload_gender)
             instance_id = int(instance.assessment_instance_id)
             if not _included_in_cutoff(
                 point_date=point_date,
@@ -210,6 +223,14 @@ class BioAITrendService:
             series[disease_id] = [by_id[i] for i in order_ids if i in by_id]
 
         count = len(ordered)
+        is_male = _is_male_label(
+            patient_gender,
+            getattr(user, "gender", None),
+            getattr(user, "sex", None),
+            *payload_genders,
+        )
+        if is_male:
+            series["pcos"] = []
         return BioAITrendResponse(
             user_id=user_id,
             assessment_count=count,
@@ -223,11 +244,11 @@ class BioAITrendService:
         *,
         instance: AssessmentInstance,
         package: AssessmentPackage | None,
-    ) -> tuple[str | None, dict[str, tuple[int, str | None]]]:
+    ) -> tuple[str | None, dict[str, tuple[int, str | None]], str | None]:
         record_id = (getattr(instance, "metsights_record_id", None) or "").strip()
         fallback_date = _instance_fallback_date(instance)
         if not record_id:
-            return fallback_date, {}
+            return fallback_date, {}, None
 
         assessment_type_code = (
             getattr(package, "assessment_type_code", None) if package is not None else None
@@ -245,9 +266,10 @@ class BioAITrendService:
                 type(exc).__name__,
                 exc,
             )
-            return fallback_date, {}
+            return fallback_date, {}, None
 
         point_date = _date_only(payload.assessment_date) or fallback_date
+        payload_gender = payload.gender or payload.sex
         scores: dict[str, tuple[int, str | None]] = {}
         for disease in payload.diseases:
             disease_id = normalize_disease_code(disease.code)
@@ -265,4 +287,74 @@ class BioAITrendService:
                 clamp_score(payload.metabolic_score),
                 payload.metabolic_health_status,
             )
-        return point_date, scores
+        return point_date, scores, payload_gender
+
+    async def embed_for_assessment_instance(
+        self,
+        db: AsyncSession,
+        *,
+        assessment_instance_id: int,
+        report_payload: dict[str, object],
+    ) -> dict[str, object]:
+        """Cutoff trends for the requested report. Never raises into report generation."""
+        try:
+            instance = await self._assessments.get_instance_by_id(
+                db,
+                assessment_instance_id=assessment_instance_id,
+            )
+        except Exception:
+            logger.exception(
+                "Bio-AI report trends: instance lookup failed for assessment_instance_id=%s",
+                assessment_instance_id,
+            )
+            return empty_trend_response(0).to_report_field()
+
+        if instance is None:
+            return empty_trend_response(0).to_report_field()
+
+        user_id = int(instance.user_id)
+        patient = report_payload.get("patient") if isinstance(report_payload.get("patient"), dict) else {}
+        summary = (
+            report_payload.get("executive_summary")
+            if isinstance(report_payload.get("executive_summary"), dict)
+            else {}
+        )
+        cutoff = _date_only(patient.get("assessment_date") if isinstance(patient, dict) else None)
+        if cutoff is None and isinstance(summary, dict):
+            cutoff = _date_only(summary.get("assessment_date"))
+        if cutoff is None:
+            cutoff = _instance_fallback_date(instance)
+
+        gender_hint = None
+        if isinstance(patient, dict):
+            gender_hint = patient.get("gender") or patient.get("sex")
+        if gender_hint is None and isinstance(summary, dict):
+            summary_patient = summary.get("patient")
+            if isinstance(summary_patient, dict):
+                gender_hint = summary_patient.get("gender") or summary_patient.get("sex")
+
+        try:
+            trend = await self.get_trends_for_user(
+                db,
+                user_id=user_id,
+                through_date=cutoff,
+                through_instance_id=int(instance.assessment_instance_id),
+                patient_gender=str(gender_hint) if gender_hint is not None else None,
+            )
+        except AppError as exc:
+            if exc.error_code == "USER_NOT_FOUND":
+                return empty_trend_response(user_id).to_report_field()
+            logger.warning(
+                "Bio-AI report trends failed for assessment_instance_id=%s: %s",
+                assessment_instance_id,
+                exc,
+            )
+            return empty_trend_response(user_id).to_report_field()
+        except Exception:
+            logger.exception(
+                "Bio-AI report trends failed for assessment_instance_id=%s",
+                assessment_instance_id,
+            )
+            return empty_trend_response(user_id).to_report_field()
+
+        return trend.to_report_field()
