@@ -64,12 +64,13 @@ class BioAITrendResponse(BaseModel):
         """Shape used when embedding trends in the Bio-AI report JSON.
 
         Uses ``diseases`` so the frontend does not get a nested ``trends.trends``
-        object. When ``trend_available`` is false, disease series are empty —
-        a single score already lives in ``disease_sections``.
+        object. When fewer than two assessments qualify, every canonical disease
+        key is present with an empty array.
         """
         data = self.model_dump(mode="json")
-        data["diseases"] = data.pop("trends")
-        # One point is not a trend; those scores already live in disease_sections.
+        series = data.pop("trends")
         if not data.get("trend_available"):
             data["diseases"] = BioAITrendsByDisease().model_dump(mode="json")
+        else:
+            data["diseases"] = series
         return data

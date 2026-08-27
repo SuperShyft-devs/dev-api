@@ -5,10 +5,13 @@ Frontend contract — single call, single input:
     GET /bioai-report/{assessment_instance_id}
 
 The backend fetches assessment + patient demographics, enriches, assembles,
-and returns one self-contained BioReport JSON. The frontend only renders it.
+and returns one self-contained BioReport JSON plus historical trends cut off
+at the requested assessment date.
 """
 
 from __future__ import annotations
+
+import logging
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,9 +19,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.dependencies import get_current_user
 from core.exceptions import AppError
 from db.session import get_db
-from modules.bioai_report.report_engine.api.dependencies import get_bioreport_service
+from modules.bioai_report.report_engine.api.dependencies import (
+    get_bioai_trend_service,
+    get_bioreport_service,
+)
 from modules.bioai_report.report_engine.exceptions import KnowledgeBaseError, ReportEngineError
 from modules.bioai_report.report_engine.services.report_service import BioReportService
+from modules.bioai_report.report_engine.services.trend_service import BioAITrendService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/bioai-report", tags=["bioai-report"])
 
@@ -29,6 +38,7 @@ async def get_bioreport_content(
     db: AsyncSession = Depends(get_db),
     _user=Depends(get_current_user),
     report_service: BioReportService = Depends(get_bioreport_service),
+    trend_service: BioAITrendService = Depends(get_bioai_trend_service),
 ):
     """Return one complete BioReport for ``assessment_instance_id``.
 
@@ -38,7 +48,8 @@ async def get_bioreport_content(
     3. Enrich patient demographics for the same ``record_id``
     4. Merge into one assessment object
     5. Build BioReport (patient → summary → disease sections + KB)
-    6. Return the raw ``BioReport`` JSON object
+    6. Attach historical Bio-AI trends cut off at this assessment date
+    7. Return the raw ``BioReport`` JSON object plus ``trends``
     """
     if assessment_instance_id is None:
         raise AppError(
@@ -71,5 +82,21 @@ async def get_bioreport_content(
             message=str(exc),
         ) from exc
 
-    # Additive: return the final report JSON object directly.
-    return report.to_dict()
+    payload = report.to_dict()
+    # Additive only: existing report keys are never rewritten. Trends are attached
+    # as a new top-level field, including when trend_available is false.
+    # Enrichment may swallow a DB error; Postgres then rejects later statements
+    # in this request until the transaction is reset.
+    try:
+        await db.rollback()
+    except Exception:
+        logger.exception(
+            "Bio-AI report could not reset DB session before trends for assessment_instance_id=%s",
+            assessment_instance_id,
+        )
+    payload["trends"] = await trend_service.embed_for_assessment_instance(
+        db,
+        assessment_instance_id=int(assessment_instance_id),
+        report_payload=payload,
+    )
+    return payload
