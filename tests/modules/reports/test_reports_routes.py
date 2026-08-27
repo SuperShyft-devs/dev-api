@@ -186,6 +186,9 @@ class _FakeDiagnosticsService:
         # Keep response static for tests; package_id is irrelevant here.
         return self._payload
 
+    async def get_health_parameter_by_parameter_key(self, db, *, parameter_key: str):
+        return None
+
 
 class _HealthiansDiagnosticsService(_FakeDiagnosticsService):
     def __init__(self):
@@ -220,9 +223,6 @@ async def _fake_healthians_digital_value(access_token: str, booking_id: str) -> 
             }
         ]
     }
-
-    async def get_health_parameter_by_parameter_key(self, db, *, parameter_key: str):
-        return None
 
 
 async def _seed_glucose_questionnaire_response(
@@ -267,9 +267,8 @@ async def _seed_glucose_questionnaire_response(
             response_id=response_id,
             assessment_instance_id=assessment_instance_id,
             question_id=question_id,
-            category_id=category_id,
+            category_ids=[category_id],
             answer={"value": value, "unit": "0"},
-            submitted_at=datetime.now(timezone.utc),
         )
     )
     await test_db_session.flush()
@@ -1922,7 +1921,7 @@ async def test_get_overview_includes_healthy_habits_from_questionnaire(
                 response_id=88003,
                 assessment_instance_id=99501,
                 question_id=q_id,
-                category_id=cat_id,
+                category_ids=[cat_id],
                 answer="no_alcohol",
             ),
             QuestionnaireHealthyHabitRule(
@@ -2753,4 +2752,107 @@ async def test_engagement_blood_parameters_reads_blood_from_other_assessment_row
         for g in pro_groups
         for t in g.get("tests", [])
     )
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+@pytest.mark.asyncio
+async def test_get_overview_fetch_after_expire_does_not_missinggreenlet(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    """Regression: post-release work must use snapshots, not expired ORM attrs."""
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99301,
+        user_id=39301,
+        engagement_id=59301,
+        record_id="REC99301",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    await test_db_session.commit()
+    test_db_session.expire_all()
+
+    met_payload = {"metabolic_age": 31.0, "diseases": []}
+    fake_metsights = _FakeMetsightsService(payload={"haemoglobin": 1}, report_payload=met_payload)
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/99301/overview", headers=_auth_header(39301))
+    assert response.status_code == 200, response.text
+    assert response.json()["data"]["metabolic_age"] == 31.0
+    assert fake_metsights.report_calls == 1
+    fastapi_app.dependency_overrides.pop(get_reports_service, None)
+
+
+async def _failing_healthians_digital_value(access_token: str, booking_id: str) -> dict:
+    assert access_token == "fake-token"
+    raise AppError(
+        status_code=503,
+        error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+        message="Healthians booking digital value request failed",
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_blood_parameters_provider_soft_fail_after_expire_uses_questionnaire(
+    async_client,
+    fastapi_app,
+    test_db_session,
+):
+    """Regression: provider soft-fail after release must fall back without MissingGreenlet."""
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=99302,
+        user_id=39302,
+        engagement_id=59302,
+        record_id="REC99302",
+        diagnostic_package_id=99302,
+        diagnostic_provider="healthians",
+    )
+    await _seed_glucose_questionnaire_response(
+        test_db_session,
+        assessment_instance_id=99302,
+        category_id=89302,
+        question_id=89302,
+        option_id=89302,
+        response_id=89302,
+    )
+    await test_db_session.commit()
+    test_db_session.expire_all()
+
+    fake_metsights = _FakeMetsightsService(
+        payload={},
+        fetch_collections_payload={
+            "provider": {"code": "Healthians"},
+            "reference_id": "9930200001",
+        },
+    )
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=fake_metsights,
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+        questionnaire_repository=QuestionnaireRepository(),
+        healthians_get_access_token=_fake_healthians_access_token,
+        healthians_get_booking_digital_value=_failing_healthians_digital_value,
+    )
+    fastapi_app.dependency_overrides[get_reports_service] = lambda: reports_service
+
+    response = await async_client.get("/reports/99302/blood-parameters", headers=_auth_header(39302))
+    assert response.status_code == 200, response.text
+    body = response.json()["data"]
+    glucose_test = next(t for g in body for t in g["tests"] if t["parameter_key"] == "glucose_fasting")
+    assert glucose_test["value"] == 91
+    assert fake_metsights.fetch_collections_calls == 1
     fastapi_app.dependency_overrides.pop(get_reports_service, None)

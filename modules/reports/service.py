@@ -229,7 +229,9 @@ class ReportsService:
         db: AsyncSession,
         *,
         individual_report: IndividualHealthReport | None,
-        assessment_instance: AssessmentInstance,
+        user_id: int,
+        engagement_id: int,
+        assessment_instance_id: int,
         diagnostic_package_id: int,
         raw_customer: dict[str, Any],
     ) -> IndividualHealthReport:
@@ -244,13 +246,13 @@ class ReportsService:
         if not has_usable_provider_blood_parameters(grouped):
             logger.warning(
                 "Healthians normalize produced empty parameters for engagement_id=%s",
-                assessment_instance.engagement_id,
+                engagement_id,
             )
 
         engagement_row = await self._repository.get_individual_report_by_engagement(
             db,
-            user_id=int(assessment_instance.user_id),
-            engagement_id=int(assessment_instance.engagement_id),
+            user_id=user_id,
+            engagement_id=engagement_id,
         )
         # Prefer an existing blood-bearing engagement row; else assessment row; else any engagement row.
         if engagement_row is not None and (
@@ -266,9 +268,9 @@ class ReportsService:
 
         if target is None:
             target = IndividualHealthReport(
-                user_id=assessment_instance.user_id,
-                engagement_id=assessment_instance.engagement_id,
-                assessment_instance_id=assessment_instance.assessment_instance_id,
+                user_id=user_id,
+                engagement_id=engagement_id,
+                assessment_instance_id=assessment_instance_id,
                 reports=None,
                 blood_parameters=grouped,
                 blood_report_raw=raw,
@@ -279,7 +281,7 @@ class ReportsService:
             target.blood_report_raw = raw
             # Do not re-point another assessment's row.
             if target.assessment_instance_id is None:
-                target.assessment_instance_id = assessment_instance.assessment_instance_id
+                target.assessment_instance_id = assessment_instance_id
             await self._repository.update_individual_report(db, target)
         return target
 
@@ -454,6 +456,8 @@ class ReportsService:
                 message="Engagement has no diagnostic package",
             )
         diagnostic_package_id = int(engagement.diagnostic_package_id)
+        sn_engagement_id = int(engagement.engagement_id)
+        sn_user_id = int(assessment_instance.user_id)
         normalized_gender = (user_gender or "").strip().lower() or None
         if normalized_gender not in {"male", "female"}:
             normalized_gender = None
@@ -479,7 +483,7 @@ class ReportsService:
             )
             return await self._blood_read_service.build_from_questionnaire_responses(
                 db=db,
-                assessment_instance_id=assessment_instance.assessment_instance_id,
+                assessment_instance_id=assessment_id,
                 diagnostic_package_id=diagnostic_package_id,
                 user_gender=normalized_gender,
             )
@@ -488,13 +492,13 @@ class ReportsService:
         assessment_report = await self._get_individual_report(
             db,
             user_id=user_id,
-            engagement_id=int(assessment_instance.engagement_id),
+            engagement_id=sn_engagement_id,
             assessment_instance_id=assessment_id,
         )
         existing_report = await self._get_blood_individual_report(
             db,
             user_id=user_id,
-            engagement_id=int(assessment_instance.engagement_id),
+            engagement_id=sn_engagement_id,
             assessment_instance_id=assessment_id,
         )
 
@@ -515,8 +519,8 @@ class ReportsService:
             try:
                 raw_customer = await self._fetch_blood_parameters_from_provider(
                     db,
-                    user_id=user_id,
-                    engagement_id=int(assessment_instance.engagement_id),
+                    user_id=sn_user_id,
+                    engagement_id=sn_engagement_id,
                     record_id=record_id,
                     user_first_name=user_first_name,
                     user_last_name=user_last_name,
@@ -524,7 +528,9 @@ class ReportsService:
                 await self._persist_provider_blood_data(
                     db,
                     individual_report=assessment_report,
-                    assessment_instance=assessment_instance,
+                    user_id=sn_user_id,
+                    engagement_id=sn_engagement_id,
+                    assessment_instance_id=assessment_id,
                     diagnostic_package_id=diagnostic_package_id,
                     raw_customer=raw_customer,
                 )
@@ -539,8 +545,8 @@ class ReportsService:
                 )
                 refreshed = await self._get_blood_individual_report(
                     db,
-                    user_id=user_id,
-                    engagement_id=int(assessment_instance.engagement_id),
+                    user_id=sn_user_id,
+                    engagement_id=sn_engagement_id,
                     assessment_instance_id=assessment_id,
                 )
                 cached = refreshed.blood_parameters if refreshed is not None else None
@@ -571,7 +577,7 @@ class ReportsService:
         )
         return await self._blood_read_service.build_from_questionnaire_responses(
             db=db,
-            assessment_instance_id=assessment_instance.assessment_instance_id,
+            assessment_instance_id=assessment_id,
             diagnostic_package_id=diagnostic_package_id,
             user_gender=normalized_gender,
         )
@@ -994,20 +1000,25 @@ class ReportsService:
         if not record_id:
             return {}
 
+        assessment_type_code = package.assessment_type_code
+        sn_user_id = assessment_instance.user_id
+        sn_engagement_id = assessment_instance.engagement_id
+        sn_assessment_instance_id = assessment_instance.assessment_instance_id
+
         await release_request_transaction(db)
 
         report_data = await self._metsights_service.get_report(
             record_id=record_id,
-            assessment_type_code=package.assessment_type_code,
+            assessment_type_code=assessment_type_code,
         )
         report_dict = report_data if isinstance(report_data, dict) else {}
 
         if cache_on_fetch:
             if individual_report is None:
                 individual_report = IndividualHealthReport(
-                    user_id=assessment_instance.user_id,
-                    engagement_id=assessment_instance.engagement_id,
-                    assessment_instance_id=assessment_instance.assessment_instance_id,
+                    user_id=sn_user_id,
+                    engagement_id=sn_engagement_id,
+                    assessment_instance_id=sn_assessment_instance_id,
                     reports=report_data,
                     blood_parameters=None,
                 )
@@ -1015,9 +1026,7 @@ class ReportsService:
             else:
                 individual_report.reports = report_data
                 # Ensure row is pinned to this assessment (corrupt shared-row recovery).
-                individual_report.assessment_instance_id = (
-                    assessment_instance.assessment_instance_id
-                )
+                individual_report.assessment_instance_id = sn_assessment_instance_id
                 await self._repository.update_individual_report(db, individual_report)
 
         return report_dict
@@ -1065,7 +1074,26 @@ class ReportsService:
         user_gender: str | None = None,
         diagnostic_package_id: int,
         allow_provider_fetch: bool = True,
+        user_id: int | None = None,
+        engagement_id: int | None = None,
+        assessment_instance_id: int | None = None,
+        metsights_record_id: str | None = None,
     ) -> list[BloodParameterGroupInReportResponse]:
+        sn_user_id = user_id if user_id is not None else int(assessment_instance.user_id)
+        sn_engagement_id = (
+            engagement_id if engagement_id is not None else int(assessment_instance.engagement_id)
+        )
+        sn_assessment_instance_id = (
+            assessment_instance_id
+            if assessment_instance_id is not None
+            else int(assessment_instance.assessment_instance_id)
+        )
+        record_id = (
+            (metsights_record_id or "").strip()
+            if metsights_record_id is not None
+            else (assessment_instance.metsights_record_id or "").strip()
+        )
+
         if has_usable_provider_blood_parameters(individual_report.blood_parameters):
             return await self._blood_read_service.build_from_canonical_or_legacy_provider(
                 db=db,
@@ -1074,7 +1102,6 @@ class ReportsService:
                 user_gender=user_gender,
             )
 
-        record_id = (assessment_instance.metsights_record_id or "").strip()
         if (
             allow_provider_fetch
             and record_id
@@ -1086,8 +1113,8 @@ class ReportsService:
             try:
                 raw_customer = await self._fetch_blood_parameters_from_provider(
                     db,
-                    user_id=int(assessment_instance.user_id),
-                    engagement_id=int(assessment_instance.engagement_id),
+                    user_id=sn_user_id,
+                    engagement_id=sn_engagement_id,
                     record_id=record_id,
                     user_first_name=user_first_name,
                     user_last_name=user_last_name,
@@ -1095,15 +1122,17 @@ class ReportsService:
                 await self._persist_provider_blood_data(
                     db,
                     individual_report=individual_report,
-                    assessment_instance=assessment_instance,
+                    user_id=sn_user_id,
+                    engagement_id=sn_engagement_id,
+                    assessment_instance_id=sn_assessment_instance_id,
                     diagnostic_package_id=diagnostic_package_id,
                     raw_customer=raw_customer,
                 )
                 refreshed = await self._get_blood_individual_report(
                     db,
-                    user_id=int(assessment_instance.user_id),
-                    engagement_id=int(assessment_instance.engagement_id),
-                    assessment_instance_id=int(assessment_instance.assessment_instance_id),
+                    user_id=sn_user_id,
+                    engagement_id=sn_engagement_id,
+                    assessment_instance_id=sn_assessment_instance_id,
                 )
                 if refreshed is not None and has_usable_provider_blood_parameters(
                     refreshed.blood_parameters
@@ -1125,7 +1154,7 @@ class ReportsService:
 
         return await self._blood_read_service.build_from_questionnaire_responses(
             db=db,
-            assessment_instance_id=assessment_instance.assessment_instance_id,
+            assessment_instance_id=sn_assessment_instance_id,
             diagnostic_package_id=diagnostic_package_id,
             user_gender=user_gender,
         )
@@ -1140,12 +1169,35 @@ class ReportsService:
         individual_report: IndividualHealthReport | None,
         user_gender: str | None,
         allow_provider_fetch: bool = True,
+        assessment_instance_id: int | None = None,
+        user_id: int | None = None,
+        engagement_id: int | None = None,
+        diagnostic_package_id: int | None = None,
+        metsights_record_id: str | None = None,
+        package_id: int | None = None,
     ) -> tuple[list[HealthyHabitItem], list[str]]:
         """Healthy habits and profiles for one assessment (overview positive_wins subset)."""
+        sn_assessment_instance_id = (
+            assessment_instance_id
+            if assessment_instance_id is not None
+            else int(assessment_instance.assessment_instance_id)
+        )
+        sn_user_id = user_id if user_id is not None else int(assessment_instance.user_id)
+        sn_engagement_id = (
+            engagement_id if engagement_id is not None else int(assessment_instance.engagement_id)
+        )
+        sn_diagnostic_package_id = (
+            diagnostic_package_id
+            if diagnostic_package_id is not None
+            else (
+                int(engagement.diagnostic_package_id)
+                if engagement is not None and engagement.diagnostic_package_id is not None
+                else None
+            )
+        )
         healthy_profiles: list[str] = []
         if (
-            engagement is not None
-            and engagement.diagnostic_package_id is not None
+            sn_diagnostic_package_id is not None
             and individual_report is not None
         ):
             try:
@@ -1158,7 +1210,7 @@ class ReportsService:
                     allow_provider_fetch
                     and not has_usable_provider_blood_parameters(individual_report.blood_parameters)
                 ):
-                    user_row = await db.get(User, assessment_instance.user_id)
+                    user_row = await db.get(User, sn_user_id)
                     if user_row is not None:
                         user_first_name = user_row.first_name or ""
                         user_last_name = user_row.last_name or ""
@@ -1169,8 +1221,12 @@ class ReportsService:
                     user_first_name=user_first_name,
                     user_last_name=user_last_name,
                     user_gender=normalized_gender,
-                    diagnostic_package_id=int(engagement.diagnostic_package_id),
+                    diagnostic_package_id=sn_diagnostic_package_id,
                     allow_provider_fetch=allow_provider_fetch,
+                    user_id=sn_user_id,
+                    engagement_id=sn_engagement_id,
+                    assessment_instance_id=sn_assessment_instance_id,
+                    metsights_record_id=metsights_record_id,
                 )
                 healthy_profiles = self._top_healthy_profile_group_names(groups)
             except AppError as exc:
@@ -1178,7 +1234,7 @@ class ReportsService:
                     raise
                 logger.debug(
                     "Skipping healthy profiles for assessment %s: %s",
-                    assessment_instance.assessment_instance_id,
+                    sn_assessment_instance_id,
                     exc.error_code,
                 )
 
@@ -1186,8 +1242,8 @@ class ReportsService:
         if self._healthy_habits_service is not None and package is not None:
             computed = await self._healthy_habits_service.top_habits_for_assessment(
                 db,
-                assessment_instance_id=int(assessment_instance.assessment_instance_id),
-                package_id=int(assessment_instance.package_id),
+                assessment_instance_id=sn_assessment_instance_id,
+                package_id=package_id if package_id is not None else int(package.package_id),
                 limit=3,
             )
             healthy_habits = [
@@ -1231,14 +1287,25 @@ class ReportsService:
                 message="FitPrint report overview is not allowed",
             )
 
+        sn_engagement_id = int(assessment_instance.engagement_id)
+        sn_assessment_instance_id = int(assessment_instance.assessment_instance_id)
+        sn_user_id = int(assessment_instance.user_id)
+        sn_metsights_record_id = (assessment_instance.metsights_record_id or "").strip()
+        sn_diagnostic_package_id = (
+            int(engagement.diagnostic_package_id)
+            if engagement is not None and engagement.diagnostic_package_id is not None
+            else None
+        )
+        sn_package_id = int(package.package_id)
+
         individual_report = await self._get_individual_report(
             db,
             user_id=user_id,
-            engagement_id=int(assessment_instance.engagement_id),
+            engagement_id=sn_engagement_id,
             assessment_instance_id=assessment_id,
         )
 
-        record_id = (assessment_instance.metsights_record_id or "").strip()
+        record_id = sn_metsights_record_id
         cached_reports = (
             individual_report.reports
             if individual_report is not None and isinstance(individual_report.reports, dict)
@@ -1266,14 +1333,14 @@ class ReportsService:
             individual_report = await self._get_individual_report(
                 db,
                 user_id=user_id,
-                engagement_id=int(assessment_instance.engagement_id),
+                engagement_id=sn_engagement_id,
                 assessment_instance_id=assessment_id,
             )
 
         blood_report = await self._get_blood_individual_report(
             db,
             user_id=user_id,
-            engagement_id=int(assessment_instance.engagement_id),
+            engagement_id=sn_engagement_id,
             assessment_instance_id=assessment_id,
         )
         profile_report = blood_report if blood_report is not None else individual_report
@@ -1322,6 +1389,12 @@ class ReportsService:
             engagement=engagement,
             individual_report=profile_report,
             user_gender=user_gender,
+            assessment_instance_id=sn_assessment_instance_id,
+            user_id=sn_user_id,
+            engagement_id=sn_engagement_id,
+            diagnostic_package_id=sn_diagnostic_package_id,
+            metsights_record_id=sn_metsights_record_id or None,
+            package_id=sn_package_id,
         )
 
         await self._require_audit_service().log_event(
@@ -1393,25 +1466,30 @@ class ReportsService:
                 message="Metsights record id is missing for this assessment",
             )
 
+        assessment_type_code = package.assessment_type_code
+        sn_user_id = assessment_instance.user_id
+        sn_engagement_id = assessment_instance.engagement_id
+        sn_assessment_instance_id = assessment_instance.assessment_instance_id
+
         await release_request_transaction(db)
 
         report_data = await self._metsights_service.get_report(
             record_id=record_id,
-            assessment_type_code=package.assessment_type_code,
+            assessment_type_code=assessment_type_code,
         )
 
         if existing_report is None:
             report = IndividualHealthReport(
-                user_id=assessment_instance.user_id,
-                engagement_id=assessment_instance.engagement_id,
-                assessment_instance_id=assessment_instance.assessment_instance_id,
+                user_id=sn_user_id,
+                engagement_id=sn_engagement_id,
+                assessment_instance_id=sn_assessment_instance_id,
                 reports=report_data,
                 blood_parameters=None,
             )
             await self._repository.create_individual_report(db, report)
         else:
             existing_report.reports = report_data
-            existing_report.assessment_instance_id = assessment_instance.assessment_instance_id
+            existing_report.assessment_instance_id = sn_assessment_instance_id
             await self._repository.update_individual_report(db, existing_report)
 
         return report_data
@@ -2136,6 +2214,10 @@ class ReportsService:
                     message="Metsights record id is missing for this assessment",
                 )
 
+            sn_user_id = assessment_instance.user_id
+            sn_engagement_id = assessment_instance.engagement_id
+            sn_assessment_instance_id = assessment_instance.assessment_instance_id
+
             await release_request_transaction(db)
 
             report_data = await self._metsights_service.get_report(
@@ -2145,18 +2227,16 @@ class ReportsService:
 
             if existing_report is None:
                 existing_report = IndividualHealthReport(
-                    user_id=assessment_instance.user_id,
-                    engagement_id=assessment_instance.engagement_id,
-                    assessment_instance_id=assessment_instance.assessment_instance_id,
+                    user_id=sn_user_id,
+                    engagement_id=sn_engagement_id,
+                    assessment_instance_id=sn_assessment_instance_id,
                     reports=report_data,
                     blood_parameters=None,
                 )
                 await self._repository.create_individual_report(db, existing_report)
             else:
                 existing_report.reports = report_data
-                existing_report.assessment_instance_id = (
-                    assessment_instance.assessment_instance_id
-                )
+                existing_report.assessment_instance_id = sn_assessment_instance_id
                 await self._repository.update_individual_report(db, existing_report)
 
         report_dict = report_data if isinstance(report_data, dict) else {}
