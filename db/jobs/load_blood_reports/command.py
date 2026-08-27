@@ -84,6 +84,7 @@ async def run_load(
     yes: bool,
     dry_run: bool,
     as_of: date | None,
+    engagement_id: int | None,
 ) -> dict:
     settings.validate()
 
@@ -109,7 +110,13 @@ async def run_load(
     assessments_service = get_assessments_service()
     notifications_service = NotificationsService(NotificationsRepository())
     on_progress = _make_progress_printer()
-    print("Loading eligible blood report participants...", flush=True)
+    if engagement_id is not None:
+        print(
+            f"Loading eligible blood report participants for engagement_id={engagement_id}...",
+            flush=True,
+        )
+    else:
+        print("Loading eligible blood report participants...", flush=True)
 
     async with session_factory() as session:
         result = await load_blood_reports(
@@ -120,6 +127,7 @@ async def run_load(
             sync_service=sync_service,
             as_of=as_of,
             dry_run=dry_run,
+            engagement_id=engagement_id,
             on_progress=on_progress,
         )
         await session.commit()
@@ -156,6 +164,13 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="YYYY-MM-DD",
         help="Override 'today' date. Useful for testing.",
     )
+    parser.add_argument(
+        "--engagement-id",
+        type=int,
+        default=None,
+        metavar="ID",
+        help="Optional: limit to one engagement_id.",
+    )
     return parser
 
 
@@ -166,12 +181,17 @@ def main(argv: list[str] | None = None) -> int:
             yes=args.yes,
             dry_run=args.dry_run,
             as_of=args.as_of,
+            engagement_id=args.engagement_id,
         )
     )
     mode = "dry-run" if result["dry_run"] else "applied"
+    engagement_line = ""
+    if result.get("engagement_id") is not None:
+        engagement_line = f"  engagement_id={result['engagement_id']}\n"
     print(
         f"\nLoad blood reports ({mode}):\n"
         f"  as_of={result['as_of']}\n"
+        f"{engagement_line}"
         f"  matched={result['matched']}, loaded={result['loaded']}, "
         f"notified={result['notified']}, skipped={result['skipped']}, failed={result['failed']}"
     )
