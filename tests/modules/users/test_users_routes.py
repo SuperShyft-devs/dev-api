@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, time, timedelta
 
 import pytest
 
 from core.config import settings
 from core.security import create_jwt_token
+from modules.engagements.models import Engagement, EngagementParticipant, EngagementSlotInfo
+from modules.organizations.models import Organization
 from modules.users.models import User
 
 
@@ -334,3 +336,140 @@ async def test_primary_cannot_unlink_unrelated_sub_profile(async_client, test_db
 
     assert response.status_code == 403
     assert response.json()["error_code"] == "FORBIDDEN"
+
+
+def _blood_collection_slot_detail(slot_date: str) -> dict:
+    return {
+        "blood_collection": {
+            slot_date: {
+                "is_enable": True,
+                "cabins": [
+                    {
+                        "cabin_name": "Blood Test Cabin 1",
+                        "cabin_key": "blood_test_cabin_1",
+                        "start_time": "09:00",
+                        "end_time": "17:00",
+                        "slot_duration": 30,
+                        "capacity_per_slot": 2,
+                        "breaks": [],
+                        "is_active": True,
+                    }
+                ],
+            }
+        }
+    }
+
+
+@pytest.mark.asyncio
+async def test_upcoming_slot_empty(async_client, test_db_session):
+    user = User(user_id=99001, age=30, phone="990010000000", status="active", first_name="Empty")
+    test_db_session.add(user)
+    await test_db_session.commit()
+
+    response = await async_client.get("/users/me/upcoming-slot", headers=_auth_header(99001))
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["has_scheduled_slot"] is False
+    assert data["slots"] == []
+
+
+@pytest.mark.asyncio
+async def test_upcoming_slot_uses_cabin_duration(async_client, test_db_session):
+    slot_date = (date.today() + timedelta(days=30)).isoformat()
+    user = User(user_id=99002, age=30, phone="990020000000", status="active", first_name="Camp")
+    org = Organization(
+        organization_id=99002,
+        name="NVIDIA",
+        organization_type="corporate",
+        status="active",
+    )
+    slot_info = EngagementSlotInfo(slot_detail_id=99002, slot_detail=_blood_collection_slot_detail(slot_date))
+    engagement = Engagement(
+        engagement_id=99002,
+        engagement_name="Camp Slot Test",
+        organization_id=99002,
+        engagement_code="UPCOMING-CAMP-99002",
+        city="BLR",
+        slot_duration=60,
+        slot_detail_id=99002,
+        start_date=date.fromisoformat(slot_date),
+        end_date=date.fromisoformat(slot_date),
+        status="running",
+    )
+    participant = EngagementParticipant(
+        engagement_participant_id=99002,
+        engagement_id=99002,
+        user_id=99002,
+        booked_by_user_id=99002,
+        engagement_date=date.fromisoformat(slot_date),
+        slot_start_time=time(13, 40),
+        blood_collection_cabin="blood_test_cabin_1",
+    )
+    test_db_session.add(user)
+    await test_db_session.flush()
+    test_db_session.add(org)
+    await test_db_session.flush()
+    test_db_session.add(slot_info)
+    await test_db_session.flush()
+    test_db_session.add(engagement)
+    await test_db_session.flush()
+    test_db_session.add(participant)
+    await test_db_session.commit()
+
+    response = await async_client.get("/users/me/upcoming-slot", headers=_auth_header(99002))
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["has_scheduled_slot"] is True
+    assert len(data["slots"]) == 1
+    slot = data["slots"][0]["slot"]
+    assert slot["slot_start_time"] == "1:40 PM"
+    assert slot["slot_end_time"] == "2:10 PM"
+    assert slot["engagement_date"] == slot_date
+    assert slot["cabin"] == "blood_test_cabin_1"
+    assert data["slots"][0]["engagement"]["engagement_type"] == "b2b"
+    assert data["slots"][0]["engagement"]["organization_name"] == "NVIDIA"
+
+
+@pytest.mark.asyncio
+async def test_upcoming_slot_home_collection_fallback(async_client, test_db_session):
+    slot_date = (date.today() + timedelta(days=31)).isoformat()
+    user = User(user_id=99003, age=30, phone="990030000000", status="active", first_name="Home")
+    engagement = Engagement(
+        engagement_id=99003,
+        engagement_name="Home Collection Test",
+        organization_id=None,
+        engagement_code="UPCOMING-HOME-99003",
+        city="BLR",
+        slot_duration=60,
+        start_date=date.fromisoformat(slot_date),
+        end_date=date.fromisoformat(slot_date),
+        status="running",
+    )
+    participant = EngagementParticipant(
+        engagement_participant_id=99003,
+        engagement_id=99003,
+        user_id=99003,
+        booked_by_user_id=99003,
+        engagement_date=date.fromisoformat(slot_date),
+        slot_start_time=time(10, 0),
+        blood_collection_cabin=None,
+    )
+    test_db_session.add(user)
+    await test_db_session.flush()
+    test_db_session.add(engagement)
+    await test_db_session.flush()
+    test_db_session.add(participant)
+    await test_db_session.commit()
+
+    response = await async_client.get("/users/me/upcoming-slot", headers=_auth_header(99003))
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["has_scheduled_slot"] is True
+    slot = data["slots"][0]["slot"]
+    assert slot["slot_start_time"] == "10:00 AM"
+    assert slot["slot_end_time"] == "11:00 AM"
+    assert slot["cabin"] is None
+    assert data["slots"][0]["engagement"]["engagement_type"] == "b2c"

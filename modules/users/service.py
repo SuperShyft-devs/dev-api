@@ -35,6 +35,7 @@ from modules.users.models import User, UserPreference
 from modules.users.repository import UsersRepository
 from modules.engagements.models import BloodCollectionType, EngagementKind
 from modules.engagements.repository import EngagementsRepository
+from modules.engagements.slot_availability import find_active_cabin
 from modules.diagnostics.repository import DiagnosticsRepository
 from common.phone import phone_lookup_candidates as _phone_lookup_candidates
 from modules.users.schemas import (
@@ -241,10 +242,28 @@ class UsersService:
 
         slots = []
         for row in rows:
+            if row.engagement_date is None or row.slot_start_time is None:
+                continue
+
             is_b2b = row.organization_id is not None
             engagement_type = "b2b" if is_b2b else "b2c"
 
+            cabin_key = (row.blood_collection_cabin or "").strip() or None
+            slot_detail = row.slot_detail if isinstance(row.slot_detail, dict) else None
+
             slot_duration_minutes = int(row.slot_duration or 0)
+            if cabin_key and slot_detail:
+                cabin = find_active_cabin(
+                    slot_detail,
+                    section="blood_collection",
+                    date_key=row.engagement_date.isoformat(),
+                    cabin_key=cabin_key,
+                )
+                if cabin is not None:
+                    cabin_duration = int(cabin.get("slot_duration") or 0)
+                    if cabin_duration > 0:
+                        slot_duration_minutes = cabin_duration
+
             slot_start_dt = datetime.combine(row.engagement_date, row.slot_start_time)
             slot_end_dt = slot_start_dt + timedelta(minutes=slot_duration_minutes)
 
@@ -267,6 +286,7 @@ class UsersService:
                         "slot_end_time": slot_end_dt.strftime("%I:%M %p").lstrip("0"),
                         "engagement_date": row.engagement_date,
                         "is_booked": row.booking_id is not None,
+                        "cabin": cabin_key,
                     },
                     "location": {
                         "type": "venue" if is_b2b else "home_collection",
@@ -275,7 +295,7 @@ class UsersService:
                 }
             )
 
-        return UpcomingSlotResponse(has_scheduled_slot=True, slots=slots)
+        return UpcomingSlotResponse(has_scheduled_slot=bool(slots), slots=slots)
 
     async def get_profiles(self, db: AsyncSession, *, current_user: User) -> list[User]:
         if current_user.parent_id is not None:

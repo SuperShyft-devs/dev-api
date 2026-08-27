@@ -142,6 +142,7 @@ class UpcomingSlotTiming(BaseModel):
     slot_end_time: str
     engagement_date: date
     is_booked: bool
+    cabin: str | None = None
 
 
 class UpcomingSlotLocation(BaseModel):

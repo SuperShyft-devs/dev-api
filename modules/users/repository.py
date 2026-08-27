@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.users.models import User, UserPreference
-from modules.engagements.models import Engagement, EngagementParticipant
+from modules.engagements.models import Engagement, EngagementParticipant, EngagementSlotInfo
 from modules.organizations.models import Organization
 from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance
 from modules.auth.models import AuthOtpSession, AuthToken
@@ -350,8 +350,11 @@ class UsersRepository:
                 EngagementParticipant.slot_start_time.label("slot_start_time"),
                 EngagementParticipant.engagement_date.label("engagement_date"),
                 EngagementParticipant.booking_id.label("booking_id"),
+                EngagementParticipant.blood_collection_cabin.label("blood_collection_cabin"),
                 Engagement.engagement_type.label("engagement_type"),
                 Engagement.slot_duration.label("slot_duration"),
+                Engagement.slot_detail_id.label("slot_detail_id"),
+                EngagementSlotInfo.slot_detail.label("slot_detail"),
                 Engagement.city.label("engagement_city"),
                 Engagement.address.label("engagement_address"),
                 Engagement.pincode.label("engagement_pincode"),
@@ -363,6 +366,7 @@ class UsersRepository:
             .select_from(EngagementParticipant)
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
             .outerjoin(Organization, Organization.organization_id == Engagement.organization_id)
+            .outerjoin(EngagementSlotInfo, EngagementSlotInfo.slot_detail_id == Engagement.slot_detail_id)
             .join(User, User.user_id == EngagementParticipant.user_id)
             .where(
                 EngagementParticipant.user_id == user_id,
