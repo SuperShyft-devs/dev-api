@@ -548,6 +548,22 @@ class QuestionnaireRepository:
             mapping.setdefault(int(qid), []).append(int(cid))
         return mapping
 
+    async def get_category_keys_by_ids(
+        self,
+        db: AsyncSession,
+        *,
+        category_ids: list[int],
+    ) -> dict[int, str]:
+        """Return mapping of category_id -> category_key."""
+        if not category_ids:
+            return {}
+        result = await db.execute(
+            select(QuestionnaireCategory.category_id, QuestionnaireCategory.category_key).where(
+                QuestionnaireCategory.category_id.in_(category_ids)
+            )
+        )
+        return {int(cid): str(key) for cid, key in result.all()}
+
     async def list_healthy_habit_rules_for_question(
         self,
         db: AsyncSession,

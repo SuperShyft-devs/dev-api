@@ -389,6 +389,141 @@ async def test_engagement_onboard_load_prev_ignores_fitprint_only_prior(async_cl
 
 
 @pytest.mark.asyncio
+async def test_engagement_onboard_load_prev_skips_vitals_and_blood_categories(
+    async_client, test_db_session
+):
+    package_id = 9110
+    await _seed_org_and_packages(test_db_session, package_id=package_id)
+    await _seed_category_question_for_package(
+        test_db_session,
+        package_id=package_id,
+        category_id=9110,
+        category_key="diet-lifestyle-parameters",
+        question_id=9110,
+        question_key="load_prev_allowed_q",
+        mapping_id=9110,
+    )
+    await _seed_category_question_for_package(
+        test_db_session,
+        package_id=package_id,
+        category_id=9111,
+        category_key="vitals",
+        question_id=9111,
+        question_key="load_prev_vitals_q",
+        mapping_id=9111,
+    )
+    await _seed_category_question_for_package(
+        test_db_session,
+        package_id=package_id,
+        category_id=9112,
+        category_key="blood-parameters",
+        question_id=9112,
+        question_key="load_prev_blood_q",
+        mapping_id=9112,
+    )
+    await _seed_category_question_for_package(
+        test_db_session,
+        package_id=package_id,
+        category_id=9113,
+        category_key="advanced-blood-parameters",
+        question_id=9113,
+        question_key="load_prev_adv_blood_q",
+        mapping_id=9113,
+    )
+    await _seed_engagement(
+        test_db_session,
+        engagement_id=3401,
+        engagement_code="LOADPREV4A",
+        package_id=package_id,
+        load_prev=False,
+    )
+    await _seed_engagement(
+        test_db_session,
+        engagement_id=3402,
+        engagement_code="LOADPREV4B",
+        package_id=package_id,
+        load_prev=True,
+    )
+
+    await test_db_session.execute(
+        text(
+            "INSERT INTO users (user_id, age, phone, status, first_name, last_name, email) "
+            "VALUES (91100, 30, '7777000110', 'active', 'Load', 'Prev', 'load.prev4@example.com') "
+            "ON CONFLICT (user_id) DO NOTHING"
+        )
+    )
+    test_db_session.add(
+        AssessmentInstance(
+            user_id=91100,
+            package_id=package_id,
+            engagement_id=3401,
+            status="active",
+        )
+    )
+    await test_db_session.flush()
+    old_instance_id = (
+        await test_db_session.execute(
+            text(
+                "SELECT assessment_instance_id FROM assessment_instances "
+                "WHERE user_id = 91100 AND engagement_id = 3401"
+            )
+        )
+    ).scalar_one()
+
+    test_db_session.add_all(
+        [
+            QuestionnaireResponse(
+                assessment_instance_id=int(old_instance_id),
+                question_id=9110,
+                category_ids=[9110],
+                answer="allowed answer",
+            ),
+            QuestionnaireResponse(
+                assessment_instance_id=int(old_instance_id),
+                question_id=9111,
+                category_ids=[9111],
+                answer="vitals answer",
+            ),
+            QuestionnaireResponse(
+                assessment_instance_id=int(old_instance_id),
+                question_id=9112,
+                category_ids=[9112],
+                answer="blood answer",
+            ),
+            QuestionnaireResponse(
+                assessment_instance_id=int(old_instance_id),
+                question_id=9113,
+                category_ids=[9113],
+                answer="adv blood answer",
+            ),
+        ]
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/users/code/LOADPREV4B/onboard",
+        json=_onboard_payload(phone="7777000110", email="load.prev4@example.com"),
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data.get("preview_available") is True
+    new_instance_id = data["assessment_instance_id"]
+
+    rows = (
+        await test_db_session.execute(
+            text(
+                "SELECT question_id, answer FROM questionnaire_responses "
+                "WHERE assessment_instance_id = :aid ORDER BY question_id"
+            ),
+            {"aid": new_instance_id},
+        )
+    ).all()
+    assert len(rows) == 1
+    assert int(rows[0].question_id) == 9110
+    assert rows[0].answer == "allowed answer"
+
+
+@pytest.mark.asyncio
 async def test_create_engagement_persists_load_prev_flag(async_client, test_db_session):
     from tests.modules.engagements.test_engagements_routes import (
         _auth_header,

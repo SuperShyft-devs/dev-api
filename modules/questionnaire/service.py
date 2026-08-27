@@ -48,6 +48,14 @@ _PREFERENCE_KEYS = {"diet_preference", "allergies"}
 _HABIT_CONDITION_OPTION = "option_match"
 _HABIT_CONDITION_SCALE = "scale_range"
 _ALLOWED_HABIT_RULE_STATUS = {"active", "inactive"}
+_LOAD_PREV_EXCLUDED_CATEGORY_KEYS = frozenset(
+    {
+        "vitals",
+        "health_vitals",
+        "blood-parameters",
+        "advanced-blood-parameters",
+    }
+)
 
 
 def _normalize(value: str | None) -> str:
@@ -2096,6 +2104,14 @@ class QuestionnaireService:
             package_id=int(dest_package.package_id),
         )
 
+        all_resolved_category_ids = {
+            int(cid) for ids in cat_ids_map.values() for cid in ids
+        }
+        category_key_by_id = await self._repository.get_category_keys_by_ids(
+            db,
+            category_ids=list(all_resolved_category_ids),
+        )
+
         copied = 0
         affected_category_ids: set[int] = set()
 
@@ -2108,6 +2124,12 @@ class QuestionnaireService:
 
             resolved_ids = cat_ids_map.get(question_id, [])
             if not resolved_ids:
+                continue
+
+            if any(
+                category_key_by_id.get(int(cid), "") in _LOAD_PREV_EXCLUDED_CATEGORY_KEYS
+                for cid in resolved_ids
+            ):
                 continue
 
             new_response = QuestionnaireResponse(
