@@ -18,9 +18,10 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from core.config import settings
+from db.engine import create_job_engine, job_session_factory
 from modules.maintenance.sanitize_legacy_data import sanitize_legacy_data
 
 logger = logging.getLogger(__name__)
@@ -41,8 +42,8 @@ async def run_sanitize(
             "or --dry-run to preview."
         )
 
-    engine = create_async_engine(settings.DATABASE_URL, echo=False, pool_pre_ping=True)
-    session_factory = async_sessionmaker(bind=engine, expire_on_commit=False)
+    engine = create_job_engine()
+    session_factory = job_session_factory(engine)
 
     async with session_factory() as session:
         report = await sanitize_legacy_data(

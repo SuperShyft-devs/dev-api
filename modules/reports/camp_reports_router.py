@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -11,6 +12,7 @@ from db.session import get_db
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
 from modules.reports.camp_reports_service import CampReportsService
+from modules.reports.camp_refresh_jobs import enqueue_camp_refresh_job, get_camp_refresh_job
 from modules.reports.dependencies import get_camp_reports_service
 from modules.reports.schemas import (
     CampReportEstimateRequest,
@@ -391,10 +393,28 @@ async def refresh_camp_report(
     camp_no: int,
     payload: CampReportRefreshRequest,
     request: Request,
+    async_refresh: bool = Query(default=True, alias="async"),
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
+    if async_refresh:
+        job_id = enqueue_camp_refresh_job(
+            service=service,
+            employee=employee,
+            camp_no=camp_no,
+            section=payload.section,
+            department=None,
+            city=None,
+            ip_address=_client_ip(request),
+            user_agent=request.headers.get("User-Agent", "unknown"),
+            endpoint=str(request.url.path),
+        )
+        return JSONResponse(
+            status_code=202,
+            content={"success": True, "data": {"job_id": job_id, "status": "pending"}},
+        )
+
     result = await service.refresh_camp_report_section(
         db,
         employee=employee,
@@ -406,6 +426,27 @@ async def refresh_camp_report(
     )
     await db.commit()
     return success_response(result)
+
+
+@router.get("/refresh-jobs/{job_id}")
+async def get_camp_refresh_job_status(
+    job_id: str,
+    employee: EmployeeContext = Depends(get_current_employee),
+):
+    job = get_camp_refresh_job(job_id)
+    if job is None:
+        raise AppError(status_code=404, error_code="JOB_NOT_FOUND", message="Refresh job not found")
+    return success_response(
+        {
+            "job_id": job.job_id,
+            "status": job.status.value,
+            "camp_no": job.camp_no,
+            "section": job.section,
+            "result": job.result,
+            "error": job.error,
+            "created_at": job.created_at.isoformat(),
+        }
+    )
 
 
 @router.put("/{camp_no}/department/{slug}/refresh")

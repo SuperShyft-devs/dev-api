@@ -695,7 +695,10 @@ class EngagementsService:
         payload: ResolveHealthiansZoneRequest,
     ) -> ResolveHealthiansZoneResponse:
         from modules.diagnostics.healthians import client as healthians_client
-        from modules.diagnostics.healthians.sync_log import finalize_healthians_sync_log, log_healthians_call
+        from modules.diagnostics.healthians.sync_log import (
+            finalize_healthians_sync_log_isolated,
+            persist_healthians_sync_log_isolated,
+        )
         from modules.diagnostics.models import DiagnosticPackage
 
         ensure_admin(employee)
@@ -732,8 +735,7 @@ class EngagementsService:
             "is_ppmc_booking": 0,
         }
 
-        serviceability_log = await log_healthians_call(
-            db,
+        serviceability_log_id = await persist_healthians_sync_log_isolated(
             engagement_id=None,
             user_id=None,
             provider="healthians",
@@ -751,17 +753,15 @@ class EngagementsService:
                 zipcode=zipcode,
                 is_ppmc_booking=0,
             )
-            await finalize_healthians_sync_log(
-                db,
-                sync_log_id=serviceability_log.sync_log_id,
+            await finalize_healthians_sync_log_isolated(
+                sync_log_id=serviceability_log_id,
                 status="success" if serviceability_response.get("status") else "failed",
                 response_payload=serviceability_response,
             )
         except Exception as exc:
             logger.exception("Healthians serviceability check failed for engagement zone resolution")
-            await finalize_healthians_sync_log(
-                db,
-                sync_log_id=serviceability_log.sync_log_id,
+            await finalize_healthians_sync_log_isolated(
+                sync_log_id=serviceability_log_id,
                 status="failed",
                 error_message=str(exc),
             )
@@ -2462,9 +2462,13 @@ class EngagementsService:
         audience: str | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
+        limit: int = 100,
     ) -> dict:
         """Return rollup + per-engagement completeness summaries for filtered engagements."""
         ensure_admin(employee)
+
+        if limit < 1 or limit > 500:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
         status_values = _parse_status_filter(status)
 
@@ -2477,7 +2481,7 @@ class EngagementsService:
 
         engagements = await self._repository.list_engagements_for_filters(
             db,
-            limit=500,
+            limit=limit,
             organization_id=organization_id,
             camp_no=camp_no,
             statuses=status_values,
@@ -2785,18 +2789,16 @@ class EngagementsService:
         for iid in instance_ids:
             cat_resp_map[int(iid)] = {}
 
-        # Query category_id for each metsights category key
+        # Query category_id for each metsights category key (single batch)
         cat_key_to_id: dict[str, int] = {}
-        for ck in _METSIGHTS_CATEGORY_KEYS:
-            cat_row = await db.execute(
-                select(QuestionnaireCategory.category_id)
-                .where(QuestionnaireCategory.category_key == ck)
-                .where(QuestionnaireCategory.category_of == "metsights")
-                .limit(1)
-            )
-            cid = cat_row.scalar_one_or_none()
-            if cid is not None:
-                cat_key_to_id[ck] = int(cid)
+        cat_rows = await db.execute(
+            select(QuestionnaireCategory.category_id, QuestionnaireCategory.category_key)
+            .where(QuestionnaireCategory.category_key.in_(_METSIGHTS_CATEGORY_KEYS))
+            .where(QuestionnaireCategory.category_of == "metsights")
+        )
+        for row in cat_rows.all():
+            if row.category_key is not None:
+                cat_key_to_id[str(row.category_key)] = int(row.category_id)
 
         # Check if responses exist per category per instance
         for ck, cid in cat_key_to_id.items():

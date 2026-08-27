@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
+from db.transaction import release_request_transaction
 from db.seed.blood_parameters_registry import (
     ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
     ADVANCED_BLOOD_PARAMETER_DETAIL_FIELD,
@@ -32,6 +33,10 @@ from db.seed.questionnaire_field_config import (
     SCALE_TO_CHOICE_CONVERTERS,
 )
 from modules.assessments.models import AssessmentCategoryProgress, AssessmentInstance
+from modules.audit.cron_sync_logging import (
+    finalize_integration_sync_log_isolated,
+    persist_integration_sync_log_isolated,
+)
 from modules.audit.models import IntegrationSyncLog
 from modules.audit.repository import AuditRepository
 from modules.diagnostics.models import DiagnosticPackage
@@ -1338,11 +1343,12 @@ class MetsightsSyncService:
 
         for resource in resources:
             api_url = f"/records/{mrid}/{resource}/"
-            sync_log = await self._create_pending_sync_log(
-                db,
+            await release_request_transaction(db)
+            sync_log_id = await persist_integration_sync_log_isolated(
+                provider="metsights",
+                api_url=api_url,
                 engagement_id=engagement_id,
                 user_id=participant_user_id,
-                api_url=api_url,
             )
 
             try:
@@ -1364,9 +1370,8 @@ class MetsightsSyncService:
                             source = f"record_detail.{nested_key}"
 
                 if not isinstance(payload, dict) or not _payload_has_answer(payload):
-                    await self._finalize_sync_log(
-                        db,
-                        sync_log_id=sync_log.sync_log_id,
+                    await finalize_integration_sync_log_isolated(
+                        sync_log_id=sync_log_id,
                         status="skipped",
                         response_payload={"skipped": True, "reason": "no_ingestable_data"},
                     )
@@ -1377,16 +1382,14 @@ class MetsightsSyncService:
                 choice_maps = _build_field_choice_maps(opt_env if isinstance(opt_env, dict) else {})
                 resource_imported = await _ingest_payload(source, payload, choice_maps)
                 resource_skipped = skipped_questions[skipped_before:]
-                await self._finalize_sync_log(
-                    db,
-                    sync_log_id=sync_log.sync_log_id,
+                await finalize_integration_sync_log_isolated(
+                    sync_log_id=sync_log_id,
                     status="success",
                     response_payload={"imported": resource_imported, "skipped": resource_skipped},
                 )
             except Exception as exc:
-                await self._finalize_sync_log(
-                    db,
-                    sync_log_id=sync_log.sync_log_id,
+                await finalize_integration_sync_log_isolated(
+                    sync_log_id=sync_log_id,
                     status="failed",
                     error_message=str(exc),
                 )
@@ -1467,6 +1470,7 @@ class MetsightsSyncService:
                     reason="empty_payload",
                 )
                 return
+            await release_request_transaction(db)
             field_meta = await self._fetch_field_metadata_for_resource(mrid, resource, cache=options_cache)
             if field_meta:
                 payload = _validate_payload_against_options(payload, field_meta)
@@ -1492,26 +1496,24 @@ class MetsightsSyncService:
                 payload["is_complete"] = True
             logger.info("Pushing to Metsights %s for record %s: %s", resource, mrid, payload)
 
-            sync_log = await self._create_pending_sync_log(
-                db,
+            sync_log_id = await persist_integration_sync_log_isolated(
+                provider="metsights",
+                api_url=api_url,
                 engagement_id=engagement_id,
                 user_id=user_id,
-                api_url=api_url,
                 request_payload=dict(payload),
             )
             try:
                 await self._metsights.upsert_record_subresource(record_id=mrid, resource=resource, body=payload)
                 patched.append(resource)
-                await self._finalize_sync_log(
-                    db,
-                    sync_log_id=sync_log.sync_log_id,
+                await finalize_integration_sync_log_isolated(
+                    sync_log_id=sync_log_id,
                     status="success",
                     response_payload={"pushed": True},
                 )
             except Exception as exc:
-                await self._finalize_sync_log(
-                    db,
-                    sync_log_id=sync_log.sync_log_id,
+                await finalize_integration_sync_log_isolated(
+                    sync_log_id=sync_log_id,
                     status="failed",
                     error_message=str(exc),
                 )
@@ -2044,6 +2046,8 @@ class MetsightsSyncService:
 
         api_url = f"/records/{mrid}/{api_path}/"
 
+        await release_request_transaction(db)
+
         field_meta = await self._fetch_field_metadata_for_resource(mrid, api_path, cache=None)
         if field_meta:
             metsights_payload = _validate_payload_against_options(metsights_payload, field_meta)
@@ -2057,40 +2061,34 @@ class MetsightsSyncService:
                 message=f"No valid answers to push for category '{category_key}'",
             )
 
-        sync_log = await self._create_pending_sync_log(
-            db,
+        sync_log_id = await persist_integration_sync_log_isolated(
+            provider="metsights",
+            api_url=api_url,
             engagement_id=engagement_id,
             user_id=user_id,
-            api_url=api_url,
             request_payload=metsights_payload,
         )
 
         try:
             metsights_payload["is_complete"] = True
             await self._metsights.upsert_record_subresource(record_id=mrid, resource=api_path, body=metsights_payload)
-            await self._finalize_sync_log(
-                db,
-                sync_log_id=sync_log.sync_log_id,
+            await finalize_integration_sync_log_isolated(
+                sync_log_id=sync_log_id,
                 status="success",
                 response_payload={"pushed": True},
-                persist=True,
             )
         except AppError as exc:
-            await self._finalize_sync_log(
-                db,
-                sync_log_id=sync_log.sync_log_id,
+            await finalize_integration_sync_log_isolated(
+                sync_log_id=sync_log_id,
                 status="failed",
                 error_message=str(exc.message),
-                persist=True,
             )
             raise
         except Exception as exc:
-            await self._finalize_sync_log(
-                db,
-                sync_log_id=sync_log.sync_log_id,
+            await finalize_integration_sync_log_isolated(
+                sync_log_id=sync_log_id,
                 status="failed",
                 error_message=str(exc),
-                persist=True,
             )
             raise AppError(
                 status_code=503,
@@ -2179,7 +2177,6 @@ class MetsightsSyncService:
         from modules.assessments.repository import AssessmentsRepository
 
         assessments_repo = AssessmentsRepository()
-        audit_repo = AuditRepository()
 
         category = await self._questionnaire.get_category_by_key_and_category_of(
             db, category_key=category_key, category_of=category_of,
@@ -2234,16 +2231,14 @@ class MetsightsSyncService:
                 }
 
         api_url = f"/records/{mrid}/{api_path}/"
-        sync_log = await audit_repo.create_sync_log(
-            db,
-            IntegrationSyncLog(
-                engagement_id=engagement_id,
-                user_id=int(instance.user_id),
-                provider="metsights",
-                api_endpoint_url=api_url,
-                status="pending",
-            ),
+        sync_log_id = await persist_integration_sync_log_isolated(
+            provider="metsights",
+            api_url=api_url,
+            engagement_id=engagement_id,
+            user_id=int(instance.user_id),
         )
+
+        await release_request_transaction(db)
 
         try:
             metsights_payload: dict[str, Any] | None = None
@@ -2272,13 +2267,13 @@ class MetsightsSyncService:
                 else:
                     metsights_payload = {}
         except AppError as exc:
-            await audit_repo.update_sync_log_status(
-                db, sync_log_id=sync_log.sync_log_id, status="failed", error_message=str(exc.message),
+            await finalize_integration_sync_log_isolated(
+                sync_log_id=sync_log_id, status="failed", error_message=str(exc.message),
             )
             raise
         except Exception as exc:
-            await audit_repo.update_sync_log_status(
-                db, sync_log_id=sync_log.sync_log_id, status="failed", error_message=str(exc),
+            await finalize_integration_sync_log_isolated(
+                sync_log_id=sync_log_id, status="failed", error_message=str(exc),
             )
             raise AppError(
                 status_code=503,
@@ -2292,6 +2287,19 @@ class MetsightsSyncService:
             isinstance(metsights_payload, dict) and metsights_payload.get("is_complete")
         )
 
+        import_keys = [
+            str(field_name)
+            for field_name, raw_val in metsights_payload.items()
+            if field_name not in _METADATA_FIELDS
+            and not str(field_name).endswith("_unit")
+            and raw_val is not None
+            and raw_val != ""
+            and not (raw_val == [] and str(field_name) not in _EMPTY_LIST_IMPORT_KEYS)
+        ]
+        definitions_by_key = await self._questionnaire.get_definitions_by_keys(
+            db, question_keys=import_keys,
+        )
+
         for field_name, raw_val in metsights_payload.items():
             if field_name in _METADATA_FIELDS or str(field_name).endswith("_unit"):
                 continue
@@ -2302,7 +2310,7 @@ class MetsightsSyncService:
             if raw_val == [] and str(field_name) not in _EMPTY_LIST_IMPORT_KEYS:
                 continue
 
-            qdef = await self._questionnaire.get_definition_by_key(db, question_key=str(field_name))
+            qdef = definitions_by_key.get(str(field_name))
             if qdef is None:
                 skipped.append(f"{field_name}:no_definition")
                 continue
@@ -2350,8 +2358,9 @@ class MetsightsSyncService:
                 )
             imported += 1
 
-        await audit_repo.update_sync_log_status(
-            db, sync_log_id=sync_log.sync_log_id, status="success",
+        await finalize_integration_sync_log_isolated(
+            sync_log_id=sync_log_id,
+            status="success",
             response_payload={"imported": imported, "skipped": skipped},
         )
 

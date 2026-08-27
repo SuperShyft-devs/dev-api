@@ -80,6 +80,29 @@ async def test_session_isolation():
 
 
 @pytest.mark.asyncio
+async def test_get_db_rolls_back_on_exit():
+    """
+    Test that get_db rolls back any open transaction when the request scope ends.
+    """
+    rollback_calls = 0
+    original_rollback = AsyncSession.rollback
+
+    async def counting_rollback(self):
+        nonlocal rollback_calls
+        rollback_calls += 1
+        return await original_rollback(self)
+
+    AsyncSession.rollback = counting_rollback
+    try:
+        async for _session in get_db():
+            pass
+    finally:
+        AsyncSession.rollback = original_rollback
+
+    assert rollback_calls >= 1
+
+
+@pytest.mark.asyncio
 async def test_connection_pool_settings():
     """
     Test that connection pool settings are properly configured.

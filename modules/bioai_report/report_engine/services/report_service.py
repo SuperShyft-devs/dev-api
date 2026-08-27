@@ -15,6 +15,7 @@ identical; only the assessment source differs.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -157,7 +158,11 @@ class BioReportService:
                 still_missing,
             )
 
-        return self.generate_from_assessment(merged, record_id=resolved_record_id or None)
+        return await asyncio.to_thread(
+            self.generate_from_assessment,
+            merged,
+            record_id=resolved_record_id or None,
+        )
 
     async def _enrich_assessment(
         self,

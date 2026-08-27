@@ -8,9 +8,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from core.config import settings
+from db.engine import create_job_engine, job_session_factory
 from modules.notifications.expire_stale import (
     DEFAULT_PENDING_TIMEOUT_HOURS,
     expire_stale_notifications,
@@ -27,12 +28,8 @@ async def run_expire(*, yes: bool, dry_run: bool, timeout_hours: int | None) -> 
             "or --dry-run to preview."
         )
 
-    engine = create_async_engine(
-        settings.DATABASE_URL,
-        echo=False,
-        pool_pre_ping=True,
-    )
-    session_factory = async_sessionmaker(bind=engine, expire_on_commit=False)
+    engine = create_job_engine()
+    session_factory = job_session_factory(engine)
 
     async with session_factory() as session:
         result = await expire_stale_notifications(

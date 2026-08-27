@@ -53,6 +53,20 @@ class QuestionnaireRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_definitions_by_keys(
+        self,
+        db: AsyncSession,
+        *,
+        question_keys: list[str],
+    ) -> dict[str, QuestionnaireDefinition]:
+        if not question_keys:
+            return {}
+        result = await db.execute(
+            select(QuestionnaireDefinition).where(QuestionnaireDefinition.question_key.in_(question_keys))
+        )
+        rows = list(result.scalars().all())
+        return {str(r.question_key): r for r in rows}
+
     async def list_definitions(
         self,
         db: AsyncSession,

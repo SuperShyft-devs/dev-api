@@ -9,7 +9,11 @@ from typing import TypeVar
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
-from modules.audit.cron_sync_logging import finalize_integration_call, log_integration_call, sanitize_response_payload
+from modules.audit.cron_sync_logging import (
+    finalize_integration_sync_log_isolated,
+    persist_integration_sync_log_isolated,
+    sanitize_response_payload,
+)
 
 T = TypeVar("T")
 
@@ -41,8 +45,7 @@ async def tracked_metsights_call(
     if sync_context is None:
         return await operation()
 
-    sync_log = await log_integration_call(
-        sync_context.db,
+    sync_log_id = await persist_integration_sync_log_isolated(
         provider="metsights",
         api_url=api_url,
         engagement_id=sync_context.engagement_id,
@@ -51,17 +54,15 @@ async def tracked_metsights_call(
     )
     try:
         result = await operation()
-        await finalize_integration_call(
-            sync_context.db,
-            sync_log_id=sync_log.sync_log_id,
+        await finalize_integration_sync_log_isolated(
+            sync_log_id=sync_log_id,
             status="success",
             response_payload=sanitize_response_payload(result),
         )
         return result
     except Exception as exc:
-        await finalize_integration_call(
-            sync_context.db,
-            sync_log_id=sync_log.sync_log_id,
+        await finalize_integration_sync_log_isolated(
+            sync_log_id=sync_log_id,
             status="failed",
             error_message=str(exc)[:2000],
         )

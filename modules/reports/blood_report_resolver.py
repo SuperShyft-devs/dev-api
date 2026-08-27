@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config import settings
 from core.exceptions import AppError
 from modules.diagnostics.healthians import client as healthians_client
-from modules.diagnostics.healthians.sync_log import finalize_healthians_sync_log, log_healthians_call
+from modules.diagnostics.healthians.sync_log import (
+    finalize_healthians_sync_log_isolated,
+    persist_healthians_sync_log_isolated,
+)
 from modules.metsights.service import MetsightsService
 from modules.reports.healthians_booking_resolver import (
     HealthiansBookingSource,
@@ -98,9 +101,9 @@ async def _fetch_healthians_report_fields(
     user_id: int,
     first_name: str,
     last_name: str,
-) -> tuple[str, bool | None, datetime | None]:
-    sync_log = await log_healthians_call(
-        db,
+    ) -> tuple[str, bool | None, datetime | None]:
+    _ = db
+    sync_log_id = await persist_healthians_sync_log_isolated(
         engagement_id=engagement_id,
         user_id=user_id,
         provider="healthians",
@@ -111,16 +114,14 @@ async def _fetch_healthians_report_fields(
     try:
         access_token = await healthians_client.get_access_token()
         report_data = await healthians_client.get_booking_report(access_token, booking_id)
-        await finalize_healthians_sync_log(
-            db,
-            sync_log_id=sync_log.sync_log_id,
+        await finalize_healthians_sync_log_isolated(
+            sync_log_id=sync_log_id,
             status="success",
             response_payload=report_data if isinstance(report_data, dict) else None,
         )
     except Exception as exc:
-        await finalize_healthians_sync_log(
-            db,
-            sync_log_id=sync_log.sync_log_id,
+        await finalize_healthians_sync_log_isolated(
+            sync_log_id=sync_log_id,
             status="failed",
             error_message=str(exc)[:2000],
         )

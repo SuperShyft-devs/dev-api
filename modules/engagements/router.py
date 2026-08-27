@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -272,6 +272,7 @@ async def list_engagements_data_completeness_summary(
     search: str | None = None,
     sort_by: str | None = None,
     sort_dir: str | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
     date: date | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
@@ -291,6 +292,7 @@ async def list_engagements_data_completeness_summary(
         audience=audience,
         sort_by=sort_by,
         sort_dir=sort_dir,
+        limit=limit,
     )
     return success_response(data)
 

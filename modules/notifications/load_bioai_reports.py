@@ -56,6 +56,23 @@ def _report_data_complete(reports: Any, report_url: Any) -> bool:
     return reports is not None and report_url is not None
 
 
+def _extract_report_file_url(report_data: Any) -> str | None:
+    """Extract a PDF/file URL from a MetSights report payload."""
+    if not isinstance(report_data, dict):
+        return None
+    for key in ("file", "url", "report_url", "pdf_url"):
+        value = report_data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    data = report_data.get("data")
+    if isinstance(data, dict):
+        for key in ("file", "url", "report_url", "pdf_url"):
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
+
+
 async def _get_eligible_participants(
     db: AsyncSession,
     today: date,

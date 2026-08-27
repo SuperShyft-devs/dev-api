@@ -13,8 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from core.exceptions import AppError
-from modules.audit.models import IntegrationSyncLog
-from modules.audit.repository import AuditRepository
+from modules.audit.cron_sync_logging import (
+    finalize_integration_sync_log_isolated,
+    persist_integration_sync_log_isolated,
+)
 from modules.metsights.client import MetsightsClient
 from modules.metsights.service import MetsightsService
 from modules.notifications.models import Notification, NotificationService
@@ -332,18 +334,13 @@ class NotificationsService:
         if payload.participant_details:
             webhook_payload["participant_details"] = payload.participant_details
 
-        audit_repo = AuditRepository()
         sync_log_user_id = payload.user_ids[0] if len(payload.user_ids) == 1 else None
-        sync_log = await audit_repo.create_sync_log(
-            db,
-            IntegrationSyncLog(
-                engagement_id=resolved_engagement_id,
-                user_id=sync_log_user_id,
-                provider="n8n",
-                api_endpoint_url=webhook_url,
-                request_payload=webhook_payload,
-                status="pending",
-            ),
+        sync_log_id = await persist_integration_sync_log_isolated(
+            provider="n8n",
+            api_url=webhook_url,
+            engagement_id=resolved_engagement_id,
+            user_id=sync_log_user_id,
+            request_payload=webhook_payload,
         )
 
         webhook_failed = False
@@ -360,9 +357,8 @@ class NotificationsService:
                     if isinstance(resp_data, dict)
                     else "Webhook called successfully"
                 )
-                await audit_repo.update_sync_log_status(
-                    db,
-                    sync_log_id=sync_log.sync_log_id,
+                await finalize_integration_sync_log_isolated(
+                    sync_log_id=sync_log_id,
                     status="success",
                     response_payload=resp_data if isinstance(resp_data, dict) else {"body": resp_data},
                 )
@@ -370,9 +366,8 @@ class NotificationsService:
             logger.error("Notification webhook call failed: %s", exc)
             webhook_message = f"Webhook call failed: {exc}"
             webhook_failed = True
-            await audit_repo.update_sync_log_status(
-                db,
-                sync_log_id=sync_log.sync_log_id,
+            await finalize_integration_sync_log_isolated(
+                sync_log_id=sync_log_id,
                 status="failed",
                 error_message=str(exc),
             )

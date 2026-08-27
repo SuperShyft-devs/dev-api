@@ -29,6 +29,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
+from db.transaction import release_request_transaction
 from db.seed.blood_parameters_registry import (
     ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
     BLOOD_PARAMETER_CATEGORY_KEY,
@@ -651,6 +652,7 @@ async def load_blood_reports(
         today,
         all_engagements=all_engagements,
     )
+    await release_request_transaction(db)
     matched = len(participants)
     loaded = 0
     notified = 0
@@ -698,6 +700,7 @@ async def load_blood_reports(
                     dry_run_reasons.append("would_draft_blood_questionnaires")
                     dry_run_reasons.append("would_retry_unsubmitted_blood_metsights_categories")
                     try:
+                        await release_request_transaction(db)
                         report_exists = await metsights_service.is_bioai_report_generated(
                             record_id=record_id,
                             assessment_type_code=assessment_type_code,
@@ -722,6 +725,8 @@ async def load_blood_reports(
                 blood_parameters = blood_params
                 diagnostic_report_url = diag_url
                 is_full_report = bool(stored_full_report) if stored_full_report is not None else False
+
+                await release_request_transaction(db)
 
                 reference_id = try_participant_booking_id(participant_booking_id, diagnostic_provider)
                 booking_source = HealthiansBookingSource.PARTICIPANT if reference_id else None

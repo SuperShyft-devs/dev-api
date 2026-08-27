@@ -7,6 +7,7 @@ from typing import Any, TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from db.session import AsyncSessionLocal
 from modules.audit.models import IntegrationSyncLog
 from modules.audit.repository import AuditRepository
 
@@ -65,6 +66,52 @@ async def finalize_integration_call(
     )
 
 
+async def persist_integration_sync_log_isolated(
+    *,
+    provider: str,
+    api_url: str,
+    engagement_id: int | None = None,
+    user_id: int | None = None,
+    request_payload: dict | None = None,
+    status: str = "pending",
+) -> int:
+    """Write integration sync log on its own session so pending rows do not pin caller transactions."""
+    audit_repo = AuditRepository()
+    async with AsyncSessionLocal() as audit_db:
+        sync_log = await audit_repo.create_sync_log(
+            audit_db,
+            IntegrationSyncLog(
+                engagement_id=engagement_id,
+                user_id=user_id,
+                provider=provider,
+                api_endpoint_url=api_url,
+                request_payload=request_payload,
+                status=status,
+            ),
+        )
+        await audit_db.commit()
+        return int(sync_log.sync_log_id)
+
+
+async def finalize_integration_sync_log_isolated(
+    *,
+    sync_log_id: int,
+    status: str,
+    response_payload: dict | None = None,
+    error_message: str | None = None,
+) -> None:
+    audit_repo = AuditRepository()
+    async with AsyncSessionLocal() as audit_db:
+        await audit_repo.update_sync_log_status(
+            audit_db,
+            sync_log_id=sync_log_id,
+            status=status,
+            response_payload=response_payload,
+            error_message=error_message,
+        )
+        await audit_db.commit()
+
+
 async def tracked_integration_call(
     db: AsyncSession,
     *,
@@ -78,8 +125,7 @@ async def tracked_integration_call(
     persist: bool = True,
 ) -> T | None:
     """Execute an external API call and record it in integration_sync_logs."""
-    sync_log = await log_integration_call(
-        db,
+    sync_log_id = await persist_integration_sync_log_isolated(
         provider=provider,
         api_url=api_url,
         engagement_id=engagement_id,
@@ -88,9 +134,8 @@ async def tracked_integration_call(
     )
     try:
         result = await operation()
-        await finalize_integration_call(
-            db,
-            sync_log_id=sync_log.sync_log_id,
+        await finalize_integration_sync_log_isolated(
+            sync_log_id=sync_log_id,
             status="success",
             response_payload=sanitize_response_payload(result),
         )
@@ -98,9 +143,8 @@ async def tracked_integration_call(
             await db.commit()
         return result
     except Exception as exc:
-        await finalize_integration_call(
-            db,
-            sync_log_id=sync_log.sync_log_id,
+        await finalize_integration_sync_log_isolated(
+            sync_log_id=sync_log_id,
             status="failed",
             error_message=str(exc)[:2000],
         )

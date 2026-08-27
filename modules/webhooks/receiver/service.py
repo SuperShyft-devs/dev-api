@@ -10,8 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config import settings
 from core.exceptions import AppError
 from modules.assessments.repository import AssessmentsRepository
-from modules.audit.cron_sync_logging import finalize_integration_call, log_integration_call
-from modules.diagnostics.healthians.sync_log import finalize_healthians_sync_log, log_healthians_call
+from modules.audit.cron_sync_logging import (
+    finalize_integration_call,
+    finalize_integration_sync_log_isolated,
+    log_integration_call,
+    persist_integration_sync_log_isolated,
+)
+from db.transaction import release_request_transaction
+from modules.diagnostics.healthians.sync_log import (
+    finalize_healthians_sync_log_isolated,
+    persist_healthians_sync_log_isolated,
+)
 from modules.engagement_notifications.repository import EngagementNotificationsRepository
 from modules.engagements.models import EngagementParticipant
 from modules.engagements.repository import EngagementsRepository
@@ -91,8 +100,9 @@ class WebhooksReceiverService:
         engagement_id = participant.engagement_id if participant else None
         user_id = participant.user_id if participant else None
 
-        sync_log = await log_healthians_call(
-            db,
+        await release_request_transaction(db)
+
+        sync_log_id = await persist_healthians_sync_log_isolated(
             engagement_id=engagement_id,
             user_id=user_id,
             provider="healthians",
@@ -110,13 +120,12 @@ class WebhooksReceiverService:
 
         response_data = {
             "received": True,
-            "sync_log_id": sync_log.sync_log_id,
+            "sync_log_id": sync_log_id,
             "forwards": forwards,
         }
 
-        await finalize_healthians_sync_log(
-            db,
-            sync_log_id=sync_log.sync_log_id,
+        await finalize_healthians_sync_log_isolated(
+            sync_log_id=sync_log_id,
             status="success",
             response_payload=response_data,
         )
@@ -331,14 +340,12 @@ class WebhooksReceiverService:
         engagement_id = int(instance.engagement_id) if instance is not None else None
         user_id = int(instance.user_id) if instance is not None else None
 
-        sync_log = await log_integration_call(
-            db,
+        sync_log_id = await persist_integration_sync_log_isolated(
             provider=_PROVIDER_AURAE,
             api_url=api_endpoint_url,
             engagement_id=engagement_id,
             user_id=user_id,
             request_payload=payload_dict,
-            status="pending",
         )
 
         try:
@@ -346,18 +353,16 @@ class WebhooksReceiverService:
             if assessment_instance_id is None:
                 assessment_instance_id = self._parse_assessment_instance_id(payload.api_customer_id)
         except AppError as exc:
-            await finalize_integration_call(
-                db,
-                sync_log_id=sync_log.sync_log_id,
+            await finalize_integration_sync_log_isolated(
+                sync_log_id=sync_log_id,
                 status="failed",
                 error_message=exc.message,
             )
             raise
 
         if instance is None:
-            await finalize_integration_call(
-                db,
-                sync_log_id=sync_log.sync_log_id,
+            await finalize_integration_sync_log_isolated(
+                sync_log_id=sync_log_id,
                 status="failed",
                 error_message=f"Assessment instance {assessment_instance_id} not found",
             )
@@ -410,6 +415,8 @@ class WebhooksReceiverService:
                 existing.assessment_instance_id = assessment_instance_id
                 existing = await self._reports_repository.update_individual_report(db, existing)
 
+        await release_request_transaction(db)
+
         notifications_dispatched: list[dict[str, Any]] = []
         if event == "report" and engagement_id is not None and user_id is not None:
             notifications_dispatched = await self._dispatch_report_ready_notifications(
@@ -424,14 +431,13 @@ class WebhooksReceiverService:
             "event": event,
             "assessment_instance_id": assessment_instance_id,
             "report_id": existing.report_id,
-            "sync_log_id": sync_log.sync_log_id,
+            "sync_log_id": sync_log_id,
         }
         if notifications_dispatched:
             response_data["notifications"] = notifications_dispatched
 
-        await finalize_integration_call(
-            db,
-            sync_log_id=sync_log.sync_log_id,
+        await finalize_integration_sync_log_isolated(
+            sync_log_id=sync_log_id,
             status="success",
             response_payload=response_data,
         )

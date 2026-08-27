@@ -6,19 +6,13 @@ Uses async SQLAlchemy for non-blocking database operations.
 """
 
 from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from core.config import settings
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from db.engine import create_api_engine
+from db.observability import install_db_observability
 
 # Create async engine with connection pooling
-# echo=True in development shows SQL queries for debugging
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.is_development(),
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=settings.DATABASE_MAX_OVERFLOW,
-    pool_pre_ping=True,  # Verify connections before using them
-    pool_recycle=3600,   # Recycle connections after 1 hour
-)
+engine = create_api_engine()
+install_db_observability(engine)
 
 # Create async session factory
 # expire_on_commit=False prevents lazy loading issues after commit
@@ -51,5 +45,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
+        except Exception:
+            await session.rollback()
+            raise
         finally:
+            await session.rollback()
             await session.close()

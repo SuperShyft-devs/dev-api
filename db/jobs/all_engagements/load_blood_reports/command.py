@@ -13,9 +13,10 @@ import asyncio
 import sys
 from datetime import date
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from core.config import settings
+from db.engine import create_job_engine, job_session_factory
 from modules.assessments.dependencies import get_assessments_service
 from modules.engagements.dependencies import get_engagements_service
 from modules.metsights.client import MetsightsClient
@@ -90,12 +91,8 @@ async def run_load(
             "or --dry-run to preview."
         )
 
-    engine = create_async_engine(
-        settings.DATABASE_URL,
-        echo=False,
-        pool_pre_ping=True,
-    )
-    session_factory = async_sessionmaker(bind=engine, expire_on_commit=False)
+    engine = create_job_engine()
+    session_factory = job_session_factory(engine)
 
     metsights_client = MetsightsClient()
     metsights_service = MetsightsService(client=metsights_client)

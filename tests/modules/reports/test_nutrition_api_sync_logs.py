@@ -24,6 +24,9 @@ class _FakeMetsightsService:
 
 
 async def _seed_engagement(test_db_session, *, engagement_id: int):
+    from tests.helpers.engagement_types import engagement_type_id
+
+    bio_ai_type = await engagement_type_id(test_db_session, "bio_ai")
     await test_db_session.execute(
         text(
             "INSERT INTO diagnostic_package (diagnostic_package_id, package_name, diagnostic_provider, status) "
@@ -42,11 +45,11 @@ async def _seed_engagement(test_db_session, *, engagement_id: int):
             "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
             "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, "
             "status, organization_id) "
-            "VALUES (:eid, 'Nutrition Log Camp', 'ENG-NUT-LOG', 'bio_ai', 1, 1, 'BLR', 20, "
-            "'2026-02-01', '2026-02-28', 'running', 0, NULL) "
+            "VALUES (:eid, 'Nutrition Log Camp', 'ENG-NUT-LOG', :etype, 1, 1, 'BLR', 20, "
+            "'2026-02-01', '2026-02-28', 'running', NULL) "
             "ON CONFLICT (engagement_id) DO NOTHING"
         ),
-        {"eid": engagement_id},
+        {"eid": engagement_id, "etype": bio_ai_type},
     )
     await test_db_session.commit()
 

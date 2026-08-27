@@ -16,9 +16,10 @@ import logging
 import sys
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from core.config import settings
+from db.engine import create_job_engine, job_session_factory
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -785,8 +786,8 @@ def main() -> None:
         from modules.users.repository import UsersRepository
 
         settings.validate()
-        engine = create_async_engine(settings.DATABASE_URL, echo=False, pool_pre_ping=True)
-        session_factory = async_sessionmaker(bind=engine, expire_on_commit=False)
+        engine = create_job_engine()
+        session_factory = job_session_factory(engine)
 
         metsights_service = MetsightsService(client=MetsightsClient())
         sync_service = MetsightsSyncService(

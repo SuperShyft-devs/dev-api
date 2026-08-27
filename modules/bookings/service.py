@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common.phone import to_healthians_mobile
 from core.config import settings
 from core.exceptions import AppError
+from db.transaction import release_request_transaction
 from modules.diagnostics.healthians import client as healthians_client
 from modules.diagnostics.healthians.sync_log import log_healthians_call
 from modules.diagnostics.models import DiagnosticPackage
@@ -202,6 +203,7 @@ async def check_service_availability(
         )
         db.add(participant)
         await db.flush()
+        await db.commit()
 
         lat = str(latitude)
         lng = str(longitude)
@@ -331,6 +333,8 @@ async def get_available_slots(
             "package": [{"deal_id": [f"package_{external_package_id}"]}],
         }
 
+        await release_request_transaction(db)
+
         try:
             resp = await healthians_client.get_slots_by_location(access_token, payload)
         except Exception as exc:
@@ -431,6 +435,8 @@ async def lock_slots(
             continue
 
         vendor_billing_user_id = str(participant.booked_by_user_id)
+
+        await release_request_transaction(db)
 
         try:
             resp = await healthians_client.freeze_slot_v1(
@@ -806,6 +812,8 @@ async def create_healthians_booking_after_payment(
             "is_ppmc_booking": 0,
         }
 
+        await release_request_transaction(db)
+
         try:
             resp = await healthians_client.create_booking_v3(
                 access_token,
@@ -918,6 +926,8 @@ async def cancel_healthians_participant_booking(
         "vendor_customer_id": str(participant.user_id),
         "remarks": remarks,
     }
+
+    await release_request_transaction(db)
 
     try:
         resp = await healthians_client.cancel_booking(

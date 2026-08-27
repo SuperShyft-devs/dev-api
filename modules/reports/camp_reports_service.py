@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common.masking import mask_email, mask_phone
 from core.config import settings
 from core.exceptions import AppError
+from db.transaction import release_request_transaction
 from modules.audit.service import AuditService
 from modules.employee.access_control import (
     ensure_camp_access,
@@ -1339,6 +1340,10 @@ class CampReportsService:
                 error_code="SECTION_NOT_IMPLEMENTED",
                 message="Report section is not implemented",
             )
+
+        # End the request transaction before section builders that call external APIs
+        # or perform heavy aggregation so Postgres connections are not idle in transaction.
+        await db.commit()
 
         checked_at = datetime.now(timezone.utc).isoformat()
         report = dict(row.report or {})
@@ -2835,6 +2840,8 @@ class CampReportsService:
                 no_record_id += 1
                 continue
             to_check.append((user_id, record_id))
+
+        await release_request_transaction(db)
 
         with_metsights_collection = 0
         missing_collection = 0

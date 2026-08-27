@@ -8,7 +8,10 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
-from modules.diagnostics.healthians.sync_log import finalize_healthians_sync_log, log_healthians_call
+from modules.diagnostics.healthians.sync_log import (
+    finalize_healthians_sync_log_isolated,
+    persist_healthians_sync_log_isolated,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +33,10 @@ class WebhookSenderService:
             if url.strip()
         ]
         results: list[dict] = []
+        _ = db
 
         for url in forward_urls:
-            sync_log = await log_healthians_call(
-                db,
+            sync_log_id = await persist_healthians_sync_log_isolated(
                 engagement_id=engagement_id,
                 user_id=user_id,
                 provider="healthians",
@@ -55,9 +58,8 @@ class WebhookSenderService:
                 response_payload = (
                     resp_data if isinstance(resp_data, dict) else {"body": resp_data}
                 )
-                await finalize_healthians_sync_log(
-                    db,
-                    sync_log_id=sync_log.sync_log_id,
+                await finalize_healthians_sync_log_isolated(
+                    sync_log_id=sync_log_id,
                     status="success",
                     response_payload=response_payload,
                 )
@@ -65,14 +67,13 @@ class WebhookSenderService:
                     {
                         "url": url,
                         "status": "success",
-                        "sync_log_id": sync_log.sync_log_id,
+                        "sync_log_id": sync_log_id,
                     }
                 )
             except Exception as exc:
                 logger.error("Healthians webhook forward failed for %s: %s", url, exc)
-                await finalize_healthians_sync_log(
-                    db,
-                    sync_log_id=sync_log.sync_log_id,
+                await finalize_healthians_sync_log_isolated(
+                    sync_log_id=sync_log_id,
                     status="failed",
                     error_message=str(exc),
                 )
@@ -80,7 +81,7 @@ class WebhookSenderService:
                     {
                         "url": url,
                         "status": "failed",
-                        "sync_log_id": sync_log.sync_log_id,
+                        "sync_log_id": sync_log_id,
                         "error": str(exc),
                     }
                 )

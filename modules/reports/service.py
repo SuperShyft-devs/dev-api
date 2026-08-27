@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from core.config import settings
 from core.exceptions import AppError
+from db.transaction import release_request_transaction
 from db.session import AsyncSessionLocal
 from modules.assessments.models import AssessmentInstance, AssessmentPackage
 from modules.engagements.models import Engagement
@@ -85,6 +86,8 @@ logger = logging.getLogger(__name__)
 _SYNC_IDLE = "idle"
 _SYNC_IN_PROGRESS = "in_progress"
 _SYNC_FAILED = "failed"
+
+_blood_parameter_refresh_in_progress: set[int] = set()
 
 # Blood fetch failures that should yield empty profiles, not abort camp/overview aggregation.
 BLOOD_DATA_UNAVAILABLE_ERROR_CODES = frozenset({
@@ -991,6 +994,8 @@ class ReportsService:
         if not record_id:
             return {}
 
+        await release_request_transaction(db)
+
         report_data = await self._metsights_service.get_report(
             record_id=record_id,
             assessment_type_code=package.assessment_type_code,
@@ -1387,6 +1392,8 @@ class ReportsService:
                 error_code="INVALID_STATE",
                 message="Metsights record id is missing for this assessment",
             )
+
+        await release_request_transaction(db)
 
         report_data = await self._metsights_service.get_report(
             record_id=record_id,
@@ -2129,6 +2136,8 @@ class ReportsService:
                     message="Metsights record id is missing for this assessment",
                 )
 
+            await release_request_transaction(db)
+
             report_data = await self._metsights_service.get_report(
                 record_id=record_id,
                 assessment_type_code="7",
@@ -2410,36 +2419,39 @@ class ReportsService:
 
     async def _refresh_user_blood_parameters(self, *, user_id: int) -> None:
         """Import Metsights blood questionnaire categories for unsynced assessments."""
+        after_id = 0
+        rows: list[AssessmentInstance] = []
         async with self._session_factory() as db:
             state = await self._get_or_create_sync_state(db, user_id=user_id)
-            try:
-                if (state.sync_status or _SYNC_IDLE) != _SYNC_IN_PROGRESS:
-                    state.sync_status = _SYNC_IN_PROGRESS
-                    await self._repository.update_user_sync_state(db, state)
-                    await db.commit()
-                after_id = int(state.last_synced_assessment_instance_id or 0)
-                rows = await self._repository.list_unsynced_assessments_with_record_id(
-                    db,
-                    user_id=user_id,
-                    after_assessment_instance_id=after_id,
-                )
+            if (state.sync_status or _SYNC_IDLE) != _SYNC_IN_PROGRESS:
+                state.sync_status = _SYNC_IN_PROGRESS
+                await self._repository.update_user_sync_state(db, state)
+            after_id = int(state.last_synced_assessment_instance_id or 0)
+            rows = await self._repository.list_unsynced_assessments_with_record_id(
+                db,
+                user_id=user_id,
+                after_assessment_instance_id=after_id,
+            )
+            await db.commit()
 
-                latest_synced_id = after_id
-                for assessment in rows:
-                    record_id = (assessment.metsights_record_id or "").strip()
-                    if not record_id:
-                        continue
-                    if self._metsights_sync_service is None:
-                        break
+        latest_synced_id = after_id
+        try:
+            for assessment in rows:
+                record_id = (assessment.metsights_record_id or "").strip()
+                if not record_id:
+                    continue
+                if self._metsights_sync_service is None:
+                    break
 
-                    any_ok = False
+                any_ok = False
+                async with self._session_factory() as import_db:
                     for category_key in (
                         BLOOD_PARAMETER_CATEGORY_KEY,
                         ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
                     ):
                         try:
                             await self._metsights_sync_service.import_category_from_metsights(
-                                db,
+                                import_db,
                                 assessment_instance_id=int(assessment.assessment_instance_id),
                                 user_id=user_id,
                                 category_key=category_key,
@@ -2454,19 +2466,26 @@ class ReportsService:
                                 exc.error_code,
                             )
 
-                    if not any_ok:
-                        # Do not advance past a failed assessment so the next run retries it.
-                        break
-                    latest_synced_id = max(latest_synced_id, int(assessment.assessment_instance_id))
+                    if any_ok:
+                        await import_db.commit()
+                    else:
+                        await import_db.rollback()
 
+                if not any_ok:
+                    # Do not advance past a failed assessment so the next run retries it.
+                    break
+                latest_synced_id = max(latest_synced_id, int(assessment.assessment_instance_id))
+
+            async with self._session_factory() as db:
+                state = await self._get_or_create_sync_state(db, user_id=user_id)
                 state.last_synced_assessment_instance_id = latest_synced_id if latest_synced_id > 0 else None
                 state.sync_status = _SYNC_IDLE
                 state.last_sync_error = None
                 state.last_synced_at = datetime.now(timezone.utc)
                 await self._repository.update_user_sync_state(db, state)
                 await db.commit()
-            except Exception as exc:
-                await db.rollback()
+        except Exception as exc:
+            async with self._session_factory() as db:
                 failed_state = await self._get_or_create_sync_state(db, user_id=user_id)
                 failed_state.sync_status = _SYNC_FAILED
                 failed_state.last_sync_error = str(exc)[:1000]
@@ -2474,7 +2493,17 @@ class ReportsService:
                 await db.commit()
 
     def trigger_user_blood_parameters_refresh(self, *, user_id: int) -> None:
-        asyncio.create_task(self._refresh_user_blood_parameters(user_id=user_id))
+        if user_id in _blood_parameter_refresh_in_progress:
+            return
+        _blood_parameter_refresh_in_progress.add(user_id)
+
+        async def _run_refresh() -> None:
+            try:
+                await self._refresh_user_blood_parameters(user_id=user_id)
+            finally:
+                _blood_parameter_refresh_in_progress.discard(user_id)
+
+        asyncio.create_task(_run_refresh())
 
     async def get_blood_parameter_trends_for_user(
         self,

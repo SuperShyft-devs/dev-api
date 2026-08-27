@@ -9,9 +9,10 @@ import argparse
 import asyncio
 from datetime import date
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from core.config import settings
+from db.engine import create_job_engine, job_session_factory
 from modules.metsights.client import MetsightsClient
 from modules.metsights.service import MetsightsService
 from modules.notifications.load_fitprint_reports import load_fitprint_reports
@@ -26,8 +27,8 @@ async def run_load(*, yes: bool, dry_run: bool, as_of: date | None) -> dict:
             "or --dry-run to preview."
         )
 
-    engine = create_async_engine(settings.DATABASE_URL, echo=False, pool_pre_ping=True)
-    session_factory = async_sessionmaker(bind=engine, expire_on_commit=False)
+    engine = create_job_engine()
+    session_factory = job_session_factory(engine)
     metsights_service = MetsightsService(client=MetsightsClient())
 
     async with session_factory() as session:

@@ -15,7 +15,11 @@ from common.phone import to_healthians_mobile
 from core.config import settings
 from core.exceptions import AppError
 from modules.diagnostics.healthians import client as healthians_client
-from modules.diagnostics.healthians.sync_log import finalize_healthians_sync_log, log_healthians_call
+from modules.diagnostics.healthians.sync_log import (
+    finalize_healthians_sync_log_isolated,
+    log_healthians_call,
+    persist_healthians_sync_log_isolated,
+)
 from modules.diagnostics.models import DiagnosticPackage
 from modules.employee.access_control import (
     ensure_console_access,
@@ -32,6 +36,7 @@ from modules.assessments.repository import AssessmentsRepository
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import _participant_enrollment_to_dict
+from db.transaction import release_request_transaction
 from modules.geocoding.client import search_places
 from modules.metsights.sync_service import MetsightsSyncService
 from modules.questionnaire.service import QuestionnaireService
@@ -528,6 +533,8 @@ class ConsoleService:
         vendor_billing_user_id = str(participant.booked_by_user_id)
         provider_label = (provider or "healthians").lower()
 
+        await release_request_transaction(db)
+
         access_token = await healthians_client.get_access_token()
 
         serviceability_url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/checkServiceabilityByLocation_v2"
@@ -537,8 +544,7 @@ class ConsoleService:
             "zipcode": zipcode,
             "is_ppmc_booking": 0,
         }
-        serviceability_log = await log_healthians_call(
-            db,
+        serviceability_log_id = await persist_healthians_sync_log_isolated(
             engagement_id=engagement_id,
             user_id=user_id,
             provider=provider_label,
@@ -555,16 +561,14 @@ class ConsoleService:
                 zipcode=zipcode,
                 is_ppmc_booking=0,
             )
-            await finalize_healthians_sync_log(
-                db,
-                sync_log_id=serviceability_log.sync_log_id,
+            await finalize_healthians_sync_log_isolated(
+                sync_log_id=serviceability_log_id,
                 status="success" if serviceability_response.get("status") else "failed",
                 response_payload=serviceability_response,
             )
         except Exception as exc:
-            await finalize_healthians_sync_log(
-                db,
-                sync_log_id=serviceability_log.sync_log_id,
+            await finalize_healthians_sync_log_isolated(
+                sync_log_id=serviceability_log_id,
                 status="failed",
                 error_message=str(exc),
             )
@@ -628,8 +632,7 @@ class ConsoleService:
         }
 
         booking_url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/createBooking_v3"
-        booking_log = await log_healthians_call(
-            db,
+        booking_log_id = await persist_healthians_sync_log_isolated(
             engagement_id=engagement_id,
             user_id=user_id,
             provider=provider_label,
@@ -645,9 +648,8 @@ class ConsoleService:
                 checksum_key=settings.HEALTHIANS_CHECKSUM_KEY,
             )
             if not booking_response.get("status"):
-                await finalize_healthians_sync_log(
-                    db,
-                    sync_log_id=booking_log.sync_log_id,
+                await finalize_healthians_sync_log_isolated(
+                    sync_log_id=booking_log_id,
                     status="failed",
                     response_payload=booking_response,
                     error_message=booking_response.get("message"),
@@ -660,9 +662,8 @@ class ConsoleService:
 
             healthians_booking_id = booking_response.get("booking_id")
             if not healthians_booking_id:
-                await finalize_healthians_sync_log(
-                    db,
-                    sync_log_id=booking_log.sync_log_id,
+                await finalize_healthians_sync_log_isolated(
+                    sync_log_id=booking_log_id,
                     status="failed",
                     response_payload=booking_response,
                     error_message="Missing booking_id in Healthians response",
@@ -673,18 +674,16 @@ class ConsoleService:
                     message="Healthians response did not include booking_id",
                 )
 
-            await finalize_healthians_sync_log(
-                db,
-                sync_log_id=booking_log.sync_log_id,
+            await finalize_healthians_sync_log_isolated(
+                sync_log_id=booking_log_id,
                 status="success",
                 response_payload=booking_response,
             )
         except AppError:
             raise
         except Exception as exc:
-            await finalize_healthians_sync_log(
-                db,
-                sync_log_id=booking_log.sync_log_id,
+            await finalize_healthians_sync_log_isolated(
+                sync_log_id=booking_log_id,
                 status="failed",
                 error_message=str(exc),
             )
@@ -1000,6 +999,8 @@ class ConsoleService:
 
         pkg = await self._load_healthians_package_for_engagement(db, engagement)
 
+        await release_request_transaction(db)
+
         results = await search_places(f"{city.strip()} {pincode.strip()}", limit=1)
         geocoded = results[0] if results else {}
         latitude = geocoded.get("latitude")
@@ -1017,6 +1018,7 @@ class ConsoleService:
         participant.latitude = latitude
         participant.longitude = longitude
         await db.flush()
+        await db.commit()
 
         lat = str(latitude)
         lng = str(longitude)
@@ -1110,6 +1112,8 @@ class ConsoleService:
             "package": [{"deal_id": [f"package_{external_package_id}"]}],
         }
 
+        await release_request_transaction(db)
+
         access_token = await healthians_client.get_access_token()
         api_url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/getSlotsByLocation"
 
@@ -1183,6 +1187,9 @@ class ConsoleService:
         pkg = await self._load_healthians_package_for_engagement(db, engagement)
 
         vendor_billing_user_id = str(participant.booked_by_user_id)
+
+        await release_request_transaction(db)
+
         access_token = await healthians_client.get_access_token()
         api_url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/freezeSlot_v1"
         req_payload = {"slot_id": blood_collection_time_slot_id, "vendor_billing_user_id": vendor_billing_user_id}
@@ -1327,11 +1334,17 @@ class ConsoleService:
             "is_ppmc_booking": 0,
         }
 
+        await release_request_transaction(db)
+
         access_token = await healthians_client.get_access_token()
         booking_url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/createBooking_v3"
-        booking_log = await log_healthians_call(
-            db, engagement_id=engagement_id, user_id=user_id, provider="healthians",
-            api_url=booking_url, request_payload=booking_payload, status="pending",
+        booking_log_id = await persist_healthians_sync_log_isolated(
+            engagement_id=engagement_id,
+            user_id=user_id,
+            provider="healthians",
+            api_url=booking_url,
+            request_payload=booking_payload,
+            status="pending",
         )
 
         try:
@@ -1339,8 +1352,8 @@ class ConsoleService:
                 access_token, booking_payload, checksum_key=settings.HEALTHIANS_CHECKSUM_KEY,
             )
             if not booking_response.get("status"):
-                await finalize_healthians_sync_log(
-                    db, sync_log_id=booking_log.sync_log_id,
+                await finalize_healthians_sync_log_isolated(
+                    sync_log_id=booking_log_id,
                     status="failed", response_payload=booking_response,
                     error_message=booking_response.get("message"),
                 )
@@ -1352,8 +1365,8 @@ class ConsoleService:
 
             healthians_booking_id = booking_response.get("booking_id")
             if not healthians_booking_id:
-                await finalize_healthians_sync_log(
-                    db, sync_log_id=booking_log.sync_log_id,
+                await finalize_healthians_sync_log_isolated(
+                    sync_log_id=booking_log_id,
                     status="failed", response_payload=booking_response,
                     error_message="Missing booking_id in Healthians response",
                 )
@@ -1363,15 +1376,15 @@ class ConsoleService:
                     message="Healthians response did not include booking_id",
                 )
 
-            await finalize_healthians_sync_log(
-                db, sync_log_id=booking_log.sync_log_id,
+            await finalize_healthians_sync_log_isolated(
+                sync_log_id=booking_log_id,
                 status="success", response_payload=booking_response,
             )
         except AppError:
             raise
         except Exception as exc:
-            await finalize_healthians_sync_log(
-                db, sync_log_id=booking_log.sync_log_id,
+            await finalize_healthians_sync_log_isolated(
+                sync_log_id=booking_log_id,
                 status="failed", error_message=str(exc),
             )
             raise AppError(status_code=502, error_code="HEALTHIANS_BOOKING_FAILED", message=str(exc)) from exc

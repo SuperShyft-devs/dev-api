@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
+from db.transaction import release_request_transaction
 from modules.diagnostics.models import DiagnosticPackage
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.metsights.service import MetsightsService
@@ -128,6 +129,8 @@ async def resolve_healthians_booking_id(
             booking_id=from_participant,
             source=HealthiansBookingSource.PARTICIPANT,
         )
+
+    await release_request_transaction(db)
 
     collection_data = await metsights_service.get_fetch_collections(record_id=rid)
     provider_code = provider_code_from_field(collection_data.get("provider"))
