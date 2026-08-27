@@ -1197,6 +1197,7 @@ class MetsightsSyncService:
 
         engagement_id = int(instance.engagement_id) if instance.engagement_id else None
         participant_user_id = int(instance.user_id)
+        package_id = int(instance.package_id)
 
         imported = 0
         skipped_questions: list[str] = []
@@ -1241,7 +1242,7 @@ class MetsightsSyncService:
                 resolved_cat_ids = await self._questionnaire.resolve_category_ids_for_question(
                     db,
                     question_id=int(qdef.question_id),
-                    package_id=int(instance.package_id),
+                    package_id=package_id,
                 )
                 if not resolved_cat_ids:
                     skipped_questions.append(f"{resource}.{field_name}.no_category")
@@ -1994,20 +1995,14 @@ class MetsightsSyncService:
         package = await self._assessments.get_package_by_id(db, int(instance.package_id))
         local_type_code = (package.assessment_type_code or "").strip() if package is not None else ""
         package_code = (package.package_code or "").strip() if package is not None else None
-
-        effective_type_code = await self._ensure_record_type_matches_package(
-            record_id=mrid,
-            local_type_code=local_type_code,
-            package_code=package_code,
-        )
-        _validate_category_for_assessment_type(type_code=effective_type_code, category_key=category_key)
+        category_id = int(category.category_id)
 
         engagement_id = int(instance.engagement_id) if instance.engagement_id else None
 
         all_instances = await assessments_repo.list_all_instances_for_engagement(db, engagement_id=engagement_id) if engagement_id else [instance]
         source_ids = [int(inst.assessment_instance_id) for inst in all_instances if int(inst.user_id) == int(user_id)]
 
-        questions = await self._questionnaire.list_questions_by_category(db, category_id=int(category.category_id))
+        questions = await self._questionnaire.list_questions_by_category(db, category_id=category_id)
         if not questions:
             raise AppError(status_code=422, error_code="INVALID_STATE", message="No questions found for this category")
 
@@ -2047,6 +2042,13 @@ class MetsightsSyncService:
         api_url = f"/records/{mrid}/{api_path}/"
 
         await release_request_transaction(db)
+
+        effective_type_code = await self._ensure_record_type_matches_package(
+            record_id=mrid,
+            local_type_code=local_type_code,
+            package_code=package_code,
+        )
+        _validate_category_for_assessment_type(type_code=effective_type_code, category_key=category_key)
 
         field_meta = await self._fetch_field_metadata_for_resource(mrid, api_path, cache=None)
         if field_meta:
@@ -2107,14 +2109,14 @@ class MetsightsSyncService:
         is_complete = await q_service.is_category_complete(
             db,
             assessment_instance_id=assessment_instance_id,
-            category_id=int(category.category_id),
+            category_id=category_id,
             user_id=user_id,
         )
 
         progress = await assessments_repo.get_category_progress(
             db,
             assessment_instance_id=assessment_instance_id,
-            category_id=int(category.category_id),
+            category_id=category_id,
         )
         if is_complete:
             if progress is None:
@@ -2122,7 +2124,7 @@ class MetsightsSyncService:
                     db,
                     AssessmentCategoryProgress(
                         assessment_instance_id=assessment_instance_id,
-                        category_id=int(category.category_id),
+                        category_id=category_id,
                         status="complete",
                         is_submitted=True,
                         completed_at=now,
@@ -2141,7 +2143,7 @@ class MetsightsSyncService:
         # Also mark is_submitted on related supershyft categories that share the same questions
         await self._mark_related_categories_submitted(
             db, assessments_repo=assessments_repo,
-            instance=instance, metsights_category_key=category_key,
+            assessment_instance_id=assessment_instance_id, metsights_category_key=category_key,
         )
 
         return {
@@ -2202,6 +2204,10 @@ class MetsightsSyncService:
         if not mrid:
             raise AppError(status_code=422, error_code="INVALID_STATE", message="Assessment has no Metsights record id")
 
+        package_id = int(instance.package_id)
+        category_id = int(category.category_id)
+        owner_user_id = int(instance.user_id)
+
         engagement_id = int(instance.engagement_id) if instance.engagement_id else None
         api_path = _CATEGORY_KEY_TO_API_PATH.get(category_key)
         if api_path is None:
@@ -2209,17 +2215,20 @@ class MetsightsSyncService:
 
         if reload == 0:
             existing_responses = await self._questionnaire.list_responses_for_instance(
-                db, assessment_instance_id=assessment_instance_id, category_id=int(category.category_id),
+                db, assessment_instance_id=assessment_instance_id, category_id=category_id,
             )
             if existing_responses:
                 await self._update_all_category_progress_for_instance(
-                    db, assessments_repo=assessments_repo, instance=instance,
+                    db, assessments_repo=assessments_repo,
+                    assessment_instance_id=assessment_instance_id,
+                    package_id=package_id,
+                    user_id=owner_user_id,
                 )
                 api_url = f"/records/{mrid}/{api_path}/"
                 await self._log_skipped_metsights_sync(
                     db,
                     engagement_id=engagement_id,
-                    user_id=int(instance.user_id),
+                    user_id=owner_user_id,
                     api_url=api_url,
                     reason="responses already exist, use reload=1 to overwrite",
                 )
@@ -2235,7 +2244,7 @@ class MetsightsSyncService:
             provider="metsights",
             api_url=api_url,
             engagement_id=engagement_id,
-            user_id=int(instance.user_id),
+            user_id=owner_user_id,
         )
 
         await release_request_transaction(db)
@@ -2334,10 +2343,10 @@ class MetsightsSyncService:
                 continue
 
             pull_resolved_ids = await self._questionnaire.resolve_category_ids_for_question(
-                db, question_id=int(qdef.question_id), package_id=int(instance.package_id),
+                db, question_id=int(qdef.question_id), package_id=package_id,
             )
             if not pull_resolved_ids:
-                pull_resolved_ids = [int(category.category_id)]
+                pull_resolved_ids = [category_id]
 
             existing = await self._questionnaire.get_response_by_instance_and_question_id(
                 db, assessment_instance_id=assessment_instance_id, question_id=int(qdef.question_id),
@@ -2365,7 +2374,10 @@ class MetsightsSyncService:
         )
 
         await self._update_all_category_progress_for_instance(
-            db, assessments_repo=assessments_repo, instance=instance,
+            db, assessments_repo=assessments_repo,
+            assessment_instance_id=assessment_instance_id,
+            package_id=package_id,
+            user_id=owner_user_id,
             mark_submitted=True,
         )
 
@@ -2377,13 +2389,13 @@ class MetsightsSyncService:
             await self._mark_imported_category_complete(
                 db,
                 assessments_repo=assessments_repo,
-                instance=instance,
-                category_id=int(category.category_id),
+                assessment_instance_id=assessment_instance_id,
+                category_id=category_id,
             )
 
         await self._mark_related_categories_submitted(
             db, assessments_repo=assessments_repo,
-            instance=instance, metsights_category_key=category_key,
+            assessment_instance_id=assessment_instance_id, metsights_category_key=category_key,
         )
 
         return {
@@ -2400,21 +2412,21 @@ class MetsightsSyncService:
         db: AsyncSession,
         *,
         assessments_repo: "AssessmentsRepository",
-        instance: AssessmentInstance,
+        assessment_instance_id: int,
         category_id: int,
     ) -> None:
         """Force-complete a category after Metsights reports ``is_complete`` for the section."""
         now = datetime.now(timezone.utc)
         progress = await assessments_repo.get_category_progress(
             db,
-            assessment_instance_id=int(instance.assessment_instance_id),
+            assessment_instance_id=assessment_instance_id,
             category_id=category_id,
         )
         if progress is None:
             await assessments_repo.create_category_progress(
                 db,
                 AssessmentCategoryProgress(
-                    assessment_instance_id=int(instance.assessment_instance_id),
+                    assessment_instance_id=assessment_instance_id,
                     category_id=category_id,
                     status="complete",
                     is_submitted=True,
@@ -2439,7 +2451,9 @@ class MetsightsSyncService:
         db: AsyncSession,
         *,
         assessments_repo: "AssessmentsRepository",
-        instance: AssessmentInstance,
+        assessment_instance_id: int,
+        package_id: int,
+        user_id: int,
         mark_submitted: bool = False,
     ) -> None:
         """Check all categories for an instance and update progress status.
@@ -2459,7 +2473,7 @@ class MetsightsSyncService:
         )
 
         package_categories = await assessments_repo.list_package_categories(
-            db, package_id=int(instance.package_id),
+            db, package_id=package_id,
         )
         now = datetime.now(timezone.utc)
         all_complete = True
@@ -2471,14 +2485,14 @@ class MetsightsSyncService:
 
             all_required_answered = await q_service.is_category_complete(
                 db,
-                assessment_instance_id=int(instance.assessment_instance_id),
+                assessment_instance_id=assessment_instance_id,
                 category_id=int(cat.category_id),
-                user_id=int(instance.user_id),
+                user_id=user_id,
             )
 
             progress = await assessments_repo.get_category_progress(
                 db,
-                assessment_instance_id=int(instance.assessment_instance_id),
+                assessment_instance_id=assessment_instance_id,
                 category_id=int(cat.category_id),
             )
 
@@ -2487,7 +2501,7 @@ class MetsightsSyncService:
                     await assessments_repo.create_category_progress(
                         db,
                         AssessmentCategoryProgress(
-                            assessment_instance_id=int(instance.assessment_instance_id),
+                            assessment_instance_id=assessment_instance_id,
                             category_id=int(cat.category_id),
                             status="complete",
                             is_submitted=mark_submitted,
@@ -2514,7 +2528,7 @@ class MetsightsSyncService:
                     await assessments_repo.create_category_progress(
                         db,
                         AssessmentCategoryProgress(
-                            assessment_instance_id=int(instance.assessment_instance_id),
+                            assessment_instance_id=assessment_instance_id,
                             category_id=int(cat.category_id),
                             status="incomplete",
                             is_submitted=False,
@@ -2526,17 +2540,21 @@ class MetsightsSyncService:
                     progress.completed_at = None
                     await assessments_repo.update_category_progress(db, progress)
 
-        if all_complete and package_categories and (instance.status or "").lower() != "completed":
-            instance.status = "completed"
-            instance.completed_at = now
-            await assessments_repo.update_instance(db, instance)
+        if all_complete and package_categories:
+            instance = await self._assessments.get_instance_by_id(
+                db, assessment_instance_id=assessment_instance_id,
+            )
+            if instance is not None and (instance.status or "").lower() != "completed":
+                instance.status = "completed"
+                instance.completed_at = now
+                await assessments_repo.update_instance(db, instance)
 
     async def _mark_related_categories_submitted(
         self,
         db: AsyncSession,
         *,
         assessments_repo: "AssessmentsRepository",
-        instance: AssessmentInstance,
+        assessment_instance_id: int,
         metsights_category_key: str,
     ) -> None:
         """After pushing a metsights category, mark the related supershyft categories as is_submitted too."""
@@ -2552,7 +2570,7 @@ class MetsightsSyncService:
                 continue
             progress = await assessments_repo.get_category_progress(
                 db,
-                assessment_instance_id=int(instance.assessment_instance_id),
+                assessment_instance_id=assessment_instance_id,
                 category_id=int(ss_cat.category_id),
             )
             if progress is None:
