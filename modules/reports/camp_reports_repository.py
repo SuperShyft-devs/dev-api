@@ -55,6 +55,13 @@ _METSIGHTS_CATEGORY_KEYS = (
     "vitals",
     "fitness-parameters",
 )
+# KPI questionnaire_completed requires these Metsights categories when assigned.
+# Vitals is camp-day data and is intentionally excluded from this set.
+_KPI_QUESTIONNAIRE_REQUIRED_CATEGORY_KEYS = (
+    "physical-measurement",
+    "diet-lifestyle-parameters",
+    "fitness-parameters",
+)
 
 
 def _person_name(first_name: str | None, last_name: str | None) -> str:
@@ -983,11 +990,17 @@ class CampReportsRepository:
         city: str | None,
         enrolled_user_ids: set[int],
     ) -> dict[str, Any]:
-        """Camp-scoped questionnaire filled status mirroring Operations tab cards.
+        """Camp-scoped Metsights questionnaire completion for KPI ``questionnaire_completed``.
 
-        Uses the same Metsights category completion rules as
-        ``get_questionnaire_status_for_engagement``, restricted to enrolled users
-        in scope and primary packages (assessment_type_code 1/2).
+        Counts a user as filled when every **required** Metsights category assigned on
+        their primary package (assessment_type_code 1/2) is complete. Required keys are
+        ``physical-measurement``, ``diet-lifestyle-parameters``, and
+        ``fitness-parameters`` when assigned. ``vitals`` is excluded (camp-day data);
+        incomplete vitals does not block ``questionnaire_completed``.
+
+        Restricted to enrolled users in scope. After deploying this rule change,
+        refresh stored camp-report KPI sections (and ``report_bts.kpis``) so counts
+        match the updated definition.
         """
         empty = {
             "questionnaire_completed": 0,
@@ -1231,7 +1244,7 @@ class CampReportsRepository:
                 if resp_counts.get(iid, 0) > 0:
                     entry["has_any_responses"] = True
                 inst_progress = progress_map.get(iid, {})
-                for ck in _METSIGHTS_CATEGORY_KEYS:
+                for ck in _KPI_QUESTIONNAIRE_REQUIRED_CATEGORY_KEYS:
                     if ck not in assigned_cats:
                         continue
                     prog = inst_progress.get(ck, {})
