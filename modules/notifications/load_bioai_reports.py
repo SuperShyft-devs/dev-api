@@ -78,6 +78,7 @@ async def _get_eligible_participants(
     today: date,
     *,
     all_engagements: bool = False,
+    engagement_id: int | None = None,
 ) -> list[tuple]:
     """Return participants with MetSights Basic/Pro assessments where today >= engagement_date.
 
@@ -130,6 +131,8 @@ async def _get_eligible_participants(
     )
     if not all_engagements:
         query = query.where(Engagement.status.ilike("running"))
+    if engagement_id is not None:
+        query = query.where(Engagement.engagement_id == engagement_id)
     result = await db.execute(query)
     return result.all()
 
@@ -191,6 +194,7 @@ async def load_bioai_reports(
     as_of: date | None = None,
     dry_run: bool = False,
     all_engagements: bool = False,
+    engagement_id: int | None = None,
     on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     """Load BioAI reports and notify participants.
@@ -203,6 +207,7 @@ async def load_bioai_reports(
         db,
         today,
         all_engagements=all_engagements,
+        engagement_id=engagement_id,
     )
     matched = len(participants)
     loaded = 0
@@ -418,6 +423,7 @@ async def load_bioai_reports(
 
     return {
         "as_of": today.isoformat(),
+        "engagement_id": engagement_id,
         "matched": matched,
         "loaded": loaded,
         "notified": notified,
