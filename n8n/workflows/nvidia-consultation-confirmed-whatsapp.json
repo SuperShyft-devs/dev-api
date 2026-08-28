@@ -116,7 +116,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members\n  .filter((member) => member.session_details && member.session_details.want !== false)\n  .map((member) => ({\n    json: {\n      notification_id: notificationId,\n      first_name: member.first_name || 'Participant',\n      last_name: member.last_name || '',\n      email: member.email || '',\n      phone: member.phone || '',\n      session_details: {\n        want: Boolean(member.session_details.want),\n        date: member.session_details.date || '',\n        slot: member.session_details.slot || '',\n        expert_type: member.session_details.expert_type || 'doctor'\n      }\n    }\n  }));"
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members\n  .filter((member) => member.session_details && member.session_details.want !== false)\n  .map((member) => ({\n    json: {\n      notification_id: notificationId,\n      first_name: member.first_name || 'Participant',\n      last_name: member.last_name || '',\n      email: member.email || '',\n      phone: member.phone || '',\n      session_details: {\n        want: Boolean(member.session_details.want),\n        date: member.session_details.date || '',\n        slot: member.session_details.slot || '',\n        expert_type: member.session_details.expert_type || 'doctor',\n        cabin: member.session_details.cabin || ''\n      }\n    }\n  }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -130,7 +130,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst consultationDate = (member.session_details?.date || '').trim();\nconst consultationTime = (member.session_details?.slot || '').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message = `camp17,${name},Your doctor consultation has been successfully confirmed.,Date: ${consultationDate},Time: ${consultationTime},Let us know in advance if you need to reschedule the session.,You can check the details below for your convenience,app.supershyft.com,Thanks for taking a moment to read this message`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst consultationDate = (member.session_details?.date || '').trim();\nconst consultationTime = (member.session_details?.slot || '').trim();\nconst cabinName = (member.session_details?.cabin || '').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message = `camp17,${name},Your doctor consultation has been successfully confirmed.,Date: ${consultationDate},Time: ${consultationTime},Cabin: ${cabinName},You can check the details below for your convenience,app.supershyft.com,Thanks for taking a moment to read this message`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
