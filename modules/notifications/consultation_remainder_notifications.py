@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.engagements.repository import ConsultationRemainderParticipant, EngagementsRepository
+from modules.engagements.slot_availability import resolve_consultation_cabin_display_name
 from modules.notifications.dedup import should_skip_notification_on_date
 from modules.notifications.schemas import DispatchRequest, SessionDetails
 from modules.notifications.service import NotificationsService
@@ -29,11 +30,17 @@ def today_in_ist(*, as_of: date | None = None) -> date:
 def _session_details_from_participant(
     participant: ConsultationRemainderParticipant,
 ) -> SessionDetails:
+    cabin = resolve_consultation_cabin_display_name(
+        participant.slot_detail,
+        consultation_date=participant.consultation_date,
+        cabin_key=participant.consultation_cabin,
+    )
     return SessionDetails(
         want=participant.want,
         date=participant.consultation_date,
         slot=participant.consultation_slot or "",
         expert_type=participant.expert_type,
+        cabin=cabin,
     )
 
 

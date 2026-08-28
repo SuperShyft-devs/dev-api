@@ -160,6 +160,28 @@ def iter_section_date_cabins(section: Any) -> list[tuple[str, dict[str, Any], li
     return result
 
 
+def resolve_consultation_cabin_display_name(
+    slot_detail: Any,
+    *,
+    consultation_date: date,
+    cabin_key: str | None,
+) -> str | None:
+    """Return cabin_name for display; fall back to cabin_key when name is unavailable."""
+    key = (cabin_key or "").strip()
+    if not key:
+        return None
+    cabin = find_active_cabin(
+        slot_detail,
+        section="consultation",
+        date_key=consultation_date.isoformat(),
+        cabin_key=key,
+    )
+    if cabin is None:
+        return key
+    name = (cabin.get("cabin_name") or "").strip()
+    return name or key
+
+
 def find_active_cabin(
     slot_detail: Any,
     *,

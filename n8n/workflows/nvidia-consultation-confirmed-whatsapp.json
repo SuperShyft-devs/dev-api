@@ -2,7 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Nvidia Consultation Confirmed WhatsApp\nSends camp17 eye checkup + doctor consultation confirmation WhatsApp to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    session_details: { want, date, slot, expert_type }\n  }],\n  engagement_id?: number\n}\n\nNotification service must have require_session_details enabled.",
+        "content": "## Nvidia Consultation Confirmed WhatsApp\nSends camp17 doctor consultation confirmation WhatsApp to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    session_details: { want, date, slot, expert_type, cabin? }\n  }],\n  engagement_id?: number\n}\n\nNotification service must have require_session_details enabled.",
         "height": 640,
         "width": 2336
       },
@@ -130,7 +130,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst consultationDate = (member.session_details?.date || '').trim();\nconst consultationTime = (member.session_details?.slot || '').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message = `camp17,${name},Your eye checkup and doctor consultation has been successfully confirmed.,Date: ${consultationDate},Time: ${consultationTime},Let us know in advance if you need to reschedule the session.,You can check the details below for your convenience,app.supershyft.com,Thanks for taking a moment to read this message`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst consultationDate = (member.session_details?.date || '').trim();\nconst consultationTime = (member.session_details?.slot || '').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message = `camp17,${name},Your doctor consultation has been successfully confirmed.,Date: ${consultationDate},Time: ${consultationTime},Let us know in advance if you need to reschedule the session.,You can check the details below for your convenience,app.supershyft.com,Thanks for taking a moment to read this message`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

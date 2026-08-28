@@ -37,7 +37,9 @@ class ConsultationRemainderParticipant:
     want: bool
     consultation_date: date
     consultation_slot: str | None
+    consultation_cabin: str | None
     expert_type: str
+    slot_detail: dict | None
 
     @property
     def service_keys(self) -> list[str]:
@@ -1425,13 +1427,16 @@ class EngagementsRepository:
                 cb.want,
                 cb.consultation_date,
                 cb.consultation_slot,
-                cb.expert_type
+                cb.consultation_cabin,
+                cb.expert_type,
+                esi.slot_detail
             FROM engagement_participants ep
             JOIN engagements e ON e.engagement_id = ep.engagement_id
             JOIN engagement_notifications en ON en.engagement_id = e.engagement_id
             JOIN auto_notification_events ane ON ane.id = en.notification_event_id
             JOIN LATERAL unnest(COALESCE(ep.consultation_booking_ids, ARRAY[]::integer[])) AS u(booking_id) ON true
             JOIN consultation_bookings cb ON cb.consultation_id = u.booking_id
+            LEFT JOIN engagement_slot_info esi ON esi.slot_detail_id = e.slot_detail_id
             WHERE lower(trim(e.status)) IN ('scheduled', 'running')
               AND ane.event_code = 'consultation_remainder'
               AND cb.consultation_date = :consultation_date
@@ -1448,7 +1453,9 @@ class EngagementsRepository:
                 want=bool(row.want),
                 consultation_date=row.consultation_date,
                 consultation_slot=row.consultation_slot,
+                consultation_cabin=row.consultation_cabin,
                 expert_type=str(row.expert_type),
+                slot_detail=row.slot_detail if isinstance(row.slot_detail, dict) else None,
             )
             for row in result.all()
         ]

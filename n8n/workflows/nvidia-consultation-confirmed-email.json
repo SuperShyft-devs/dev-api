@@ -2,7 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Nvidia Consultation Confirmed Email\nSends eye checkup + doctor consultation booking confirmation email to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    session_details: { want, date, slot, expert_type }\n  }],\n  engagement_id?: number\n}\n\nNotification service must have require_session_details enabled.",
+        "content": "## Nvidia Consultation Confirmed Email\nSends doctor consultation booking confirmation email to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    session_details: { want, date, slot, expert_type, cabin? }\n  }],\n  engagement_id?: number\n}\n\nNotification service must have require_session_details enabled.",
         "height": 560,
         "width": 1984
       },
@@ -116,7 +116,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members\n  .filter((member) => member.session_details && member.session_details.want !== false)\n  .map((member) => ({\n    json: {\n      notification_id: notificationId,\n      first_name: member.first_name || 'Participant',\n      last_name: member.last_name || '',\n      email: member.email || '',\n      phone: member.phone || '',\n      session_details: {\n        want: Boolean(member.session_details.want),\n        date: member.session_details.date || '',\n        slot: member.session_details.slot || '',\n        expert_type: member.session_details.expert_type || 'doctor'\n      }\n    }\n  }));"
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members\n  .filter((member) => member.session_details && member.session_details.want !== false)\n  .map((member) => ({\n    json: {\n      notification_id: notificationId,\n      first_name: member.first_name || 'Participant',\n      last_name: member.last_name || '',\n      email: member.email || '',\n      phone: member.phone || '',\n      session_details: {\n        want: Boolean(member.session_details.want),\n        date: member.session_details.date || '',\n        slot: member.session_details.slot || '',\n        expert_type: member.session_details.expert_type || 'doctor',\n        cabin: member.session_details.cabin || ''\n      }\n    }\n  }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -130,7 +130,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst consultationDate = (member.session_details?.date || '').trim();\nconst consultationTime = (member.session_details?.slot || '').trim();\n\nconst body = `Hi ${name},\\n\\nYour eye checkup and doctor consultation has been successfully scheduled.\\n\\nDate: ${consultationDate}\\nTime: ${consultationTime}\\n\\nPlease keep your Bio-AI Health Report accessible during the session so your doctor can walk you through the findings in detail.\\n\\nIf you need to reschedule, please inform us in advance.\\n\\nWarm regards,\\nTeam Supershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Your Eye checkup & Doctor Consultation is Confirmed',\n    body\n  }\n};"
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst consultationDate = (member.session_details?.date || '').trim();\nconst consultationTime = (member.session_details?.slot || '').trim();\nconst cabinName = (member.session_details?.cabin || '').trim();\n\nconst cabinLine = cabinName ? `\\nCabin: ${cabinName}` : '';\nconst body = `Hi ${name},\\n\\nYour doctor consultation has been successfully scheduled.\\n\\nDate: ${consultationDate}\\nTime: ${consultationTime}${cabinLine}\\n\\nPlease keep your Bio-AI Health Report accessible during the session so your doctor can walk you through the findings in detail.\\n\\nIf you need to reschedule, please inform us in advance.\\n\\nWarm regards,\\nTeam Supershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Your Doctor Consultation is Confirmed',\n    body\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

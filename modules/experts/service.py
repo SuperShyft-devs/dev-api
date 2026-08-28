@@ -823,6 +823,7 @@ class ExpertAvailabilityService:
                 expert_id=payload.expert_id,
                 consultation_date=payload.date,
                 consultation_slot=slot_hhmm,
+                consultation_cabin=persisted_cabin,
             )
 
         return {

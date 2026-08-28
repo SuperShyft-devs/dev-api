@@ -15,6 +15,7 @@ from modules.engagements.enums import ConsultationMode
 from modules.engagements.models import OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
 from modules.experts.repository import ExpertsRepository
+from modules.engagements.slot_availability import resolve_consultation_cabin_display_name
 from modules.notifications.onboarding_notify import (
     participant_details_from_user,
     _with_participant_user_id,
@@ -179,6 +180,7 @@ async def notify_onboarding_assistants_on_consultation_booking(
     expert_type: str,
     consultation_date: date,
     consultation_slot: str,
+    consultation_cabin: str | None = None,
     expert_id: int | None = None,
     experts_repository: ExpertsRepository | None = None,
     employee_repository: EmployeeRepository | None = None,
@@ -216,11 +218,22 @@ async def notify_onboarding_assistants_on_consultation_booking(
         participant_user_id=participant_user_id,
     )
     details = _with_participant_user_id(participant_details, participant_user_id)
+    slot_detail = None
+    if getattr(engagement, "slot_detail_id", None) is not None:
+        from modules.engagements.slot_info_repository import EngagementSlotInfoRepository
+
+        slot_detail = await EngagementSlotInfoRepository().get_by_id(db, int(engagement.slot_detail_id))
+    cabin = resolve_consultation_cabin_display_name(
+        slot_detail,
+        consultation_date=consultation_date,
+        cabin_key=consultation_cabin,
+    )
     session_details = SessionDetails(
         want=True,
         date=consultation_date,
         slot=consultation_slot,
         expert_type=expert_type,
+        cabin=cabin,
     )
     engagement_id = int(engagement.engagement_id)
 

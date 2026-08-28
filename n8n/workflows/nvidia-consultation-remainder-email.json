@@ -2,7 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Nvidia Consultation Remainder Email\nSends day-of eye checkup + doctor consultation reminder email to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    session_details: { want, date, slot, expert_type }\n  }],\n  engagement_id?: number\n}\n\nEach member carries its own session_details (API attaches per user on dispatch).",
+        "content": "## Nvidia Consultation Remainder Email\nSends day-of doctor consultation reminder email to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    session_details: { want, date, slot, expert_type, cabin? }\n  }],\n  engagement_id?: number\n}\n\nEach member carries its own session_details (API attaches per user on dispatch).",
         "height": 560,
         "width": 1984
       },
@@ -82,17 +82,7 @@
             },
             {
               "id": "ere01-cond-6ce1454a",
-              "leftValue": "={{ $json.body.members[0].session_details.expert_type }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "exists",
-                "singleValue": true
-              }
-            },
-            {
-              "id": "ere01-cond-791451e6",
-              "leftValue": "={{ $json.body.members[0].session_details.date }}",
+              "leftValue": "={{ $json.body.members[0].session_details.slot }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -116,7 +106,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members\n  .filter((member) => member.session_details && member.session_details.want !== false)\n  .map((member) => ({\n    json: {\n      notification_id: notificationId,\n      first_name: member.first_name || 'Participant',\n      last_name: member.last_name || '',\n      email: member.email || '',\n      phone: member.phone || '',\n      session_details: {\n        want: Boolean(member.session_details.want),\n        date: member.session_details.date || '',\n        slot: member.session_details.slot || '',\n        expert_type: member.session_details.expert_type || 'doctor'\n      }\n    }\n  }));"
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members\n  .filter((member) => member.session_details && member.session_details.want !== false)\n  .map((member) => ({\n    json: {\n      notification_id: notificationId,\n      first_name: member.first_name || 'Participant',\n      last_name: member.last_name || '',\n      email: member.email || '',\n      phone: member.phone || '',\n      session_details: {\n        want: Boolean(member.session_details.want),\n        date: member.session_details.date || '',\n        slot: member.session_details.slot || '',\n        expert_type: member.session_details.expert_type || 'doctor',\n        cabin: member.session_details.cabin || ''\n      }\n    }\n  }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -130,7 +120,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nconst body = `Hi ${name},\\n\\nThis is a reminder that your eye checkup followed by doctor consultation is scheduled for today.\\n\\nPlease keep your phone available during the scheduled time and have your Bio-AI Health Report accessible so the discussion can be as productive as possible.\\n\\nYou can check the details below at your convenience\\napp.supershyft.com\\n\\nWe look forward to helping you take the next step toward better health.\\n\\nWarm regards,\\nSupport Team\\nSupershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Reminder Your Eye checkup and Doctor consultation is Today',\n    body\n  }\n};"
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst consultationTime = (member.session_details?.slot || '').trim();\nconst cabinName = (member.session_details?.cabin || '').trim();\n\nconst cabinLine = cabinName ? `\\nCabin: ${cabinName}` : '';\nconst body = `Hi ${name},\\n\\nThis is a reminder that your doctor consultation is scheduled for today.\\n\\nTime: ${consultationTime}${cabinLine}\\n\\nPlease attend your consultation at the scheduled time and have your Bio-AI Health Report accessible so the discussion can be as productive as possible.\\n\\nYou can check the details below at your convenience\\napp.supershyft.com\\n\\nWe look forward to helping you take the next step toward better health.\\n\\nWarm regards,\\nSupport Team\\nSupershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Reminder Your Doctor consultation is Today',\n    body\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -260,7 +250,7 @@
             {
               "id": "ere01-asgn-8bedf956",
               "name": "message",
-              "value": "Payload validation failed: each member requires session_details with date and expert_type",
+              "value": "Payload validation failed: each member requires session_details with date and slot",
               "type": "string"
             }
           ]

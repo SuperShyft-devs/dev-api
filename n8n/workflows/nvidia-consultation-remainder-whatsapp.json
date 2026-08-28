@@ -2,7 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Nvidia Consultation Remainder WhatsApp\nSends camp17 day-of eye checkup + doctor consultation reminder WhatsApp to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{ first_name, last_name, email, phone }],\n  engagement_id?: number\n}\n\nStatic today reminder copy; session_details may be present from the API but is not required by this workflow.",
+        "content": "## Nvidia Consultation Remainder WhatsApp\nSends camp17 day-of doctor consultation reminder WhatsApp to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    session_details: { want, date, slot, expert_type, cabin? }\n  }],\n  engagement_id?: number\n}\n\nNotification service must have require_session_details enabled.",
         "height": 640,
         "width": 2336
       },
@@ -69,6 +69,26 @@
                 "type": "number",
                 "operation": "gt"
               }
+            },
+            {
+              "id": "erw01-cond-session-details",
+              "leftValue": "={{ $json.body.members[0].session_details }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "erw01-cond-session-slot",
+              "leftValue": "={{ $json.body.members[0].session_details.slot }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -86,7 +106,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email || '',\n    phone: member.phone || ''\n  }\n}));"
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members\n  .filter((member) => member.session_details && member.session_details.want !== false)\n  .map((member) => ({\n    json: {\n      notification_id: notificationId,\n      first_name: member.first_name || 'Participant',\n      last_name: member.last_name || '',\n      email: member.email || '',\n      phone: member.phone || '',\n      session_details: {\n        want: Boolean(member.session_details.want),\n        date: member.session_details.date || '',\n        slot: member.session_details.slot || '',\n        expert_type: member.session_details.expert_type || 'doctor',\n        cabin: member.session_details.cabin || ''\n      }\n    }\n  }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -100,7 +120,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message = `camp17,${name},This is a reminder that your eye checkup and doctor consultation is scheduled for today.,Please attend the session with them at your scheduled time.,We look forward to supporting you on your health journey.,You can check the details below at your convenience,app.supershyft.com,Thanks for taking a moment to read this message`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst consultationTime = (member.session_details?.slot || '').trim();\nconst cabinName = (member.session_details?.cabin || '').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst cabinPart = cabinName ? `,Cabin: ${cabinName}` : '';\nconst message = `camp17,${name},This is a reminder that your doctor consultation is scheduled for today.,Time: ${consultationTime}${cabinPart},We look forward to supporting you on your health journey.,You can check the details below at your convenience,app.supershyft.com,Thanks for taking a moment to read this message`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -299,7 +319,7 @@
             {
               "id": "erw01-asgn-56512f95",
               "name": "message",
-              "value": "Payload validation failed",
+              "value": "Payload validation failed: each member requires session_details with slot",
               "type": "string"
             }
           ]

@@ -24,6 +24,7 @@ class SessionDetails(BaseModel):
     date: date
     slot: str
     expert_type: SlugKey
+    cabin: str | None = None
 
 
 class PrepareReportsRequest(BaseModel):

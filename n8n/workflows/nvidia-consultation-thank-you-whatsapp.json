@@ -2,7 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Nvidia Consultation Thank You WhatsApp\nSends camp17 post eye checkup + doctor consultation thank you WhatsApp to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    external_link\n  }]\n}\n\nNotification service must have require_external_link enabled (API attaches feedback URL per member).",
+        "content": "## Nvidia Consultation Thank You WhatsApp\nSends camp17 post doctor consultation thank you WhatsApp to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    external_link\n  }]\n}\n\nNotification service must have require_external_link enabled (API attaches feedback URL per member).",
         "height": 640,
         "width": 2336
       },

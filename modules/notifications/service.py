@@ -305,7 +305,7 @@ class NotificationsService:
 
             session_details = _resolve_session_details_for_user(payload, user.user_id)
             if session_details is not None:
-                member["session_details"] = session_details.model_dump(mode="json")
+                member["session_details"] = session_details.model_dump(mode="json", exclude_none=True)
 
             if svc.require_external_link:
                 member["external_link"] = external_link_value

@@ -2,7 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Book Nvidia Consultation WhatsApp\nSends camp17 eye checkup + doctor consultation booking WhatsApp to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    external_link\n  }]\n}\n\nNotification service must have require_external_link enabled (API attaches booking URL per member).",
+        "content": "## Book Nvidia Consultation WhatsApp\nSends camp17 doctor consultation booking WhatsApp to each member.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    external_link\n  }]\n}\n\nNotification service must have require_external_link enabled (API attaches booking URL per member).",
         "height": 640,
         "width": 2336
       },
@@ -110,7 +110,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst bookingLink = (member.external_link || '').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message = `camp17,${name},Your Bio-AI Health Assessment has been completed and your eye checkup and doctor consultation is now available for booking.,Choose a convenient time slot that works best for your schedule through the booking link below.,This consultation will help you understand your health risks and create an actionable plan.,You can check the details below for your convenience,${bookingLink},Thanks for taking a moment to read this message`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst bookingLink = (member.external_link || '').trim();\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\nconst message = `camp17,${name},Your Bio-AI Health Assessment has been completed and your doctor consultation is now available for booking.,Choose a convenient time slot that works best for your schedule through the booking link below.,This consultation will help you understand your health risks and create an actionable plan.,You can check the details below for your convenience,${bookingLink},Thanks for taking a moment to read this message`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
