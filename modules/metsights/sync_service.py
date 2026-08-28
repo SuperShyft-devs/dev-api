@@ -713,6 +713,55 @@ def _map_metsights_choice_to_option_value(
     return _match_option_value_for_label(code_s, db_options)
 
 
+_CHOICE_QUESTION_TYPES = frozenset({"single_choice", "multiple_choice"})
+
+
+def _normalize_pulled_choice_answer(
+    answer: Any,
+    *,
+    question_type: str | None,
+    db_options: Any,
+    code_to_label: dict[str, str] | None = None,
+) -> tuple[Any | None, str | None]:
+    """Map pulled choice answers to local ``option_value`` codes.
+
+    Returns ``(normalized_answer, skip_reason)``. ``skip_reason`` is ``None`` when
+    the answer is kept (non-choice types are returned unchanged).
+    """
+    qtype = _question_type_for_submit(question_type)
+    if qtype not in _CHOICE_QUESTION_TYPES:
+        return answer, None
+
+    code_map = code_to_label or {}
+    if qtype == "multiple_choice":
+        seq = answer if isinstance(answer, list) else [answer]
+        mapped: list[str] = []
+        for item in seq:
+            if item is None or str(item).strip() == "":
+                continue
+            mv = _map_metsights_choice_to_option_value(
+                raw_code=item,
+                code_to_label=code_map,
+                db_options=db_options,
+            )
+            if mv is None:
+                return None, f"unmappable:{item!r}"
+            if mv not in mapped:
+                mapped.append(mv)
+        if not mapped:
+            return None, "empty_after_map"
+        return mapped, None
+
+    mv = _map_metsights_choice_to_option_value(
+        raw_code=answer,
+        code_to_label=code_map,
+        db_options=db_options,
+    )
+    if mv is None:
+        return None, f"unmappable:{answer!r}"
+    return mv, None
+
+
 def _pick_scale_unit_string(canonical_candidate: str | None, db_unit_options: Any) -> str | None:
     if not canonical_candidate:
         return None
@@ -2309,6 +2358,18 @@ class MetsightsSyncService:
             db, question_keys=import_keys,
         )
 
+        choice_question_ids = [
+            int(defn.question_id)
+            for defn in definitions_by_key.values()
+            if _question_type_for_submit(getattr(defn, "question_type", None)) in _CHOICE_QUESTION_TYPES
+        ]
+        options_by_question_id: dict[int, list[Any]] = {}
+        if choice_question_ids:
+            for opt in await self._questionnaire.list_options_for_question_ids(
+                db, question_ids=choice_question_ids
+            ):
+                options_by_question_id.setdefault(int(opt.question_id), []).append(opt)
+
         for field_name, raw_val in metsights_payload.items():
             if field_name in _METADATA_FIELDS or str(field_name).endswith("_unit"):
                 continue
@@ -2341,6 +2402,18 @@ class MetsightsSyncService:
             if answer is None:
                 skipped.append(f"{field_name}:strategy_returned_none")
                 continue
+
+            qtype = _question_type_for_submit(getattr(qdef, "question_type", None))
+            if qtype in _CHOICE_QUESTION_TYPES:
+                db_opts = options_by_question_id.get(int(qdef.question_id)) or []
+                answer, skip_reason = _normalize_pulled_choice_answer(
+                    answer,
+                    question_type=getattr(qdef, "question_type", None),
+                    db_options=db_opts,
+                )
+                if skip_reason is not None:
+                    skipped.append(f"{field_name}:{skip_reason}")
+                    continue
 
             pull_resolved_ids = await self._questionnaire.resolve_category_ids_for_question(
                 db, question_id=int(qdef.question_id), package_id=package_id,
