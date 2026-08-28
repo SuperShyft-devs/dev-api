@@ -1691,12 +1691,43 @@ class UsersService:
         user = await self._repository.patch_missing_fields(db, user=existing, data=patch_data)
         return user, False
 
+    async def _resolve_blood_cabin_name_for_notify(
+        self,
+        db: AsyncSession,
+        *,
+        engagement,
+        collection_date: date | str | None,
+        cabin_key: str | None,
+    ) -> str | None:
+        if self._engagements_service is None:
+            return (cabin_key or "").strip() or None
+        key = (cabin_key or "").strip() or None
+        if not key or collection_date is None:
+            return key
+        try:
+            parsed_date = (
+                collection_date
+                if isinstance(collection_date, date)
+                else date.fromisoformat(str(collection_date).strip())
+            )
+        except ValueError:
+            return key
+        from modules.engagements.slot_availability import resolve_blood_collection_cabin_display_name
+
+        slot_detail = await self._engagements_service.resolve_slot_detail(db, engagement)
+        return resolve_blood_collection_cabin_display_name(
+            slot_detail,
+            collection_date=parsed_date,
+            cabin_key=key,
+        )
+
     @staticmethod
     def _participant_details_from_onboard_payload(
         payload: PublicUserOnboardRequest | EngagementUserOnboardRequest,
         *,
         source: str,
         participant_user_id: int,
+        cabin_name: str | None = None,
     ) -> dict[str, str]:
         from modules.notifications.onboarding_notify import detail_or_hyphen
 
@@ -1713,6 +1744,7 @@ class UsersService:
             "pincode": detail_or_hyphen(payload.pincode),
             "collection_date": detail_or_hyphen(payload.blood_collection_date),
             "collection_time": detail_or_hyphen(payload.blood_collection_time_slot),
+            "cabin_name": detail_or_hyphen(cabin_name),
             "engagement": detail_or_hyphen(source),
             "participant_user_id": str(participant_user_id),
         }
@@ -1725,6 +1757,7 @@ class UsersService:
         participant_user_id: int,
         payload: PublicUserOnboardRequest | EngagementUserOnboardRequest,
         source: str,
+        cabin_key: str | None = None,
     ) -> None:
         """Fire-and-forget: notify onboarding assistants using the engagement's service key."""
         if self._notifications_service is None or self._engagements_service is None:
@@ -1732,8 +1765,20 @@ class UsersService:
 
         from modules.notifications.onboarding_notify import notify_onboarding_assistants_on_enrollment
 
+        resolved_cabin_key = cabin_key
+        if resolved_cabin_key is None:
+            resolved_cabin_key = getattr(payload, "blood_collection_cabin", None)
+        cabin_name = await self._resolve_blood_cabin_name_for_notify(
+            db,
+            engagement=engagement,
+            collection_date=getattr(payload, "blood_collection_date", None),
+            cabin_key=resolved_cabin_key,
+        )
         participant_details = self._participant_details_from_onboard_payload(
-            payload, source=source, participant_user_id=participant_user_id
+            payload,
+            source=source,
+            participant_user_id=participant_user_id,
+            cabin_name=cabin_name,
         )
         await notify_onboarding_assistants_on_enrollment(
             db,
@@ -1754,6 +1799,7 @@ class UsersService:
         source: str,
         collection_date: str | None = None,
         collection_time: str | None = None,
+        cabin_key: str | None = None,
     ) -> None:
         if self._notifications_service is None or self._engagements_service is None:
             return
@@ -1763,12 +1809,19 @@ class UsersService:
             participant_details_from_user,
         )
 
+        cabin_name = await self._resolve_blood_cabin_name_for_notify(
+            db,
+            engagement=engagement,
+            collection_date=collection_date,
+            cabin_key=cabin_key,
+        )
         participant_details = participant_details_from_user(
             user,
             source=source,
             participant_user_id=int(user.user_id),
             collection_date=collection_date,
             collection_time=collection_time,
+            cabin_name=cabin_name,
         )
         await notify_onboarding_assistants_on_enrollment(
             db,
@@ -2569,6 +2622,7 @@ class UsersService:
             participant_user_id=int(user.user_id),
             payload=payload,
             source=code,
+            cabin_key=blood_collection_cabin,
         )
 
         mid = (assessment_instance.metsights_record_id or "").strip() or None

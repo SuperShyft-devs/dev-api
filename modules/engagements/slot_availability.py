@@ -160,10 +160,11 @@ def iter_section_date_cabins(section: Any) -> list[tuple[str, dict[str, Any], li
     return result
 
 
-def resolve_consultation_cabin_display_name(
+def resolve_cabin_display_name(
     slot_detail: Any,
     *,
-    consultation_date: date,
+    section: str,
+    slot_date: date,
     cabin_key: str | None,
 ) -> str | None:
     """Return cabin_name for display; fall back to cabin_key when name is unavailable."""
@@ -172,14 +173,44 @@ def resolve_consultation_cabin_display_name(
         return None
     cabin = find_active_cabin(
         slot_detail,
-        section="consultation",
-        date_key=consultation_date.isoformat(),
+        section=section,
+        date_key=slot_date.isoformat(),
         cabin_key=key,
     )
     if cabin is None:
         return key
     name = (cabin.get("cabin_name") or "").strip()
     return name or key
+
+
+def resolve_consultation_cabin_display_name(
+    slot_detail: Any,
+    *,
+    consultation_date: date,
+    cabin_key: str | None,
+) -> str | None:
+    """Return consultation cabin_name for display; fall back to cabin_key when name is unavailable."""
+    return resolve_cabin_display_name(
+        slot_detail,
+        section="consultation",
+        slot_date=consultation_date,
+        cabin_key=cabin_key,
+    )
+
+
+def resolve_blood_collection_cabin_display_name(
+    slot_detail: Any,
+    *,
+    collection_date: date,
+    cabin_key: str | None,
+) -> str | None:
+    """Return blood-collection cabin_name for display; fall back to cabin_key when name is unavailable."""
+    return resolve_cabin_display_name(
+        slot_detail,
+        section="blood_collection",
+        slot_date=collection_date,
+        cabin_key=cabin_key,
+    )
 
 
 def find_active_cabin(

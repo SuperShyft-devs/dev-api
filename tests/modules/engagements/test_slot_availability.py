@@ -16,6 +16,7 @@ from modules.engagements.slot_availability import (
     occupancy_key,
     require_available_blood_collection_slot,
     require_available_consultation_slot,
+    resolve_blood_collection_cabin_display_name,
 )
 
 
@@ -304,3 +305,46 @@ def test_build_public_slot_detail_accepts_wrapped_and_legacy_shapes():
     public_legacy = build_public_slot_detail(legacy)
     public_wrapped = build_public_slot_detail(wrapped)
     assert public_legacy == public_wrapped
+
+
+def test_resolve_blood_collection_cabin_display_name():
+    slot_detail = {
+        "blood_collection": {
+            "2026-08-20": [
+                {
+                    "cabin_name": "Blood Test Cabin 1",
+                    "cabin_key": "blood_test_cabin_1",
+                    "start_time": "09:00",
+                    "end_time": "10:00",
+                    "slot_duration": 30,
+                    "capacity_per_slot": 6,
+                    "breaks": [],
+                    "is_active": True,
+                }
+            ]
+        }
+    }
+    assert (
+        resolve_blood_collection_cabin_display_name(
+            slot_detail,
+            collection_date=date(2026, 8, 20),
+            cabin_key="blood_test_cabin_1",
+        )
+        == "Blood Test Cabin 1"
+    )
+    assert (
+        resolve_blood_collection_cabin_display_name(
+            slot_detail,
+            collection_date=date(2026, 8, 20),
+            cabin_key="missing_cabin",
+        )
+        == "missing_cabin"
+    )
+    assert (
+        resolve_blood_collection_cabin_display_name(
+            slot_detail,
+            collection_date=date(2026, 8, 20),
+            cabin_key=None,
+        )
+        is None
+    )

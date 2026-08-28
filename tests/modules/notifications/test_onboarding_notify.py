@@ -230,6 +230,7 @@ def test_participant_details_from_user_fills_missing_with_hyphen():
     assert details["pincode"] == "-"
     assert details["collection_date"] == "-"
     assert details["collection_time"] == "-"
+    assert details["cabin_name"] == "-"
     DispatchRequest(
         service_key="booking-alert-whatsapp",
         user_ids=[8],
