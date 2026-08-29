@@ -295,8 +295,8 @@ class BioAITrendService:
         *,
         assessment_instance_id: int,
         report_payload: dict[str, object],
-    ) -> dict[str, object]:
-        """Cutoff trends for the requested report. Never raises into report generation."""
+    ) -> dict[str, object] | bool:
+        """Cutoff ``health_trends`` for the requested report. Never raises into report generation."""
         try:
             instance = await self._assessments.get_instance_by_id(
                 db,

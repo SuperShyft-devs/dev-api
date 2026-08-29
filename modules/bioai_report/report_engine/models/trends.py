@@ -6,6 +6,20 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Single mapping for frontend series titles (canonical disease_id → display name).
+TREND_DISEASE_TITLES: dict[str, str] = {
+    "metabolic_syndrome": "Metabolic Syndrome",
+    "dyslipidemia": "Dyslipidemia",
+    "pcos": "PCOS",
+    "oxidative_stress": "Oxidative Stress",
+    "nafld": "NAFLD",
+    "hypertension": "Hypertension",
+    "obesity": "Obesity",
+    "thyroid_health": "Thyroid Health",
+    "type2_diabetes": "Type 2 Diabetes",
+    "cardiac_health": "Cardiac Health",
+}
+
 
 class BioAITrendAssessment(BaseModel):
     """One completed assessment included in the trend series."""
@@ -60,17 +74,32 @@ class BioAITrendResponse(BaseModel):
     assessments: list[BioAITrendAssessment] = Field(default_factory=list)
     trends: BioAITrendsByDisease = Field(default_factory=BioAITrendsByDisease)
 
-    def to_report_field(self) -> dict[str, Any]:
-        """Shape used when embedding trends in the Bio-AI report JSON.
+    def to_report_field(self) -> dict[str, Any] | bool:
+        """Frontend ``health_trends`` value for the Bio-AI report JSON.
 
-        Uses ``diseases`` so the frontend does not get a nested ``trends.trends``
-        object. When fewer than two assessments qualify, every canonical disease
-        key is present with an empty array.
+        Returns ``False`` when fewer than two assessments qualify. Otherwise
+        returns ``{"series": [...]}`` with only diseases that have at least one
+        numeric score. Each point is ``{date, score}`` only; null scores are omitted.
         """
-        data = self.model_dump(mode="json")
-        series = data.pop("trends")
-        if not data.get("trend_available"):
-            data["diseases"] = BioAITrendsByDisease().model_dump(mode="json")
-        else:
-            data["diseases"] = series
-        return data
+        if not self.trend_available:
+            return False
+
+        by_disease = self.trends.model_dump(mode="json")
+        series: list[dict[str, Any]] = []
+        for disease_id, title in TREND_DISEASE_TITLES.items():
+            points: list[dict[str, Any]] = []
+            for point in by_disease.get(disease_id) or []:
+                score = point.get("score")
+                if score is None:
+                    continue
+                points.append({"date": point.get("date"), "score": score})
+            if not points:
+                continue
+            series.append(
+                {
+                    "disease_id": disease_id,
+                    "title": title,
+                    "points": points,
+                }
+            )
+        return {"series": series}

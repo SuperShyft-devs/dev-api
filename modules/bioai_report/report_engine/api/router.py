@@ -48,8 +48,8 @@ async def get_bioreport_content(
     3. Enrich patient demographics for the same ``record_id``
     4. Merge into one assessment object
     5. Build BioReport (patient → summary → disease sections + KB)
-    6. Attach historical Bio-AI trends cut off at this assessment date
-    7. Return the raw ``BioReport`` JSON object plus ``trends``
+    6. Attach ``health_trends`` cut off at this assessment date
+    7. Return the raw ``BioReport`` JSON object plus ``health_trends``
     """
     if assessment_instance_id is None:
         raise AppError(
@@ -83,8 +83,8 @@ async def get_bioreport_content(
         ) from exc
 
     payload = report.to_dict()
-    # Additive only: existing report keys are never rewritten. Trends are attached
-    # as a new top-level field, including when trend_available is false.
+    # Additive only: existing report keys are never rewritten. health_trends is
+    # attached as a new top-level field (object or false).
     # Enrichment may swallow a DB error; Postgres then rejects later statements
     # in this request until the transaction is reset.
     try:
@@ -94,7 +94,7 @@ async def get_bioreport_content(
             "Bio-AI report could not reset DB session before trends for assessment_instance_id=%s",
             assessment_instance_id,
         )
-    payload["trends"] = await trend_service.embed_for_assessment_instance(
+    payload["health_trends"] = await trend_service.embed_for_assessment_instance(
         db,
         assessment_instance_id=int(assessment_instance_id),
         report_payload=payload,

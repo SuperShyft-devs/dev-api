@@ -10,6 +10,7 @@ import pytest
 
 from core.exceptions import AppError
 from modules.bioai_report.report_engine.models.assessment import AssessmentDisease, AssessmentPayload
+from modules.bioai_report.report_engine.models.trends import TREND_DISEASE_TITLES
 from modules.bioai_report.report_engine.services.trend_service import BioAITrendService, TREND_DISEASE_IDS
 
 
@@ -292,21 +293,18 @@ async def test_same_day_later_instance_is_excluded_by_instance_id():
     assert result.trends.obesity[0].score == 20
 
 
-def test_report_embed_uses_diseases_not_nested_trends():
-    from modules.bioai_report.report_engine.models.trends import BioAITrendResponse
-
-    embedded = BioAITrendResponse(
-        user_id=1,
-        assessment_count=0,
-        trend_available=False,
-    ).to_report_field()
-    assert "diseases" in embedded
-    assert "trends" not in embedded
-    assert set(embedded["diseases"]) == set(TREND_DISEASE_IDS)
-    assert all(embedded["diseases"][key] == [] for key in TREND_DISEASE_IDS)
+def _series_by_id(health_trends: dict) -> dict:
+    return {item["disease_id"]: item for item in health_trends["series"]}
 
 
-def test_report_embed_empties_diseases_when_trend_not_available():
+def _assert_graph_points(points: list[dict]) -> None:
+    for point in points:
+        assert set(point) == {"date", "score"}
+        assert point["score"] is not None
+        assert point["score"] != "diabetes"
+
+
+def test_health_trends_false_when_not_available():
     from modules.bioai_report.report_engine.models.trends import (
         BioAITrendAssessment,
         BioAITrendPoint,
@@ -331,15 +329,10 @@ def test_report_embed_empties_diseases_when_trend_not_available():
             ]
         ),
     ).to_report_field()
-    assert embedded["trend_available"] is False
-    assert embedded["assessment_count"] == 1
-    assert embedded["assessments"] == [
-        {"assessment_instance_id": 7312, "assessment_date": "2026-02-03"}
-    ]
-    assert embedded["diseases"] == {key: [] for key in TREND_DISEASE_IDS}
+    assert embedded is False
 
 
-def test_report_embed_keeps_disease_series_when_trend_available():
+def test_health_trends_series_omits_nulls_and_extra_fields():
     from modules.bioai_report.report_engine.models.trends import (
         BioAITrendPoint,
         BioAITrendResponse,
@@ -358,15 +351,49 @@ def test_report_embed_keeps_disease_series_when_trend_available():
                     risk_status="Healthy",
                     risk_band="0-25",
                     assessment_instance_id=1,
+                ),
+                BioAITrendPoint(
+                    date="2025-01-01",
+                    score=None,
+                    risk_status=None,
+                    risk_band=None,
+                    assessment_instance_id=2,
+                ),
+            ],
+            pcos=[
+                BioAITrendPoint(
+                    date="2024-01-01",
+                    score=None,
+                    assessment_instance_id=1,
                 )
-            ]
+            ],
+            nafld=[
+                BioAITrendPoint(
+                    date="2024-01-01",
+                    score=0,
+                    risk_status="Healthy",
+                    risk_band="0-25",
+                    assessment_instance_id=1,
+                )
+            ],
         ),
     ).to_report_field()
-    assert embedded["diseases"]["obesity"][0]["score"] == 20
+    assert embedded is not False
+    by_id = _series_by_id(embedded)
+    assert "pcos" not in by_id
+    assert by_id["obesity"]["title"] == TREND_DISEASE_TITLES["obesity"]
+    assert by_id["obesity"]["points"] == [{"date": "2024-01-01", "score": 20}]
+    assert by_id["nafld"]["points"] == [{"date": "2024-01-01", "score": 0}]
+    _assert_graph_points(by_id["obesity"]["points"])
+    assert "user_id" not in embedded
+    assert "assessment_count" not in embedded
+    assert "trend_available" not in embedded
+    assert "diseases" not in embedded
+    assert "diabetes" not in [item["disease_id"] for item in embedded["series"]]
 
 
 @pytest.mark.asyncio
-async def test_embed_for_report_applies_date_cutoff_and_diseases_key():
+async def test_embed_for_report_applies_historical_cutoff():
     rows = [
         (_instance(instance_id=2023, record_id="y2023", completed="2023-01-01"), _package()),
         (_instance(instance_id=2024, record_id="y2024", completed="2024-01-01"), _package()),
@@ -386,41 +413,67 @@ async def test_embed_for_report_applies_date_cutoff_and_diseases_key():
         assessment_instance_id=2026,
         report_payload={"patient": {"assessment_date": "2026-06-01T10:00:00+05:30"}},
     )
-    assert "trends" not in latest
-    assert [a["assessment_instance_id"] for a in latest["assessments"]] == [2023, 2024, 2025, 2026]
-    assert latest["trend_available"] is True
+    assert latest is not False
+    obesity = _series_by_id(latest)["obesity"]["points"]
+    assert [p["score"] for p in obesity] == [10, 20, 30, 40]
+    assert [p["date"] for p in obesity] == [
+        "2023-06-01",
+        "2024-06-15",
+        "2025-06-01",
+        "2026-06-01",
+    ]
+    assert "pcos" not in _series_by_id(latest)
 
     mid = await svc.embed_for_assessment_instance(
         None,
         assessment_instance_id=2025,
         report_payload={"patient": {"assessment_date": "2025-06-01T10:00:00+05:30"}},
     )
-    assert [a["assessment_instance_id"] for a in mid["assessments"]] == [2023, 2024, 2025]
+    assert [p["score"] for p in _series_by_id(mid)["obesity"]["points"]] == [10, 20, 30]
 
     older = await svc.embed_for_assessment_instance(
         None,
         assessment_instance_id=2024,
         report_payload={"patient": {"assessment_date": "2024-06-15T14:30:00+05:30"}},
     )
-    assert [a["assessment_instance_id"] for a in older["assessments"]] == [2023, 2024]
-    assert [p["score"] for p in older["diseases"]["obesity"]] == [10, 20]
-    pcos = older["diseases"]["pcos"]
-    assert pcos[0]["score"] is None
-    assert pcos[1]["score"] is None
+    assert [p["score"] for p in _series_by_id(older)["obesity"]["points"]] == [10, 20]
+    assert 0 not in [p["score"] for p in _series_by_id(older)["obesity"]["points"] if p["score"] is None]
 
     single = await svc.embed_for_assessment_instance(
         None,
         assessment_instance_id=2023,
         report_payload={"patient": {"assessment_date": "2023-06-01T10:00:00+05:30"}},
     )
-    assert single["assessment_count"] == 1
-    assert single["trend_available"] is False
-    assert set(single["diseases"]) == set(TREND_DISEASE_IDS)
-    assert all(single["diseases"][key] == [] for key in TREND_DISEASE_IDS)
+    assert single is False
 
 
 @pytest.mark.asyncio
-async def test_female_pcos_scores_when_trend_available():
+async def test_same_day_cutoff_in_health_trends():
+    rows = [
+        (_instance(instance_id=10, record_id="a", completed="2024-06-15"), _package()),
+        (_instance(instance_id=11, record_id="b", completed="2024-06-15"), _package()),
+    ]
+    payloads = {
+        "a": _payload(date="2024-06-15T08:00:00+05:30", diseases=[("obesity", 20)]),
+        "b": _payload(date="2024-06-15T18:00:00+05:30", diseases=[("obesity", 40)]),
+    }
+    only_first = await _service(rows, payloads).embed_for_assessment_instance(
+        None,
+        assessment_instance_id=10,
+        report_payload={"patient": {"assessment_date": "2024-06-15T08:00:00+05:30"}},
+    )
+    assert only_first is False
+
+    both = await _service(rows, payloads).embed_for_assessment_instance(
+        None,
+        assessment_instance_id=11,
+        report_payload={"patient": {"assessment_date": "2024-06-15T18:00:00+05:30"}},
+    )
+    assert [p["score"] for p in _series_by_id(both)["obesity"]["points"]] == [20, 40]
+
+
+@pytest.mark.asyncio
+async def test_female_pcos_appears_in_health_trends():
     rows = [
         (_instance(instance_id=1, record_id="r1", completed="2024-01-01"), _package()),
         (_instance(instance_id=2, record_id="r2", completed="2025-01-01"), _package()),
@@ -433,9 +486,18 @@ async def test_female_pcos_scores_when_trend_available():
     assert result.trend_available is True
     assert [p.score for p in result.trends.pcos] == [30, 40]
 
+    embedded = await _service(rows, payloads, gender="female").embed_for_assessment_instance(
+        None,
+        assessment_instance_id=2,
+        report_payload={"patient": {"assessment_date": "2025-01-01", "sex": "female"}},
+    )
+    pcos = _series_by_id(embedded)["pcos"]
+    assert pcos["title"] == "PCOS"
+    assert [p["score"] for p in pcos["points"]] == [30, 40]
+
 
 @pytest.mark.asyncio
-async def test_male_pcos_is_empty_even_when_metsights_has_pcos():
+async def test_male_pcos_is_absent_from_health_trends():
     rows = [
         (_instance(instance_id=1, record_id="r1", completed="2024-01-01"), _package()),
         (_instance(instance_id=2, record_id="r2", completed="2025-01-01"), _package()),
@@ -449,17 +511,35 @@ async def test_male_pcos_is_empty_even_when_metsights_has_pcos():
         assessment_instance_id=2,
         report_payload={"patient": {"assessment_date": "2025-01-01", "sex": "male", "gender": "male"}},
     )
-    assert embedded["trend_available"] is True
-    assert embedded["diseases"]["pcos"] == []
-    assert [p["score"] for p in embedded["diseases"]["obesity"]] == [20, 25]
+    by_id = _series_by_id(embedded)
+    assert "pcos" not in by_id
+    assert [p["score"] for p in by_id["obesity"]["points"]] == [20, 25]
 
 
 @pytest.mark.asyncio
-async def test_trend_unavailable_does_not_strip_existing_report_fields():
-    """When trend_available is false, only trends.diseases are empty arrays.
+async def test_diabetes_alias_is_type2_diabetes_in_health_trends():
+    rows = [
+        (_instance(instance_id=1, record_id="r1", completed="2024-01-01"), _package()),
+        (_instance(instance_id=2, record_id="r2", completed="2025-01-01"), _package()),
+    ]
+    payloads = {
+        "r1": _payload(date="2024-01-01", diseases=[("diabetes", 55)]),
+        "r2": _payload(date="2025-01-01", diseases=[("diabetes", 60)]),
+    }
+    embedded = await _service(rows, payloads).embed_for_assessment_instance(
+        None,
+        assessment_instance_id=2,
+        report_payload={"patient": {"assessment_date": "2025-01-01"}},
+    )
+    ids = [item["disease_id"] for item in embedded["series"]]
+    assert "diabetes" not in ids
+    assert "type2_diabetes" in ids
+    assert _series_by_id(embedded)["type2_diabetes"]["title"] == "Type 2 Diabetes"
+    assert [p["score"] for p in _series_by_id(embedded)["type2_diabetes"]["points"]] == [55, 60]
 
-    patient, executive_summary, disease_sections, and report_metadata stay intact.
-    """
+
+@pytest.mark.asyncio
+async def test_health_trends_false_does_not_strip_existing_report_fields():
     report = {
         "patient": {
             "name": "Rishi Nagar",
@@ -491,32 +571,53 @@ async def test_trend_unavailable_does_not_strip_existing_report_fields():
             diseases=[("oxidative_stress", 33), ("nafld", 21)],
         )
     }
-    trends = await _service(rows, payloads).embed_for_assessment_instance(
+    health_trends = await _service(rows, payloads).embed_for_assessment_instance(
         None,
         assessment_instance_id=1,
         report_payload=report,
     )
-    merged = {**report, "trends": trends}
-    without_trends = {k: v for k, v in merged.items() if k != "trends"}
+    merged = {**report, "health_trends": health_trends}
+    without_trends = {k: v for k, v in merged.items() if k != "health_trends"}
     assert json.dumps(without_trends, sort_keys=True) == original
-    assert "patient" in merged
-    assert "executive_summary" in merged
-    assert "disease_sections" in merged
-    assert "report_metadata" in merged
+    assert "trends" not in merged
+    assert merged["health_trends"] is False
     assert merged["disease_sections"][0]["current_status"]["score"] == 33
     assert merged["executive_summary"]["metabolic_score"] == 20
-    t = merged["trends"]
-    assert t["assessment_count"] == 1
-    assert t["trend_available"] is False
-    assert t["assessments"] == [
-        {"assessment_instance_id": 1, "assessment_date": "2023-11-28"}
+
+
+@pytest.mark.asyncio
+async def test_merged_report_includes_health_trends_series():
+    report = {
+        "patient": {"assessment_date": "2025-06-01", "sex": "female"},
+        "executive_summary": {"metabolic_score": 20},
+        "disease_sections": [{"disease_id": "hypertension", "current_status": {"score": 32}}],
+        "report_metadata": {"disease_count": 1},
+    }
+    original = json.dumps(report, sort_keys=True)
+    rows = [
+        (_instance(instance_id=1, record_id="r1", completed="2025-01-01"), _package()),
+        (_instance(instance_id=2, record_id="r2", completed="2025-06-01"), _package()),
     ]
-    assert set(t["diseases"]) == set(TREND_DISEASE_IDS)
-    assert all(t["diseases"][key] == [] for key in TREND_DISEASE_IDS)
+    payloads = {
+        "r1": _payload(date="2025-01-01", diseases=[("hypertension", 40), ("oxidative_stress", 35)]),
+        "r2": _payload(date="2025-06-01", diseases=[("hypertension", 32), ("oxidative_stress", 28)]),
+    }
+    health_trends = await _service(rows, payloads, gender="female").embed_for_assessment_instance(
+        None,
+        assessment_instance_id=2,
+        report_payload=report,
+    )
+    merged = {**report, "health_trends": health_trends}
+    assert json.dumps({k: v for k, v in merged.items() if k != "health_trends"}, sort_keys=True) == original
+    assert "trends" not in merged
+    by_id = _series_by_id(merged["health_trends"])
+    assert by_id["hypertension"]["title"] == "Hypertension"
+    assert by_id["oxidative_stress"]["title"] == "Oxidative Stress"
+    _assert_graph_points(by_id["hypertension"]["points"])
+    assert [p["score"] for p in by_id["hypertension"]["points"]] == [40, 32]
 
 
-def test_openapi_registers_trends_and_keeps_report_route():
-
+def test_openapi_registers_report_route_without_standalone_trends():
     from main import app
 
     paths = app.openapi()["paths"]
