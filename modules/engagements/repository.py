@@ -46,6 +46,20 @@ class ConsultationRemainderParticipant:
         return [cfg.service_key for cfg in self.service_configs]
 
 
+@dataclass(frozen=True)
+class PretestReminderParticipant:
+    user_id: int
+    engagement_id: int
+    service_configs: tuple[NotificationServiceConfigItem, ...]
+    engagement_date: date
+    slot_start_time: time | None
+    blood_collection_cabin: str | None = None
+
+    @property
+    def service_keys(self) -> list[str]:
+        return [cfg.service_key for cfg in self.service_configs]
+
+
 class EngagementsRepository:
     """Engagement database queries."""
 
@@ -1183,12 +1197,15 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         collection_date: date,
-    ) -> list[tuple[int, int, list[NotificationServiceConfigItem]]]:
-        """Return (user_id, engagement_id, service_configs) for scheduled or running engagements with collection on collection_date."""
+    ) -> list[PretestReminderParticipant]:
+        """Return participants for scheduled/running engagements with blood collection on collection_date."""
         query = (
             select(
                 EngagementParticipant.user_id,
                 EngagementParticipant.engagement_id,
+                EngagementParticipant.engagement_date,
+                EngagementParticipant.slot_start_time,
+                EngagementParticipant.blood_collection_cabin,
                 EngagementNotification.notification_services,
             )
             .join(Engagement, Engagement.engagement_id == EngagementParticipant.engagement_id)
@@ -1211,12 +1228,16 @@ class EngagementsRepository:
         )
         result = await db.execute(query)
         return [
-            (
-                int(row.user_id),
-                int(row.engagement_id),
-                normalize_notification_services(row.notification_services),
+            PretestReminderParticipant(
+                user_id=int(row.user_id),
+                engagement_id=int(row.engagement_id),
+                service_configs=tuple(normalize_notification_services(row.notification_services)),
+                engagement_date=row.engagement_date,
+                slot_start_time=row.slot_start_time,
+                blood_collection_cabin=(row.blood_collection_cabin or None),
             )
             for row in result.all()
+            if row.engagement_date is not None
         ]
 
     async def list_engagements_for_booking_guide_reminder(

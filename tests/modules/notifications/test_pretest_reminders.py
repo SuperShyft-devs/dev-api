@@ -9,13 +9,16 @@ import pytest
 from sqlalchemy import text
 
 from modules.engagements.repository import EngagementsRepository
-from modules.notifications.pretest_reminders import dispatch_pretest_reminders
+from modules.notifications.pretest_reminders import (
+    dispatch_pretest_reminders,
+    format_blood_collection_slot,
+)
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.service import NotificationsService
 from modules.users.models import User
 
-PRETEST_WHATSAPP_KEY = "pretest-whatsapp"
-PRETEST_EMAIL_KEY = "pretest-email"
+PRETEST_WHATSAPP_KEY = "pretest-whatsapp-1-1-v1"
+PRETEST_EMAIL_KEY = "pretest-email-1-1-v1"
 DEFAULT_PRETEST_KEYS = f"{PRETEST_WHATSAPP_KEY},{PRETEST_EMAIL_KEY}"
 
 
@@ -33,21 +36,76 @@ async def _seed_dependencies(test_db_session) -> None:
         )
     )
     for service_key, channel, webhook_path in (
-        (PRETEST_WHATSAPP_KEY, "whatsapp", "pretest-whatsapp"),
-        (PRETEST_EMAIL_KEY, "email", "pretest-email"),
+        (PRETEST_WHATSAPP_KEY, "whatsapp", "pretest-whatsapp-1+1-v1"),
+        (PRETEST_EMAIL_KEY, "email", "pretest-email-1+1-v1"),
         ("custom-pretest-only", "email", "custom-pretest-only"),
     ):
         await test_db_session.execute(
             text(
                 "INSERT INTO notification_services "
-                "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, require_bio_ai_report_url, "
-                "require_participant_detail) "
-                "VALUES (:sk, :dn, :ch, :wp, true, false, false, false) "
-                "ON CONFLICT (service_key) DO UPDATE SET is_active = true"
+                "(service_key, display_name, channel, webhook_path, is_active, require_blood_report_url, "
+                "require_bio_ai_report_url, require_participant_detail, require_session_details) "
+                "VALUES (:sk, :dn, :ch, :wp, true, false, false, false, true) "
+                "ON CONFLICT (service_key) DO UPDATE SET is_active = true, require_session_details = true"
             ),
             {"sk": service_key, "dn": service_key, "ch": channel, "wp": webhook_path},
         )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagement_types (code, display_name, is_active) "
+            "VALUES ('bio_ai', 'BioAI', true) "
+            "ON CONFLICT (code) DO UPDATE SET is_active = true"
+        )
+    )
+    type_row = (
+        await test_db_session.execute(
+            text("SELECT id FROM engagement_types WHERE code = 'bio_ai'")
+        )
+    ).one()
+    type_id = int(type_row[0])
+    await test_db_session.execute(
+        text(
+            "INSERT INTO auto_notification_events (event_code, display_name, engagement_type_ids, description) "
+            "VALUES ('pretest_guidelines', 'Pretest Guidelines', :type_ids, 'Test pretest event') "
+            "ON CONFLICT (event_code) DO UPDATE SET display_name = EXCLUDED.display_name"
+        ),
+        {"type_ids": [type_id]},
+    )
     await test_db_session.commit()
+
+
+async def _pretest_event_id(test_db_session) -> int:
+    row = (
+        await test_db_session.execute(
+            text("SELECT id FROM auto_notification_events WHERE event_code = 'pretest_guidelines'")
+        )
+    ).one()
+    return int(row[0])
+
+
+async def _bind_pretest_services(
+    test_db_session,
+    *,
+    engagement_id: int,
+    service_keys: str = DEFAULT_PRETEST_KEYS,
+) -> None:
+    evt_id = await _pretest_event_id(test_db_session)
+    services_json = json.dumps(
+        [
+            {"service_key": key.strip(), "external_link": None}
+            for key in service_keys.split(",")
+            if key.strip()
+        ]
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagement_notifications (engagement_id, notification_event_id, notification_services) "
+            "VALUES (:eid, :evt, CAST(:services AS jsonb)) "
+            "ON CONFLICT (engagement_id, notification_event_id) DO UPDATE "
+            "SET notification_services = EXCLUDED.notification_services"
+        ),
+        {"eid": engagement_id, "evt": evt_id, "services": services_json},
+    )
 
 
 async def _insert_engagement(
@@ -56,23 +114,23 @@ async def _insert_engagement(
     engagement_id: int,
     engagement_code: str,
     status: str,
-    pretest_guidelines_notification: str | None = DEFAULT_PRETEST_KEYS,
+    bind_services: bool = True,
+    service_keys: str = DEFAULT_PRETEST_KEYS,
 ) -> None:
-    pretest_value = (
-        "NULL"
-        if pretest_guidelines_notification is None
-        else f"'{pretest_guidelines_notification}'"
-    )
     await test_db_session.execute(
         text(
             "INSERT INTO engagements "
             "(engagement_id, engagement_name, engagement_code, engagement_type, assessment_package_id, "
-            "diagnostic_package_id, city, slot_duration, start_date, end_date, status, "
-            "organization_id, onboarding_notification, pretest_guidelines_notification) "
-            f"VALUES ({engagement_id}, 'Camp {engagement_id}', '{engagement_code}', 'bio_ai', 1, 1, 'BLR', 20, "
-            f"'2026-06-01', '2026-06-30', '{status}', NULL, NULL, {pretest_value})"
+            "diagnostic_package_id, city, slot_duration, start_date, end_date, status, organization_id) "
+            f"VALUES ({engagement_id}, 'Camp {engagement_id}', '{engagement_code}', "
+            "(SELECT id FROM engagement_types WHERE code = 'bio_ai'), 1, 1, 'BLR', 20, "
+            f"'2026-06-01', '2026-06-30', '{status}', NULL)"
         )
     )
+    if bind_services:
+        await _bind_pretest_services(
+            test_db_session, engagement_id=engagement_id, service_keys=service_keys
+        )
 
 
 async def _insert_participant(
@@ -81,7 +139,7 @@ async def _insert_participant(
     engagement_id: int,
     user_id: int,
     engagement_date: str,
-    slot_start_time: str,
+    slot_start_time: str | None,
 ) -> None:
     test_db_session.add(
         User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active")
@@ -97,7 +155,7 @@ async def _insert_participant(
             "eid": engagement_id,
             "uid": user_id,
             "ed": date.fromisoformat(engagement_date),
-            "slot": time.fromisoformat(slot_start_time),
+            "slot": time.fromisoformat(slot_start_time) if slot_start_time else None,
         },
     )
 
@@ -133,6 +191,12 @@ def _services():
         NotificationsService(notifications_repository),
         EngagementsRepository(),
     )
+
+
+def test_format_blood_collection_slot():
+    assert format_blood_collection_slot(time(8, 30)) == "8:30 AM"
+    assert format_blood_collection_slot(time(14, 0)) == "2:00 PM"
+    assert format_blood_collection_slot(None) == ""
 
 
 @pytest.mark.asyncio
@@ -188,8 +252,12 @@ async def test_pretest_reminders_all_participants(test_db_session, monkeypatch):
     assert result["failed"] == 0
     assert len(webhook_calls) == 6
 
-    user_ids_per_call = [call["json"]["members"][0] for call in webhook_calls]
-    assert all("phone" in m or "email" in m for m in user_ids_per_call)
+    for call in webhook_calls:
+        member = call["json"]["members"][0]
+        assert "session_details" in member
+        assert member["session_details"]["date"] == collection_date
+        assert member["session_details"]["slot"]
+        assert member["session_details"]["expert_type"] == "blood_collection"
 
     notification_count = (
         await test_db_session.execute(text("SELECT COUNT(*) FROM notifications"))
@@ -272,6 +340,7 @@ async def test_pretest_reminders_includes_scheduled_engagements(test_db_session,
     assert result["skipped"] == 0
     assert result["failed"] == 0
     assert len(webhook_calls) == 2
+    assert webhook_calls[0]["json"]["members"][0]["session_details"]["slot"] == "8:00 AM"
 
 
 @pytest.mark.asyncio
@@ -321,14 +390,14 @@ async def test_pretest_reminders_dry_run_does_not_dispatch(test_db_session, monk
 async def test_pretest_reminders_one_user_id_per_dispatch(test_db_session, monkeypatch):
     await _seed_dependencies(test_db_session)
     await _insert_engagement(
-        test_db_session, engagement_id=9605, engagement_code="ENG9605", status="running"
+        test_db_session, engagement_id=9606, engagement_code="ENG9606", status="running"
     )
     collection_date = "2026-06-02"
     as_of = date(2026, 6, 1)
     await _insert_participant(
         test_db_session,
-        engagement_id=9605,
-        user_id=96051,
+        engagement_id=9606,
+        user_id=96061,
         engagement_date=collection_date,
         slot_start_time="07:00:00",
     )
@@ -350,24 +419,10 @@ async def test_pretest_reminders_one_user_id_per_dispatch(test_db_session, monke
     )
     await test_db_session.commit()
 
-    rows = (
-        await test_db_session.execute(
-            text(
-                'SELECT service_key, "user" AS user_payload, engagement_id '
-                "FROM notifications ORDER BY notification_id"
-            )
-        )
-    ).all()
-    assert len(rows) == 2
-    for row in rows:
-        user_payload = row.user_payload
-        if isinstance(user_payload, str):
-            user_payload = json.loads(user_payload)
-        assert len(user_payload["user_ids"]) == 1
-        assert user_payload["user_ids"][0] == 96051
-        assert row.engagement_id == 9605
-    service_keys = {row.service_key for row in rows}
-    assert service_keys == {PRETEST_WHATSAPP_KEY, PRETEST_EMAIL_KEY}
+    assert len(webhook_calls) == 2
+    for call in webhook_calls:
+        assert call["json"]["members"][0]["session_details"]["slot"] == "7:00 AM"
+        assert len(call["json"]["members"]) == 1
 
 
 @pytest.mark.asyncio
@@ -375,54 +430,10 @@ async def test_pretest_reminders_skips_when_no_keys_configured(test_db_session, 
     await _seed_dependencies(test_db_session)
     await _insert_engagement(
         test_db_session,
-        engagement_id=9606,
-        engagement_code="ENG9606",
-        status="running",
-        pretest_guidelines_notification=None,
-    )
-    collection_date = "2026-06-02"
-    as_of = date(2026, 6, 1)
-    await _insert_participant(
-        test_db_session,
-        engagement_id=9606,
-        user_id=96061,
-        engagement_date=collection_date,
-        slot_start_time="08:00:00",
-    )
-    await test_db_session.commit()
-
-    webhook_calls: list[dict] = []
-    monkeypatch.setattr(
-        "modules.notifications.service.httpx.AsyncClient",
-        _fake_httpx_client(webhook_calls),
-    )
-
-    notifications_service, engagements_repository = _services()
-    result = await dispatch_pretest_reminders(
-        test_db_session,
-        notifications_service=notifications_service,
-        engagements_repository=engagements_repository,
-        as_of=as_of,
-        dry_run=False,
-    )
-    await test_db_session.commit()
-
-    assert result["matched"] == 1
-    assert result["sent"] == 0
-    assert result["skipped"] == 1
-    assert result["failed"] == 0
-    assert len(webhook_calls) == 0
-
-
-@pytest.mark.asyncio
-async def test_pretest_reminders_single_custom_key(test_db_session, monkeypatch):
-    await _seed_dependencies(test_db_session)
-    await _insert_engagement(
-        test_db_session,
         engagement_id=9607,
         engagement_code="ENG9607",
         status="running",
-        pretest_guidelines_notification="custom-pretest-only",
+        bind_services=False,
     )
     collection_date = "2026-06-02"
     as_of = date(2026, 6, 1)
@@ -451,16 +462,94 @@ async def test_pretest_reminders_single_custom_key(test_db_session, monkeypatch)
     )
     await test_db_session.commit()
 
+    assert result["matched"] == 0
+    assert len(webhook_calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_pretest_reminders_single_custom_key(test_db_session, monkeypatch):
+    await _seed_dependencies(test_db_session)
+    await _insert_engagement(
+        test_db_session,
+        engagement_id=9608,
+        engagement_code="ENG9608",
+        status="running",
+        service_keys="custom-pretest-only",
+    )
+    collection_date = "2026-06-02"
+    as_of = date(2026, 6, 1)
+    await _insert_participant(
+        test_db_session,
+        engagement_id=9608,
+        user_id=96081,
+        engagement_date=collection_date,
+        slot_start_time="09:15:00",
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+    monkeypatch.setattr(
+        "modules.notifications.service.httpx.AsyncClient",
+        _fake_httpx_client(webhook_calls),
+    )
+
+    notifications_service, engagements_repository = _services()
+    result = await dispatch_pretest_reminders(
+        test_db_session,
+        notifications_service=notifications_service,
+        engagements_repository=engagements_repository,
+        as_of=as_of,
+        dry_run=False,
+    )
+    await test_db_session.commit()
+
     assert result["matched"] == 1
     assert result["sent"] == 1
-    assert result["skipped"] == 0
-    assert result["failed"] == 0
     assert len(webhook_calls) == 1
+    assert webhook_calls[0]["json"]["members"][0]["session_details"]["slot"] == "9:15 AM"
 
     rows = (
-        await test_db_session.execute(
-            text("SELECT service_key FROM notifications ORDER BY notification_id")
-        )
+        await test_db_session.execute(text("SELECT service_key FROM notifications"))
     ).all()
     assert len(rows) == 1
     assert rows[0].service_key == "custom-pretest-only"
+
+
+@pytest.mark.asyncio
+async def test_pretest_reminders_skips_missing_slot(test_db_session, monkeypatch):
+    await _seed_dependencies(test_db_session)
+    await _insert_engagement(
+        test_db_session, engagement_id=9609, engagement_code="ENG9609", status="running"
+    )
+    collection_date = "2026-06-02"
+    as_of = date(2026, 6, 1)
+    await _insert_participant(
+        test_db_session,
+        engagement_id=9609,
+        user_id=96091,
+        engagement_date=collection_date,
+        slot_start_time=None,
+    )
+    await test_db_session.commit()
+
+    webhook_calls: list[dict] = []
+    monkeypatch.setattr(
+        "modules.notifications.service.httpx.AsyncClient",
+        _fake_httpx_client(webhook_calls),
+    )
+
+    notifications_service, engagements_repository = _services()
+    result = await dispatch_pretest_reminders(
+        test_db_session,
+        notifications_service=notifications_service,
+        engagements_repository=engagements_repository,
+        as_of=as_of,
+        dry_run=False,
+    )
+    await test_db_session.commit()
+
+    assert result["matched"] == 1
+    assert result["sent"] == 0
+    assert result["skipped"] == 1
+    assert len(webhook_calls) == 0
+    assert result["details"][0]["reason"] == "missing slot_start_time for session_details"
