@@ -30,6 +30,9 @@ class AppError(Exception):
     message: str
     details: Dict[str, object] | None = None
 
+    def __str__(self) -> str:
+        return self.message or f"{self.error_code} ({self.status_code})"
+
 
 def _map_status_to_error_code(status_code: int) -> str:
     """Map HTTP status codes to standard error codes."""

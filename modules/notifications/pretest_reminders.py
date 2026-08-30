@@ -19,6 +19,15 @@ logger = logging.getLogger(__name__)
 _IST = ZoneInfo("Asia/Kolkata")
 
 
+def _exc_message(exc: BaseException) -> str:
+    """Prefer AppError.message; dataclasses leave Exception.args empty so str(exc) is ''."""
+    message = getattr(exc, "message", None)
+    if isinstance(message, str) and message.strip():
+        return message
+    text = str(exc).strip()
+    return text or type(exc).__name__
+
+
 def tomorrow_in_ist(*, as_of: date | None = None) -> date:
     """Return the calendar day after as_of (or today in IST when as_of is omitted)."""
     if as_of is not None:
@@ -119,11 +128,12 @@ async def dispatch_pretest_reminders(
             })
             continue
 
-        try:
-            dispatched_any = False
-            skipped_all = True
-            for cfg in participant.service_configs:
-                sk = cfg.service_key
+        dispatched_any = False
+        skipped_all = True
+        failed_any = False
+        for cfg in participant.service_configs:
+            sk = cfg.service_key
+            try:
                 skip_reason = await should_skip_notification(
                     db,
                     service_key=sk,
@@ -160,27 +170,30 @@ async def dispatch_pretest_reminders(
                     "action": "sent",
                     "reason": f"dispatched '{sk}'",
                 })
+            except Exception as exc:
+                failed_any = True
+                reason = _exc_message(exc)
+                details.append({
+                    "user_id": participant.user_id,
+                    "engagement_id": participant.engagement_id,
+                    "service_key": sk,
+                    "action": "failed",
+                    "reason": reason,
+                })
+                logger.warning(
+                    "Pretest reminder dispatch failed: service_key=%s user_id=%s engagement_id=%s: %s",
+                    sk,
+                    participant.user_id,
+                    participant.engagement_id,
+                    reason,
+                )
 
-            if dispatched_any:
-                sent += 1
-            elif skipped_all:
-                skipped += 1
-        except Exception as exc:
+        if dispatched_any:
+            sent += 1
+        elif failed_any:
             failed += 1
-            details.append({
-                "user_id": participant.user_id,
-                "engagement_id": participant.engagement_id,
-                "service_key": ",".join(service_keys),
-                "action": "failed",
-                "reason": str(exc),
-            })
-            logger.warning(
-                "Pretest reminder dispatch failed: service_keys=%s user_id=%s engagement_id=%s: %s",
-                ",".join(service_keys),
-                participant.user_id,
-                participant.engagement_id,
-                str(exc),
-            )
+        elif skipped_all:
+            skipped += 1
 
     return {
         "as_of": (as_of or datetime.now(_IST).date()).isoformat(),
