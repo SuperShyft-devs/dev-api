@@ -1,0 +1,519 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pre-Test Guidelines WhatsApp (camp15 + medialink)\nSame PDF attachment pattern as send-bioai-whatsapp (WhatAPI media webhook + camp15).\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone,\n    session_details: { want, date, slot, expert_type, cabin? }\n  }],\n  engagement_id?: number\n}\n\nNotification service must have require_session_details enabled.\nMaps: slot → Consultation_Time, cabin → Cabin_Name.\nPDF medialink: https://api.supershyft.com/media/documents/BIO-AI%20test%20guidelines.pdf",
+        "height": 640,
+        "width": 2336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4448,
+        4800
+      ],
+      "typeVersion": 1,
+      "id": "ptws-node-0000-sticky",
+      "name": "Sticky Note Pretest WhatsApp Session"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pretest-whatsapp-session-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4576,
+        4992
+      ],
+      "id": "ptws-node-0001-webhook",
+      "name": "Pretest WhatsApp Session",
+      "webhookId": "ptws-wh-pretest-wa-session"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ptws-cond-notif",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ptws-cond-members",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ptws-cond-len",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "ptws-cond-sd",
+              "leftValue": "={{ $json.body.members[0].session_details }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ptws-cond-date",
+              "leftValue": "={{ $json.body.members[0].session_details.date }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ptws-cond-slot",
+              "leftValue": "={{ $json.body.members[0].session_details.slot }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4784,
+        4992
+      ],
+      "id": "ptws-node-0002-validate",
+      "name": "Validate WhatsApp Payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members\n  .filter((member) => member.session_details && member.session_details.want !== false)\n  .map((member) => ({\n    json: {\n      notification_id: notificationId,\n      first_name: member.first_name || 'Participant',\n      last_name: member.last_name || '',\n      email: member.email || '',\n      phone: member.phone || '',\n      session_details: {\n        want: Boolean(member.session_details.want),\n        date: member.session_details.date || '',\n        slot: member.session_details.slot || '',\n        expert_type: member.session_details.expert_type || 'blood_collection',\n        cabin: member.session_details.cabin || ''\n      }\n    }\n  }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5008,
+        4880
+      ],
+      "id": "ptws-node-0003-split",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\nconst consultationTime = (member.session_details?.slot || '').trim();\nconst cabinName = (member.session_details?.cabin || '').trim();\nconst preTestPdf = 'https://api.supershyft.com/media/documents/BIO-AI%20test%20guidelines.pdf';\n\nlet phone = String(member.phone || '').replace(/\\D/g, '');\nif (phone.length === 10) phone = '91' + phone;\n\n// camp15 + medialink (same gateway as send-bioai-whatsapp) — 4 body params after name\nconst message =\n`camp15,${name},\nThis is a reminder that your Supershyft Preventive Health blood test is scheduled for tomorrow. Before your upcoming test to understand how to prepare you can refer to the document attached.,\nTime: ${consultationTime},\nCabin: ${cabinName},\nAlso please complete your Health Assessment on the Supershyft app before your test. Thanks for your cooperation!`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    phone,\n    message,\n    medialink: preTestPdf\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5264,
+        4880
+      ],
+      "id": "ptws-node-0004-prepare",
+      "name": "Prepare Pretest WhatsApp Session"
+    },
+    {
+      "parameters": {
+        "url": "https://webhook.whatapi.in/webhook/69ea095002e28c7ee412c02d",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Prepare Pretest WhatsApp Session').item.json.phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $('Prepare Pretest WhatsApp Session').item.json.message }}"
+            },
+            {
+              "name": "medialink",
+              "value": "={{ $('Prepare Pretest WhatsApp Session').item.json.medialink }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5488,
+        4880
+      ],
+      "id": "ptws-node-0005-send",
+      "name": "Send WhatsApp Message",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "wbw01-cond-accepted",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5712,
+        4768
+      ],
+      "id": "ptws-node-0006-accepted",
+      "name": "WhatAPI Accepted?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "wbw01-asgn-sent-id",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Pretest WhatsApp Session').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "wbw01-asgn-sent-status",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "wbw01-asgn-sent-msg",
+              "name": "message",
+              "value": "Message sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6208,
+        4688
+      ],
+      "id": "ptws-node-0007-sent",
+      "name": "WhatsApp Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "wbw01-asgn-fail-id",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Pretest WhatsApp Session').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "wbw01-asgn-fail-status",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "wbw01-asgn-fail-msg",
+              "name": "message",
+              "value": "WhatsApp sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5808,
+        4960
+      ],
+      "id": "ptws-node-0008-failed",
+      "name": "WhatsApp Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "wbw01-asgn-na-id",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Pretest WhatsApp Session').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "wbw01-asgn-na-status",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "wbw01-asgn-na-msg",
+              "name": "message",
+              "value": "WhatsApp sending failed: message not accepted",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6032,
+        4864
+      ],
+      "id": "ptws-node-0009-notaccepted",
+      "name": "WhatAPI Not Accepted"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "wbw01-asgn-val-id",
+              "name": "notification_id",
+              "value": "={{ $('Pretest WhatsApp Session').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "wbw01-asgn-val-status",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "wbw01-asgn-val-msg",
+              "name": "message",
+              "value": "Payload validation failed: each member requires session_details with date and slot",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5008,
+        5136
+      ],
+      "id": "ptws-node-0010-valfail",
+      "name": "WhatsApp Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6576,
+        5152
+      ],
+      "id": "ptws-node-0011-callback",
+      "name": "WhatsApp Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Validate WhatsApp Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Pretest WhatsApp Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "WhatAPI Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Accepted?": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatAPI Not Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Sent Response": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Failed Response": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatAPI Not Accepted": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pretest WhatsApp Session": {
+      "main": [
+        [
+          {
+            "node": "Validate WhatsApp Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Pretest WhatsApp Session": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}
