@@ -1,0 +1,473 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Nvidia Collection Booking Alert\nSkips OA/internal team alerts. Only notifies the participant by dispatching:\n- nvidia-collection-confirmed-whatsapp-v1\n- nvidia-collection-confirmed-email-v1\nwith session_details (date, slot, cabin).\n\nExpects: {\n  notification_id, engagement_id,\n  participant_details: { participant_user_id, collection_date?, collection_time?, cabin_name?, ... },\n  session_details?: { date, slot, cabin?, expert_type? },\n  members?: []  // ignored — not notified\n}\n\nSession details prefer top-level session_details, else participant_details collection_date/time/cabin_name.",
+        "height": 720,
+        "width": 2200
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        7872,
+        2432
+      ],
+      "typeVersion": 1,
+      "id": "b2ba-sticky-0001",
+      "name": "Sticky Note Nvidia Collection Booking Alert"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nvidia-collection-booking-alert-whatsapp-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        7984,
+        2912
+      ],
+      "id": "ncba-coll-webhook-0001",
+      "name": "Nvidia Collection Booking Alert Webhook",
+      "webhookId": "ncba-coll-webhook-id-v1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b2ba-val-001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b2ba-val-002",
+              "leftValue": "={{ $json.body.engagement_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b2ba-val-003",
+              "leftValue": "={{ $json.body.participant_details }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b2ba-val-004",
+              "leftValue": "={{ $json.body.participant_details.participant_user_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        8224,
+        2912
+      ],
+      "id": "b2ba-validate-0001",
+      "name": "Validate Nvidia Collection Booking Payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst pd = body.participant_details || {};\n\nconst userIdRaw = pd.participant_user_id;\nconst userId = Number(userIdRaw);\nif (!Number.isFinite(userId) || userId <= 0) {\n  return [{\n    json: {\n      notification_id: body.notification_id,\n      status: 'failed',\n      message: 'Payload validation failed: participant_details.participant_user_id is required',\n      skip_dispatch: true\n    }\n  }];\n}\n\nconst topSession = body.session_details\n  || (Array.isArray(body.members) && body.members[0] && body.members[0].session_details)\n  || {};\n\nconst date = (topSession.date || pd.collection_date || '').toString().trim();\nconst slot = (topSession.slot || pd.collection_time || '').toString().trim();\nconst cabin = (topSession.cabin || pd.cabin_name || '').toString().trim();\n\nif (!date || date === '-' || !slot || slot === '-') {\n  return [{\n    json: {\n      notification_id: body.notification_id,\n      status: 'failed',\n      message: 'Payload validation failed: session_details.date and session_details.slot (or participant_details collection_date/time) are required',\n      skip_dispatch: true\n    }\n  }];\n}\n\nconst sessionDetails = {\n  want: topSession.want !== false,\n  date,\n  slot,\n  expert_type: topSession.expert_type || 'blood_collection'\n};\nif (cabin && cabin !== '-') sessionDetails.cabin = cabin;\n\n// members (OAs/internal team) are intentionally ignored — only notify the participant\nreturn [{\n  json: {\n    notification_id: body.notification_id,\n    engagement_id: body.engagement_id,\n    user_ids: [userId],\n    session_details: sessionDetails,\n    status: 'sent',\n    message: 'participant-only dispatch with session_details (internal team skipped)',\n    skip_dispatch: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8576,
+        2800
+      ],
+      "id": "b2ba-prepare-0001",
+      "name": "Prepare Participant Dispatch"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b2ba-skip-001",
+              "leftValue": "={{ $json.skip_dispatch }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        8800,
+        2800
+      ],
+      "id": "b2ba-ready-0001",
+      "name": "Ready to Dispatch?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b2ba-valfail-001",
+              "name": "notification_id",
+              "value": "={{ $('Nvidia Collection Booking Alert Webhook').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "b2ba-valfail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "b2ba-valfail-003",
+              "name": "message",
+              "value": "Payload validation failed: notification_id, engagement_id, and participant_details.participant_user_id are required",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        8576,
+        3104
+      ],
+      "id": "b2ba-valfail-resp-001",
+      "name": "Collection Booking Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/dispatch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"service_key\": \"nvidia-collection-confirmed-whatsapp-v1\",\n  \"user_ids\": {{ JSON.stringify($json.user_ids) }},\n  \"engagement_id\": {{ $json.engagement_id }},\n  \"session_details\": {{ JSON.stringify($json.session_details) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        9040,
+        2688
+      ],
+      "id": "ncba-coll-dispatch-wa-0001",
+      "name": "Dispatch Nvidia Collection Confirmed WhatsApp",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/dispatch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"service_key\": \"nvidia-collection-confirmed-email-v1\",\n  \"user_ids\": {{ JSON.stringify($('Prepare Participant Dispatch').item.json.user_ids) }},\n  \"engagement_id\": {{ $('Prepare Participant Dispatch').item.json.engagement_id }},\n  \"session_details\": {{ JSON.stringify($('Prepare Participant Dispatch').item.json.session_details) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        9280,
+        2688
+      ],
+      "id": "ncba-coll-dispatch-email-0001",
+      "name": "Dispatch Nvidia Collection Confirmed Email",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b2ba-ok-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "b2ba-ok-002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "b2ba-ok-003",
+              "name": "message",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.message }} | Participant Notification sent Successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        9520,
+        2608
+      ],
+      "id": "b2ba-ok-resp-001",
+      "name": "Participant Notify Success"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b2ba-fail-001",
+              "name": "notification_id",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "b2ba-fail-002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "b2ba-fail-003",
+              "name": "message",
+              "value": "={{ $('Prepare Participant Dispatch').item.json.message }} | Participant Notification Failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        9520,
+        2880
+      ],
+      "id": "b2ba-fail-resp-0001",
+      "name": "Participant Notify Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        9760,
+        2800
+      ],
+      "id": "b2ba-callback-0001",
+      "name": "Nvidia Collection Booking Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Nvidia Collection Booking Alert Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Nvidia Collection Booking Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Nvidia Collection Booking Payload": {
+      "main": [
+        [
+          {
+            "node": "Prepare Participant Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Collection Booking Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Participant Dispatch": {
+      "main": [
+        [
+          {
+            "node": "Ready to Dispatch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready to Dispatch?": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Nvidia Collection Confirmed WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nvidia Collection Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collection Booking Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "Nvidia Collection Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Nvidia Collection Confirmed WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Nvidia Collection Confirmed Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Participant Notify Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Nvidia Collection Confirmed Email": {
+      "main": [
+        [
+          {
+            "node": "Participant Notify Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Participant Notify Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Participant Notify Success": {
+      "main": [
+        [
+          {
+            "node": "Nvidia Collection Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Participant Notify Failed": {
+      "main": [
+        [
+          {
+            "node": "Nvidia Collection Booking Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}
