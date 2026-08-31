@@ -183,6 +183,13 @@ class ConsultationBookRequest(BaseModel):
     cabin: Optional[str] = Field(default=None, max_length=100)
 
 
+class ConsultationRescheduleRequest(BaseModel):
+    engagement_id: int = Field(gt=0)
+    consultation_date: date
+    consultation_slot: str = Field(min_length=1, max_length=20)
+    expert_type: str = Field(min_length=1, max_length=100)
+
+
 class ConsultationConfirmRequest(BaseModel):
     user_id: int = Field(gt=0)
     engagement_id: int = Field(gt=0)

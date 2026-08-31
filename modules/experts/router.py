@@ -22,6 +22,7 @@ from modules.experts.schemas import (
     ConsultationConfirmRequest,
     ConsultationDoneRequest,
     ConsultationManageUpdateRequest,
+    ConsultationRescheduleRequest,
     ExpertCreateRequest,
     ExpertReviewCreateRequest,
     ExpertStatusUpdateRequest,
@@ -193,6 +194,18 @@ async def book_consultation_slot(
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
     data = await availability_service.book_consultation_slot(db, user_id=user.user_id, payload=payload)
+    await db.commit()
+    return success_response(data)
+
+
+@router.post("/consultations/reschedule")
+async def reschedule_consultation_slot(
+    payload: ConsultationRescheduleRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+    availability_service: ExpertAvailabilityService = Depends(get_availability_service),
+):
+    data = await availability_service.reschedule_consultation_slot(db, user_id=user.user_id, payload=payload)
     await db.commit()
     return success_response(data)
 
