@@ -99,6 +99,7 @@ async def test_connect_metsights_records_releases_before_create(monkeypatch):
     db.dirty = False
     db.new = False
     db.deleted = False
+    db.commit = AsyncMock()
     employee = EmployeeContext(employee_id=701, user_id=701, role="admin")
 
     result = await service.connect_metsights_records_for_package(
@@ -169,6 +170,7 @@ async def test_add_package_backfill_releases_before_create(monkeypatch):
     db.dirty = False
     db.new = False
     db.deleted = False
+    db.commit = AsyncMock()
     employee = EmployeeContext(employee_id=701, user_id=701, role="admin")
 
     result = await service.add_package_to_engagement(

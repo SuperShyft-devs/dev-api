@@ -280,6 +280,7 @@ class EngagementAssessmentPackagesService:
                                     assessment_instance_id=existing_instance_id,
                                     metsights_record_id=new_rid,
                                 )
+                                await db.commit()
                         except AppError as exc:
                             errors.append(
                                 {
@@ -838,6 +839,9 @@ class EngagementAssessmentPackagesService:
                     assessment_instance_id=inst_id,
                     metsights_record_id=record_id,
                 )
+                # Persist Core UPDATE before the next iteration's release.
+                # (release used to rollback non-ORM DML; commit here is explicit.)
+                await db.commit()
                 base["status"] = "connected"
                 base["metsights_record_id"] = record_id
                 connected += 1

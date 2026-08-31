@@ -343,9 +343,34 @@ async def test_release_request_transaction_commits_dirty_session(test_db_session
 
 
 @pytest.mark.asyncio
-async def test_release_request_transaction_rolls_back_read_only(test_db_session):
+async def test_release_request_transaction_ends_read_only_transaction(test_db_session):
     from db.transaction import release_request_transaction
 
     await test_db_session.execute(text("SELECT 1"))
     await release_request_transaction(test_db_session)
     assert not test_db_session.in_transaction()
+
+
+@pytest.mark.asyncio
+async def test_release_commits_when_session_not_orm_dirty():
+    """Core UPDATE/flush does not populate session.dirty.
+
+    Old release rolled back in that case, undoing set_metsights_record_id writes
+    so Connect could report connected:13 while Synced only moved +1.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    from db.transaction import release_request_transaction
+
+    db = MagicMock()
+    db.in_transaction.return_value = True
+    db.dirty = set()
+    db.new = set()
+    db.deleted = set()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+
+    await release_request_transaction(db)
+
+    db.commit.assert_awaited_once()
+    db.rollback.assert_not_awaited()
