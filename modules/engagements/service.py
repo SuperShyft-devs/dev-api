@@ -2497,6 +2497,7 @@ class EngagementsService:
         rollup = {
             "engagement_count": 0,
             "total_participants": 0,
+            "with_booking_id": 0,
             "blood_report": 0,
             "blood_values": 0,
             "bio_ai_report": 0,
@@ -2524,6 +2525,7 @@ class EngagementsService:
                 }
             )
             rollup["total_participants"] += summary["total_participants"]
+            rollup["with_booking_id"] += summary["with_booking_id"]
             rollup["blood_report"] += summary["blood_report"]
             rollup["blood_values"] += summary["blood_values"]
             rollup["bio_ai_report"] += summary["bio_ai_report"]
@@ -2568,6 +2570,7 @@ class EngagementsService:
                 User.last_name,
                 User.phone,
                 User.email,
+                EngagementParticipant.booking_id,
             )
             .select_from(EngagementParticipant)
             .join(User, User.user_id == EngagementParticipant.user_id)
@@ -2623,6 +2626,7 @@ class EngagementsService:
         participants: list[dict] = []
         summary = {
             "total_participants": 0,
+            "with_booking_id": 0,
             "blood_report": 0,
             "blood_values": 0,
             "bio_ai_report": 0,
@@ -2641,6 +2645,7 @@ class EngagementsService:
 
             flags = ihr_flags.get(uid, default_flags)
             q_state = q_state_by_user.get(uid, "not_started")
+            has_booking_id = bool(row.booking_id and str(row.booking_id).strip())
 
             if include_participants:
                 participants.append(
@@ -2650,6 +2655,7 @@ class EngagementsService:
                         "last_name": row.last_name,
                         "phone": row.phone,
                         "email": row.email,
+                        "has_booking_id": has_booking_id,
                         "has_blood_report": flags["has_blood_report"],
                         "has_blood_values": flags["has_blood_values"],
                         "has_bio_ai_report": flags["has_bio_ai_report"],
@@ -2659,6 +2665,8 @@ class EngagementsService:
                 )
 
             summary["total_participants"] += 1
+            if has_booking_id:
+                summary["with_booking_id"] += 1
             if flags["has_blood_report"]:
                 summary["blood_report"] += 1
             if flags["has_blood_values"]:

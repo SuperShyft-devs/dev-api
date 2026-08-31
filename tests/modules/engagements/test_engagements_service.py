@@ -179,11 +179,11 @@ async def test_get_data_completeness_tracks_pdf_json_and_values_separately(test_
     await test_db_session.execute(
         text(
             "INSERT INTO engagement_participants "
-            "(engagement_participant_id, engagement_id, user_id, engagement_date, slot_start_time, booked_by_user_id) "
+            "(engagement_participant_id, engagement_id, user_id, engagement_date, slot_start_time, booked_by_user_id, booking_id) "
             "VALUES "
-            "(90101, 9010, 1101, '2026-02-01', '10:00:00', 1101), "
-            "(90102, 9010, 1102, '2026-02-01', '10:20:00', 1102), "
-            "(90103, 9010, 1103, '2026-02-01', '10:40:00', 1103)"
+            "(90101, 9010, 1101, '2026-02-01', '10:00:00', 1101, 'HL-1101'), "
+            "(90102, 9010, 1102, '2026-02-01', '10:20:00', 1102, NULL), "
+            "(90103, 9010, 1103, '2026-02-01', '10:40:00', 1103, NULL)"
         )
     )
     await test_db_session.execute(
@@ -207,12 +207,14 @@ async def test_get_data_completeness_tracks_pdf_json_and_values_separately(test_
     )
 
     assert data["summary"]["total_participants"] == 3
+    assert data["summary"]["with_booking_id"] == 1
     assert data["summary"]["blood_report"] == 1
     assert data["summary"]["blood_values"] == 1
     assert data["summary"]["bio_ai_report"] == 1
     assert data["summary"]["bio_ai_json"] == 1
 
     by_user = {row["user_id"]: row for row in data["participants"]}
+    assert by_user[1101]["has_booking_id"] is True
     assert by_user[1101]["has_blood_report"] is True
     assert by_user[1101]["has_blood_values"] is False
     assert by_user[1101]["has_bio_ai_report"] is False
