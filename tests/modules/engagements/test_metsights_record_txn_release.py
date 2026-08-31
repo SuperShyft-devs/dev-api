@@ -36,16 +36,39 @@ def _build_service(*, metsights: MetsightsService) -> EngagementAssessmentPackag
 @pytest.mark.asyncio
 async def test_connect_metsights_records_releases_before_create(monkeypatch):
     call_order: list[str] = []
+    create_calls = 0
+
+    class _Inst:
+        def __init__(self, assessment_instance_id: int, user_id: int):
+            self.assessment_instance_id = assessment_instance_id
+            self.user_id = user_id
+            self.metsights_record_id = None
+            self._expired = False
+
+        def expire(self) -> None:
+            self._expired = True
+
+        def __getattribute__(self, name: str):
+            if name in {"assessment_instance_id", "user_id", "metsights_record_id"} and object.__getattribute__(
+                self, "_expired"
+            ):
+                raise RuntimeError("expired ORM attr accessed after release")
+            return object.__getattribute__(self, name)
+
+    instances = [_Inst(501, 601), _Inst(502, 602)]
 
     async def _release(db):
         call_order.append("release")
+        for inst in instances:
+            inst.expire()
         await release_request_transaction(db)
 
     async def _create(self, *, profile_id: str, assessment_type_code: str):
+        nonlocal create_calls
         call_order.append("create")
-        assert profile_id == "profile-abc"
+        create_calls += 1
         assert assessment_type_code == "2"
-        return "NEWREC01"
+        return f"NEWREC{create_calls:02d}"
 
     monkeypatch.setattr(
         "modules.engagements.assessment_packages_service.release_request_transaction",
@@ -59,18 +82,13 @@ async def test_connect_metsights_records_releases_before_create(monkeypatch):
     mock_package.package_code = "METSIGHTS_PRO"
     mock_package.assessment_type_code = "2"
 
-    mock_instance = MagicMock()
-    mock_instance.assessment_instance_id = 501
-    mock_instance.user_id = 601
-    mock_instance.metsights_record_id = None
-
     mock_user = MagicMock()
     mock_user.metsights_profile_id = "profile-abc"
 
     service._engagements.get_engagement_by_id = AsyncMock(return_value=MagicMock())
     service._assessments_repo.get_package_by_id = AsyncMock(return_value=mock_package)
     service._assessments_repo.list_instances_for_engagement_and_package = AsyncMock(
-        return_value=[mock_instance]
+        return_value=instances
     )
     service._users.get_user_by_id = AsyncMock(return_value=mock_user)
     service._assessments_repo.set_metsights_record_id = AsyncMock()
@@ -93,9 +111,10 @@ async def test_connect_metsights_records_releases_before_create(monkeypatch):
         endpoint="/test/connect",
     )
 
-    assert call_order == ["release", "create"]
-    assert result["connected"] == 1
-    service._assessments_repo.set_metsights_record_id.assert_awaited_once()
+    assert call_order == ["release", "create", "release", "create"]
+    assert result["connected"] == 2
+    assert result["package_code"] == "METSIGHTS_PRO"
+    assert service._assessments_repo.set_metsights_record_id.await_count == 2
 
 
 @pytest.mark.asyncio

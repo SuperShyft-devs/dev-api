@@ -238,6 +238,7 @@ class EngagementAssessmentPackagesService:
         )
 
         package_id = int(package.package_id)
+        package_code = package.package_code
         assessment_type_code = (package.assessment_type_code or "").strip()
 
         participant_ids = await self._engagements.list_distinct_participant_ids_for_engagement(
@@ -260,6 +261,8 @@ class EngagementAssessmentPackagesService:
             # If an instance already exists but is missing a Metsights record,
             # try to create one and backfill before skipping.
             if existing is not None:
+                # Snapshot before release_request_transaction expires ORM attrs.
+                existing_instance_id = int(existing.assessment_instance_id)
                 existing_rid = (existing.metsights_record_id or "").strip()
                 if not existing_rid and assessment_type_code:
                     user = await self._users.get_user_by_id(db, participant_id)
@@ -274,10 +277,9 @@ class EngagementAssessmentPackagesService:
                             if new_rid:
                                 await self._assessments_repo.set_metsights_record_id(
                                     db,
-                                    assessment_instance_id=int(existing.assessment_instance_id),
+                                    assessment_instance_id=existing_instance_id,
                                     metsights_record_id=new_rid,
                                 )
-                                existing.metsights_record_id = new_rid
                         except AppError as exc:
                             errors.append(
                                 {
@@ -290,7 +292,7 @@ class EngagementAssessmentPackagesService:
                             logger.exception(
                                 "Metsights backfill failed for user_id=%s instance_id=%s",
                                 participant_id,
-                                existing.assessment_instance_id,
+                                existing_instance_id,
                             )
                             errors.append(
                                 {
@@ -303,7 +305,7 @@ class EngagementAssessmentPackagesService:
                 skipped.append(
                     {
                         "user_id": participant_id,
-                        "assessment_instance_id": existing.assessment_instance_id,
+                        "assessment_instance_id": existing_instance_id,
                         "reason": "already exists",
                     }
                 )
@@ -354,6 +356,8 @@ class EngagementAssessmentPackagesService:
                     endpoint=endpoint,
                     metsights_record_id=metsights_record_id,
                 )
+                created_instance_id = int(instance.assessment_instance_id)
+                created_record_id = instance.metsights_record_id
             except AppError as exc:
                 errors.append(
                     {
@@ -382,8 +386,8 @@ class EngagementAssessmentPackagesService:
             created.append(
                 {
                     "user_id": participant_id,
-                    "assessment_instance_id": instance.assessment_instance_id,
-                    "metsights_record_id": instance.metsights_record_id,
+                    "assessment_instance_id": created_instance_id,
+                    "metsights_record_id": created_record_id,
                 }
             )
 
@@ -404,7 +408,7 @@ class EngagementAssessmentPackagesService:
 
         return {
             "package_id": package_id,
-            "package_code": package.package_code,
+            "package_code": package_code,
             "created": created,
             "skipped": skipped,
             "errors": errors,
@@ -763,6 +767,7 @@ class EngagementAssessmentPackagesService:
                 message="Assessment package does not exist",
             )
 
+        package_code = package.package_code
         assessment_type_code = (package.assessment_type_code or "").strip()
         if not assessment_type_code:
             raise AppError(
@@ -777,14 +782,25 @@ class EngagementAssessmentPackagesService:
             package_id=package_id,
         )
 
+        # Snapshot before any release_request_transaction: commit/rollback expires
+        # every loaded ORM instance, so later loop iterations cannot touch attrs.
+        work_items: list[dict[str, Any]] = [
+            {
+                "assessment_instance_id": int(instance.assessment_instance_id),
+                "user_id": int(instance.user_id),
+                "metsights_record_id": (instance.metsights_record_id or "").strip() or None,
+            }
+            for instance in instances
+        ]
+
         connected = 0
         skipped = 0
         failed = 0
         results: list[dict[str, Any]] = []
 
-        for instance in instances:
-            inst_id = int(instance.assessment_instance_id)
-            user_id = int(instance.user_id)
+        for item in work_items:
+            inst_id = int(item["assessment_instance_id"])
+            user_id = int(item["user_id"])
             base: dict[str, Any] = {
                 "user_id": user_id,
                 "assessment_instance_id": inst_id,
@@ -793,7 +809,7 @@ class EngagementAssessmentPackagesService:
                 "reason": None,
             }
 
-            existing_rid = (instance.metsights_record_id or "").strip()
+            existing_rid = (item["metsights_record_id"] or "").strip()
             if existing_rid:
                 base["status"] = "skipped"
                 base["reason"] = "already_connected"
@@ -856,9 +872,9 @@ class EngagementAssessmentPackagesService:
         return {
             "engagement_id": engagement_id,
             "package_id": package_id,
-            "package_code": package.package_code,
+            "package_code": package_code,
             "assessment_type_code": assessment_type_code,
-            "total": len(instances),
+            "total": len(work_items),
             "connected": connected,
             "skipped": skipped,
             "failed": failed,
