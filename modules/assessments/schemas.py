@@ -7,7 +7,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from common.validation import PositiveIntId, SafeDisplayName, SlugKey, StatusStr
+from common.validation import PackageCode, PositiveIntId, SafeDisplayName, SlugKey, StatusStr
 
 
 class AssessmentListItem(BaseModel):
@@ -78,14 +78,14 @@ class MetsightsImportRequest(BaseModel):
 
 
 class AssessmentPackageCreateRequest(BaseModel):
-    package_code: SlugKey
+    package_code: PackageCode
     display_name: SafeDisplayName
     assessment_type_code: SlugKey
     status: StatusStr = "active"
 
 
 class AssessmentPackageUpdateRequest(BaseModel):
-    package_code: SlugKey
+    package_code: PackageCode
     display_name: SafeDisplayName
     assessment_type_code: SlugKey
 

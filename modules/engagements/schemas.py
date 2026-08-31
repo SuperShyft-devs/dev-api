@@ -16,6 +16,7 @@ from common.validation import (
     OptionalLandmarkText,
     OptionalPinCode,
     OptionalSafeDisplayName,
+    PackageCode,
     PhoneStr,
     PinCode,
     PositiveIntId,
@@ -350,7 +351,8 @@ class CreatePhleboRequest(BaseModel):
 class EngagementAssessmentPackageAddRequest(BaseModel):
     """Request to add an additional assessment package to an engagement."""
 
-    package_code: SlugKey
+    # Must preserve case: seeded codes are uppercase (MY_FITNESS_PRINT). SlugKey lowercases.
+    package_code: PackageCode
 
 
 # Metsights record sub-resource keys accepted by engagement questionnaire push.

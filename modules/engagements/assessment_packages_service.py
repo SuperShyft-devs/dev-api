@@ -13,6 +13,13 @@ Business rules:
   responses, category progress, and the assessment instance itself. The
   Metsights Records API has no DELETE endpoint, so the remote record is
   intentionally orphaned.
+
+Healing missing ``metsights_record_id`` after deploy:
+- Admin → engagement → Assessments → package row → connect/sync control
+  (``POST /engagements/{id}/connect-metsights-records``).
+- Synced count should rise for participants who already have a Metsights profile.
+- Run connect only after this release-txn fix is deployed; otherwise bulk sync
+  can hit the same idle-transaction timeout under load.
 """
 
 from __future__ import annotations
@@ -23,6 +30,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
+from db.transaction import release_request_transaction
 from modules.assessments.models import AssessmentPackage
 from modules.assessments.repository import AssessmentsRepository
 from modules.assessments.service import AssessmentsService
@@ -258,6 +266,7 @@ class EngagementAssessmentPackagesService:
                     profile_id = (getattr(user, "metsights_profile_id", None) or "").strip() if user else ""
                     if profile_id:
                         try:
+                            await release_request_transaction(db)
                             new_rid = await self._metsights.create_record_for_profile(
                                 profile_id=profile_id,
                                 assessment_type_code=assessment_type_code,
@@ -306,6 +315,7 @@ class EngagementAssessmentPackagesService:
             metsights_record_id: str | None = None
             if profile_id and assessment_type_code:
                 try:
+                    await release_request_transaction(db)
                     metsights_record_id = await self._metsights.create_record_for_profile(
                         profile_id=profile_id,
                         assessment_type_code=assessment_type_code,
@@ -802,6 +812,7 @@ class EngagementAssessmentPackagesService:
                 continue
 
             try:
+                await release_request_transaction(db)
                 record_id = await self._metsights.create_record_for_profile(
                     profile_id=profile_id,
                     assessment_type_code=assessment_type_code,

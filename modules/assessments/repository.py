@@ -326,7 +326,12 @@ class AssessmentsRepository:
         return result.scalar_one_or_none()
 
     async def get_package_by_code(self, db: AsyncSession, *, package_code: str) -> AssessmentPackage | None:
-        result = await db.execute(select(AssessmentPackage).where(AssessmentPackage.package_code == package_code))
+        code = (package_code or "").strip()
+        if not code:
+            return None
+        result = await db.execute(
+            select(AssessmentPackage).where(func.lower(AssessmentPackage.package_code) == code.lower())
+        )
         return result.scalar_one_or_none()
 
     async def create_package(self, db: AsyncSession, package: AssessmentPackage) -> AssessmentPackage:

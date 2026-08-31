@@ -14,6 +14,7 @@ from pydantic import BeforeValidator, EmailStr, Field, StringConstraints
 _PIN_CODE_RE = re.compile(r"^\d{6}$")
 _OTP_RE = re.compile(r"^\d{4,10}$")
 _SLUG_KEY_RE = re.compile(r"^[a-z0-9_]+$")
+_PACKAGE_CODE_RE = re.compile(r"^[A-Za-z0-9_]+$")
 _SERVICE_KEY_RE = re.compile(r"^[a-z0-9_-]+$")
 _PHONE_ALLOWED = frozenset("0123456789+ -()")
 _SCRIPT_PATTERN = re.compile(r"(?i)<\s*script|javascript\s*:|on\w+\s*=")
@@ -266,6 +267,22 @@ def _validate_optional_slug_key(value: Any) -> str | None:
     return _validate_slug_key(value)
 
 
+def _validate_package_code(value: Any) -> str:
+    """Preserve case for assessment package codes (seeded as uppercase, e.g. MY_FITNESS_PRINT)."""
+    if value is None:
+        raise ValidationError("Package code is required")
+    if not isinstance(value, str):
+        raise ValidationError("Package code must be a string")
+    cleaned = value.strip()
+    if not cleaned:
+        raise ValidationError("Package code cannot be empty")
+    if len(cleaned) > 100:
+        raise ValidationError("Package code must be at most 100 characters")
+    if not _PACKAGE_CODE_RE.match(cleaned):
+        raise ValidationError("Package code must be alphanumeric with underscores only")
+    return cleaned
+
+
 def _validate_service_key(value: Any) -> str:
     if value is None:
         raise ValidationError("Key is required")
@@ -409,6 +426,8 @@ OtpCode = Annotated[str, BeforeValidator(_validate_otp)]
 
 SlugKey = Annotated[str, BeforeValidator(_validate_slug_key)]
 OptionalSlugKey = Annotated[str | None, BeforeValidator(_validate_optional_slug_key)]
+
+PackageCode = Annotated[str, BeforeValidator(_validate_package_code)]
 
 ServiceKey = Annotated[str, BeforeValidator(_validate_service_key)]
 OptionalServiceKey = Annotated[str | None, BeforeValidator(_validate_optional_service_key)]

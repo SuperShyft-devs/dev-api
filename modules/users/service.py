@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from core.exceptions import AppError
+from db.transaction import release_request_transaction
 from modules.employee.models import Employee
 from modules.audit.service import AuditService
 from modules.metsights.service import MetsightsService
@@ -985,6 +986,7 @@ class UsersService:
 
         if profile_id and self._metsights_service is not None:
             try:
+                await release_request_transaction(db)
                 fitprint_record_id = await self._metsights_service.create_record_for_profile(
                     profile_id=profile_id,
                     assessment_type_code="7",
@@ -1021,6 +1023,7 @@ class UsersService:
                 package = await self._assessments_service.get_package_by_id(db, assessment_package_id)
                 assessment_type_code = (getattr(package, "assessment_type_code", None) or "").strip() if package else ""
                 if assessment_type_code:
+                    await release_request_transaction(db)
                     metsights_record_id = await self._metsights_service.create_record_for_profile(
                         profile_id=profile_id,
                         assessment_type_code=assessment_type_code,
@@ -2031,6 +2034,7 @@ class UsersService:
                 )
                 if fitprint_package is None:
                     raise RuntimeError("Active FitPrint Full assessment package is missing")
+                await release_request_transaction(db)
                 fitprint_record_id = await self._metsights_service.create_record_for_profile(
                     profile_id=profile_id,
                     assessment_type_code="7",
@@ -2068,6 +2072,7 @@ class UsersService:
                 package = await self._assessments_service.get_package_by_id(db, engagement.assessment_package_id)
                 assessment_type_code = (getattr(package, "assessment_type_code", None) or "").strip() if package else ""
                 if assessment_type_code:
+                    await release_request_transaction(db)
                     record_id = await self._metsights_service.create_record_for_profile(
                         profile_id=profile_id,
                         assessment_type_code=assessment_type_code,
@@ -2442,6 +2447,7 @@ class UsersService:
                 )
 
                 if bool(engagement.enroll_for_fitprint_full):
+                    await release_request_transaction(db)
                     fitprint_record_id = await self._metsights_service.create_record_for_profile(
                         profile_id=profile_id,
                         assessment_type_code="7",
@@ -2501,6 +2507,7 @@ class UsersService:
                 )
                 primary_record_id: str | None = None
                 if primary_type_code:
+                    await release_request_transaction(db)
                     primary_record_id = await self._metsights_service.create_record_for_profile(
                         profile_id=profile_id,
                         assessment_type_code=primary_type_code,
@@ -2541,6 +2548,7 @@ class UsersService:
                 assessment_type_code = (getattr(package, "assessment_type_code", None) or "").strip() if package else ""
                 profile_id = (user.metsights_profile_id or "").strip()
                 if profile_id and assessment_type_code:
+                    await release_request_transaction(db)
                     record_id = await self._metsights_service.create_record_for_profile(
                         profile_id=profile_id,
                         assessment_type_code=assessment_type_code,

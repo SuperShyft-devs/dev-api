@@ -11,14 +11,15 @@ from common.validation import (
     ExpertAboutText,
     OptionalPersonName,
     OptionalPinCode,
+    PackageCode,
     PersonName,
     PhoneStr,
     PinCode,
     PositiveIntId,
     SafeDisplayName,
     SafeText,
-    SlugKey,
     ServiceKey,
+    SlugKey,
     SupportQueryText,
     ValidationError,
     validate_nested_strings,
@@ -59,6 +60,10 @@ class _PositiveIdModel(BaseModel):
 
 class _SlugModel(BaseModel):
     key: SlugKey
+
+
+class _PackageCodeModel(BaseModel):
+    code: PackageCode
 
 
 class _ServiceKeyModel(BaseModel):
@@ -208,6 +213,19 @@ def test_slug_key():
     assert _SlugModel(key="type_key_1").key == "type_key_1"
     with pytest.raises(PydanticValidationError):
         _SlugModel(key="Bad Key")
+
+
+def test_slug_key_lowercases():
+    assert _SlugModel(key="MY_FITNESS_PRINT").key == "my_fitness_print"
+
+
+def test_package_code_preserves_case():
+    assert _PackageCodeModel(code="MY_FITNESS_PRINT").code == "MY_FITNESS_PRINT"
+    assert _PackageCodeModel(code="  METSIGHTS_PRO  ").code == "METSIGHTS_PRO"
+    with pytest.raises(PydanticValidationError):
+        _PackageCodeModel(code="Bad Code")
+    with pytest.raises(PydanticValidationError):
+        _PackageCodeModel(code="")
 
 
 def test_service_key_allows_hyphens():
