@@ -190,6 +190,25 @@ class ConsoleService:
                     )
         return participant
 
+    async def _reload_participant(
+        self,
+        db: AsyncSession,
+        engagement_participant_id: int,
+    ) -> EngagementParticipant:
+        result = await db.execute(
+            select(EngagementParticipant).where(
+                EngagementParticipant.engagement_participant_id == engagement_participant_id
+            )
+        )
+        participant = result.scalar_one_or_none()
+        if participant is None:
+            raise AppError(
+                status_code=404,
+                error_code="PARTICIPANT_NOT_FOUND",
+                message="Participant is not enrolled in this engagement",
+            )
+        return participant
+
     async def _ensure_console_participant_instance(
         self,
         db: AsyncSession,
@@ -533,6 +552,15 @@ class ConsoleService:
         vendor_billing_user_id = str(participant.booked_by_user_id)
         provider_label = (provider or "healthians").lower()
 
+        # Snapshot ORM attrs before release_request_transaction (read-only rollback expires instances).
+        user_age = user.age
+        user_email = (user.email or "").strip()
+        external_camp_id = engagement.external_camp_id
+        engagement_sub_locality = (engagement.sub_locality or "").strip()
+        engagement_address = (engagement.address or "").strip()
+        external_package_id = diagnostic_package.external_package_id
+        engagement_participant_id = participant.engagement_participant_id
+
         await release_request_transaction(db)
 
         access_token = await healthians_client.get_access_token()
@@ -602,27 +630,27 @@ class ConsoleService:
                     "customer_id": str(user_id),
                     "customer_name": customer_name,
                     "relation": relation,
-                    "age": user.age,
+                    "age": user_age,
                     "dob": dob or "",
                     "gender": gender,
                     "contact_number": phone,
-                    "email": (user.email or "").strip(),
+                    "email": user_email,
                     "barcode": barcode.strip(),
                 }
             ],
-            "camp_id": engagement.external_camp_id,
+            "camp_id": external_camp_id,
             "slot": {"slot_id": ""},
             "sample_collected": "y",
-            "package": [{"deal_id": [f"package_{diagnostic_package.external_package_id}"]}],
+            "package": [{"deal_id": [f"package_{external_package_id}"]}],
             "customer_calling_number": phone,
             "billing_cust_name": customer_name,
             "gender": gender,
             "mobile": phone,
-            "email": (user.email or "").strip(),
-            "sub_locality": (engagement.sub_locality or "").strip(),
+            "email": user_email,
+            "sub_locality": engagement_sub_locality,
             "latitude": lat,
             "longitude": long,
-            "address": (engagement.address or "").strip(),
+            "address": engagement_address,
             "zipcode": zipcode,
             "hard_copy": 0,
             "vendor_billing_user_id": vendor_billing_user_id,
@@ -695,7 +723,7 @@ class ConsoleService:
 
         await self._repository.update_participant_healthians_booking(
             db,
-            engagement_participant_id=participant.engagement_participant_id,
+            engagement_participant_id=engagement_participant_id,
             barcode=barcode.strip(),
             booking_id=str(healthians_booking_id),
         )
@@ -708,7 +736,7 @@ class ConsoleService:
             "resCode": booking_response.get("resCode"),
             "tatDetail": booking_response.get("tatDetail"),
             "barcode": barcode.strip(),
-            "engagement_participant_id": participant.engagement_participant_id,
+            "engagement_participant_id": engagement_participant_id,
             "user_id": user_id,
         }
 
@@ -999,6 +1027,8 @@ class ConsoleService:
 
         pkg = await self._load_healthians_package_for_engagement(db, engagement)
 
+        engagement_participant_id = participant.engagement_participant_id
+
         await release_request_transaction(db)
 
         results = await search_places(f"{city.strip()} {pincode.strip()}", limit=1)
@@ -1008,6 +1038,7 @@ class ConsoleService:
         if latitude is None or longitude is None:
             raise AppError(status_code=422, error_code="GEOCODE_FAILED", message="Could not geocode address")
 
+        participant = await self._reload_participant(db, engagement_participant_id)
         participant.address = address_line.strip()
         participant.sub_locality = address_line.strip()
         participant.landmark = landmark.strip() if landmark else None
@@ -1055,6 +1086,7 @@ class ConsoleService:
             )
 
         zone_id = (resp.get("data") or {}).get("zone_id")
+        participant = await self._reload_participant(db, engagement_participant_id)
         participant.healthians_zone_id = str(zone_id) if zone_id else None
         await db.flush()
 
@@ -1187,6 +1219,7 @@ class ConsoleService:
         pkg = await self._load_healthians_package_for_engagement(db, engagement)
 
         vendor_billing_user_id = str(participant.booked_by_user_id)
+        engagement_participant_id = participant.engagement_participant_id
 
         await release_request_transaction(db)
 
@@ -1228,6 +1261,7 @@ class ConsoleService:
         except ValueError as exc:
             raise AppError(status_code=422, error_code="INVALID_SLOT_TIME", message=str(exc)) from exc
 
+        participant = await self._reload_participant(db, engagement_participant_id)
         participant.blood_collection_time_slot_id = blood_collection_time_slot_id
         participant.engagement_date = blood_collection_date
         participant.slot_start_time = slot_start_time
@@ -1301,6 +1335,7 @@ class ConsoleService:
         vendor_billing_user_id = str(participant.booked_by_user_id)
         external_package_id = pkg.external_package_id or 0
         slot_id = participant.blood_collection_time_slot_id or ""
+        engagement_participant_id = participant.engagement_participant_id
 
         booking_payload: dict[str, Any] = {
             "customer": [{
@@ -1389,6 +1424,7 @@ class ConsoleService:
             )
             raise AppError(status_code=502, error_code="HEALTHIANS_BOOKING_FAILED", message=str(exc)) from exc
 
+        participant = await self._reload_participant(db, engagement_participant_id)
         participant.booking_id = str(healthians_booking_id)
         await db.flush()
 
@@ -1399,7 +1435,7 @@ class ConsoleService:
             "booking_id": str(healthians_booking_id),
             "resCode": booking_response.get("resCode"),
             "tatDetail": booking_response.get("tatDetail"),
-            "engagement_participant_id": participant.engagement_participant_id,
+            "engagement_participant_id": engagement_participant_id,
             "user_id": user_id,
             "engagement_id": engagement_id,
         }
