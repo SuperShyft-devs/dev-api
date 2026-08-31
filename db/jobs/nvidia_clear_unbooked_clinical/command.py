@@ -24,7 +24,6 @@ import asyncio
 import json
 import sys
 import time
-from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -53,9 +52,7 @@ CLINICAL_CATEGORY_KEYS = (
     "advanced-blood-parameters",
 )
 
-VITALS_KEYS = frozenset({"vitals", "health_vitals"})
-BLOOD_KEYS = frozenset({"blood-parameters"})
-ADVANCED_BLOOD_KEYS = frozenset({"advanced-blood-parameters"})
+CLINICAL_GROUPS = ("vitals", "blood-parameters", "advanced-blood-parameters")
 
 SCOPED_INSTANCES_CTE = """
     scoped_instances AS (
@@ -76,24 +73,42 @@ SCOPED_INSTANCES_CTE = """
     )
 """
 
-COUNT_RESPONSES_SQL = text(
+SELECT_RESPONSE_DETAILS_SQL = text(
     f"""
-    WITH {SCOPED_INSTANCES_CTE},
-    clinical_responses AS (
-        SELECT
-            si.engagement_code,
-            qc.category_key,
-            qr.response_id
-        FROM questionnaire_responses qr
-        JOIN scoped_instances si ON si.assessment_instance_id = qr.assessment_instance_id
-        JOIN questionnaire_categories qc
-            ON qc.category_id = ANY(qr.category_ids)
-           AND qc.category_key = ANY(:clinical_keys)
+    WITH {SCOPED_INSTANCES_CTE}
+    SELECT
+        si.engagement_code,
+        si.user_id,
+        u.phone,
+        qc.category_key,
+        qd.question_key,
+        qd.question_text,
+        qr.response_id
+    FROM questionnaire_responses qr
+    JOIN scoped_instances si ON si.assessment_instance_id = qr.assessment_instance_id
+    JOIN users u ON u.user_id = si.user_id
+    JOIN questionnaire_definitions qd ON qd.question_id = qr.question_id
+    JOIN questionnaire_categories qc
+        ON qc.category_id = ANY(qr.category_ids)
+       AND qc.category_key = ANY(:clinical_keys)
+    ORDER BY si.engagement_code, si.user_id, qc.category_key, qd.question_key, qr.response_id
+    """
+)
+
+COUNT_RESPONSES_BY_ENGAGEMENT_SQL = text(
+    f"""
+    WITH {SCOPED_INSTANCES_CTE}
+    SELECT si.engagement_code, count(DISTINCT qr.response_id) AS response_count
+    FROM questionnaire_responses qr
+    JOIN scoped_instances si ON si.assessment_instance_id = qr.assessment_instance_id
+    WHERE EXISTS (
+        SELECT 1
+        FROM questionnaire_categories qc
+        WHERE qc.category_id = ANY(qr.category_ids)
+          AND qc.category_key = ANY(:clinical_keys)
     )
-    SELECT engagement_code, category_key, count(*) AS response_count
-    FROM clinical_responses
-    GROUP BY engagement_code, category_key
-    ORDER BY engagement_code, category_key
+    GROUP BY si.engagement_code
+    ORDER BY si.engagement_code
     """
 )
 
@@ -105,42 +120,36 @@ COUNT_PARTICIPANTS_SQL = text(
     """
 )
 
-COUNT_PROGRESS_SQL = text(
+COUNT_PROGRESS_BY_GROUP_SQL = text(
     f"""
-    WITH {SCOPED_INSTANCES_CTE}
+    WITH {SCOPED_INSTANCES_CTE},
+    clinical_progress AS (
+        SELECT
+            si.assessment_instance_id,
+            CASE
+                WHEN qc.category_key IN ('vitals', 'health_vitals') THEN 'vitals'
+                WHEN qc.category_key = 'blood-parameters' THEN 'blood-parameters'
+                ELSE 'advanced-blood-parameters'
+            END AS clinical_group,
+            acp.status,
+            acp.is_submitted
+        FROM scoped_instances si
+        JOIN assessment_instances ai ON ai.assessment_instance_id = si.assessment_instance_id
+        JOIN assessment_package_categories apc ON apc.package_id = ai.package_id
+        JOIN questionnaire_categories qc ON qc.category_id = apc.category_id
+        JOIN assessment_category_progress acp
+            ON acp.assessment_instance_id = si.assessment_instance_id
+           AND acp.category_id = qc.category_id
+        WHERE qc.category_key = ANY(:clinical_keys)
+    )
     SELECT
-        si.engagement_code,
-        qc.category_key,
+        clinical_group,
         count(*) AS progress_rows,
-        count(*) FILTER (WHERE lower(coalesce(acp.status, '')) = 'complete') AS complete_rows,
-        count(*) FILTER (WHERE acp.is_submitted) AS submitted_rows
-    FROM scoped_instances si
-    JOIN assessment_package_categories apc ON apc.package_id = (
-        SELECT package_id FROM assessment_instances WHERE assessment_instance_id = si.assessment_instance_id
-    )
-    JOIN questionnaire_categories qc ON qc.category_id = apc.category_id
-    JOIN assessment_category_progress acp
-        ON acp.assessment_instance_id = si.assessment_instance_id
-       AND acp.category_id = qc.category_id
-    WHERE qc.category_key = ANY(:clinical_keys)
-    GROUP BY si.engagement_code, qc.category_key
-    ORDER BY si.engagement_code, qc.category_key
-    """
-)
-
-SELECT_RESPONSE_IDS_SQL = text(
-    f"""
-    WITH {SCOPED_INSTANCES_CTE}
-    SELECT qr.response_id
-    FROM questionnaire_responses qr
-    JOIN scoped_instances si ON si.assessment_instance_id = qr.assessment_instance_id
-    WHERE EXISTS (
-        SELECT 1
-        FROM questionnaire_categories qc
-        WHERE qc.category_id = ANY(qr.category_ids)
-          AND qc.category_key = ANY(:clinical_keys)
-    )
-    ORDER BY qr.response_id
+        count(*) FILTER (WHERE lower(coalesce(status, '')) = 'complete') AS complete_rows,
+        count(*) FILTER (WHERE is_submitted) AS submitted_rows
+    FROM clinical_progress
+    GROUP BY clinical_group
+    ORDER BY clinical_group
     """
 )
 
@@ -209,26 +218,21 @@ class ProgressBar:
             sys.stdout.flush()
 
 
-def _rollup_category_totals(
-  rows: list[Any],
-  *,
-  value_field: str,
-) -> dict[str, int]:
-    totals = {
-        "vitals": 0,
-        "blood-parameters": 0,
-        "advanced-blood-parameters": 0,
+def _progress_by_group(rows: list[Any]) -> dict[str, dict[str, int]]:
+    grouped = {
+        group: {"progress_rows": 0, "complete_rows": 0, "submitted_rows": 0}
+        for group in CLINICAL_GROUPS
     }
     for row in rows:
-        key = str(row.category_key)
-        value = int(getattr(row, value_field))
-        if key in VITALS_KEYS:
-            totals["vitals"] += value
-        elif key in BLOOD_KEYS:
-            totals["blood-parameters"] += value
-        elif key in ADVANCED_BLOOD_KEYS:
-            totals["advanced-blood-parameters"] += value
-    return totals
+        group = str(row.clinical_group)
+        if group not in grouped:
+            continue
+        grouped[group] = {
+            "progress_rows": int(row.progress_rows),
+            "complete_rows": int(row.complete_rows),
+            "submitted_rows": int(row.submitted_rows),
+        }
+    return grouped
 
 
 async def _fetch_preview(
@@ -244,71 +248,112 @@ async def _fetch_preview(
     participant_count = int(
         (await session.execute(COUNT_PARTICIPANTS_SQL, params)).scalar_one()
     )
-    response_rows = (await session.execute(COUNT_RESPONSES_SQL, params)).all()
-    progress_rows = (await session.execute(COUNT_PROGRESS_SQL, params)).all()
+    progress_group_rows = (await session.execute(COUNT_PROGRESS_BY_GROUP_SQL, params)).all()
+    response_detail_rows = (await session.execute(SELECT_RESPONSE_DETAILS_SQL, params)).all()
+    engagement_response_rows = (
+        await session.execute(COUNT_RESPONSES_BY_ENGAGEMENT_SQL, params)
+    ).all()
 
-    response_ids = [
-        int(row.response_id)
-        for row in (await session.execute(SELECT_RESPONSE_IDS_SQL, params)).all()
+    response_ids = sorted({int(row.response_id) for row in response_detail_rows})
+    responses_to_delete = [
+        {
+            "engagement_code": row.engagement_code,
+            "user_id": int(row.user_id),
+            "phone": row.phone,
+            "category_key": row.category_key,
+            "question_key": row.question_key,
+            "question_text": row.question_text,
+            "response_id": int(row.response_id),
+        }
+        for row in response_detail_rows
     ]
 
-    by_engagement_responses: Counter[str] = Counter()
-    for row in response_rows:
-        by_engagement_responses[str(row.engagement_code)] += int(row.response_count)
+    progress_by_group = _progress_by_group(progress_group_rows)
+    progress_rows_to_reset_total = sum(
+        group["progress_rows"] for group in progress_by_group.values()
+    )
 
     return {
         "participant_count": participant_count,
         "response_count": len(response_ids),
         "response_ids": response_ids,
-        "responses_by_category": _rollup_category_totals(response_rows, value_field="response_count"),
-        "progress_by_category": _rollup_category_totals(progress_rows, value_field="progress_rows"),
-        "progress_complete_by_category": _rollup_category_totals(progress_rows, value_field="complete_rows"),
-        "progress_submitted_by_category": _rollup_category_totals(progress_rows, value_field="submitted_rows"),
-        "by_engagement_responses": dict(by_engagement_responses),
-        "response_rows": [
-            {
-                "engagement_code": row.engagement_code,
-                "category_key": row.category_key,
-                "response_count": int(row.response_count),
-            }
-            for row in response_rows
-        ],
-        "progress_rows": [
-            {
-                "engagement_code": row.engagement_code,
-                "category_key": row.category_key,
-                "progress_rows": int(row.progress_rows),
-                "complete_rows": int(row.complete_rows),
-                "submitted_rows": int(row.submitted_rows),
-            }
-            for row in progress_rows
-        ],
+        "responses_to_delete": responses_to_delete,
+        "progress_by_group": progress_by_group,
+        "progress_rows_to_reset_total": progress_rows_to_reset_total,
+        "by_engagement_responses": {
+            str(row.engagement_code): int(row.response_count)
+            for row in engagement_response_rows
+        },
     }
 
 
 def _print_summary(*, dry_run: bool, preview: dict[str, Any]) -> None:
-    mode = "dry-run" if dry_run else "applied"
-    print(
-        f"Clear unbooked clinical data ({mode}): "
-        f"participants={preview['participant_count']} "
-        f"responses_to_delete={preview['response_count']} "
-        f"progress_rows_to_reset={preview['reset_progress_rows']}",
-        flush=True,
-    )
-    for label in ("vitals", "blood-parameters", "advanced-blood-parameters"):
+    banner = "DRY RUN — no database changes" if dry_run else "APPLIED — database updated"
+    print("=" * 64, flush=True)
+    print(f"NVIDIA clear unbooked clinical — {banner}", flush=True)
+    print("=" * 64, flush=True)
+
+    print("\nWHO (scope)", flush=True)
+    print(f"  {preview['participant_count']} participants", flush=True)
+    print("  booking_id IS NULL on engagement_participants", flush=True)
+    print("  primary assessment = Metsights Pro (assessment_type_code = 2)", flush=True)
+    print(f"  engagements: {', '.join(preview['engagement_codes'])}", flush=True)
+
+    print("\nDELETE — table: questionnaire_responses", flush=True)
+    print("  removes columns: response_id, assessment_instance_id, question_id, category_ids, answer", flush=True)
+    print(f"  total rows to delete: {preview['response_count']}", flush=True)
+    if preview["responses_to_delete"]:
         print(
-            f"  {label}: responses={preview['responses_by_category'][label]} "
-            f"progress_rows={preview['progress_rows_to_reset_by_category'][label]} "
-            f"(was complete={preview['progress_complete_by_category'][label]}, "
-            f"was submitted={preview['progress_submitted_by_category'][label]})",
+            "\n  "
+            f"{'#':<4} {'engagement':<10} {'user_id':<8} {'phone':<14} "
+            f"{'category':<26} {'question_key':<28} question_text",
             flush=True,
         )
-    for code in sorted(preview["by_engagement_responses"]):
-        count = preview["by_engagement_responses"][code]
-        if count:
-            print(f"  {code}: {count} response(s)", flush=True)
-    if dry_run and preview["response_count"]:
-        print("Re-run with --yes to delete responses and reset category progress.", flush=True)
+        seen_response_ids: set[int] = set()
+        line_no = 0
+        for item in preview["responses_to_delete"]:
+            if item["response_id"] in seen_response_ids:
+                continue
+            seen_response_ids.add(item["response_id"])
+            line_no += 1
+            phone = (item["phone"] or "")[:14]
+            question_text = (item["question_text"] or "")[:60]
+            print(
+                f"  {line_no:<4} {item['engagement_code']:<10} {item['user_id']:<8} {phone:<14} "
+                f"{item['category_key']:<26} {item['question_key']:<28} {question_text}",
+                flush=True,
+            )
+    else:
+        print("  (none — no clinical answers found in scope)", flush=True)
+
+    print("\nUPDATE — table: assessment_category_progress", flush=True)
+    print("  status        -> 'incomplete'", flush=True)
+    print("  is_submitted  -> false", flush=True)
+    print("  completed_at  -> NULL", flush=True)
+    print(f"  total rows to update: {preview['reset_progress_rows']}", flush=True)
+    for group in CLINICAL_GROUPS:
+        stats = preview["progress_by_group"][group]
+        note = ""
+        if group == "vitals":
+            note = " (includes vitals + health_vitals category keys)"
+        print(
+            f"  {group}{note}: {stats['progress_rows']} rows "
+            f"(was complete={stats['complete_rows']}, was submitted={stats['submitted_rows']})",
+            flush=True,
+        )
+
+    print("\nNOT TOUCHED", flush=True)
+    print("  engagement_participants, assessment_instances, individual_health_reports, Metsights", flush=True)
+
+    if dry_run:
+        print("\nRun with --yes to apply these changes.", flush=True)
+    else:
+        print(
+            f"\nDone: deleted {preview['deleted_responses']} response row(s), "
+            f"updated {preview['reset_progress_rows']} progress row(s).",
+            flush=True,
+        )
+    print("=" * 64, flush=True)
 
 
 async def run_clear_unbooked_clinical(
@@ -336,8 +381,7 @@ async def run_clear_unbooked_clinical(
     try:
         async with session_factory() as session:
             preview = await _fetch_preview(session, engagement_codes=engagement_codes)
-            preview["progress_rows_to_reset_by_category"] = preview["progress_by_category"]
-            preview["progress_rows_to_reset_total"] = sum(preview["progress_by_category"].values())
+            preview["engagement_codes"] = list(engagement_codes)
 
             deleted_responses = 0
             reset_progress_rows = 0
@@ -365,7 +409,6 @@ async def run_clear_unbooked_clinical(
                 reset_progress_rows if yes else preview["progress_rows_to_reset_total"]
             )
             preview["dry_run"] = dry_run
-            preview["engagement_codes"] = list(engagement_codes)
             preview["clinical_category_keys"] = list(CLINICAL_CATEGORY_KEYS)
 
             _print_summary(dry_run=dry_run, preview=preview)
