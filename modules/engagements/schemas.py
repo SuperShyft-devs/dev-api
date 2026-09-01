@@ -432,6 +432,9 @@ class EngagementParticipantUpdateRequest(BaseModel):
     consultations: Optional[dict[str, Any]] = None
     blood_collection_time_slot_id: Optional[str] = Field(default=None, max_length=100)
     booking_id: Optional[str] = Field(default=None, max_length=100)
+    engagement_date: Optional[date] = None
+    slot_start_time: Optional[time] = None
+    blood_collection_cabin: Optional[str] = Field(default=None, max_length=100)
 
 
 class MoveParticipantRequest(BaseModel):

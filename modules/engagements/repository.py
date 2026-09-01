@@ -344,6 +344,7 @@ class EngagementsRepository:
         engagement_date: date,
         slot_start_time: time,
         slot_detail_id: int | None = None,
+        exclude_engagement_participant_id: int | None = None,
     ) -> int:
         query = (
             select(func.count())
@@ -352,6 +353,10 @@ class EngagementsRepository:
             .where(EngagementParticipant.engagement_date == engagement_date)
             .where(EngagementParticipant.slot_start_time == slot_start_time)
         )
+        if exclude_engagement_participant_id is not None:
+            query = query.where(
+                EngagementParticipant.engagement_participant_id != exclude_engagement_participant_id
+            )
         if slot_detail_id is not None:
             query = query.join(
                 Engagement,

@@ -820,7 +820,7 @@ class EngagementsService:
             occupancy_map_from_rows(consultation_rows),
         )
 
-    async def validate_blood_collection_slot_for_onboard(
+    async def _validate_blood_collection_slot_capacity(
         self,
         db: AsyncSession,
         *,
@@ -828,6 +828,7 @@ class EngagementsService:
         collection_date: date,
         cabin_key: str | None,
         slot_time: time,
+        exclude_engagement_participant_id: int | None = None,
     ) -> str | None:
         normalized_cabin = (cabin_key or "").strip() or None
         slot_detail = await self.resolve_slot_detail(db, engagement)
@@ -850,11 +851,29 @@ class EngagementsService:
             slot_detail_id=(
                 int(engagement.slot_detail_id) if engagement.slot_detail_id is not None else None
             ),
+            exclude_engagement_participant_id=exclude_engagement_participant_id,
         )
         capacity = int(cabin.get("capacity_per_slot") or 0)
         if count >= capacity:
             raise slot_unavailable()
         return persisted_cabin
+
+    async def validate_blood_collection_slot_for_onboard(
+        self,
+        db: AsyncSession,
+        *,
+        engagement: Engagement,
+        collection_date: date,
+        cabin_key: str | None,
+        slot_time: time,
+    ) -> str | None:
+        return await self._validate_blood_collection_slot_capacity(
+            db,
+            engagement=engagement,
+            collection_date=collection_date,
+            cabin_key=cabin_key,
+            slot_time=slot_time,
+        )
 
     async def validate_consultation_slots_for_onboard(
         self,
@@ -1582,6 +1601,52 @@ class EngagementsService:
                 normalized_booking_id = stripped or None
             participant.booking_id = normalized_booking_id
             response["booking_id"] = normalized_booking_id
+
+        schedule_fields = {"engagement_date", "slot_start_time", "blood_collection_cabin"}
+        if updates.keys() & schedule_fields:
+            if _blood_collection_type_value(engagement.blood_collection_type) == BloodCollectionType.home_collection.value:
+                raise AppError(
+                    status_code=400,
+                    error_code="SCHEDULE_UPDATE_NOT_ALLOWED",
+                    message="Schedule fields cannot be updated for home collection engagements",
+                )
+
+            slot_detail = await self.resolve_slot_detail(db, engagement)
+            if not slot_detail_is_configured(slot_detail):
+                raise AppError(
+                    status_code=400,
+                    error_code="SCHEDULE_UPDATE_NOT_CONFIGURED",
+                    message="Schedule editing requires slot_detail configuration",
+                )
+
+            new_date = updates.get("engagement_date", participant.engagement_date)
+            raw_slot = updates.get("slot_start_time", participant.slot_start_time)
+            new_slot = coerce_time(raw_slot) if not isinstance(raw_slot, time) else raw_slot
+            new_cabin_raw = updates.get("blood_collection_cabin", participant.blood_collection_cabin)
+
+            if new_date is None or new_slot is None:
+                raise AppError(
+                    status_code=400,
+                    error_code="SCHEDULE_UPDATE_INCOMPLETE",
+                    message="engagement_date and slot_start_time are required",
+                )
+
+            persisted_cabin = await self._validate_blood_collection_slot_capacity(
+                db,
+                engagement=engagement,
+                collection_date=new_date,
+                cabin_key=new_cabin_raw,
+                slot_time=new_slot,
+                exclude_engagement_participant_id=int(participant.engagement_participant_id),
+            )
+
+            normalized_slot = time(new_slot.hour, new_slot.minute)
+            participant.engagement_date = new_date
+            participant.slot_start_time = normalized_slot
+            participant.blood_collection_cabin = persisted_cabin
+            response["engagement_date"] = new_date.isoformat()
+            response["slot_start_time"] = normalized_slot.isoformat()
+            response["blood_collection_cabin"] = persisted_cabin
 
         await self._repository.update_participant(db, participant)
 

@@ -59,6 +59,7 @@ def _engagement_to_dict(
     participant_count: int | None = None,
     notifications: list[dict] | None = None,
     slot_detail: dict | None = None,
+    public_slot_detail: dict | None = None,
 ) -> dict:
     data = {
         "engagement_id": engagement.engagement_id,
@@ -70,6 +71,7 @@ def _engagement_to_dict(
         "engagement_type": engagement.engagement_type,
         "consultations": engagement.consultations,
         "slot_detail": slot_detail,
+        "public_slot_detail": public_slot_detail,
         "slot_detail_id": engagement.slot_detail_id,
         "assessment_package_id": engagement.assessment_package_id,
         "diagnostic_package_id": engagement.diagnostic_package_id,
@@ -369,6 +371,7 @@ async def get_engagement_details(
             ),
             notifications=notifications,
             slot_detail=await engagements_service.resolve_slot_detail(db, engagement),
+            public_slot_detail=await engagements_service.public_slot_detail_for_engagement(db, engagement),
         )
     )
 
