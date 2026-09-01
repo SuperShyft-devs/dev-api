@@ -53,6 +53,7 @@ from modules.notifications.dedup import should_skip_notification
 from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
 from modules.reports.blood_parameters_normalizer import build_grouped_from_healthians
+from modules.reports.blood_report_archival import resolve_persistable_diagnostic_report_url
 from modules.reports.blood_parameters_schemas import (
     booking_id_from_fetch_collections,
     has_usable_provider_blood_parameters,
@@ -866,13 +867,30 @@ async def load_blood_reports(
                 if api_full_report is not None:
                     is_full_report = api_full_report
 
+                persistable_url = await resolve_persistable_diagnostic_report_url(
+                    fetched_diag_url,
+                    is_full_report=is_full_report,
+                    existing_url=diag_url,
+                    assessment_instance_id=instance_id,
+                )
+                if is_full_report and persistable_url is None:
+                    details.append({
+                        "user_id": user_id,
+                        "engagement_id": engagement_id,
+                        "action": "skipped",
+                        "reason": "blood report PDF archival failed",
+                    })
+
+                url_to_store = persistable_url
+                stored_diag_url = (diag_url or "").strip() if diag_url else ""
+
                 skip_digital_reload = verified_at_unchanged(stored_verified_at, api_verified_at)
                 blood_loaded_this_run = False
                 blood_drafted_this_run = False
 
                 metadata_needs_update = (
                     (api_full_report is not None and bool(stored_full_report) != api_full_report)
-                    or (fetched_diag_url != diag_url)
+                    or (url_to_store is not None and url_to_store != stored_diag_url)
                 )
 
                 if skip_digital_reload:
@@ -884,12 +902,13 @@ async def load_blood_reports(
                             engagement_id=engagement_id,
                             instance_id=instance_id,
                         )
-                        ihr.diagnostic_report_url = fetched_diag_url
+                        if url_to_store is not None:
+                            ihr.diagnostic_report_url = url_to_store
+                            diagnostic_report_url = url_to_store
                         if api_full_report is not None:
                             ihr.blood_parameters_full_report = api_full_report
                         if api_verified_at is not None:
                             ihr.blood_parameters_verified_at = api_verified_at
-                        diagnostic_report_url = fetched_diag_url
                         if ihr_id is None:
                             await db.flush()
                             ihr_id = ihr.report_id
@@ -917,10 +936,11 @@ async def load_blood_reports(
                         engagement_id=engagement_id,
                         instance_id=instance_id,
                     )
-                    ihr.diagnostic_report_url = fetched_diag_url
+                    if url_to_store is not None:
+                        ihr.diagnostic_report_url = url_to_store
+                        diagnostic_report_url = url_to_store
                     ihr.blood_parameters_full_report = api_full_report
                     ihr.blood_parameters_verified_at = api_verified_at
-                    diagnostic_report_url = fetched_diag_url
                     if ihr_id is None:
                         await db.flush()
                         ihr_id = ihr.report_id

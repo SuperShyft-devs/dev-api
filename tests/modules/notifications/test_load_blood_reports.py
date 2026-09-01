@@ -21,11 +21,13 @@ from modules.notifications.service import NotificationsService
 from modules.platform_settings.dependencies import get_platform_settings_service_readonly
 from modules.questionnaire.models import QuestionnaireCategory
 from modules.questionnaire.repository import QuestionnaireRepository
+from modules.reports.blood_report_archival import is_archived_blood_report_url
 from modules.reports.models import IndividualHealthReport
 from modules.users.models import User
 from modules.users.repository import UsersRepository
 
 _REPORT_URL = "https://example.com/blood-report.pdf"
+_ARCHIVED_REPORT_URL = "https://supershyft.com/reports/AbCdEfGhIjKlMnOp.pdf"
 _VERIFIED_AT = "2025-12-04 19:55:56"
 _VERIFIED_AT_DT = datetime(2025, 12, 4, 19, 55, 56, tzinfo=timezone.utc)
 
@@ -147,8 +149,30 @@ async def _seed_running_participant(
     await test_db_session.commit()
 
 
+async def _fake_resolve_persistable_diagnostic_report_url(
+    healthians_url: str,
+    *,
+    is_full_report: bool,
+    existing_url: str | None,
+    assessment_instance_id: int,
+) -> str | None:
+    healthians = (healthians_url or "").strip()
+    if not healthians:
+        return None
+    if not is_full_report:
+        return healthians
+    existing = (existing_url or "").strip()
+    if existing and is_archived_blood_report_url(existing):
+        return existing
+    return _ARCHIVED_REPORT_URL
+
+
 def _build_services(monkeypatch) -> tuple[MetsightsService, MetsightsSyncService, AssessmentsService, NotificationsService]:
     monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.resolve_persistable_diagnostic_report_url",
+        _fake_resolve_persistable_diagnostic_report_url,
+    )
     metsights_service = MetsightsService(client=MetsightsClient())
     sync_service = MetsightsSyncService(
         metsights_service=metsights_service,
@@ -345,7 +369,7 @@ async def test_load_blood_reports_calls_report_before_digital_value(
             select(IndividualHealthReport).where(IndividualHealthReport.assessment_instance_id == 88001)
         )
     ).scalar_one()
-    assert ihr.diagnostic_report_url == _REPORT_URL
+    assert ihr.diagnostic_report_url == _ARCHIVED_REPORT_URL
     assert ihr.blood_parameters_full_report is True
     assert ihr.blood_parameters_verified_at == _VERIFIED_AT_DT
 
@@ -1597,4 +1621,249 @@ async def test_load_blood_reports_persists_full_report_when_verified_at_unchange
     ).scalar_one_or_none()
     assert ihr is not None
     assert ihr.blood_parameters_full_report is True
+
+
+@pytest.mark.asyncio
+async def test_load_blood_reports_archival_failure_skips_healthians_url(
+    test_db_session, monkeypatch
+):
+    await _seed_running_participant(test_db_session, user_id=88020, engagement_id=88020, assessment_id=88020)
+
+    async def _fail_resolve(*args, **kwargs):
+        if kwargs.get("is_full_report"):
+            return None
+        return (args[0] or "").strip() or None
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.resolve_persistable_diagnostic_report_url",
+        _fail_resolve,
+    )
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_report(_token, _booking_id):
+        return _report_payload()
+
+    async def _fake_digital(_token, _booking_id):
+        return {
+            "data": [
+                {
+                    "customer_name": "John Doe",
+                    "digital_data": [{"parameter_id": "1", "value": "91.0", "unit": "mg/dL"}],
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_report",
+        _fake_report,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_digital_value",
+        _fake_digital,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports._group_provider_blood",
+        _fake_group_factory(),
+    )
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    async def _fake_draft(db, *, user_id, assessment_instance_id, allow_completed=False):
+        return {"responses_drafted": 0}
+
+    monkeypatch.setattr(assessments_service, "draft_blood_parameters_from_report", _fake_draft)
+
+    dispatch_calls: list[str] = []
+
+    async def _fake_dispatch(self, db, *, payload, triggered_by_user_id=None):
+        dispatch_calls.append(payload.service_key)
+        return {"dispatched": 1}
+
+    monkeypatch.setattr(
+        "modules.notifications.service.NotificationsService.dispatch",
+        _fake_dispatch,
+    )
+
+    result = await load_blood_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=notifications_service,
+        assessments_service=assessments_service,
+        sync_service=sync_service,
+    )
+
+    assert dispatch_calls == []
+    assert any(
+        "blood report PDF archival failed" in d["reason"]
+        for d in result["details"]
+    )
+    ihr = (
+        await test_db_session.execute(
+            select(IndividualHealthReport).where(
+                IndividualHealthReport.assessment_instance_id == 88020
+            )
+        )
+    ).scalar_one()
+    assert ihr.diagnostic_report_url is None
+    assert ihr.blood_parameters is not None
+
+
+@pytest.mark.asyncio
+async def test_load_blood_reports_reuses_existing_archived_url_without_rearchive(
+    test_db_session, monkeypatch
+):
+    await _seed_running_participant(
+        test_db_session,
+        user_id=88021,
+        engagement_id=88021,
+        assessment_id=88021,
+        existing_diag_url=_ARCHIVED_REPORT_URL,
+        existing_full_report=True,
+        existing_verified_at=_VERIFIED_AT_DT,
+        existing_blood_parameters=[
+            {
+                "group_name": "Metabolic",
+                "test_count": 1,
+                "tests": [{"parameter_key": "glucose_fasting", "value": 80.0, "unit": "mg/dL"}],
+            }
+        ],
+    )
+
+    resolve_calls: list[int] = []
+
+    async def _tracking_resolve(healthians_url, *, is_full_report, existing_url, assessment_instance_id):
+        resolve_calls.append(assessment_instance_id)
+        return await _fake_resolve_persistable_diagnostic_report_url(
+            healthians_url,
+            is_full_report=is_full_report,
+            existing_url=existing_url,
+            assessment_instance_id=assessment_instance_id,
+        )
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.resolve_persistable_diagnostic_report_url",
+        _tracking_resolve,
+    )
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_report(_token, _booking_id):
+        return _report_payload()
+
+    async def _fake_digital(_token, _booking_id):
+        return {"data": []}
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_report",
+        _fake_report,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_digital_value",
+        _fake_digital,
+    )
+
+    await load_blood_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=notifications_service,
+        assessments_service=assessments_service,
+        sync_service=sync_service,
+    )
+
+    assert resolve_calls == [88021]
+    ihr = (
+        await test_db_session.execute(
+            select(IndividualHealthReport).where(
+                IndividualHealthReport.assessment_instance_id == 88021
+            )
+        )
+    ).scalar_one()
+    assert ihr.diagnostic_report_url == _ARCHIVED_REPORT_URL
+
+
+@pytest.mark.asyncio
+async def test_load_blood_reports_maps_archived_url_to_assessment_instance(
+    test_db_session, monkeypatch
+):
+    await _seed_running_participant(
+        test_db_session,
+        user_id=88022,
+        engagement_id=88022,
+        assessment_id=88022,
+    )
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_report(_token, _booking_id):
+        return _report_payload()
+
+    async def _fake_digital(_token, _booking_id):
+        return {
+            "data": [
+                {
+                    "customer_name": "John Doe",
+                    "digital_data": [{"parameter_id": "1", "value": "91.0", "unit": "mg/dL"}],
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_report",
+        _fake_report,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_digital_value",
+        _fake_digital,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports._group_provider_blood",
+        _fake_group_factory(),
+    )
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    async def _fake_draft(db, *, user_id, assessment_instance_id, allow_completed=False):
+        return {"responses_drafted": 0}
+
+    monkeypatch.setattr(assessments_service, "draft_blood_parameters_from_report", _fake_draft)
+
+    await load_blood_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=notifications_service,
+        assessments_service=assessments_service,
+        sync_service=sync_service,
+    )
+
+    ihr = (
+        await test_db_session.execute(
+            select(IndividualHealthReport).where(
+                IndividualHealthReport.assessment_instance_id == 88022
+            )
+        )
+    ).scalar_one()
+    assert ihr.assessment_instance_id == 88022
+    assert ihr.user_id == 88022
+    assert ihr.engagement_id == 88022
+    assert ihr.diagnostic_report_url == _ARCHIVED_REPORT_URL
 

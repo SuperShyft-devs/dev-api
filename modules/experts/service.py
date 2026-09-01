@@ -1688,6 +1688,18 @@ class ExpertAvailabilityService:
 
         media_base = settings.MEDIA_BASE_URL.rstrip("/")
         media_root = Path(settings.MEDIA_ROOT)
+        blood_reports_base = (settings.BLOOD_REPORTS_BASE_URL or "").strip().rstrip("/")
+        blood_reports_root = Path(settings.BLOOD_REPORTS_ROOT)
+
+        if blood_reports_base and url.startswith(blood_reports_base + "/"):
+            filename = url[len(blood_reports_base) + 1 :]
+            file_path = blood_reports_root / filename
+            if not file_path.is_file():
+                raise AppError(status_code=404, error_code="NOT_FOUND", message="Report PDF is not available")
+            payload = file_path.read_bytes()
+            if not payload.startswith(b"%PDF"):
+                raise AppError(status_code=422, error_code="INVALID_STATE", message="Stored file is not a PDF")
+            return payload
 
         if url.startswith(media_base + "/") or url.startswith("/media/"):
             relative = url

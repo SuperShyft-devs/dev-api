@@ -110,6 +110,18 @@ class Settings:
     )
     BIO_AI_REPORTS_TIMEOUT_SECONDS: int = int(os.getenv("BIO_AI_REPORTS_TIMEOUT_SECONDS", "60"))
 
+    # Blood diagnostic PDF archival (permanent links on supershyft.com)
+    BLOOD_REPORTS_ROOT: str = os.getenv(
+        "BLOOD_REPORTS_ROOT",
+        "/var/www/website/supershyft.com/reports",
+    )
+    BLOOD_REPORTS_BASE_URL: str = os.getenv(
+        "BLOOD_REPORTS_BASE_URL",
+        "https://supershyft.com/reports",
+    )
+    BLOOD_REPORTS_TIMEOUT_SECONDS: int = int(os.getenv("BLOOD_REPORTS_TIMEOUT_SECONDS", "60"))
+    BLOOD_REPORTS_MAX_MB: int = int(os.getenv("BLOOD_REPORTS_MAX_MB", "10"))
+
     # Nutrition API settings
     NUTRITION_API_URL: str = os.getenv("NUTRITION_API_URL", "https://nutrition.supershyft.com/calculate")
     NUTRITION_API_KEY: str = os.getenv("NUTRITION_API_KEY", "metsights-secret-2024")
