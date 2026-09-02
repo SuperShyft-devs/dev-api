@@ -82,6 +82,8 @@ from modules.reports.schemas import (
 
 logger = logging.getLogger(__name__)
 
+_METSIGHTS_PRO_BASIC_TYPE_CODES = ("1", "2")
+
 
 _SYNC_IDLE = "idle"
 _SYNC_IN_PROGRESS = "in_progress"
@@ -249,28 +251,22 @@ class ReportsService:
                 engagement_id,
             )
 
-        engagement_row = await self._repository.get_individual_report_by_engagement(
+        storage_assessment_id = await self._repository.resolve_blood_storage_assessment_instance_id(
             db,
             user_id=user_id,
             engagement_id=engagement_id,
+            caller_assessment_instance_id=assessment_instance_id,
         )
-        # Prefer an existing blood-bearing engagement row; else assessment row; else any engagement row.
-        if engagement_row is not None and (
-            engagement_row.blood_parameters is not None or engagement_row.blood_report_raw is not None
-        ):
-            target = engagement_row
-        elif individual_report is not None:
-            target = individual_report
-        elif engagement_row is not None:
-            target = engagement_row
-        else:
-            target = None
+        target = await self._repository.get_individual_report_by_assessment(
+            db,
+            assessment_instance_id=storage_assessment_id,
+        )
 
         if target is None:
             target = IndividualHealthReport(
                 user_id=user_id,
                 engagement_id=engagement_id,
-                assessment_instance_id=assessment_instance_id,
+                assessment_instance_id=storage_assessment_id,
                 reports=None,
                 blood_parameters=grouped,
                 blood_report_raw=raw,
@@ -279,10 +275,13 @@ class ReportsService:
         else:
             target.blood_parameters = grouped
             target.blood_report_raw = raw
-            # Do not re-point another assessment's row.
-            if target.assessment_instance_id is None:
-                target.assessment_instance_id = assessment_instance_id
             await self._repository.update_individual_report(db, target)
+
+        await self._repository.clear_fitprint_blood_fields_for_engagement(
+            db,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
         return target
 
     async def _import_metsights_blood_categories_if_requested(
@@ -2385,6 +2384,24 @@ class ReportsService:
             user_id=user_id,
         )
 
+        def _trend_type_priority(type_code: str | None) -> int:
+            code = (type_code or "").strip()
+            if code in _METSIGHTS_PRO_BASIC_TYPE_CODES:
+                return 0
+            if code == "7":
+                return 2
+            return 1
+
+        rows_sorted = sorted(
+            rows,
+            key=lambda row: (
+                _trend_type_priority(
+                    row[2].assessment_type_code if row[2] is not None else None
+                ),
+                int(row[1].assessment_instance_id),
+            ),
+        )
+
         hp = await self._diagnostics_service.get_health_parameter_by_parameter_key(
             db, parameter_key=parameter_key,
         )
@@ -2399,6 +2416,7 @@ class ReportsService:
         data_points: list[dict[str, Any]] = []
         unit: str | None = None
         seen_assessment_ids: set[int] = set()
+        seen_engagement_ids: set[int] = set()
 
         async def _append_point(
             *,
@@ -2424,7 +2442,15 @@ class ReportsService:
                 }
             )
 
-        for report, assessment in rows:
+        for report, assessment, package in rows_sorted:
+            type_code = (package.assessment_type_code if package is not None else "") or ""
+            if type_code == "7":
+                continue
+
+            engagement_id = int(assessment.engagement_id)
+            if engagement_id in seen_engagement_ids:
+                continue
+
             seen_assessment_ids.add(int(assessment.assessment_instance_id))
             blood_parameters = report.blood_parameters
             numeric_value: float | None = None
@@ -2462,6 +2488,7 @@ class ReportsService:
 
             if numeric_value is None:
                 continue
+            seen_engagement_ids.add(engagement_id)
             await _append_point(
                 assessment=assessment,
                 numeric_value=numeric_value,
@@ -2474,7 +2501,8 @@ class ReportsService:
         )
         for assessment, _package in extra_assessments:
             aid = int(assessment.assessment_instance_id)
-            if aid in seen_assessment_ids:
+            engagement_id = int(assessment.engagement_id)
+            if aid in seen_assessment_ids or engagement_id in seen_engagement_ids:
                 continue
             numeric_value, entry_unit = (
                 await self._blood_read_service._questionnaire_reader.extract_parameter_for_assessment(
@@ -2485,6 +2513,7 @@ class ReportsService:
             )
             if numeric_value is None:
                 continue
+            seen_engagement_ids.add(engagement_id)
             await _append_point(
                 assessment=assessment,
                 numeric_value=numeric_value,

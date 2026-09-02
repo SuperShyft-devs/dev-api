@@ -862,6 +862,162 @@ async def test_get_blood_parameter_trends_returns_ordered_points(async_client, t
 
 
 @pytest.mark.asyncio
+async def test_get_blood_parameter_trends_dedupes_pro_and_fitprint_per_engagement(
+    async_client,
+    test_db_session,
+):
+    pro_id = 138051
+    fitprint_id = 138052
+    user_id = 138051
+    engagement_id = 148051
+
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=pro_id,
+        user_id=user_id,
+        engagement_id=engagement_id,
+        record_id="TREND_PRO",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    await _add_assessment_instance(
+        test_db_session,
+        assessment_id=fitprint_id,
+        user_id=user_id,
+        engagement_id=engagement_id,
+        record_id="TREND_FIT",
+        package_code="MY_FITNESS_PRINT",
+        assessment_type_code="7",
+    )
+
+    completed = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    for aid in (pro_id, fitprint_id):
+        inst = await test_db_session.get(AssessmentInstance, aid)
+        inst.completed_at = completed
+
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=138551,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=pro_id,
+            blood_parameters={"esr_automated": 23.0, "esr_automated_unit": "mm/1st hour"},
+        )
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=138552,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=fitprint_id,
+            blood_parameters={"esr_automated": 23.0, "esr_automated_unit": "mm/1st hour"},
+        )
+    )
+    test_db_session.add(
+        ReportsUserSyncState(
+            user_id=user_id,
+            last_synced_assessment_instance_id=pro_id,
+            sync_status="idle",
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.get(
+        "/reports/trends?blood_parameter=esr_automated",
+        headers=_auth_header(user_id),
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["data_points"] == [
+        {"date": "2026-09-01", "value": 23.0, "engagement_id": engagement_id},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_persist_provider_blood_writes_primary_not_fitprint(test_db_session, monkeypatch):
+    pro_id = 139051
+    fitprint_id = 139052
+    user_id = 139051
+    engagement_id = 149051
+    grouped_blood = {"haemoglobin": 14.0, "haemoglobin_unit": "g/dL"}
+
+    await _seed_assessment(
+        test_db_session,
+        assessment_id=pro_id,
+        user_id=user_id,
+        engagement_id=engagement_id,
+        record_id="PERSIST_PRO",
+        package_code="MET_PRO",
+        assessment_type_code="2",
+    )
+    await _add_assessment_instance(
+        test_db_session,
+        assessment_id=fitprint_id,
+        user_id=user_id,
+        engagement_id=engagement_id,
+        record_id="PERSIST_FIT",
+        package_code="MY_FITNESS_PRINT",
+        assessment_type_code="7",
+    )
+    test_db_session.add(
+        IndividualHealthReport(
+            report_id=139551,
+            user_id=user_id,
+            engagement_id=engagement_id,
+            assessment_instance_id=fitprint_id,
+            blood_parameters={"haemoglobin": 99.0, "haemoglobin_unit": "g/dL"},
+        )
+    )
+    await test_db_session.commit()
+
+    reports_service = ReportsService(
+        repository=ReportsRepository(),
+        assessments_repository=AssessmentsRepository(),
+        metsights_service=_FakeMetsightsService(payload={}),
+        diagnostics_service=_FakeDiagnosticsService(),
+        audit_service=AuditService(AuditRepository()),
+        healthy_habits_service=HealthyHabitsService(QuestionnaireRepository()),
+    )
+
+    def fake_build_grouped(raw_customer, package_groups):
+        return grouped_blood, raw_customer
+
+    monkeypatch.setattr(
+        "modules.reports.service.build_grouped_from_healthians",
+        fake_build_grouped,
+    )
+
+    await reports_service._persist_provider_blood_data(
+        test_db_session,
+        individual_report=None,
+        user_id=user_id,
+        engagement_id=engagement_id,
+        assessment_instance_id=pro_id,
+        diagnostic_package_id=1,
+        raw_customer={"digital_data": []},
+    )
+    await test_db_session.commit()
+
+    pro_ihr = (
+        await test_db_session.execute(
+            select(IndividualHealthReport).where(
+                IndividualHealthReport.assessment_instance_id == pro_id
+            )
+        )
+    ).scalar_one()
+    fit_ihr = (
+        await test_db_session.execute(
+            select(IndividualHealthReport).where(
+                IndividualHealthReport.assessment_instance_id == fitprint_id
+            )
+        )
+    ).scalar_one()
+
+    assert pro_ihr.blood_parameters == grouped_blood
+    assert fit_ihr.blood_parameters is None
+
+
+@pytest.mark.asyncio
 async def test_get_blood_parameter_trends_returns_empty_when_no_points(async_client, test_db_session):
     await _seed_assessment(
         test_db_session,

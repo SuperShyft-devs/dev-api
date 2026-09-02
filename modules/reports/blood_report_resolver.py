@@ -160,6 +160,16 @@ async def resolve_blood_report_url(
     """Return a blood diagnostic report URL, fetching from Healthians and caching when needed."""
     repo = reports_repository or ReportsRepository()
 
+    storage_assessment_id = await repo.resolve_blood_storage_assessment_instance_id(
+        db,
+        user_id=user_id,
+        engagement_id=engagement_id,
+        caller_assessment_instance_id=assessment_instance_id,
+    )
+    storage_report = await repo.get_individual_report_by_assessment(
+        db,
+        assessment_instance_id=storage_assessment_id,
+    )
     assessment_report = await repo.get_individual_report_by_assessment(
         db, assessment_instance_id=assessment_instance_id
     )
@@ -168,10 +178,23 @@ async def resolve_blood_report_url(
         user_id=user_id,
         engagement_id=engagement_id,
     )
-    for candidate in (assessment_report, engagement_report, existing_ihr):
-        cached = (candidate.diagnostic_report_url if candidate is not None else None) or ""
-        if cached.strip():
-            return cached.strip()
+
+    for candidate in (storage_report, assessment_report, engagement_report, existing_ihr):
+        if candidate is None:
+            continue
+        if (
+            candidate.assessment_instance_id is not None
+            and int(candidate.assessment_instance_id) != storage_assessment_id
+        ):
+            type_code = await repo.get_assessment_type_code_for_instance(
+                db,
+                assessment_instance_id=int(candidate.assessment_instance_id),
+            )
+            if (type_code or "").strip() == "7":
+                continue
+        cached = (candidate.diagnostic_report_url or "").strip()
+        if cached:
+            return cached
 
     record_id = (metsights_record_id or "").strip()
     if not record_id:
@@ -224,12 +247,12 @@ async def resolve_blood_report_url(
                 last_name=last_name or "",
             )
 
-    target = assessment_report or engagement_report or existing_ihr
+    target = storage_report
     if target is None:
         target = IndividualHealthReport(
             user_id=user_id,
             engagement_id=engagement_id,
-            assessment_instance_id=assessment_instance_id,
+            assessment_instance_id=storage_assessment_id,
             diagnostic_report_url=report_url,
             blood_parameters_full_report=full_report,
             blood_parameters_verified_at=verified_at,
@@ -241,8 +264,6 @@ async def resolve_blood_report_url(
             target.blood_parameters_full_report = full_report
         if verified_at is not None:
             target.blood_parameters_verified_at = verified_at
-        if target.assessment_instance_id is None:
-            target.assessment_instance_id = assessment_instance_id
         await repo.update_individual_report(db, target)
 
     return report_url
