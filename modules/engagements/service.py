@@ -351,6 +351,39 @@ class EngagementsService:
 
         return await self._slot_info_repository.create(db, data)
 
+    async def _blood_test_complete_by_user_engagement(
+        self,
+        db: AsyncSession,
+        rows: list[tuple],
+    ) -> dict[tuple[int, int], bool]:
+        """Map (user_id, engagement_id) to Healthians full_report flag from IHR."""
+        if not rows:
+            return {}
+
+        from modules.reports.models import IndividualHealthReport
+
+        user_ids = list({int(row[2]) for row in rows})
+        engagement_ids = list({int(row[1]) for row in rows})
+        result = await db.execute(
+            select(
+                IndividualHealthReport.user_id,
+                IndividualHealthReport.engagement_id,
+                IndividualHealthReport.blood_parameters_full_report,
+            ).where(
+                IndividualHealthReport.user_id.in_(user_ids),
+                IndividualHealthReport.engagement_id.in_(engagement_ids),
+            )
+        )
+
+        flags: dict[tuple[int, int], bool] = {}
+        for user_id, engagement_id, full_report in result.all():
+            key = (int(user_id), int(engagement_id))
+            if full_report is True:
+                flags[key] = True
+            elif key not in flags:
+                flags[key] = False
+        return flags
+
     async def _participant_rows_to_dicts(self, db: AsyncSession, rows: list[tuple]) -> list[dict[str, Any]]:
         all_booking_ids: list[int] = []
         for row in rows:
@@ -359,13 +392,19 @@ class EngagementsService:
 
         bookings = await self._consultation_bookings.get_by_ids(db, list(dict.fromkeys(all_booking_ids)))
         bookings_by_id = {booking.consultation_id: booking for booking in bookings}
+        blood_test_complete_flags = await self._blood_test_complete_by_user_engagement(db, rows)
 
         result: list[dict[str, Any]] = []
         for row in rows:
             ids = row[20] or []
             participant_bookings = [bookings_by_id[i] for i in ids if i in bookings_by_id]
             consultations = bookings_to_consultations_map(participant_bookings)
-            result.append(_participant_enrollment_to_dict(row, consultations=consultations))
+            participant = _participant_enrollment_to_dict(row, consultations=consultations)
+            participant["blood_test_complete"] = blood_test_complete_flags.get(
+                (int(row[2]), int(row[1])),
+                False,
+            )
+            result.append(participant)
         return result
 
     def lazy_checklists_service(self) -> ChecklistsService:
