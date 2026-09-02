@@ -64,7 +64,7 @@ from modules.reports.healthians_booking_resolver import (
     try_participant_booking_id,
 )
 from modules.reports.healthians_report_fields import (
-    customer_display_name,
+    match_booking_report_entry,
     parse_booking_report_entry,
     verified_at_unchanged,
 )
@@ -439,37 +439,6 @@ async def _group_provider_blood(
     return build_grouped_from_healthians(raw_customer, package_groups=package_tests.groups)
 
 
-def _match_customer_by_name(
-    data_list: list[Any],
-    first_name: str,
-    last_name: str,
-) -> dict[str, Any] | None:
-    """Find the customer entry whose name matches the user (case-insensitive, tokenised)."""
-    target_full = f"{first_name} {last_name}".strip().lower()
-    target_tokens = set(target_full.split())
-
-    best: dict[str, Any] | None = None
-    best_score = 0
-
-    for entry in data_list:
-        if not isinstance(entry, dict):
-            continue
-        customer_name = customer_display_name(entry).lower()
-        if not customer_name:
-            continue
-        if customer_name == target_full:
-            return entry
-        entry_tokens = set(customer_name.split())
-        overlap = len(target_tokens & entry_tokens)
-        if overlap > best_score:
-            best_score = overlap
-            best = entry
-
-    if best is not None and best_score >= 1:
-        return best
-    return data_list[0] if data_list else None
-
-
 async def _get_eligible_participants(
     db: AsyncSession,
     today: date,
@@ -840,8 +809,10 @@ async def load_blood_reports(
                     })
                     continue
 
-                matched_report = _match_customer_by_name(
-                    report_list, first_name or "", last_name or ""
+                matched_report = match_booking_report_entry(
+                    report_list,
+                    first_name=first_name or "",
+                    last_name=last_name or "",
                 )
                 if matched_report is None:
                     skipped += 1

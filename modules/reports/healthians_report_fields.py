@@ -68,3 +68,67 @@ def parse_booking_report_entry(
         parse_healthians_full_report(entry.get("full_report")),
         parse_healthians_verified_at(entry.get("verified_at")),
     )
+
+
+def match_booking_report_entry(
+    report_list: list[Any],
+    *,
+    first_name: str = "",
+    last_name: str = "",
+) -> dict[str, Any] | None:
+    """Pick the report row for a participant, with a single-entry fallback."""
+    if not report_list:
+        return None
+
+    entries = [entry for entry in report_list if isinstance(entry, dict)]
+    if not entries:
+        return None
+    if len(entries) == 1:
+        return entries[0]
+
+    target_full = f"{first_name} {last_name}".strip().lower()
+    target_tokens = set(target_full.split()) if target_full else set()
+
+    best: dict[str, Any] | None = None
+    best_score = 0
+    for entry in entries:
+        customer_name = customer_display_name(entry).lower()
+        if not customer_name:
+            continue
+        if customer_name == target_full:
+            return entry
+        entry_tokens = set(customer_name.split())
+        overlap = len(target_tokens & entry_tokens)
+        if overlap > best_score:
+            best_score = overlap
+            best = entry
+
+    if best is not None and best_score >= 1:
+        return best
+    return None
+
+
+def has_full_booking_report_in_payload(
+    response_payload: dict[str, Any] | list[Any] | None,
+    *,
+    first_name: str = "",
+    last_name: str = "",
+) -> bool:
+    """True when a Healthians getBookingReport payload indicates ``full_report``."""
+    if not isinstance(response_payload, dict) or response_payload.get("status") is not True:
+        return False
+
+    report_list = response_payload.get("data")
+    if not isinstance(report_list, list):
+        return False
+
+    matched = match_booking_report_entry(
+        report_list,
+        first_name=first_name,
+        last_name=last_name,
+    )
+    if matched is None:
+        return False
+
+    _, full_report, _ = parse_booking_report_entry(matched)
+    return full_report is True

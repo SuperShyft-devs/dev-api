@@ -145,6 +145,36 @@ class AuditRepository:
         result = await db.execute(query)
         return int(result.scalar_one())
 
+    async def list_successful_get_booking_report_logs(
+        self,
+        db: AsyncSession,
+        *,
+        user_ids: list[int] | None = None,
+        engagement_ids: list[int] | None = None,
+        booking_ids: list[str] | None = None,
+    ) -> list[IntegrationSyncLog]:
+        """Return successful getBookingReport logs newest-first for participant matching."""
+        query = (
+            select(IntegrationSyncLog)
+            .where(
+                IntegrationSyncLog.status == "success",
+                IntegrationSyncLog.api_endpoint_url.ilike("%getBookingReport%"),
+                IntegrationSyncLog.response_payload.isnot(None),
+            )
+            .order_by(IntegrationSyncLog.sync_log_id.desc())
+        )
+        if user_ids:
+            query = query.where(IntegrationSyncLog.user_id.in_(user_ids))
+        if engagement_ids:
+            query = query.where(IntegrationSyncLog.engagement_id.in_(engagement_ids))
+        if booking_ids:
+            query = query.where(
+                IntegrationSyncLog.request_payload.isnot(None),
+                IntegrationSyncLog.request_payload["booking_id"].astext.in_(booking_ids),
+            )
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
     async def list_create_booking_dates_for_engagement(
         self,
         db: AsyncSession,

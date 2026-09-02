@@ -356,15 +356,20 @@ class EngagementsService:
         db: AsyncSession,
         rows: list[tuple],
     ) -> dict[tuple[int, int], bool]:
-        """Map (user_id, engagement_id) to Healthians full_report flag from IHR."""
+        """Map (user_id, engagement_id) to Healthians full_report availability."""
         if not rows:
             return {}
 
+        from modules.audit.repository import AuditRepository
+        from modules.reports.healthians_report_fields import has_full_booking_report_in_payload
         from modules.reports.models import IndividualHealthReport
 
-        user_ids = list({int(row[2]) for row in rows})
-        engagement_ids = list({int(row[1]) for row in rows})
-        result = await db.execute(
+        row_by_key = {(int(row[2]), int(row[1])): row for row in rows}
+        flags: dict[tuple[int, int], bool] = dict.fromkeys(row_by_key, False)
+
+        user_ids = list({key[0] for key in row_by_key})
+        engagement_ids = list({key[1] for key in row_by_key})
+        ihr_result = await db.execute(
             select(
                 IndividualHealthReport.user_id,
                 IndividualHealthReport.engagement_id,
@@ -374,14 +379,71 @@ class EngagementsService:
                 IndividualHealthReport.engagement_id.in_(engagement_ids),
             )
         )
-
-        flags: dict[tuple[int, int], bool] = {}
-        for user_id, engagement_id, full_report in result.all():
+        for user_id, engagement_id, full_report in ihr_result.all():
             key = (int(user_id), int(engagement_id))
             if full_report is True:
                 flags[key] = True
-            elif key not in flags:
-                flags[key] = False
+
+        pending_keys = [key for key, ready in flags.items() if not ready]
+        if not pending_keys:
+            return flags
+
+        audit_repo = AuditRepository()
+
+        def _payload_indicates_full_report(row: tuple, payload: dict | list | None) -> bool:
+            return has_full_booking_report_in_payload(
+                payload,
+                first_name=str(row[3] or ""),
+                last_name=str(row[4] or ""),
+            )
+
+        pending_user_ids = list({key[0] for key in pending_keys})
+        pending_engagement_ids = list({key[1] for key in pending_keys})
+        logs = await audit_repo.list_successful_get_booking_report_logs(
+            db,
+            user_ids=pending_user_ids,
+            engagement_ids=pending_engagement_ids,
+        )
+        seen_keys: set[tuple[int, int]] = set()
+        for log in logs:
+            if log.user_id is None or log.engagement_id is None:
+                continue
+            key = (int(log.user_id), int(log.engagement_id))
+            if key not in flags or flags[key] or key in seen_keys:
+                continue
+            row = row_by_key.get(key)
+            if row is None:
+                continue
+            seen_keys.add(key)
+            if _payload_indicates_full_report(row, log.response_payload):
+                flags[key] = True
+
+        still_pending = [key for key, ready in flags.items() if not ready]
+        booking_to_key: dict[str, tuple[int, int]] = {}
+        for key in still_pending:
+            booking_id = str(row_by_key[key][25] or "").strip()
+            if booking_id:
+                booking_to_key[booking_id] = key
+
+        if booking_to_key:
+            booking_logs = await audit_repo.list_successful_get_booking_report_logs(
+                db,
+                booking_ids=list(booking_to_key.keys()),
+            )
+            seen_booking_ids: set[str] = set()
+            for log in booking_logs:
+                request_payload = log.request_payload if isinstance(log.request_payload, dict) else {}
+                booking_id = str(request_payload.get("booking_id") or "").strip()
+                if not booking_id or booking_id in seen_booking_ids:
+                    continue
+                key = booking_to_key.get(booking_id)
+                if key is None or flags[key]:
+                    continue
+                seen_booking_ids.add(booking_id)
+                row = row_by_key[key]
+                if _payload_indicates_full_report(row, log.response_payload):
+                    flags[key] = True
+
         return flags
 
     async def _participant_rows_to_dicts(self, db: AsyncSession, rows: list[tuple]) -> list[dict[str, Any]]:
