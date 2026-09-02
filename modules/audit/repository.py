@@ -5,9 +5,9 @@ Only database writes live here.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import func, select, update as sql_update
+from sqlalchemy import Date, cast, func, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.audit.models import DataAuditLog, IntegrationSyncLog
@@ -144,3 +144,28 @@ class AuditRepository:
         )
         result = await db.execute(query)
         return int(result.scalar_one())
+
+    async def list_create_booking_dates_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> list[tuple[date, int]]:
+        """Distinct IST calendar dates and user_ids from successful createBooking_v3 logs."""
+        booking_date = cast(
+            func.timezone("Asia/Kolkata", IntegrationSyncLog.created_at),
+            Date,
+        )
+        query = (
+            select(booking_date, IntegrationSyncLog.user_id)
+            .where(
+                IntegrationSyncLog.engagement_id == engagement_id,
+                IntegrationSyncLog.status == "success",
+                IntegrationSyncLog.user_id.is_not(None),
+                IntegrationSyncLog.api_endpoint_url.ilike("%createBooking_v3%"),
+            )
+            .distinct()
+            .order_by(booking_date.desc(), IntegrationSyncLog.user_id.asc())
+        )
+        result = await db.execute(query)
+        return [(row[0], int(row[1])) for row in result.all()]

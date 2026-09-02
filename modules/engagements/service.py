@@ -1895,6 +1895,31 @@ class EngagementsService:
         result = await self._participant_rows_to_dicts(db, participants)
         return result, total
 
+    async def list_booking_dates_for_engagement_id(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+    ) -> dict[str, Any]:
+        """Distinct IST booking dates from successful createBooking_v3 sync logs."""
+
+        ensure_admin(employee)
+
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+
+        audit = self._require_audit_service()
+        return await audit.list_create_booking_dates_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+
     async def list_participants_for_b2c_engagements(
         self,
         db: AsyncSession,

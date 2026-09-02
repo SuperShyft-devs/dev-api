@@ -84,6 +84,25 @@ class AuditService:
         )
         return [self._serialize_sync_log(row) for row in rows], total
 
+    async def list_create_booking_dates_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> dict[str, Any]:
+        pairs = await self._repository.list_create_booking_dates_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+        user_ids_by_date: dict[str, list[int]] = {}
+        for booking_date, user_id in pairs:
+            date_key = booking_date.isoformat()
+            bucket = user_ids_by_date.setdefault(date_key, [])
+            if user_id not in bucket:
+                bucket.append(user_id)
+        dates = sorted(user_ids_by_date.keys(), reverse=True)
+        return {"dates": dates, "user_ids_by_date": user_ids_by_date}
+
     @staticmethod
     def _serialize_sync_log(row: IntegrationSyncLog) -> dict[str, Any]:
         return {
