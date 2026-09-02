@@ -36,9 +36,40 @@ from modules.engagements.schemas import (
     ResolveHealthiansZoneRequest,
 )
 from modules.engagements.models import Engagement
+from modules.engagements.participant_list_filters import filters_to_meta, parse_participant_list_filters
 from modules.engagements.service import EngagementsService
 
 router = APIRouter(prefix="/engagements", tags=["engagements"])
+
+
+def _consultation_filters_from_query(request: Request) -> dict[str, str]:
+    filters: dict[str, str] = {}
+    for key, value in request.query_params.multi_items():
+        if not key.startswith("consultation_"):
+            continue
+        if value not in {"yes", "no"}:
+            continue
+        filters[key.removeprefix("consultation_")] = value
+    return filters
+
+
+def _participant_filters_from_request(
+    request: Request,
+    *,
+    search: str | None = None,
+    engagement_date: date | None = None,
+    booking_date: date | None = None,
+    department: str | None = None,
+    has_booking_id: str | None = None,
+):
+    return parse_participant_list_filters(
+        search=search,
+        engagement_date=engagement_date,
+        booking_date=booking_date,
+        department=department,
+        has_booking_id=has_booking_id,
+        consultation_filters=_consultation_filters_from_query(request),
+    )
 
 
 def _client_ip(request: Request) -> str:
@@ -539,19 +570,79 @@ async def get_engagement_booking_dates(
     return success_response(data)
 
 
-@router.get("/{engagement_id}/participants")
-async def get_engagement_participants_by_id(
+@router.get("/{engagement_id}/participants/filter-options")
+async def get_engagement_participant_filter_options(
     engagement_id: int,
-    page: int = 1,
-    limit: int = 20,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     engagements_service: EngagementsService = Depends(get_engagements_service),
 ):
-    """Get all distinct users enrolled in a specific engagement by id."""
+    data = await engagements_service.participant_filter_options_for_engagement_id(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+    )
+    return success_response(data)
+
+
+@router.get("/{engagement_id}/participants/stats")
+async def get_engagement_participant_stats(
+    engagement_id: int,
+    request: Request,
+    search: str | None = None,
+    engagement_date: date | None = None,
+    booking_date: date | None = None,
+    department: str | None = None,
+    has_booking_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    filters = _participant_filters_from_request(
+        request,
+        search=search,
+        engagement_date=engagement_date,
+        booking_date=booking_date,
+        department=department,
+        has_booking_id=has_booking_id,
+    )
+    data = await engagements_service.participant_stats_for_engagement_id(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        filters=filters,
+    )
+    return success_response(data, meta={"filters": filters_to_meta(filters)})
+
+
+@router.get("/{engagement_id}/participants")
+async def get_engagement_participants_by_id(
+    engagement_id: int,
+    request: Request,
+    page: int = 1,
+    limit: int = 20,
+    search: str | None = None,
+    engagement_date: date | None = None,
+    booking_date: date | None = None,
+    department: str | None = None,
+    has_booking_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """Get distinct users enrolled in a specific engagement by id."""
 
     if page < 1 or limit < 1 or limit > 100:
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+
+    filters = _participant_filters_from_request(
+        request,
+        search=search,
+        engagement_date=engagement_date,
+        booking_date=booking_date,
+        department=department,
+        has_booking_id=has_booking_id,
+    )
 
     participants, total = await engagements_service.list_participants_for_engagement_id(
         db,
@@ -559,9 +650,18 @@ async def get_engagement_participants_by_id(
         engagement_id=engagement_id,
         page=page,
         limit=limit,
+        filters=filters,
     )
 
-    return success_response(participants, meta={"page": page, "limit": limit, "total": total})
+    return success_response(
+        participants,
+        meta={
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "filters": filters_to_meta(filters),
+        },
+    )
 
 
 @router.delete("/{engagement_id}/participants")

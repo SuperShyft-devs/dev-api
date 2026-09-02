@@ -826,7 +826,7 @@ async def load_blood_reports(
                 fetched_diag_url, api_full_report, api_verified_at = parse_booking_report_entry(
                     matched_report
                 )
-                if fetched_diag_url is None:
+                if fetched_diag_url is None and api_full_report is not True:
                     skipped += 1
                     details.append({
                         "user_id": user_id, "engagement_id": engagement_id,

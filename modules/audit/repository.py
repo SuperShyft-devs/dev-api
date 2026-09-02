@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, cast, func, select, update as sql_update
+from sqlalchemy import Date, Integer, cast, func, or_, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.audit.models import DataAuditLog, IntegrationSyncLog
@@ -168,10 +168,27 @@ class AuditRepository:
         if engagement_ids:
             query = query.where(IntegrationSyncLog.engagement_id.in_(engagement_ids))
         if booking_ids:
-            query = query.where(
-                IntegrationSyncLog.request_payload.isnot(None),
-                IntegrationSyncLog.request_payload["booking_id"].astext.in_(booking_ids),
-            )
+            normalized_booking_ids = [str(booking_id).strip() for booking_id in booking_ids]
+            normalized_booking_ids = [booking_id for booking_id in normalized_booking_ids if booking_id]
+            booking_filters = []
+            if normalized_booking_ids:
+                booking_filters.append(
+                    IntegrationSyncLog.request_payload["booking_id"].astext.in_(normalized_booking_ids)
+                )
+                numeric_booking_ids = [
+                    int(booking_id) for booking_id in normalized_booking_ids if booking_id.isdigit()
+                ]
+                if numeric_booking_ids:
+                    booking_filters.append(
+                        cast(IntegrationSyncLog.request_payload["booking_id"], Integer).in_(
+                            numeric_booking_ids
+                        )
+                    )
+            if booking_filters:
+                query = query.where(
+                    IntegrationSyncLog.request_payload.isnot(None),
+                    or_(*booking_filters),
+                )
         result = await db.execute(query)
         return list(result.scalars().all())
 

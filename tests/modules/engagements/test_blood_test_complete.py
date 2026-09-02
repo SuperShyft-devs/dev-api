@@ -1,13 +1,13 @@
-"""Tests for blood_test_complete participant enrichment."""
+"""Tests for live Healthians blood_test_complete participant enrichment."""
 
 from __future__ import annotations
 
 from datetime import date
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import text
 
-from modules.audit.models import IntegrationSyncLog
 from modules.employee.models import Employee
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.engagements.service import EngagementsService
@@ -73,10 +73,22 @@ async def _seed_engagement(test_db_session, *, engagement_id: int, type_code: st
 
 
 @pytest.mark.asyncio
-async def test_participant_blood_test_complete_uses_get_booking_report_sync_log(test_db_session):
+@patch("modules.engagements.blood_test_complete_resolver.healthians_client.get_booking_report", new_callable=AsyncMock)
+@patch("modules.engagements.blood_test_complete_resolver.healthians_client.get_access_token", new_callable=AsyncMock)
+async def test_participant_blood_test_complete_calls_healthians_live(
+    mock_get_access_token,
+    mock_get_booking_report,
+    test_db_session,
+):
+    mock_get_access_token.return_value = "token"
+    mock_get_booking_report.return_value = {
+        "status": True,
+        "data": [{"cust_name": "NEELIMA M", "full_report": 1}],
+    }
+
     engagement_id = 988150
     user_id = 988150
-    await _seed_engagement(test_db_session, engagement_id=engagement_id, type_code="blood_complete_sync")
+    await _seed_engagement(test_db_session, engagement_id=engagement_id, type_code="blood_complete_live")
     test_db_session.add(
         User(
             user_id=user_id,
@@ -87,33 +99,13 @@ async def test_participant_blood_test_complete_uses_get_booking_report_sync_log(
             status="active",
         )
     )
+    await test_db_session.flush()
     test_db_session.add(
         EngagementParticipant(
             engagement_participant_id=988150,
             engagement_id=engagement_id,
             user_id=user_id,
             booking_id="20014806389",
-        )
-    )
-    await test_db_session.flush()
-    test_db_session.add(
-        IntegrationSyncLog(
-            engagement_id=engagement_id,
-            user_id=user_id,
-            provider="healthians",
-            api_endpoint_url="https://hbridge.healthians.com/api/toast4health/getBookingReport",
-            request_payload={"booking_id": "20014806389"},
-            response_payload={
-                "status": True,
-                "data": [
-                    {
-                        "cust_name": "NEELIMA M",
-                        "full_report": 1,
-                        "report_url": "https://example.com/report.pdf",
-                    }
-                ],
-            },
-            status="success",
         )
     )
     await test_db_session.commit()
@@ -131,3 +123,4 @@ async def test_participant_blood_test_complete_uses_get_booking_report_sync_log(
 
     assert len(result) == 1
     assert result[0]["blood_test_complete"] is True
+    mock_get_booking_report.assert_awaited_once()

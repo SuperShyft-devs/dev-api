@@ -63,3 +63,16 @@ def test_has_full_booking_report_in_payload():
     }
     assert has_full_booking_report_in_payload(payload, first_name="Neelima", last_name="M") is True
     assert has_full_booking_report_in_payload(payload, first_name="Other", last_name="Person") is True
+
+
+def test_has_full_booking_report_in_payload_accepts_numeric_status():
+    payload = {
+        "status": 1,
+        "data": [{"cust_name": "NEELIMA M", "full_report": 1}],
+    }
+    assert has_full_booking_report_in_payload(payload, first_name="Neelima", last_name="M") is True
+
+
+def test_has_full_booking_report_in_payload_accepts_list_payload():
+    payload = [{"cust_name": "NEELIMA M", "full_report": 1}]
+    assert has_full_booking_report_in_payload(payload, first_name="Neelima", last_name="M") is True

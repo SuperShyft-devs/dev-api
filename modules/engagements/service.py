@@ -37,6 +37,11 @@ from modules.engagements.consultation_booking_validation import (
     effective_consultation_mode,
 )
 from modules.engagements.models import BloodCollectionType, ConsultationMode, Engagement, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
+from modules.engagements.participant_list_filters import (
+    ParticipantListFilters,
+    filters_are_active,
+    parse_participant_list_filters,
+)
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.slot_availability import (
     build_public_slot_detail,
@@ -357,94 +362,9 @@ class EngagementsService:
         rows: list[tuple],
     ) -> dict[tuple[int, int], bool]:
         """Map (user_id, engagement_id) to Healthians full_report availability."""
-        if not rows:
-            return {}
+        from modules.engagements.blood_test_complete_resolver import resolve_blood_test_complete_flags
 
-        from modules.audit.repository import AuditRepository
-        from modules.reports.healthians_report_fields import has_full_booking_report_in_payload
-        from modules.reports.models import IndividualHealthReport
-
-        row_by_key = {(int(row[2]), int(row[1])): row for row in rows}
-        flags: dict[tuple[int, int], bool] = dict.fromkeys(row_by_key, False)
-
-        user_ids = list({key[0] for key in row_by_key})
-        engagement_ids = list({key[1] for key in row_by_key})
-        ihr_result = await db.execute(
-            select(
-                IndividualHealthReport.user_id,
-                IndividualHealthReport.engagement_id,
-                IndividualHealthReport.blood_parameters_full_report,
-            ).where(
-                IndividualHealthReport.user_id.in_(user_ids),
-                IndividualHealthReport.engagement_id.in_(engagement_ids),
-            )
-        )
-        for user_id, engagement_id, full_report in ihr_result.all():
-            key = (int(user_id), int(engagement_id))
-            if full_report is True:
-                flags[key] = True
-
-        pending_keys = [key for key, ready in flags.items() if not ready]
-        if not pending_keys:
-            return flags
-
-        audit_repo = AuditRepository()
-
-        def _payload_indicates_full_report(row: tuple, payload: dict | list | None) -> bool:
-            return has_full_booking_report_in_payload(
-                payload,
-                first_name=str(row[3] or ""),
-                last_name=str(row[4] or ""),
-            )
-
-        pending_user_ids = list({key[0] for key in pending_keys})
-        pending_engagement_ids = list({key[1] for key in pending_keys})
-        logs = await audit_repo.list_successful_get_booking_report_logs(
-            db,
-            user_ids=pending_user_ids,
-            engagement_ids=pending_engagement_ids,
-        )
-        seen_keys: set[tuple[int, int]] = set()
-        for log in logs:
-            if log.user_id is None or log.engagement_id is None:
-                continue
-            key = (int(log.user_id), int(log.engagement_id))
-            if key not in flags or flags[key] or key in seen_keys:
-                continue
-            row = row_by_key.get(key)
-            if row is None:
-                continue
-            seen_keys.add(key)
-            if _payload_indicates_full_report(row, log.response_payload):
-                flags[key] = True
-
-        still_pending = [key for key, ready in flags.items() if not ready]
-        booking_to_key: dict[str, tuple[int, int]] = {}
-        for key in still_pending:
-            booking_id = str(row_by_key[key][25] or "").strip()
-            if booking_id:
-                booking_to_key[booking_id] = key
-
-        if booking_to_key:
-            booking_logs = await audit_repo.list_successful_get_booking_report_logs(
-                db,
-                booking_ids=list(booking_to_key.keys()),
-            )
-            seen_booking_ids: set[str] = set()
-            for log in booking_logs:
-                request_payload = log.request_payload if isinstance(log.request_payload, dict) else {}
-                booking_id = str(request_payload.get("booking_id") or "").strip()
-                if not booking_id or booking_id in seen_booking_ids:
-                    continue
-                key = booking_to_key.get(booking_id)
-                if key is None or flags[key]:
-                    continue
-                seen_booking_ids.add(booking_id)
-                row = row_by_key[key]
-                if _payload_indicates_full_report(row, log.response_payload):
-                    flags[key] = True
-
-        return flags
+        return await resolve_blood_test_complete_flags(db, rows)
 
     async def _participant_rows_to_dicts(self, db: AsyncSession, rows: list[tuple]) -> list[dict[str, Any]]:
         all_booking_ids: list[int] = []
@@ -1961,6 +1881,48 @@ class EngagementsService:
         result = await self._participant_rows_to_dicts(db, participants)
         return result, total
 
+    async def _resolve_participant_list_filters(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        filters: ParticipantListFilters,
+    ) -> ParticipantListFilters:
+        if filters.booking_date is None:
+            return filters
+
+        audit = self._require_audit_service()
+        booking_dates = await audit.list_create_booking_dates_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+        user_ids = {
+            int(user_id)
+            for user_id in booking_dates.get("user_ids_by_date", {}).get(
+                filters.booking_date.isoformat(),
+                [],
+            )
+        }
+        return ParticipantListFilters(
+            search=filters.search,
+            engagement_date=filters.engagement_date,
+            booking_date=filters.booking_date,
+            department=filters.department,
+            has_booking_id=filters.has_booking_id,
+            booking_date_user_ids=user_ids,
+            consultation_filters=filters.consultation_filters,
+        )
+
+    async def _ensure_engagement_exists(self, db: AsyncSession, engagement_id: int) -> Engagement:
+        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
+        if engagement is None:
+            raise AppError(
+                status_code=404,
+                error_code="ENGAGEMENT_NOT_FOUND",
+                message="Engagement does not exist",
+            )
+        return engagement
+
     async def list_participants_for_engagement_id(
         self,
         db: AsyncSession,
@@ -1969,32 +1931,111 @@ class EngagementsService:
         engagement_id: int,
         page: int,
         limit: int,
+        filters: ParticipantListFilters | None = None,
     ) -> tuple[list[dict], int]:
         """Fetch participant enrollment rows for a specific engagement by id."""
 
         ensure_admin(employee)
+        await self._ensure_engagement_exists(db, engagement_id)
 
-        engagement = await self._repository.get_engagement_by_id(db, engagement_id)
-        if engagement is None:
-            raise AppError(
-                status_code=404,
-                error_code="ENGAGEMENT_NOT_FOUND",
-                message="Engagement does not exist",
+        resolved_filters = (
+            await self._resolve_participant_list_filters(
+                db,
+                engagement_id=engagement_id,
+                filters=filters,
             )
+            if filters is not None
+            else None
+        )
 
         participants = await self._repository.list_participants_by_engagement_id(
             db,
             engagement_id=engagement_id,
             page=page,
             limit=limit,
+            filters=resolved_filters,
         )
         total = await self._repository.count_distinct_participants_for_engagement(
             db,
             engagement_id=engagement_id,
+            filters=resolved_filters,
         )
 
         result = await self._participant_rows_to_dicts(db, participants)
         return result, total
+
+    async def participant_stats_for_engagement_id(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        filters: ParticipantListFilters | None = None,
+    ) -> dict[str, Any]:
+        """Return blood-test completion counts using live Healthians lookups."""
+
+        from modules.engagements.blood_test_complete_resolver import resolve_blood_test_complete_flags
+
+        ensure_admin(employee)
+        await self._ensure_engagement_exists(db, engagement_id)
+
+        resolved_filters = (
+            await self._resolve_participant_list_filters(
+                db,
+                engagement_id=engagement_id,
+                filters=filters,
+            )
+            if filters is not None
+            else ParticipantListFilters()
+        )
+
+        filtered_rows = await self._repository.list_all_participants_by_engagement_id(
+            db,
+            engagement_id=engagement_id,
+            filters=resolved_filters,
+        )
+        filtered_flags = await resolve_blood_test_complete_flags(db, filtered_rows)
+        filtered_complete = sum(1 for ready in filtered_flags.values() if ready)
+        not_ready_names = [
+            " ".join(part for part in (row[3], row[4]) if part).strip() or "—"
+            for row in filtered_rows
+            if not filtered_flags.get((int(row[2]), int(row[1])), False)
+        ]
+
+        overall_total = len(filtered_rows)
+        overall_complete = filtered_complete
+        if filters is not None and filters_are_active(resolved_filters):
+            overall_rows = await self._repository.list_all_participants_by_engagement_id(
+                db,
+                engagement_id=engagement_id,
+                filters=None,
+            )
+            overall_flags = await resolve_blood_test_complete_flags(db, overall_rows)
+            overall_total = len(overall_rows)
+            overall_complete = sum(1 for ready in overall_flags.values() if ready)
+
+        return {
+            "filtered_total": len(filtered_rows),
+            "filtered_blood_test_complete": filtered_complete,
+            "overall_total": overall_total,
+            "overall_blood_test_complete": overall_complete,
+            "not_ready_names": not_ready_names[:100],
+        }
+
+    async def participant_filter_options_for_engagement_id(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+    ) -> dict[str, Any]:
+        ensure_admin(employee)
+        await self._ensure_engagement_exists(db, engagement_id)
+        engagement_dates = await self._repository.list_distinct_engagement_dates_for_engagement(
+            db,
+            engagement_id=engagement_id,
+        )
+        return {"engagement_dates": engagement_dates}
 
     async def list_booking_dates_for_engagement_id(
         self,

@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, time
 
-from sqlalchemy import String, and_, cast, func, or_, select, text, update
+from sqlalchemy import String, and_, false, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
@@ -21,6 +21,8 @@ from modules.engagements.models import (
     EngagementType,
     OnboardingAssistantAssignment,
 )
+from modules.engagements.participant_list_filters import ParticipantListFilters
+from modules.experts.models import ConsultationBooking
 from modules.engagements.slot_detail_dates import engagement_collection_date_matches
 from modules.organizations.models import Organization
 from modules.engagement_notifications.service_config import (
@@ -570,18 +572,195 @@ class EngagementsRepository:
         *,
         engagement_id: int,
         participant_department_slugs: set[str] | None = None,
+        filters: ParticipantListFilters | None = None,
     ) -> int:
-        query = select(func.count(func.distinct(EngagementParticipant.user_id))).where(
-            EngagementParticipant.engagement_id == engagement_id
+        ranked_rows = self._participant_ranked_subquery(
+            engagement_id=engagement_id,
+            participant_department_slugs=participant_department_slugs,
+            filters=filters,
         )
-        if participant_department_slugs is not None:
-            if not participant_department_slugs:
-                return 0
-            query = query.where(
-                EngagementParticipant.participant_department.in_(participant_department_slugs)
-            )
+        query = select(func.count()).select_from(ranked_rows).where(ranked_rows.c.rn == 1)
         result = await db.execute(query)
         return int(result.scalar_one() or 0)
+
+    def _participant_ranked_subquery(
+        self,
+        *,
+        engagement_id: int,
+        participant_department_slugs: set[str] | None = None,
+        filters: ParticipantListFilters | None = None,
+    ):
+        from modules.users.models import User
+
+        participant_filters = [EngagementParticipant.engagement_id == engagement_id]
+        if participant_department_slugs is not None:
+            if not participant_department_slugs:
+                participant_filters.append(false())
+            else:
+                participant_filters.append(
+                    EngagementParticipant.participant_department.in_(participant_department_slugs)
+                )
+
+        if filters is not None:
+            if filters.department:
+                participant_filters.append(
+                    EngagementParticipant.participant_department == filters.department
+                )
+            if filters.engagement_date is not None:
+                participant_filters.append(
+                    EngagementParticipant.engagement_date == filters.engagement_date
+                )
+            if filters.booking_date_user_ids is not None:
+                if not filters.booking_date_user_ids:
+                    participant_filters.append(false())
+                else:
+                    participant_filters.append(
+                        EngagementParticipant.user_id.in_(filters.booking_date_user_ids)
+                    )
+            if filters.has_booking_id is True:
+                participant_filters.append(
+                    EngagementParticipant.booking_id.isnot(None),
+                    EngagementParticipant.booking_id != "",
+                )
+            elif filters.has_booking_id is False:
+                participant_filters.append(
+                    or_(
+                        EngagementParticipant.booking_id.is_(None),
+                        EngagementParticipant.booking_id == "",
+                    )
+                )
+            for expert_type, want_filter in filters.consultation_filters.items():
+                consultation_exists = (
+                    select(ConsultationBooking.consultation_id)
+                    .where(
+                        ConsultationBooking.engagement_participant_id
+                        == EngagementParticipant.engagement_participant_id,
+                        ConsultationBooking.expert_type == expert_type,
+                        ConsultationBooking.want.is_(want_filter == "yes"),
+                    )
+                    .exists()
+                )
+                participant_filters.append(consultation_exists)
+
+        user_filters = []
+        if filters is not None and filters.search:
+            pattern = ilike_pattern(filters.search)
+            user_filters.append(
+                or_(
+                    User.first_name.ilike(pattern),
+                    User.last_name.ilike(pattern),
+                    User.email.ilike(pattern),
+                    User.phone.ilike(pattern),
+                    EngagementParticipant.booking_id.ilike(pattern),
+                )
+            )
+
+        return (
+            select(
+                EngagementParticipant.engagement_participant_id,
+                EngagementParticipant.engagement_id,
+                User.user_id,
+                User.first_name,
+                User.last_name,
+                User.phone,
+                User.email,
+                User.age,
+                User.address,
+                User.pin_code,
+                User.city,
+                User.state,
+                User.country,
+                User.status,
+                EngagementParticipant.slot_start_time,
+                EngagementParticipant.engagement_date,
+                EngagementParticipant.blood_collection_cabin,
+                EngagementParticipant.participants_employee_id,
+                EngagementParticipant.participant_department,
+                EngagementParticipant.participant_blood_group,
+                EngagementParticipant.consultation_booking_ids,
+                EngagementParticipant.is_profile_created_on_metsights,
+                EngagementParticipant.is_primary_record_id_synced,
+                EngagementParticipant.is_fitprint_record_id_synced,
+                EngagementParticipant.barcode,
+                EngagementParticipant.booking_id,
+                EngagementParticipant.blood_collection_time_slot_id,
+                EngagementParticipant.booked_by_user_id,
+                func.row_number()
+                .over(
+                    partition_by=EngagementParticipant.user_id,
+                    order_by=EngagementParticipant.engagement_participant_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(EngagementParticipant)
+            .join(User, User.user_id == EngagementParticipant.user_id)
+            .where(*participant_filters, *user_filters)
+        ).subquery()
+
+    async def list_distinct_engagement_dates_for_engagement(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> list[str]:
+        result = await db.execute(
+            select(EngagementParticipant.engagement_date)
+            .where(
+                EngagementParticipant.engagement_id == engagement_id,
+                EngagementParticipant.engagement_date.isnot(None),
+            )
+            .distinct()
+            .order_by(EngagementParticipant.engagement_date.desc())
+        )
+        return [row[0].isoformat() for row in result.all() if row[0] is not None]
+
+    async def list_all_participants_by_engagement_id(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        filters: ParticipantListFilters | None = None,
+    ) -> list[tuple]:
+        ranked_rows = self._participant_ranked_subquery(
+            engagement_id=engagement_id,
+            filters=filters,
+        )
+        query = (
+            select(
+                ranked_rows.c.engagement_participant_id,
+                ranked_rows.c.engagement_id,
+                ranked_rows.c.user_id,
+                ranked_rows.c.first_name,
+                ranked_rows.c.last_name,
+                ranked_rows.c.phone,
+                ranked_rows.c.email,
+                ranked_rows.c.age,
+                ranked_rows.c.address,
+                ranked_rows.c.pin_code,
+                ranked_rows.c.city,
+                ranked_rows.c.state,
+                ranked_rows.c.country,
+                ranked_rows.c.status,
+                ranked_rows.c.slot_start_time,
+                ranked_rows.c.engagement_date,
+                ranked_rows.c.blood_collection_cabin,
+                ranked_rows.c.participants_employee_id,
+                ranked_rows.c.participant_department,
+                ranked_rows.c.participant_blood_group,
+                ranked_rows.c.consultation_booking_ids,
+                ranked_rows.c.is_profile_created_on_metsights,
+                ranked_rows.c.is_primary_record_id_synced,
+                ranked_rows.c.is_fitprint_record_id_synced,
+                ranked_rows.c.barcode,
+                ranked_rows.c.booking_id,
+                ranked_rows.c.blood_collection_time_slot_id,
+                ranked_rows.c.booked_by_user_id,
+            )
+            .where(ranked_rows.c.rn == 1)
+            .order_by(ranked_rows.c.engagement_participant_id.asc())
+        )
+        result = await db.execute(query)
+        return list(result.all())
 
     async def count_distinct_participants_by_engagement_ids(
         self,
@@ -860,61 +1039,18 @@ class EngagementsRepository:
         page: int,
         limit: int,
         participant_department_slugs: set[str] | None = None,
+        filters: ParticipantListFilters | None = None,
     ) -> list[tuple]:
         """Fetch participant enrollment rows for a specific engagement."""
-        from modules.users.models import User
+        if participant_department_slugs is not None and not participant_department_slugs:
+            return []
 
         offset = (page - 1) * limit
-
-        participant_filters = [EngagementParticipant.engagement_id == engagement_id]
-        if participant_department_slugs is not None:
-            if not participant_department_slugs:
-                return []
-            participant_filters.append(
-                EngagementParticipant.participant_department.in_(participant_department_slugs)
-            )
-
-        ranked_rows = (
-            select(
-                EngagementParticipant.engagement_participant_id,
-                EngagementParticipant.engagement_id,
-                User.user_id,
-                User.first_name,
-                User.last_name,
-                User.phone,
-                User.email,
-                User.age,
-                User.address,
-                User.pin_code,
-                User.city,
-                User.state,
-                User.country,
-                User.status,
-                EngagementParticipant.slot_start_time,
-                EngagementParticipant.engagement_date,
-                EngagementParticipant.blood_collection_cabin,
-                EngagementParticipant.participants_employee_id,
-                EngagementParticipant.participant_department,
-                EngagementParticipant.participant_blood_group,
-                EngagementParticipant.consultation_booking_ids,
-                EngagementParticipant.is_profile_created_on_metsights,
-                EngagementParticipant.is_primary_record_id_synced,
-                EngagementParticipant.is_fitprint_record_id_synced,
-                EngagementParticipant.barcode,
-                EngagementParticipant.booking_id,
-                EngagementParticipant.blood_collection_time_slot_id,
-                EngagementParticipant.booked_by_user_id,
-                func.row_number()
-                .over(
-                    partition_by=EngagementParticipant.user_id,
-                    order_by=EngagementParticipant.engagement_participant_id.desc(),
-                )
-                .label("rn"),
-            )
-            .select_from(EngagementParticipant)
-            .join(User, User.user_id == EngagementParticipant.user_id)
-            .where(*participant_filters)
-        ).subquery()
+        ranked_rows = self._participant_ranked_subquery(
+            engagement_id=engagement_id,
+            participant_department_slugs=participant_department_slugs,
+            filters=filters,
+        )
 
         query = (
             select(
