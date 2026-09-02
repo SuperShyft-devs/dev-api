@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
@@ -64,6 +65,25 @@ async def _seed_notification_service(test_db_session, *, service_key: str = "boo
     await test_db_session.commit()
 
 
+async def _engagement_type_id(test_db_session, code: str = "bio_ai") -> int:
+    await test_db_session.execute(
+        text(
+            "INSERT INTO engagement_types (code, display_name, is_active) "
+            "VALUES (:code, :dn, true) "
+            "ON CONFLICT (code) DO UPDATE SET is_active = true"
+        ),
+        {"code": code, "dn": code},
+    )
+    await test_db_session.flush()
+    row = (
+        await test_db_session.execute(
+            text("SELECT id FROM engagement_types WHERE code = :code"),
+            {"code": code},
+        )
+    ).one()
+    return int(row[0])
+
+
 async def _seed_running_participant(
     test_db_session,
     *,
@@ -80,6 +100,7 @@ async def _seed_running_participant(
     blood_report_notification: str | None = "booking-alert-whatsapp",
 ):
     await _seed_notification_service(test_db_session)
+    engagement_type_id = await _engagement_type_id(test_db_session)
 
     test_db_session.add(
         User(
@@ -96,7 +117,7 @@ async def _seed_running_participant(
             engagement_id=engagement_id,
             engagement_name="Blood Cron Engagement",
             engagement_code=f"ENG-BLOOD-CRON-{engagement_id}",
-            engagement_type="bio_ai",
+            engagement_type=engagement_type_id,
             assessment_package_id=1,
             diagnostic_package_id=diagnostic_package_id,
             city="Bengaluru",
@@ -104,10 +125,37 @@ async def _seed_running_participant(
             start_date=date.today() - timedelta(days=7),
             end_date=date.today() + timedelta(days=7),
             status="running",
-            blood_report_notification=blood_report_notification,
         )
     )
     await test_db_session.flush()
+
+    if blood_report_notification:
+        evt_row = (
+            await test_db_session.execute(
+                text(
+                    "SELECT id FROM auto_notification_events "
+                    "WHERE event_code = 'blood_report_ready'"
+                )
+            )
+        ).one_or_none()
+        if evt_row is not None:
+            services_json = json.dumps(
+                [{"service_key": blood_report_notification, "external_link": None}]
+            )
+            await test_db_session.execute(
+                text(
+                    "INSERT INTO engagement_notifications "
+                    "(engagement_id, notification_event_id, notification_services) "
+                    "VALUES (:eid, :evt, CAST(:services AS jsonb)) "
+                    "ON CONFLICT (engagement_id, notification_event_id) DO UPDATE "
+                    "SET notification_services = EXCLUDED.notification_services"
+                ),
+                {
+                    "eid": engagement_id,
+                    "evt": int(evt_row[0]),
+                    "services": services_json,
+                },
+            )
 
     test_db_session.add(
         EngagementParticipant(
@@ -706,6 +754,90 @@ async def test_load_blood_reports_skips_notification_when_full_report_zero(
     ).scalar_one()
     assert ihr.blood_parameters_full_report is False
     assert ihr.diagnostic_report_url == _REPORT_URL
+
+
+@pytest.mark.asyncio
+async def test_load_blood_reports_send_notifications_false_never_dispatches(
+    test_db_session, monkeypatch
+):
+    await _seed_running_participant(
+        test_db_session,
+        user_id=88013,
+        engagement_id=88013,
+        assessment_id=88013,
+    )
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_report(_token, _booking_id):
+        return _report_payload(full_report=1)
+
+    async def _fake_digital(_token, _booking_id):
+        return {
+            "data": [
+                {
+                    "customer_name": "John Doe",
+                    "digital_data": [{"parameter_id": "1", "value": "91.0", "unit": "mg/dL"}],
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_report",
+        _fake_report,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_digital_value",
+        _fake_digital,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports._group_provider_blood",
+        _fake_group_factory(),
+    )
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    async def _fake_draft(db, *, user_id, assessment_instance_id, allow_completed=False):
+        return {"responses_drafted": 1}
+
+    monkeypatch.setattr(assessments_service, "draft_blood_parameters_from_report", _fake_draft)
+
+    async def _fake_push(self, db, *, assessment_instance_id, user_id, category_key, category_of="metsights"):
+        return {"fields_pushed": []}
+
+    monkeypatch.setattr(
+        "modules.metsights.sync_service.MetsightsSyncService._push_category_to_metsights",
+        _fake_push,
+    )
+
+    dispatch_calls: list[str] = []
+
+    async def _fake_dispatch(self, db, *, payload, triggered_by_user_id=None):
+        dispatch_calls.append(payload.service_key)
+        return {"dispatched": 1}
+
+    monkeypatch.setattr(
+        "modules.notifications.service.NotificationsService.dispatch",
+        _fake_dispatch,
+    )
+
+    result = await load_blood_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=notifications_service,
+        assessments_service=assessments_service,
+        sync_service=sync_service,
+        send_notifications=False,
+    )
+
+    assert dispatch_calls == []
+    assert result["notified"] == 0
+    assert result["loaded"] >= 1
 
 
 @pytest.mark.asyncio

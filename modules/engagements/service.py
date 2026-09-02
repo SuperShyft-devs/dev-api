@@ -79,6 +79,7 @@ from modules.users.repository import UsersRepository
 if TYPE_CHECKING:
     from modules.checklists.service import ChecklistsService
     from modules.metsights.service import MetsightsService
+    from modules.metsights.sync_service import MetsightsSyncService
     from modules.notifications.service import NotificationsService
 
 
@@ -2036,6 +2037,65 @@ class EngagementsService:
             engagement_id=engagement_id,
         )
         return {"engagement_dates": engagement_dates}
+
+    async def load_blood_reports_for_participants(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_ids: list[int],
+        sync_service: "MetsightsSyncService",
+    ) -> dict[str, Any]:
+        """Run load_blood_reports for selected participants without sending notifications."""
+
+        from modules.notifications.load_blood_reports import load_blood_reports
+
+        ensure_admin(employee)
+        await self._ensure_engagement_exists(db, engagement_id)
+
+        unique_user_ids = list(dict.fromkeys(int(user_id) for user_id in user_ids))
+        enrolled = await self._repository.get_participants_map_for_engagement(
+            db,
+            engagement_id=engagement_id,
+            user_ids=unique_user_ids,
+        )
+        missing = [user_id for user_id in unique_user_ids if user_id not in enrolled]
+        if missing:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_INPUT",
+                message=(
+                    "These participants are not in the engagement: "
+                    + ", ".join(str(user_id) for user_id in missing)
+                ),
+            )
+
+        if self._metsights_service is None or self._assessments_service is None:
+            raise AppError(
+                status_code=503,
+                error_code="EXTERNAL_SERVICE_UNAVAILABLE",
+                message="Metsights integration is not configured",
+            )
+
+        notifications_service = self._notifications_service
+        if notifications_service is None:
+            from modules.notifications.dependencies import get_notifications_service
+
+            notifications_service = get_notifications_service()
+
+        return await load_blood_reports(
+            db,
+            metsights_service=self._metsights_service,
+            notifications_service=notifications_service,
+            assessments_service=self._assessments_service,
+            sync_service=sync_service,
+            engagement_id=engagement_id,
+            user_ids=set(unique_user_ids),
+            send_notifications=False,
+            all_engagements=True,
+            ignore_engagement_date=True,
+        )
 
     async def list_booking_dates_for_engagement_id(
         self,

@@ -54,6 +54,7 @@ from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
 from modules.reports.blood_parameters_normalizer import build_grouped_from_healthians
 from modules.reports.blood_report_archival import resolve_persistable_diagnostic_report_url
+from modules.reports.blood_report_resolver import _match_customer_by_name
 from modules.reports.blood_parameters_schemas import (
     booking_id_from_fetch_collections,
     has_usable_provider_blood_parameters,
@@ -445,6 +446,8 @@ async def _get_eligible_participants(
     *,
     all_engagements: bool = False,
     engagement_id: int | None = None,
+    user_ids: set[int] | None = None,
+    ignore_engagement_date: bool = False,
 ) -> list[tuple]:
     """Return participants needing blood report loading.
 
@@ -509,7 +512,6 @@ async def _get_eligible_participants(
             en_sub,
             en_sub.c.engagement_id == Engagement.engagement_id,
         )
-        .where(EngagementParticipant.engagement_date <= today)
         .where(AssessmentPackage.assessment_type_code.in_(_METSIGHTS_PRO_BASIC_TYPE_CODES))
         .where(
             or_(
@@ -520,10 +522,16 @@ async def _get_eligible_participants(
         .where(AssessmentInstance.metsights_record_id.isnot(None))
         .where(AssessmentInstance.metsights_record_id != "")
     )
+    if not ignore_engagement_date:
+        query = query.where(EngagementParticipant.engagement_date <= today)
     if not all_engagements:
         query = query.where(Engagement.status.ilike("running"))
     if engagement_id is not None:
         query = query.where(Engagement.engagement_id == engagement_id)
+    if user_ids is not None:
+        if not user_ids:
+            return []
+        query = query.where(EngagementParticipant.user_id.in_(user_ids))
     result = await db.execute(query)
     return result.all()
 
@@ -613,6 +621,9 @@ async def load_blood_reports(
     dry_run: bool = False,
     all_engagements: bool = False,
     engagement_id: int | None = None,
+    user_ids: set[int] | None = None,
+    send_notifications: bool = True,
+    ignore_engagement_date: bool = False,
     on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     """Load blood reports and notify participants.
@@ -626,6 +637,8 @@ async def load_blood_reports(
         today,
         all_engagements=all_engagements,
         engagement_id=engagement_id,
+        user_ids=user_ids,
+        ignore_engagement_date=ignore_engagement_date,
     )
     await release_request_transaction(db)
     matched = len(participants)
@@ -1035,47 +1048,48 @@ async def load_blood_reports(
                         details=details,
                     )
 
-                if not is_full_report:
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped",
-                        "reason": "full_report is 0; notification not sent",
-                    })
-                    continue
+                if send_notifications:
+                    if not is_full_report:
+                        skipped += 1
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped",
+                            "reason": "full_report is 0; notification not sent",
+                        })
+                        continue
 
-                if not _blood_report_data_complete(blood_parameters, diagnostic_report_url):
-                    skipped += 1
-                    incomplete_reason = (
-                        "blood report data incomplete "
-                        "(missing blood_parameters or diagnostic_report_url)"
+                    if not _blood_report_data_complete(blood_parameters, diagnostic_report_url):
+                        skipped += 1
+                        incomplete_reason = (
+                            "blood report data incomplete "
+                            "(missing blood_parameters or diagnostic_report_url)"
+                        )
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped",
+                            "reason": incomplete_reason,
+                        })
+                        continue
+
+                    service_configs = normalize_notification_services(blood_report_services)
+                    if not service_configs:
+                        skipped += 1
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped", "reason": "blood reports ready, no notification keys configured",
+                        })
+                        continue
+
+                    notified += await _send_report_notifications(
+                        db,
+                        notifications_service=notifications_service,
+                        service_configs=service_configs,
+                        user_id=user_id,
+                        engagement_id=engagement_id,
+                        assessment_instance_id=instance_id,
+                        details=details,
                     )
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped",
-                        "reason": incomplete_reason,
-                    })
-                    continue
-
-                service_configs = normalize_notification_services(blood_report_services)
-                if not service_configs:
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "blood reports ready, no notification keys configured",
-                    })
-                    continue
-
-                notified += await _send_report_notifications(
-                    db,
-                    notifications_service=notifications_service,
-                    service_configs=service_configs,
-                    user_id=user_id,
-                    engagement_id=engagement_id,
-                    assessment_instance_id=instance_id,
-                    details=details,
-                )
-                await db.commit()
+                    await db.commit()
 
             except Exception as exc:
                 await db.rollback()

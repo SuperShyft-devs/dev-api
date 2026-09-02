@@ -446,6 +446,10 @@ class MoveParticipantsBatchRequest(BaseModel):
     user_ids: list[int] = Field(min_length=1)
 
 
+class LoadBloodReportsForParticipantsRequest(BaseModel):
+    user_ids: list[int] = Field(min_length=1, max_length=50)
+
+
 class ConsultationConsentRequest(BaseModel):
     bio_ai: bool = False
     blood_report: bool = False

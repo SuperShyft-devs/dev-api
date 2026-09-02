@@ -29,6 +29,7 @@ from modules.engagements.schemas import (
     EngagementParticipantUpdateRequest,
     EngagementStatusUpdateRequest,
     EngagementUpdateRequest,
+    LoadBloodReportsForParticipantsRequest,
     MoveParticipantRequest,
     MoveParticipantsBatchRequest,
     CreatePhleboRequest,
@@ -38,6 +39,8 @@ from modules.engagements.schemas import (
 from modules.engagements.models import Engagement
 from modules.engagements.participant_list_filters import filters_to_meta, parse_participant_list_filters
 from modules.engagements.service import EngagementsService
+from modules.metsights.dependencies import get_metsights_sync_service
+from modules.metsights.sync_service import MetsightsSyncService
 
 router = APIRouter(prefix="/engagements", tags=["engagements"])
 
@@ -613,6 +616,28 @@ async def get_engagement_participant_stats(
         filters=filters,
     )
     return success_response(data, meta={"filters": filters_to_meta(filters)})
+
+
+@router.post("/{engagement_id}/participants/load-blood-reports")
+async def load_blood_reports_for_engagement_participants(
+    engagement_id: int,
+    payload: LoadBloodReportsForParticipantsRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+    sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
+):
+    """Load blood reports for selected participants (same as cron job, no notifications)."""
+
+    data = await engagements_service.load_blood_reports_for_participants(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        user_ids=payload.user_ids,
+        sync_service=sync_service,
+    )
+    await db.commit()
+    return success_response(data)
 
 
 @router.get("/{engagement_id}/participants")
