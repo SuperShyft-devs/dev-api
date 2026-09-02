@@ -21,6 +21,7 @@ from modules.notifications.dependencies import (
 )
 from modules.notifications.questionnaire_reminders import dispatch_questionnaire_reminders
 from modules.notifications.schemas import (
+    BulkDeleteNotificationsRequest,
     CallbackRequest,
     DispatchRequest,
     NotificationServiceCreate,
@@ -222,6 +223,20 @@ async def delete_service(
 ):
     result = await svc.delete_service(
         db, notification_service_id=notification_service_id
+    )
+    await db.commit()
+    return success_response(result)
+
+
+@router.post("/bulk-delete")
+async def bulk_delete_notifications(
+    payload: BulkDeleteNotificationsRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    svc: NotificationsService = Depends(get_notifications_service),
+):
+    result = await svc.delete_notifications(
+        db, notification_ids=payload.notification_ids
     )
     await db.commit()
     return success_response(result)

@@ -93,6 +93,10 @@ class NotificationServiceCreate(BaseModel):
     require_external_link: bool = False
 
 
+class BulkDeleteNotificationsRequest(BaseModel):
+    notification_ids: list[PositiveIntId] = Field(..., min_length=1, max_length=500)
+
+
 class NotificationServiceUpdate(BaseModel):
     display_name: OptionalSafeDisplayName = None
     channel: str | None = Field(None, pattern=r"^(email|whatsapp)$")

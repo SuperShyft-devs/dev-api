@@ -623,6 +623,21 @@ class NotificationsService:
             )
         return {"notification_id": notification_id, "deleted": True}
 
+    async def delete_notifications(
+        self, db: AsyncSession, *, notification_ids: list[int]
+    ) -> dict:
+        unique_ids = list(dict.fromkeys(notification_ids))
+        deleted_ids = await self._repo.delete_notifications(
+            db, notification_ids=unique_ids
+        )
+        deleted_set = set(deleted_ids)
+        not_found_ids = [nid for nid in unique_ids if nid not in deleted_set]
+        return {
+            "deleted_ids": deleted_ids,
+            "deleted_count": len(deleted_ids),
+            "not_found_ids": not_found_ids,
+        }
+
     async def delete_service(
         self, db: AsyncSession, *, notification_service_id: int
     ) -> dict:

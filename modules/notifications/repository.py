@@ -175,6 +175,19 @@ class NotificationsRepository:
         await db.flush()
         return int(result.rowcount or 0)
 
+    async def delete_notifications(
+        self, db: AsyncSession, *, notification_ids: list[int]
+    ) -> list[int]:
+        if not notification_ids:
+            return []
+        result = await db.execute(
+            delete(Notification)
+            .where(Notification.notification_id.in_(notification_ids))
+            .returning(Notification.notification_id)
+        )
+        await db.flush()
+        return list(result.scalars().all())
+
     def _apply_notification_list_filters(
         self,
         query,
