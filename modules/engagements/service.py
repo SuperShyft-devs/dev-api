@@ -2023,6 +2023,36 @@ class EngagementsService:
             "not_ready_names": not_ready_names[:100],
         }
 
+    async def participant_user_ids_for_engagement_id(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        filters: ParticipantListFilters | None = None,
+    ) -> dict[str, Any]:
+        """Return user_ids for all participants matching list filters (no pagination)."""
+
+        ensure_admin(employee)
+        await self._ensure_engagement_exists(db, engagement_id)
+
+        resolved_filters = (
+            await self._resolve_participant_list_filters(
+                db,
+                engagement_id=engagement_id,
+                filters=filters,
+            )
+            if filters is not None
+            else None
+        )
+
+        user_ids = await self._repository.list_participant_user_ids_by_engagement_id(
+            db,
+            engagement_id=engagement_id,
+            filters=resolved_filters,
+        )
+        return {"user_ids": user_ids, "total": len(user_ids)}
+
     async def participant_filter_options_for_engagement_id(
         self,
         db: AsyncSession,

@@ -762,6 +762,25 @@ class EngagementsRepository:
         result = await db.execute(query)
         return list(result.all())
 
+    async def list_participant_user_ids_by_engagement_id(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        filters: ParticipantListFilters | None = None,
+    ) -> list[int]:
+        ranked_rows = self._participant_ranked_subquery(
+            engagement_id=engagement_id,
+            filters=filters,
+        )
+        query = (
+            select(ranked_rows.c.user_id)
+            .where(ranked_rows.c.rn == 1)
+            .order_by(ranked_rows.c.user_id.asc())
+        )
+        result = await db.execute(query)
+        return [int(user_id) for user_id in result.scalars().all()]
+
     async def count_distinct_participants_by_engagement_ids(
         self,
         db: AsyncSession,

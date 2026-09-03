@@ -619,6 +619,38 @@ async def get_engagement_participant_stats(
     return success_response(data, meta={"filters": filters_to_meta(filters)})
 
 
+@router.get("/{engagement_id}/participants/ids")
+async def get_engagement_participant_ids(
+    engagement_id: int,
+    request: Request,
+    search: str | None = None,
+    engagement_date: date | None = None,
+    booking_date: date | None = None,
+    department: str | None = None,
+    has_booking_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """User IDs for all participants matching the same filters as the list endpoint."""
+
+    filters = _participant_filters_from_request(
+        request,
+        search=search,
+        engagement_date=engagement_date,
+        booking_date=booking_date,
+        department=department,
+        has_booking_id=has_booking_id,
+    )
+    data = await engagements_service.participant_user_ids_for_engagement_id(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        filters=filters,
+    )
+    return success_response(data, meta={"filters": filters_to_meta(filters)})
+
+
 @router.post("/{engagement_id}/participants/load-blood-reports")
 async def load_blood_reports_for_engagement_participants(
     engagement_id: int,
