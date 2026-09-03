@@ -1910,6 +1910,7 @@ class EngagementsService:
             booking_date=filters.booking_date,
             department=filters.department,
             has_booking_id=filters.has_booking_id,
+            reports_ready=filters.reports_ready,
             booking_date_user_ids=user_ids,
             consultation_filters=filters.consultation_filters,
         )

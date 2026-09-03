@@ -1,0 +1,387 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Fan out: one output item per member\nconst body = $input.first().json.body;\nconst notificationId = body.notification_id;\n\nreturn body.members.map(member => ({\n  json: {\n    notification_id: notificationId,\n    first_name: member.first_name || 'Participant',\n    last_name: member.last_name || '',\n    email: member.email,\n    phone: member.phone || ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4944,
+        -320
+      ],
+      "id": "dcbn-split-0001-0000-0000-000000000001",
+      "name": "Split Members"
+    },
+    {
+      "parameters": {
+        "content": "## Doctor Consultation Booking Notice Email\nInforms members that doctor consultation booking will open on the Supershyft app, and that HR will follow up once the option is released.\n\nRequired payload:\n{\n  notification_id: number,\n  members: [{\n    first_name, last_name, email, phone\n  }]\n}\n\nNo require_external_link or require_session_details needed.",
+        "height": 640,
+        "width": 1848
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4400,
+        -480
+      ],
+      "typeVersion": 1,
+      "id": "dcbn-sticky-0001-0000-0000-000000000001",
+      "name": "Sticky Note Doctor Consultation Booking Notice"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "doctor-consultation-booking-notice-email-v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4496,
+        -240
+      ],
+      "id": "dcbn-webhook-0001-0000-0000-000000000001",
+      "name": "Doctor Consultation Booking Notice Email",
+      "webhookId": "dcbn-webhook-id-0001-0000-000000000001"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "dcbn-cond-0001-0000-0000-000000000001",
+              "leftValue": "={{ $json.body.notification_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "dcbn-cond-0002-0000-0000-000000000002",
+              "leftValue": "={{ $json.body.members }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "dcbn-cond-0003-0000-0000-000000000003",
+              "leftValue": "={{ $json.body.members.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4720,
+        -240
+      ],
+      "id": "dcbn-if-0001-0000-0000-000000000001",
+      "name": "Validate Email Payload"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const member = $input.item.json;\nconst name = (member.first_name || 'Participant').trim();\n\nconst body = `Dear ${name},\n\nYou will receive access to book your doctor consultation through the Supershyft app. The entire consultation process will be managed through the app, where you can select your preferred cabin, date, and time slot.\n\nYour HR team will reach out to you once the booking option is released on the app.\n\nRegards,\nTeam Supershyft`;\n\nreturn {\n  json: {\n    notification_id: member.notification_id,\n    to: member.email,\n    subject: 'Doctor Consultation Booking on Supershyft App',\n    body\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5152,
+        -320
+      ],
+      "id": "dcbn-prepare-0001-0000-0000-000000000001",
+      "name": "Prepare Doctor Consultation Booking Notice Email"
+    },
+    {
+      "parameters": {
+        "fromEmail": "support@supershyft.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        5376,
+        -320
+      ],
+      "id": "dcbn-send-0001-0000-0000-000000000001",
+      "name": "Send Doctor Consultation Booking Notice Email",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "webhookId": "dcbn-send-webhook-0001-0000-000000000001",
+      "credentials": {
+        "smtp": {
+          "id": "eCub7Y6RwBvqnurK",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dcbn-sent-0001-0000-0000-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Doctor Consultation Booking Notice Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "dcbn-sent-0002-0000-0000-000000000002",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "dcbn-sent-0003-0000-0000-000000000003",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5728,
+        -336
+      ],
+      "id": "dcbn-set-sent-0001-0000-0000-000000000001",
+      "name": "Email Sent Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dcbn-fail-0001-0000-0000-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Doctor Consultation Booking Notice Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "dcbn-fail-0002-0000-0000-000000000002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "dcbn-fail-0003-0000-0000-000000000003",
+              "name": "message",
+              "value": "Email sending failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5584,
+        -208
+      ],
+      "id": "dcbn-set-fail-0001-0000-0000-000000000001",
+      "name": "Email Failed Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dcbn-valfail-0001-0000-0000-000000000001",
+              "name": "notification_id",
+              "value": "={{ $('Doctor Consultation Booking Notice Email').item.json.body.notification_id }}",
+              "type": "number"
+            },
+            {
+              "id": "dcbn-valfail-0002-0000-0000-000000000002",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "dcbn-valfail-0003-0000-0000-000000000003",
+              "name": "message",
+              "value": "Payload validation failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4944,
+        -64
+      ],
+      "id": "dcbn-set-valfail-0001-0000-0000-000000000001",
+      "name": "Email Validation Failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.supershyft.com/notifications/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notification_id\": {{ $json.notification_id }},\n  \"status\": \"{{ $json.status }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6000,
+        -64
+      ],
+      "id": "dcbn-callback-0001-0000-0000-000000000001",
+      "name": "Email Callback",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "djiMPtATquR2OnRc",
+          "name": "Notification Header Auth | api.supershyft"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Split Members": {
+      "main": [
+        [
+          {
+            "node": "Prepare Doctor Consultation Booking Notice Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doctor Consultation Booking Notice Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Email Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email Payload": {
+      "main": [
+        [
+          {
+            "node": "Split Members",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Doctor Consultation Booking Notice Email": {
+      "main": [
+        [
+          {
+            "node": "Send Doctor Consultation Booking Notice Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Doctor Consultation Booking Notice Email": {
+      "main": [
+        [
+          {
+            "node": "Email Sent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Sent Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Response": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Validation Failed": {
+      "main": [
+        [
+          {
+            "node": "Email Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "eed8b3457b986f6362867dfc9a5378439da2846ec92ad64fddac97c84b5cba32"
+  }
+}

@@ -14,6 +14,7 @@ class ParticipantListFilters:
     booking_date: date | None = None
     department: str | None = None
     has_booking_id: bool | None = None
+    reports_ready: bool | None = None
     booking_date_user_ids: set[int] | None = None
     consultation_filters: dict[str, str] = field(default_factory=dict)
 
@@ -25,6 +26,7 @@ def parse_participant_list_filters(
     booking_date: date | None = None,
     department: str | None = None,
     has_booking_id: str | None = None,
+    reports_ready: str | None = None,
     consultation_filters: dict[str, str] | None = None,
 ) -> ParticipantListFilters:
     parsed_has_booking_id: bool | None = None
@@ -32,6 +34,12 @@ def parse_participant_list_filters(
         parsed_has_booking_id = True
     elif has_booking_id == "no":
         parsed_has_booking_id = False
+
+    parsed_reports_ready: bool | None = None
+    if reports_ready == "yes":
+        parsed_reports_ready = True
+    elif reports_ready == "no":
+        parsed_reports_ready = False
 
     normalized_search = (search or "").strip() or None
     normalized_department = (department or "").strip() or None
@@ -42,6 +50,7 @@ def parse_participant_list_filters(
         booking_date=booking_date,
         department=normalized_department,
         has_booking_id=parsed_has_booking_id,
+        reports_ready=parsed_reports_ready,
         consultation_filters={
             key: value
             for key, value in (consultation_filters or {}).items()
@@ -57,6 +66,7 @@ def filters_are_active(filters: ParticipantListFilters) -> bool:
         or filters.booking_date
         or filters.department
         or filters.has_booking_id is not None
+        or filters.reports_ready is not None
         or filters.consultation_filters
     )
 
@@ -72,6 +82,13 @@ def filters_to_meta(filters: ParticipantListFilters) -> dict[str, Any]:
             if filters.has_booking_id is True
             else "no"
             if filters.has_booking_id is False
+            else None
+        ),
+        "reports_ready": (
+            "yes"
+            if filters.reports_ready is True
+            else "no"
+            if filters.reports_ready is False
             else None
         ),
         "consultation_filters": filters.consultation_filters or None,

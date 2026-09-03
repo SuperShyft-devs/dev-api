@@ -629,6 +629,40 @@ class EngagementsRepository:
                         EngagementParticipant.booking_id == "",
                     )
                 )
+            if filters.reports_ready is not None:
+                from modules.reports.models import IndividualHealthReport
+
+                # Blood and Bio AI URLs may live on different IHR rows for the
+                # same user+engagement — require both to be non-empty.
+                bio_ai_report_ready = (
+                    select(IndividualHealthReport.report_id)
+                    .where(
+                        IndividualHealthReport.user_id == EngagementParticipant.user_id,
+                        IndividualHealthReport.engagement_id
+                        == EngagementParticipant.engagement_id,
+                        IndividualHealthReport.report_url.isnot(None),
+                        func.trim(IndividualHealthReport.report_url) != "",
+                    )
+                    .exists()
+                )
+                blood_report_ready = (
+                    select(IndividualHealthReport.report_id)
+                    .where(
+                        IndividualHealthReport.user_id == EngagementParticipant.user_id,
+                        IndividualHealthReport.engagement_id
+                        == EngagementParticipant.engagement_id,
+                        IndividualHealthReport.diagnostic_report_url.isnot(None),
+                        func.trim(IndividualHealthReport.diagnostic_report_url) != "",
+                    )
+                    .exists()
+                )
+                if filters.reports_ready is True:
+                    participant_filters.append(bio_ai_report_ready)
+                    participant_filters.append(blood_report_ready)
+                else:
+                    participant_filters.append(
+                        or_(~bio_ai_report_ready, ~blood_report_ready)
+                    )
             for expert_type, want_filter in filters.consultation_filters.items():
                 consultation_exists = (
                     select(ConsultationBooking.consultation_id)

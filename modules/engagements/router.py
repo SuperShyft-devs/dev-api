@@ -65,6 +65,7 @@ def _participant_filters_from_request(
     booking_date: date | None = None,
     department: str | None = None,
     has_booking_id: str | None = None,
+    reports_ready: str | None = None,
 ):
     return parse_participant_list_filters(
         search=search,
@@ -72,6 +73,7 @@ def _participant_filters_from_request(
         booking_date=booking_date,
         department=department,
         has_booking_id=has_booking_id,
+        reports_ready=reports_ready,
         consultation_filters=_consultation_filters_from_query(request),
     )
 
@@ -598,6 +600,7 @@ async def get_engagement_participant_stats(
     booking_date: date | None = None,
     department: str | None = None,
     has_booking_id: str | None = None,
+    reports_ready: str | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     engagements_service: EngagementsService = Depends(get_engagements_service),
@@ -609,6 +612,7 @@ async def get_engagement_participant_stats(
         booking_date=booking_date,
         department=department,
         has_booking_id=has_booking_id,
+        reports_ready=reports_ready,
     )
     data = await engagements_service.participant_stats_for_engagement_id(
         db,
@@ -628,6 +632,7 @@ async def get_engagement_participant_ids(
     booking_date: date | None = None,
     department: str | None = None,
     has_booking_id: str | None = None,
+    reports_ready: str | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     engagements_service: EngagementsService = Depends(get_engagements_service),
@@ -641,6 +646,7 @@ async def get_engagement_participant_ids(
         booking_date=booking_date,
         department=department,
         has_booking_id=has_booking_id,
+        reports_ready=reports_ready,
     )
     data = await engagements_service.participant_user_ids_for_engagement_id(
         db,
@@ -704,6 +710,7 @@ async def get_engagement_participants_by_id(
     booking_date: date | None = None,
     department: str | None = None,
     has_booking_id: str | None = None,
+    reports_ready: str | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     engagements_service: EngagementsService = Depends(get_engagements_service),
@@ -720,6 +727,7 @@ async def get_engagement_participants_by_id(
         booking_date=booking_date,
         department=department,
         has_booking_id=has_booking_id,
+        reports_ready=reports_ready,
     )
 
     participants, total = await engagements_service.list_participants_for_engagement_id(
