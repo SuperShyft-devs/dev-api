@@ -30,6 +30,7 @@ from modules.engagements.schemas import (
     EngagementStatusUpdateRequest,
     EngagementUpdateRequest,
     LoadBloodReportsForParticipantsRequest,
+    LoadBioaiReportsForParticipantsRequest,
     MoveParticipantRequest,
     MoveParticipantsBatchRequest,
     CreatePhleboRequest,
@@ -635,6 +636,26 @@ async def load_blood_reports_for_engagement_participants(
         engagement_id=engagement_id,
         user_ids=payload.user_ids,
         sync_service=sync_service,
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.post("/{engagement_id}/participants/load-bioai-reports")
+async def load_bioai_reports_for_engagement_participants(
+    engagement_id: int,
+    payload: LoadBioaiReportsForParticipantsRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """Load BioAI reports for selected participants (same as cron job, no notifications)."""
+
+    data = await engagements_service.load_bioai_reports_for_participants(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        user_ids=payload.user_ids,
     )
     await db.commit()
     return success_response(data)

@@ -79,6 +79,8 @@ async def _get_eligible_participants(
     *,
     all_engagements: bool = False,
     engagement_id: int | None = None,
+    user_ids: set[int] | None = None,
+    ignore_engagement_date: bool = False,
 ) -> list[tuple]:
     """Return participants with MetSights Basic/Pro assessments where today >= engagement_date.
 
@@ -124,15 +126,22 @@ async def _get_eligible_participants(
             en_sub,
             en_sub.c.engagement_id == Engagement.engagement_id,
         )
-        .where(EngagementParticipant.engagement_date <= today)
-        .where(AssessmentInstance.metsights_record_id.isnot(None))
-        .where(AssessmentInstance.metsights_record_id != "")
         .where(AssessmentPackage.assessment_type_code.in_(_PRO_BASIC_TYPE_CODES))
     )
+    if not ignore_engagement_date:
+        query = query.where(EngagementParticipant.engagement_date <= today)
     if not all_engagements:
         query = query.where(Engagement.status.ilike("running"))
     if engagement_id is not None:
         query = query.where(Engagement.engagement_id == engagement_id)
+    if user_ids is not None:
+        if not user_ids:
+            return []
+        query = query.where(EngagementParticipant.user_id.in_(user_ids))
+    query = (
+        query.where(AssessmentInstance.metsights_record_id.isnot(None))
+        .where(AssessmentInstance.metsights_record_id != "")
+    )
     result = await db.execute(query)
     return result.all()
 
@@ -195,6 +204,9 @@ async def load_bioai_reports(
     dry_run: bool = False,
     all_engagements: bool = False,
     engagement_id: int | None = None,
+    user_ids: set[int] | None = None,
+    send_notifications: bool = True,
+    ignore_engagement_date: bool = False,
     on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     """Load BioAI reports and notify participants.
@@ -208,6 +220,8 @@ async def load_bioai_reports(
         today,
         all_engagements=all_engagements,
         engagement_id=engagement_id,
+        user_ids=user_ids,
+        ignore_engagement_date=ignore_engagement_date,
     )
     matched = len(participants)
     loaded = 0
@@ -387,25 +401,26 @@ async def load_bioai_reports(
                     })
                     continue
 
-                service_configs = normalize_notification_services(bioai_report_services)
-                if not service_configs:
-                    skipped += 1
-                    details.append({
-                        "user_id": user_id, "engagement_id": engagement_id,
-                        "action": "skipped", "reason": "reports ready, no notification keys configured",
-                    })
-                    continue
+                if send_notifications:
+                    service_configs = normalize_notification_services(bioai_report_services)
+                    if not service_configs:
+                        skipped += 1
+                        details.append({
+                            "user_id": user_id, "engagement_id": engagement_id,
+                            "action": "skipped", "reason": "reports ready, no notification keys configured",
+                        })
+                        continue
 
-                notified += await _send_report_notifications(
-                    db,
-                    notifications_service=notifications_service,
-                    service_configs=service_configs,
-                    user_id=user_id,
-                    engagement_id=engagement_id,
-                    assessment_instance_id=instance_id,
-                    details=details,
-                )
-                await db.commit()
+                    notified += await _send_report_notifications(
+                        db,
+                        notifications_service=notifications_service,
+                        service_configs=service_configs,
+                        user_id=user_id,
+                        engagement_id=engagement_id,
+                        assessment_instance_id=instance_id,
+                        details=details,
+                    )
+                    await db.commit()
 
             except Exception as exc:
                 await db.rollback()

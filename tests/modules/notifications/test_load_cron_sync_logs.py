@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, time, timedelta
 
 import pytest
@@ -42,6 +43,18 @@ async def _seed_bioai_participant(
     )
     await test_db_session.execute(
         text(
+            "INSERT INTO engagement_types (code, display_name, is_active) "
+            "VALUES ('bio_ai', 'Bio AI', true) ON CONFLICT (code) DO NOTHING"
+        )
+    )
+    type_row = (
+        await test_db_session.execute(
+            text("SELECT id FROM engagement_types WHERE code = 'bio_ai'")
+        )
+    ).one()
+    engagement_type_id = int(type_row[0])
+    await test_db_session.execute(
+        text(
             "INSERT INTO diagnostic_package (diagnostic_package_id, package_name, diagnostic_provider, status) "
             "VALUES (1, 'Test Diagnostic', 'test_provider', 'active') ON CONFLICT (diagnostic_package_id) DO NOTHING"
         )
@@ -68,7 +81,7 @@ async def _seed_bioai_participant(
             engagement_id=engagement_id,
             engagement_name="BioAI Cron Engagement",
             engagement_code=f"ENG-BIOAI-CRON-{engagement_id}",
-            engagement_type="bio_ai",
+            engagement_type=engagement_type_id,
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="Bengaluru",
@@ -76,10 +89,37 @@ async def _seed_bioai_participant(
             start_date=date.today() - timedelta(days=7),
             end_date=date.today() + timedelta(days=7),
             status="running",
-            bioai_report_notification=bioai_notification,
         )
     )
     await test_db_session.flush()
+
+    if bioai_notification:
+        evt_row = (
+            await test_db_session.execute(
+                text(
+                    "SELECT id FROM auto_notification_events "
+                    "WHERE event_code = 'bioai_report_ready'"
+                )
+            )
+        ).one_or_none()
+        if evt_row is not None:
+            services_json = json.dumps(
+                [{"service_key": bioai_notification, "external_link": None}]
+            )
+            await test_db_session.execute(
+                text(
+                    "INSERT INTO engagement_notifications "
+                    "(engagement_id, notification_event_id, notification_services) "
+                    "VALUES (:eid, :evt, CAST(:services AS jsonb)) "
+                    "ON CONFLICT (engagement_id, notification_event_id) DO UPDATE "
+                    "SET notification_services = EXCLUDED.notification_services"
+                ),
+                {
+                    "eid": engagement_id,
+                    "evt": int(evt_row[0]),
+                    "services": services_json,
+                },
+            )
     test_db_session.add(
         EngagementParticipant(
             engagement_id=engagement_id,
@@ -261,6 +301,60 @@ async def test_load_bioai_reports_sends_notifications_when_configured(test_db_se
     assert result["loaded"] == 1
     assert result["notified"] == 1
     assert dispatch_calls == [{"user_ids": [99001], "assessment_instance_id": 99001}]
+
+
+@pytest.mark.asyncio
+async def test_load_bioai_reports_send_notifications_false_never_dispatches(
+    test_db_session, monkeypatch
+):
+    await _seed_bioai_participant(
+        test_db_session,
+        user_id=990113,
+        engagement_id=990113,
+        assessment_id=990113,
+    )
+    monkeypatch.setattr(settings, "METSIGHTS_API_KEY", "test-key")
+    metsights_service = MetsightsService(client=MetsightsClient())
+
+    async def _fake_blood_params(*, record_id: str):
+        return {"is_complete": True}
+
+    async def _fake_report(*, record_id: str, assessment_type_code: str | None):
+        return {"file": "https://example.com/bioai.pdf"}
+
+    async def _fake_register(*args, **kwargs):
+        return "https://bio-ai-reports.supershyft.com/r/testslug"
+
+    monkeypatch.setattr(metsights_service, "get_blood_parameters", _fake_blood_params)
+    monkeypatch.setattr(metsights_service, "get_report", _fake_report)
+    monkeypatch.setattr(
+        "modules.notifications.load_bioai_reports.register_permanent_bio_ai_report_url",
+        _fake_register,
+    )
+
+    dispatch_calls: list[dict] = []
+
+    async def _fake_dispatch(self, db, *, payload, triggered_by_user_id=None):
+        dispatch_calls.append(
+            {
+                "user_ids": list(payload.user_ids),
+                "assessment_instance_id": payload.assessment_instance_id,
+            }
+        )
+        return {"dispatched": len(payload.user_ids)}
+
+    monkeypatch.setattr(NotificationsService, "dispatch", _fake_dispatch)
+
+    result = await load_bioai_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=NotificationsService(NotificationsRepository()),
+        send_notifications=False,
+    )
+
+    assert result["loaded"] == 1
+    assert result["notified"] == 0
+    assert dispatch_calls == []
 
 
 @pytest.mark.asyncio
