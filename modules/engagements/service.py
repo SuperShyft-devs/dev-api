@@ -2135,6 +2135,7 @@ class EngagementsService:
         employee: EmployeeContext,
         engagement_id: int,
         user_ids: list[int],
+        sync_service: "MetsightsSyncService",
     ) -> dict[str, Any]:
         """Run load_bioai_reports for selected participants without sending notifications."""
 
@@ -2160,7 +2161,7 @@ class EngagementsService:
                 ),
             )
 
-        if self._metsights_service is None:
+        if self._metsights_service is None or self._assessments_service is None:
             raise AppError(
                 status_code=503,
                 error_code="EXTERNAL_SERVICE_UNAVAILABLE",
@@ -2177,6 +2178,8 @@ class EngagementsService:
             db,
             metsights_service=self._metsights_service,
             notifications_service=notifications_service,
+            assessments_service=self._assessments_service,
+            sync_service=sync_service,
             engagement_id=engagement_id,
             user_ids=set(unique_user_ids),
             send_notifications=False,

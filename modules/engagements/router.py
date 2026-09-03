@@ -686,6 +686,7 @@ async def load_bioai_reports_for_engagement_participants(
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext = Depends(get_current_employee),
     engagements_service: EngagementsService = Depends(get_engagements_service),
+    sync_service: MetsightsSyncService = Depends(get_metsights_sync_service),
 ):
     """Load BioAI reports for selected participants (same as cron job, no notifications)."""
 
@@ -694,6 +695,7 @@ async def load_bioai_reports_for_engagement_participants(
         employee=employee,
         engagement_id=engagement_id,
         user_ids=payload.user_ids,
+        sync_service=sync_service,
     )
     await db.commit()
     return success_response(data)
