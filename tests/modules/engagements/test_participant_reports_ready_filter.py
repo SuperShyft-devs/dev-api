@@ -82,19 +82,28 @@ async def _seed_engagement(test_db_session, *, engagement_id: int, type_code: st
     await test_db_session.commit()
 
 
-@pytest.mark.asyncio
-async def test_reports_ready_filter_both_urls(async_client, test_db_session):
-    engagement_id = 88501
-    admin_id = 88502
-    await _seed_employee(test_db_session, user_id=admin_id, employee_id=admin_id)
-    await _seed_engagement(test_db_session, engagement_id=engagement_id, type_code="reports_ready_filter")
+async def _ids(async_client, *, engagement_id: int, admin_id: int, reports_ready: str) -> list[int]:
+    response = await async_client.get(
+        f"/engagements/{engagement_id}/participants/ids?reports_ready={reports_ready}",
+        headers=_auth_header(admin_id),
+    )
+    assert response.status_code == 200
+    return sorted(response.json()["data"]["user_ids"])
 
-    both_ready = 885101
-    bio_only = 885102
-    blood_only = 885103
-    neither = 885104
-    # Bio AI + blood URLs on separate IHR rows — still counts as ready.
-    split_rows = 885105
+
+@pytest.mark.asyncio
+async def test_reports_ready_filter_modes(async_client, test_db_session):
+    engagement_id = 88601
+    admin_id = 88602
+    await _seed_employee(test_db_session, user_id=admin_id, employee_id=admin_id)
+    await _seed_engagement(test_db_session, engagement_id=engagement_id, type_code="reports_ready_filter_v2")
+
+    both_ready = 886101
+    bio_only = 886102
+    blood_only = 886103
+    neither = 886104
+    # Bio AI + blood URLs on separate IHR rows — still counts as both ready.
+    split_rows = 886105
 
     for user_id in (both_ready, bio_only, blood_only, neither, split_rows):
         test_db_session.add(
@@ -153,30 +162,42 @@ async def test_reports_ready_filter_both_urls(async_client, test_db_session):
     )
     await test_db_session.commit()
 
-    ready = await async_client.get(
-        f"/engagements/{engagement_id}/participants/ids?reports_ready=yes",
-        headers=_auth_header(admin_id),
-    )
-    assert ready.status_code == 200
-    ready_payload = ready.json()["data"]
-    assert ready_payload["total"] == 2
-    assert sorted(ready_payload["user_ids"]) == [both_ready, split_rows]
-
-    missing = await async_client.get(
-        f"/engagements/{engagement_id}/participants/ids?reports_ready=no",
-        headers=_auth_header(admin_id),
-    )
-    assert missing.status_code == 200
-    missing_payload = missing.json()["data"]
-    assert missing_payload["total"] == 3
-    assert sorted(missing_payload["user_ids"]) == [bio_only, blood_only, neither]
+    assert await _ids(async_client, engagement_id=engagement_id, admin_id=admin_id, reports_ready="bio_ai") == [
+        both_ready,
+        bio_only,
+        split_rows,
+    ]
+    assert await _ids(async_client, engagement_id=engagement_id, admin_id=admin_id, reports_ready="blood") == [
+        both_ready,
+        blood_only,
+        split_rows,
+    ]
+    assert await _ids(async_client, engagement_id=engagement_id, admin_id=admin_id, reports_ready="both") == [
+        both_ready,
+        split_rows,
+    ]
+    assert await _ids(async_client, engagement_id=engagement_id, admin_id=admin_id, reports_ready="missing") == [
+        bio_only,
+        blood_only,
+        neither,
+    ]
+    # Legacy aliases still work.
+    assert await _ids(async_client, engagement_id=engagement_id, admin_id=admin_id, reports_ready="yes") == [
+        both_ready,
+        split_rows,
+    ]
+    assert await _ids(async_client, engagement_id=engagement_id, admin_id=admin_id, reports_ready="no") == [
+        bio_only,
+        blood_only,
+        neither,
+    ]
 
     listed = await async_client.get(
-        f"/engagements/{engagement_id}/participants?reports_ready=yes&page=1&limit=50",
+        f"/engagements/{engagement_id}/participants?reports_ready=both&page=1&limit=50",
         headers=_auth_header(admin_id),
     )
     assert listed.status_code == 200
     listed_body = listed.json()
     assert listed_body["meta"]["total"] == 2
-    assert listed_body["meta"]["filters"]["reports_ready"] == "yes"
+    assert listed_body["meta"]["filters"]["reports_ready"] == "both"
     assert sorted(p["user_id"] for p in listed_body["data"]) == [both_ready, split_rows]

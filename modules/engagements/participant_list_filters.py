@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any
+from typing import Any, Literal
+
+ReportsReadyFilter = Literal["bio_ai", "blood", "both", "missing"]
+
+_REPORTS_READY_VALUES: frozenset[str] = frozenset({"bio_ai", "blood", "both", "missing"})
+# Backward-compatible aliases from the initial yes/no filter.
+_REPORTS_READY_ALIASES: dict[str, ReportsReadyFilter] = {
+    "yes": "both",
+    "no": "missing",
+}
 
 
 @dataclass(frozen=True)
@@ -14,7 +23,7 @@ class ParticipantListFilters:
     booking_date: date | None = None
     department: str | None = None
     has_booking_id: bool | None = None
-    reports_ready: bool | None = None
+    reports_ready: ReportsReadyFilter | None = None
     booking_date_user_ids: set[int] | None = None
     consultation_filters: dict[str, str] = field(default_factory=dict)
 
@@ -35,11 +44,11 @@ def parse_participant_list_filters(
     elif has_booking_id == "no":
         parsed_has_booking_id = False
 
-    parsed_reports_ready: bool | None = None
-    if reports_ready == "yes":
-        parsed_reports_ready = True
-    elif reports_ready == "no":
-        parsed_reports_ready = False
+    parsed_reports_ready: ReportsReadyFilter | None = None
+    if reports_ready in _REPORTS_READY_VALUES:
+        parsed_reports_ready = reports_ready  # type: ignore[assignment]
+    elif reports_ready in _REPORTS_READY_ALIASES:
+        parsed_reports_ready = _REPORTS_READY_ALIASES[reports_ready]
 
     normalized_search = (search or "").strip() or None
     normalized_department = (department or "").strip() or None
@@ -84,12 +93,6 @@ def filters_to_meta(filters: ParticipantListFilters) -> dict[str, Any]:
             if filters.has_booking_id is False
             else None
         ),
-        "reports_ready": (
-            "yes"
-            if filters.reports_ready is True
-            else "no"
-            if filters.reports_ready is False
-            else None
-        ),
+        "reports_ready": filters.reports_ready,
         "consultation_filters": filters.consultation_filters or None,
     }

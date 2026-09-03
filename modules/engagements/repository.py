@@ -633,7 +633,7 @@ class EngagementsRepository:
                 from modules.reports.models import IndividualHealthReport
 
                 # Blood and Bio AI URLs may live on different IHR rows for the
-                # same user+engagement — require both to be non-empty.
+                # same user+engagement.
                 bio_ai_report_ready = (
                     select(IndividualHealthReport.report_id)
                     .where(
@@ -656,10 +656,15 @@ class EngagementsRepository:
                     )
                     .exists()
                 )
-                if filters.reports_ready is True:
+                if filters.reports_ready == "bio_ai":
+                    participant_filters.append(bio_ai_report_ready)
+                elif filters.reports_ready == "blood":
+                    participant_filters.append(blood_report_ready)
+                elif filters.reports_ready == "both":
                     participant_filters.append(bio_ai_report_ready)
                     participant_filters.append(blood_report_ready)
-                else:
+                elif filters.reports_ready == "missing":
+                    # Missing at least one report URL (not both ready).
                     participant_filters.append(
                         or_(~bio_ai_report_ready, ~blood_report_ready)
                     )
