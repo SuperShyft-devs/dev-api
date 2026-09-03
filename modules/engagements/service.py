@@ -2187,6 +2187,54 @@ class EngagementsService:
             ignore_engagement_date=True,
         )
 
+    async def remove_reports_for_participants(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        engagement_id: int,
+        user_ids: list[int],
+    ) -> dict[str, Any]:
+        """Hard-delete all individual_health_report rows for selected participants in an engagement."""
+
+        ensure_admin(employee)
+        await self._ensure_engagement_exists(db, engagement_id)
+
+        unique_user_ids = list(dict.fromkeys(int(user_id) for user_id in user_ids))
+        enrolled = await self._repository.get_participants_map_for_engagement(
+            db,
+            engagement_id=engagement_id,
+            user_ids=unique_user_ids,
+        )
+        missing = [user_id for user_id in unique_user_ids if user_id not in enrolled]
+        if missing:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_INPUT",
+                message=(
+                    "These participants are not in the engagement: "
+                    + ", ".join(str(user_id) for user_id in missing)
+                ),
+            )
+
+        total_removed = 0
+        users_with_no_reports = 0
+        for user_id in unique_user_ids:
+            deleted = await self._reports_repository.delete_individual_reports_for_engagement(
+                db,
+                user_id=user_id,
+                engagement_id=engagement_id,
+            )
+            total_removed += deleted
+            if deleted == 0:
+                users_with_no_reports += 1
+
+        return {
+            "removed": total_removed,
+            "users_processed": len(unique_user_ids),
+            "users_with_no_reports": users_with_no_reports,
+        }
+
     async def list_booking_dates_for_engagement_id(
         self,
         db: AsyncSession,

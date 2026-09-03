@@ -31,6 +31,7 @@ from modules.engagements.schemas import (
     EngagementUpdateRequest,
     LoadBloodReportsForParticipantsRequest,
     LoadBioaiReportsForParticipantsRequest,
+    RemoveReportsForParticipantsRequest,
     MoveParticipantRequest,
     MoveParticipantsBatchRequest,
     CreatePhleboRequest,
@@ -696,6 +697,26 @@ async def load_bioai_reports_for_engagement_participants(
         engagement_id=engagement_id,
         user_ids=payload.user_ids,
         sync_service=sync_service,
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.post("/{engagement_id}/participants/remove-reports")
+async def remove_reports_for_engagement_participants(
+    engagement_id: int,
+    payload: RemoveReportsForParticipantsRequest,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """Delete all individual health report rows for selected participants in an engagement."""
+
+    data = await engagements_service.remove_reports_for_participants(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        user_ids=payload.user_ids,
     )
     await db.commit()
     return success_response(data)
