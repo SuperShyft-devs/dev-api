@@ -127,6 +127,7 @@ def test_is_healthians_diagnostic_provider_case_insensitive():
 def test_try_participant_booking_id_requires_healthians_provider():
     assert try_participant_booking_id("12345", "healthians") == "12345"
     assert try_participant_booking_id("12345", "other_lab") is None
+    assert try_participant_booking_id("12345", None) == "12345"
     assert try_participant_booking_id(None, "healthians") is None
     assert try_participant_booking_id("  ", "healthians") is None
 
@@ -153,6 +154,30 @@ async def test_resolve_prefers_participant_booking_without_metsights(test_db_ses
     assert resolved.booking_id == "1387716654555"
     assert resolved.source == HealthiansBookingSource.PARTICIPANT
     assert resolved.collection_data is None
+    assert fake_metsights.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_resolve_prefers_participant_booking_when_provider_unset(test_db_session):
+    await _seed_participant_context(test_db_session, diagnostic_provider="")
+    await test_db_session.commit()
+
+    fake_metsights = _FakeMetsightsService(
+        payload={
+            "reference_id": "metsights-booking",
+            "provider": {"code": "Healthians"},
+        }
+    )
+    resolved = await resolve_healthians_booking_id(
+        test_db_session,
+        user_id=50101,
+        engagement_id=40101,
+        record_id="REC50101",
+        metsights_service=fake_metsights,
+    )
+
+    assert resolved.booking_id == "1387716654555"
+    assert resolved.source == HealthiansBookingSource.PARTICIPANT
     assert fake_metsights.calls == 0
 
 

@@ -68,7 +68,8 @@ def try_participant_booking_id(
     booking_id = (participant_booking_id or "").strip()
     if not booking_id:
         return None
-    if not is_healthians_diagnostic_provider(diagnostic_provider):
+    provider = (diagnostic_provider or "").strip()
+    if provider and not is_healthians_diagnostic_provider(provider):
         return None
     return booking_id
 

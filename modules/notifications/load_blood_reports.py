@@ -868,7 +868,10 @@ async def load_blood_reports(
                 url_to_store = persistable_url
                 stored_diag_url = (diag_url or "").strip() if diag_url else ""
 
-                skip_digital_reload = verified_at_unchanged(stored_verified_at, api_verified_at)
+                skip_digital_reload = (
+                    verified_at_unchanged(stored_verified_at, api_verified_at)
+                    and _blood_report_data_complete(blood_params, diag_url)
+                )
                 blood_loaded_this_run = False
                 blood_drafted_this_run = False
 

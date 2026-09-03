@@ -567,6 +567,80 @@ async def test_load_blood_reports_skips_reload_when_verified_at_unchanged(
 
 
 @pytest.mark.asyncio
+async def test_load_blood_reports_reloads_when_verified_at_unchanged_but_blood_missing(
+    test_db_session, monkeypatch
+):
+    """After remove-reports, metadata may match Healthians but blood_parameters are gone."""
+    await _seed_running_participant(
+        test_db_session,
+        user_id=990115,
+        engagement_id=990115,
+        assessment_id=990115,
+        booking_id="BOOK-990115",
+        existing_blood_parameters=None,
+        existing_verified_at=_VERIFIED_AT_DT,
+        existing_full_report=True,
+        existing_diag_url=_REPORT_URL,
+    )
+
+    digital_calls: list[str] = []
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_report(_token, _booking_id):
+        return _report_payload()
+
+    async def _fake_digital(_token, booking_id):
+        digital_calls.append(booking_id)
+        return {
+            "data": [
+                {
+                    "customer_name": "John Doe",
+                    "deal_id": "BOOK-990115",
+                    "test_values": [{"test_name": "Glucose Fasting", "value": "80", "unit": "mg/dL"}],
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_report",
+        _fake_report,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_digital_value",
+        _fake_digital,
+    )
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    result = await load_blood_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=notifications_service,
+        assessments_service=assessments_service,
+        sync_service=sync_service,
+        engagement_id=990115,
+        user_ids={990115},
+        all_engagements=True,
+    )
+
+    assert "BOOK-990115" in digital_calls
+    assert result["loaded"] >= 1
+
+    ihr = (
+        await test_db_session.execute(
+            select(IndividualHealthReport).where(IndividualHealthReport.assessment_instance_id == 990115)
+        )
+    ).scalar_one()
+    assert ihr.blood_parameters is not None
+
+
+@pytest.mark.asyncio
 async def test_load_blood_reports_skips_metsights_retry_when_categories_submitted(
     test_db_session, monkeypatch
 ):
