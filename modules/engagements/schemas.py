@@ -447,11 +447,11 @@ class MoveParticipantsBatchRequest(BaseModel):
 
 
 class LoadBloodReportsForParticipantsRequest(BaseModel):
-    user_ids: list[int] = Field(min_length=1, max_length=50)
+    user_ids: list[int] = Field(min_length=1, max_length=2000)
 
 
 class LoadBioaiReportsForParticipantsRequest(BaseModel):
-    user_ids: list[int] = Field(min_length=1, max_length=50)
+    user_ids: list[int] = Field(min_length=1, max_length=2000)
 
 
 class ConsultationConsentRequest(BaseModel):
