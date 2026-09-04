@@ -357,16 +357,6 @@ class EngagementsService:
 
         return await self._slot_info_repository.create(db, data)
 
-    async def _blood_test_complete_by_user_engagement(
-        self,
-        db: AsyncSession,
-        rows: list[tuple],
-    ) -> dict[tuple[int, int], bool]:
-        """Map (user_id, engagement_id) to Healthians full_report availability."""
-        from modules.engagements.blood_test_complete_resolver import resolve_blood_test_complete_flags
-
-        return await resolve_blood_test_complete_flags(db, rows)
-
     async def _participant_rows_to_dicts(self, db: AsyncSession, rows: list[tuple]) -> list[dict[str, Any]]:
         all_booking_ids: list[int] = []
         for row in rows:
@@ -375,7 +365,6 @@ class EngagementsService:
 
         bookings = await self._consultation_bookings.get_by_ids(db, list(dict.fromkeys(all_booking_ids)))
         bookings_by_id = {booking.consultation_id: booking for booking in bookings}
-        blood_test_complete_flags = await self._blood_test_complete_by_user_engagement(db, rows)
 
         result: list[dict[str, Any]] = []
         for row in rows:
@@ -383,10 +372,7 @@ class EngagementsService:
             participant_bookings = [bookings_by_id[i] for i in ids if i in bookings_by_id]
             consultations = bookings_to_consultations_map(participant_bookings)
             participant = _participant_enrollment_to_dict(row, consultations=consultations)
-            participant["blood_test_complete"] = blood_test_complete_flags.get(
-                (int(row[2]), int(row[1])),
-                False,
-            )
+            participant["blood_test_complete"] = None
             result.append(participant)
         return result
 

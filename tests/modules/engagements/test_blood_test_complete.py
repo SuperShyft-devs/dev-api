@@ -73,19 +73,7 @@ async def _seed_engagement(test_db_session, *, engagement_id: int, type_code: st
 
 
 @pytest.mark.asyncio
-@patch("modules.engagements.blood_test_complete_resolver.healthians_client.get_booking_report", new_callable=AsyncMock)
-@patch("modules.engagements.blood_test_complete_resolver.healthians_client.get_access_token", new_callable=AsyncMock)
-async def test_participant_blood_test_complete_calls_healthians_live(
-    mock_get_access_token,
-    mock_get_booking_report,
-    test_db_session,
-):
-    mock_get_access_token.return_value = "token"
-    mock_get_booking_report.return_value = {
-        "status": True,
-        "data": [{"cust_name": "NEELIMA M", "full_report": 1}],
-    }
-
+async def test_participant_list_skips_live_healthians_enrichment(test_db_session):
     engagement_id = 988150
     user_id = 988150
     await _seed_engagement(test_db_session, engagement_id=engagement_id, type_code="blood_complete_live")
@@ -122,5 +110,61 @@ async def test_participant_blood_test_complete_calls_healthians_live(
     result = await service._participant_rows_to_dicts(test_db_session, participants)
 
     assert len(result) == 1
-    assert result[0]["blood_test_complete"] is True
+    assert result[0]["blood_test_complete"] is None
+
+
+@pytest.mark.asyncio
+@patch("modules.engagements.blood_test_complete_resolver.healthians_client.get_booking_report", new_callable=AsyncMock)
+@patch("modules.engagements.blood_test_complete_resolver.healthians_client.get_access_token", new_callable=AsyncMock)
+async def test_participant_stats_calls_healthians_live(
+    mock_get_access_token,
+    mock_get_booking_report,
+    test_db_session,
+):
+    mock_get_access_token.return_value = "token"
+    mock_get_booking_report.return_value = {
+        "status": True,
+        "data": [{"cust_name": "NEELIMA M", "full_report": 1}],
+    }
+
+    engagement_id = 988151
+    user_id = 988151
+    await _seed_employee(test_db_session, user_id=988152, employee_id=988152)
+    await _seed_engagement(test_db_session, engagement_id=engagement_id, type_code="blood_complete_stats")
+    test_db_session.add(
+        User(
+            user_id=user_id,
+            age=25,
+            first_name="Neelima",
+            last_name="M",
+            phone="7902555238",
+            status="active",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=988151,
+            engagement_id=engagement_id,
+            user_id=user_id,
+            booking_id="20014806389",
+        )
+    )
+    await test_db_session.commit()
+
+    service = EngagementsService(repository=__import__(
+        "modules.engagements.repository", fromlist=["EngagementsRepository"]
+    ).EngagementsRepository())
+    from modules.employee.service import EmployeeContext
+
+    employee = EmployeeContext(employee_id=988152, user_id=988152, role="admin")
+    stats = await service.participant_stats_for_engagement_id(
+        test_db_session,
+        employee=employee,
+        engagement_id=engagement_id,
+        filters=None,
+    )
+
+    assert stats["filtered_total"] == 1
+    assert stats["filtered_blood_test_complete"] == 1
     mock_get_booking_report.assert_awaited_once()
