@@ -676,6 +676,25 @@ class MetsightsService:
                 error_body = exc.response.json()
             except Exception:
                 error_body = exc.response.text
+            detail_text = ""
+            if isinstance(error_body, dict):
+                detail_text = str(error_body.get("detail") or "")
+            else:
+                detail_text = str(error_body)
+            # Metsights requires the parent blood-parameters row before advanced.
+            if (
+                res == "advanced-blood-parameters"
+                and "blood parameter does not exist" in detail_text.lower()
+            ):
+                raise AppError(
+                    status_code=422,
+                    error_code="METSIGHTS_VALIDATION_ERROR",
+                    message=(
+                        "Metsights rejected data for advanced-blood-parameters: "
+                        "parent blood-parameters does not exist for this record. "
+                        "Push blood-parameters first, then retry advanced."
+                    ),
+                ) from exc
             hint = ""
             if isinstance(payload, dict):
                 bad = _extract_bad_fields(exc)

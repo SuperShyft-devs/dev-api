@@ -242,7 +242,8 @@ async def _ensure_metsights_blood_categories(
     *,
     package_id: int,
     instance_id: int,
-    submitted: bool,
+    submitted: bool = False,
+    submitted_keys: frozenset[str] | set[str] | None = None,
 ) -> None:
     keys = (
         ("blood-parameters", "Blood Parameters", 98111),
@@ -282,7 +283,10 @@ async def _ensure_metsights_blood_categories(
                     category_id=int(category.category_id),
                 )
             )
-        if submitted:
+        mark_submitted = (
+            key in submitted_keys if submitted_keys is not None else submitted
+        )
+        if mark_submitted:
             existing_progress = (
                 await test_db_session.execute(
                     select(AssessmentCategoryProgress).where(
@@ -489,7 +493,7 @@ async def test_load_blood_reports_skips_reload_when_verified_at_unchanged(
         existing_blood_parameters=existing_blood,
         existing_verified_at=_VERIFIED_AT_DT,
         existing_full_report=True,
-        existing_diag_url=_REPORT_URL,
+        existing_diag_url=_ARCHIVED_REPORT_URL,
     )
 
     digital_calls: list[str] = []
@@ -566,6 +570,127 @@ async def test_load_blood_reports_skips_reload_when_verified_at_unchanged(
         if d["action"] == "skipped"
     )
     assert "blood-parameters" in push_calls
+
+
+@pytest.mark.asyncio
+async def test_load_blood_reports_reloads_when_full_report_missing_archived_url(
+    test_db_session, monkeypatch
+):
+    """Full report with verified_at match but no archived PDF must re-enter load path."""
+    existing_blood = [
+        {
+            "group_name": "Metabolic",
+            "test_count": 1,
+            "tests": [{"parameter_key": "glucose_fasting", "value": 80.0, "unit": "mg/dL"}],
+        }
+    ]
+    await _seed_running_participant(
+        test_db_session,
+        user_id=880111,
+        engagement_id=880111,
+        assessment_id=880111,
+        booking_id="BOOK-880111",
+        existing_blood_parameters=existing_blood,
+        existing_verified_at=_VERIFIED_AT_DT,
+        existing_full_report=True,
+        existing_diag_url=None,
+    )
+
+    digital_calls: list[str] = []
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_report(_token, _booking_id):
+        return _report_payload()
+
+    async def _fake_digital(_token, booking_id):
+        digital_calls.append(booking_id)
+        return {
+            "data": [
+                {
+                    "customer_name": "John Doe",
+                    "tests": [{"parameter": "Glucose Fasting", "value": "90", "unit": "mg/dL"}],
+                }
+            ]
+        }
+
+    async def _fake_group(db, raw_customer, *, diagnostic_package_id):
+        return (
+            [
+                {
+                    "group_name": "Metabolic",
+                    "test_count": 1,
+                    "tests": [{"parameter_key": "glucose_fasting", "value": 90.0, "unit": "mg/dL"}],
+                }
+            ],
+            {"raw": True},
+        )
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_report",
+        _fake_report,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_digital_value",
+        _fake_digital,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports._group_provider_blood",
+        _fake_group,
+    )
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    async def _fake_draft(db, *, user_id, assessment_instance_id, allow_completed=False):
+        return {"responses_drafted": 1}
+
+    monkeypatch.setattr(assessments_service, "draft_blood_parameters_from_report", _fake_draft)
+
+    async def _report_missing(self, *, record_id: str, assessment_type_code: str | None):
+        return False
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.is_bioai_report_generated",
+        _report_missing,
+    )
+
+    async def _fake_push(self, db, *, assessment_instance_id, user_id, category_key, category_of="metsights"):
+        return {"fields_pushed": ["glucose_fasting_value"]}
+
+    monkeypatch.setattr(
+        "modules.metsights.sync_service.MetsightsSyncService._push_category_to_metsights",
+        _fake_push,
+    )
+
+    async def _fake_dispatch(self, db, *, payload, triggered_by_user_id=None):
+        return {"dispatched": 1}
+
+    monkeypatch.setattr(
+        "modules.notifications.service.NotificationsService.dispatch",
+        _fake_dispatch,
+    )
+
+    result = await load_blood_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=notifications_service,
+        assessments_service=assessments_service,
+        sync_service=sync_service,
+    )
+
+    assert digital_calls == ["BOOK-880111"]
+    assert result["loaded"] >= 1
+    ihr = (
+        await test_db_session.execute(
+            select(IndividualHealthReport).where(IndividualHealthReport.assessment_instance_id == 880111)
+        )
+    ).scalar_one()
+    assert ihr.diagnostic_report_url == _ARCHIVED_REPORT_URL
 
 
 @pytest.mark.asyncio
@@ -661,7 +786,7 @@ async def test_load_blood_reports_skips_metsights_retry_when_categories_submitte
         existing_blood_parameters=existing_blood,
         existing_verified_at=_VERIFIED_AT_DT,
         existing_full_report=True,
-        existing_diag_url=_REPORT_URL,
+        existing_diag_url=_ARCHIVED_REPORT_URL,
     )
     await _ensure_metsights_blood_categories(
         test_db_session,
@@ -735,6 +860,123 @@ async def test_load_blood_reports_skips_metsights_retry_when_categories_submitte
         "already submitted to Metsights" in d["reason"]
         for d in result["details"]
         if d["action"] == "skipped"
+    )
+
+
+@pytest.mark.asyncio
+async def test_load_blood_reports_repushes_blood_when_missing_on_metsights(
+    test_db_session, monkeypatch
+):
+    """Stale local blood-parameters submitted flag must not block advanced push."""
+    existing_blood = [
+        {
+            "group_name": "Metabolic",
+            "test_count": 1,
+            "tests": [{"parameter_key": "glucose_fasting", "value": 80.0, "unit": "mg/dL"}],
+        }
+    ]
+    await _seed_running_participant(
+        test_db_session,
+        user_id=88014,
+        engagement_id=88014,
+        assessment_id=88014,
+        existing_blood_parameters=existing_blood,
+        existing_verified_at=_VERIFIED_AT_DT,
+        existing_full_report=True,
+        existing_diag_url=_ARCHIVED_REPORT_URL,
+    )
+    await _ensure_metsights_blood_categories(
+        test_db_session,
+        package_id=1,
+        instance_id=88014,
+        submitted_keys={"blood-parameters"},
+    )
+
+    async def _fake_token():
+        return "token"
+
+    async def _fake_report(_token, _booking_id):
+        return _report_payload()
+
+    async def _fake_digital(_token, booking_id):
+        return {"data": []}
+
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_report",
+        _fake_report,
+    )
+    monkeypatch.setattr(
+        "modules.notifications.load_blood_reports.healthians_client.get_booking_digital_value",
+        _fake_digital,
+    )
+
+    metsights_service, sync_service, assessments_service, notifications_service = _build_services(monkeypatch)
+
+    async def _fake_draft(db, *, user_id, assessment_instance_id, allow_completed=False):
+        return {"responses_drafted": 11}
+
+    monkeypatch.setattr(assessments_service, "draft_blood_parameters_from_report", _fake_draft)
+
+    async def _fake_fallback(db, *, user_id, assessment_instance_id, category_keys=None):
+        return {"responses_drafted": 0}
+
+    monkeypatch.setattr(
+        assessments_service,
+        "draft_blood_parameter_internal_fallbacks",
+        _fake_fallback,
+    )
+
+    async def _report_missing(self, *, record_id: str, assessment_type_code: str | None):
+        return False
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.is_bioai_report_generated",
+        _report_missing,
+    )
+
+    async def _parent_missing(self, *, record_id: str, resource: str):
+        return None
+
+    monkeypatch.setattr(
+        "modules.metsights.service.MetsightsService.get_record_subresource_or_none",
+        _parent_missing,
+    )
+
+    push_calls: list[str] = []
+
+    async def _fake_push(self, db, *, assessment_instance_id, user_id, category_key, category_of="metsights"):
+        push_calls.append(category_key)
+        return {"fields_pushed": ["field"]}
+
+    monkeypatch.setattr(
+        "modules.metsights.sync_service.MetsightsSyncService._push_category_to_metsights",
+        _fake_push,
+    )
+
+    async def _fake_dispatch(self, db, *, payload, triggered_by_user_id=None):
+        return {"dispatched": 1}
+
+    monkeypatch.setattr(
+        "modules.notifications.service.NotificationsService.dispatch",
+        _fake_dispatch,
+    )
+
+    result = await load_blood_reports(
+        test_db_session,
+        metsights_service=metsights_service,
+        notifications_service=notifications_service,
+        assessments_service=assessments_service,
+        sync_service=sync_service,
+    )
+
+    assert push_calls[:2] == ["blood-parameters", "advanced-blood-parameters"]
+    assert any(
+        "missing on Metsights; re-pushing before advanced-blood-parameters" in d["reason"]
+        for d in result["details"]
     )
 
 
@@ -1635,7 +1877,7 @@ async def test_load_blood_reports_applies_proactive_fallbacks_before_push(
         existing_blood_parameters=existing_blood,
         existing_verified_at=_VERIFIED_AT_DT,
         existing_full_report=True,
-        existing_diag_url=_REPORT_URL,
+        existing_diag_url=_ARCHIVED_REPORT_URL,
     )
 
     digital_calls: list[str] = []
@@ -1743,7 +1985,7 @@ async def test_load_blood_reports_persists_full_report_when_verified_at_unchange
         existing_blood_parameters=existing_blood,
         existing_verified_at=_VERIFIED_AT_DT,
         existing_full_report=False,
-        existing_diag_url=_REPORT_URL,
+        existing_diag_url=_ARCHIVED_REPORT_URL,
     )
 
     digital_calls: list[str] = []

@@ -6,14 +6,18 @@ where today >= engagement_date:
 2. If blood_parameters_verified_at matches API verified_at, skip getBookingDigitalValue
    but still refresh blood_parameters_full_report / diagnostic_report_url metadata when
    those fields changed (partial reports keep diagnostic_report_url null; full reports
-   store an archived supershyft URL only).
+   store an archived supershyft URL only). Full reports without an archived PDF URL
+   always re-enter the load path so archival can retry.
 3. After a successful blood load, draft blood-parameter questionnaire responses.
 4. After blood values are available, check whether the engagement primary
    package's metsights ``blood-parameters`` / ``advanced-blood-parameters``
    categories are submitted. Push (or retry) any that are not, unless BioAI
-   is already generated. For *full* reports, fill missing mandatory answers from
-   internal average fallbacks before push; on push failure, apply fallbacks again
-   and retry once. Partial reports never receive average fallbacks.
+   is already generated. If advanced needs push but local blood-parameters is
+   marked submitted while Metsights has no parent blood-parameters row, re-push
+   blood-parameters first (Metsights rejects advanced otherwise). For *full*
+   reports, fill missing mandatory answers from internal average fallbacks
+   before push; on push failure, apply fallbacks again and retry once. Partial
+   reports never receive average fallbacks.
 5. Notifications only when full_report is true, and only when both blood fields
    are present, using engagement_notifications for blood_report_ready event
    (skipping services already sent).
@@ -197,6 +201,7 @@ async def _sync_unsubmitted_blood_to_metsights(
         return
 
     to_push: list[str] = []
+    skipped_as_submitted: list[str] = []
     for category_key in category_keys:
         submitted = await _is_metsights_blood_category_submitted(
             db,
@@ -204,14 +209,42 @@ async def _sync_unsubmitted_blood_to_metsights(
             category_key=category_key,
         )
         if submitted and not blood_loaded_this_run:
+            skipped_as_submitted.append(category_key)
+            continue
+        to_push.append(category_key)
+
+    # Metsights rejects advanced-blood-parameters with
+    # "Blood parameter does not exist for this record" unless the parent
+    # blood-parameters sub-resource exists. Local is_submitted can be stale
+    # (marked submitted while Metsights never got / lost the parent row).
+    if (
+        ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY in to_push
+        and BLOOD_PARAMETER_CATEGORY_KEY in skipped_as_submitted
+    ):
+        parent = await metsights_service.get_record_subresource_or_none(
+            record_id=record_id,
+            resource=BLOOD_PARAMETER_CATEGORY_KEY,
+        )
+        if parent is None:
+            skipped_as_submitted.remove(BLOOD_PARAMETER_CATEGORY_KEY)
+            to_push.insert(0, BLOOD_PARAMETER_CATEGORY_KEY)
             details.append({
                 "user_id": user_id,
                 "engagement_id": engagement_id,
                 "action": "skipped",
-                "reason": f"{category_key} already submitted to Metsights",
+                "reason": (
+                    "blood-parameters marked submitted locally but missing on "
+                    "Metsights; re-pushing before advanced-blood-parameters"
+                ),
             })
-            continue
-        to_push.append(category_key)
+
+    for category_key in skipped_as_submitted:
+        details.append({
+            "user_id": user_id,
+            "engagement_id": engagement_id,
+            "action": "skipped",
+            "reason": f"{category_key} already submitted to Metsights",
+        })
 
     if not to_push:
         return
@@ -883,9 +916,17 @@ async def load_blood_reports(
                 # signed URLs are never left in diagnostic_report_url.
                 url_changed = (url_to_store or "") != stored_diag_url
 
+                # Full reports also require a permanent archived PDF URL. If the
+                # archived link is missing (or still a transient Healthians/S3 URL),
+                # re-enter the load path so archival can retry even when verified_at
+                # matches.
+                has_archived_pdf = is_archived_blood_report_url(
+                    str(diag_url).strip() if diag_url is not None else None
+                )
                 skip_digital_reload = (
                     verified_at_unchanged(stored_verified_at, api_verified_at)
                     and has_usable_provider_blood_parameters(blood_params)
+                    and (not is_full_report or has_archived_pdf)
                 )
                 blood_loaded_this_run = False
                 blood_drafted_this_run = False
@@ -915,6 +956,7 @@ async def load_blood_reports(
                             ihr_id = ihr.report_id
                         await db.flush()
                         await db.commit()
+                        loaded += 1
                         details.append({
                             "user_id": user_id,
                             "engagement_id": engagement_id,
