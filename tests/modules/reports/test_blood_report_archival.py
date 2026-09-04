@@ -85,14 +85,47 @@ async def test_archive_blood_report_pdf_rejects_non_pdf(blood_reports_paths, mon
 
 
 @pytest.mark.asyncio
-async def test_resolve_persistable_diagnostic_report_url_partial_uses_healthians():
+async def test_resolve_persistable_diagnostic_report_url_partial_returns_none():
     url = await resolve_persistable_diagnostic_report_url(
         _HEALTHIANS_URL,
         is_full_report=False,
         existing_url=None,
         assessment_instance_id=1,
     )
-    assert url == _HEALTHIANS_URL
+    assert url is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_persistable_diagnostic_report_url_partial_keeps_archived():
+    url = await resolve_persistable_diagnostic_report_url(
+        _HEALTHIANS_URL,
+        is_full_report=False,
+        existing_url=_ARCHIVED_URL,
+        assessment_instance_id=1,
+    )
+    assert url == _ARCHIVED_URL
+
+
+@pytest.mark.asyncio
+async def test_diagnostic_report_url_to_persist_clears_s3_on_partial():
+    from modules.reports.blood_report_archival import diagnostic_report_url_to_persist
+
+    assert (
+        diagnostic_report_url_to_persist(
+            is_full_report=False,
+            persistable_url=None,
+            existing_url=_HEALTHIANS_URL,
+        )
+        is None
+    )
+    assert (
+        diagnostic_report_url_to_persist(
+            is_full_report=False,
+            persistable_url=None,
+            existing_url=_ARCHIVED_URL,
+        )
+        == _ARCHIVED_URL
+    )
 
 
 @pytest.mark.asyncio
@@ -128,6 +161,28 @@ async def test_resolve_persistable_diagnostic_report_url_reuses_existing_archive
         assessment_instance_id=1,
     )
     assert url == _ARCHIVED_URL
+
+
+@pytest.mark.asyncio
+async def test_diagnostic_report_url_to_persist_never_stores_s3_on_full():
+    from modules.reports.blood_report_archival import diagnostic_report_url_to_persist
+
+    assert (
+        diagnostic_report_url_to_persist(
+            is_full_report=True,
+            persistable_url=_HEALTHIANS_URL,
+            existing_url=None,
+        )
+        is None
+    )
+    assert (
+        diagnostic_report_url_to_persist(
+            is_full_report=True,
+            persistable_url=None,
+            existing_url=_HEALTHIANS_URL,
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio

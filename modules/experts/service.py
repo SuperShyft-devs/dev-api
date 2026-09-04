@@ -1646,8 +1646,13 @@ class ExpertAvailabilityService:
             .where(IndividualHealthReport.engagement_id == engagement.engagement_id)
         )
         reports = list(result.scalars().all())
+        from modules.reports.blood_report_archival import is_archived_blood_report_url
+
         has_bio_ai = any(bool((r.report_url or "").strip()) for r in reports)
-        has_blood_report = any(bool((r.diagnostic_report_url or "").strip()) for r in reports)
+        has_blood_report = any(
+            is_archived_blood_report_url((r.diagnostic_report_url or "").strip())
+            for r in reports
+        )
 
         from modules.assessments.repository import AssessmentsRepository
         from modules.questionnaire.repository import QuestionnaireRepository
@@ -1799,6 +1804,7 @@ class ExpertAvailabilityService:
         else:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Unknown report kind")
 
+        from modules.reports.blood_report_archival import is_archived_blood_report_url
         from modules.reports.models import IndividualHealthReport
 
         result = await db.execute(
@@ -1811,9 +1817,13 @@ class ExpertAvailabilityService:
         url = None
         for report in reports:
             candidate = report.report_url if kind == "bio_ai" else report.diagnostic_report_url
-            if isinstance(candidate, str) and candidate.strip():
-                url = candidate.strip()
-                break
+            if not (isinstance(candidate, str) and candidate.strip()):
+                continue
+            # Blood PDFs must be permanently archived; never return Healthians/S3 links.
+            if kind != "bio_ai" and not is_archived_blood_report_url(candidate.strip()):
+                continue
+            url = candidate.strip()
+            break
         if not url:
             raise AppError(
                 status_code=404,

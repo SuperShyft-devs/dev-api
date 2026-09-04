@@ -12,6 +12,7 @@ from modules.notifications.repository import NotificationsRepository
 from modules.questionnaire.models import QuestionnaireResponse
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.questionnaire.service import QuestionnaireService
+from modules.reports.blood_report_archival import is_archived_blood_report_url
 from modules.users.repository import UsersRepository
 
 
@@ -165,7 +166,11 @@ class ParticipantJourneyService:
             )
 
             ihr = ihr_by_instance.get(instance.assessment_instance_id)
-            has_blood = bool((ihr.diagnostic_report_url or "").strip()) if ihr else False
+            has_blood = (
+                is_archived_blood_report_url((ihr.diagnostic_report_url or "").strip())
+                if ihr
+                else False
+            )
             type_code = (getattr(package, "assessment_type_code", None) or "").strip()
             has_report_url = bool((ihr.report_url or "").strip()) if ihr else False
             has_bio = has_report_url and type_code in ("1", "2")

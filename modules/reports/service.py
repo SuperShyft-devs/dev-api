@@ -32,6 +32,11 @@ from modules.reports.blood_parameters_normalizer import build_grouped_from_healt
 from modules.reports.blood_parameters_read_service import BloodParametersReadService
 from modules.reports.blood_parameters_questionnaire_reader import BloodParametersQuestionnaireReader
 from modules.reports.blood_parameters_schemas import has_usable_provider_blood_parameters
+from modules.reports.blood_report_archival import (
+    diagnostic_report_url_to_persist,
+    is_archived_blood_report_url,
+    resolve_persistable_diagnostic_report_url,
+)
 from modules.reports.healthians_booking_resolver import (
     HealthiansBookingSource,
     is_known_invalid_healthians_booking_id,
@@ -686,12 +691,16 @@ class ReportsService:
         )
         existing_report = assessment_report
         for candidate in (assessment_report, engagement_report):
-            if candidate is not None and (candidate.diagnostic_report_url or "").strip():
+            if candidate is None:
+                continue
+            cached_candidate = (candidate.diagnostic_report_url or "").strip()
+            if cached_candidate and is_archived_blood_report_url(cached_candidate):
                 existing_report = candidate
                 break
 
         cached = (existing_report.diagnostic_report_url if existing_report is not None else None) or ""
-        if cached.strip():
+        # Only serve permanently archived supershyft URLs from cache — never Healthians/S3.
+        if cached.strip() and is_archived_blood_report_url(cached):
             await self._require_audit_service().log_event(
                 db,
                 action="USER_FETCH_DIAGNOSTIC_PDF_REPORT",
@@ -721,6 +730,7 @@ class ReportsService:
 
         full_report: bool | None = None
         verified_at = None
+        report_url: str | None = None
         if resolved.source == HealthiansBookingSource.PARTICIPANT:
             if self._healthians_get_access_token is None or self._healthians_get_booking_report is None:
                 raise AppError(
@@ -779,6 +789,30 @@ class ReportsService:
                     message="Diagnostic report PDF is not available for this record",
                 )
             report_url = file_url.strip()
+            full_report = True
+
+        is_full = bool(full_report) if full_report is not None else False
+        existing_diag = cached.strip() if is_archived_blood_report_url(cached.strip() or None) else None
+        if report_url and is_archived_blood_report_url(report_url.strip()):
+            source_for_resolve = report_url.strip()
+            existing_for_resolve = report_url.strip()
+            is_full_for_resolve = True
+        else:
+            source_for_resolve = report_url or ""
+            existing_for_resolve = existing_diag
+            is_full_for_resolve = is_full
+
+        persistable_url = await resolve_persistable_diagnostic_report_url(
+            source_for_resolve,
+            is_full_report=is_full_for_resolve,
+            existing_url=existing_for_resolve,
+            assessment_instance_id=int(assessment_instance.assessment_instance_id),
+        )
+        url_to_store = diagnostic_report_url_to_persist(
+            is_full_report=is_full_for_resolve,
+            persistable_url=persistable_url,
+            existing_url=existing_diag,
+        )
 
         # Prefer engagement blood/diag row; else assessment row; else create assessment row.
         target = engagement_report if engagement_report is not None else assessment_report
@@ -789,18 +823,29 @@ class ReportsService:
                 assessment_instance_id=assessment_instance.assessment_instance_id,
                 reports=None,
                 blood_parameters=None,
-                diagnostic_report_url=report_url,
+                diagnostic_report_url=url_to_store,
                 blood_parameters_full_report=full_report,
                 blood_parameters_verified_at=verified_at,
             )
             await self._repository.create_individual_report(db, target)
         else:
-            target.diagnostic_report_url = report_url
+            target.diagnostic_report_url = url_to_store
             if full_report is not None:
                 target.blood_parameters_full_report = full_report
             if verified_at is not None:
                 target.blood_parameters_verified_at = verified_at
             await self._repository.update_individual_report(db, target)
+
+        if not url_to_store:
+            raise AppError(
+                status_code=422,
+                error_code="INVALID_STATE",
+                message=(
+                    "Diagnostic report PDF is not available for this record"
+                    if not is_full
+                    else "Blood report PDF archival failed"
+                ),
+            )
 
         await self._require_audit_service().log_event(
             db,
@@ -812,7 +857,7 @@ class ReportsService:
             session_id=None,
         )
 
-        return DiagnosticPdfResponse(assessment_id=assessment_id, report_url=report_url)
+        return DiagnosticPdfResponse(assessment_id=assessment_id, report_url=url_to_store)
 
     async def get_bio_ai_pdf_for_user(
         self,

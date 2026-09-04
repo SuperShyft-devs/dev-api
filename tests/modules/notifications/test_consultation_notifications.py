@@ -249,7 +249,9 @@ async def _insert_blood_ihr(
             user_id=user_id,
             engagement_id=engagement_id,
             blood_report_raw={"hemoglobin": 14} if ready else None,
-            diagnostic_report_url="https://example.com/blood.pdf" if ready else None,
+            diagnostic_report_url=(
+                "https://supershyft.com/reports/AbCdEfGhIjKlMnOp.pdf" if ready else None
+            ),
         )
     )
 

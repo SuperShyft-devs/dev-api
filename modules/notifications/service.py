@@ -30,6 +30,7 @@ from modules.notifications.schemas import (
 )
 from modules.notifications.report_prepare import prepare_user_report_urls
 from modules.reports.bio_ai_report_resolver import resolve_bio_ai_report_url
+from modules.reports.blood_report_archival import is_archived_blood_report_url
 from modules.reports.blood_report_resolver import resolve_blood_report_url
 
 logger = logging.getLogger(__name__)
@@ -235,6 +236,9 @@ class NotificationsService:
                 )
                 if svc.require_blood_report_url:
                     url = (ihr.diagnostic_report_url if ihr else None) or None
+                    # Never send Healthians/S3 signed links — only archived supershyft URLs.
+                    if url and not is_archived_blood_report_url(str(url).strip()):
+                        url = None
                     if not (url and str(url).strip()):
                         try:
                             url = await resolve_blood_report_url(

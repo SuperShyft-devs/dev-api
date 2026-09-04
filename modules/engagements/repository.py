@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, time
+import re
 
 from sqlalchemy import String, and_, false, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -630,10 +631,21 @@ class EngagementsRepository:
                     )
                 )
             if filters.reports_ready is not None:
+                from core.config import settings
                 from modules.reports.models import IndividualHealthReport
 
                 # Blood and Bio AI URLs may live on different IHR rows for the
-                # same user+engagement.
+                # same user+engagement. Blood URLs must be archived supershyft links.
+                blood_base = (settings.BLOOD_REPORTS_BASE_URL or "").strip().rstrip("/")
+                blood_url_archived = (
+                    IndividualHealthReport.diagnostic_report_url.isnot(None),
+                    func.trim(IndividualHealthReport.diagnostic_report_url) != "",
+                    IndividualHealthReport.diagnostic_report_url.op("~")(
+                        f"^{re.escape(blood_base)}/[A-Za-z0-9]{{16}}\\.pdf$"
+                    )
+                    if blood_base
+                    else false(),
+                )
                 bio_ai_report_ready = (
                     select(IndividualHealthReport.report_id)
                     .where(
@@ -651,8 +663,7 @@ class EngagementsRepository:
                         IndividualHealthReport.user_id == EngagementParticipant.user_id,
                         IndividualHealthReport.engagement_id
                         == EngagementParticipant.engagement_id,
-                        IndividualHealthReport.diagnostic_report_url.isnot(None),
-                        func.trim(IndividualHealthReport.diagnostic_report_url) != "",
+                        *blood_url_archived,
                     )
                     .exists()
                 )
@@ -1565,6 +1576,12 @@ class EngagementsRepository:
         or want=true with consultation_date, consultation_slot, and
         consultation_cabin all empty.
         """
+        from core.config import settings
+
+        blood_base = (settings.BLOOD_REPORTS_BASE_URL or "").strip().rstrip("/")
+        blood_url_pattern = (
+            f"^{re.escape(blood_base)}/[A-Za-z0-9]{{16}}\\.pdf$" if blood_base else r"a^"
+        )
         query = text(
             """
             SELECT DISTINCT
@@ -1588,7 +1605,8 @@ class EngagementsRepository:
                      AND ihr.report_url IS NOT NULL)
                  OR (et.code = 'blood_test_with_consultation'
                      AND ihr.blood_report_raw IS NOT NULL
-                     AND ihr.diagnostic_report_url IS NOT NULL)
+                     AND ihr.diagnostic_report_url IS NOT NULL
+                     AND ihr.diagnostic_report_url ~ :blood_url_pattern)
               )
               AND e.consultations IS NOT NULL
               AND jsonb_typeof(e.consultations::jsonb) = 'object'
@@ -1618,7 +1636,7 @@ class EngagementsRepository:
             ORDER BY ep.engagement_id ASC, ep.user_id ASC
             """
         )
-        result = await db.execute(query)
+        result = await db.execute(query, {"blood_url_pattern": blood_url_pattern})
         return [
             (
                 int(row.user_id),

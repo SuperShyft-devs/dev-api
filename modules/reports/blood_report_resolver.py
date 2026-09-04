@@ -16,6 +16,11 @@ from modules.diagnostics.healthians.sync_log import (
     persist_healthians_sync_log_isolated,
 )
 from modules.metsights.service import MetsightsService
+from modules.reports.blood_report_archival import (
+    diagnostic_report_url_to_persist,
+    is_archived_blood_report_url,
+    resolve_persistable_diagnostic_report_url,
+)
 from modules.reports.healthians_booking_resolver import (
     HealthiansBookingSource,
     resolve_healthians_booking_id,
@@ -193,7 +198,8 @@ async def resolve_blood_report_url(
             if (type_code or "").strip() == "7":
                 continue
         cached = (candidate.diagnostic_report_url or "").strip()
-        if cached:
+        # Only reuse permanently archived supershyft URLs — never Healthians/S3 signed links.
+        if cached and is_archived_blood_report_url(cached):
             return cached
 
     record_id = (metsights_record_id or "").strip()
@@ -237,6 +243,8 @@ async def resolve_blood_report_url(
         file_url = collection_data.get("file")
         if isinstance(file_url, str) and file_url.strip():
             report_url = file_url.strip()
+            # MetSights collection files are treated as complete PDFs.
+            full_report = True
         else:
             report_url, full_report, verified_at = await _fetch_healthians_report_fields(
                 db,
@@ -247,23 +255,67 @@ async def resolve_blood_report_url(
                 last_name=last_name or "",
             )
 
+    is_full = bool(full_report) if full_report is not None else False
+    existing_diag = None
+    for candidate in (storage_report, assessment_report, engagement_report, existing_ihr):
+        if candidate is None:
+            continue
+        cached_existing = (candidate.diagnostic_report_url or "").strip()
+        # Only treat permanently archived URLs as reusable existing state.
+        if cached_existing and is_archived_blood_report_url(cached_existing):
+            existing_diag = cached_existing
+            break
+
+    # If Healthians/MetSights already returned a permanent supershyft URL, keep it.
+    if report_url and is_archived_blood_report_url(report_url.strip()):
+        source_for_resolve = report_url.strip()
+        existing_for_resolve = report_url.strip()
+        is_full_for_resolve = True
+    else:
+        source_for_resolve = report_url or ""
+        existing_for_resolve = existing_diag
+        is_full_for_resolve = is_full
+
+    persistable_url = await resolve_persistable_diagnostic_report_url(
+        source_for_resolve,
+        is_full_report=is_full_for_resolve,
+        existing_url=existing_for_resolve,
+        assessment_instance_id=storage_assessment_id,
+    )
+    url_to_store = diagnostic_report_url_to_persist(
+        is_full_report=is_full_for_resolve,
+        persistable_url=persistable_url,
+        existing_url=existing_diag,
+    )
+
     target = storage_report
     if target is None:
         target = IndividualHealthReport(
             user_id=user_id,
             engagement_id=engagement_id,
             assessment_instance_id=storage_assessment_id,
-            diagnostic_report_url=report_url,
+            diagnostic_report_url=url_to_store,
             blood_parameters_full_report=full_report,
             blood_parameters_verified_at=verified_at,
         )
         await repo.create_individual_report(db, target)
     else:
-        target.diagnostic_report_url = report_url
+        target.diagnostic_report_url = url_to_store
         if full_report is not None:
             target.blood_parameters_full_report = full_report
         if verified_at is not None:
             target.blood_parameters_verified_at = verified_at
         await repo.update_individual_report(db, target)
 
-    return report_url
+    if not url_to_store:
+        raise AppError(
+            status_code=422,
+            error_code="INVALID_STATE",
+            message=(
+                "Blood report PDF is not available yet"
+                if not is_full
+                else "Blood report PDF archival failed"
+            ),
+        )
+
+    return url_to_store

@@ -4,8 +4,9 @@ For participants in running engagements with MetSights Pro/Basic assessments
 where today >= engagement_date:
 1. Call getBookingReport first; on failure skip (no digital-value fetch).
 2. If blood_parameters_verified_at matches API verified_at, skip getBookingDigitalValue
-   but still persist diagnostic_report_url / blood_parameters_full_report when those
-   fields changed; otherwise refresh all report metadata and load digital values.
+   but still refresh blood_parameters_full_report / diagnostic_report_url metadata when
+   those fields changed (partial reports keep diagnostic_report_url null; full reports
+   store an archived supershyft URL only).
 3. After a successful blood load, draft blood-parameter questionnaire responses.
 4. After blood values are available, check whether the engagement primary
    package's metsights ``blood-parameters`` / ``advanced-blood-parameters``
@@ -53,7 +54,11 @@ from modules.notifications.dedup import should_skip_notification
 from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
 from modules.reports.blood_parameters_normalizer import build_grouped_from_healthians
-from modules.reports.blood_report_archival import resolve_persistable_diagnostic_report_url
+from modules.reports.blood_report_archival import (
+    diagnostic_report_url_to_persist,
+    is_archived_blood_report_url,
+    resolve_persistable_diagnostic_report_url,
+)
 from modules.reports.blood_report_resolver import _match_customer_by_name
 from modules.reports.blood_parameters_schemas import (
     booking_id_from_fetch_collections,
@@ -97,9 +102,12 @@ def _metsights_report_url(*, record_id: str, assessment_type_code: str) -> str:
 
 
 def _blood_report_data_complete(blood_parameters: Any, diagnostic_report_url: Any) -> bool:
+    """True when blood values exist and the PDF URL is a permanent archived link."""
     return (
         has_usable_provider_blood_parameters(blood_parameters)
-        and diagnostic_report_url is not None
+        and is_archived_blood_report_url(
+            str(diagnostic_report_url).strip() if diagnostic_report_url is not None else None
+        )
     )
 
 
@@ -852,7 +860,7 @@ async def load_blood_reports(
                     is_full_report = api_full_report
 
                 persistable_url = await resolve_persistable_diagnostic_report_url(
-                    fetched_diag_url,
+                    fetched_diag_url or "",
                     is_full_report=is_full_report,
                     existing_url=diag_url,
                     assessment_instance_id=instance_id,
@@ -865,19 +873,26 @@ async def load_blood_reports(
                         "reason": "blood report PDF archival failed",
                     })
 
-                url_to_store = persistable_url
                 stored_diag_url = (diag_url or "").strip() if diag_url else ""
+                url_to_store = diagnostic_report_url_to_persist(
+                    is_full_report=is_full_report,
+                    persistable_url=persistable_url,
+                    existing_url=stored_diag_url,
+                )
+                # Always write the resolved value (including None) so Healthians/S3
+                # signed URLs are never left in diagnostic_report_url.
+                url_changed = (url_to_store or "") != stored_diag_url
 
                 skip_digital_reload = (
                     verified_at_unchanged(stored_verified_at, api_verified_at)
-                    and _blood_report_data_complete(blood_params, diag_url)
+                    and has_usable_provider_blood_parameters(blood_params)
                 )
                 blood_loaded_this_run = False
                 blood_drafted_this_run = False
 
                 metadata_needs_update = (
                     (api_full_report is not None and bool(stored_full_report) != api_full_report)
-                    or (url_to_store is not None and url_to_store != stored_diag_url)
+                    or url_changed
                 )
 
                 if skip_digital_reload:
@@ -889,9 +904,8 @@ async def load_blood_reports(
                             engagement_id=engagement_id,
                             instance_id=instance_id,
                         )
-                        if url_to_store is not None:
-                            ihr.diagnostic_report_url = url_to_store
-                            diagnostic_report_url = url_to_store
+                        ihr.diagnostic_report_url = url_to_store
+                        diagnostic_report_url = url_to_store
                         if api_full_report is not None:
                             ihr.blood_parameters_full_report = api_full_report
                         if api_verified_at is not None:
@@ -923,9 +937,8 @@ async def load_blood_reports(
                         engagement_id=engagement_id,
                         instance_id=instance_id,
                     )
-                    if url_to_store is not None:
-                        ihr.diagnostic_report_url = url_to_store
-                        diagnostic_report_url = url_to_store
+                    ihr.diagnostic_report_url = url_to_store
+                    diagnostic_report_url = url_to_store
                     ihr.blood_parameters_full_report = api_full_report
                     ihr.blood_parameters_verified_at = api_verified_at
                     if ihr_id is None:

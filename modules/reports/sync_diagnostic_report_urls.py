@@ -22,6 +22,7 @@ from modules.diagnostics.healthians import client as healthians_client
 from modules.diagnostics.models import DiagnosticPackage
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.reports.blood_report_archival import (
+    diagnostic_report_url_to_persist,
     is_archived_blood_report_url,
     resolve_persistable_diagnostic_report_url,
 )
@@ -334,36 +335,29 @@ async def sync_diagnostic_report_urls(
 
             storage_instance_id = instance_id if instance_id is not None else 0
             persistable_url = await resolve_persistable_diagnostic_report_url(
-                fetched_diag_url,
+                fetched_diag_url or "",
                 is_full_report=is_full_report,
                 existing_url=diag_url,
                 assessment_instance_id=storage_instance_id,
             )
-            if is_full_report and persistable_url is None:
-                skipped += 1
+            if is_full_report and persistable_url is None and not is_archived_blood_report_url(diag_url):
                 details.append({
                     "user_id": user_id,
                     "engagement_id": row_engagement_id,
                     "action": "skipped",
                     "reason": "blood report PDF archival failed",
                 })
-                continue
-
-            url_to_store = persistable_url
-            if url_to_store is None:
-                skipped += 1
-                details.append({
-                    "user_id": user_id,
-                    "engagement_id": row_engagement_id,
-                    "action": "skipped",
-                    "reason": "no persistable diagnostic_report_url",
-                })
-                continue
+                # Still fall through to clear any leftover Healthians/S3 URL.
 
             stored_diag_url = existing_url
+            url_to_store = diagnostic_report_url_to_persist(
+                is_full_report=is_full_report,
+                persistable_url=persistable_url,
+                existing_url=stored_diag_url,
+            )
             metadata_unchanged = (
                 not force
-                and url_to_store == stored_diag_url
+                and (url_to_store or "") == (stored_diag_url or "")
                 and (api_full_report is None or bool(stored_full_report) == api_full_report)
                 and (
                     api_verified_at is None

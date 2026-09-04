@@ -114,17 +114,27 @@ async def resolve_persistable_diagnostic_report_url(
     existing_url: str | None,
     assessment_instance_id: int,
 ) -> str | None:
-    """Return the URL to store in ``individual_health_report.diagnostic_report_url``."""
+    """Return the URL to store in ``individual_health_report.diagnostic_report_url``.
+
+    Partial Healthians reports must never be persisted (their signed S3 links expire).
+    Only a successful archive to ``BLOOD_REPORTS_BASE_URL`` (or an already-archived
+    existing URL) is stored. Callers should write the returned value even when it is
+    ``None`` so leftover S3 URLs are cleared.
+    """
     healthians = (healthians_url or "").strip()
-    if not healthians:
-        return None
+    existing = (existing_url or "").strip()
 
     if not is_full_report:
-        return healthians
+        # Keep an already-archived supershyft URL; otherwise leave/clear to null.
+        if existing and is_archived_blood_report_url(existing):
+            return existing
+        return None
 
-    existing = (existing_url or "").strip()
     if existing and is_archived_blood_report_url(existing):
         return existing
+
+    if not healthians:
+        return None
 
     try:
         return await archive_blood_report_pdf(
@@ -138,3 +148,24 @@ async def resolve_persistable_diagnostic_report_url(
             exc,
         )
         return None
+
+
+def diagnostic_report_url_to_persist(
+    *,
+    is_full_report: bool,
+    persistable_url: str | None,
+    existing_url: str | None,
+) -> str | None:
+    """Canonical ``diagnostic_report_url`` value to write (never a Healthians/S3 link)."""
+    existing = (existing_url or "").strip() or None
+    persistable = (persistable_url or "").strip() or None
+
+    if persistable and is_archived_blood_report_url(persistable):
+        return persistable
+
+    if existing and is_archived_blood_report_url(existing):
+        # Full-report archival failed: keep prior archive. Partial: keep archive.
+        return existing
+
+    # Never persist Healthians/S3 (or any non-archived) URLs.
+    return None

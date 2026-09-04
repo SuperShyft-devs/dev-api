@@ -203,7 +203,7 @@ async def test_participant_journey_summary_returns_instance_and_counts(async_cli
             engagement_id=9611,
             assessment_instance_id=inst.assessment_instance_id,
             report_url="https://example.com/bio-ai/9611",
-            diagnostic_report_url="https://example.com/blood/9611",
+            diagnostic_report_url="https://supershyft.com/reports/AbCdEfGhIjKlMnOp.pdf",
         )
     )
     await test_db_session.commit()

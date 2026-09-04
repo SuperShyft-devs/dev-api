@@ -43,6 +43,7 @@ from modules.reports.camp_report_section_builders import (
 )
 from modules.notifications.expire_stale import DEFAULT_PENDING_TIMEOUT_HOURS
 from modules.notifications.models import Notification
+from modules.reports.blood_report_archival import is_archived_blood_report_url
 from modules.reports.models import CampReport, IndividualHealthReport
 from modules.users.models import User
 
@@ -829,7 +830,9 @@ class CampReportsRepository:
                 "has_assessment": assessment_instance_id is not None,
                 "has_blood_parameters": blood_parameters is not None,
                 "has_diagnostic_report_url": bool(
-                    str(diagnostic_report_url).strip() if diagnostic_report_url else ""
+                    is_archived_blood_report_url(
+                        str(diagnostic_report_url).strip() if diagnostic_report_url else ""
+                    )
                 ),
                 "actual_age": chronological_age,
             }

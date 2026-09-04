@@ -126,7 +126,7 @@ async def test_reports_ready_filter_modes(async_client, test_db_session):
                 user_id=both_ready,
                 engagement_id=engagement_id,
                 report_url="https://bio-ai-reports.example/r/both",
-                diagnostic_report_url="https://blood.example/both.pdf",
+                diagnostic_report_url="https://supershyft.com/reports/AbCdEfGhIjKlMnOp.pdf",
             ),
             IndividualHealthReport(
                 user_id=bio_only,
@@ -138,7 +138,7 @@ async def test_reports_ready_filter_modes(async_client, test_db_session):
                 user_id=blood_only,
                 engagement_id=engagement_id,
                 report_url=None,
-                diagnostic_report_url="https://blood.example/blood.pdf",
+                diagnostic_report_url="https://supershyft.com/reports/PqRsTuVwXyZaBcDe.pdf",
             ),
             IndividualHealthReport(
                 user_id=neither,
@@ -156,7 +156,7 @@ async def test_reports_ready_filter_modes(async_client, test_db_session):
                 user_id=split_rows,
                 engagement_id=engagement_id,
                 report_url=None,
-                diagnostic_report_url="https://blood.example/split.pdf",
+                diagnostic_report_url="https://supershyft.com/reports/FgHiJkLmNoPqRsTu.pdf",
             ),
         ]
     )

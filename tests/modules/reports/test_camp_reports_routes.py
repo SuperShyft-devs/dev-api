@@ -2418,7 +2418,7 @@ async def _seed_camp_participants_enriched(test_db_session, *, organization_id: 
             user_id=user_id,
             engagement_id=engagement_id,
             assessment_instance_id=assessment_id,
-            diagnostic_report_url="https://example.com/blood.pdf",
+            diagnostic_report_url="https://supershyft.com/reports/AbCdEfGhIjKlMnOp.pdf",
             report_url="https://example.com/bio-ai.pdf",
         )
     )

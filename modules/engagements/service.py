@@ -2975,6 +2975,7 @@ class EngagementsService:
     ) -> dict:
         from modules.engagements.models import EngagementParticipant
         from modules.reports.blood_parameters_schemas import has_usable_provider_blood_parameters
+        from modules.reports.blood_report_archival import is_archived_blood_report_url
         from modules.reports.camp_reports_repository import _coerce_reports_dict
         from modules.reports.models import IndividualHealthReport
         from modules.users.models import User
@@ -3023,7 +3024,9 @@ class EngagementsService:
                     "has_bio_ai_json": False,
                 },
             )
-            if row.diagnostic_report_url and str(row.diagnostic_report_url).strip():
+            if row.diagnostic_report_url and is_archived_blood_report_url(
+                str(row.diagnostic_report_url).strip()
+            ):
                 flags["has_blood_report"] = True
             if has_usable_provider_blood_parameters(row.blood_parameters):
                 flags["has_blood_values"] = True

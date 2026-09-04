@@ -1314,9 +1314,15 @@ async def test_dispatch_fetches_blood_report_when_cache_missing(
                 {
                     "customer_name": "Blood User",
                     "report_url": f"https://example.com/blood/{booking_id}.pdf",
+                    "full_report": 1,
                 }
             ]
         }
+
+    archived_url = "https://supershyft.com/reports/AbCdEfGhIjKlMnOp.pdf"
+
+    async def _fake_archive(source_url, *, assessment_instance_id):
+        return archived_url
 
     monkeypatch.setattr("modules.notifications.service.httpx.AsyncClient", _FakeClient)
     monkeypatch.setattr(
@@ -1331,6 +1337,10 @@ async def test_dispatch_fetches_blood_report_when_cache_missing(
         "modules.diagnostics.healthians.client.get_booking_report",
         _fake_get_booking_report,
     )
+    monkeypatch.setattr(
+        "modules.reports.blood_report_archival.archive_blood_report_pdf",
+        _fake_archive,
+    )
 
     response = await async_client.post(
         "/notifications/dispatch",
@@ -1344,7 +1354,7 @@ async def test_dispatch_fetches_blood_report_when_cache_missing(
     assert response.status_code == 201, response.text
     assert webhook_calls
     member = webhook_calls[0]["json"]["members"][0]
-    assert member["blood_report_url"] == "https://example.com/blood/BOOK-9753.pdf"
+    assert member["blood_report_url"] == archived_url
 
     cached = await test_db_session.execute(
         text(
@@ -1352,7 +1362,7 @@ async def test_dispatch_fetches_blood_report_when_cache_missing(
             "WHERE assessment_instance_id = 9753"
         )
     )
-    assert cached.scalar_one() == "https://example.com/blood/BOOK-9753.pdf"
+    assert cached.scalar_one() == archived_url
 
 
 @pytest.mark.asyncio
@@ -1470,9 +1480,15 @@ async def test_prepare_reports_dual_report_uses_single_ihr_row(
                 {
                     "customer_name": "Dual Report",
                     "report_url": f"https://example.com/blood/{booking_id}.pdf",
+                    "full_report": 1,
                 }
             ]
         }
+
+    archived_url = "https://supershyft.com/reports/PqRsTuVwXyZaBcDe.pdf"
+
+    async def _fake_archive(source_url, *, assessment_instance_id):
+        return archived_url
 
     async def _fake_get_report(self, *, record_id: str, assessment_type_code: str | None):
         return {"record_id": record_id}
@@ -1491,6 +1507,10 @@ async def test_prepare_reports_dual_report_uses_single_ihr_row(
     monkeypatch.setattr(
         "modules.diagnostics.healthians.client.get_booking_report",
         _fake_get_booking_report,
+    )
+    monkeypatch.setattr(
+        "modules.reports.blood_report_archival.archive_blood_report_pdf",
+        _fake_archive,
     )
     monkeypatch.setattr(
         "modules.metsights.service.MetsightsService.get_report",
@@ -1530,7 +1550,7 @@ async def test_prepare_reports_dual_report_uses_single_ihr_row(
             )
         )
     ).one()
-    assert row[0] == "https://example.com/blood/BOOK-9773.pdf"
+    assert row[0] == archived_url
     assert row[1] == "https://bio-ai-reports.supershyft.com/r/DUAL-REPORT"
 
 

@@ -191,7 +191,7 @@ async def test_get_data_completeness_tracks_pdf_json_and_values_separately(test_
             "INSERT INTO individual_health_report "
             "(report_id, user_id, engagement_id, diagnostic_report_url, blood_parameters, report_url, reports) "
             "VALUES "
-            "(901001, 1101, 9010, 'https://example.com/blood-1101.pdf', NULL, NULL, NULL), "
+            "(901001, 1101, 9010, 'https://supershyft.com/reports/AbCdEfGhIjKlMnOp.pdf', NULL, NULL, NULL), "
             "(901002, 1102, 9010, NULL, CAST(:blood_values AS jsonb), NULL, NULL), "
             "(901003, 1103, 9010, NULL, NULL, 'https://example.com/bio-1103.pdf', CAST(:bio_json AS jsonb))"
         ),
@@ -282,7 +282,7 @@ async def test_list_engagements_data_completeness_summary_rollup(test_db_session
         text(
             "INSERT INTO individual_health_report "
             "(report_id, user_id, engagement_id, diagnostic_report_url, blood_parameters, report_url, reports) VALUES "
-            "(902001, 1201, 9020, 'https://example.com/blood-1201.pdf', NULL, NULL, NULL), "
+            "(902001, 1201, 9020, 'https://supershyft.com/reports/PqRsTuVwXyZaBcDe.pdf', NULL, NULL, NULL), "
             "(902002, 1203, 9021, NULL, NULL, 'https://example.com/bio-1203.pdf', '{\"metabolic_score\": 80}')"
         )
     )

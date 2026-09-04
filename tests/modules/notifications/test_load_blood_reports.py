@@ -205,13 +205,15 @@ async def _fake_resolve_persistable_diagnostic_report_url(
     assessment_instance_id: int,
 ) -> str | None:
     healthians = (healthians_url or "").strip()
-    if not healthians:
-        return None
-    if not is_full_report:
-        return healthians
     existing = (existing_url or "").strip()
+    if not is_full_report:
+        if existing and is_archived_blood_report_url(existing):
+            return existing
+        return None
     if existing and is_archived_blood_report_url(existing):
         return existing
+    if not healthians:
+        return None
     return _ARCHIVED_REPORT_URL
 
 
@@ -827,7 +829,7 @@ async def test_load_blood_reports_skips_notification_when_full_report_zero(
         )
     ).scalar_one()
     assert ihr.blood_parameters_full_report is False
-    assert ihr.diagnostic_report_url == _REPORT_URL
+    assert ihr.diagnostic_report_url is None
 
 
 @pytest.mark.asyncio
