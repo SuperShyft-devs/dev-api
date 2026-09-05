@@ -8,12 +8,17 @@ from sqlalchemy.pool import NullPool
 from core.config import settings
 
 
-def _connect_args() -> dict:
-    if settings.DATABASE_STATEMENT_TIMEOUT_MS <= 0:
+def _connect_args(statement_timeout_ms: int | None = None) -> dict:
+    timeout_ms = (
+        statement_timeout_ms
+        if statement_timeout_ms is not None
+        else settings.DATABASE_STATEMENT_TIMEOUT_MS
+    )
+    if timeout_ms <= 0:
         return {}
     return {
         "server_settings": {
-            "statement_timeout": str(settings.DATABASE_STATEMENT_TIMEOUT_MS),
+            "statement_timeout": str(timeout_ms),
         },
     }
 
@@ -32,14 +37,18 @@ def create_api_engine() -> AsyncEngine:
     )
 
 
-def create_job_engine() -> AsyncEngine:
+# Camp report refresh runs heavy analytics SQL; allow a longer per-statement budget.
+CAMP_REFRESH_STATEMENT_TIMEOUT_MS = 120_000
+
+
+def create_job_engine(statement_timeout_ms: int | None = None) -> AsyncEngine:
     """CLI/cron jobs — one connection per run, no persistent pool."""
     return create_async_engine(
         settings.DATABASE_URL,
         echo=False,
         poolclass=NullPool,
         pool_pre_ping=True,
-        connect_args=_connect_args(),
+        connect_args=_connect_args(statement_timeout_ms),
     )
 
 

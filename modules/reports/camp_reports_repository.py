@@ -180,7 +180,7 @@ class CampReportsRepository:
     """CRUD queries for camp_reports."""
 
     @staticmethod
-    def _enrolled_users_ranked_subquery(
+    def _enrolled_users_ranked_select(
         *,
         camp_no: int,
         department: str | None = None,
@@ -217,18 +217,147 @@ class CampReportsRepository:
             ranked_rows = ranked_rows.where(func.lower(func.trim(Engagement.city)) == city.lower())
 
         ranked = ranked_rows.subquery()
+        return select(
+            ranked.c.user_id,
+            ranked.c.date_of_birth,
+            ranked.c.age,
+            ranked.c.gender,
+            ranked.c.first_name,
+            ranked.c.last_name,
+            ranked.c.engagement_id,
+        ).where(ranked.c.rn == 1)
+
+    @staticmethod
+    def _enrolled_users_ranked_subquery(
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ):
+        """Distinct enrolled users per camp (latest participant row per user_id)."""
+        return CampReportsRepository._enrolled_users_ranked_select(
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        ).subquery()
+
+    @staticmethod
+    def _enrolled_users_ranked_cte(
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+        name: str = "enrolled_users",
+    ):
+        """Distinct enrolled users as a CTE (avoids repeating the ranked scan in one query)."""
+        return CampReportsRepository._enrolled_users_ranked_select(
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        ).cte(name)
+
+    @staticmethod
+    def _bio_ai_report_join_ctes(
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ):
+        """CTEs for enrolled users + latest Bio AI report + Basic/Pro instance presence."""
+        enrolled = CampReportsRepository._enrolled_users_ranked_cte(
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
+
+        ranked_reports = (
+            select(
+                enrolled.c.user_id,
+                IndividualHealthReport.reports,
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=_latest_report_order(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(AssessmentInstance, AssessmentInstance.user_id == enrolled.c.user_id)
+            .join(
+                Engagement,
+                and_(
+                    Engagement.engagement_id == AssessmentInstance.engagement_id,
+                    Engagement.camp_no == camp_no,
+                ),
+            )
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .join(
+                IndividualHealthReport,
+                IndividualHealthReport.assessment_instance_id
+                == AssessmentInstance.assessment_instance_id,
+            )
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        ).cte("ranked_reports")
+
+        latest_report = (
+            select(ranked_reports.c.user_id, ranked_reports.c.reports)
+            .where(ranked_reports.c.rn == 1)
+        ).cte("latest_report")
+
+        ranked_instances = (
+            select(
+                enrolled.c.user_id,
+                func.row_number()
+                .over(
+                    partition_by=enrolled.c.user_id,
+                    order_by=AssessmentInstance.assessment_instance_id.desc(),
+                )
+                .label("rn"),
+            )
+            .select_from(enrolled)
+            .join(AssessmentInstance, AssessmentInstance.user_id == enrolled.c.user_id)
+            .join(
+                Engagement,
+                and_(
+                    Engagement.engagement_id == AssessmentInstance.engagement_id,
+                    Engagement.camp_no == camp_no,
+                ),
+            )
+            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
+            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
+        ).cte("ranked_instances")
+
+        bio_ai_users = (
+            select(ranked_instances.c.user_id).where(ranked_instances.c.rn == 1)
+        ).cte("bio_ai_users")
+
+        return enrolled, latest_report, bio_ai_users
+
+    @staticmethod
+    def _bio_ai_user_status_query(
+        *,
+        camp_no: int,
+        department: str | None = None,
+        city: str | None = None,
+    ):
+        enrolled, latest_report, bio_ai_users = CampReportsRepository._bio_ai_report_join_ctes(
+            camp_no=camp_no,
+            department=department,
+            city=city,
+        )
         return (
             select(
-                ranked.c.user_id,
-                ranked.c.date_of_birth,
-                ranked.c.age,
-                ranked.c.gender,
-                ranked.c.first_name,
-                ranked.c.last_name,
-                ranked.c.engagement_id,
+                enrolled.c.user_id,
+                User.first_name,
+                User.last_name,
+                enrolled.c.gender,
+                latest_report.c.reports,
+                bio_ai_users.c.user_id.label("bio_ai_user_id"),
             )
-            .where(ranked.c.rn == 1)
-            .subquery()
+            .select_from(enrolled)
+            .join(User, User.user_id == enrolled.c.user_id)
+            .outerjoin(latest_report, latest_report.c.user_id == enrolled.c.user_id)
+            .outerjoin(bio_ai_users, bio_ai_users.c.user_id == enrolled.c.user_id)
         )
 
     async def get_camp_context(self, db: AsyncSession, *, camp_no: int) -> tuple | None:
@@ -530,7 +659,7 @@ class CampReportsRepository:
         has ``booking_id`` not null. ``metsights_record_id`` comes from the latest Basic/Pro
         (type 1/2) assessment instance for that user's enrolled engagement.
         """
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
+        enrolled = self._enrolled_users_ranked_cte(camp_no=camp_no, department=department, city=city)
 
         booking_users = (
             select(EngagementParticipant.user_id.label("user_id"))
@@ -544,8 +673,7 @@ class CampReportsRepository:
                 EngagementParticipant.booking_id.isnot(None),
             )
             .distinct()
-            .subquery()
-        )
+        ).cte("booking_users")
 
         ranked_assessments = (
             select(
@@ -568,7 +696,7 @@ class CampReportsRepository:
             )
             .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
             .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
-        ).subquery()
+        ).cte("ranked_assessments")
 
         latest_assessment = (
             select(
@@ -576,8 +704,7 @@ class CampReportsRepository:
                 ranked_assessments.c.metsights_record_id,
             )
             .where(ranked_assessments.c.rn == 1)
-            .subquery()
-        )
+        ).cte("latest_assessment")
 
         result = await db.execute(
             select(
@@ -1545,86 +1672,13 @@ class CampReportsRepository:
 
         ``reason`` is None when a metabolic_score is present.
         """
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
-
-        ranked_reports = (
-            select(
-                enrolled.c.user_id,
-                IndividualHealthReport.reports,
-                func.row_number()
-                .over(
-                    partition_by=enrolled.c.user_id,
-                    order_by=_latest_report_order(),
-                )
-                .label("rn"),
+        result = await db.execute(
+            self._bio_ai_user_status_query(
+                camp_no=camp_no,
+                department=department,
+                city=city,
             )
-            .select_from(enrolled)
-            .join(AssessmentInstance, AssessmentInstance.user_id == enrolled.c.user_id)
-            .join(
-                Engagement,
-                and_(
-                    Engagement.engagement_id == AssessmentInstance.engagement_id,
-                    Engagement.camp_no == camp_no,
-                ),
-            )
-            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
-            .join(
-                IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id
-                == AssessmentInstance.assessment_instance_id,
-            )
-            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
-        ).subquery()
-
-        latest_report = (
-            select(ranked_reports.c.user_id, ranked_reports.c.reports)
-            .where(ranked_reports.c.rn == 1)
-            .subquery()
         )
-
-        ranked_instances = (
-            select(
-                enrolled.c.user_id,
-                func.row_number()
-                .over(
-                    partition_by=enrolled.c.user_id,
-                    order_by=AssessmentInstance.assessment_instance_id.desc(),
-                )
-                .label("rn"),
-            )
-            .select_from(enrolled)
-            .join(AssessmentInstance, AssessmentInstance.user_id == enrolled.c.user_id)
-            .join(
-                Engagement,
-                and_(
-                    Engagement.engagement_id == AssessmentInstance.engagement_id,
-                    Engagement.camp_no == camp_no,
-                ),
-            )
-            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
-            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
-        ).subquery()
-
-        bio_ai_users = (
-            select(ranked_instances.c.user_id).where(ranked_instances.c.rn == 1).subquery()
-        )
-
-        query = (
-            select(
-                enrolled.c.user_id,
-                User.first_name,
-                User.last_name,
-                enrolled.c.gender,
-                latest_report.c.reports,
-                bio_ai_users.c.user_id.label("bio_ai_user_id"),
-            )
-            .select_from(enrolled)
-            .join(User, User.user_id == enrolled.c.user_id)
-            .outerjoin(latest_report, latest_report.c.user_id == enrolled.c.user_id)
-            .outerjoin(bio_ai_users, bio_ai_users.c.user_id == enrolled.c.user_id)
-        )
-
-        result = await db.execute(query)
         rows: list[tuple[int, str | None, str | None, str | None, float | None, str | None]] = []
         for user_id, first_name, last_name, gender, reports, bio_ai_user_id in result.all():
             if bio_ai_user_id is None:
@@ -1692,86 +1746,13 @@ class CampReportsRepository:
 
         ``reason`` is None when an oxidative_stress score is present.
         """
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
-
-        ranked_reports = (
-            select(
-                enrolled.c.user_id,
-                IndividualHealthReport.reports,
-                func.row_number()
-                .over(
-                    partition_by=enrolled.c.user_id,
-                    order_by=_latest_report_order(),
-                )
-                .label("rn"),
+        result = await db.execute(
+            self._bio_ai_user_status_query(
+                camp_no=camp_no,
+                department=department,
+                city=city,
             )
-            .select_from(enrolled)
-            .join(AssessmentInstance, AssessmentInstance.user_id == enrolled.c.user_id)
-            .join(
-                Engagement,
-                and_(
-                    Engagement.engagement_id == AssessmentInstance.engagement_id,
-                    Engagement.camp_no == camp_no,
-                ),
-            )
-            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
-            .join(
-                IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id
-                == AssessmentInstance.assessment_instance_id,
-            )
-            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
-        ).subquery()
-
-        latest_report = (
-            select(ranked_reports.c.user_id, ranked_reports.c.reports)
-            .where(ranked_reports.c.rn == 1)
-            .subquery()
         )
-
-        ranked_instances = (
-            select(
-                enrolled.c.user_id,
-                func.row_number()
-                .over(
-                    partition_by=enrolled.c.user_id,
-                    order_by=AssessmentInstance.assessment_instance_id.desc(),
-                )
-                .label("rn"),
-            )
-            .select_from(enrolled)
-            .join(AssessmentInstance, AssessmentInstance.user_id == enrolled.c.user_id)
-            .join(
-                Engagement,
-                and_(
-                    Engagement.engagement_id == AssessmentInstance.engagement_id,
-                    Engagement.camp_no == camp_no,
-                ),
-            )
-            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
-            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
-        ).subquery()
-
-        bio_ai_users = (
-            select(ranked_instances.c.user_id).where(ranked_instances.c.rn == 1).subquery()
-        )
-
-        query = (
-            select(
-                enrolled.c.user_id,
-                User.first_name,
-                User.last_name,
-                enrolled.c.gender,
-                latest_report.c.reports,
-                bio_ai_users.c.user_id.label("bio_ai_user_id"),
-            )
-            .select_from(enrolled)
-            .join(User, User.user_id == enrolled.c.user_id)
-            .outerjoin(latest_report, latest_report.c.user_id == enrolled.c.user_id)
-            .outerjoin(bio_ai_users, bio_ai_users.c.user_id == enrolled.c.user_id)
-        )
-
-        result = await db.execute(query)
         rows: list[tuple[int, str | None, str | None, str | None, float | None, str | None]] = []
         for user_id, first_name, last_name, gender, reports, bio_ai_user_id in result.all():
             if bio_ai_user_id is None:
@@ -1842,86 +1823,13 @@ class CampReportsRepository:
         ``reports`` is the latest Basic/Pro Bio AI JSON when present.
         ``reason`` is None when a usable Bio AI report exists.
         """
-        enrolled = self._enrolled_users_ranked_subquery(camp_no=camp_no, department=department, city=city)
-
-        ranked_reports = (
-            select(
-                enrolled.c.user_id,
-                IndividualHealthReport.reports,
-                func.row_number()
-                .over(
-                    partition_by=enrolled.c.user_id,
-                    order_by=_latest_report_order(),
-                )
-                .label("rn"),
+        result = await db.execute(
+            self._bio_ai_user_status_query(
+                camp_no=camp_no,
+                department=department,
+                city=city,
             )
-            .select_from(enrolled)
-            .join(AssessmentInstance, AssessmentInstance.user_id == enrolled.c.user_id)
-            .join(
-                Engagement,
-                and_(
-                    Engagement.engagement_id == AssessmentInstance.engagement_id,
-                    Engagement.camp_no == camp_no,
-                ),
-            )
-            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
-            .join(
-                IndividualHealthReport,
-                IndividualHealthReport.assessment_instance_id
-                == AssessmentInstance.assessment_instance_id,
-            )
-            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
-        ).subquery()
-
-        latest_report = (
-            select(ranked_reports.c.user_id, ranked_reports.c.reports)
-            .where(ranked_reports.c.rn == 1)
-            .subquery()
         )
-
-        ranked_instances = (
-            select(
-                enrolled.c.user_id,
-                func.row_number()
-                .over(
-                    partition_by=enrolled.c.user_id,
-                    order_by=AssessmentInstance.assessment_instance_id.desc(),
-                )
-                .label("rn"),
-            )
-            .select_from(enrolled)
-            .join(AssessmentInstance, AssessmentInstance.user_id == enrolled.c.user_id)
-            .join(
-                Engagement,
-                and_(
-                    Engagement.engagement_id == AssessmentInstance.engagement_id,
-                    Engagement.camp_no == camp_no,
-                ),
-            )
-            .join(AssessmentPackage, AssessmentPackage.package_id == AssessmentInstance.package_id)
-            .where(AssessmentPackage.assessment_type_code.in_(("1", "2")))
-        ).subquery()
-
-        bio_ai_users = (
-            select(ranked_instances.c.user_id).where(ranked_instances.c.rn == 1).subquery()
-        )
-
-        query = (
-            select(
-                enrolled.c.user_id,
-                User.first_name,
-                User.last_name,
-                enrolled.c.gender,
-                latest_report.c.reports,
-                bio_ai_users.c.user_id.label("bio_ai_user_id"),
-            )
-            .select_from(enrolled)
-            .join(User, User.user_id == enrolled.c.user_id)
-            .outerjoin(latest_report, latest_report.c.user_id == enrolled.c.user_id)
-            .outerjoin(bio_ai_users, bio_ai_users.c.user_id == enrolled.c.user_id)
-        )
-
-        result = await db.execute(query)
         rows: list[
             tuple[int, str | None, str | None, str | None, dict[str, Any] | None, str | None]
         ] = []

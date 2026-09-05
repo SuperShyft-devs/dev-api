@@ -20,7 +20,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from core.config import settings
-from db.engine import create_job_engine, job_session_factory
+from db.engine import CAMP_REFRESH_STATEMENT_TIMEOUT_MS, create_job_engine, job_session_factory
 from modules.assessments.repository import AssessmentsRepository
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
@@ -156,7 +156,7 @@ async def run_refresh(
             "or --dry-run to preview."
         )
 
-    engine = create_job_engine()
+    engine = create_job_engine(statement_timeout_ms=CAMP_REFRESH_STATEMENT_TIMEOUT_MS)
     session_factory = job_session_factory(engine)
 
     service = _build_camp_reports_service()
