@@ -1,4 +1,8 @@
-"""Retry failed notification dispatches from the last N hours (default: 5 days).
+"""Retry failed report-email notification dispatches from the last N hours (default: 5 days).
+
+By default only retries:
+  - send-reports-email (BioAI & Blood Report)
+  - send-blood-report-email-v2 (Blood Report | No Questionnaire)
 
 Throttles retries to avoid Gmail SMTP rate limits (454 too many login attempts).
 Creates new notification rows via the standard dispatch path; does not mutate
@@ -24,6 +28,7 @@ from modules.notifications.retry_failed import (
     DEFAULT_HOURS,
     DEFAULT_LIMIT,
     DEFAULT_MAX_CONSECUTIVE_FAILURES,
+    DEFAULT_RETRY_SERVICE_KEYS,
     retry_failed_notifications,
 )
 from modules.notifications.service import NotificationsService
@@ -69,10 +74,11 @@ async def run_retry_failed_notifications(
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    allowlist = ", ".join(DEFAULT_RETRY_SERVICE_KEYS)
     parser = argparse.ArgumentParser(
         description=(
-            "Retry failed email notifications from the last N hours, one at a time "
-            "with a delay between dispatches."
+            "Retry failed report-email notifications from the last N hours, one at a time "
+            f"with a delay between dispatches. Default services: {allowlist}."
         )
     )
     parser.add_argument(
@@ -116,7 +122,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--service-key",
         default=None,
         metavar="KEY",
-        help="Optional service_key filter for targeted reruns.",
+        help=(
+            "Optional single service_key override. "
+            f"Default allowlist: {allowlist}."
+        ),
     )
     parser.add_argument(
         "--max-consecutive-failures",
@@ -150,7 +159,7 @@ def main(argv: list[str] | None = None) -> int:
         f"\nRetry failed notifications ({mode}):\n"
         f"  hours={result['hours']}\n"
         f"  channel={result['channel']}\n"
-        f"  service_key={result['service_key']}\n"
+        f"  service_keys={result['service_keys']}\n"
         f"  limit={result['limit']}\n"
         f"  delay_seconds={result['delay_seconds']}\n"
         f"  matched={result['matched']}\n"

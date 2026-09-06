@@ -16,10 +16,12 @@ from modules.notifications.models import Notification
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.retry_failed import (
     DEFAULT_HOURS,
+    DEFAULT_RETRY_SERVICE_KEYS,
     build_dispatch_request,
     dedupe_failed_notifications,
     is_dispatch_failure,
     list_failed_notifications,
+    resolve_retry_service_keys,
     retry_failed_notifications,
 )
 from modules.notifications.schemas import SessionDetails
@@ -227,6 +229,74 @@ async def test_list_failed_notifications_uses_five_day_lookback(test_db_session)
     keys = {row.service_key for row in rows}
     assert within_sk in keys
     assert outside_sk not in keys
+
+
+def test_resolve_retry_service_keys_defaults_to_report_emails():
+    assert resolve_retry_service_keys() == list(DEFAULT_RETRY_SERVICE_KEYS)
+    assert resolve_retry_service_keys(service_key="send-reports-email") == [
+        "send-reports-email"
+    ]
+    assert resolve_retry_service_keys(
+        service_keys=["send-blood-report-email-v2"]
+    ) == ["send-blood-report-email-v2"]
+
+
+@pytest.mark.asyncio
+async def test_retry_defaults_to_report_email_service_allowlist(test_db_session):
+    """Cron default only retries the two report-email services."""
+    engagement_id = await _seed_engagement(test_db_session)
+    other_sk = _unique_service_key("retry-other-email")
+    for sk in (*DEFAULT_RETRY_SERVICE_KEYS, other_sk):
+        await _seed_service(test_db_session, service_key=sk)
+
+    await _seed_failed_notification(
+        test_db_session,
+        service_key=DEFAULT_RETRY_SERVICE_KEYS[0],
+        user_id=60,
+        engagement_id=engagement_id,
+    )
+    await _seed_failed_notification(
+        test_db_session,
+        service_key=DEFAULT_RETRY_SERVICE_KEYS[1],
+        user_id=61,
+        engagement_id=engagement_id,
+    )
+    await _seed_failed_notification(
+        test_db_session,
+        service_key=other_sk,
+        user_id=62,
+        engagement_id=engagement_id,
+    )
+
+    service = NotificationsService(NotificationsRepository())
+    service.dispatch = AsyncMock()  # type: ignore[method-assign]
+
+    class _Factory:
+        def __call__(self):
+            return self
+
+        async def __aenter__(self):
+            return test_db_session
+
+        async def __aexit__(self, *args):
+            return None
+
+    result = await retry_failed_notifications(
+        _Factory(),
+        notifications_service=service,
+        hours=24,
+        channel="email",
+        limit=10,
+        delay_seconds=0,
+        dry_run=True,
+    )
+
+    assert result["service_keys"] == list(DEFAULT_RETRY_SERVICE_KEYS)
+    assert result["matched"] == 2
+    matched_keys = {d["service_key"] for d in result["details"]}
+    assert matched_keys == set(DEFAULT_RETRY_SERVICE_KEYS)
+    assert other_sk not in matched_keys
+    service.dispatch.assert_not_called()
 
 
 @pytest.mark.asyncio
