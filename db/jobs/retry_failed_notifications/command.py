@@ -6,7 +6,7 @@ failed rows.
 
 Production example (Linux cron, hourly):
 
-    0 * * * * cd /var/www/backend/api && ./venv/bin/python -m db.jobs.retry_failed_notifications --yes --delay-seconds 4 --limit 400 >> /var/log/retry-failed-notifications.log 2>&1
+    0 * * * * cd /var/www/backend/api && /var/www/backend/api/venv/bin/python3 -m db.jobs.retry_failed_notifications --yes --delay-seconds 3 --limit 600 >> /var/log/retry-failed-notifications.log 2>&1
 
 Entrypoint: ``python -m db.jobs.retry_failed_notifications --yes``
 """

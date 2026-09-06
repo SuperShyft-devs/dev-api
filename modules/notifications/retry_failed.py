@@ -69,6 +69,32 @@ def dedupe_failed_notifications(notifications: list[Notification]) -> list[Retry
     return sorted(best.values(), key=lambda c: c.notification_id)
 
 
+async def select_retry_candidates(
+    db: AsyncSession,
+    candidates: list[RetryCandidate],
+    *,
+    repository: NotificationsRepository,
+    limit: int,
+) -> list[RetryCandidate]:
+    """Return oldest-first failed notifications that still need a retry, up to limit."""
+    retryable: list[RetryCandidate] = []
+    for candidate in candidates:
+        if len(retryable) >= limit:
+            break
+        if candidate.engagement_id is None:
+            continue
+        skip_reason = await should_skip_notification(
+            db,
+            service_key=candidate.service_key,
+            user_id=candidate.user_id,
+            engagement_id=candidate.engagement_id,
+            repository=repository,
+        )
+        if skip_reason is None:
+            retryable.append(candidate)
+    return retryable
+
+
 async def list_failed_notifications(
     db: AsyncSession,
     *,
@@ -204,7 +230,13 @@ async def retry_failed_notifications(
             channel=channel,
             service_key=service_key,
         )
-        candidates = dedupe_failed_notifications(failed_rows)[:limit]
+        deduped = dedupe_failed_notifications(failed_rows)
+        candidates = await select_retry_candidates(
+            session,
+            deduped,
+            repository=repo,
+            limit=limit,
+        )
 
     matched = len(candidates)
     retried = 0

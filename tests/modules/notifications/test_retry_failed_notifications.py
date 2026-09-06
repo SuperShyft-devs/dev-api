@@ -284,9 +284,169 @@ async def test_retry_skips_when_already_sent(test_db_session):
         delay_seconds=0,
         dry_run=False,
     )
-    assert result["skipped"] == 1
+    assert result["matched"] == 0
+    assert result["skipped"] == 0
     assert result["retried"] == 0
     service.dispatch.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_selects_oldest_retryable_and_skips_already_sent(test_db_session):
+    engagement_id = await _seed_engagement(test_db_session)
+    service_key = _unique_service_key("retry-select-svc")
+    await _seed_service(test_db_session, service_key=service_key)
+
+    # User A: oldest failed row but already sent — must not consume limit.
+    base_id = random.randint(50_000_000, 99_999_990)
+    await _seed_failed_notification(
+        test_db_session,
+        notification_id=base_id,
+        service_key=service_key,
+        user_id=70,
+        engagement_id=engagement_id,
+    )
+    test_db_session.add(
+        Notification(
+            service_key=service_key,
+            status="sent",
+            channel="email",
+            user={"user_ids": [70]},
+            engagement_id=engagement_id,
+            message="Email sent successfully",
+            dispatched_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(timezone.utc),
+        )
+    )
+    await _seed_failed_notification(
+        test_db_session,
+        notification_id=base_id + 100,
+        service_key=service_key,
+        user_id=72,
+        engagement_id=engagement_id,
+    )
+    await _seed_failed_notification(
+        test_db_session,
+        notification_id=base_id + 200,
+        service_key=service_key,
+        user_id=71,
+        engagement_id=engagement_id,
+    )
+    await test_db_session.commit()
+
+    dispatch_calls: list[dict] = []
+
+    async def _dispatch(db, *, payload, triggered_by_user_id=None):
+        dispatch_calls.append({"user_ids": payload.user_ids})
+        return {
+            "notification_id": 9000 + payload.user_ids[0],
+            "status": "pending",
+            "message": "Webhook called successfully",
+        }
+
+    service = NotificationsService(NotificationsRepository())
+    service.dispatch = _dispatch  # type: ignore[method-assign]
+
+    class _Factory:
+        def __call__(self):
+            return self
+
+        async def __aenter__(self):
+            return test_db_session
+
+        async def __aexit__(self, *args):
+            return None
+
+    result = await retry_failed_notifications(
+        _Factory(),
+        notifications_service=service,
+        hours=24,
+        service_key=service_key,
+        limit=2,
+        delay_seconds=0,
+        dry_run=False,
+    )
+
+    assert result["matched"] == 2
+    assert result["retried"] == 2
+    assert result["skipped"] == 0
+    assert dispatch_calls[0]["user_ids"] == [72]
+    assert dispatch_calls[1]["user_ids"] == [71]
+
+
+@pytest.mark.asyncio
+async def test_limit_applies_after_already_sent_filter(test_db_session):
+    engagement_id = await _seed_engagement(test_db_session)
+    service_key = _unique_service_key("retry-limit-svc")
+    await _seed_service(test_db_session, service_key=service_key)
+
+    base_id = random.randint(50_000_000, 99_999_990)
+
+    for offset, user_id in ((0, 80), (10, 81)):
+        await _seed_failed_notification(
+            test_db_session,
+            notification_id=base_id + offset,
+            service_key=service_key,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+        test_db_session.add(
+            Notification(
+                service_key=service_key,
+                status="sent",
+                channel="email",
+                user={"user_ids": [user_id]},
+                engagement_id=engagement_id,
+                message="Email sent successfully",
+                dispatched_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(timezone.utc),
+            )
+        )
+    for offset, user_id in ((20, 82), (30, 83), (40, 84)):
+        await _seed_failed_notification(
+            test_db_session,
+            notification_id=base_id + offset,
+            service_key=service_key,
+            user_id=user_id,
+            engagement_id=engagement_id,
+        )
+    await test_db_session.commit()
+
+    dispatch_calls: list[dict] = []
+
+    async def _dispatch(db, *, payload, triggered_by_user_id=None):
+        dispatch_calls.append({"user_ids": payload.user_ids})
+        return {
+            "notification_id": 8000 + payload.user_ids[0],
+            "status": "pending",
+            "message": "Webhook called successfully",
+        }
+
+    service = NotificationsService(NotificationsRepository())
+    service.dispatch = _dispatch  # type: ignore[method-assign]
+
+    class _Factory:
+        def __call__(self):
+            return self
+
+        async def __aenter__(self):
+            return test_db_session
+
+        async def __aexit__(self, *args):
+            return None
+
+    result = await retry_failed_notifications(
+        _Factory(),
+        notifications_service=service,
+        hours=24,
+        service_key=service_key,
+        limit=2,
+        delay_seconds=0,
+        dry_run=False,
+    )
+
+    assert result["matched"] == 2
+    assert result["retried"] == 2
+    assert [call["user_ids"][0] for call in dispatch_calls] == [82, 83]
 
 
 @pytest.mark.asyncio
