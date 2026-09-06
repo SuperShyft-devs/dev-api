@@ -15,6 +15,7 @@ from modules.engagements.models import Engagement
 from modules.notifications.models import Notification
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.retry_failed import (
+    DEFAULT_HOURS,
     build_dispatch_request,
     dedupe_failed_notifications,
     is_dispatch_failure,
@@ -191,6 +192,41 @@ async def test_list_failed_notifications_excludes_otp_services(test_db_session):
     keys = {row.service_key for row in rows}
     assert email_sk in keys
     assert otp_sk not in keys
+
+
+@pytest.mark.asyncio
+async def test_list_failed_notifications_uses_five_day_lookback(test_db_session):
+    """Default lookback is 5 days: include ~3-day-old fails, exclude older than 5 days."""
+    assert DEFAULT_HOURS == 120
+
+    engagement_id = await _seed_engagement(test_db_session)
+    within_sk = _unique_service_key("retry-within-5d")
+    outside_sk = _unique_service_key("retry-outside-5d")
+    await _seed_service(test_db_session, service_key=within_sk)
+    await _seed_service(test_db_session, service_key=outside_sk)
+
+    now = datetime.now(timezone.utc)
+    await _seed_failed_notification(
+        test_db_session,
+        service_key=within_sk,
+        user_id=50,
+        engagement_id=engagement_id,
+        dispatched_at=now - timedelta(days=3),
+    )
+    await _seed_failed_notification(
+        test_db_session,
+        service_key=outside_sk,
+        user_id=51,
+        engagement_id=engagement_id,
+        dispatched_at=now - timedelta(days=6),
+    )
+
+    rows = await list_failed_notifications(
+        test_db_session, hours=DEFAULT_HOURS, channel="email"
+    )
+    keys = {row.service_key for row in rows}
+    assert within_sk in keys
+    assert outside_sk not in keys
 
 
 @pytest.mark.asyncio

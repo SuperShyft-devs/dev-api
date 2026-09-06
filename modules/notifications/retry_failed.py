@@ -21,7 +21,7 @@ from modules.notifications.service import NotificationsService
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_HOURS = 24
+DEFAULT_HOURS = 120  # 5 days
 DEFAULT_DELAY_SECONDS = 4
 DEFAULT_LIMIT = 400
 DEFAULT_MAX_CONSECUTIVE_FAILURES = 5

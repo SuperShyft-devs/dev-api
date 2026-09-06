@@ -1,4 +1,4 @@
-"""Retry failed notification dispatches from the last N hours.
+"""Retry failed notification dispatches from the last N hours (default: 5 days).
 
 Throttles retries to avoid Gmail SMTP rate limits (454 too many login attempts).
 Creates new notification rows via the standard dispatch path; does not mutate
