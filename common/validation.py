@@ -267,6 +267,29 @@ def _validate_optional_slug_key(value: Any) -> str | None:
     return _validate_slug_key(value)
 
 
+def _validate_parameter_key(value: Any) -> str:
+    """Free-form blood-parameter key (allows /, hyphens, etc.; not slug-restricted)."""
+    if value is None:
+        raise ValidationError("Key is required")
+    if not isinstance(value, str):
+        raise ValidationError("Key must be a string")
+    cleaned = value.strip()
+    if not cleaned:
+        raise ValidationError("Key cannot be empty")
+    _reject_control_chars(cleaned)
+    _reject_html_script(cleaned)
+    _validate_max_length(cleaned, 100, "Key")
+    return cleaned
+
+
+def _validate_optional_parameter_key(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    return _validate_parameter_key(value)
+
+
 def _validate_package_code(value: Any) -> str:
     """Preserve case for assessment package codes (seeded as uppercase, e.g. MY_FITNESS_PRINT)."""
     if value is None:
@@ -426,6 +449,8 @@ OtpCode = Annotated[str, BeforeValidator(_validate_otp)]
 
 SlugKey = Annotated[str, BeforeValidator(_validate_slug_key)]
 OptionalSlugKey = Annotated[str | None, BeforeValidator(_validate_optional_slug_key)]
+
+OptionalParameterKey = Annotated[str | None, BeforeValidator(_validate_optional_parameter_key)]
 
 PackageCode = Annotated[str, BeforeValidator(_validate_package_code)]
 

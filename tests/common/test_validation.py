@@ -9,6 +9,7 @@ from common.validation import (
     AddressText,
     ChecklistText,
     ExpertAboutText,
+    OptionalParameterKey,
     OptionalPersonName,
     OptionalPinCode,
     PackageCode,
@@ -60,6 +61,10 @@ class _PositiveIdModel(BaseModel):
 
 class _SlugModel(BaseModel):
     key: SlugKey
+
+
+class _OptionalParameterKeyModel(BaseModel):
+    key: OptionalParameterKey = None
 
 
 class _PackageCodeModel(BaseModel):
@@ -217,6 +222,24 @@ def test_slug_key():
 
 def test_slug_key_lowercases():
     assert _SlugModel(key="MY_FITNESS_PRINT").key == "my_fitness_print"
+
+
+def test_optional_parameter_key_accepts_slash_and_hyphen():
+    assert _OptionalParameterKeyModel(key="bun/creatinine_ratio").key == "bun/creatinine_ratio"
+    assert _OptionalParameterKeyModel(key="glucose-fasting").key == "glucose-fasting"
+    assert _OptionalParameterKeyModel(key="  BUN/Creatinine_Ratio  ").key == "BUN/Creatinine_Ratio"
+
+
+def test_optional_parameter_key_empty_becomes_none():
+    assert _OptionalParameterKeyModel().key is None
+    assert _OptionalParameterKeyModel(key=None).key is None
+    assert _OptionalParameterKeyModel(key="").key is None
+    assert _OptionalParameterKeyModel(key="   ").key is None
+
+
+def test_optional_parameter_key_rejects_html():
+    with pytest.raises(PydanticValidationError):
+        _OptionalParameterKeyModel(key="<script>alert(1)</script>")
 
 
 def test_package_code_preserves_case():

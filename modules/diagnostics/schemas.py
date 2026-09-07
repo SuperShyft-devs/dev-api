@@ -9,6 +9,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from common.validation import (
+    OptionalParameterKey,
     OptionalSafeDisplayName,
     OptionalSafeText,
     OptionalSlugKey,
@@ -175,7 +176,7 @@ class HealthParameterCreate(BaseModel):
     parameter_type: ParameterType = ParameterType.TEST
     test_name: SafeDisplayName
     external_parameter_id: Optional[int] = None
-    parameter_key: OptionalSlugKey = None
+    parameter_key: OptionalParameterKey = None
     unit: Optional[str] = None
     meaning: OptionalSafeText = None
     low_risk_lower_range_male: Optional[float] = None
@@ -208,7 +209,7 @@ class HealthParameterUpdate(BaseModel):
     parameter_type: Optional[ParameterType] = None
     test_name: OptionalSafeDisplayName = None
     external_parameter_id: Optional[int] = None
-    parameter_key: OptionalSlugKey = None
+    parameter_key: OptionalParameterKey = None
     unit: Optional[str] = None
     meaning: OptionalSafeText = None
     low_risk_lower_range_male: Optional[float] = None

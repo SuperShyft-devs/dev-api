@@ -269,7 +269,7 @@ def all_column_specs() -> list[ColumnSpec]:
         add("diagnostic_test_groups", col, kind, ("group_id",), required=req)
 
     for col, kind, req in (
-        ("parameter_key", SanitizeKind.SLUG_KEY, True),
+        ("parameter_key", SanitizeKind.SAFE_TEXT, False),
         ("test_name", SanitizeKind.SAFE_DISPLAY_NAME, True),
     ):
         add("health_parameters", col, kind, ("test_id",), required=req)
