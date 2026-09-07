@@ -23,7 +23,6 @@ from modules.engagements.models import Engagement, EngagementParticipant
 from modules.experts.consultation_bookings_repository import ConsultationBookingsRepository
 from modules.experts.consultations import (
     booking_to_api_preference,
-    consultation_datetime,
     is_upcoming_slot,
     normalize_consent,
     normalize_hhmm,
@@ -1283,7 +1282,10 @@ class ExpertAvailabilityService:
                 message="Consultation is already marked done",
             )
 
-        self._ensure_slot_reached(booking)
+        engagement = await db.get(Engagement, participant.engagement_id)
+        if engagement is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Engagement not found")
+        self._ensure_within_engagement_window(engagement)
 
         booking.meet_link = meet_link
         booking.done = True
@@ -1299,23 +1301,36 @@ class ExpertAvailabilityService:
             "done": True,
         }
 
-    def _ensure_slot_reached(self, booking: ConsultationBooking, *, now=None) -> None:
-        date_val = booking.consultation_date.isoformat() if booking.consultation_date else None
-        when = consultation_datetime(date_val, booking.consultation_slot)
-        if when is None:
-            raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message="Consultation slot is not scheduled",
-            )
-        from datetime import datetime
+    @staticmethod
+    def _within_engagement_window(engagement: Engagement, *, on_date: date | None = None) -> bool:
+        today = on_date or date.today()
+        start = engagement.start_date
+        end = engagement.end_date
+        if start is None or end is None:
+            return False
+        return start <= today <= end
 
-        current = now or datetime.now()
-        if current < when:
+    def _ensure_within_engagement_window(self, engagement: Engagement, *, on_date: date | None = None) -> None:
+        today = on_date or date.today()
+        start = engagement.start_date
+        end = engagement.end_date
+        if start is None or end is None:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_INPUT",
-                message="Consultation cannot be marked done before the scheduled slot",
+                message="Engagement dates are not configured",
+            )
+        if today < start:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation cannot be marked done before the engagement start date",
+            )
+        if today > end:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Consultation cannot be marked done after the engagement end date",
             )
 
     @staticmethod
@@ -1673,12 +1688,7 @@ class ExpertAvailabilityService:
 
         date_val = pref.get("date")
         slot_val = pref.get("slot")
-        slot_reached = False
-        when = consultation_datetime(date_val, slot_val)
-        if when is not None:
-            from datetime import datetime
-
-            slot_reached = datetime.now() >= when
+        within_engagement_window = self._within_engagement_window(engagement)
 
         is_camp_consultation = booking.expert_id is None and self._is_offline_b2b_engagement(engagement)
         email_out = mask_email(user.email) if is_camp_consultation else user.email
@@ -1693,6 +1703,8 @@ class ExpertAvailabilityService:
             "phone": phone_out,
             "engagement_id": engagement.engagement_id,
             "engagement_code": engagement.engagement_code,
+            "start_date": engagement.start_date.isoformat() if engagement.start_date else None,
+            "end_date": engagement.end_date.isoformat() if engagement.end_date else None,
             "engagement_participant_id": participant.engagement_participant_id,
             "expert_type": booking.expert_type,
             "expert_id": booking.expert_id,
@@ -1718,7 +1730,7 @@ class ExpertAvailabilityService:
                     "available": has_questionnaire,
                 },
             },
-            "slot_reached": slot_reached,
+            "within_engagement_window": within_engagement_window,
         }
 
     async def update_consultation_manage(
@@ -1761,7 +1773,7 @@ class ExpertAvailabilityService:
                 error_code="INVALID_INPUT",
                 message="Consultation is already marked done",
             )
-        self._ensure_slot_reached(booking)
+        self._ensure_within_engagement_window(engagement)
         booking.done = True
         db.add(booking)
         await db.flush()

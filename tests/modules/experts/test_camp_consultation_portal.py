@@ -267,6 +267,7 @@ async def test_camp_consultation_manage_without_expert_id(async_client, test_db_
     assert body["cabin"] == "C1"
     assert body["phone"] == "********0002"
     assert body["email"].startswith("*")
+    assert body["within_engagement_window"] is True
 
     patch = await async_client.patch(
         f"/experts/portal/consultations/{consultation_id}",
