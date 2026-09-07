@@ -6,7 +6,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,10 +21,15 @@ from modules.notifications.service import NotificationsService
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_HOURS = 24
+DEFAULT_HOURS = 120  # 5 days
 DEFAULT_DELAY_SECONDS = 4
 DEFAULT_LIMIT = 400
 DEFAULT_MAX_CONSECUTIVE_FAILURES = 5
+# BioAI & Blood Report + Blood Report | No Questionnaire
+DEFAULT_RETRY_SERVICE_KEYS: tuple[str, ...] = (
+    "send-reports-email",
+    "send-blood-report-email-v2",
+)
 
 _WEBHOOK_FAILURE_SNIPPET = "webhook call failed"
 _EMAIL_FAILURE_SNIPPET = "email sending failed"
@@ -95,12 +100,26 @@ async def select_retry_candidates(
     return retryable
 
 
+def resolve_retry_service_keys(
+    *,
+    service_key: str | None = None,
+    service_keys: Sequence[str] | None = None,
+) -> list[str]:
+    """Resolve which service keys to retry; defaults to report-email allowlist."""
+    if service_key is not None:
+        return [service_key]
+    if service_keys is not None:
+        return list(service_keys)
+    return list(DEFAULT_RETRY_SERVICE_KEYS)
+
+
 async def list_failed_notifications(
     db: AsyncSession,
     *,
     hours: int,
     channel: str,
     service_key: str | None = None,
+    service_keys: Sequence[str] | None = None,
 ) -> list[Notification]:
     """Return failed notifications in the lookback window, excluding OTP services."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
@@ -117,6 +136,8 @@ async def list_failed_notifications(
     )
     if service_key is not None:
         query = query.where(Notification.service_key == service_key)
+    elif service_keys is not None:
+        query = query.where(Notification.service_key.in_(list(service_keys)))
     result = await db.execute(query)
     return list(result.scalars().all())
 
@@ -213,22 +234,31 @@ async def retry_failed_notifications(
     hours: int = DEFAULT_HOURS,
     channel: str = "email",
     service_key: str | None = None,
+    service_keys: Sequence[str] | None = None,
     limit: int = DEFAULT_LIMIT,
     delay_seconds: float = DEFAULT_DELAY_SECONDS,
     max_consecutive_failures: int = DEFAULT_MAX_CONSECUTIVE_FAILURES,
     dry_run: bool = False,
     sleep_fn: Callable[[float], Awaitable[None]] | None = None,
 ) -> dict[str, Any]:
-    """Select failed notifications and retry them with throttling."""
+    """Select failed notifications and retry them with throttling.
+
+    By default only retries ``DEFAULT_RETRY_SERVICE_KEYS`` (report emails).
+    Pass ``service_key`` or ``service_keys`` to override.
+    """
     repo = repository or NotificationsRepository()
     sleep = sleep_fn or asyncio.sleep
+    resolved_keys = resolve_retry_service_keys(
+        service_key=service_key,
+        service_keys=service_keys,
+    )
 
     async with session_factory() as session:
         failed_rows = await list_failed_notifications(
             session,
             hours=hours,
             channel=channel,
-            service_key=service_key,
+            service_keys=resolved_keys,
         )
         deduped = dedupe_failed_notifications(failed_rows)
         candidates = await select_retry_candidates(
@@ -397,6 +427,7 @@ async def retry_failed_notifications(
         "hours": hours,
         "channel": channel,
         "service_key": service_key,
+        "service_keys": resolved_keys,
         "limit": limit,
         "delay_seconds": delay_seconds,
         "max_consecutive_failures": max_consecutive_failures,

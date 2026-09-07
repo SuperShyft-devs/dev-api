@@ -308,7 +308,7 @@ async def test_mark_consultation_done_requires_meet_link(async_client, test_db_s
 
 
 @pytest.mark.asyncio
-async def test_consultation_manage_done_before_slot_rejected(async_client, test_db_session):
+async def test_consultation_manage_done_outside_engagement_window_rejected(async_client, test_db_session):
     from datetime import date, time, timedelta
 
     expert_user_id = 78540
@@ -344,9 +344,9 @@ async def test_consultation_manage_done_before_slot_rejected(async_client, test_
             diagnostic_package_id=1,
             city="BLR",
             slot_duration=20,
-            start_date=date.today(),
+            start_date=date.today() + timedelta(days=1),
             end_date=date.today() + timedelta(days=7),
-            status="running",
+            status="scheduled",
         )
     )
     await test_db_session.flush()
@@ -376,12 +376,102 @@ async def test_consultation_manage_done_before_slot_rejected(async_client, test_
     )
     await test_db_session.commit()
 
+    detail = await async_client.get(
+        f"/experts/portal/consultations/{consultation_id}",
+        headers=_auth_header(expert_user_id),
+    )
+    assert detail.status_code == 200
+    assert detail.json()["data"]["within_engagement_window"] is False
+
     before = await async_client.post(
         f"/experts/portal/consultations/{consultation_id}/done",
         headers=_auth_header(expert_user_id),
     )
     assert before.status_code == 400
-    assert "before the scheduled slot" in before.json()["message"]
+    assert "before the engagement start date" in before.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_consultation_manage_done_after_engagement_end_rejected(async_client, test_db_session):
+    from datetime import date, time, timedelta
+
+    expert_user_id = 78542
+    participant_user_id = 78543
+    engagement_id = 7856
+    participant_id = 78543
+    consultation_id = 785601
+
+    test_db_session.add_all(
+        [
+            User(user_id=expert_user_id, age=35, phone="785420000000", status="active"),
+            User(user_id=participant_user_id, age=30, phone="785430000000", status="active"),
+        ]
+    )
+    await test_db_session.flush()
+    test_db_session.add(Employee(employee_id=442, user_id=expert_user_id, role="expert", status="active"))
+    expert = Expert(
+        user_id=expert_user_id,
+        expert_type="doctor",
+        specialization="General medicine",
+        status="active",
+    )
+    test_db_session.add(expert)
+    await test_db_session.flush()
+    test_db_session.add(
+        Engagement(
+            engagement_id=engagement_id,
+            engagement_name="Past Consult",
+            engagement_code="PAST7856",
+            engagement_type="consultation",
+            consultations={"doctor": True},
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date.today() - timedelta(days=14),
+            end_date=date.today() - timedelta(days=1),
+            status="completed",
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_participant_id=participant_id,
+            engagement_id=engagement_id,
+            user_id=participant_user_id,
+            engagement_date=date.today() - timedelta(days=7),
+            slot_start_time=time(10, 0),
+            consultation_booking_ids=[consultation_id],
+        )
+    )
+    await test_db_session.flush()
+    test_db_session.add(
+        ConsultationBooking(
+            consultation_id=consultation_id,
+            engagement_participant_id=participant_id,
+            expert_type="doctor",
+            expert_id=expert.expert_id,
+            want=True,
+            consultation_date=date.today() - timedelta(days=7),
+            consultation_slot="10:00",
+            done=False,
+        )
+    )
+    await test_db_session.commit()
+
+    detail = await async_client.get(
+        f"/experts/portal/consultations/{consultation_id}",
+        headers=_auth_header(expert_user_id),
+    )
+    assert detail.status_code == 200
+    assert detail.json()["data"]["within_engagement_window"] is False
+
+    after = await async_client.post(
+        f"/experts/portal/consultations/{consultation_id}/done",
+        headers=_auth_header(expert_user_id),
+    )
+    assert after.status_code == 400
+    assert "after the engagement end date" in after.json()["message"]
 
 
 @pytest.mark.asyncio
@@ -498,7 +588,8 @@ async def test_consultation_manage_detail_patch_and_done(async_client, test_db_s
     assert body["shared_resources"]["bio_ai"]["consent"] is True
     assert body["shared_resources"]["bio_ai"]["available"] is True
     assert body["shared_resources"]["blood_report"]["consent"] is False
-    assert body["slot_reached"] is True
+    assert body["within_engagement_window"] is True
+    assert body["start_date"] == date.today().isoformat()
 
     patched = await async_client.patch(
         f"/experts/portal/consultations/{consultation_id}",
