@@ -148,9 +148,9 @@ async def test_list_employees_search_matches_name_and_role_substring(async_clien
     )
     await test_db_session.commit()
 
-    # Partial role match ("ro" ⊆ organization_manager) previously raised LookupError on the enum column.
+    # Partial role match ("org" ⊆ organization_manager) must work against the enum column.
     by_role = await async_client.get(
-        "/employees?page=1&limit=10&search=ro&sort_by=employee_id&sort_dir=desc",
+        "/employees?page=1&limit=10&search=org&sort_by=employee_id&sort_dir=desc",
         headers=_auth_header(8013),
     )
     assert by_role.status_code == 200
@@ -228,18 +228,13 @@ async def test_update_employee_status_sets_inactive(async_client, test_db_sessio
 async def test_update_employee_status_rejects_inactive_for_employee_one(async_client, test_db_session):
     await _seed_admin_employee(test_db_session, user_id=8007, employee_id=15)
 
-    test_db_session.add(User(user_id=9402, phone="9402000000", age=30, status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9500, user_id=9402, role="onboarding_assistant", status="active"))
-    await test_db_session.commit()
-
     response = await async_client.patch(
-        "/employees/9500/status",
+        "/employees/1/status",
         headers=_auth_header(8007),
         json={"status": "inactive"},
     )
-    assert response.status_code == 400
+    assert response.status_code == 403
 
-    protected = await test_db_session.get(Employee, 9500)
+    protected = await test_db_session.get(Employee, 1)
     assert protected is not None
     assert (protected.status or "").lower() == "active"

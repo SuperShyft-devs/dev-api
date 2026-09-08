@@ -18,9 +18,11 @@ Tests must still clean up data they insert (see autouse cleanup fixture).
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 
+import asyncpg
 from dotenv import load_dotenv
 
 # Load .env before reading TEST_DATABASE_URL (same as core.config).
@@ -40,6 +42,7 @@ import pytest_asyncio
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from db.base import Base
@@ -125,6 +128,39 @@ def _run_subprocess(argv: list[str]) -> None:
         )
 
 
+def _recreate_guarded_local_test_database(database_url: str) -> bool:
+    """Recreate only the dedicated local test database; never a shared database."""
+
+    url = make_url(database_url)
+    host = (url.host or "").strip("[]").lower()
+    database = url.database or ""
+    if host not in {"localhost", "127.0.0.1", "::1"} or database != "supershyft_test":
+        return False
+
+    async def recreate() -> None:
+        connection = await asyncpg.connect(
+            user=url.username,
+            password=url.password,
+            host=url.host or "localhost",
+            port=url.port or 5432,
+            database="postgres",
+        )
+        try:
+            await connection.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = $1 AND pid <> pg_backend_pid()",
+                database,
+            )
+            quoted_database = '"' + database.replace('"', '""') + '"'
+            await connection.execute(f"DROP DATABASE IF EXISTS {quoted_database}")
+            await connection.execute(f"CREATE DATABASE {quoted_database}")
+        finally:
+            await connection.close()
+
+    asyncio.run(recreate())
+    return True
+
+
 def pytest_sessionstart(session: pytest.Session) -> None:
     if not _use_isolated_test_db:
         return
@@ -138,15 +174,10 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     if not db_url:
         raise RuntimeError("TEST_DATABASE_URL / DATABASE_URL is required for isolated test DB")
 
-    # Tear down migration state without DROP SCHEMA (avoids orphaned pg types on Windows PG).
-    subprocess.run(
-        [sys.executable, "-m", "alembic", "downgrade", "base"],
-        cwd=_project_root(),
-        env=os.environ.copy(),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    if not _recreate_guarded_local_test_database(db_url):
+        # Non-local environments must prove that a normal downgrade succeeds.
+        # Never silently continue with a dirty or partially migrated database.
+        _run_subprocess([sys.executable, "-m", "alembic", "downgrade", "base"])
     _run_subprocess([sys.executable, "-m", "alembic", "upgrade", "head"])
     result = subprocess.run(
         [sys.executable, "-m", "db.seed", "--yes"],
@@ -419,7 +450,10 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
         await test_db_session.execute(
             text(
                 "INSERT INTO platform_settings (settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
-                "VALUES (1, 1, 6)"
+                "VALUES (1, 1, 6) "
+                "ON CONFLICT (settings_id) DO UPDATE SET "
+                "b2c_default_assessment_package_id = EXCLUDED.b2c_default_assessment_package_id, "
+                "b2c_default_diagnostic_package_id = EXCLUDED.b2c_default_diagnostic_package_id"
             )
         )
     await test_db_session.execute(text("DELETE FROM engagement_notifications"))
@@ -428,7 +462,8 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
         # Tests insert ad-hoc assessment_packages; seed keeps MET_BASIC / MET_PRO / FitPrint as ids 1–3.
         await test_db_session.execute(
             text(
-                "DELETE FROM assessment_package_categories WHERE package_id NOT IN (1, 2, 3)"
+                "DELETE FROM assessment_package_categories "
+                "WHERE package_id NOT IN (1, 2, 3) OR category_id > 5"
             )
         )
         await test_db_session.execute(
@@ -451,6 +486,14 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
 
     if _use_isolated_test_db:
         await test_db_session.execute(text("DELETE FROM employee WHERE user_id NOT IN (1, 2)"))
+        await test_db_session.execute(
+            text(
+                "SELECT setval("
+                "pg_get_serial_sequence('employee', 'employee_id'), "
+                "COALESCE((SELECT MAX(employee_id) FROM employee), 1), true"
+                ")"
+            )
+        )
         # Checkout rows reference users and bookings; remove before users to avoid FK teardown failures.
         await test_db_session.execute(
             text(
