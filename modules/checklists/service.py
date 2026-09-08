@@ -30,6 +30,8 @@ from modules.checklists.schemas import (
     UserFacingChecklistItem,
 )
 from modules.employee.service import EmployeeContext
+from modules.employee.models import EmployeeRole
+from modules.employee.permissions import PermissionAction, context_task_allows, permission_denied
 
 
 def _readiness_from_tasks(tasks: list[EngagementChecklistTask]) -> ChecklistReadiness:
@@ -520,10 +522,24 @@ class ChecklistsService:
         self._ensure_employee(current_employee)
         task = await self._repository.get_task_by_id(db, task_id)
         if task is None:
+            if (
+                current_employee.role == EmployeeRole.inferior_admin
+                and not context_task_allows(
+                    current_employee, "checklists_tasks", "tasks", PermissionAction.edit
+                )
+            ):
+                raise permission_denied("checklists_tasks", PermissionAction.edit)
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Task does not exist")
         await self._repository.assign_task(db, task_id, data.assigned_employee_id)
         task = await self._repository.get_task_by_id(db, task_id)
         if task is None:
+            if (
+                current_employee.role == EmployeeRole.inferior_admin
+                and not context_task_allows(
+                    current_employee, "checklists_tasks", "tasks", PermissionAction.edit
+                )
+            ):
+                raise permission_denied("checklists_tasks", PermissionAction.edit)
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Task does not exist")
         audit = self._require_audit_service()
         await audit.log_event(
@@ -553,7 +569,22 @@ class ChecklistsService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         task = await self._repository.get_task_by_id(db, task_id)
         if task is None:
+            if (
+                current_employee.role == EmployeeRole.inferior_admin
+                and not context_task_allows(
+                    current_employee, "checklists_tasks", "tasks", PermissionAction.edit
+                )
+            ):
+                raise permission_denied("checklists_tasks", PermissionAction.edit)
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Task does not exist")
+        if (
+            current_employee.role == EmployeeRole.inferior_admin
+            and task.assigned_employee_id != current_employee.employee_id
+            and not context_task_allows(
+                current_employee, "checklists_tasks", "tasks", PermissionAction.edit
+            )
+        ):
+            raise permission_denied("checklists_tasks", PermissionAction.edit)
         await self._repository.update_task_status(
             db,
             task_id=task_id,
@@ -590,7 +621,22 @@ class ChecklistsService:
         self._ensure_employee(current_employee)
         task = await self._repository.get_task_by_id(db, task_id)
         if task is None:
+            if (
+                current_employee.role == EmployeeRole.inferior_admin
+                and not context_task_allows(
+                    current_employee, "checklists_tasks", "tasks", PermissionAction.edit
+                )
+            ):
+                raise permission_denied("checklists_tasks", PermissionAction.edit)
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Task does not exist")
+        if (
+            current_employee.role == EmployeeRole.inferior_admin
+            and task.assigned_employee_id != current_employee.employee_id
+            and not context_task_allows(
+                current_employee, "checklists_tasks", "tasks", PermissionAction.edit
+            )
+        ):
+            raise permission_denied("checklists_tasks", PermissionAction.edit)
         payload = data.model_dump(exclude_unset=True)
         if payload:
             await self._repository.update_task(db, task_id, payload)

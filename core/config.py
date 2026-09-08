@@ -11,8 +11,10 @@ from common.phone import phone_lookup_candidates
 
 logger = logging.getLogger(__name__)
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from the project-root .env (not process cwd)
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
+_IS_PRODUCTION = os.getenv("APP_ENVIRONMENT", "development").lower() == "production"
 
 
 class Settings:
@@ -83,11 +85,14 @@ class Settings:
     # Server health monitoring (read-only SQLite from cron health-check script)
     HEALTH_CHECK_DB_PATH: str = os.getenv(
         "HEALTH_CHECK_DB_PATH",
-        "/var/www/health-check-db/health.db",
+        "/var/www/health-check-db/health.db" if _IS_PRODUCTION else "./health.db",
     )
 
     # Media upload settings
-    MEDIA_ROOT: str = os.getenv("MEDIA_ROOT", "/var/www/backend/media")
+    MEDIA_ROOT: str = os.getenv(
+        "MEDIA_ROOT",
+        "/var/www/backend/media" if _IS_PRODUCTION else "./media",
+    )
     MEDIA_BASE_URL: str = os.getenv("MEDIA_BASE_URL", "http://localhost:8000/media")
     USER_PROFILE_PHOTO_MAX_MB: int = int(os.getenv("USER_PROFILE_PHOTO_MAX_MB", "2"))
     ORG_LOGO_MAX_MB: int = int(os.getenv("ORG_LOGO_MAX_MB", "5"))
@@ -113,7 +118,7 @@ class Settings:
     # Blood diagnostic PDF archival (permanent links on supershyft.com)
     BLOOD_REPORTS_ROOT: str = os.getenv(
         "BLOOD_REPORTS_ROOT",
-        "/var/www/website/supershyft.com/reports",
+        "/var/www/website/supershyft.com/reports" if _IS_PRODUCTION else "./blood_reports",
     )
     BLOOD_REPORTS_BASE_URL: str = os.getenv(
         "BLOOD_REPORTS_BASE_URL",

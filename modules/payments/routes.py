@@ -15,6 +15,8 @@ from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_current_employee, get_employee_service
 from modules.employee.service import EmployeeContext, EmployeeService
+from modules.employee.models import EmployeeRole
+from modules.employee.permissions import PermissionAction, context_task_allows
 from modules.payments.services import PaymentsService
 
 # Prefix /payments (not /api/payments): dev-admin Vite proxy strips /api from the request path.
@@ -203,8 +205,16 @@ async def booking_status(
 ):
     is_employee = False
     try:
-        await employee_service.get_active_employee_by_user_id(db, user.user_id)
-        is_employee = True
+        employee = await employee_service.get_active_employee_by_user_id(db, user.user_id)
+        is_employee = (
+            employee.role != EmployeeRole.inferior_admin
+            or context_task_allows(
+                employee,
+                "payments_bookings",
+                "bookings",
+                PermissionAction.view,
+            )
+        )
     except AppError:
         pass
 

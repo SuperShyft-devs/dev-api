@@ -37,7 +37,7 @@ from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -102,6 +102,7 @@ from modules.notification_events.router import router as notification_events_rou
 from modules.engagement_notifications.router import router as engagement_notifications_router
 from modules.experts.router import expert_types_router
 from modules.diagnostics.healthians.router import router as healthians_router
+from modules.employee.permissions import authorize_inferior_admin_request
 
 
 def _project_root() -> Path:
@@ -320,7 +321,7 @@ async def fastapi_app(
 ) -> FastAPI:
     """FastAPI app wired to the real DB and a capturing notifications service."""
 
-    app = FastAPI()
+    app = FastAPI(dependencies=[Depends(authorize_inferior_admin_request)])
     add_exception_handlers(app)
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

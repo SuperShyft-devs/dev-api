@@ -24,6 +24,7 @@ from modules.diagnostics.models import DiagnosticPackage
 from modules.employee.access_control import (
     ensure_console_access,
     ensure_employee_present,
+    has_route_admin_scope,
     ensure_engagement_running,
     ensure_participant_department_access,
     resolve_org_manager_scope_for_organization,
@@ -301,7 +302,7 @@ class ConsoleService:
         employee: EmployeeContext,
     ) -> list[dict]:
         ensure_employee_present(employee)
-        if employee.role == EmployeeRole.admin:
+        if has_route_admin_scope(employee):
             engagements = await self._repository.list_running_engagements(db)
         elif employee.role == EmployeeRole.onboarding_assistant:
             engagements = await self._repository.list_running_engagements_for_assigned_employee(

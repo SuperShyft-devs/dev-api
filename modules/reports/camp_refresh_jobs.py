@@ -14,6 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from db.session import AsyncSessionLocal
 from modules.employee.service import EmployeeContext
+from modules.employee.models import EmployeeRole
+from modules.employee.repository import EmployeeRepository
+from modules.employee.permissions import PermissionAction, context_has_capability
+from core.exceptions import AppError
 from modules.reports.camp_reports_service import CampReportsService
 
 logger = logging.getLogger(__name__)
@@ -33,6 +37,10 @@ class CampRefreshJob:
     created_at: datetime
     camp_no: int
     section: str
+    requested_by_employee_id: int
+    permission_category: str = "reports"
+    department: str | None = None
+    city: str | None = None
     result: dict[str, Any] | None = None
     error: str | None = None
 
@@ -64,6 +72,24 @@ async def _run_refresh_job(
     factory = session_factory or AsyncSessionLocal
     try:
         async with factory() as db:
+            if employee.role == EmployeeRole.inferior_admin:
+                from modules.employee.service import EmployeeService
+
+                employee = await EmployeeService(
+                    EmployeeRepository()
+                ).get_active_employee_by_user_id(
+                    db,
+                    employee.user_id,
+                    capability=employee.capability,
+                )
+                if not context_has_capability(
+                    employee, "reports", PermissionAction.edit
+                ):
+                    raise AppError(
+                        status_code=403,
+                        error_code="PERMISSION_DENIED",
+                        message="Report permission was revoked before job execution",
+                    )
             result = await service.refresh_camp_report_section(
                 db,
                 employee=employee,
@@ -103,6 +129,9 @@ def enqueue_camp_refresh_job(
         created_at=datetime.now(timezone.utc),
         camp_no=camp_no,
         section=section,
+        requested_by_employee_id=employee.employee_id,
+        department=department,
+        city=city,
     )
     task = asyncio.create_task(
         _run_refresh_job(

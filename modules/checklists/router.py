@@ -23,6 +23,8 @@ from modules.checklists.schemas import (
 from modules.checklists.service import ChecklistsService
 from modules.employee.dependencies import get_current_employee, get_optional_employee
 from modules.employee.service import EmployeeContext
+from modules.employee.models import EmployeeRole
+from modules.employee.permissions import PermissionAction, context_task_allows
 
 router = APIRouter(tags=["checklists"])
 
@@ -274,7 +276,12 @@ async def list_engagement_checklists(
     employee: EmployeeContext | None = Depends(get_optional_employee),
     service: ChecklistsService = Depends(get_checklists_service),
 ):
-    if employee is not None:
+    if employee is not None and (
+        employee.role != EmployeeRole.inferior_admin
+        or context_task_allows(
+            employee, "checklists_tasks", "assignments", PermissionAction.view
+        )
+    ):
         rows = await service.get_engagement_checklists(db, engagement_id)
         return success_response([r.model_dump(mode="json") for r in rows])
 

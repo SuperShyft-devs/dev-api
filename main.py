@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
@@ -46,6 +46,7 @@ from modules.audit.router import router as audit_router
 from modules.geocoding.router import router as geocode_router
 from modules.server_health.router import router as server_health_router
 from modules.db_health.router import router as db_health_router
+from modules.employee.permissions import authorize_inferior_admin_request
 
 
 # Configure logging
@@ -57,6 +58,7 @@ app = FastAPI(
     description="Supershyft health platform",
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
+    dependencies=[Depends(authorize_inferior_admin_request)],
 )
 
 add_exception_handlers(app)
