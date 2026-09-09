@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +30,7 @@ def get_notifications_service() -> NotificationsService:
 
 
 async def authenticate_notification_endpoint(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(_optional_http_bearer),
     x_api_key: str | None = Header(None),
@@ -43,7 +44,11 @@ async def authenticate_notification_endpoint(
     if credentials is not None and credentials.scheme.lower() == "bearer":
         try:
             user = await authenticate_bearer_user(db, credentials, access_token=None)
-            employee = await employee_service.get_active_employee_by_user_id(db, user.user_id)
+            employee = await employee_service.get_active_employee_by_user_id(
+                db,
+                user.user_id,
+                capability=getattr(request.state, "rbac_capability", None),
+            )
             ensure_internal_employee(employee)
             return employee
         except AppError:

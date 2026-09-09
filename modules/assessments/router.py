@@ -28,9 +28,21 @@ from modules.employee.dependencies import get_current_employee, get_optional_emp
 from modules.metsights.dependencies import get_metsights_sync_service
 from modules.metsights.sync_service import MetsightsSyncService
 from modules.employee.service import EmployeeContext
+from modules.employee.models import EmployeeRole
+from modules.employee.permissions import PermissionAction, context_task_allows
 
 
 router = APIRouter(prefix="/assessments", tags=["assessments"])
+
+
+def _employee_can_admin_assessments(employee: EmployeeContext | None) -> bool:
+    if employee is None:
+        return False
+    if employee.role != EmployeeRole.inferior_admin:
+        return True
+    return context_task_allows(
+        employee, "assessments", "integrations", PermissionAction.edit
+    )
 
 
 def _client_ip(request: Request) -> str:
@@ -178,7 +190,7 @@ async def import_metsights_questionnaire_answers(
         category_key=body.category,
         category_of=body.category_of,
         reload=body.reload,
-        employee_ok=employee is not None,
+        employee_ok=_employee_can_admin_assessments(employee),
     )
     await db.commit()
     return success_response(result)
@@ -198,7 +210,7 @@ async def import_metsights_questionnaire_answers_legacy(
         db,
         assessment_instance_id=assessment_instance_id,
         current_user_id=current_user.user_id,
-        employee_ok=employee is not None,
+        employee_ok=_employee_can_admin_assessments(employee),
     )
     await db.commit()
     return success_response(result)
@@ -218,7 +230,7 @@ async def draft_blood_parameters_from_report(
         db,
         user_id=user.user_id,
         assessment_instance_id=assessment_instance_id,
-        employee_ok=employee is not None,
+        employee_ok=_employee_can_admin_assessments(employee),
     )
     await db.commit()
     return success_response(result)
@@ -257,7 +269,7 @@ async def update_assessment_status(
         assessment_instance_id=assessment_instance_id,
         user_id=user.user_id,
         status=payload.status,
-        employee_ok=employee is not None,
+        employee_ok=_employee_can_admin_assessments(employee),
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),

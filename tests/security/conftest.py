@@ -1,3 +1,1 @@
-"""Reuse root test fixtures for security route tests."""
-
-pytest_plugins = ["tests.conftest"]
+"""Security tests inherit fixtures from the root ``tests/conftest.py``."""

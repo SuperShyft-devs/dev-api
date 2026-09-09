@@ -136,6 +136,11 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Local media / report paths (see MEDIA_ROOT, BLOOD_REPORTS_ROOT, HEALTH_CHECK_DB_PATH)
+/media/
+/blood_reports/
+/health.db
+
 # Environments
 .env
 .envrc

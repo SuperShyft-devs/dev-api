@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,6 +32,7 @@ def get_employee_management_service() -> EmployeeService:
 
 
 async def get_current_employee(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
     employee_service: EmployeeService = Depends(get_employee_service),
@@ -42,10 +43,15 @@ async def get_current_employee(
     Role checks must happen in services.
     """
 
-    return await employee_service.get_active_employee_by_user_id(db, current_user.user_id)
+    return await employee_service.get_active_employee_by_user_id(
+        db,
+        current_user.user_id,
+        capability=getattr(request.state, "rbac_capability", None),
+    )
 
 
 async def get_optional_employee(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
     employee_service: EmployeeService = Depends(get_employee_service),
@@ -53,22 +59,32 @@ async def get_optional_employee(
     """Return employee context if the user is an active employee, else None."""
 
     try:
-        return await employee_service.get_active_employee_by_user_id(db, current_user.user_id)
+        return await employee_service.get_active_employee_by_user_id(
+            db,
+            current_user.user_id,
+            capability=getattr(request.state, "rbac_capability", None),
+        )
     except AppError:
         return None
 
 
 async def get_current_employee_bearer_or_query(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user_bearer_or_query),
     employee_service: EmployeeService = Depends(get_employee_service),
 ) -> EmployeeContext:
     """Active employee context; JWT via Authorization header or ?access_token= (for browser downloads)."""
 
-    return await employee_service.get_active_employee_by_user_id(db, current_user.user_id)
+    return await employee_service.get_active_employee_by_user_id(
+        db,
+        current_user.user_id,
+        capability=getattr(request.state, "rbac_capability", None),
+    )
 
 
 async def get_optional_employee_if_authenticated(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(_optional_http_bearer),
     employee_service: EmployeeService = Depends(get_employee_service),
@@ -82,6 +98,10 @@ async def get_optional_employee_if_authenticated(
     except AppError:
         return None
     try:
-        return await employee_service.get_active_employee_by_user_id(db, user.user_id)
+        return await employee_service.get_active_employee_by_user_id(
+            db,
+            user.user_id,
+            capability=getattr(request.state, "rbac_capability", None),
+        )
     except AppError:
         return None

@@ -11,8 +11,10 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
-from core.dependencies import get_current_user
 from db.session import get_db
+from modules.employee.access_control import ensure_admin
+from modules.employee.dependencies import get_current_employee
+from modules.employee.service import EmployeeContext
 from modules.assessments.models import AssessmentPackageCategory
 from modules.questionnaire.models import (
     QuestionnaireCategory,
@@ -34,12 +36,13 @@ router = APIRouter(prefix="/admin-temp", tags=["admin-temp"])
 @router.post("/sync-questionnaire-seed")
 async def sync_questionnaire_seed(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    employee: EmployeeContext = Depends(get_current_employee),
 ):
     """Upsert all questionnaire seed data (definitions, categories, options,
     category-question links, package-category links) so the server DB matches
     the codebase seed exactly."""
 
+    ensure_admin(employee)
     stats: dict[str, int] = {
         "categories_upserted": 0,
         "questions_upserted": 0,

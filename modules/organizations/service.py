@@ -19,6 +19,7 @@ from modules.employee.access_control import (
     ensure_camp_access_admin_or_org_manager,
     ensure_employee_present,
     ensure_internal_employee,
+    has_route_admin_scope,
     ensure_org_access,
     is_internal_employee,
 )
@@ -342,7 +343,7 @@ class OrganizationsService:
         ensure_employee_present(employee)
 
         contact_person_user_id = None
-        if employee.role == EmployeeRole.admin:
+        if has_route_admin_scope(employee):
             pass
         elif employee.role == EmployeeRole.organization_manager:
             contact_person_user_id = employee.user_id
@@ -387,7 +388,7 @@ class OrganizationsService:
                 employee.user_id,
                 camp_cities=camp_cities,
                 reported_dept_slugs=reported_slugs_by_org.get(oid, []),
-                is_admin=employee.role == EmployeeRole.admin,
+                is_admin=has_route_admin_scope(employee),
             )
             result.append(item)
         return result, total

@@ -11,6 +11,7 @@ from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
+from modules.employee.models import EmployeeRole
 from modules.reports.camp_reports_service import CampReportsService
 from modules.reports.camp_refresh_jobs import enqueue_camp_refresh_job, get_camp_refresh_job
 from modules.reports.dependencies import get_camp_reports_service
@@ -435,7 +436,22 @@ async def get_camp_refresh_job_status(
 ):
     job = get_camp_refresh_job(job_id)
     if job is None:
+        if employee.role == EmployeeRole.inferior_admin:
+            raise AppError(
+                status_code=403,
+                error_code="FORBIDDEN",
+                message="You do not have permission to perform this action",
+            )
         raise AppError(status_code=404, error_code="JOB_NOT_FOUND", message="Refresh job not found")
+    if (
+        employee.role == EmployeeRole.inferior_admin
+        and job.requested_by_employee_id != employee.employee_id
+    ):
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
     return success_response(
         {
             "job_id": job.job_id,

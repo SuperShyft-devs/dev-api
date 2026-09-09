@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.employee.models import EmployeeRole
+from modules.employee.permissions import context_has_capability
 from modules.employee.service import EmployeeContext
 from modules.engagements.repository import EngagementsRepository
 from modules.organizations.contact_person import (
@@ -35,6 +36,18 @@ def is_internal_employee(role: EmployeeRole) -> bool:
     return role in INTERNAL_ROLES
 
 
+def has_route_admin_scope(employee: EmployeeContext) -> bool:
+    """True for full admins or an authorized route-bound Inferior Admin."""
+    if employee.role == EmployeeRole.admin:
+        return True
+    capability = employee.capability
+    return bool(
+        employee.role == EmployeeRole.inferior_admin
+        and capability is not None
+        and context_has_capability(employee, capability.category, capability.action)
+    )
+
+
 def ensure_employee_present(employee: EmployeeContext | None) -> None:
     if employee is None:
         raise AppError(
@@ -46,6 +59,8 @@ def ensure_employee_present(employee: EmployeeContext | None) -> None:
 
 def ensure_internal_employee(employee: EmployeeContext | None) -> None:
     ensure_employee_present(employee)
+    if has_route_admin_scope(employee):
+        return
     if not is_internal_employee(employee.role):
         raise AppError(
             status_code=403,
@@ -56,7 +71,7 @@ def ensure_internal_employee(employee: EmployeeContext | None) -> None:
 
 def ensure_admin(employee: EmployeeContext | None) -> None:
     ensure_employee_present(employee)
-    if employee.role != EmployeeRole.admin:
+    if not has_route_admin_scope(employee):
         raise AppError(
             status_code=403,
             error_code="FORBIDDEN",
@@ -94,7 +109,7 @@ def ensure_expert_portal_owns(
 ) -> None:
     """Admins may access any expert; experts only their own expert_id."""
     ensure_expert_portal_access(employee)
-    if employee.role == EmployeeRole.admin:
+    if has_route_admin_scope(employee):
         return
     if caller_expert_id is None or caller_expert_id != resource_expert_id:
         raise AppError(
@@ -191,7 +206,7 @@ async def ensure_console_access(
 ) -> None:
     """Admins: any engagement. Org managers: assigned + org contact person. OAs: assigned + running."""
     ensure_employee_present(employee)
-    if employee.role == EmployeeRole.admin:
+    if has_route_admin_scope(employee):
         return
 
     if employee.role == EmployeeRole.organization_manager:
@@ -314,7 +329,7 @@ async def ensure_org_access(
     repository: OrganizationsRepository | None = None,
 ) -> OrgManagerScope | None:
     ensure_employee_present(employee)
-    if is_internal_employee(employee.role):
+    if is_internal_employee(employee.role) or has_route_admin_scope(employee):
         return None
 
     if employee.role != EmployeeRole.organization_manager:
@@ -364,7 +379,7 @@ async def ensure_camp_access_admin_or_org_manager(
 ) -> None:
     """Allow admin (all camps) or organization_manager (own org only)."""
     ensure_employee_present(employee)
-    if employee.role == EmployeeRole.admin:
+    if has_route_admin_scope(employee):
         return
 
     if employee.role != EmployeeRole.organization_manager:
@@ -417,7 +432,7 @@ async def get_org_manager_scope_for_employee(
     *,
     repository: OrganizationsRepository | None = None,
 ) -> OrgManagerScope | None:
-    if employee.role == EmployeeRole.admin:
+    if has_route_admin_scope(employee):
         return OrgManagerScope(is_org_manager=True)
     if employee.role != EmployeeRole.organization_manager:
         return None

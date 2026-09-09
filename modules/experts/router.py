@@ -14,6 +14,8 @@ from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_current_employee, get_optional_employee_if_authenticated
 from modules.employee.service import EmployeeContext
+from modules.employee.models import EmployeeRole
+from modules.employee.permissions import PermissionAction, context_task_allows
 from modules.experts.dependencies import get_expert_types_service, get_experts_service, get_availability_service
 from modules.experts.schemas import (
     AvailabilityBlockCreate,
@@ -39,6 +41,20 @@ from modules.users.models import User
 router = APIRouter(prefix="/experts", tags=["experts"])
 portal_router = APIRouter(prefix="/experts/portal", tags=["experts-portal"])
 expert_types_router = APIRouter(prefix="/expert-types", tags=["expert-types"])
+
+
+def _effective_public_employee(
+    employee: EmployeeContext | None,
+) -> EmployeeContext | None:
+    if (
+        employee is not None
+        and employee.role == EmployeeRole.inferior_admin
+        and not context_task_allows(
+            employee, "experts", "experts", PermissionAction.view
+        )
+    ):
+        return None
+    return employee
 
 
 def _client_ip(request: Request) -> str:
@@ -156,6 +172,7 @@ async def list_experts(
     if page < 1 or limit < 1 or limit > 100:
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
+    employee = _effective_public_employee(employee)
     status_param = status if employee is not None else None
     experts, total = await experts_service.list_experts(
         db,
@@ -375,7 +392,11 @@ async def get_expert(
     employee: EmployeeContext | None = Depends(get_optional_employee_if_authenticated),
     experts_service: ExpertsService = Depends(get_experts_service),
 ):
-    expert, tags = await experts_service.get_expert_detail(db, employee=employee, expert_id=expert_id)
+    expert, tags = await experts_service.get_expert_detail(
+        db,
+        employee=_effective_public_employee(employee),
+        expert_id=expert_id,
+    )
     data = _expert_dict(expert)
     data["expertise_tags"] = [_tag_dict(t) for t in tags]
     return success_response(data)

@@ -7,11 +7,16 @@ from __future__ import annotations
 
 from typing import Optional
 
-from sqlalchemy import String, cast, func, or_, select
+from sqlalchemy import String, cast, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern
-from modules.employee.models import Employee
+from modules.employee.models import (
+    Employee,
+    EmployeeCategoryPermission,
+    EmployeeTaskPermission,
+    PermissionCategory,
+)
 from modules.users.models import User
 
 
@@ -63,6 +68,103 @@ class EmployeeRepository:
     async def get_by_id(self, db: AsyncSession, employee_id: int) -> Optional[Employee]:
         result = await db.execute(select(Employee).where(Employee.employee_id == employee_id))
         return result.scalar_one_or_none()
+
+    async def get_by_id_for_update(self, db: AsyncSession, employee_id: int) -> Optional[Employee]:
+        result = await db.execute(
+            select(Employee).where(Employee.employee_id == employee_id).with_for_update()
+        )
+        return result.scalar_one_or_none()
+
+    async def list_permissions(
+        self, db: AsyncSession, employee_id: int
+    ) -> list[EmployeeCategoryPermission]:
+        result = await db.execute(
+            select(EmployeeCategoryPermission)
+            .where(EmployeeCategoryPermission.employee_id == employee_id)
+            .order_by(EmployeeCategoryPermission.category_key)
+        )
+        return list(result.scalars().all())
+
+    async def list_active_categories(self, db: AsyncSession) -> list[PermissionCategory]:
+        result = await db.execute(
+            select(PermissionCategory)
+            .where(PermissionCategory.is_active.is_(True))
+            .order_by(PermissionCategory.display_order)
+        )
+        return list(result.scalars().all())
+
+    async def list_task_permissions(
+        self, db: AsyncSession, employee_id: int
+    ) -> list[EmployeeTaskPermission]:
+        result = await db.execute(
+            select(EmployeeTaskPermission)
+            .where(EmployeeTaskPermission.employee_id == employee_id)
+            .order_by(
+                EmployeeTaskPermission.category_key,
+                EmployeeTaskPermission.task_key,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def replace_permissions(
+        self,
+        db: AsyncSession,
+        *,
+        employee_id: int,
+        grants: list[EmployeeCategoryPermission],
+    ) -> None:
+        await db.execute(
+            delete(EmployeeCategoryPermission).where(
+                EmployeeCategoryPermission.employee_id == employee_id
+            )
+        )
+        db.add_all(grants)
+        await db.flush()
+
+    async def replace_task_permissions(
+        self,
+        db: AsyncSession,
+        *,
+        employee_id: int,
+        grants: list[EmployeeTaskPermission],
+    ) -> None:
+        await db.execute(
+            delete(EmployeeTaskPermission).where(
+                EmployeeTaskPermission.employee_id == employee_id
+            )
+        )
+        db.add_all(grants)
+        await db.flush()
+
+    async def bump_permissions_version(
+        self, db: AsyncSession, *, employee_id: int, expected_version: int
+    ) -> bool:
+        result = await db.execute(
+            update(Employee)
+            .where(
+                Employee.employee_id == employee_id,
+                Employee.permissions_version == expected_version,
+            )
+            .values(permissions_version=Employee.permissions_version + 1)
+        )
+        return result.rowcount == 1
+
+    async def count_active_admins(self, db: AsyncSession) -> int:
+        result = await db.execute(
+            select(func.count())
+            .select_from(Employee)
+            .where(Employee.role == "admin", func.lower(Employee.status) == "active")
+        )
+        return int(result.scalar_one())
+
+    async def lock_active_admins(self, db: AsyncSession) -> list[Employee]:
+        result = await db.execute(
+            select(Employee)
+            .where(Employee.role == "admin", func.lower(Employee.status) == "active")
+            .order_by(Employee.employee_id)
+            .with_for_update()
+        )
+        return list(result.scalars().all())
 
     async def get_by_id_with_user_names(
         self, db: AsyncSession, employee_id: int

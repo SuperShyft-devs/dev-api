@@ -19,6 +19,8 @@ from modules.users.dependencies import get_participant_journey_service, get_user
 from modules.users.participant_journey_service import ParticipantJourneyService
 from modules.employee.dependencies import get_current_employee, get_optional_employee
 from modules.employee.service import EmployeeContext
+from modules.employee.models import EmployeeRole
+from modules.employee.permissions import PermissionAction, context_task_allows, permission_denied
 from modules.metsights.dependencies import get_metsights_sync_service
 from modules.metsights.sync_service import MetsightsSyncService
 from modules.users.schemas import (
@@ -182,6 +184,29 @@ async def get_me(
             "employee_id": employee.employee_id,
             "role": employee.role,
         }
+        if employee.role == EmployeeRole.inferior_admin:
+            task_permissions: dict[str, dict[str, dict[str, bool]]] = {}
+            for composite_key, task_grant in employee.task_permissions.items():
+                category_key, task_key = composite_key.split(".", 1)
+                task_permissions.setdefault(category_key, {})[task_key] = {
+                    "can_view": task_grant.can_view,
+                    "can_edit": task_grant.can_edit,
+                }
+            data["employee"]["permissions"] = {
+                "version": employee.permissions_version,
+                "categories": {
+                    key: {
+                        "can_view": grant.can_view,
+                        "can_edit": grant.can_edit,
+                        **(
+                            {"tasks": task_permissions[key]}
+                            if key in task_permissions
+                            else {}
+                        ),
+                    }
+                    for key, grant in sorted(employee.permissions.items())
+                },
+            }
     return success_response(data)
 
 
@@ -674,6 +699,16 @@ async def sync_user_metsights_completed_records(
     payload: MetsightsSyncRecordsRequest = Body(default_factory=MetsightsSyncRecordsRequest),
 ):
     """Import completed Metsights assessments as local assessment instances (self or employee)."""
+
+    if (
+        employee is not None
+        and employee.role == EmployeeRole.inferior_admin
+        and user_id != current_user.user_id
+        and not context_task_allows(
+            employee, "users", "metsights_sync", PermissionAction.edit
+        )
+    ):
+        raise permission_denied("users", PermissionAction.edit)
 
     result = await sync_service.sync_completed_metsights_records(
         db,
