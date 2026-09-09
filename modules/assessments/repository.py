@@ -276,6 +276,31 @@ class AssessmentsRepository:
         )
         return list(result.scalars().all())
 
+    async def list_instances_with_metsights_record_id(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int | None = None,
+    ) -> list[AssessmentInstance]:
+        """Return all assessment instances that have a non-empty MetSights record id.
+
+        Includes every engagement status. Optionally limit to one engagement.
+        """
+        query = (
+            select(AssessmentInstance)
+            .where(AssessmentInstance.metsights_record_id.is_not(None))
+            .where(AssessmentInstance.metsights_record_id != "")
+            .order_by(
+                AssessmentInstance.engagement_id.asc(),
+                AssessmentInstance.user_id.asc(),
+                AssessmentInstance.assessment_instance_id.asc(),
+            )
+        )
+        if engagement_id is not None:
+            query = query.where(AssessmentInstance.engagement_id == engagement_id)
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
     async def delete_category_progress_for_instance(
         self,
         db: AsyncSession,
