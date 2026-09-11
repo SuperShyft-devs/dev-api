@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date, time, timedelta
+from datetime import date, time
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from core.config import settings
-from core.security import create_jwt_token
 from modules.assessments.models import (
     AssessmentInstance,
     AssessmentPackage,
@@ -21,17 +19,21 @@ from modules.questionnaire.models import (
     QuestionnaireDefinition,
 )
 from modules.users.models import User
-
+from tests.helpers.auth import employee_auth_header, partner_auth_header, seed_partner
 from tests.modules.engagements.test_console_routes import (
     _assign_assistant,
     _seed_employee,
     _seed_engagement,
+    _seed_partner,
 )
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
+
+
+def _partner_auth_header(partner_id: int) -> dict[str, str]:
+    return partner_auth_header(partner_id)
 
 
 async def _seed_participant_with_assessment(
@@ -136,7 +138,7 @@ async def test_console_list_participant_assessments_success(async_client, test_d
     participant_user_id = 88020
     assessment_instance_id = 88030
 
-    await _seed_employee(test_db_session, user_id=admin_user_id, employee_id=880)
+    await _seed_employee(test_db_session, employee_id=880)
     await _seed_engagement(test_db_session, engagement_id=engagement_id, status="running")
     await _seed_participant_with_assessment(
         test_db_session,
@@ -147,7 +149,7 @@ async def test_console_list_participant_assessments_success(async_client, test_d
 
     response = await async_client.get(
         f"/engagements/{engagement_id}/console/participants/{participant_user_id}/assessments",
-        headers=_auth_header(admin_user_id),
+        headers=_auth_header(880),
     )
     assert response.status_code == 200
     data = response.json()["data"]
@@ -164,7 +166,7 @@ async def test_console_assessment_routes_forbidden_for_unassigned_oa(async_clien
     participant_user_id = 88021
     assessment_instance_id = 88031
 
-    await _seed_employee(test_db_session, user_id=oa_user_id, employee_id=881, role="onboarding_assistant")
+    await _seed_partner(test_db_session, partner_id=881)
     await _seed_engagement(test_db_session, engagement_id=engagement_id, status="running")
     await _seed_participant_with_assessment(
         test_db_session,
@@ -176,7 +178,7 @@ async def test_console_assessment_routes_forbidden_for_unassigned_oa(async_clien
     )
 
     base = f"/engagements/{engagement_id}/console/participants/{participant_user_id}"
-    headers = _auth_header(oa_user_id)
+    headers = _partner_auth_header(881)
 
     for path in [
         f"{base}/assessments",
@@ -196,7 +198,7 @@ async def test_console_assessment_status_wrong_engagement_returns_404(async_clie
     participant_user_id = 88022
     assessment_instance_id = 88032
 
-    await _seed_employee(test_db_session, user_id=admin_user_id, employee_id=882)
+    await _seed_employee(test_db_session, employee_id=882)
     await _seed_engagement(test_db_session, engagement_id=engagement_id, status="running")
     await _seed_engagement(test_db_session, engagement_id=other_engagement_id, status="running")
     await _seed_participant_with_assessment(
@@ -210,7 +212,7 @@ async def test_console_assessment_status_wrong_engagement_returns_404(async_clie
 
     response = await async_client.get(
         f"/engagements/{other_engagement_id}/console/participants/{participant_user_id}/assessments/{assessment_instance_id}/status",
-        headers=_auth_header(admin_user_id),
+        headers=_auth_header(882),
     )
     assert response.status_code == 404
     assert response.json()["error_code"] == "ASSESSMENT_NOT_FOUND"
@@ -224,7 +226,7 @@ async def test_console_get_questionnaire_success(async_client, test_db_session):
     assessment_instance_id = 88033
     category_id = 8810
 
-    await _seed_employee(test_db_session, user_id=admin_user_id, employee_id=883)
+    await _seed_employee(test_db_session, employee_id=883)
     await _seed_engagement(test_db_session, engagement_id=engagement_id, status="running")
     await _seed_participant_with_assessment(
         test_db_session,
@@ -237,7 +239,7 @@ async def test_console_get_questionnaire_success(async_client, test_db_session):
 
     response = await async_client.get(
         f"/engagements/{engagement_id}/console/participants/{participant_user_id}/questionnaire/{assessment_instance_id}/category/{category_id}",
-        headers=_auth_header(admin_user_id),
+        headers=_auth_header(883),
     )
     assert response.status_code == 200
     data = response.json()["data"]
@@ -254,7 +256,7 @@ async def test_console_upsert_responses_requires_running_engagement(async_client
     assessment_instance_id = 88034
     category_id = 8812
 
-    await _seed_employee(test_db_session, user_id=admin_user_id, employee_id=884)
+    await _seed_employee(test_db_session, employee_id=884)
     await _seed_engagement(test_db_session, engagement_id=engagement_id, status="completed")
     await _seed_participant_with_assessment(
         test_db_session,
@@ -267,7 +269,7 @@ async def test_console_upsert_responses_requires_running_engagement(async_client
 
     response = await async_client.put(
         f"/engagements/{engagement_id}/console/participants/{participant_user_id}/questionnaire/{assessment_instance_id}/category/{category_id}/responses",
-        headers=_auth_header(admin_user_id),
+        headers=_auth_header(884),
         json={"responses": [{"question_id": 8803, "answer": "170"}]},
     )
     assert response.status_code == 422
@@ -282,12 +284,12 @@ async def test_console_upsert_responses_success(async_client, test_db_session):
     assessment_instance_id = 88035
     category_id = 8814
 
-    await _seed_employee(test_db_session, user_id=oa_user_id, employee_id=885, role="onboarding_assistant")
+    await _seed_partner(test_db_session, partner_id=885)
     await _seed_engagement(test_db_session, engagement_id=engagement_id, status="running")
     await _assign_assistant(
         test_db_session,
         assignment_id=88050,
-        employee_id=885,
+        partner_id=885,
         engagement_id=engagement_id,
     )
     await _seed_participant_with_assessment(
@@ -301,7 +303,7 @@ async def test_console_upsert_responses_success(async_client, test_db_session):
 
     response = await async_client.put(
         f"/engagements/{engagement_id}/console/participants/{participant_user_id}/questionnaire/{assessment_instance_id}/category/{category_id}/responses",
-        headers=_auth_header(oa_user_id),
+        headers=_partner_auth_header(885),
         json={"responses": [{"question_id": 8803, "answer": "170"}]},
     )
     assert response.status_code == 200
@@ -316,7 +318,7 @@ async def test_console_submit_assessment_success(async_client, test_db_session):
     assessment_instance_id = 88036
     category_id = 8816
 
-    await _seed_employee(test_db_session, user_id=admin_user_id, employee_id=886)
+    await _seed_employee(test_db_session, employee_id=886)
     await _seed_engagement(test_db_session, engagement_id=engagement_id, status="running")
     await _seed_participant_with_assessment(
         test_db_session,
@@ -334,7 +336,7 @@ async def test_console_submit_assessment_success(async_client, test_db_session):
     ):
         response = await async_client.post(
             f"/engagements/{engagement_id}/console/participants/{participant_user_id}/assessments/{assessment_instance_id}/submit",
-            headers=_auth_header(admin_user_id),
+            headers=_auth_header(886),
             json={"category": "physical-measurement", "category_of": "metsights"},
         )
 

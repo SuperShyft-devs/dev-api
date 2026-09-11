@@ -1,6 +1,6 @@
 """Organizations HTTP routes.
 
-These endpoints are employee-only.
+Employee admin routes plus organization_manager partner access on scoped paths.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_current_employee
 from modules.employee.service import EmployeeContext
+from modules.organizations.actor import OrgScopedActor, get_org_scoped_actor
 from modules.organizations.dependencies import get_organizations_service
 from modules.organizations.schemas import (
     OrganizationCreateRequest,
@@ -243,7 +244,7 @@ async def list_my_organizations(
     sort_by: str | None = None,
     sort_dir: str | None = None,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     organizations_service: OrganizationsService = Depends(get_organizations_service),
 ):
     if page < 1 or limit < 1 or limit > 100:
@@ -251,7 +252,8 @@ async def list_my_organizations(
 
     organizations, total = await organizations_service.list_my_organizations_for_employee(
         db,
-        employee=employee,
+        employee=actor.employee,
+        partner=actor.partner,
         page=page,
         limit=limit,
         search=search,
@@ -265,12 +267,13 @@ async def list_my_organizations(
 async def get_organization_details(
     organization_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     organizations_service: OrganizationsService = Depends(get_organizations_service),
 ):
     organization, industry = await organizations_service.get_organization_details_for_employee(
         db,
-        employee=employee,
+        employee=actor.employee,
+        partner=actor.partner,
         organization_id=organization_id,
     )
 
@@ -285,12 +288,13 @@ async def update_organization(
     payload: OrganizationUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     organizations_service: OrganizationsService = Depends(get_organizations_service),
 ):
     updated = await organizations_service.update_organization_for_employee(
         db,
-        employee=employee,
+        employee=actor.employee,
+        partner=actor.partner,
         organization_id=organization_id,
         payload=payload,
         ip_address=_client_ip(request),
@@ -335,7 +339,7 @@ async def list_organization_camps(
     sort_dir: str | None = None,
     initialized_only: bool = True,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     organizations_service: OrganizationsService = Depends(get_organizations_service),
 ):
     if page < 1 or limit < 1 or limit > 100:
@@ -343,7 +347,8 @@ async def list_organization_camps(
 
     camps, total = await organizations_service.list_camps_for_organization_for_employee(
         db,
-        employee=employee,
+        employee=actor.employee,
+        partner=actor.partner,
         organization_id=organization_id,
         page=page,
         limit=limit,

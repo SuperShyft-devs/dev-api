@@ -178,7 +178,7 @@ class ChecklistsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return ChecklistTemplateResponse(
@@ -221,7 +221,7 @@ class ChecklistsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return ChecklistTemplateResponse(
@@ -261,7 +261,7 @@ class ChecklistsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -294,7 +294,7 @@ class ChecklistsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return ChecklistTemplateItemResponse(
@@ -337,7 +337,7 @@ class ChecklistsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return ChecklistTemplateItemResponse(
@@ -376,7 +376,7 @@ class ChecklistsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -466,7 +466,7 @@ class ChecklistsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -500,7 +500,7 @@ class ChecklistsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -548,7 +548,7 @@ class ChecklistsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return _task_to_response(task)
@@ -602,7 +602,7 @@ class ChecklistsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return _task_to_response(task)
@@ -650,7 +650,7 @@ class ChecklistsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return _task_to_response(task)

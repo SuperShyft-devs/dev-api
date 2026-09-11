@@ -82,8 +82,22 @@ DEFAULT_USERS: tuple[SeedUser, ...] = (
 )
 
 DEFAULT_EMPLOYEES: tuple[SeedEmployee, ...] = (
-    SeedEmployee(employee_id=1, user_id=1, role="admin", status="active"),
-    SeedEmployee(employee_id=2, user_id=2, role="admin", status="active"),
+    SeedEmployee(
+        employee_id=1,
+        name="Rishi Nagar",
+        phone="7770081606",
+        email="rishi@supershyft.com",
+        role="admin",
+        status="active",
+    ),
+    SeedEmployee(
+        employee_id=2,
+        name="Harshili Gada",
+        phone="9769422110",
+        email="harshili.fitnastic@gmail.com",
+        role="admin",
+        status="active",
+    ),
 )
 
 DEFAULT_ASSESSMENT_PACKAGES: tuple[SeedAssessmentPackage, ...] = (

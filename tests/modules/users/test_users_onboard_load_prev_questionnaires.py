@@ -561,11 +561,11 @@ async def test_create_engagement_persists_load_prev_flag(async_client, test_db_s
         "load_prev_assessment_questionnaires": True,
     }
 
-    response = await async_client.post("/engagements", headers=_auth_header(7901), json=payload)
+    response = await async_client.post("/engagements", headers=_auth_header(901), json=payload)
     assert response.status_code == 201
     engagement_id = response.json()["data"]["engagement_id"]
 
-    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7901))
+    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(901))
     assert details.status_code == 200
     detail_data = details.json().get("data", details.json())
     assert detail_data["load_prev_assessment_questionnaires"] is True
@@ -577,11 +577,11 @@ async def test_create_engagement_persists_load_prev_flag(async_client, test_db_s
     }
     updated = await async_client.put(
         f"/engagements/{engagement_id}",
-        headers=_auth_header(7901),
+        headers=_auth_header(901),
         json=update_payload,
     )
     assert updated.status_code == 200
 
-    details2 = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7901))
+    details2 = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(901))
     detail_data2 = details2.json().get("data", details2.json())
     assert detail_data2["load_prev_assessment_questionnaires"] is False

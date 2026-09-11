@@ -22,6 +22,7 @@ from modules.employee.access_control import (
     has_route_admin_scope,
     ensure_org_access,
     is_internal_employee,
+    org_manager_contact_id,
 )
 from modules.employee.models import Employee, EmployeeRole
 from modules.employee.repository import EmployeeRepository
@@ -36,6 +37,8 @@ from modules.organizations.contact_person import (
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
 from modules.organizations.schemas import OrganizationCreateRequest, OrganizationUpdateRequest
+from modules.partners.models import Partner, PartnerRole
+from modules.partners.repository import PartnersRepository
 from modules.users.repository import UsersRepository
 
 
@@ -131,25 +134,31 @@ class OrganizationsService:
         employee_repository: EmployeeRepository | None = None,
         users_repository: UsersRepository | None = None,
         audit_service: AuditService | None = None,
+        partners_repository: PartnersRepository | None = None,
     ):
         self._repository = repository
         self._employee_repository = employee_repository or EmployeeRepository()
         self._users_repository = users_repository or UsersRepository()
         self._audit_service = audit_service
+        self._partners_repository = partners_repository or PartnersRepository()
 
     def _require_audit_service(self) -> AuditService:
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
         return self._audit_service
 
-    async def _validate_contact_person_user_id(self, db, user_id: int | None) -> int | None:
-        if user_id is None:
+    async def _validate_contact_person_user_id(self, db, partner_id: int | None) -> int | None:
+        """Validate an existing active organization_manager partner (IDs are partner_ids)."""
+        if partner_id is None:
             return None
 
-        user = await self._users_repository.get_user_by_id(db, user_id)
-        if user is None or (user.status or "").lower() != "active":
+        partner = await self._partners_repository.get_by_id(db, partner_id)
+        if partner is None or (partner.status or "").lower() != "active":
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-        return user_id
+        role = partner.role.value if isinstance(partner.role, PartnerRole) else str(partner.role or "")
+        if role != PartnerRole.organization_manager.value:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        return partner_id
 
     async def _validate_contact_person_user_ids(
         self,
@@ -160,29 +169,31 @@ class OrganizationsService:
     ) -> dict | None:
         parsed = parse_contact_person_user_ids(raw)
         validate_contact_person_department_slugs(parsed, allowed_department_slugs)
-        for user_id in iter_contact_person_user_ids(parsed):
-            await self._validate_contact_person_user_id(db, user_id)
+        for partner_id in iter_contact_person_user_ids(parsed):
+            await self._validate_contact_person_user_id(db, partner_id)
         return parsed
 
-    async def _ensure_contact_person_employees(self, db, user_ids: set[int]) -> None:
-        for user_id in user_ids:
-            await self._ensure_contact_person_employee(db, user_id)
+    async def _ensure_contact_person_partners(self, db, partner_ids: set[int]) -> None:
+        for partner_id in partner_ids:
+            await self._ensure_contact_person_partner(db, partner_id)
 
-    async def _ensure_contact_person_employee(self, db, user_id: int) -> None:
-        existing = await self._employee_repository.get_by_user_id(db, user_id)
+    async def _ensure_contact_person_partner(self, db, partner_id: int) -> None:
+        """Verify contact person is an existing organization_manager partner; do not create."""
+        existing = await self._partners_repository.get_by_id(db, partner_id)
         if existing is None:
-            row = Employee(
-                user_id=user_id,
-                role=EmployeeRole.organization_manager,
-                status="active",
-            )
-            await self._employee_repository.create(db, row)
-            return
-
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        role = existing.role.value if isinstance(existing.role, PartnerRole) else str(existing.role or "")
+        if role != PartnerRole.organization_manager.value:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         if (existing.status or "").lower() != "active":
-            existing.status = "active"
-            await self._employee_repository.update(db, existing)
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
+    # Backward-compatible aliases used by older call sites / tests.
+    async def _ensure_contact_person_employees(self, db, partner_ids: set[int]) -> None:
+        await self._ensure_contact_person_partners(db, partner_ids)
+
+    async def _ensure_contact_person_employee(self, db, partner_id: int) -> None:
+        await self._ensure_contact_person_partner(db, partner_id)
     async def create_organization_for_employee(
         self,
         db,
@@ -232,7 +243,7 @@ class OrganizationsService:
 
         organization = await self._repository.create(db, organization)
 
-        await self._ensure_contact_person_employees(
+        await self._ensure_contact_person_partners(
             db,
             iter_contact_person_user_ids(contact_person_user_ids),
         )
@@ -244,7 +255,7 @@ class OrganizationsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -333,26 +344,29 @@ class OrganizationsService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         page: int,
         limit: int,
         search: str | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
     ) -> tuple[list[dict], int]:
-        ensure_employee_present(employee)
+        if employee is not None:
+            ensure_employee_present(employee)
 
         contact_person_user_id = None
-        if has_route_admin_scope(employee):
+        is_admin = employee is not None and has_route_admin_scope(employee)
+        if is_admin:
             pass
-        elif employee.role == EmployeeRole.organization_manager:
-            contact_person_user_id = employee.user_id
         else:
-            raise AppError(
-                status_code=403,
-                error_code="FORBIDDEN",
-                message="You do not have permission to perform this action",
-            )
+            contact_person_user_id = org_manager_contact_id(employee=employee, partner=partner)
+            if contact_person_user_id is None:
+                raise AppError(
+                    status_code=403,
+                    error_code="FORBIDDEN",
+                    message="You do not have permission to perform this action",
+                )
 
         organizations = await self._repository.list_organizations(
             db,
@@ -383,12 +397,13 @@ class OrganizationsService:
             camp_cities = cities_by_org.get(oid, [])
             item = self.organization_to_details_dict(org, industry)
             item["camp_cities"] = camp_cities
+            report_contact_id = contact_person_user_id if contact_person_user_id is not None else 0
             item["report_access"] = build_camp_report_access(
                 org.contact_person_user_ids,
-                employee.user_id,
+                report_contact_id,
                 camp_cities=camp_cities,
                 reported_dept_slugs=reported_slugs_by_org.get(oid, []),
-                is_admin=has_route_admin_scope(employee),
+                is_admin=is_admin,
             )
             result.append(item)
         return result, total
@@ -468,7 +483,8 @@ class OrganizationsService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         organization_id: int,
     ) -> tuple[Organization, str | None]:
         organization = await self._repository.get_by_id(db, organization_id)
@@ -483,6 +499,7 @@ class OrganizationsService:
             db,
             employee,
             organization_id,
+            partner=partner,
             repository=self._repository,
         )
 
@@ -498,7 +515,8 @@ class OrganizationsService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         organization_id: int,
         payload: OrganizationUpdateRequest,
         ip_address: str,
@@ -517,6 +535,7 @@ class OrganizationsService:
             db,
             employee,
             organization_id,
+            partner=partner,
             repository=self._repository,
         )
 
@@ -549,7 +568,7 @@ class OrganizationsService:
             if departments
             else get_department_slugs(organization)
         )
-        if is_internal_employee(employee.role):
+        if employee is not None and is_internal_employee(employee.role):
             previous_user_ids = iter_contact_person_user_ids(organization.contact_person_user_ids)
             contact_person_user_ids = await self._validate_contact_person_user_ids(
                 db,
@@ -558,10 +577,11 @@ class OrganizationsService:
             )
             organization.contact_person_user_ids = contact_person_user_ids
             new_user_ids = iter_contact_person_user_ids(contact_person_user_ids)
-            await self._ensure_contact_person_employees(db, previous_user_ids | new_user_ids)
+            await self._ensure_contact_person_partners(db, previous_user_ids | new_user_ids)
         organization.bd_employee_id = payload.bd_employee_id
         organization.departments = departments
-        organization.updated_employee_id = employee.employee_id
+        if employee is not None:
+            organization.updated_employee_id = employee.employee_id
 
         organization = await self._repository.update(db, organization)
 
@@ -572,7 +592,7 @@ class OrganizationsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -614,7 +634,7 @@ class OrganizationsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -811,7 +831,8 @@ class OrganizationsService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         organization_id: int,
         page: int,
         limit: int,
@@ -824,6 +845,7 @@ class OrganizationsService:
             db,
             employee,
             organization_id,
+            partner=partner,
             repository=self._repository,
         )
 
@@ -890,7 +912,7 @@ class OrganizationsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 

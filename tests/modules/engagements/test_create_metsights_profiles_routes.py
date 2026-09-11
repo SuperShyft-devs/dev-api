@@ -7,26 +7,19 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import text
 
-from core.config import settings
-from core.security import create_jwt_token
-from modules.employee.models import Employee
 from modules.metsights.service import MetsightsService
 from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, make_employee, seed_employee, user_auth_header
 
 NEW_PROFILE_ID = "019e49eb-efce-d5ce-444b-154b18231133"
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int | None = None):
-    eid = employee_id if employee_id is not None else user_id
-    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}0000000001", status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=eid, user_id=user_id, role="admin", status="active"))
-    await test_db_session.commit()
+async def _seed_employee(test_db_session, *, employee_id: int, role: str = "admin"):
+    await seed_employee(test_db_session, employee_id=employee_id, role=role)
 
 
 async def _seed_engagement(test_db_session, *, engagement_id: int = 9101):
@@ -84,7 +77,7 @@ async def test_create_metsights_profiles_requires_auth(async_client):
 
 @pytest.mark.asyncio
 async def test_create_metsights_profiles_skips_existing_id(async_client, test_db_session, monkeypatch):
-    await _seed_employee(test_db_session, user_id=9101)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_engagement(test_db_session)
     existing_id = "01961d4b-3cb1-cfae-f876-2957ef9acf18"
     await _seed_participant(test_db_session, engagement_id=9101, user_id=5101, metsights_profile_id=existing_id)
@@ -100,7 +93,7 @@ async def test_create_metsights_profiles_skips_existing_id(async_client, test_db
 
     response = await async_client.post(
         "/engagements/9101/create-metsights-profiles",
-        headers=_auth_header(9101),
+        headers=_auth_header(1),
     )
     assert response.status_code == 200
     data = response.json()["data"]
@@ -119,7 +112,7 @@ async def test_create_metsights_profiles_skips_existing_id(async_client, test_db
 
 @pytest.mark.asyncio
 async def test_create_metsights_profiles_creates_and_stores_id(async_client, test_db_session, monkeypatch):
-    await _seed_employee(test_db_session, user_id=9102)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_engagement(test_db_session, engagement_id=9102)
     await _seed_participant(test_db_session, engagement_id=9102, user_id=5102, metsights_profile_id=None)
 
@@ -133,7 +126,7 @@ async def test_create_metsights_profiles_creates_and_stores_id(async_client, tes
 
     response = await async_client.post(
         "/engagements/9102/create-metsights-profiles",
-        headers=_auth_header(9102),
+        headers=_auth_header(1),
     )
     assert response.status_code == 200
     data = response.json()["data"]
@@ -163,7 +156,7 @@ async def test_create_metsights_profiles_creates_and_stores_id(async_client, tes
 
 @pytest.mark.asyncio
 async def test_create_metsights_profiles_fails_missing_fields(async_client, test_db_session, monkeypatch):
-    await _seed_employee(test_db_session, user_id=9103)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_engagement(test_db_session, engagement_id=9103)
 
     await test_db_session.execute(
@@ -188,7 +181,7 @@ async def test_create_metsights_profiles_fails_missing_fields(async_client, test
 
     response = await async_client.post(
         "/engagements/9103/create-metsights-profiles",
-        headers=_auth_header(9103),
+        headers=_auth_header(1),
     )
     assert response.status_code == 200
     data = response.json()["data"]

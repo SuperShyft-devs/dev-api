@@ -42,6 +42,7 @@ CATEGORY_LABELS: Mapping[str, str] = MappingProxyType(
         "checklists_tasks": "Checklists & Tasks",
         "support": "Support",
         "employees": "Employees",
+        "partners": "Partners",
         "platform_settings": "Platform Settings",
         "system_monitoring": "System Monitoring",
     }
@@ -140,6 +141,11 @@ TASK_CATALOG: Mapping[str, tuple[tuple[str, str, str], ...]] = MappingProxyType(
             ("directory", "Employee directory", "List and view employees"),
             ("create_update", "Create & update", "Create employees and update employee details"),
             ("status", "Employee status", "Activate or deactivate employees"),
+        ),
+        "partners": (
+            ("directory", "Partner directory", "List and view partners"),
+            ("records", "Partner records", "Create and update partner details"),
+            ("status", "Partner status", "Activate or deactivate partners"),
         ),
         "platform_settings": (
             ("settings", "Platform settings", "Manage platform-wide settings"),
@@ -471,6 +477,10 @@ def _task_for_operation(category: str, path: str, method: str) -> str:
         if path.endswith("/status"):
             return "status"
         return "directory" if method == "GET" else "create_update"
+    if category == "partners":
+        if path.endswith("/status"):
+            return "status"
+        return "directory" if method == "GET" else "records"
     if category == "platform_settings":
         if path.startswith("/engagement-types"):
             return "engagement_types"
@@ -516,8 +526,12 @@ def classify_operation(route_template: str, method: str) -> RouteCapability | No
         category, action = "system_monitoring", PermissionAction.edit
     elif path.startswith("/employees/users"):
         category = "users"
+    elif path.startswith("/employees/auth") or path.startswith("/partners/auth"):
+        return None
     elif path.startswith("/employees"):
         category = "employees"
+    elif path.startswith("/partners"):
+        category = "partners"
     elif "/console" in path:
         category = "engagement_console"
     elif path.startswith("/engagements") and (
@@ -610,11 +624,19 @@ async def authorize_inferior_admin_request(
     if request.headers.get("x-api-key") and request.url.path.startswith("/notifications"):
         return
     try:
-        user_id = int(decode_and_verify_jwt(token).get("sub"))
+        from core.subject_auth import jwt_subject_typ, parse_subject_id
+
+        payload = decode_and_verify_jwt(token)
+        typ = jwt_subject_typ(payload)
+        if typ in {"partner", "user"}:
+            return  # Not an inferior-admin employee path.
+        if typ != "employee":
+            return
+        employee_id = parse_subject_id(payload.get("sub"))
     except Exception:
         return  # The route's normal auth dependency owns the 401 contract.
 
-    result = await db.execute(select(Employee).where(Employee.user_id == user_id))
+    result = await db.execute(select(Employee).where(Employee.employee_id == employee_id))
     employee = result.scalar_one_or_none()
     if employee is None or employee.role != EmployeeRole.inferior_admin:
         return

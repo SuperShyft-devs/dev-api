@@ -9,8 +9,7 @@ from common.responses import success_response
 from core.exceptions import AppError
 from db.session import get_db
 from modules.assessments.schemas import AssessmentSubmitRequest
-from modules.employee.dependencies import get_current_employee
-from modules.employee.service import EmployeeContext
+from modules.engagements.console.actor import ConsoleActor, get_console_actor
 from modules.engagements.console.schemas import (
     ConsoleParticipantBookRequest,
     HomeCollectionAvailableSlotsRequest,
@@ -38,10 +37,10 @@ def _client_ip(request: Request) -> str:
 @router.get("/console/engagements")
 async def list_console_engagements(
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
-    data = await console_service.list_console_engagements(db, employee=employee)
+    data = await console_service.list_console_engagements(db, employee=actor.employee, partner=actor.partner)
     return success_response(data)
 
 
@@ -49,12 +48,12 @@ async def list_console_engagements(
 async def get_engagement_for_console(
     engagement_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     data = await console_service.get_engagement_for_console(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
     )
     return success_response(data)
@@ -66,7 +65,7 @@ async def get_console_participants(
     page: int = 1,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     if page < 1 or limit < 1 or limit > 100:
@@ -74,7 +73,7 @@ async def get_console_participants(
 
     participants, total = await console_service.list_participants_for_console(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         page=page,
         limit=limit,
@@ -89,12 +88,12 @@ async def book_console_participant(
     user_id: int,
     payload: ConsoleParticipantBookRequest,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     data = await console_service.book_participant(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         user_id=user_id,
         barcode=payload.barcode,
@@ -109,14 +108,14 @@ async def cancel_console_participant_booking(
     user_id: int,
     remarks: str,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     if not remarks.strip():
         raise AppError(status_code=400, error_code="INVALID_INPUT", message="remarks is required")
     data = await console_service.cancel_participant_booking(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         user_id=user_id,
         remarks=remarks.strip(),
@@ -130,12 +129,12 @@ async def list_console_participant_assessments(
     engagement_id: int,
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     data = await console_service.list_participant_assessments(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         user_id=user_id,
     )
@@ -149,12 +148,12 @@ async def get_console_participant_assessment_status(
     assessment_instance_id: int,
     category_of: str = "supershyft",
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     data = await console_service.get_participant_assessment_status(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         user_id=user_id,
         assessment_instance_id=assessment_instance_id,
@@ -172,12 +171,12 @@ async def get_console_participant_questionnaire(
     assessment_instance_id: int,
     category_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     data = await console_service.get_participant_questionnaire(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         user_id=user_id,
         assessment_instance_id=assessment_instance_id,
@@ -197,7 +196,7 @@ async def upsert_console_participant_questionnaire_responses(
     payload: QuestionnaireResponsesUpsertRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     responses_data = [
@@ -207,7 +206,7 @@ async def upsert_console_participant_questionnaire_responses(
 
     await console_service.upsert_participant_questionnaire_responses(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         user_id=user_id,
         assessment_instance_id=assessment_instance_id,
@@ -228,12 +227,12 @@ async def submit_console_participant_assessment(
     assessment_instance_id: int,
     body: AssessmentSubmitRequest,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     data = await console_service.submit_participant_assessment_category(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         user_id=user_id,
         assessment_instance_id=assessment_instance_id,
@@ -253,12 +252,12 @@ async def check_home_collection_service_availability(
     user_id: int,
     payload: HomeCollectionCheckServiceabilityRequest,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     data = await console_service.check_home_collection_service_availability(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         user_id=user_id,
         address_line=payload.address_line,
@@ -276,12 +275,12 @@ async def get_home_collection_available_slots(
     user_id: int,
     payload: HomeCollectionAvailableSlotsRequest,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     data = await console_service.get_home_collection_available_slots(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         user_id=user_id,
         blood_collection_date=payload.blood_collection_date,
@@ -296,12 +295,12 @@ async def lock_home_collection_slot(
     user_id: int,
     payload: HomeCollectionLockRequest,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     data = await console_service.lock_home_collection_slot(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         user_id=user_id,
         blood_collection_date=payload.blood_collection_date,
@@ -317,12 +316,12 @@ async def book_home_collection(
     engagement_id: int,
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ConsoleActor = Depends(get_console_actor),
     console_service: ConsoleService = Depends(get_console_service),
 ):
     data = await console_service.book_home_collection(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
         user_id=user_id,
     )

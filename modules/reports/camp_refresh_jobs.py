@@ -77,9 +77,9 @@ async def _run_refresh_job(
 
                 employee = await EmployeeService(
                     EmployeeRepository()
-                ).get_active_employee_by_user_id(
+                ).get_active_employee_by_id(
                     db,
-                    employee.user_id,
+                    employee.employee_id,
                     capability=employee.capability,
                 )
                 if not context_has_capability(

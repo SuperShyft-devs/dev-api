@@ -2,23 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import date, time, timedelta
+from datetime import date, time
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from core.config import settings
-from core.security import create_jwt_token
 from modules.assessments.models import AssessmentPackage
 from modules.diagnostics.models import DiagnosticPackage
-from modules.employee.models import Employee
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, seed_employee
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
 @pytest.mark.asyncio
@@ -52,11 +50,7 @@ async def test_console_book_participant_uses_engagement_external_camp_id(async_c
         existing_diag.diagnostic_provider = "healthians"
         existing_diag.external_package_id = 2002
 
-    test_db_session.add(
-        User(user_id=93101, age=30, phone="9310100000", status="active", first_name="Admin", last_name="User")
-    )
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=601, user_id=93101, role="admin", status="active"))
+    await seed_employee(test_db_session, employee_id=601, role="admin", commit=False)
 
     existing_eng = await test_db_session.get(Engagement, 7101)
     if existing_eng is None:
@@ -148,7 +142,7 @@ async def test_console_book_participant_uses_engagement_external_camp_id(async_c
                 response = await async_client.post(
                     "/engagements/7101/console/participants/93102/book",
                     json={"barcode": "BC96001"},
-                    headers=_auth_header(93101),
+                    headers=_auth_header(601),
                 )
 
     assert response.status_code == 200
@@ -202,11 +196,7 @@ async def test_console_home_collection_book_flow(async_client, test_db_session, 
         existing_diag.external_package_id = 2003
         existing_diag.original_price = 999
 
-    test_db_session.add(
-        User(user_id=93111, age=30, phone="9311100000", status="active", first_name="Admin", last_name="User")
-    )
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=611, user_id=93111, role="admin", status="active"))
+    await seed_employee(test_db_session, employee_id=611, role="admin", commit=False)
 
     existing_eng = await test_db_session.get(Engagement, 7102)
     if existing_eng is None:
@@ -267,7 +257,7 @@ async def test_console_home_collection_book_flow(async_client, test_db_session, 
         existing_participant.booked_by_user_id = 93112
     await test_db_session.commit()
 
-    auth = _auth_header(93111)
+    auth = _auth_header(611)
     base = "/engagements/7102/console/participants/93112/book-home-collection"
     slot_date = date.today().isoformat()
 

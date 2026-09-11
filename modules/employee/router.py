@@ -16,17 +16,25 @@ from common.excel_db_export import export_public_schema_to_xlsx_bytes
 from common.responses import success_response
 from core.exceptions import AppError
 from core.network import get_client_ip
+from core.rate_limit import limiter
 from db.session import get_db
+from modules.employee.auth_service import EmployeeAuthService
 from modules.employee.dependencies import (
     get_current_employee,
     get_current_employee_bearer_or_query,
+    get_employee_auth_service,
     get_employee_management_service,
+    get_employee_service,
 )
 from modules.employee.schemas import (
     EmployeeCreateRequest,
-    ReplaceEmployeePermissionsRequest,
+    EmployeeLogoutRequest,
+    EmployeeRefreshTokenRequest,
+    EmployeeSendOtpRequest,
     EmployeeStatusUpdateRequest,
     EmployeeUpdateRequest,
+    EmployeeVerifyOtpRequest,
+    ReplaceEmployeePermissionsRequest,
 )
 from modules.employee.permissions import TASK_CATALOG
 from modules.employee.service import EmployeeContext, EmployeeService
@@ -39,6 +47,177 @@ from modules.audit.service import AuditService
 
 
 router = APIRouter(prefix="/employees", tags=["employees"])
+
+
+def _employee_to_dict(row) -> dict:
+    return {
+        "employee_id": row.employee_id,
+        "name": row.name,
+        "phone": row.phone,
+        "email": row.email,
+        "role": row.role,
+        "status": row.status,
+        "permissions_version": getattr(row, "permissions_version", None),
+        "created_at": getattr(row, "created_at", None),
+        "updated_at": getattr(row, "updated_at", None),
+    }
+
+
+def _tokens_payload(tokens) -> dict:
+    return {
+        "access_token": tokens.access_token,
+        "refresh_token": tokens.refresh_token,
+        "token_type": "bearer",
+    }
+
+
+# ── Auth (registered before /{employee_id} routes) ───────────────────────
+
+
+@router.post("/auth/send-otp")
+@limiter.limit("5/minute")
+async def employee_send_otp(
+    payload: EmployeeSendOtpRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    auth_service: EmployeeAuthService = Depends(get_employee_auth_service),
+):
+    session_id, delivery = await auth_service.send_otp(
+        db,
+        phone=payload.phone,
+        email=str(payload.email) if payload.email else None,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    if delivery is not None:
+        await auth_service.deliver_otp(db, delivery=delivery)
+        await db.commit()
+    return success_response({"session_id": session_id})
+
+
+def _employee_permissions_payload(employee_ctx: EmployeeContext) -> dict | None:
+    from modules.employee.models import EmployeeRole
+
+    if employee_ctx.role != EmployeeRole.inferior_admin:
+        return None
+    task_permissions: dict[str, dict[str, dict[str, bool]]] = {}
+    for composite_key, task_grant in employee_ctx.task_permissions.items():
+        category_key, task_key = composite_key.split(".", 1)
+        task_permissions.setdefault(category_key, {})[task_key] = {
+            "can_view": task_grant.can_view,
+            "can_edit": task_grant.can_edit,
+        }
+    return {
+        "version": employee_ctx.permissions_version,
+        "categories": {
+            key: {
+                "can_view": grant.can_view,
+                "can_edit": grant.can_edit,
+                **({"tasks": task_permissions[key]} if key in task_permissions else {}),
+            }
+            for key, grant in sorted(employee_ctx.permissions.items())
+        },
+    }
+
+
+@router.post("/auth/verify-otp")
+@limiter.limit("10/minute")
+async def employee_verify_otp(
+    payload: EmployeeVerifyOtpRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    auth_service: EmployeeAuthService = Depends(get_employee_auth_service),
+    employee_service: EmployeeService = Depends(get_employee_service),
+):
+    employee, tokens = await auth_service.verify_otp(
+        db,
+        phone=payload.phone,
+        email=str(payload.email) if payload.email else None,
+        otp=payload.otp,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    employee_ctx = await employee_service.get_active_employee_by_id(db, employee.employee_id)
+    body: dict = {
+        "employee_id": employee.employee_id,
+        "name": employee.name,
+        "role": employee.role,
+        "tokens": _tokens_payload(tokens),
+    }
+    permissions = _employee_permissions_payload(employee_ctx)
+    if permissions is not None:
+        body["permissions"] = permissions
+    return success_response(body)
+
+
+@router.get("/auth/me")
+async def employee_auth_me(
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    employee_service: EmployeeService = Depends(get_employee_service),
+):
+    row = await employee_service.get_employee_row_for_self(db, employee_id=employee.employee_id)
+    body: dict = {
+        "employee_id": row.employee_id,
+        "name": row.name,
+        "phone": row.phone,
+        "email": row.email,
+        "role": row.role,
+        "status": row.status,
+    }
+    permissions = _employee_permissions_payload(employee)
+    if permissions is not None:
+        body["permissions"] = permissions
+    return success_response(body)
+
+
+@router.post("/auth/refresh-token")
+async def employee_refresh_token(
+    payload: EmployeeRefreshTokenRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    auth_service: EmployeeAuthService = Depends(get_employee_auth_service),
+):
+    employee, tokens = await auth_service.refresh_tokens(
+        db,
+        refresh_token=payload.refresh_token,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(
+        {
+            "employee_id": employee.employee_id,
+            "role": employee.role,
+            "tokens": _tokens_payload(tokens),
+        }
+    )
+
+
+@router.post("/auth/logout")
+async def employee_logout(
+    payload: EmployeeLogoutRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    auth_service: EmployeeAuthService = Depends(get_employee_auth_service),
+):
+    await auth_service.logout(
+        db,
+        refresh_token=payload.refresh_token,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response({"success": True})
+
+
+# ── CRUD ────────────────────────────────────────────────────────────────
 
 
 @router.post("", status_code=201)
@@ -58,7 +237,7 @@ async def create_employee(
         endpoint=str(request.url.path),
     )
     await db.commit()
-    return success_response({"employee_id": created.employee_id})
+    return success_response(_employee_to_dict(created))
 
 
 @router.get("")
@@ -68,7 +247,6 @@ async def list_employees(
     limit: int = 20,
     status: str | None = None,
     role: str | None = None,
-    user_id: int | None = None,
     search: str | None = None,
     sort_by: str | None = None,
     sort_dir: str | None = None,
@@ -86,25 +264,23 @@ async def list_employees(
         limit=limit,
         status=status,
         role=role,
-        user_id=user_id,
         search=search,
         sort_by=sort_by,
         sort_dir=sort_dir,
     )
 
-    data = []
-    for row, first_name, last_name in employees:
-        data.append(
-            {
-                "employee_id": row.employee_id,
-                "user_id": row.user_id,
-                "role": row.role,
-                "status": row.status,
-                "permissions_version": row.permissions_version,
-                "first_name": first_name,
-                "last_name": last_name,
-            }
-        )
+    data = [
+        {
+            "employee_id": row.employee_id,
+            "name": row.name,
+            "phone": row.phone,
+            "email": row.email,
+            "role": row.role,
+            "status": row.status,
+            "permissions_version": row.permissions_version,
+        }
+        for row in employees
+    ]
 
     return success_response(data, meta={"page": page, "limit": limit, "total": total})
 
@@ -182,7 +358,7 @@ async def download_database_backup_excel(
         endpoint=str(request.url.path),
         ip_address=get_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
-        user_id=employee.user_id,
+        user_id=None,
         session_id=None,
     )
     await db.commit()
@@ -272,23 +448,11 @@ async def get_employee(
     employee: EmployeeContext = Depends(get_current_employee),
     employee_service: EmployeeService = Depends(get_employee_management_service),
 ):
-    row, first_name, last_name = await employee_service.get_employee_details(
+    row = await employee_service.get_employee_details(
         db, employee=employee, employee_id=employee_id
     )
 
-    return success_response(
-        {
-            "employee_id": row.employee_id,
-            "user_id": row.user_id,
-            "role": row.role,
-            "status": row.status,
-            "permissions_version": row.permissions_version,
-            "first_name": first_name,
-            "last_name": last_name,
-            "created_at": row.created_at,
-            "updated_at": row.updated_at,
-        }
-    )
+    return success_response(_employee_to_dict(row))
 
 
 @router.put("/{employee_id}")

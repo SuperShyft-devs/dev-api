@@ -21,6 +21,7 @@ from modules.experts.repository import (
 from modules.experts.schemas import ConsultationRescheduleRequest
 from modules.experts.service import ExpertAvailabilityService
 from modules.users.models import User
+from tests.helpers.auth import seed_partner
 
 
 async def _seed_reschedule_fixture(
@@ -289,22 +290,20 @@ async def test_reschedule_clears_expert_and_booked_override(test_db_session, mon
     user_id = 78706
     expert_id = 78706
 
-    test_db_session.add(
-        User(
-            user_id=user_id + 1000,
-            age=40,
-            phone=f"{user_id + 1000}000000000",
-            first_name="Expert",
-            last_name="Nutri",
-            email=f"expert{user_id}@example.com",
-            status="active",
-        )
+    expert_partner_id = user_id + 1000
+    await seed_partner(
+        test_db_session,
+        partner_id=expert_partner_id,
+        role="expert",
+        name="Expert Nutri",
+        phone=f"{expert_partner_id}000000000",
+        email=f"expert{user_id}@example.com",
+        commit=False,
     )
-    await test_db_session.flush()
     test_db_session.add(
         Expert(
             expert_id=expert_id,
-            user_id=user_id + 1000,
+            partner_id=expert_partner_id,
             expert_type="nutritionist",
             specialization="Diet",
             status="active",

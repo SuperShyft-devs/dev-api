@@ -7,26 +7,20 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import text
 
-from core.config import settings
-from core.security import create_jwt_token
-from modules.employee.models import Employee
 from modules.metsights.service import MetsightsService
 from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, make_employee, seed_employee, user_auth_header
 
 METSIGHTS_PROFILE_ID = "01961d4b-3cb1-cfae-f876-2957ef9acf18"
 NEW_RECORD_ID = "08AB25490686"
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
-async def _seed_employee(test_db_session, *, user_id: int):
-    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}0000000001", status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=user_id, user_id=user_id, role="admin", status="active"))
-    await test_db_session.commit()
+async def _seed_employee(test_db_session, *, employee_id: int, role: str = "admin"):
+    await seed_employee(test_db_session, employee_id=employee_id, role=role)
 
 
 async def _seed_engagement_with_package(test_db_session, *, engagement_id: int = 9201, package_id: int = 2):
@@ -68,7 +62,7 @@ async def test_connect_metsights_records_requires_auth(async_client):
 
 @pytest.mark.asyncio
 async def test_connect_metsights_records_links_existing_instances(async_client, test_db_session, monkeypatch):
-    await _seed_employee(test_db_session, user_id=9201)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_engagement_with_package(test_db_session)
 
     await test_db_session.execute(
@@ -102,7 +96,7 @@ async def test_connect_metsights_records_links_existing_instances(async_client, 
 
     response = await async_client.post(
         "/engagements/9201/connect-metsights-records",
-        headers=_auth_header(9201),
+        headers=_auth_header(1),
         json={"package_id": 2},
     )
     assert response.status_code == 200
@@ -125,7 +119,7 @@ async def test_connect_metsights_records_links_existing_instances(async_client, 
 
 @pytest.mark.asyncio
 async def test_connect_metsights_records_skips_already_connected(async_client, test_db_session, monkeypatch):
-    await _seed_employee(test_db_session, user_id=9202)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_engagement_with_package(test_db_session, engagement_id=9202)
 
     await test_db_session.execute(
@@ -154,7 +148,7 @@ async def test_connect_metsights_records_skips_already_connected(async_client, t
 
     response = await async_client.post(
         "/engagements/9202/connect-metsights-records",
-        headers=_auth_header(9202),
+        headers=_auth_header(1),
         json={"package_id": 2},
     )
     assert response.status_code == 200
@@ -167,7 +161,7 @@ async def test_connect_metsights_records_skips_already_connected(async_client, t
 
 @pytest.mark.asyncio
 async def test_connect_metsights_records_skips_no_profile_id(async_client, test_db_session, monkeypatch):
-    await _seed_employee(test_db_session, user_id=9203)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_engagement_with_package(test_db_session, engagement_id=9203)
 
     await test_db_session.execute(
@@ -195,7 +189,7 @@ async def test_connect_metsights_records_skips_no_profile_id(async_client, test_
 
     response = await async_client.post(
         "/engagements/9203/connect-metsights-records",
-        headers=_auth_header(9203),
+        headers=_auth_header(1),
         json={"package_id": 2},
     )
     assert response.status_code == 200

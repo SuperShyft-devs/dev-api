@@ -10,7 +10,8 @@ import pytest
 from core.exceptions import AppError
 from modules.diagnostics.models import DiagnosticPackage
 from modules.engagements.enums import ConsultationMode
-from modules.engagements.models import Engagement, EngagementParticipant
+from modules.engagements.models import Engagement, EngagementParticipant, EngagementSlotInfo
+from modules.organizations.models import Organization
 from modules.experts.repository import (
     ExpertAvailabilityOverrideRepository,
     ExpertAvailabilityRepository,
@@ -77,6 +78,27 @@ async def _seed_booking_fixture(
         )
     )
     await test_db_session.flush()
+    if organization_id is not None:
+        existing_org = await test_db_session.get(Organization, organization_id)
+        if existing_org is None:
+            test_db_session.add(
+                Organization(
+                    organization_id=organization_id,
+                    name=f"Org {organization_id}",
+                    organization_type="corporate",
+                    status="active",
+                )
+            )
+            await test_db_session.flush()
+    slot_detail_id = engagement_id if slot_detail is not None else None
+    if slot_detail is not None:
+        test_db_session.add(
+            EngagementSlotInfo(
+                slot_detail_id=slot_detail_id,
+                slot_detail=slot_detail,
+            )
+        )
+        await test_db_session.flush()
     test_db_session.add(
         Engagement(
             engagement_id=engagement_id,
@@ -86,7 +108,7 @@ async def _seed_booking_fixture(
             engagement_type=1,
             consultations={expert_type: True},
             consultation_mode=consultation_mode,
-            slot_detail=slot_detail,
+            slot_detail_id=slot_detail_id,
             assessment_package_id=1,
             diagnostic_package_id=1,
             city="BLR",

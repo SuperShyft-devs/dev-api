@@ -499,7 +499,7 @@ class EngagementAssessmentPackagesService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -718,7 +718,7 @@ class EngagementAssessmentPackagesService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -869,7 +869,7 @@ class EngagementAssessmentPackagesService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 

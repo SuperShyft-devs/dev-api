@@ -211,18 +211,43 @@ async def _resolve_user(session: AsyncSession, blob: dict[str, Any]) -> User:
 
 
 async def _ensure_admin_employee(session: AsyncSession, user_id: int) -> None:
-    row = (await session.execute(select(Employee).where(Employee.user_id == user_id).limit(1))).scalar_one_or_none()
+    """Ensure an admin employee exists for profile-seed flows (detached from users)."""
+    user = await session.get(User, user_id)
+    phone = getattr(user, "phone", None) if user is not None else None
+    email = getattr(user, "email", None) if user is not None else None
+    name_parts = []
+    if user is not None:
+        if getattr(user, "first_name", None):
+            name_parts.append(str(user.first_name))
+        if getattr(user, "last_name", None):
+            name_parts.append(str(user.last_name))
+    name = " ".join(name_parts).strip() or f"Admin {user_id}"
+
+    row = None
+    if phone:
+        row = (
+            await session.execute(select(Employee).where(Employee.phone == phone).limit(1))
+        ).scalar_one_or_none()
+    if row is None and email:
+        row = (
+            await session.execute(select(Employee).where(Employee.email == email).limit(1))
+        ).scalar_one_or_none()
     if row is None:
         eid = await _next_employee_id(session)
         session.add(
             Employee(
                 employee_id=eid,
-                user_id=user_id,
+                name=name,
+                phone=phone,
+                email=email,
                 role="admin",
                 status="active",
             )
         )
     else:
+        row.name = name
+        row.phone = phone or row.phone
+        row.email = email or row.email
         row.role = "admin"
         row.status = "active"
     await session.flush()

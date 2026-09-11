@@ -7,7 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
-from core.dependencies import authenticate_bearer_user
+from core.dependencies import get_current_employee_from_token
 from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.access_control import ensure_internal_employee
@@ -43,10 +43,10 @@ async def authenticate_notification_endpoint(
     """
     if credentials is not None and credentials.scheme.lower() == "bearer":
         try:
-            user = await authenticate_bearer_user(db, credentials, access_token=None)
-            employee = await employee_service.get_active_employee_by_user_id(
+            employee_row = await get_current_employee_from_token(db, credentials, access_token=None)
+            employee = await employee_service.get_active_employee_by_id(
                 db,
-                user.user_id,
+                employee_row.employee_id,
                 capability=getattr(request.state, "rbac_capability", None),
             )
             ensure_internal_employee(employee)

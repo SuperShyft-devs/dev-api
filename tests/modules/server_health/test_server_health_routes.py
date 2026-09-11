@@ -17,9 +17,9 @@ from modules.server_health.service import ServerHealthService
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 async def _seed_health_db(db_path: Path, *, with_null_overall: bool = False) -> None:
@@ -106,7 +106,7 @@ async def test_server_health_current_requires_admin(async_client, test_db_sessio
     test_db_session.add(User(user_id=uid, age=30, phone="92001000001", status="active"))
     await test_db_session.flush()
     test_db_session.add(
-        Employee(employee_id=92001, user_id=uid, role="onboarding_assistant", status="active")
+        Employee(employee_id=92001, name="Employee 92001", phone="0000092001", email="employee92001@test.example", role="onboarding_assistant", status="active")
     )
     await test_db_session.commit()
 
@@ -121,7 +121,7 @@ async def test_server_health_current_returns_latest_grouped(
     uid = 92002
     test_db_session.add(User(user_id=uid, age=30, phone="92002000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=92002, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=92002, name="Employee 92002", phone="0000092002", email="employee92002@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     response = await async_client.get("/server-health/current", headers=_auth_header(uid))
@@ -142,7 +142,7 @@ async def test_server_health_history_respects_limit_and_dates(
     uid = 92003
     test_db_session.add(User(user_id=uid, age=30, phone="92003000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=92003, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=92003, name="Employee 92003", phone="0000092003", email="employee92003@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     response = await async_client.get(
@@ -167,7 +167,7 @@ async def test_server_health_returns_503_when_db_missing(async_client, test_db_s
     uid = 92004
     test_db_session.add(User(user_id=uid, age=30, phone="92004000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=92004, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=92004, name="Employee 92004", phone="0000092004", email="employee92004@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     response = await async_client.get("/server-health/current", headers=_auth_header(uid))
@@ -188,7 +188,7 @@ async def test_server_health_tolerates_null_overall_status(async_client, test_db
     uid = 92005
     test_db_session.add(User(user_id=uid, age=30, phone="92005000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=92005, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=92005, name="Employee 92005", phone="0000092005", email="employee92005@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     current = await async_client.get("/server-health/current", headers=_auth_header(uid))

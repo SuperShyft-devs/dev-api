@@ -14,6 +14,7 @@ from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_current_employee, get_optional_employee_if_authenticated
 from modules.employee.service import EmployeeContext
+from modules.experts.portal_actor import ExpertPortalActor, get_expert_portal_actor
 from modules.employee.models import EmployeeRole
 from modules.employee.permissions import PermissionAction, context_task_allows
 from modules.experts.dependencies import get_expert_types_service, get_experts_service, get_availability_service
@@ -75,7 +76,7 @@ def _decimal_to_float(value: Decimal | None) -> float:
 def _expert_dict(expert) -> dict:
     return {
         "expert_id": expert.expert_id,
-        "user_id": expert.user_id,
+        "partner_id": expert.partner_id,
         "expert_type": expert.expert_type,
         "specialization": expert.specialization,
         "profile_photo": expert.profile_photo,
@@ -145,10 +146,10 @@ def _review_dict(review) -> dict:
 @portal_router.get("/me")
 async def get_experts_portal_me(
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     experts_service: ExpertsService = Depends(get_experts_service),
 ):
-    expert, tags = await experts_service.get_portal_me(db, employee=employee)
+    expert, tags = await experts_service.get_portal_me(db, employee=actor.employee, partner=actor.partner)
     data = _expert_dict(expert)
     data["expertise_tags"] = [_tag_dict(t) for t in tags]
     return success_response(data)
@@ -230,10 +231,10 @@ async def reschedule_consultation_slot(
 @portal_router.get("/requests")
 async def portal_list_consultation_requests(
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    data = await availability_service.list_consultation_requests(db, employee=employee)
+    data = await availability_service.list_consultation_requests(db, employee=actor.employee, partner=actor.partner)
     return success_response(data)
 
 
@@ -241,10 +242,10 @@ async def portal_list_consultation_requests(
 async def portal_confirm_consultation(
     payload: ConsultationConfirmRequest,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    data = await availability_service.confirm_consultation_request(db, employee=employee, payload=payload)
+    data = await availability_service.confirm_consultation_request(db, employee=actor.employee, partner=actor.partner, payload=payload)
     await db.commit()
     return success_response(data)
 
@@ -252,20 +253,20 @@ async def portal_confirm_consultation(
 @portal_router.get("/upcoming")
 async def portal_list_upcoming_consultations(
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    data = await availability_service.list_upcoming_consultations(db, employee=employee)
+    data = await availability_service.list_upcoming_consultations(db, employee=actor.employee, partner=actor.partner)
     return success_response(data)
 
 
 @portal_router.get("/camp-consultations/engagements")
 async def portal_list_camp_consultation_engagements(
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    data = await availability_service.list_camp_consultation_engagements(db, employee=employee)
+    data = await availability_service.list_camp_consultation_engagements(db, employee=actor.employee, partner=actor.partner)
     return success_response(data)
 
 
@@ -273,12 +274,12 @@ async def portal_list_camp_consultation_engagements(
 async def portal_list_camp_consultation_participants(
     engagement_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
     data = await availability_service.list_camp_consultation_participants(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         engagement_id=engagement_id,
     )
     return success_response(data)
@@ -288,10 +289,10 @@ async def portal_list_camp_consultation_participants(
 async def portal_mark_consultation_done(
     payload: ConsultationDoneRequest,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    data = await availability_service.mark_consultation_done(db, employee=employee, payload=payload)
+    data = await availability_service.mark_consultation_done(db, employee=actor.employee, partner=actor.partner, payload=payload)
     await db.commit()
     return success_response(data)
 
@@ -300,11 +301,11 @@ async def portal_mark_consultation_done(
 async def portal_get_consultation_manage(
     consultation_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
     data = await availability_service.get_consultation_manage_detail(
-        db, employee=employee, consultation_id=consultation_id
+        db, employee=actor.employee, partner=actor.partner, consultation_id=consultation_id
     )
     return success_response(data)
 
@@ -314,11 +315,11 @@ async def portal_update_consultation_manage(
     consultation_id: int,
     payload: ConsultationManageUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
     data = await availability_service.update_consultation_manage(
-        db, employee=employee, consultation_id=consultation_id, payload=payload
+        db, employee=actor.employee, partner=actor.partner, consultation_id=consultation_id, payload=payload
     )
     await db.commit()
     return success_response(data)
@@ -328,11 +329,11 @@ async def portal_update_consultation_manage(
 async def portal_mark_consultation_done_by_id(
     consultation_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
     data = await availability_service.mark_consultation_done_by_id(
-        db, employee=employee, consultation_id=consultation_id
+        db, employee=actor.employee, partner=actor.partner, consultation_id=consultation_id
     )
     await db.commit()
     return success_response(data)
@@ -342,11 +343,11 @@ async def portal_mark_consultation_done_by_id(
 async def portal_consultation_bio_ai_pdf(
     consultation_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
     payload = await availability_service.fetch_consultation_pdf_bytes(
-        db, employee=employee, consultation_id=consultation_id, kind="bio_ai"
+        db, employee=actor.employee, partner=actor.partner, consultation_id=consultation_id, kind="bio_ai"
     )
     return Response(
         content=payload,
@@ -359,11 +360,11 @@ async def portal_consultation_bio_ai_pdf(
 async def portal_consultation_blood_report_pdf(
     consultation_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
     payload = await availability_service.fetch_consultation_pdf_bytes(
-        db, employee=employee, consultation_id=consultation_id, kind="blood_report"
+        db, employee=actor.employee, partner=actor.partner, consultation_id=consultation_id, kind="blood_report"
     )
     return Response(
         content=payload,
@@ -376,11 +377,11 @@ async def portal_consultation_blood_report_pdf(
 async def portal_consultation_questionnaire(
     consultation_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
     data = await availability_service.get_consultation_questionnaire(
-        db, employee=employee, consultation_id=consultation_id
+        db, employee=actor.employee, partner=actor.partner, consultation_id=consultation_id
     )
     return success_response(data)
 
@@ -615,11 +616,11 @@ async def delete_expert_override(
 @portal_router.get("/availability")
 async def portal_list_availability(
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     experts_service: ExpertsService = Depends(get_experts_service),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    expert, _ = await experts_service.get_portal_me(db, employee=actor.employee, partner=actor.partner)
     blocks = await availability_service.list_blocks(db, expert_id=expert.expert_id)
     return success_response([_availability_block_dict(b) for b in blocks])
 
@@ -628,11 +629,11 @@ async def portal_list_availability(
 async def portal_create_availability(
     payload: AvailabilityBlockCreate,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     experts_service: ExpertsService = Depends(get_experts_service),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    expert, _ = await experts_service.get_portal_me(db, employee=actor.employee, partner=actor.partner)
     block = await availability_service.create_block(db, expert_id=expert.expert_id, payload=payload)
     await db.commit()
     return success_response(_availability_block_dict(block))
@@ -643,11 +644,11 @@ async def portal_update_availability(
     block_id: int,
     payload: AvailabilityBlockCreate,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     experts_service: ExpertsService = Depends(get_experts_service),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    expert, _ = await experts_service.get_portal_me(db, employee=actor.employee, partner=actor.partner)
     block = await availability_service.update_block(db, expert_id=expert.expert_id, block_id=block_id, payload=payload)
     await db.commit()
     return success_response(_availability_block_dict(block))
@@ -657,11 +658,11 @@ async def portal_update_availability(
 async def portal_delete_availability(
     block_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     experts_service: ExpertsService = Depends(get_experts_service),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    expert, _ = await experts_service.get_portal_me(db, employee=actor.employee, partner=actor.partner)
     await availability_service.delete_block(db, expert_id=expert.expert_id, block_id=block_id)
     await db.commit()
     return success_response({"id": block_id})
@@ -671,11 +672,11 @@ async def portal_delete_availability(
 async def portal_bulk_save_availability(
     payload: AvailabilityBulkSave,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     experts_service: ExpertsService = Depends(get_experts_service),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    expert, _ = await experts_service.get_portal_me(db, employee=actor.employee, partner=actor.partner)
     blocks = await availability_service.bulk_save_blocks(db, expert_id=expert.expert_id, payload=payload)
     await db.commit()
     return success_response([_availability_block_dict(b) for b in blocks])
@@ -684,11 +685,11 @@ async def portal_bulk_save_availability(
 @portal_router.get("/overrides")
 async def portal_list_overrides(
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     experts_service: ExpertsService = Depends(get_experts_service),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    expert, _ = await experts_service.get_portal_me(db, employee=actor.employee, partner=actor.partner)
     overrides = await availability_service.list_overrides(db, expert_id=expert.expert_id)
     return success_response([_override_dict(o) for o in overrides])
 
@@ -697,11 +698,11 @@ async def portal_list_overrides(
 async def portal_create_override(
     payload: OverrideCreate,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     experts_service: ExpertsService = Depends(get_experts_service),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    expert, _ = await experts_service.get_portal_me(db, employee=actor.employee, partner=actor.partner)
     override = await availability_service.create_override(db, expert_id=expert.expert_id, payload=payload)
     await db.commit()
     return success_response(_override_dict(override))
@@ -711,11 +712,11 @@ async def portal_create_override(
 async def portal_delete_override(
     override_id: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: ExpertPortalActor = Depends(get_expert_portal_actor),
     experts_service: ExpertsService = Depends(get_experts_service),
     availability_service: ExpertAvailabilityService = Depends(get_availability_service),
 ):
-    expert, _ = await experts_service.get_portal_me(db, employee=employee)
+    expert, _ = await experts_service.get_portal_me(db, employee=actor.employee, partner=actor.partner)
     await availability_service.delete_override(db, expert_id=expert.expert_id, override_id=override_id)
     await db.commit()
     return success_response({"id": override_id})

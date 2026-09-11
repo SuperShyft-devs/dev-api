@@ -283,8 +283,8 @@ async def test_consultation_booking_alert_online_with_expert_id_auto_assigns_oa(
     test_db_session.add(expert_user)
     await test_db_session.flush()
 
-    admin_employee = Employee(employee_id=5201, user_id=5201, role=EmployeeRole.admin, status="active")
-    expert_employee = Employee(employee_id=5202, user_id=5202, role=EmployeeRole.expert, status="active")
+    admin_employee = Employee(employee_id=5201, name="Employee 5201", phone="0000005201", email="employee5201@test.example", role=EmployeeRole.admin, status="active")
+    expert_employee = Employee(employee_id=5202, name="Employee 5202", phone="0000005202", email="employee5202@test.example", role=EmployeeRole.expert, status="active")
     test_db_session.add(admin_employee)
     test_db_session.add(expert_employee)
     await test_db_session.flush()
@@ -350,7 +350,7 @@ async def test_consultation_booking_alert_online_with_expert_id_skips_duplicate_
     test_db_session.add(expert_user)
     await test_db_session.flush()
 
-    expert_employee = Employee(employee_id=5203, user_id=5203, role=EmployeeRole.expert, status="active")
+    expert_employee = Employee(employee_id=5203, name="Employee 5203", phone="0000005203", email="employee5203@test.example", role=EmployeeRole.expert, status="active")
     test_db_session.add(expert_employee)
     await test_db_session.flush()
 

@@ -136,15 +136,19 @@ class ConsoleService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         engagement: Engagement,
     ) -> set[str] | None:
-        if employee.role != EmployeeRole.organization_manager or engagement.organization_id is None:
+        from modules.employee.access_control import org_manager_contact_id
+
+        contact_id = org_manager_contact_id(employee=employee, partner=partner)
+        if contact_id is None or engagement.organization_id is None:
             return None
         organization = await db.get(Organization, engagement.organization_id)
         if organization is None:
             return set()
-        scope = resolve_org_manager_scope_for_organization(organization, employee.user_id)
+        scope = resolve_org_manager_scope_for_organization(organization, contact_id)
         if scope is None:
             return set()
         return scope.participant_department_slugs_for_city(engagement.city)
@@ -153,11 +157,14 @@ class ConsoleService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         engagement_id: int,
         user_id: int,
     ) -> EngagementParticipant:
-        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+        from modules.employee.access_control import org_manager_contact_id
+
+        await ensure_console_access(db, engagement_id, repository=self._repository, employee=employee, partner=partner)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -179,10 +186,11 @@ class ConsoleService:
                 message="Participant is not enrolled in this engagement",
             )
 
-        if employee.role == EmployeeRole.organization_manager and engagement.organization_id is not None:
+        contact_id = org_manager_contact_id(employee=employee, partner=partner)
+        if contact_id is not None and engagement.organization_id is not None:
             organization = await db.get(Organization, engagement.organization_id)
             if organization is not None:
-                scope = resolve_org_manager_scope_for_organization(organization, employee.user_id)
+                scope = resolve_org_manager_scope_for_organization(organization, contact_id)
                 if scope is not None:
                     ensure_participant_department_access(
                         scope,
@@ -299,20 +307,47 @@ class ConsoleService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
     ) -> list[dict]:
-        ensure_employee_present(employee)
-        if has_route_admin_scope(employee):
+        from modules.partners.models import PartnerRole
+
+        if employee is not None and has_route_admin_scope(employee):
             engagements = await self._repository.list_running_engagements(db)
-        elif employee.role == EmployeeRole.onboarding_assistant:
-            engagements = await self._repository.list_running_engagements_for_assigned_employee(
-                db, employee_id=employee.employee_id
-            )
-        elif employee.role == EmployeeRole.organization_manager:
+        elif partner is not None:
+            from modules.employee.access_control import is_organization_manager_partner
+            from modules.partners.models import PartnerRole
+
+            if is_organization_manager_partner(partner):
+                assigned = await self._repository.list_engagements_for_assigned_org_contact_person(
+                    db,
+                    contact_id=partner.partner_id,
+                )
+                engagements = []
+                for engagement in assigned:
+                    if engagement.organization_id is None:
+                        continue
+                    organization = await db.get(Organization, engagement.organization_id)
+                    if organization is None:
+                        continue
+                    scope = resolve_org_manager_scope_for_organization(organization, partner.partner_id)
+                    if scope is not None and scope.can_access_engagement_city(engagement.city):
+                        engagements.append(engagement)
+            else:
+                role = partner.role.value if hasattr(partner.role, "value") else str(partner.role or "")
+                if role != PartnerRole.phlebo.value:
+                    raise AppError(
+                        status_code=403,
+                        error_code="FORBIDDEN",
+                        message="You do not have permission to perform this action",
+                    )
+                engagements = await self._repository.list_running_engagements_for_assigned_partner(
+                    db, partner_id=partner.partner_id
+                )
+        elif employee is not None and employee.role == EmployeeRole.organization_manager:
             assigned = await self._repository.list_engagements_for_assigned_org_contact_person(
                 db,
-                employee_id=employee.employee_id,
-                user_id=employee.user_id,
+                contact_id=employee.employee_id,
             )
             engagements = []
             for engagement in assigned:
@@ -321,7 +356,7 @@ class ConsoleService:
                 organization = await db.get(Organization, engagement.organization_id)
                 if organization is None:
                     continue
-                scope = resolve_org_manager_scope_for_organization(organization, employee.user_id)
+                scope = resolve_org_manager_scope_for_organization(organization, employee.employee_id)
                 if scope is not None and scope.can_access_engagement_city(engagement.city):
                     engagements.append(engagement)
         else:
@@ -348,9 +383,10 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
     ) -> dict:
-        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+        await ensure_console_access(db, engagement_id, repository=self._repository, employee=employee, partner=partner)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -377,11 +413,12 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         page: int,
         limit: int,
     ) -> tuple[list[dict], int]:
-        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+        await ensure_console_access(db, engagement_id, repository=self._repository, employee=employee, partner=partner)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -418,11 +455,12 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         user_id: int,
         barcode: str,
     ) -> dict:
-        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+        await ensure_console_access(db, engagement_id, repository=self._repository, employee=employee, partner=partner)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -445,10 +483,13 @@ class ConsoleService:
                 message="Participant is not enrolled in this engagement",
             )
 
-        if employee.role == EmployeeRole.organization_manager and engagement.organization_id is not None:
+        from modules.employee.access_control import org_manager_contact_id
+
+        contact_id = org_manager_contact_id(employee=employee, partner=partner)
+        if contact_id is not None and engagement.organization_id is not None:
             organization = await db.get(Organization, engagement.organization_id)
             if organization is not None:
-                scope = resolve_org_manager_scope_for_organization(organization, employee.user_id)
+                scope = resolve_org_manager_scope_for_organization(organization, contact_id)
                 if scope is not None:
                     ensure_participant_department_access(
                         scope,
@@ -746,13 +787,14 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         user_id: int,
         remarks: str,
     ) -> dict:
         from modules.bookings.service import cancel_healthians_participant_booking
 
-        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+        await ensure_console_access(db, engagement_id, repository=self._repository, employee=employee, partner=partner)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -789,6 +831,7 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         user_id: int,
     ) -> list[dict]:
@@ -818,6 +861,7 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         user_id: int,
         assessment_instance_id: int,
@@ -848,6 +892,7 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         user_id: int,
         assessment_instance_id: int,
@@ -879,6 +924,7 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         user_id: int,
         assessment_instance_id: int,
@@ -918,6 +964,7 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         user_id: int,
         assessment_instance_id: int,
@@ -1004,6 +1051,7 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         user_id: int,
         address_line: str,
@@ -1011,7 +1059,7 @@ class ConsoleService:
         city: str,
         pincode: str,
     ) -> dict:
-        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+        await ensure_console_access(db, engagement_id, repository=self._repository, employee=employee, partner=partner)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -1104,11 +1152,12 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         user_id: int,
         blood_collection_date: date,
     ) -> dict:
-        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+        await ensure_console_access(db, engagement_id, repository=self._repository, employee=employee, partner=partner)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -1198,13 +1247,14 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         user_id: int,
         blood_collection_date: date,
         blood_collection_time_slot_id: str,
         blood_collection_time_slot: str,
     ) -> dict:
-        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+        await ensure_console_access(db, engagement_id, repository=self._repository, employee=employee, partner=partner)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:
@@ -1282,10 +1332,11 @@ class ConsoleService:
         db: AsyncSession,
         *,
         employee: EmployeeContext,
+        partner=None,
         engagement_id: int,
         user_id: int,
     ) -> dict:
-        await ensure_console_access(db, employee, engagement_id, repository=self._repository)
+        await ensure_console_access(db, engagement_id, repository=self._repository, employee=employee, partner=partner)
 
         engagement = await self._repository.get_engagement_by_id(db, engagement_id)
         if engagement is None:

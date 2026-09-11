@@ -39,8 +39,8 @@ from modules.users.models import User
 
 
 def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+    from tests.helpers.auth import user_auth_header
+    return user_auth_header(user_id)
 
 
 class _FakeMetsightsService:

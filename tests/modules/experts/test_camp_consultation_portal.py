@@ -6,27 +6,19 @@ from datetime import date, datetime, time, timedelta
 
 import pytest
 
-from core.config import settings
-from core.security import create_jwt_token
-from modules.employee.models import Employee
 from modules.engagements.enums import ConsultationMode
 from modules.engagements.models import Engagement, EngagementParticipant, OnboardingAssistantAssignment
 from modules.experts.models import ConsultationBooking, Expert
 from modules.organizations.models import Organization
 from modules.users.models import User
-
-
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+from tests.helpers.auth import partner_auth_header, seed_partner
 
 
 async def _seed_camp_setup(
     test_db_session,
     *,
     engagement_id: int,
-    expert_user_id: int,
-    expert_employee_id: int,
+    expert_partner_id: int,
     participant_user_id: int,
     participant_id: int,
     nutritionist_consultation_id: int,
@@ -42,39 +34,29 @@ async def _seed_camp_setup(
             status="active",
         )
     )
-    test_db_session.add_all(
-        [
-            User(
-                user_id=expert_user_id,
-                age=35,
-                phone="886000000001",
-                email="expert.camp@example.com",
-                first_name="Nutri",
-                last_name="Expert",
-                status="active",
-            ),
-            User(
-                user_id=participant_user_id,
-                age=30,
-                phone="886000000002",
-                email="participant.camp@example.com",
-                first_name="Camp",
-                last_name="Patient",
-                status="active",
-            ),
-        ]
-    )
-    await test_db_session.flush()
     test_db_session.add(
-        Employee(
-            employee_id=expert_employee_id,
-            user_id=expert_user_id,
-            role="expert",
+        User(
+            user_id=participant_user_id,
+            age=30,
+            phone="886000000002",
+            email="participant.camp@example.com",
+            first_name="Camp",
+            last_name="Patient",
             status="active",
         )
     )
+    await test_db_session.flush()
+    await seed_partner(
+        test_db_session,
+        partner_id=expert_partner_id,
+        role="expert",
+        name="Nutri Expert",
+        phone="886000000001",
+        email="expert.camp@example.com",
+        commit=False,
+    )
     expert = Expert(
-        user_id=expert_user_id,
+        partner_id=expert_partner_id,
         expert_type=expert_type,
         specialization="Nutrition",
         status="active",
@@ -88,7 +70,7 @@ async def _seed_camp_setup(
             engagement_id=engagement_id,
             engagement_name="Camp Consultation",
             engagement_code=f"CAMP{engagement_id}",
-            engagement_type="consultation",
+            engagement_type=1,
             organization_id=8860,
             camp_no=886001,
             consultations={"doctor": True, "nutritionist": True},
@@ -107,7 +89,7 @@ async def _seed_camp_setup(
         test_db_session.add(
             OnboardingAssistantAssignment(
                 onboarding_assistant_id=886001,
-                employee_id=expert_employee_id,
+                partner_id=expert_partner_id,
                 engagement_id=engagement_id,
             )
         )
@@ -154,15 +136,13 @@ async def _seed_camp_setup(
 @pytest.mark.asyncio
 async def test_camp_consultation_engagements_only_for_assigned_offline(async_client, test_db_session):
     engagement_id = 88601
-    expert_user_id = 88601
-    expert_employee_id = 88601
+    expert_partner_id = 88601
     other_engagement_id = 88602
 
     await _seed_camp_setup(
         test_db_session,
         engagement_id=engagement_id,
-        expert_user_id=expert_user_id,
-        expert_employee_id=expert_employee_id,
+        expert_partner_id=expert_partner_id,
         participant_user_id=88611,
         participant_id=88611,
         nutritionist_consultation_id=886101,
@@ -175,7 +155,7 @@ async def test_camp_consultation_engagements_only_for_assigned_offline(async_cli
             engagement_id=other_engagement_id,
             engagement_name="Other Offline Camp",
             engagement_code="CAMP88602",
-            engagement_type="consultation",
+            engagement_type=1,
             organization_id=8860,
             camp_no=886002,
             consultations={"nutritionist": True},
@@ -193,7 +173,7 @@ async def test_camp_consultation_engagements_only_for_assigned_offline(async_cli
 
     response = await async_client.get(
         "/experts/portal/camp-consultations/engagements",
-        headers=_auth_header(expert_user_id),
+        headers=partner_auth_header(expert_partner_id),
     )
     assert response.status_code == 200
     data = response.json()["data"]
@@ -209,14 +189,12 @@ async def test_camp_consultation_participants_filter_by_expert_type_and_mask_pii
     async_client, test_db_session
 ):
     engagement_id = 88603
-    expert_user_id = 88603
-    expert_employee_id = 88603
+    expert_partner_id = 88603
 
     await _seed_camp_setup(
         test_db_session,
         engagement_id=engagement_id,
-        expert_user_id=expert_user_id,
-        expert_employee_id=expert_employee_id,
+        expert_partner_id=expert_partner_id,
         participant_user_id=88613,
         participant_id=88613,
         nutritionist_consultation_id=886301,
@@ -225,7 +203,7 @@ async def test_camp_consultation_participants_filter_by_expert_type_and_mask_pii
 
     response = await async_client.get(
         f"/experts/portal/camp-consultations/engagements/{engagement_id}/participants",
-        headers=_auth_header(expert_user_id),
+        headers=partner_auth_header(expert_partner_id),
     )
     assert response.status_code == 200
     data = response.json()["data"]
@@ -242,24 +220,24 @@ async def test_camp_consultation_participants_filter_by_expert_type_and_mask_pii
 @pytest.mark.asyncio
 async def test_camp_consultation_manage_without_expert_id(async_client, test_db_session):
     engagement_id = 88604
-    expert_user_id = 88604
-    expert_employee_id = 88604
+    expert_partner_id = 88604
     consultation_id = 886401
 
     await _seed_camp_setup(
         test_db_session,
         engagement_id=engagement_id,
-        expert_user_id=expert_user_id,
-        expert_employee_id=expert_employee_id,
+        expert_partner_id=expert_partner_id,
         participant_user_id=88614,
         participant_id=88614,
         nutritionist_consultation_id=consultation_id,
         doctor_consultation_id=886402,
     )
 
+    expert_headers = partner_auth_header(expert_partner_id)
+
     detail = await async_client.get(
         f"/experts/portal/consultations/{consultation_id}",
-        headers=_auth_header(expert_user_id),
+        headers=expert_headers,
     )
     assert detail.status_code == 200
     body = detail.json()["data"]
@@ -271,7 +249,7 @@ async def test_camp_consultation_manage_without_expert_id(async_client, test_db_
 
     patch = await async_client.patch(
         f"/experts/portal/consultations/{consultation_id}",
-        headers=_auth_header(expert_user_id),
+        headers=expert_headers,
         json={"consultation_summary": "Camp consult complete"},
     )
     assert patch.status_code == 200
@@ -279,7 +257,7 @@ async def test_camp_consultation_manage_without_expert_id(async_client, test_db_
 
     done = await async_client.post(
         f"/experts/portal/consultations/{consultation_id}/done",
-        headers=_auth_header(expert_user_id),
+        headers=expert_headers,
     )
     assert done.status_code == 200
     assert done.json()["data"]["done"] is True
@@ -288,15 +266,13 @@ async def test_camp_consultation_manage_without_expert_id(async_client, test_db_
 @pytest.mark.asyncio
 async def test_camp_consultation_forbidden_without_oa_assignment(async_client, test_db_session):
     engagement_id = 88605
-    expert_user_id = 88605
-    expert_employee_id = 88605
+    expert_partner_id = 88605
     consultation_id = 886501
 
     await _seed_camp_setup(
         test_db_session,
         engagement_id=engagement_id,
-        expert_user_id=expert_user_id,
-        expert_employee_id=expert_employee_id,
+        expert_partner_id=expert_partner_id,
         participant_user_id=88615,
         participant_id=88615,
         nutritionist_consultation_id=consultation_id,
@@ -304,15 +280,17 @@ async def test_camp_consultation_forbidden_without_oa_assignment(async_client, t
         assign_expert_as_oa=False,
     )
 
+    expert_headers = partner_auth_header(expert_partner_id)
+
     response = await async_client.get(
         f"/experts/portal/camp-consultations/engagements/{engagement_id}/participants",
-        headers=_auth_header(expert_user_id),
+        headers=expert_headers,
     )
     assert response.status_code == 403
 
     manage = await async_client.get(
         f"/experts/portal/consultations/{consultation_id}",
-        headers=_auth_header(expert_user_id),
+        headers=expert_headers,
     )
     assert manage.status_code == 403
 
@@ -320,15 +298,13 @@ async def test_camp_consultation_forbidden_without_oa_assignment(async_client, t
 @pytest.mark.asyncio
 async def test_camp_consultation_manage_rejects_wrong_expert_type(async_client, test_db_session):
     engagement_id = 88606
-    expert_user_id = 88606
-    expert_employee_id = 88606
+    expert_partner_id = 88606
     doctor_consultation_id = 886602
 
     await _seed_camp_setup(
         test_db_session,
         engagement_id=engagement_id,
-        expert_user_id=expert_user_id,
-        expert_employee_id=expert_employee_id,
+        expert_partner_id=expert_partner_id,
         participant_user_id=88616,
         participant_id=88616,
         nutritionist_consultation_id=886601,
@@ -337,6 +313,6 @@ async def test_camp_consultation_manage_rejects_wrong_expert_type(async_client, 
 
     response = await async_client.get(
         f"/experts/portal/consultations/{doctor_consultation_id}",
-        headers=_auth_header(expert_user_id),
+        headers=partner_auth_header(expert_partner_id),
     )
     assert response.status_code == 403

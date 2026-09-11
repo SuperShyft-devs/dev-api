@@ -58,7 +58,7 @@ async def create_camp_report_section(
     employee: EmployeeContext = Depends(get_current_employee),
     service: CampReportSectionsService = Depends(get_camp_report_sections_service),
 ):
-    created = await service.create_section(
+    row = await service.create_section(
         db,
         employee=employee,
         payload=payload,
@@ -67,7 +67,14 @@ async def create_camp_report_section(
         endpoint=str(request.url.path),
     )
     await db.commit()
-    return success_response({"report_sections": created.report_sections})
+    return success_response(
+        {
+            "report_sections": row.report_sections,
+            "section": row.section,
+            "section_key": row.section_key,
+            "description": row.description,
+        }
+    )
 
 
 @router.put("/{report_sections}")
@@ -79,7 +86,7 @@ async def update_camp_report_section(
     employee: EmployeeContext = Depends(get_current_employee),
     service: CampReportSectionsService = Depends(get_camp_report_sections_service),
 ):
-    updated = await service.update_section(
+    row = await service.update_section(
         db,
         employee=employee,
         report_sections=report_sections,
@@ -91,10 +98,10 @@ async def update_camp_report_section(
     await db.commit()
     return success_response(
         {
-            "report_sections": updated.report_sections,
-            "section": updated.section,
-            "section_key": updated.section_key,
-            "description": updated.description,
+            "report_sections": row.report_sections,
+            "section": row.section,
+            "section_key": row.section_key,
+            "description": row.description,
         }
     )
 
@@ -116,4 +123,4 @@ async def delete_camp_report_section(
         endpoint=str(request.url.path),
     )
     await db.commit()
-    return success_response({"deleted": True})
+    return success_response({"success": True})

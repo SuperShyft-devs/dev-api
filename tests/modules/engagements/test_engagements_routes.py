@@ -2,27 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
 import pytest
 from sqlalchemy import text
 
-from core.config import settings
-from core.security import create_jwt_token
-from modules.employee.models import Employee
 from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, make_employee, seed_employee, user_auth_header
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1, role: str = "admin"):
-    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role=role, status="active"))
-    await test_db_session.commit()
+async def _seed_employee(test_db_session, *, employee_id: int, role: str = "admin"):
+    await seed_employee(test_db_session, employee_id=employee_id, role=role)
 
 
 async def _seed_organization(test_db_session, *, organization_id: int, name: str = "Test Org"):
@@ -125,13 +119,13 @@ async def test_create_engagement_requires_employee(async_client, test_db_session
         "end_date": "2026-02-01",
     }
 
-    response = await async_client.post("/engagements", headers=_auth_header(7001), json=payload)
+    response = await async_client.post("/engagements", headers=user_auth_header(7001), json=payload)
     assert response.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_create_engagement_creates_row(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7002, employee_id=10)
+    await _seed_employee(test_db_session, employee_id=10)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -158,13 +152,13 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
         "end_date": "2026-02-02",
     }
 
-    response = await async_client.post("/engagements", headers=_auth_header(7002), json=payload)
+    response = await async_client.post("/engagements", headers=_auth_header(10), json=payload)
     assert response.status_code == 201
 
     engagement_id = response.json()["data"]["engagement_id"]
     assert isinstance(engagement_id, int)
 
-    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7002))
+    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(10))
     assert details.status_code == 200
     body = details.json()
     detail_data = body.get("data", body)
@@ -173,7 +167,7 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
 
     assistants = await async_client.get(
         f"/engagements/{engagement_id}/onboarding-assistants",
-        headers=_auth_header(7002),
+        headers=_auth_header(10),
     )
     assert assistants.status_code == 200
     assistant_ids = sorted(a["employee_id"] for a in assistants.json()["data"])
@@ -182,7 +176,7 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
 
 @pytest.mark.asyncio
 async def test_create_engagement_persists_location_fields(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7012, employee_id=18)
+    await _seed_employee(test_db_session, employee_id=18)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -207,11 +201,11 @@ async def test_create_engagement_persists_location_fields(async_client, test_db_
         "end_date": "2026-02-02",
     }
 
-    response = await async_client.post("/engagements", headers=_auth_header(7012), json=payload)
+    response = await async_client.post("/engagements", headers=_auth_header(18), json=payload)
     assert response.status_code == 201
     engagement_id = response.json()["data"]["engagement_id"]
 
-    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7012))
+    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(18))
     assert details.status_code == 200
     data = details.json()["data"]
     assert data["address"] == "Marol Naka, Andheri"
@@ -224,7 +218,7 @@ async def test_create_engagement_persists_location_fields(async_client, test_db_
     assert data["latitude"] == pytest.approx(19.1083663)
     assert data["longitude"] == pytest.approx(72.8788727)
 
-    listed = await async_client.get("/engagements", headers=_auth_header(7012))
+    listed = await async_client.get("/engagements", headers=_auth_header(18))
     assert listed.status_code == 200
     row = next(item for item in listed.json()["data"] if item["engagement_id"] == engagement_id)
     assert row["sub_locality"] == "Saki Naka"
@@ -252,11 +246,11 @@ async def test_create_engagement_persists_location_fields(async_client, test_db_
         "end_date": "2026-02-02",
     }
     updated = await async_client.put(
-        f"/engagements/{engagement_id}", headers=_auth_header(7012), json=update_payload
+        f"/engagements/{engagement_id}", headers=_auth_header(18), json=update_payload
     )
     assert updated.status_code == 200
 
-    details2 = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7012))
+    details2 = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(18))
     data2 = details2.json()["data"]
     assert data2["address"] == "Updated Address"
     assert data2["sub_locality"] == "Andheri East"
@@ -287,7 +281,7 @@ async def _engagement_type_id(test_db_session, code: str = "bio_ai") -> int:
 
 @pytest.mark.asyncio
 async def test_create_and_update_engagement_persists_slot_detail(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7020, employee_id=25)
+    await _seed_employee(test_db_session, employee_id=25)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -338,11 +332,11 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
         "slot_detail": slot_detail,
     }
 
-    response = await async_client.post("/engagements", headers=_auth_header(7020), json=payload)
+    response = await async_client.post("/engagements", headers=_auth_header(25), json=payload)
     assert response.status_code == 201, response.text
     engagement_id = response.json()["data"]["engagement_id"]
 
-    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7020))
+    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(25))
     assert details.status_code == 200
     data = details.json()["data"]
     assert data["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["cabin_key"] == "blood_test_cabin_1"
@@ -381,11 +375,11 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
         "slot_detail": updated_slot,
     }
     updated = await async_client.put(
-        f"/engagements/{engagement_id}", headers=_auth_header(7020), json=update_payload
+        f"/engagements/{engagement_id}", headers=_auth_header(25), json=update_payload
     )
     assert updated.status_code == 200, updated.text
 
-    details2 = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7020))
+    details2 = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(25))
     data2 = details2.json()["data"]
     assert data2["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["cabin_name"] == "Blood Test Cabin 1 Updated"
     assert data2["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["is_active"] is False
@@ -394,7 +388,7 @@ async def test_create_and_update_engagement_persists_slot_detail(async_client, t
 
 @pytest.mark.asyncio
 async def test_create_engagements_with_same_metadata_share_slot_detail_id(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7030, employee_id=30)
+    await _seed_employee(test_db_session, employee_id=30)
     await _seed_organization(test_db_session, organization_id=2, name="Shared Slot Org")
     await _seed_assessment_package(test_db_session, package_id=2, package_code="PKG2")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=2)
@@ -430,7 +424,7 @@ async def test_create_engagements_with_same_metadata_share_slot_detail_id(async_
 
     first = await async_client.post(
         "/engagements",
-        headers=_auth_header(7030),
+        headers=_auth_header(30),
         json={**base_payload, "engagement_name": "Shared Camp A", "engagement_code": "SHARE001"},
     )
     assert first.status_code == 201, first.text
@@ -438,14 +432,14 @@ async def test_create_engagements_with_same_metadata_share_slot_detail_id(async_
 
     second = await async_client.post(
         "/engagements",
-        headers=_auth_header(7030),
+        headers=_auth_header(30),
         json={**base_payload, "engagement_name": "Shared Camp B", "engagement_code": "SHARE002"},
     )
     assert second.status_code == 201, second.text
     second_id = second.json()["data"]["engagement_id"]
 
-    first_details = await async_client.get(f"/engagements/{first_id}", headers=_auth_header(7030))
-    second_details = await async_client.get(f"/engagements/{second_id}", headers=_auth_header(7030))
+    first_details = await async_client.get(f"/engagements/{first_id}", headers=_auth_header(30))
+    second_details = await async_client.get(f"/engagements/{second_id}", headers=_auth_header(30))
     first_data = first_details.json()["data"]
     second_data = second_details.json()["data"]
 
@@ -482,10 +476,10 @@ async def test_create_engagements_with_same_metadata_share_slot_detail_id(async_
         "end_date": "2026-08-21",
         "slot_detail": updated_slot,
     }
-    updated = await async_client.put(f"/engagements/{first_id}", headers=_auth_header(7030), json=update_payload)
+    updated = await async_client.put(f"/engagements/{first_id}", headers=_auth_header(30), json=update_payload)
     assert updated.status_code == 200, updated.text
 
-    second_after = await async_client.get(f"/engagements/{second_id}", headers=_auth_header(7030))
+    second_after = await async_client.get(f"/engagements/{second_id}", headers=_auth_header(30))
     assert (
         second_after.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]["cabin_name"]
         == "Shared Cabin Updated"
@@ -494,7 +488,7 @@ async def test_create_engagements_with_same_metadata_share_slot_detail_id(async_
 
 @pytest.mark.asyncio
 async def test_create_engagement_rejects_invalid_slot_detail(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7021, employee_id=26)
+    await _seed_employee(test_db_session, employee_id=26)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
     type_id = await _engagement_type_id(test_db_session, "blood_test")
 
@@ -523,13 +517,13 @@ async def test_create_engagement_rejects_invalid_slot_detail(async_client, test_
             }
         },
     }
-    response = await async_client.post("/engagements", headers=_auth_header(7021), json=payload)
+    response = await async_client.post("/engagements", headers=_auth_header(26), json=payload)
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_create_engagement_rejects_consultation_cabin_without_expert_type(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7022, employee_id=27)
+    await _seed_employee(test_db_session, employee_id=27)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -562,13 +556,13 @@ async def test_create_engagement_rejects_consultation_cabin_without_expert_type(
             }
         },
     }
-    response = await async_client.post("/engagements", headers=_auth_header(7022), json=payload)
+    response = await async_client.post("/engagements", headers=_auth_header(27), json=payload)
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_create_engagement_rejects_unknown_consultation_expert_type(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7023, employee_id=28)
+    await _seed_employee(test_db_session, employee_id=28)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -602,7 +596,7 @@ async def test_create_engagement_rejects_unknown_consultation_expert_type(async_
             }
         },
     }
-    response = await async_client.post("/engagements", headers=_auth_header(7023), json=payload)
+    response = await async_client.post("/engagements", headers=_auth_header(28), json=payload)
     assert response.status_code == 400
     assert response.json()["error_code"] == "INVALID_INPUT"
     assert response.json()["message"] == "Unknown expert type: unknown_type"
@@ -611,7 +605,7 @@ async def test_create_engagement_rejects_unknown_consultation_expert_type(async_
 @pytest.mark.asyncio
 async def test_create_engagement_sets_camp_no_for_org_8(async_client, test_db_session):
 
-    await _seed_employee(test_db_session, user_id=7010, employee_id=16)
+    await _seed_employee(test_db_session, employee_id=16)
     await _seed_organization(test_db_session, organization_id=8, name="Org Eight")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -628,18 +622,18 @@ async def test_create_engagement_sets_camp_no_for_org_8(async_client, test_db_se
         "end_date": "2026-06-24",
     }
 
-    response = await async_client.post("/engagements", headers=_auth_header(7010), json=payload)
+    response = await async_client.post("/engagements", headers=_auth_header(16), json=payload)
     assert response.status_code == 201
 
     engagement_id = response.json()["data"]["engagement_id"]
-    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7010))
+    details = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(16))
     detail_data = details.json()["data"]
     assert detail_data["camp_no"] == 8230626
 
 
 @pytest.mark.asyncio
 async def test_update_engagement_recalculates_camp_no(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7011, employee_id=17)
+    await _seed_employee(test_db_session, employee_id=17)
     await _seed_organization(test_db_session, organization_id=8, name="Org Eight")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -678,16 +672,16 @@ async def test_update_engagement_recalculates_camp_no(async_client, test_db_sess
         "end_date": "2026-07-02",
     }
 
-    response = await async_client.put("/engagements/8110", headers=_auth_header(7011), json=payload)
+    response = await async_client.put("/engagements/8110", headers=_auth_header(17), json=payload)
     assert response.status_code == 200
 
-    details = await async_client.get("/engagements/8110", headers=_auth_header(7011))
+    details = await async_client.get("/engagements/8110", headers=_auth_header(17))
     assert details.json()["data"]["camp_no"] == 8010726
 
 
 @pytest.mark.asyncio
 async def test_create_engagement_allows_null_diagnostic_package(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7008, employee_id=15)
+    await _seed_employee(test_db_session, employee_id=15)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
 
     payload = {
@@ -701,13 +695,13 @@ async def test_create_engagement_allows_null_diagnostic_package(async_client, te
         "end_date": "2026-02-02",
     }
 
-    response = await async_client.post("/engagements", headers=_auth_header(7008), json=payload)
+    response = await async_client.post("/engagements", headers=_auth_header(15), json=payload)
     assert response.status_code == 201
 
 
 @pytest.mark.asyncio
 async def test_list_engagements_paginates_and_filters(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7003, employee_id=11)
+    await _seed_employee(test_db_session, employee_id=11)
     await _seed_organization(test_db_session, organization_id=1, name="Org 1")
     await _seed_organization(test_db_session, organization_id=2, name="Org 2")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
@@ -754,7 +748,7 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
 
     response = await async_client.get(
         "/engagements?page=1&limit=10&org_id=1&status=running&city=BLR&date=2026-02-01",
-        headers=_auth_header(7003),
+        headers=_auth_header(11),
     )
 
     assert response.status_code == 200
@@ -771,7 +765,7 @@ async def test_list_engagements_paginates_and_filters(async_client, test_db_sess
 
 @pytest.mark.asyncio
 async def test_list_engagements_filters_by_multiple_statuses(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=70031, employee_id=31)
+    await _seed_employee(test_db_session, employee_id=31)
     await _seed_organization(test_db_session, organization_id=1, name="Org 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -804,7 +798,7 @@ async def test_list_engagements_filters_by_multiple_statuses(async_client, test_
 
     response = await async_client.get(
         "/engagements?page=1&limit=10&org_id=1&status=scheduled,running",
-        headers=_auth_header(70031),
+        headers=_auth_header(31),
     )
 
     assert response.status_code == 200
@@ -816,19 +810,19 @@ async def test_list_engagements_filters_by_multiple_statuses(async_client, test_
 
     invalid_response = await async_client.get(
         "/engagements?page=1&limit=10&status=running,invalid",
-        headers=_auth_header(70031),
+        headers=_auth_header(31),
     )
     assert invalid_response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_resolve_healthians_zone_for_non_healthians_package(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=70032, employee_id=32)
+    await _seed_employee(test_db_session, employee_id=32)
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
 
     response = await async_client.post(
         "/engagements/resolve-healthians-zone",
-        headers=_auth_header(70032),
+        headers=_auth_header(32),
         json={
             "diagnostic_package_id": 1,
             "latitude": 12.9716,
@@ -846,7 +840,7 @@ async def test_resolve_healthians_zone_for_non_healthians_package(async_client, 
 
 @pytest.mark.asyncio
 async def test_resolve_healthians_zone_serviceable(async_client, test_db_session, monkeypatch):
-    await _seed_employee(test_db_session, user_id=70033, employee_id=33)
+    await _seed_employee(test_db_session, employee_id=33)
     await test_db_session.execute(
         text(
             "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status, bookings_count) "
@@ -873,7 +867,7 @@ async def test_resolve_healthians_zone_serviceable(async_client, test_db_session
 
     response = await async_client.post(
         "/engagements/resolve-healthians-zone",
-        headers=_auth_header(70033),
+        headers=_auth_header(33),
         json={
             "diagnostic_package_id": 99,
             "latitude": 12.9716,
@@ -891,7 +885,7 @@ async def test_resolve_healthians_zone_serviceable(async_client, test_db_session
 
 @pytest.mark.asyncio
 async def test_list_engagements_filters_by_audience(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7004, employee_id=12)
+    await _seed_employee(test_db_session, employee_id=12)
     await _seed_organization(test_db_session, organization_id=1, name="Org 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -936,7 +930,7 @@ async def test_list_engagements_filters_by_audience(async_client, test_db_sessio
 
     b2b_response = await async_client.get(
         "/engagements?page=1&limit=10&audience=b2b&search=B2B",
-        headers=_auth_header(7004),
+        headers=_auth_header(12),
     )
     assert b2b_response.status_code == 200
     b2b_body = b2b_response.json()
@@ -947,7 +941,7 @@ async def test_list_engagements_filters_by_audience(async_client, test_db_sessio
 
     b2c_response = await async_client.get(
         "/engagements?page=1&limit=10&audience=b2c&search=B2C",
-        headers=_auth_header(7004),
+        headers=_auth_header(12),
     )
     assert b2c_response.status_code == 200
     b2c_body = b2c_response.json()
@@ -958,7 +952,7 @@ async def test_list_engagements_filters_by_audience(async_client, test_db_sessio
 
     invalid_response = await async_client.get(
         "/engagements?audience=invalid",
-        headers=_auth_header(7004),
+        headers=_auth_header(12),
     )
     assert invalid_response.status_code == 400
 
@@ -968,7 +962,7 @@ async def test_list_engagements_filters_by_camp_no(async_client, test_db_session
     from modules.engagements.camp_no import compute_camp_no
     from modules.engagements.models import Engagement
 
-    await _seed_employee(test_db_session, user_id=7005, employee_id=13)
+    await _seed_employee(test_db_session, employee_id=13)
     await _seed_organization(test_db_session, organization_id=1, name="Org 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -1016,7 +1010,7 @@ async def test_list_engagements_filters_by_camp_no(async_client, test_db_session
 
     response = await async_client.get(
         f"/engagements?page=1&limit=10&camp_no={camp_a}",
-        headers=_auth_header(7005),
+        headers=_auth_header(13),
     )
     assert response.status_code == 200
     body = response.json()
@@ -1028,7 +1022,7 @@ async def test_list_engagements_filters_by_camp_no(async_client, test_db_session
 
 @pytest.mark.asyncio
 async def test_get_engagement_details_returns_row(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7004, employee_id=12)
+    await _seed_employee(test_db_session, employee_id=12)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -1054,7 +1048,7 @@ async def test_get_engagement_details_returns_row(async_client, test_db_session)
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/engagements/8201", headers=_auth_header(7004))
+    response = await async_client.get("/engagements/8201", headers=_auth_header(12))
     assert response.status_code == 200
     body = response.json()["data"]
     assert body["engagement_id"] == 8201
@@ -1064,7 +1058,7 @@ async def test_get_engagement_details_returns_row(async_client, test_db_session)
 
 @pytest.mark.asyncio
 async def test_update_engagement_updates_fields(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7005, employee_id=13)
+    await _seed_employee(test_db_session, employee_id=13)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -1104,7 +1098,7 @@ async def test_update_engagement_updates_fields(async_client, test_db_session):
         "metsights_engagement_id": "MS1",
     }
 
-    response = await async_client.put("/engagements/8301", headers=_auth_header(7005), json=payload)
+    response = await async_client.put("/engagements/8301", headers=_auth_header(13), json=payload)
     assert response.status_code == 200
 
     updated = await test_db_session.get(Engagement, 8301)
@@ -1118,7 +1112,7 @@ async def test_update_engagement_updates_fields(async_client, test_db_session):
 
 @pytest.mark.asyncio
 async def test_update_b2c_engagement_without_organization(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7005, employee_id=13)
+    await _seed_employee(test_db_session, employee_id=13)
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=2)
@@ -1158,7 +1152,7 @@ async def test_update_b2c_engagement_without_organization(async_client, test_db_
         "metsights_engagement_id": None,
     }
 
-    response = await async_client.put("/engagements/8305", headers=_auth_header(7005), json=payload)
+    response = await async_client.put("/engagements/8305", headers=_auth_header(13), json=payload)
     assert response.status_code == 200
 
     updated = await test_db_session.get(Engagement, 8305)
@@ -1169,7 +1163,7 @@ async def test_update_b2c_engagement_without_organization(async_client, test_db_
 
 @pytest.mark.asyncio
 async def test_update_engagement_rejects_duplicate_engagement_code(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7005, employee_id=13)
+    await _seed_employee(test_db_session, employee_id=13)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -1223,7 +1217,7 @@ async def test_update_engagement_rejects_duplicate_engagement_code(async_client,
         "end_date": "2026-02-01",
     }
 
-    response = await async_client.put("/engagements/8303", headers=_auth_header(7005), json=payload)
+    response = await async_client.put("/engagements/8303", headers=_auth_header(13), json=payload)
     assert response.status_code == 409
 
 
@@ -1427,7 +1421,7 @@ async def test_get_public_occupied_slots_returns_only_active_b2c(async_client, t
 
 @pytest.mark.asyncio
 async def test_patch_engagement_status_changes_status(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7006, employee_id=14)
+    await _seed_employee(test_db_session, employee_id=14)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -1455,7 +1449,7 @@ async def test_patch_engagement_status_changes_status(async_client, test_db_sess
 
     response = await async_client.patch(
         "/engagements/8401/status",
-        headers=_auth_header(7006),
+        headers=_auth_header(14),
         json={"status": "completed"},
     )
     assert response.status_code == 200
@@ -1480,7 +1474,7 @@ async def test_delete_engagement_removes_scoped_data_but_not_users(async_client,
     from modules.reports.models import IndividualHealthReport
     from modules.users.models import User
 
-    await _seed_employee(test_db_session, user_id=7010, employee_id=20)
+    await _seed_employee(test_db_session, employee_id=20)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -1539,7 +1533,7 @@ async def test_delete_engagement_removes_scoped_data_but_not_users(async_client,
     )
     await test_db_session.commit()
 
-    response = await async_client.delete("/engagements/8501", headers=_auth_header(7010))
+    response = await async_client.delete("/engagements/8501", headers=_auth_header(20))
     assert response.status_code == 200
     body = response.json()["data"]
     assert body["engagement_id"] == 8501
@@ -1576,7 +1570,7 @@ async def test_delete_participant_clears_notification_refs_before_instance_delet
     from modules.engagements.models import Engagement, EngagementParticipant
     from modules.notifications.models import Notification
 
-    await _seed_employee(test_db_session, user_id=7020, employee_id=21)
+    await _seed_employee(test_db_session, employee_id=21)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -1636,7 +1630,7 @@ async def test_delete_participant_clears_notification_refs_before_instance_delet
 
     response = await async_client.delete(
         "/engagements/8601/participants/1020",
-        headers=_auth_header(7020),
+        headers=_auth_header(21),
     )
     assert response.status_code == 200, response.text
     body = response.json()["data"]
@@ -1673,7 +1667,7 @@ async def test_patch_participant_department_updates_slug(async_client, test_db_s
     from modules.engagements.models import Engagement, EngagementParticipant
     from modules.organizations.models import Organization
 
-    await _seed_employee(test_db_session, user_id=7030, employee_id=31)
+    await _seed_employee(test_db_session, employee_id=31)
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
 
@@ -1723,7 +1717,7 @@ async def test_patch_participant_department_updates_slug(async_client, test_db_s
 
     response = await async_client.patch(
         "/engagements/8701/participants/1030",
-        headers=_auth_header(7030),
+        headers=_auth_header(31),
         json={"participant_department": "marketing"},
     )
     assert response.status_code == 200
@@ -1754,7 +1748,7 @@ async def _seed_engagement_participant_for_patch(
     from modules.experts.models import ConsultationBooking
     from modules.organizations.models import Organization
 
-    await _seed_employee(test_db_session, user_id=employee_user_id, employee_id=employee_id)
+    await _seed_employee(test_db_session, employee_id=employee_id)
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
 
@@ -1822,7 +1816,7 @@ async def test_patch_participant_consultation_fields(async_client, test_db_sessi
 
     response = await async_client.patch(
         "/engagements/8702/participants/1031",
-        headers=_auth_header(7031),
+        headers=_auth_header(32),
         json={"consultations": {"doctor": {"want": True}}},
     )
     assert response.status_code == 200
@@ -1846,7 +1840,7 @@ async def test_patch_participant_consultation_null(async_client, test_db_session
 
     response = await async_client.patch(
         "/engagements/8702/participants/1031",
-        headers=_auth_header(7031),
+        headers=_auth_header(32),
         json={"consultations": {"nutritionist": {"want": False}}},
     )
     assert response.status_code == 200
@@ -1869,7 +1863,7 @@ async def test_patch_participant_partial_update(async_client, test_db_session):
 
     response = await async_client.patch(
         "/engagements/8702/participants/1031",
-        headers=_auth_header(7031),
+        headers=_auth_header(32),
         json={"consultations": {"nutritionist": {"want": True}}},
     )
     assert response.status_code == 200
@@ -1945,7 +1939,7 @@ async def test_update_consultation_consent_for_participant(async_client, test_db
 
     response = await async_client.post(
         f"/engagements/{engagement_id}/consultation/{consultation_id}/consent",
-        headers=_auth_header(user_id),
+        headers=user_auth_header(user_id),
         json={"bio_ai": True, "questionnaire": True},
     )
     assert response.status_code == 200
@@ -1957,7 +1951,7 @@ async def test_update_consultation_consent_for_participant(async_client, test_db
 
     forbidden = await async_client.post(
         f"/engagements/{engagement_id}/consultation/{consultation_id}/consent",
-        headers=_auth_header(1036),
+        headers=user_auth_header(1036),
         json={"bio_ai": True},
     )
     assert forbidden.status_code == 403
@@ -2034,7 +2028,7 @@ async def test_get_engagement_consultations_for_user(async_client, test_db_sessi
 
     response = await async_client.get(
         f"/engagements/{engagement_id}/consultation",
-        headers=_auth_header(user_id),
+        headers=user_auth_header(user_id),
     )
     assert response.status_code == 200
     data = response.json()["data"]
@@ -2079,23 +2073,22 @@ async def test_get_engagement_consultations_forbidden_for_non_participant(async_
 
     response = await async_client.get(
         "/engagements/8707/consultation",
-        headers=_auth_header(1038),
+        headers=user_auth_header(1038),
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_list_engagements_onboarding_assistant_403(async_client, test_db_session):
-    await _seed_employee(
-        test_db_session, user_id=7040, employee_id=40, role="onboarding_assistant"
-    )
-    response = await async_client.get("/engagements", headers=_auth_header(7040))
+    await _seed_employee(test_db_session, employee_id=40, role="onboarding_assistant")
+    response = await async_client.get("/engagements", headers=_auth_header(40))
     assert response.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_update_engagement_onboarding_assistant_403(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7041, employee_id=41, role="admin")
-    await _seed_employee(
-        test_db_session, user_id=7042, employee_id=42, role="onboarding_assistant"
-    )
+    await _seed_employee(test_db_session, employee_id=41, role="admin")
+    await _seed_employee(test_db_session, employee_id=42, role="onboarding_assistant")
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -2134,7 +2127,7 @@ async def test_update_engagement_onboarding_assistant_403(async_client, test_db_
     }
     response = await async_client.put(
         "/engagements/8801",
-        headers=_auth_header(7042),
+        headers=_auth_header(42),
         json=payload,
     )
     assert response.status_code == 403
@@ -2144,7 +2137,7 @@ async def test_update_engagement_onboarding_assistant_403(async_client, test_db_
 async def test_create_engagement_allows_same_service_on_questionnaire_reminders(
     async_client, test_db_session
 ):
-    await _seed_employee(test_db_session, user_id=7050, employee_id=50)
+    await _seed_employee(test_db_session, employee_id=50)
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
@@ -2198,7 +2191,7 @@ async def test_create_engagement_allows_same_service_on_questionnaire_reminders(
         ],
     }
 
-    response = await async_client.post("/engagements", headers=_auth_header(7050), json=payload)
+    response = await async_client.post("/engagements", headers=_auth_header(50), json=payload)
     assert response.status_code == 201, response.text
 
     engagement_id = response.json()["data"]["engagement_id"]
@@ -2237,7 +2230,7 @@ _EXPECTED_BLOOD_SLOTS = [
 
 @pytest.mark.asyncio
 async def test_get_engagement_by_code_returns_available_slots_with_spot_left(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7410, employee_id=410)
+    await _seed_employee(test_db_session, employee_id=410)
     await _seed_organization(test_db_session, organization_id=9101, name="Slot Public Org")
     await _seed_assessment_package(test_db_session, package_id=9101, package_code="PKG9101")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9101)
@@ -2286,7 +2279,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
     }
     create = await async_client.post(
         "/engagements",
-        headers=_auth_header(7410),
+        headers=_auth_header(410),
         json={
             "engagement_name": "Public Slot Camp",
             "organization_id": 9101,
@@ -2325,7 +2318,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
         {"slot": "09:30", "spot_left": 1},
     ]
 
-    admin = await async_client.get("/engagements/" + str(create.json()["data"]["engagement_id"]), headers=_auth_header(7410))
+    admin = await async_client.get("/engagements/" + str(create.json()["data"]["engagement_id"]), headers=_auth_header(410))
     raw_cabin = admin.json()["data"]["slot_detail"]["blood_collection"]["2026-08-20"]["cabins"][0]
     assert "start_time" in raw_cabin
     assert "capacity_per_slot" in raw_cabin
@@ -2358,7 +2351,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
     engagement_id = create.json()["data"]["engagement_id"]
     parts = await async_client.get(
         f"/engagements/{engagement_id}/participants",
-        headers=_auth_header(7410),
+        headers=_auth_header(410),
     )
     assert parts.status_code == 200, parts.text
     assert parts.json()["data"][0]["blood_collection_cabin"] == "blood_test_cabin_1"
@@ -2376,7 +2369,7 @@ async def test_get_engagement_by_code_returns_available_slots_with_spot_left(asy
 
 @pytest.mark.asyncio
 async def test_get_engagement_by_code_includes_disabled_dates_with_empty_cabins(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7415, employee_id=415)
+    await _seed_employee(test_db_session, employee_id=415)
     await _seed_organization(test_db_session, organization_id=9105, name="Disabled Date Org")
     await _seed_assessment_package(test_db_session, package_id=9105, package_code="PKG9105")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9105)
@@ -2418,7 +2411,7 @@ async def test_get_engagement_by_code_includes_disabled_dates_with_empty_cabins(
     }
     create = await async_client.post(
         "/engagements",
-        headers=_auth_header(7415),
+        headers=_auth_header(415),
         json={
             "engagement_name": "Disabled Date Camp",
             "organization_id": 9105,
@@ -2437,7 +2430,7 @@ async def test_get_engagement_by_code_includes_disabled_dates_with_empty_cabins(
 
     admin = await async_client.get(
         f"/engagements/{create.json()['data']['engagement_id']}",
-        headers=_auth_header(7415),
+        headers=_auth_header(415),
     )
     assert admin.status_code == 200
     admin_blood = admin.json()["data"]["slot_detail"]["blood_collection"]
@@ -2454,7 +2447,7 @@ async def test_get_engagement_by_code_includes_disabled_dates_with_empty_cabins(
 
 @pytest.mark.asyncio
 async def test_shared_slot_detail_spot_left_counts_across_engagements(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7412, employee_id=412)
+    await _seed_employee(test_db_session, employee_id=412)
     await _seed_organization(test_db_session, organization_id=9103, name="Shared Spot Org")
     await _seed_assessment_package(test_db_session, package_id=9103, package_code="PKG9103")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9103)
@@ -2507,21 +2500,21 @@ async def test_shared_slot_detail_spot_left_counts_across_engagements(async_clie
 
     first = await async_client.post(
         "/engagements",
-        headers=_auth_header(7412),
+        headers=_auth_header(412),
         json={**base_payload, "engagement_name": "Shared Spot A", "engagement_code": "SHARESPA"},
     )
     assert first.status_code == 201, first.text
     second = await async_client.post(
         "/engagements",
-        headers=_auth_header(7412),
+        headers=_auth_header(412),
         json={**base_payload, "engagement_name": "Shared Spot B", "engagement_code": "SHARESPB"},
     )
     assert second.status_code == 201, second.text
 
     first_id = first.json()["data"]["engagement_id"]
     second_id = second.json()["data"]["engagement_id"]
-    first_details = await async_client.get(f"/engagements/{first_id}", headers=_auth_header(7412))
-    second_details = await async_client.get(f"/engagements/{second_id}", headers=_auth_header(7412))
+    first_details = await async_client.get(f"/engagements/{first_id}", headers=_auth_header(412))
+    second_details = await async_client.get(f"/engagements/{second_id}", headers=_auth_header(412))
     assert first_details.json()["data"]["slot_detail_id"] == second_details.json()["data"]["slot_detail_id"]
 
     onboard = await async_client.post(
@@ -2591,7 +2584,7 @@ async def test_shared_slot_detail_spot_left_counts_across_engagements(async_clie
 
 @pytest.mark.asyncio
 async def test_get_engagement_by_code_returns_null_slot_detail_when_unset(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7411, employee_id=411)
+    await _seed_employee(test_db_session, employee_id=411)
     await _seed_organization(test_db_session, organization_id=9102, name="No Slot Org")
     await _seed_assessment_package(test_db_session, package_id=9102, package_code="PKG9102")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9102)
@@ -2599,7 +2592,7 @@ async def test_get_engagement_by_code_returns_null_slot_detail_when_unset(async_
 
     create = await async_client.post(
         "/engagements",
-        headers=_auth_header(7411),
+        headers=_auth_header(411),
         json={
             "engagement_name": "No Slot Camp",
             "organization_id": 9102,
@@ -2621,7 +2614,7 @@ async def test_get_engagement_by_code_returns_null_slot_detail_when_unset(async_
 
 @pytest.mark.asyncio
 async def test_get_engagement_by_code_includes_consultation_mode(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7420, employee_id=420)
+    await _seed_employee(test_db_session, employee_id=420)
     await _seed_organization(test_db_session, organization_id=9201, name="Mode Public Org")
     await _seed_assessment_package(test_db_session, package_id=9201, package_code="PKG9201")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9201)
@@ -2629,7 +2622,7 @@ async def test_get_engagement_by_code_includes_consultation_mode(async_client, t
 
     create = await async_client.post(
         "/engagements",
-        headers=_auth_header(7420),
+        headers=_auth_header(420),
         json={
             "engagement_name": "Offline Consult Camp",
             "organization_id": 9201,
@@ -2673,7 +2666,7 @@ async def test_get_engagement_by_code_includes_consultation_mode(async_client, t
 
 @pytest.mark.asyncio
 async def test_create_engagement_online_strips_consultation_slot_detail(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7421, employee_id=421)
+    await _seed_employee(test_db_session, employee_id=421)
     await _seed_organization(test_db_session, organization_id=9202, name="Online Mode Org")
     await _seed_assessment_package(test_db_session, package_id=9202, package_code="PKG9202")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=9202)
@@ -2681,7 +2674,7 @@ async def test_create_engagement_online_strips_consultation_slot_detail(async_cl
 
     create = await async_client.post(
         "/engagements",
-        headers=_auth_header(7421),
+        headers=_auth_header(421),
         json={
             "engagement_name": "Online Consult Camp",
             "organization_id": 9202,
@@ -2717,7 +2710,7 @@ async def test_create_engagement_online_strips_consultation_slot_detail(async_cl
     assert create.status_code == 201, create.text
     engagement_id = create.json()["data"]["engagement_id"]
 
-    detail = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(7421))
+    detail = await async_client.get(f"/engagements/{engagement_id}", headers=_auth_header(421))
     assert detail.status_code == 200, detail.text
     slot_detail = detail.json()["data"].get("slot_detail")
     assert slot_detail is None or "consultation" not in slot_detail

@@ -2,36 +2,26 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy import text
 
-from core.config import settings
-from core.security import create_jwt_token
 from modules.audit.models import IntegrationSyncLog
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
-from modules.employee.models import Employee
 from modules.engagements.models import Engagement
 from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, make_employee, seed_employee, user_auth_header
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token(
-        {"sub": str(user_id)},
-        timedelta(minutes=5),
-        secret_key=settings.JWT_SECRET_KEY,
-    )
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int):
-    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id:010d}", status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
-    await test_db_session.commit()
+async def _seed_employee(test_db_session, *, employee_id: int, role: str = "admin"):
+    await seed_employee(test_db_session, employee_id=employee_id, role=role)
 
 
 async def _engagement_type_id(test_db_session, code: str) -> int:
@@ -179,7 +169,7 @@ async def test_list_create_booking_dates_buckets_by_ist_and_filters_success_only
 @pytest.mark.asyncio
 async def test_get_engagement_booking_dates_route(async_client, test_db_session):
     engagement_id = 78102
-    await _seed_employee(test_db_session, user_id=7810, employee_id=7810)
+    await _seed_employee(test_db_session, employee_id=7810)
     await _seed_engagement(test_db_session, engagement_id=engagement_id, type_code="booking_dates_route")
     await _seed_users(test_db_session, [78201, 78202])
 
@@ -217,7 +207,7 @@ async def test_get_engagement_booking_dates_route(async_client, test_db_session)
 
 @pytest.mark.asyncio
 async def test_get_engagement_booking_dates_not_found(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7811, employee_id=7811)
+    await _seed_employee(test_db_session, employee_id=7811)
 
     response = await async_client.get(
         "/engagements/999999/booking-dates",

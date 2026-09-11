@@ -2,33 +2,23 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
 import pytest
 from sqlalchemy import text
 
-from core.config import settings
-from core.security import create_jwt_token
-from modules.employee.models import Employee
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.reports.models import IndividualHealthReport
 from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, make_employee, seed_employee, user_auth_header
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token(
-        {"sub": str(user_id)},
-        timedelta(minutes=5),
-        secret_key=settings.JWT_SECRET_KEY,
-    )
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int):
-    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id:010d}", status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
-    await test_db_session.commit()
+async def _seed_employee(test_db_session, *, employee_id: int, role: str = "admin"):
+    await seed_employee(test_db_session, employee_id=employee_id, role=role)
 
 
 async def _engagement_type_id(test_db_session, code: str) -> int:
@@ -95,7 +85,7 @@ async def _ids(async_client, *, engagement_id: int, admin_id: int, reports_ready
 async def test_reports_ready_filter_modes(async_client, test_db_session):
     engagement_id = 88601
     admin_id = 88602
-    await _seed_employee(test_db_session, user_id=admin_id, employee_id=admin_id)
+    await _seed_employee(test_db_session, employee_id=admin_id)
     await _seed_engagement(test_db_session, engagement_id=engagement_id, type_code="reports_ready_filter_v2")
 
     both_ready = 886101

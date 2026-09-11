@@ -36,6 +36,7 @@ from modules.employee.schemas import (
     EmployeeCreateRequest,
     EmployeeUpdateRequest,
 )
+from modules.partners.repository import PartnersRepository
 
 
 @dataclass(frozen=True)
@@ -43,7 +44,6 @@ class EmployeeContext:
     """Authenticated employee context."""
 
     employee_id: int
-    user_id: int
     role: EmployeeRole
     permissions_version: int = 1
     permissions: Mapping[str, PermissionGrant] = field(
@@ -58,18 +58,65 @@ class EmployeeContext:
 _ALLOWED_EMPLOYEE_STATUS = {"active", "inactive", "archived"}
 _ALLOWED_EMPLOYEE_STATUS_UPDATE = {"active", "inactive"}
 _ALWAYS_ACTIVE_EMPLOYEE_ID = 1
+_STAFF_ROLES = frozenset(
+    {
+        EmployeeRole.admin,
+        EmployeeRole.inferior_admin,
+    }
+)
 
 
 def _normalize_status(value: str | None) -> str:
     return (value or "").strip().lower()
 
 
+def _normalize_email(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    return normalized or None
+
+
+def _normalize_phone(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _parse_staff_role(role) -> EmployeeRole:
+    if isinstance(role, EmployeeRole):
+        parsed = role
+    else:
+        try:
+            parsed = EmployeeRole(str(role))
+        except ValueError as exc:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_EMPLOYEE_ROLE",
+                message="Invalid employee role",
+            ) from exc
+    if parsed not in _STAFF_ROLES:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_EMPLOYEE_ROLE",
+            message="Invalid employee role",
+        )
+    return parsed
+
+
 class EmployeeService:
     """Employee service layer."""
 
-    def __init__(self, repository: EmployeeRepository, audit_service: AuditService | None = None):
+    def __init__(
+        self,
+        repository: EmployeeRepository,
+        audit_service: AuditService | None = None,
+        partners_repository: PartnersRepository | None = None,
+    ):
         self._repository = repository
         self._audit_service = audit_service
+        self._partners_repository = partners_repository or PartnersRepository()
 
     def _ensure_employee_access(self, employee: EmployeeContext | None) -> None:
         if employee is None:
@@ -104,14 +151,38 @@ class EmployeeService:
             raise RuntimeError("Audit service is required")
         return self._audit_service
 
-    async def get_active_employee_by_user_id(
+    async def _reject_if_partner_identifier_exists(
         self,
         db: AsyncSession,
-        user_id: int,
+        *,
+        phone: str | None,
+        email: str | None,
+    ) -> None:
+        if phone:
+            existing = await self._partners_repository.get_by_phone(db, phone)
+            if existing is not None:
+                raise AppError(
+                    status_code=409,
+                    error_code="IDENTIFIER_ALREADY_EXISTS",
+                    message="Phone or email already exists on a partner",
+                )
+        if email:
+            existing = await self._partners_repository.get_by_email(db, email)
+            if existing is not None:
+                raise AppError(
+                    status_code=409,
+                    error_code="IDENTIFIER_ALREADY_EXISTS",
+                    message="Phone or email already exists on a partner",
+                )
+
+    async def get_active_employee_by_id(
+        self,
+        db: AsyncSession,
+        employee_id: int,
         *,
         capability: RouteCapability | None = None,
     ) -> EmployeeContext:
-        employee = await self._repository.get_by_user_id(db, user_id)
+        employee = await self._repository.get_by_id(db, employee_id)
         if employee is None:
             raise AppError(
                 status_code=403,
@@ -140,7 +211,6 @@ class EmployeeService:
         )
         return EmployeeContext(
             employee_id=employee.employee_id,
-            user_id=employee.user_id,
             role=employee.role,
             permissions_version=employee.permissions_version,
             permissions=permissions,
@@ -326,33 +396,58 @@ class EmployeeService:
         self._ensure_admin(employee)
         await self._recheck_management_actor(db, employee)
 
-        if employee.role == EmployeeRole.inferior_admin and payload.role in {
+        role = _parse_staff_role(payload.role)
+        if employee.role == EmployeeRole.inferior_admin and role in {
             EmployeeRole.admin,
             EmployeeRole.inferior_admin,
         }:
             raise full_admin_only()
-        if payload.role == EmployeeRole.inferior_admin and payload.permissions is None:
+        if role == EmployeeRole.inferior_admin and payload.permissions is None:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_PERMISSION_CONFIGURATION",
                 message="A complete permission snapshot is required",
             )
-        if payload.role != EmployeeRole.inferior_admin and payload.permissions is not None:
+        if role != EmployeeRole.inferior_admin and payload.permissions is not None:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_EMPLOYEE_ROLE",
-                message="Permissions are only valid for Inferior Admin employees",
+                message="Permissions are only valid for Employee role",
             )
 
         status_value = _normalize_status(payload.status)
         if status_value not in _ALLOWED_EMPLOYEE_STATUS:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-        existing = await self._repository.get_by_user_id(db, payload.user_id)
-        if existing is not None:
-            raise AppError(status_code=409, error_code="EMPLOYEE_ALREADY_EXISTS", message="Employee already exists")
+        phone = _normalize_phone(payload.phone)
+        email = _normalize_email(str(payload.email) if payload.email else None)
 
-        row = Employee(user_id=payload.user_id, role=payload.role, status=status_value)
+        await self._reject_if_partner_identifier_exists(db, phone=phone, email=email)
+
+        if phone:
+            existing = await self._repository.get_by_phone(db, phone)
+            if existing is not None:
+                raise AppError(
+                    status_code=409,
+                    error_code="EMPLOYEE_ALREADY_EXISTS",
+                    message="Employee already exists",
+                )
+        if email:
+            existing = await self._repository.get_by_email(db, email)
+            if existing is not None:
+                raise AppError(
+                    status_code=409,
+                    error_code="EMPLOYEE_ALREADY_EXISTS",
+                    message="Employee already exists",
+                )
+
+        row = Employee(
+            name=payload.name.strip(),
+            phone=phone,
+            email=email,
+            role=role,
+            status=status_value,
+        )
         try:
             row = await self._repository.create(db, row)
         except IntegrityError as exc:
@@ -361,7 +456,7 @@ class EmployeeService:
                 error_code="EMPLOYEE_ALREADY_EXISTS",
                 message="Employee already exists",
             ) from exc
-        if payload.role == EmployeeRole.inferior_admin:
+        if role == EmployeeRole.inferior_admin:
             await self._write_grants(
                 db, target=row, actor=employee, grants=payload.permissions or []
             )
@@ -373,7 +468,7 @@ class EmployeeService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -388,11 +483,10 @@ class EmployeeService:
         limit: int,
         status: str | None,
         role: str | None,
-        user_id: int | None,
         search: str | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
-    ) -> tuple[list[tuple[Employee, str | None, str | None]], int]:
+    ) -> tuple[list[Employee], int]:
         self._ensure_admin(employee, action=PermissionAction.view)
 
         status_value = None
@@ -408,7 +502,6 @@ class EmployeeService:
             limit=limit,
             status=status_value,
             role=role,
-            user_id=user_id,
             search=search,
             sort_by=sort_by,
             sort_dir=sort_dir,
@@ -417,11 +510,26 @@ class EmployeeService:
             db,
             status=status_value,
             role=role,
-            user_id=user_id,
             search=search,
         )
 
         return employees, total
+
+    async def get_employee_row_for_self(
+        self,
+        db: AsyncSession,
+        *,
+        employee_id: int,
+    ) -> Employee:
+        """Load employee row for the authenticated subject (no admin gate)."""
+        row = await self._repository.get_by_id(db, employee_id)
+        if row is None:
+            raise AppError(
+                status_code=404,
+                error_code="EMPLOYEE_NOT_FOUND",
+                message="Employee does not exist",
+            )
+        return row
 
     async def get_employee_details(
         self,
@@ -429,10 +537,10 @@ class EmployeeService:
         *,
         employee: EmployeeContext,
         employee_id: int,
-    ) -> tuple[Employee, str | None, str | None]:
+    ) -> Employee:
         self._ensure_admin(employee, action=PermissionAction.view)
 
-        row = await self._repository.get_by_id_with_user_names(db, employee_id)
+        row = await self._repository.get_by_id(db, employee_id)
         if row is None:
             raise AppError(status_code=404, error_code="EMPLOYEE_NOT_FOUND", message="Employee does not exist")
 
@@ -455,31 +563,39 @@ class EmployeeService:
         row = await self._repository.get_by_id_for_update(db, employee_id)
         if row is None:
             raise AppError(status_code=404, error_code="EMPLOYEE_NOT_FOUND", message="Employee does not exist")
-        role_changes = payload.role != row.role
+
+        role = _parse_staff_role(payload.role)
+        phone = _normalize_phone(payload.phone)
+        email = _normalize_email(str(payload.email) if payload.email else None)
+
+        role_changes = role != row.role
         grants_change = payload.permissions is not None
+        identity_changes = (
+            (payload.name.strip() != (row.name or ""))
+            or (phone != row.phone)
+            or (email != row.email)
+        )
         self._ensure_target_allowed(
             employee,
             row,
-            changing_privileges=(
-                role_changes or grants_change or payload.user_id != row.user_id
-            ),
+            changing_privileges=(role_changes or grants_change or identity_changes),
         )
-        if employee.role == EmployeeRole.inferior_admin and payload.role in {
+        if employee.role == EmployeeRole.inferior_admin and role in {
             EmployeeRole.admin,
             EmployeeRole.inferior_admin,
         }:
             raise full_admin_only()
-        if payload.role == EmployeeRole.inferior_admin and role_changes and payload.permissions is None:
+        if role == EmployeeRole.inferior_admin and role_changes and payload.permissions is None:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_PERMISSION_CONFIGURATION",
                 message="A complete permission snapshot is required",
             )
-        if payload.role != EmployeeRole.inferior_admin and payload.permissions is not None:
+        if role != EmployeeRole.inferior_admin and payload.permissions is not None:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_EMPLOYEE_ROLE",
-                message="Permissions are only valid for Inferior Admin employees",
+                message="Permissions are only valid for Employee role",
             )
         if payload.permissions is not None and payload.expected_version is None:
             raise AppError(
@@ -493,7 +609,7 @@ class EmployeeService:
                 error_code="PERMISSIONS_VERSION_CONFLICT",
                 message="Permissions changed elsewhere",
             )
-        if row.role == EmployeeRole.admin and payload.role != EmployeeRole.admin:
+        if row.role == EmployeeRole.admin and role != EmployeeRole.admin:
             active_admins = await self._repository.lock_active_admins(db)
             if len(active_admins) <= 1:
                 raise AppError(
@@ -502,19 +618,35 @@ class EmployeeService:
                     message="The last active administrator is protected",
                 )
 
-        if payload.user_id != row.user_id:
-            existing = await self._repository.get_by_user_id(db, payload.user_id)
-            if existing is not None and existing.employee_id != row.employee_id:
-                raise AppError(status_code=409, error_code="EMPLOYEE_ALREADY_EXISTS", message="Employee already exists")
-            row.user_id = payload.user_id
+        await self._reject_if_partner_identifier_exists(db, phone=phone, email=email)
 
-        row.role = payload.role
-        if payload.role == EmployeeRole.inferior_admin and payload.permissions is not None:
+        if phone and phone != row.phone:
+            existing = await self._repository.get_by_phone(db, phone)
+            if existing is not None and existing.employee_id != row.employee_id:
+                raise AppError(
+                    status_code=409,
+                    error_code="EMPLOYEE_ALREADY_EXISTS",
+                    message="Employee already exists",
+                )
+        if email and email != row.email:
+            existing = await self._repository.get_by_email(db, email)
+            if existing is not None and existing.employee_id != row.employee_id:
+                raise AppError(
+                    status_code=409,
+                    error_code="EMPLOYEE_ALREADY_EXISTS",
+                    message="Employee already exists",
+                )
+
+        row.name = payload.name.strip()
+        row.phone = phone
+        row.email = email
+        row.role = role
+        if role == EmployeeRole.inferior_admin and payload.permissions is not None:
             await self._write_grants(
                 db, target=row, actor=employee, grants=payload.permissions
             )
             row.permissions_version += 1
-        elif payload.role != EmployeeRole.inferior_admin:
+        elif role != EmployeeRole.inferior_admin:
             await self._repository.replace_permissions(
                 db, employee_id=row.employee_id, grants=[]
             )
@@ -532,7 +664,7 @@ class EmployeeService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -581,7 +713,7 @@ class EmployeeService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -645,7 +777,7 @@ class EmployeeService:
             raise AppError(
                 status_code=400,
                 error_code="INVALID_EMPLOYEE_ROLE",
-                message="Permissions are only valid for Inferior Admin employees",
+                message="Permissions are only valid for Employee role",
             )
         if target.permissions_version != expected_version:
             raise AppError(
@@ -667,7 +799,7 @@ class EmployeeService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return target

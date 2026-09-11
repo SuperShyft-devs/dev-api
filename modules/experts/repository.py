@@ -84,11 +84,16 @@ class ExpertsRepository:
         result = await db.execute(select(Expert).where(Expert.expert_id == expert_id))
         return result.scalar_one_or_none()
 
-    async def get_by_user_id(self, db: AsyncSession, user_id: int) -> Expert | None:
+    async def get_by_partner_id(self, db: AsyncSession, partner_id: int) -> Expert | None:
         result = await db.execute(
-            select(Expert).where(Expert.user_id == user_id).order_by(Expert.expert_id.asc()).limit(1)
+            select(Expert).where(Expert.partner_id == partner_id).order_by(Expert.expert_id.asc()).limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def get_by_user_id(self, db: AsyncSession, user_id: int) -> Expert | None:
+        """Deprecated: experts link to partners. Kept for transitional call sites."""
+        _ = user_id
+        return None
 
     async def count_experts(
         self,
@@ -145,15 +150,19 @@ class ExpertsRepository:
         result = await db.execute(query)
         return list(result.scalars().all())
 
-    async def list_active_user_ids_by_type(self, db: AsyncSession, *, expert_type: str) -> list[int]:
+    async def list_active_partner_ids_by_type(self, db: AsyncSession, *, expert_type: str) -> list[int]:
         result = await db.execute(
-            select(Expert.user_id)
+            select(Expert.partner_id)
             .where(Expert.status == "active")
             .where(Expert.expert_type == expert_type)
-            .where(Expert.user_id.isnot(None))
+            .where(Expert.partner_id.isnot(None))
             .order_by(Expert.expert_id.asc())
         )
-        return [int(uid) for uid in result.scalars().all() if uid is not None]
+        return [int(pid) for pid in result.scalars().all() if pid is not None]
+
+    async def list_active_user_ids_by_type(self, db: AsyncSession, *, expert_type: str) -> list[int]:
+        """Deprecated: prefer list_active_partner_ids_by_type."""
+        return await self.list_active_partner_ids_by_type(db, expert_type=expert_type)
 
     async def create(self, db: AsyncSession, expert: Expert) -> Expert:
         db.add(expert)

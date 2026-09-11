@@ -18,15 +18,15 @@ from modules.questionnaire.models import (
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1, role: str = "admin"):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()  # Ensure user is inserted before employee
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role=role, status="active"))
+    test_db_session.add(Employee(employee_id=employee_id, name=f"Employee {employee_id}", phone=str(employee_id).zfill(10)[:15], email=f"employee{employee_id}@test.example", role=role, status="active"))
     await test_db_session.commit()
 
 
@@ -81,7 +81,7 @@ async def test_create_question_creates_row(async_client, test_db_session):
             {"option_value": "Bad", "display_name": "Bad", "tooltip_text": None},
         ],
     }
-    response = await async_client.post("/questionnaire/questions", headers=_auth_header(9002), json=payload)
+    response = await async_client.post("/questionnaire/questions", headers=_auth_header(10), json=payload)
     assert response.status_code == 201
 
     question_id = response.json()["data"]["question_id"]
@@ -117,7 +117,7 @@ async def test_create_question_persists_visibility_rules_and_prefill(async_clien
         },
         "prefill_from": {"source": "user_preference", "preference_key": "diet_preference"},
     }
-    response = await async_client.post("/questionnaire/questions", headers=_auth_header(9012), json=payload)
+    response = await async_client.post("/questionnaire/questions", headers=_auth_header(20), json=payload)
     assert response.status_code == 201
     question_id = response.json()["data"]["question_id"]
     created = await test_db_session.get(QuestionnaireDefinition, question_id)
@@ -138,7 +138,7 @@ async def test_create_question_rejects_invalid_visibility_rules(async_client, te
             "conditions": [{"type": "question_answer", "operator": "equals", "value": "yes"}],
         },
     }
-    response = await async_client.post("/questionnaire/questions", headers=_auth_header(9013), json=payload)
+    response = await async_client.post("/questionnaire/questions", headers=_auth_header(21), json=payload)
     assert response.status_code == 400
     assert response.json()["error_code"] == "INVALID_INPUT"
 
@@ -157,7 +157,7 @@ async def test_list_questions_paginates_and_filters(async_client, test_db_sessio
 
     response = await async_client.get(
         "/questionnaire/questions?page=1&limit=10&status=active",
-        headers=_auth_header(9003),
+        headers=_auth_header(11),
     )
     assert response.status_code == 200
 
@@ -179,7 +179,7 @@ async def test_get_question_returns_row(async_client, test_db_session):
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/questionnaire/questions/200", headers=_auth_header(9004))
+    response = await async_client.get("/questionnaire/questions/200", headers=_auth_header(12))
     assert response.status_code == 200
     assert response.json()["data"]["question_id"] == 200
 
@@ -202,7 +202,7 @@ async def test_update_question_updates_fields(async_client, test_db_session):
             {"option_value": "y", "display_name": "y", "tooltip_text": None},
         ],
     }
-    response = await async_client.put("/questionnaire/questions/300", headers=_auth_header(9005), json=payload)
+    response = await async_client.put("/questionnaire/questions/300", headers=_auth_header(13), json=payload)
     assert response.status_code == 200
 
     updated = await test_db_session.get(QuestionnaireDefinition, 300)
@@ -240,7 +240,7 @@ async def test_admin_get_returns_stored_question_type_not_runtime_override(async
     )
     await test_db_session.commit()
 
-    get_response = await async_client.get("/questionnaire/questions/301", headers=_auth_header(9005))
+    get_response = await async_client.get("/questionnaire/questions/301", headers=_auth_header(13))
     assert get_response.status_code == 200
     assert get_response.json()["data"]["question_type"] == "multiple_choice"
 
@@ -255,12 +255,12 @@ async def test_admin_get_returns_stored_question_type_not_runtime_override(async
     }
     update_response = await async_client.put(
         "/questionnaire/questions/301",
-        headers=_auth_header(9005),
+        headers=_auth_header(13),
         json=update_payload,
     )
     assert update_response.status_code == 200
 
-    refreshed = await async_client.get("/questionnaire/questions/301", headers=_auth_header(9005))
+    refreshed = await async_client.get("/questionnaire/questions/301", headers=_auth_header(13))
     assert refreshed.status_code == 200
     assert refreshed.json()["data"]["question_type"] == "single_choice"
 
@@ -274,7 +274,7 @@ async def test_create_scale_question_requires_units(async_client, test_db_sessio
         "question_type": "scale",
         "options": [],
     }
-    response = await async_client.post("/questionnaire/questions", headers=_auth_header(9014), json=payload)
+    response = await async_client.post("/questionnaire/questions", headers=_auth_header(22), json=payload)
     assert response.status_code == 400
     assert response.json()["error_code"] == "INVALID_INPUT"
 
@@ -291,7 +291,7 @@ async def test_create_scale_question_persists_units(async_client, test_db_sessio
             {"option_value": "lb", "display_name": "Pounds", "tooltip_text": None},
         ],
     }
-    response = await async_client.post("/questionnaire/questions", headers=_auth_header(9015), json=payload)
+    response = await async_client.post("/questionnaire/questions", headers=_auth_header(23), json=payload)
     assert response.status_code == 201
     question_id = response.json()["data"]["question_id"]
     from sqlalchemy import select
@@ -313,7 +313,7 @@ async def test_create_question_multi_choice_alias_normalized(async_client, test_
             {"option_value": "non_veg", "display_name": "Non Veg", "tooltip_text": None},
         ],
     }
-    response = await async_client.post("/questionnaire/questions", headers=_auth_header(9016), json=payload)
+    response = await async_client.post("/questionnaire/questions", headers=_auth_header(24), json=payload)
     assert response.status_code == 201
     question_id = response.json()["data"]["question_id"]
     created = await test_db_session.get(QuestionnaireDefinition, question_id)
@@ -332,7 +332,7 @@ async def test_patch_question_status_sets_inactive(async_client, test_db_session
 
     response = await async_client.patch(
         "/questionnaire/questions/400/status",
-        headers=_auth_header(9006),
+        headers=_auth_header(14),
         json={"status": "inactive"},
     )
     assert response.status_code == 200
@@ -346,7 +346,7 @@ async def test_patch_question_status_sets_inactive(async_client, test_db_session
 async def test_get_question_returns_404_when_missing(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9007, employee_id=15)
 
-    response = await async_client.get("/questionnaire/questions/999999", headers=_auth_header(9007))
+    response = await async_client.get("/questionnaire/questions/999999", headers=_auth_header(15))
     assert response.status_code == 404
     assert response.json() == {"error_code": "QUESTIONNAIRE_QUESTION_NOT_FOUND", "message": "Question does not exist"}
 
@@ -355,7 +355,7 @@ async def test_get_question_returns_404_when_missing(async_client, test_db_sessi
 async def test_list_questions_rejects_invalid_pagination(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=9008, employee_id=16)
 
-    response = await async_client.get("/questionnaire/questions?page=0&limit=10", headers=_auth_header(9008))
+    response = await async_client.get("/questionnaire/questions?page=0&limit=10", headers=_auth_header(16))
     assert response.status_code == 400
     assert response.json() == {"error_code": "INVALID_INPUT", "message": "Invalid request"}
 
@@ -415,7 +415,7 @@ async def test_reorder_category_questions_persists_display_order(async_client, t
 
     reorder_response = await async_client.patch(
         "/questionnaire/categories/8100/questions/order",
-        headers=_auth_header(9010),
+        headers=_auth_header(18),
         json={"question_ids": [9102, 9101]},
     )
     assert reorder_response.status_code == 200
@@ -423,7 +423,7 @@ async def test_reorder_category_questions_persists_display_order(async_client, t
 
     list_response = await async_client.get(
         "/questionnaire/categories/8100/questions",
-        headers=_auth_header(9010),
+        headers=_auth_header(18),
     )
     assert list_response.status_code == 200
     data = list_response.json()["data"]
@@ -466,7 +466,7 @@ async def test_reorder_category_questions_rejects_invalid_ids(async_client, test
 
     duplicate_response = await async_client.patch(
         "/questionnaire/categories/8101/questions/order",
-        headers=_auth_header(9011),
+        headers=_auth_header(19),
         json={"question_ids": [9201, 9201]},
     )
     assert duplicate_response.status_code == 400
@@ -474,7 +474,7 @@ async def test_reorder_category_questions_rejects_invalid_ids(async_client, test
 
     missing_response = await async_client.patch(
         "/questionnaire/categories/8101/questions/order",
-        headers=_auth_header(9011),
+        headers=_auth_header(19),
         json={"question_ids": [9201]},
     )
     assert missing_response.status_code == 400
@@ -496,7 +496,7 @@ async def test_create_healthy_habit_rule_rejects_text_question(async_client, tes
     await test_db_session.commit()
     response = await async_client.post(
         "/questionnaire/questions/9301/healthy-habit-rules",
-        headers=_auth_header(9020),
+        headers=_auth_header(20),
         json={
             "habit_label": "X",
             "condition_type": "option_match",
@@ -527,7 +527,7 @@ async def test_healthy_habit_rules_crud(async_client, test_db_session):
 
     create_res = await async_client.post(
         "/questionnaire/questions/9302/healthy-habit-rules",
-        headers=_auth_header(9021),
+        headers=_auth_header(21),
         json={
             "habit_key": "good_pick",
             "habit_label": "Good pick",
@@ -542,13 +542,13 @@ async def test_healthy_habit_rules_crud(async_client, test_db_session):
     rule_id = body["rule_id"]
     assert body["habit_label"] == "Good pick"
 
-    list_res = await async_client.get("/questionnaire/questions/9302/healthy-habit-rules", headers=_auth_header(9021))
+    list_res = await async_client.get("/questionnaire/questions/9302/healthy-habit-rules", headers=_auth_header(21))
     assert list_res.status_code == 200
     assert len(list_res.json()["data"]) == 1
 
     update_res = await async_client.put(
         f"/questionnaire/questions/9302/healthy-habit-rules/{rule_id}",
-        headers=_auth_header(9021),
+        headers=_auth_header(21),
         json={
             "habit_key": "good_pick",
             "habit_label": "Good pick updated",
@@ -564,7 +564,7 @@ async def test_healthy_habit_rules_crud(async_client, test_db_session):
 
     delete_res = await async_client.delete(
         f"/questionnaire/questions/9302/healthy-habit-rules/{rule_id}",
-        headers=_auth_header(9021),
+        headers=_auth_header(21),
     )
     assert delete_res.status_code == 200
     assert delete_res.json()["data"]["deleted"] is True

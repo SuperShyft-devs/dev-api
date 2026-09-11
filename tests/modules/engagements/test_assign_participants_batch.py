@@ -2,25 +2,22 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 from sqlalchemy import text
 
-from core.config import settings
-from core.security import create_jwt_token
-from modules.employee.models import Employee
 from modules.metsights.service import MetsightsService
 from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, make_employee, seed_employee, user_auth_header
 
 METSIGHTS_PROFILE_ID = "01961d4b-3cb1-cfae-f876-2957ef9acf18"
 OTHER_METSIGHTS_PROFILE_ID = "01961d4b-3cb1-cfae-f876-2957ef9acf19"
 METSIGHTS_CREATED_AT = "2025-04-10T06:53:19.882069+05:30"
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
 def _mock_metsights_records(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -64,12 +61,8 @@ def _patch_metsights_list_records(monkeypatch: pytest.MonkeyPatch):
     _mock_metsights_records(monkeypatch)
 
 
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int | None = None):
-    eid = employee_id if employee_id is not None else user_id
-    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}0000000001", status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=eid, user_id=user_id, role="admin", status="active"))
-    await test_db_session.commit()
+async def _seed_employee(test_db_session, *, employee_id: int, role: str = "admin"):
+    await seed_employee(test_db_session, employee_id=employee_id, role=role)
 
 
 async def _seed_assessment_package(test_db_session, *, package_id: int = 1):
@@ -120,14 +113,14 @@ async def test_assign_participants_batch_requires_auth(async_client):
 
 @pytest.mark.asyncio
 async def test_assign_participants_batch_rejects_more_than_50_rows(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=8001)
+    await _seed_employee(test_db_session, employee_id=1)
     rows = [
         {"metsights_record_id": f"R{i}", "phone": "+919876543210", "email": "a@example.com"}
         for i in range(51)
     ]
     response = await async_client.post(
         "/engagements/1/assign-participants-batch",
-        headers=_auth_header(8001),
+        headers=_auth_header(1),
         json={"rows": rows},
     )
     assert response.status_code in (400, 422)
@@ -135,7 +128,7 @@ async def test_assign_participants_batch_rejects_more_than_50_rows(async_client,
 
 @pytest.mark.asyncio
 async def test_assign_participants_batch_skips_already_assigned(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=8002)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_assessment_package(test_db_session)
     await _seed_engagement(test_db_session)
 
@@ -155,7 +148,7 @@ async def test_assign_participants_batch_skips_already_assigned(async_client, te
 
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
-        headers=_auth_header(8002),
+        headers=_auth_header(1),
         json={
             "rows": [
                 {
@@ -174,13 +167,13 @@ async def test_assign_participants_batch_skips_already_assigned(async_client, te
 
 @pytest.mark.asyncio
 async def test_assign_participants_batch_skips_user_not_found(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=8003)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_assessment_package(test_db_session)
     await _seed_engagement(test_db_session)
 
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
-        headers=_auth_header(8003),
+        headers=_auth_header(1),
         json={
             "rows": [
                 {
@@ -200,7 +193,7 @@ async def test_assign_participants_batch_skips_user_not_found(async_client, test
 @pytest.mark.asyncio
 async def test_assign_participants_batch_assigns_without_email_via_phone_and_record(async_client, test_db_session):
     """When email is empty, resolve user by phone + Metsights record id (not by email)."""
-    await _seed_employee(test_db_session, user_id=8012)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_assessment_package(test_db_session)
     await _seed_engagement(test_db_session)
 
@@ -215,7 +208,7 @@ async def test_assign_participants_batch_assigns_without_email_via_phone_and_rec
 
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
-        headers=_auth_header(8012),
+        headers=_auth_header(1),
         json={
             "rows": [
                 {
@@ -235,7 +228,7 @@ async def test_assign_participants_batch_assigns_without_email_via_phone_and_rec
 
 @pytest.mark.asyncio
 async def test_assign_participants_batch_picks_user_whose_profile_has_record(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=8010)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_assessment_package(test_db_session)
     await _seed_engagement(test_db_session)
 
@@ -257,7 +250,7 @@ async def test_assign_participants_batch_picks_user_whose_profile_has_record(asy
 
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
-        headers=_auth_header(8010),
+        headers=_auth_header(1),
         json={
             "rows": [
                 {
@@ -286,7 +279,7 @@ async def test_assign_participants_batch_picks_user_whose_profile_has_record(asy
 
 @pytest.mark.asyncio
 async def test_assign_participants_batch_record_not_found_does_not_enroll(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=8011)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_assessment_package(test_db_session)
     await _seed_engagement(test_db_session)
 
@@ -301,7 +294,7 @@ async def test_assign_participants_batch_record_not_found_does_not_enroll(async_
 
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
-        headers=_auth_header(8011),
+        headers=_auth_header(1),
         json={
             "rows": [
                 {
@@ -330,7 +323,7 @@ async def test_assign_participants_batch_record_not_found_does_not_enroll(async_
 
 @pytest.mark.asyncio
 async def test_assign_participants_batch_happy_path_enrolls_and_assigns(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=8004)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_assessment_package(test_db_session)
     await _seed_engagement(test_db_session)
 
@@ -345,7 +338,7 @@ async def test_assign_participants_batch_happy_path_enrolls_and_assigns(async_cl
 
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
-        headers=_auth_header(8004),
+        headers=_auth_header(1),
         json={
             "rows": [
                 {
@@ -389,7 +382,7 @@ async def test_assign_participants_batch_happy_path_enrolls_and_assigns(async_cl
 
 @pytest.mark.asyncio
 async def test_assign_participants_batch_already_enrolled_still_assigns(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=8005)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_assessment_package(test_db_session)
     await _seed_engagement(test_db_session)
 
@@ -410,7 +403,7 @@ async def test_assign_participants_batch_already_enrolled_still_assigns(async_cl
 
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
-        headers=_auth_header(8005),
+        headers=_auth_header(1),
         json={
             "rows": [
                 {
@@ -432,7 +425,7 @@ async def test_assign_participants_batch_already_enrolled_still_assigns(async_cl
 async def test_assign_participants_batch_sets_profile_on_metsights_when_user_linked(
     async_client, test_db_session
 ):
-    await _seed_employee(test_db_session, user_id=8007)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_assessment_package(test_db_session)
     await _seed_engagement(test_db_session)
 
@@ -447,7 +440,7 @@ async def test_assign_participants_batch_sets_profile_on_metsights_when_user_lin
 
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
-        headers=_auth_header(8007),
+        headers=_auth_header(1),
         json={
             "rows": [
                 {
@@ -476,13 +469,13 @@ async def test_assign_participants_batch_sets_profile_on_metsights_when_user_lin
 
 @pytest.mark.asyncio
 async def test_assign_participants_batch_requires_assessment_package(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=8006)
+    await _seed_employee(test_db_session, employee_id=1)
     await _seed_assessment_package(test_db_session)
     await _seed_engagement(test_db_session, assessment_package_id=None)
 
     response = await async_client.post(
         "/engagements/9001/assign-participants-batch",
-        headers=_auth_header(8006),
+        headers=_auth_header(1),
         json={
             "rows": [
                 {

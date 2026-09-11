@@ -74,8 +74,9 @@ async def list_diagnostic_packages(
         auth_user = await authenticate_bearer_user(db, credentials)
         requesting_user_id = auth_user.user_id
     if include_inactive:
-        user = await authenticate_bearer_user(db, credentials)
-        await employee_service.get_active_employee_by_user_id(db, user.user_id)
+        from core.dependencies import get_current_employee_from_token
+
+        await get_current_employee_from_token(db, credentials)
         active_only = False
 
     data = await diagnostics_service.get_packages(

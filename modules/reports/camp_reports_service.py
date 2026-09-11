@@ -244,7 +244,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         organization_id: int,
         city: str | None,
         department: str | None,
@@ -255,6 +256,7 @@ class CampReportsService:
             organization_id,
             city=city,
             department=department,
+            partner=partner,
             repository=self._organizations_repository,
         )
 
@@ -289,7 +291,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         organization_id: int,
         department: str | None,
@@ -305,6 +308,7 @@ class CampReportsService:
         await self._ensure_scoped_camp_report_access(
             db,
             employee=employee,
+            partner=partner,
             organization_id=organization_id,
             city=normalized_city,
             department=normalized_department,
@@ -315,7 +319,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         ip_address: str,
         user_agent: str,
@@ -361,7 +366,7 @@ class CampReportsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return created
@@ -370,7 +375,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         slug: str,
         ip_address: str,
@@ -435,7 +441,7 @@ class CampReportsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return created
@@ -444,7 +450,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         city: str,
         ip_address: str,
@@ -501,7 +508,7 @@ class CampReportsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return created
@@ -510,7 +517,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         city: str,
         slug: str,
@@ -579,7 +587,7 @@ class CampReportsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return created
@@ -634,7 +642,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         ip_address: str,
         user_agent: str,
@@ -654,7 +663,7 @@ class CampReportsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return result
@@ -775,7 +784,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         ip_address: str,
         user_agent: str,
@@ -798,7 +808,7 @@ class CampReportsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -806,7 +816,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         slug: str,
         ip_address: str,
@@ -837,7 +848,7 @@ class CampReportsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -897,7 +908,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
     ) -> list[dict]:
         ensure_internal_employee(employee)
@@ -954,7 +966,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         page: int,
         limit: int,
@@ -965,6 +978,7 @@ class CampReportsService:
         department, city = await self._normalize_and_ensure_report_access(
             db,
             employee=employee,
+            partner=partner,
             camp_no=camp_no,
             organization_id=context["organization_id"],
             department=department,
@@ -1048,7 +1062,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         department: str | None = None,
         city: str | None = None,
@@ -1057,6 +1072,7 @@ class CampReportsService:
         department, city = await self._normalize_and_ensure_report_access(
             db,
             employee=employee,
+            partner=partner,
             camp_no=camp_no,
             organization_id=context["organization_id"],
             department=department,
@@ -1073,7 +1089,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         department: str | None = None,
         city: str | None = None,
@@ -1083,6 +1100,7 @@ class CampReportsService:
             db,
             employee,
             context["organization_id"],
+            partner=partner,
             repository=self._organizations_repository,
         )
 
@@ -1096,6 +1114,7 @@ class CampReportsService:
         await self._ensure_scoped_camp_report_access(
             db,
             employee=employee,
+            partner=partner,
             organization_id=context["organization_id"],
             city=city,
             department=department,
@@ -1111,7 +1130,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         section: str,
         department: str | None = None,
@@ -1125,6 +1145,7 @@ class CampReportsService:
         department, city = await self._normalize_and_ensure_report_access(
             db,
             employee=employee,
+            partner=partner,
             camp_no=camp_no,
             organization_id=context["organization_id"],
             department=department,
@@ -1158,7 +1179,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         section: str,
         payload: dict[str, Any],
@@ -1185,6 +1207,7 @@ class CampReportsService:
         department, city = await self._normalize_and_ensure_report_access(
             db,
             employee=employee,
+            partner=partner,
             camp_no=camp_no,
             organization_id=context["organization_id"],
             department=department,
@@ -1220,7 +1243,7 @@ class CampReportsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1647,7 +1670,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         operations: list[dict[str, Any]],
     ) -> dict:
@@ -1657,6 +1681,7 @@ class CampReportsService:
             db,
             employee,
             context["organization_id"],
+            partner=None,
             repository=self._organizations_repository,
         )
 
@@ -1782,7 +1807,8 @@ class CampReportsService:
         self,
         db: AsyncSession,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner=None,
         camp_no: int,
         section: str,
         department: str | None = None,
@@ -1795,6 +1821,7 @@ class CampReportsService:
         department, city = await self._normalize_and_ensure_report_access(
             db,
             employee=employee,
+            partner=partner,
             camp_no=camp_no,
             organization_id=context["organization_id"],
             department=department,
@@ -1816,7 +1843,7 @@ class CampReportsService:
             ip_address=ip_address,
             user_agent=user_agent,
             endpoint=endpoint,
-            user_id=employee.user_id,
+            user_id=None,
         )
 
     async def refresh_camp_report_section_for_cron(

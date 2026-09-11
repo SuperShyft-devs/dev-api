@@ -29,7 +29,9 @@ class SeedUser:
 @dataclass(frozen=True)
 class SeedEmployee:
     employee_id: int
-    user_id: int
+    name: str
+    phone: str | None
+    email: str | None
     role: str
     status: str
 

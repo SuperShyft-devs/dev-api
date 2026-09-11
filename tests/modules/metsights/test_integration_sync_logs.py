@@ -16,15 +16,15 @@ from modules.users.models import User
 from tests.modules.questionnaire.test_questionnaire_user_routes import _ensure_test_engagement, _seed_user
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 async def _seed_employee(test_db_session, *, user_id: int):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}0000000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=user_id, user_id=user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=user_id, name=f"Employee {user_id}", phone=str(user_id).zfill(10)[:15], email=f"employee{user_id}@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
 

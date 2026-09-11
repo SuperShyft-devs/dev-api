@@ -876,15 +876,15 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         engagement_id: int,
-        employee_id: int,
+        partner_id: int,
     ) -> OnboardingAssistantAssignment:
-        """Assign an onboarding assistant to an engagement.
-        
+        """Assign a phlebo partner as onboarding assistant to an engagement.
+
         The unique constraint prevents duplicate assignments.
         """
         assignment = OnboardingAssistantAssignment(
             engagement_id=engagement_id,
-            employee_id=employee_id,
+            partner_id=partner_id,
         )
         db.add(assignment)
         await db.flush()
@@ -895,22 +895,22 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         engagement_id: int,
-        employee_id: int,
+        partner_id: int,
     ) -> bool:
-        """Remove an onboarding assistant from an engagement.
-        
+        """Remove an onboarding assistant partner from an engagement.
+
         Returns True if an assignment was deleted, False if not found.
         """
         query = select(OnboardingAssistantAssignment).where(
             OnboardingAssistantAssignment.engagement_id == engagement_id,
-            OnboardingAssistantAssignment.employee_id == employee_id,
+            OnboardingAssistantAssignment.partner_id == partner_id,
         )
         result = await db.execute(query)
         assignment = result.scalar_one_or_none()
-        
+
         if assignment is None:
             return False
-        
+
         await db.delete(assignment)
         await db.flush()
         return True
@@ -933,13 +933,19 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         engagement_id: int,
-        employee_id: int,
+        partner_id: int | None = None,
+        employee_id: int | None = None,
     ) -> OnboardingAssistantAssignment | None:
-        """Check if a specific employee is assigned to an engagement."""
+        """Check if a specific partner or employee is assigned to an engagement."""
+        if partner_id is None and employee_id is None:
+            raise ValueError("partner_id or employee_id is required")
         query = select(OnboardingAssistantAssignment).where(
-            OnboardingAssistantAssignment.engagement_id == engagement_id,
-            OnboardingAssistantAssignment.employee_id == employee_id,
+            OnboardingAssistantAssignment.engagement_id == engagement_id
         )
+        if partner_id is not None:
+            query = query.where(OnboardingAssistantAssignment.partner_id == partner_id)
+        if employee_id is not None:
+            query = query.where(OnboardingAssistantAssignment.employee_id == employee_id)
         result = await db.execute(query)
         return result.scalar_one_or_none()
 
@@ -948,6 +954,28 @@ class EngagementsRepository:
         query = (
             select(Engagement)
             .where(Engagement.status == "running")
+            .order_by(Engagement.start_date.desc(), Engagement.engagement_id.desc())
+        )
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+    async def list_running_engagements_for_assigned_partner(
+        self,
+        db: AsyncSession,
+        *,
+        partner_id: int,
+    ) -> list[Engagement]:
+        """List running engagements where the partner is assigned as onboarding assistant."""
+        query = (
+            select(Engagement)
+            .join(
+                OnboardingAssistantAssignment,
+                OnboardingAssistantAssignment.engagement_id == Engagement.engagement_id,
+            )
+            .where(
+                OnboardingAssistantAssignment.partner_id == partner_id,
+                Engagement.status == "running",
+            )
             .order_by(Engagement.start_date.desc(), Engagement.engagement_id.desc())
         )
         result = await db.execute(query)
@@ -979,27 +1007,27 @@ class EngagementsRepository:
         self,
         db: AsyncSession,
         *,
-        employee_id: int,
-        user_id: int,
+        contact_id: int | None = None,
+        employee_id: int | None = None,
+        user_id: int | None = None,
         allowed_cities: list[str] | None = None,
     ) -> list[Engagement]:
-        """List engagements assigned to employee where user is in org contact persons (any status)."""
+        """List engagements for orgs where contact JSON contains contact_id (partner_id)."""
         from modules.organizations.models import Organization
         from modules.organizations.repository import OrganizationsRepository
 
+        _ = user_id  # Legacy alias
+        resolved_id = contact_id if contact_id is not None else employee_id
+        if resolved_id is None:
+            return []
         query = (
             select(Engagement)
-            .join(
-                OnboardingAssistantAssignment,
-                OnboardingAssistantAssignment.engagement_id == Engagement.engagement_id,
-            )
             .join(
                 Organization,
                 Organization.organization_id == Engagement.organization_id,
             )
             .where(
-                OnboardingAssistantAssignment.employee_id == employee_id,
-                OrganizationsRepository._contact_person_user_ids_contains_user(user_id),
+                OrganizationsRepository._contact_person_user_ids_contains_user(resolved_id),
             )
             .order_by(Engagement.start_date.desc(), Engagement.engagement_id.desc())
         )
@@ -1031,6 +1059,128 @@ class EngagementsRepository:
         result = await db.execute(query)
         return list(result.scalars().all())
 
+    async def list_onboarding_assistant_partner_contacts(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        roles: frozenset[str] | None = None,
+    ) -> list[dict]:
+        """Return partner contact dicts for assistants assigned to an engagement.
+
+        When roles is omitted, all assigned partners are returned.
+        """
+        from modules.partners.models import Partner
+
+        query = (
+            select(Partner)
+            .join(
+                OnboardingAssistantAssignment,
+                OnboardingAssistantAssignment.partner_id == Partner.partner_id,
+            )
+            .where(OnboardingAssistantAssignment.engagement_id == engagement_id)
+        )
+        if roles is not None:
+            query = query.where(Partner.role.in_(roles))
+        query = query.order_by(Partner.partner_id.asc())
+        result = await db.execute(query)
+        contacts: list[dict] = []
+        for partner in result.scalars().all():
+            name = (partner.name or "").strip()
+            parts = name.split(None, 1)
+            first_name = parts[0] if parts else ""
+            last_name = parts[1] if len(parts) > 1 else ""
+            contacts.append(
+                {
+                    "kind": "partner",
+                    "partner_id": int(partner.partner_id),
+                    "employee_id": None,
+                    "name": name,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "phone": partner.phone,
+                    "email": partner.email,
+                    "role": partner.role,
+                    "status": partner.status,
+                }
+            )
+        return contacts
+
+    async def list_onboarding_assistant_employee_contacts(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> list[dict]:
+        """List assigned staff-employee contacts for an engagement."""
+        from modules.employee.models import Employee
+
+        query = (
+            select(Employee)
+            .join(
+                OnboardingAssistantAssignment,
+                OnboardingAssistantAssignment.employee_id == Employee.employee_id,
+            )
+            .where(OnboardingAssistantAssignment.engagement_id == engagement_id)
+            .order_by(Employee.employee_id.asc())
+        )
+        result = await db.execute(query)
+        contacts: list[dict] = []
+        for emp in result.scalars().all():
+            name = (emp.name or "").strip()
+            parts = name.split(None, 1)
+            first_name = parts[0] if parts else ""
+            last_name = parts[1] if len(parts) > 1 else ""
+            role = emp.role.value if hasattr(emp.role, "value") else str(emp.role)
+            contacts.append(
+                {
+                    "kind": "employee",
+                    "partner_id": None,
+                    "employee_id": int(emp.employee_id),
+                    "name": name,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "phone": emp.phone,
+                    "email": emp.email,
+                    "role": role,
+                    "status": emp.status,
+                }
+            )
+        return contacts
+
+    async def list_onboarding_assistant_assignee_rows(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+    ) -> list[dict]:
+        """Mixed assigned list for admin UI (partners + employees)."""
+        partners = await self.list_onboarding_assistant_partner_contacts(
+            db, engagement_id=engagement_id
+        )
+        employees = await self.list_onboarding_assistant_employee_contacts(
+            db, engagement_id=engagement_id
+        )
+        return partners + employees
+
+    async def list_onboarding_assistant_notify_contacts(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        partner_roles: frozenset[str] | None = None,
+        include_employees: bool = False,
+    ) -> list[dict]:
+        """Contacts for notification dispatch."""
+        contacts = await self.list_onboarding_assistant_partner_contacts(
+            db, engagement_id=engagement_id, roles=partner_roles
+        )
+        if include_employees:
+            contacts = contacts + await self.list_onboarding_assistant_employee_contacts(
+                db, engagement_id=engagement_id
+            )
+        return contacts
+
     async def list_onboarding_assistant_user_ids(
         self,
         db: AsyncSession,
@@ -1038,25 +1188,9 @@ class EngagementsRepository:
         engagement_id: int,
         roles: frozenset | None = None,
     ) -> list[int]:
-        """Return user_ids for onboarding assistants assigned to an engagement.
-
-        When roles is omitted, only admin-role assistants are returned (enrollment alerts).
-        """
-        from modules.employee.models import Employee, EmployeeRole
-
-        effective_roles = roles if roles is not None else frozenset({EmployeeRole.admin})
-
-        query = (
-            select(Employee.user_id)
-            .join(
-                OnboardingAssistantAssignment,
-                OnboardingAssistantAssignment.employee_id == Employee.employee_id,
-            )
-            .where(OnboardingAssistantAssignment.engagement_id == engagement_id)
-            .where(Employee.role.in_(effective_roles))
-        )
-        result = await db.execute(query)
-        return [int(uid) for uid in result.scalars().all()]
+        """Deprecated: assistants are partners. Prefer list_onboarding_assistant_partner_contacts."""
+        _ = db, engagement_id, roles
+        return []
 
     async def create_onboarding_assistant_assignment(
         self,
@@ -1073,19 +1207,26 @@ class EngagementsRepository:
         db: AsyncSession,
         *,
         engagement_id: int,
-        employee_id: int,
+        partner_id: int | None = None,
+        employee_id: int | None = None,
     ) -> int:
         """Delete an onboarding assistant assignment.
-        
+
         Returns the number of rows deleted (0 or 1).
         """
         from sqlalchemy import delete as sql_delete
 
-        result = await db.execute(
-            sql_delete(OnboardingAssistantAssignment)
-            .where(OnboardingAssistantAssignment.engagement_id == engagement_id)
-            .where(OnboardingAssistantAssignment.employee_id == employee_id)
+        if partner_id is None and employee_id is None:
+            raise ValueError("partner_id or employee_id is required")
+
+        query = sql_delete(OnboardingAssistantAssignment).where(
+            OnboardingAssistantAssignment.engagement_id == engagement_id
         )
+        if partner_id is not None:
+            query = query.where(OnboardingAssistantAssignment.partner_id == partner_id)
+        if employee_id is not None:
+            query = query.where(OnboardingAssistantAssignment.employee_id == employee_id)
+        result = await db.execute(query)
         return int(result.rowcount or 0)
 
     async def count_participants_by_engagement_code(

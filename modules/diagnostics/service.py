@@ -589,7 +589,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return await self._package_response_with_test_count(db, duplicated)
@@ -612,7 +612,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return {"reordered": True}
@@ -695,7 +695,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._to_health_parameter_response(created)
@@ -757,7 +757,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._to_health_parameter_response(updated)
@@ -783,7 +783,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return {"deleted": True}
@@ -838,7 +838,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._to_group_response(created, tests=[], test_count=0)
@@ -889,7 +889,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._to_group_response(updated, tests=tests)
@@ -915,7 +915,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -965,7 +965,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return AssignTestsToGroupResponse(
@@ -1005,7 +1005,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1037,7 +1037,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return {"group_id": group_id, "test_ids": ordered_ids}
@@ -1117,7 +1117,7 @@ class DiagnosticsService:
     ) -> None:
         if employee is not None:
             self._ensure_employee_access(employee)
-            audit_user_id = employee.user_id
+            audit_user_id = None
         else:
             audit_user_id = current_user_id
 
@@ -1190,7 +1190,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return {"diagnostic_package_id": package_id, "group_ids": ordered_ids}
@@ -1225,7 +1225,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return await self._package_response_with_test_count(db, updated)
@@ -1251,7 +1251,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1313,7 +1313,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return FilterChipResponse(
@@ -1379,7 +1379,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return FilterChipResponse(
@@ -1415,7 +1415,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1466,7 +1466,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return PackageFilterChipResponse(
@@ -1508,7 +1508,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1559,7 +1559,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return PackageFilterChipResponse(
@@ -1601,7 +1601,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1632,7 +1632,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._to_reason_response(created)
@@ -1668,7 +1668,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._to_reason_response(updated)
@@ -1700,7 +1700,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1732,7 +1732,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._to_tag_response(created)
@@ -1764,7 +1764,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1802,7 +1802,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._to_sample_response(created)
@@ -1845,7 +1845,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._to_sample_response(updated)
@@ -1877,7 +1877,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1914,7 +1914,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._to_preparation_response(created)
@@ -1969,7 +1969,7 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._to_preparation_response(updated)
@@ -2005,6 +2005,6 @@ class DiagnosticsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )

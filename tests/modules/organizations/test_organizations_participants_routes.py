@@ -2,35 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, time
 
 import pytest
 
-from core.config import settings
-from core.security import create_jwt_token
-from modules.employee.models import Employee
+from modules.assessments.models import AssessmentPackage
+from modules.engagements.models import Engagement, EngagementParticipant
 from modules.organizations.models import Organization
 from modules.users.models import User
-from modules.engagements.models import Engagement, EngagementParticipant
-from modules.assessments.models import AssessmentPackage
-from datetime import date, time
+from tests.helpers.auth import employee_auth_header, seed_employee, user_auth_header
+from tests.helpers.engagement_types import engagement_type_id
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    """Create authentication header for testing."""
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
-
-
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
-    """Seed a test employee."""
-    user = User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active")
-    test_db_session.add(user)
-    await test_db_session.flush()
-    
-    employee = Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active")
-    test_db_session.add(employee)
-    await test_db_session.commit()
+async def _seed_employee(test_db_session, *, employee_id: int, role: str = "admin"):
+    await seed_employee(test_db_session, employee_id=employee_id, role=role)
 
 
 @pytest.mark.asyncio
@@ -46,16 +31,16 @@ async def test_get_organization_participants_requires_employee(async_client, tes
     test_db_session.add(User(user_id=8001, age=30, phone="8001000000", status="active"))
     await test_db_session.commit()
 
-    response = await async_client.get("/organizations/1/participants", headers=_auth_header(8001))
+    response = await async_client.get("/organizations/1/participants", headers=user_auth_header(8001))
     assert response.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_get_organization_participants_returns_404_for_nonexistent_organization(async_client, test_db_session):
     """Test that the endpoint returns 404 for non-existent organization."""
-    await _seed_employee(test_db_session, user_id=8002, employee_id=101)
+    await _seed_employee(test_db_session, employee_id=101)
 
-    response = await async_client.get("/organizations/99999/participants", headers=_auth_header(8002))
+    response = await async_client.get("/organizations/99999/participants", headers=employee_auth_header(101))
     assert response.status_code == 404
     assert response.json()["error_code"] == "ORGANIZATION_NOT_FOUND"
 
@@ -63,7 +48,7 @@ async def test_get_organization_participants_returns_404_for_nonexistent_organiz
 @pytest.mark.asyncio
 async def test_get_organization_participants_returns_empty_list_when_no_engagements(async_client, test_db_session):
     """Test that the endpoint returns empty list when organization has no engagements."""
-    await _seed_employee(test_db_session, user_id=8003, employee_id=102)
+    await _seed_employee(test_db_session, employee_id=102)
 
     # Create organization with no engagements
     test_db_session.add(
@@ -75,7 +60,7 @@ async def test_get_organization_participants_returns_empty_list_when_no_engageme
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/organizations/1001/participants", headers=_auth_header(8003))
+    response = await async_client.get("/organizations/1001/participants", headers=employee_auth_header(102))
     assert response.status_code == 200
     body = response.json()
     assert body["data"] == []
@@ -87,7 +72,7 @@ async def test_get_organization_participants_returns_empty_list_when_no_engageme
 @pytest.mark.asyncio
 async def test_get_organization_participants_returns_empty_list_when_no_participants(async_client, test_db_session):
     """Test that the endpoint returns empty list when engagements have no participants."""
-    await _seed_employee(test_db_session, user_id=8004, employee_id=103)
+    await _seed_employee(test_db_session, employee_id=103)
 
     # Create assessment package (required for engagements)
     test_db_session.add(
@@ -116,7 +101,7 @@ async def test_get_organization_participants_returns_empty_list_when_no_particip
             engagement_name="Org 1002 camp",
             organization_id=1002,
             engagement_code="ENG2001",
-            engagement_type="doctor",
+            engagement_type=await engagement_type_id(test_db_session, "bio_ai"),
             assessment_package_id=88101,
             diagnostic_package_id=6,
             slot_duration=20,
@@ -127,7 +112,7 @@ async def test_get_organization_participants_returns_empty_list_when_no_particip
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/organizations/1002/participants", headers=_auth_header(8004))
+    response = await async_client.get("/organizations/1002/participants", headers=employee_auth_header(103))
     assert response.status_code == 200
     body = response.json()
     assert body["data"] == []
@@ -139,7 +124,7 @@ async def test_get_organization_participants_returns_participants_from_single_en
     async_client, test_db_session
 ):
     """Test that the endpoint returns participants from a single engagement."""
-    await _seed_employee(test_db_session, user_id=8005, employee_id=104)
+    await _seed_employee(test_db_session, employee_id=104)
 
     # Create assessment package
     test_db_session.add(
@@ -168,7 +153,7 @@ async def test_get_organization_participants_returns_participants_from_single_en
             engagement_name="Org 1003 camp",
             organization_id=1003,
             engagement_code="ENG2002",
-            engagement_type="doctor",
+            engagement_type=await engagement_type_id(test_db_session, "bio_ai"),
             assessment_package_id=88102,
             diagnostic_package_id=6,
             slot_duration=20,
@@ -227,7 +212,7 @@ async def test_get_organization_participants_returns_participants_from_single_en
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/organizations/1003/participants", headers=_auth_header(8005))
+    response = await async_client.get("/organizations/1003/participants", headers=employee_auth_header(104))
     assert response.status_code == 200
     body = response.json()
     assert body["meta"]["total"] == 2
@@ -252,7 +237,7 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
     async_client, test_db_session
 ):
     """Test that the endpoint returns distinct users across multiple engagements."""
-    await _seed_employee(test_db_session, user_id=8006, employee_id=105)
+    await _seed_employee(test_db_session, employee_id=105)
 
     # Create assessment package
     test_db_session.add(
@@ -282,7 +267,7 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
             engagement_name="Org 1004 camp A",
             organization_id=1004,
             engagement_code="ENG2003",
-            engagement_type="doctor",
+            engagement_type=await engagement_type_id(test_db_session, "bio_ai"),
             assessment_package_id=88103,
             diagnostic_package_id=6,
             slot_duration=20,
@@ -297,7 +282,7 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
             engagement_name="Org 1004 camp B",
             organization_id=1004,
             engagement_code="ENG2004",
-            engagement_type="doctor",
+            engagement_type=await engagement_type_id(test_db_session, "bio_ai"),
             assessment_package_id=88103,
             diagnostic_package_id=6,
             slot_duration=20,
@@ -390,7 +375,7 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/organizations/1004/participants", headers=_auth_header(8006))
+    response = await async_client.get("/organizations/1004/participants", headers=employee_auth_header(105))
     assert response.status_code == 200
     body = response.json()
     
@@ -407,7 +392,7 @@ async def test_get_organization_participants_returns_distinct_users_across_multi
 @pytest.mark.asyncio
 async def test_get_organization_participants_validates_pagination_params(async_client, test_db_session):
     """Test that the endpoint validates pagination parameters."""
-    await _seed_employee(test_db_session, user_id=8007, employee_id=106)
+    await _seed_employee(test_db_session, employee_id=106)
 
     test_db_session.add(
         Organization(
@@ -419,22 +404,22 @@ async def test_get_organization_participants_validates_pagination_params(async_c
     await test_db_session.commit()
 
     # Test invalid page
-    response = await async_client.get("/organizations/1005/participants?page=0", headers=_auth_header(8007))
+    response = await async_client.get("/organizations/1005/participants?page=0", headers=employee_auth_header(106))
     assert response.status_code == 400
 
     # Test invalid limit (too small)
-    response = await async_client.get("/organizations/1005/participants?limit=0", headers=_auth_header(8007))
+    response = await async_client.get("/organizations/1005/participants?limit=0", headers=employee_auth_header(106))
     assert response.status_code == 400
 
     # Test invalid limit (too large)
-    response = await async_client.get("/organizations/1005/participants?limit=101", headers=_auth_header(8007))
+    response = await async_client.get("/organizations/1005/participants?limit=101", headers=employee_auth_header(106))
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_get_organization_participants_paginates_results(async_client, test_db_session):
     """Test that the endpoint paginates results correctly."""
-    await _seed_employee(test_db_session, user_id=8008, employee_id=107)
+    await _seed_employee(test_db_session, employee_id=107)
 
     # Create assessment package
     test_db_session.add(
@@ -463,7 +448,7 @@ async def test_get_organization_participants_paginates_results(async_client, tes
             engagement_name="Org 1006 camp",
             organization_id=1006,
             engagement_code="ENG2005",
-            engagement_type="doctor",
+            engagement_type=await engagement_type_id(test_db_session, "bio_ai"),
             assessment_package_id=88104,
             diagnostic_package_id=6,
             slot_duration=20,
@@ -506,7 +491,7 @@ async def test_get_organization_participants_paginates_results(async_client, tes
 
     # Get page 1 with limit 2
     response = await async_client.get(
-        "/organizations/1006/participants?page=1&limit=2", headers=_auth_header(8008)
+        "/organizations/1006/participants?page=1&limit=2", headers=employee_auth_header(107)
     )
     assert response.status_code == 200
     body = response.json()
@@ -517,7 +502,7 @@ async def test_get_organization_participants_paginates_results(async_client, tes
 
     # Get page 2 with limit 2
     response = await async_client.get(
-        "/organizations/1006/participants?page=2&limit=2", headers=_auth_header(8008)
+        "/organizations/1006/participants?page=2&limit=2", headers=employee_auth_header(107)
     )
     assert response.status_code == 200
     body = response.json()
@@ -528,7 +513,7 @@ async def test_get_organization_participants_paginates_results(async_client, tes
 
     # Get page 3 with limit 2 (should have 1 item)
     response = await async_client.get(
-        "/organizations/1006/participants?page=3&limit=2", headers=_auth_header(8008)
+        "/organizations/1006/participants?page=3&limit=2", headers=employee_auth_header(107)
     )
     assert response.status_code == 200
     body = response.json()
@@ -541,7 +526,7 @@ async def test_get_organization_participants_paginates_results(async_client, tes
 @pytest.mark.asyncio
 async def test_get_organization_participants_excludes_other_organizations(async_client, test_db_session):
     """Test that the endpoint only returns participants from the specified organization."""
-    await _seed_employee(test_db_session, user_id=8009, employee_id=108)
+    await _seed_employee(test_db_session, employee_id=108)
 
     # Create assessment package
     test_db_session.add(
@@ -578,7 +563,7 @@ async def test_get_organization_participants_excludes_other_organizations(async_
             engagement_name="Org A camp",
             organization_id=1007,
             engagement_code="ENG2006",
-            engagement_type="doctor",
+            engagement_type=await engagement_type_id(test_db_session, "bio_ai"),
             assessment_package_id=88105,
             diagnostic_package_id=6,
             slot_duration=20,
@@ -593,7 +578,7 @@ async def test_get_organization_participants_excludes_other_organizations(async_
             engagement_name="Org B camp",
             organization_id=1008,
             engagement_code="ENG2007",
-            engagement_type="doctor",
+            engagement_type=await engagement_type_id(test_db_session, "bio_ai"),
             assessment_package_id=88105,
             diagnostic_package_id=6,
             slot_duration=20,
@@ -649,7 +634,7 @@ async def test_get_organization_participants_excludes_other_organizations(async_
     await test_db_session.commit()
 
     # Get participants for OrgA (should only get user 9201)
-    response = await async_client.get("/organizations/1007/participants", headers=_auth_header(8009))
+    response = await async_client.get("/organizations/1007/participants", headers=employee_auth_header(108))
     assert response.status_code == 200
     body = response.json()
     assert body["meta"]["total"] == 1
@@ -658,7 +643,7 @@ async def test_get_organization_participants_excludes_other_organizations(async_
     assert body["data"][0]["first_name"] == "OrgA_User"
 
     # Get participants for OrgB (should only get user 9202)
-    response = await async_client.get("/organizations/1008/participants", headers=_auth_header(8009))
+    response = await async_client.get("/organizations/1008/participants", headers=employee_auth_header(108))
     assert response.status_code == 200
     body = response.json()
     assert body["meta"]["total"] == 1

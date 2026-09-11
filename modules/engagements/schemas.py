@@ -335,13 +335,20 @@ class EngagementDetailsResponse(EngagementListItem):
 
 
 class OnboardingAssistantsAddRequest(BaseModel):
-    """Request to assign employees as onboarding assistants."""
+    """Assign phlebo/expert partners and/or admin/inferior_admin employees."""
 
-    employee_ids: list[int] = Field(..., min_length=1)
+    partner_ids: list[int] = Field(default_factory=list)
+    employee_ids: list[int] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_at_least_one_id(self) -> OnboardingAssistantsAddRequest:
+        if not self.partner_ids and not self.employee_ids:
+            raise ValueError("At least one of partner_ids or employee_ids is required")
+        return self
 
 
 class CreatePhleboRequest(BaseModel):
-    """Create (or reuse) a phlebo user/employee and assign to an engagement."""
+    """Create (or reuse) a phlebo partner and assign to an engagement."""
 
     name: SafeDisplayName
     phone: PhoneStr

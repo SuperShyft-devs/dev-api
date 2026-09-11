@@ -435,7 +435,7 @@ class AssessmentsService:
             endpoint="/assessments/{assessment_id}/metsights-record-id",
             ip_address="0.0.0.0",
             user_agent="employee-api",
-            user_id=current_employee.user_id,
+            user_id=None,
             session_id=None,
         )
 

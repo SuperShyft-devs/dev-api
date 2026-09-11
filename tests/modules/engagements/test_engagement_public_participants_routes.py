@@ -2,34 +2,24 @@
 
 from __future__ import annotations
 
-from datetime import date, time, timedelta
+from datetime import date, time
 
 import pytest
 
-from core.config import settings
-from core.security import create_jwt_token
-from modules.employee.models import Employee
 from modules.users.models import User
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.assessments.models import AssessmentPackage
 from modules.organizations.models import Organization
+from tests.helpers.auth import employee_auth_header, make_employee, seed_employee, user_auth_header
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    """Create authentication header for testing."""
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
+async def _seed_employee(test_db_session, *, employee_id: int, role: str = "admin"):
     """Seed a test employee."""
-    user = User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active")
-    test_db_session.add(user)
-    await test_db_session.flush()
-    
-    employee = Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active")
-    test_db_session.add(employee)
-    await test_db_session.commit()
+    await seed_employee(test_db_session, employee_id=employee_id, role=role)
 
 
 @pytest.mark.asyncio
@@ -45,16 +35,16 @@ async def test_get_public_participants_requires_employee(async_client, test_db_s
     test_db_session.add(User(user_id=6001, age=30, phone="6001000000", status="active"))
     await test_db_session.commit()
 
-    response = await async_client.get("/engagements/public/participants", headers=_auth_header(6001))
+    response = await async_client.get("/engagements/public/participants", headers=user_auth_header(6001))
     assert response.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_get_public_participants_returns_empty_list_when_no_b2c_engagements(async_client, test_db_session):
     """Test that the endpoint returns empty list when no B2C engagements exist."""
-    await _seed_employee(test_db_session, user_id=6002, employee_id=301)
+    await _seed_employee(test_db_session, employee_id=301)
 
-    response = await async_client.get("/engagements/public/participants", headers=_auth_header(6002))
+    response = await async_client.get("/engagements/public/participants", headers=_auth_header(301))
     assert response.status_code == 200
     body = response.json()
     assert body["data"] == []
@@ -66,7 +56,7 @@ async def test_get_public_participants_returns_empty_list_when_no_b2c_engagement
 @pytest.mark.asyncio
 async def test_get_public_participants_returns_empty_list_when_no_participants(async_client, test_db_session):
     """Test that the endpoint returns empty list when B2C engagements have no participants."""
-    await _seed_employee(test_db_session, user_id=6003, employee_id=302)
+    await _seed_employee(test_db_session, employee_id=302)
 
     # Create assessment package
     test_db_session.add(
@@ -96,7 +86,7 @@ async def test_get_public_participants_returns_empty_list_when_no_participants(a
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/engagements/public/participants", headers=_auth_header(6003))
+    response = await async_client.get("/engagements/public/participants", headers=_auth_header(302))
     assert response.status_code == 200
     body = response.json()
     assert body["data"] == []
@@ -108,7 +98,7 @@ async def test_get_public_participants_returns_participants_from_b2c_engagements
     async_client, test_db_session
 ):
     """Test that the endpoint returns participants from B2C engagements."""
-    await _seed_employee(test_db_session, user_id=6004, employee_id=303)
+    await _seed_employee(test_db_session, employee_id=303)
 
     # Create assessment package
     test_db_session.add(
@@ -186,7 +176,7 @@ async def test_get_public_participants_returns_participants_from_b2c_engagements
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/engagements/public/participants", headers=_auth_header(6004))
+    response = await async_client.get("/engagements/public/participants", headers=_auth_header(303))
     assert response.status_code == 200
     body = response.json()
     assert body["meta"]["total"] == 2
@@ -211,7 +201,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
     async_client, test_db_session
 ):
     """Test that the endpoint returns distinct users across multiple B2C engagements."""
-    await _seed_employee(test_db_session, user_id=6005, employee_id=304)
+    await _seed_employee(test_db_session, employee_id=304)
 
     # Create assessment package
     test_db_session.add(
@@ -337,7 +327,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/engagements/public/participants", headers=_auth_header(6005))
+    response = await async_client.get("/engagements/public/participants", headers=_auth_header(304))
     assert response.status_code == 200
     body = response.json()
     
@@ -354,7 +344,7 @@ async def test_get_public_participants_returns_distinct_users_across_multiple_b2
 @pytest.mark.asyncio
 async def test_get_public_participants_excludes_b2b_participants(async_client, test_db_session):
     """Test that the endpoint only returns B2C participants, not B2B participants."""
-    await _seed_employee(test_db_session, user_id=6006, employee_id=305)
+    await _seed_employee(test_db_session, employee_id=305)
 
     # Create assessment package
     test_db_session.add(
@@ -460,7 +450,7 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/engagements/public/participants", headers=_auth_header(6006))
+    response = await async_client.get("/engagements/public/participants", headers=_auth_header(305))
     assert response.status_code == 200
     body = response.json()
     
@@ -474,25 +464,25 @@ async def test_get_public_participants_excludes_b2b_participants(async_client, t
 @pytest.mark.asyncio
 async def test_get_public_participants_validates_pagination_params(async_client, test_db_session):
     """Test that the endpoint validates pagination parameters."""
-    await _seed_employee(test_db_session, user_id=6007, employee_id=306)
+    await _seed_employee(test_db_session, employee_id=306)
 
     # Test invalid page
-    response = await async_client.get("/engagements/public/participants?page=0", headers=_auth_header(6007))
+    response = await async_client.get("/engagements/public/participants?page=0", headers=_auth_header(306))
     assert response.status_code == 400
 
     # Test invalid limit (too small)
-    response = await async_client.get("/engagements/public/participants?limit=0", headers=_auth_header(6007))
+    response = await async_client.get("/engagements/public/participants?limit=0", headers=_auth_header(306))
     assert response.status_code == 400
 
     # Test invalid limit (too large)
-    response = await async_client.get("/engagements/public/participants?limit=101", headers=_auth_header(6007))
+    response = await async_client.get("/engagements/public/participants?limit=101", headers=_auth_header(306))
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_get_public_participants_paginates_results(async_client, test_db_session):
     """Test that the endpoint paginates results correctly."""
-    await _seed_employee(test_db_session, user_id=6008, employee_id=307)
+    await _seed_employee(test_db_session, employee_id=307)
 
     # Create assessment package
     test_db_session.add(
@@ -554,7 +544,7 @@ async def test_get_public_participants_paginates_results(async_client, test_db_s
 
     # Get page 1 with limit 2
     response = await async_client.get(
-        "/engagements/public/participants?page=1&limit=2", headers=_auth_header(6008)
+        "/engagements/public/participants?page=1&limit=2", headers=_auth_header(307)
     )
     assert response.status_code == 200
     body = response.json()
@@ -565,7 +555,7 @@ async def test_get_public_participants_paginates_results(async_client, test_db_s
 
     # Get page 2 with limit 2
     response = await async_client.get(
-        "/engagements/public/participants?page=2&limit=2", headers=_auth_header(6008)
+        "/engagements/public/participants?page=2&limit=2", headers=_auth_header(307)
     )
     assert response.status_code == 200
     body = response.json()
@@ -576,7 +566,7 @@ async def test_get_public_participants_paginates_results(async_client, test_db_s
 
     # Get page 3 with limit 2 (should have 1 item)
     response = await async_client.get(
-        "/engagements/public/participants?page=3&limit=2", headers=_auth_header(6008)
+        "/engagements/public/participants?page=3&limit=2", headers=_auth_header(307)
     )
     assert response.status_code == 200
     body = response.json()

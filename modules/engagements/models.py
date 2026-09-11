@@ -2,7 +2,24 @@
 
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, Enum as SAEnum, Float, ForeignKey, Index, Integer, String, Text, Time, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Column,
+    Date,
+    DateTime,
+    Enum as SAEnum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    Time,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import validates
 from sqlalchemy.sql import func
@@ -82,18 +99,35 @@ class Engagement(Base):
 
 
 class OnboardingAssistantAssignment(Base):
-    """SQLAlchemy model for `onboarding_assistant_assignment` table."""
+    """SQLAlchemy model for `onboarding_assistant_assignment` table.
+
+    Exactly one of partner_id (phlebo/expert) or employee_id (admin/inferior_admin) is set.
+    """
 
     __tablename__ = "onboarding_assistant_assignment"
 
     onboarding_assistant_id = Column(Integer, primary_key=True)
-    employee_id = Column(Integer, ForeignKey("employee.employee_id"), nullable=False)
+    partner_id = Column(Integer, ForeignKey("partners.partner_id"), nullable=True)
+    employee_id = Column(Integer, ForeignKey("employee.employee_id", ondelete="CASCADE"), nullable=True)
     engagement_id = Column(Integer, ForeignKey("engagements.engagement_id"), nullable=False)
 
     __table_args__ = (
-        UniqueConstraint("engagement_id", "employee_id", name="uq_onboarding_assistant_assignment"),
+        UniqueConstraint("engagement_id", "partner_id", name="uq_onboarding_assistant_assignment"),
         Index("ix_onboarding_assistant_assignment_engagement_id", "engagement_id"),
+        Index("ix_onboarding_assistant_assignment_partner_id", "partner_id"),
         Index("ix_onboarding_assistant_assignment_employee_id", "employee_id"),
+        Index(
+            "uq_oa_assignment_engagement_employee",
+            "engagement_id",
+            "employee_id",
+            unique=True,
+            postgresql_where=text("employee_id IS NOT NULL"),
+        ),
+        CheckConstraint(
+            "(partner_id IS NOT NULL AND employee_id IS NULL) OR "
+            "(partner_id IS NULL AND employee_id IS NOT NULL)",
+            name="ck_oa_assignment_partner_xor_employee",
+        ),
     )
 
 

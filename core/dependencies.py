@@ -14,31 +14,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from core.security import decode_and_verify_jwt
+from core.subject_auth import jwt_subject_typ, parse_subject_id
 from db.session import get_db
 
 
 _http_bearer = HTTPBearer(auto_error=False)
 
 
-def _parse_user_id(subject: Optional[str]) -> int:
-    if subject is None:
-        raise ValueError("Missing subject")
-
-    user_id = int(subject)
-    if user_id <= 0:
-        raise ValueError("Invalid subject")
-
-    return user_id
-
-
-async def authenticate_bearer_user(
-    db: AsyncSession,
+def _extract_bearer_token(
     credentials: HTTPAuthorizationCredentials | None,
     *,
     access_token: str | None = None,
-):
-    """Validate Bearer JWT (header or optional query token) and return the active user."""
-
+) -> str:
     token: str | None = None
     if credentials is not None and credentials.scheme.lower() == "bearer":
         token = credentials.credentials
@@ -47,10 +34,34 @@ async def authenticate_bearer_user(
 
     if token is None:
         raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
+    return token
 
+
+def _decode_payload(token: str) -> dict:
     try:
-        payload = decode_and_verify_jwt(token)
-        user_id = _parse_user_id(payload.get("sub"))
+        return decode_and_verify_jwt(token)
+    except Exception as exc:
+        raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed") from exc
+
+
+async def authenticate_bearer_user(
+    db: AsyncSession,
+    credentials: HTTPAuthorizationCredentials | None,
+    *,
+    access_token: str | None = None,
+):
+    """Validate Bearer JWT (header or optional query token) and return the active user.
+
+    Requires ``typ`` missing or ``\"user\"`` (backward compatible).
+    """
+
+    token = _extract_bearer_token(credentials, access_token=access_token)
+    payload = _decode_payload(token)
+    try:
+        typ = jwt_subject_typ(payload)
+        if typ != "user":
+            raise ValueError("Not a user token")
+        user_id = parse_subject_id(payload.get("sub"))
     except Exception as exc:
         raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed") from exc
 
@@ -65,6 +76,88 @@ async def authenticate_bearer_user(
         raise AppError(status_code=403, error_code="FORBIDDEN", message="You do not have permission to perform this action")
 
     return user
+
+
+async def get_current_employee_from_token(
+    db: AsyncSession,
+    credentials: HTTPAuthorizationCredentials | None,
+    *,
+    access_token: str | None = None,
+):
+    """Validate Bearer JWT with ``typ=employee`` and return the active Employee row."""
+
+    token = _extract_bearer_token(credentials, access_token=access_token)
+    payload = _decode_payload(token)
+    try:
+        typ = jwt_subject_typ(payload)
+        employee_id = parse_subject_id(payload.get("sub"))
+    except Exception as exc:
+        raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed") from exc
+
+    if typ != "employee":
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+    from modules.employee.models import Employee
+
+    employee = await db.get(Employee, employee_id)
+    if employee is None:
+        raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
+
+    if (employee.status or "").lower() != "active":
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+    return employee
+
+
+async def get_current_partner(
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),
+):
+    """Validate Bearer JWT with ``typ=partner`` and return the active Partner row."""
+
+    return await get_current_partner_from_token(db, credentials, access_token=None)
+
+
+async def get_current_partner_from_token(
+    db: AsyncSession,
+    credentials: HTTPAuthorizationCredentials | None,
+    *,
+    access_token: str | None = None,
+):
+    """Validate Bearer JWT with ``typ=partner`` and return the active Partner row."""
+
+    token = _extract_bearer_token(credentials, access_token=access_token)
+    payload = _decode_payload(token)
+    try:
+        typ = jwt_subject_typ(payload)
+        if typ != "partner":
+            raise ValueError("Not a partner token")
+        partner_id = parse_subject_id(payload.get("sub"))
+    except Exception as exc:
+        raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed") from exc
+
+    from modules.partners.models import Partner
+
+    partner = await db.get(Partner, partner_id)
+    if partner is None:
+        raise AppError(status_code=401, error_code="AUTH_FAILED", message="Authentication failed")
+
+    if (partner.status or "").lower() != "active":
+        raise AppError(
+            status_code=403,
+            error_code="FORBIDDEN",
+            message="You do not have permission to perform this action",
+        )
+
+    return partner
 
 
 async def get_current_user(

@@ -456,8 +456,8 @@ class UsersRepository:
         return user
 
     async def get_employee_by_user_id(self, db: AsyncSession, user_id: int) -> Employee | None:
-        result = await db.execute(select(Employee).where(Employee.user_id == user_id).limit(1))
-        return result.scalar_one_or_none()
+        # Employees are no longer linked to users.
+        return None
 
     async def list_descendant_user_ids(self, db: AsyncSession, root_user_id: int) -> list[int]:
         """Return root user id + all descendants through users.parent_id."""
@@ -698,6 +698,8 @@ class UsersRepository:
         org_rows = await db.execute(
             select(Organization).where(Organization.contact_person_user_ids.isnot(None))
         )
+        # Contact JSON now stores employee_ids (staff). Removing user_ids from contact
+        # persons is a no-op for staff identity; still scrub any leftover matching ints.
         from modules.organizations.contact_person import remove_user_from_contact_person_user_ids
 
         for organization in org_rows.scalars().all():
@@ -709,27 +711,8 @@ class UsersRepository:
                 if updated != organization.contact_person_user_ids:
                     organization.contact_person_user_ids = updated
 
-        # Employee rows reference users; organizations and onboarding assignments reference employee.
-        employee_ids_subq = select(Employee.employee_id).where(Employee.user_id.in_(user_ids))
-        await db.execute(
-            delete(OnboardingAssistantAssignment).where(OnboardingAssistantAssignment.employee_id.in_(employee_ids_subq))
-        )
-        await db.execute(
-            update(Organization)
-            .where(Organization.bd_employee_id.in_(employee_ids_subq))
-            .values(bd_employee_id=None)
-        )
-        await db.execute(
-            update(Organization)
-            .where(Organization.created_employee_id.in_(employee_ids_subq))
-            .values(created_employee_id=None)
-        )
-        await db.execute(
-            update(Organization)
-            .where(Organization.updated_employee_id.in_(employee_ids_subq))
-            .values(updated_employee_id=None)
-        )
-        await db.execute(delete(Employee).where(Employee.user_id.in_(user_ids)))
+        # Employees are independent of users — do not cascade-delete employees or
+        # partner assignments when deleting end-user accounts.
 
     async def delete_users_by_ids(self, db: AsyncSession, user_ids: list[int]) -> int:
         if not user_ids:

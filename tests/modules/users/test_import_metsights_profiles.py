@@ -14,15 +14,15 @@ from modules.metsights.service import MetsightsService
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}0000000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=employee_id, name=f"Employee {employee_id}", phone=str(employee_id).zfill(10)[:15], email=f"employee{employee_id}@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
 
@@ -119,7 +119,7 @@ async def test_import_metsights_profiles_order_fitprint_skip_and_female_diagnost
 
     response = await async_client.post(
         "/users/import-metsights-profiles",
-        headers=_auth_header(9901),
+        headers=_auth_header(601),
         json={"metsights_profile_ids": [pid]},
     )
     assert response.status_code == 200
@@ -224,7 +224,7 @@ async def test_import_metsights_profiles_male_uses_diagnostic_17(async_client, t
 
     response = await async_client.post(
         "/users/import-metsights-profiles",
-        headers=_auth_header(9902),
+        headers=_auth_header(602),
         json={"metsights_profile_ids": [pid]},
     )
     assert response.status_code == 200
@@ -300,7 +300,7 @@ async def test_import_metsights_profiles_skips_existing_record_id(async_client, 
 
     response = await async_client.post(
         "/users/import-metsights-profiles",
-        headers=_auth_header(9903),
+        headers=_auth_header(603),
         json={"metsights_profile_ids": [pid]},
     )
     assert response.status_code == 200

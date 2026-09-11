@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
-
 import pytest
 
-from core.config import settings
-from core.security import create_jwt_token
 from modules.employee.models import (
-    Employee,
     EmployeeCategoryPermission,
     EmployeeRole,
     EmployeeTaskPermission,
@@ -24,18 +19,14 @@ from modules.employee.permissions import (
     grant_allows,
 )
 from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, make_employee, user_auth_header
 
 
-def _headers(user_id: int) -> dict[str, str]:
-    token = create_jwt_token(
-        {"sub": str(user_id)},
-        timedelta(minutes=5),
-        secret_key=settings.JWT_SECRET_KEY,
-    )
-    return {"Authorization": f"Bearer {token}"}
+def _headers(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
-def test_catalog_contract_has_exact_fifteen_categories():
+def test_catalog_contract_has_exact_sixteen_categories():
     assert PERMISSION_CATEGORY_KEYS == {
         "users",
         "organizations",
@@ -50,6 +41,7 @@ def test_catalog_contract_has_exact_fifteen_categories():
         "checklists_tasks",
         "support",
         "employees",
+        "partners",
         "platform_settings",
         "system_monitoring",
     }
@@ -71,6 +63,8 @@ def test_catalog_contract_has_exact_fifteen_categories():
         ("PATCH", "/diagnostic-test-groups/{group_id}/tests/order", "diagnostics", PermissionAction.edit),
         ("GET", "/audit/integration-sync-logs", "system_monitoring", PermissionAction.view),
         ("POST", "/admin-temp/sync-questionnaire-seed", "system_monitoring", PermissionAction.edit),
+        ("GET", "/partners", "partners", PermissionAction.view),
+        ("POST", "/partners", "partners", PermissionAction.edit),
     ],
 )
 def test_operation_manifest_explicit_classification(method, path, category, action):
@@ -101,6 +95,8 @@ def test_operation_manifest_explicit_classification(method, path, category, acti
         ("PUT", "/engagements/{engagement_id}/notifications", "engagement_configuration"),
         ("PUT", "/checklist-templates/{template_id}/items/{item_id}", "template_items"),
         ("PATCH", "/platform-settings/b2c-onboarding", "b2c_onboarding"),
+        ("GET", "/partners/{partner_id}", "directory"),
+        ("PATCH", "/partners/{partner_id}/status", "status"),
     ],
 )
 def test_operation_manifest_assigns_nested_tasks(method, path, task_key):
@@ -126,6 +122,8 @@ def test_every_category_has_configurable_tasks():
         ("GET", "/checklist/my-tasks"),
         ("POST", "/support/tickets"),
         ("GET", "/experts/portal/me"),
+        ("POST", "/employees/auth/send-otp"),
+        ("POST", "/partners/auth/send-otp"),
     ],
 )
 def test_operation_manifest_explicit_exclusions(method, path):
@@ -171,19 +169,17 @@ def test_edit_grant_implies_read_but_view_does_not_allow_edit():
 async def _seed_employee(
     db,
     *,
-    user_id: int,
     employee_id: int,
     role: EmployeeRole,
     grants: dict[str, tuple[bool, bool]] | None = None,
 ):
-    db.add(User(user_id=user_id, phone=f"7{user_id:09d}", age=30, status="active"))
-    await db.flush()
     db.add(
-        Employee(
+        make_employee(
             employee_id=employee_id,
-            user_id=user_id,
-            role=role,
+            role=role.value if isinstance(role, EmployeeRole) else role,
             status="active",
+            phone=f"7{employee_id:09d}"[:15],
+            email=f"emp{employee_id}@test.example",
         )
     )
     await db.flush()
@@ -211,20 +207,19 @@ async def _seed_employee(
 
 
 @pytest.mark.asyncio
-async def test_users_me_exposes_additive_permission_contract(async_client, test_db_session):
+async def test_employees_auth_me_exposes_additive_permission_contract(async_client, test_db_session):
     await _seed_employee(
         test_db_session,
-        user_id=9701,
         employee_id=9701,
         role=EmployeeRole.inferior_admin,
         grants={"users": (True, False)},
     )
-    response = await async_client.get("/users/me", headers=_headers(9701))
+    response = await async_client.get("/employees/auth/me", headers=_headers(9701))
     assert response.status_code == 200
-    employee = response.json()["data"]["employee"]
-    assert employee["role"] == "inferior_admin"
-    assert employee["permissions"]["version"] == 1
-    assert employee["permissions"]["categories"]["users"] == {
+    data = response.json()["data"]
+    assert data["role"] == "inferior_admin"
+    assert data["permissions"]["version"] == 1
+    assert data["permissions"]["categories"]["users"] == {
         "can_view": True,
         "can_edit": False,
     }
@@ -234,7 +229,6 @@ async def test_users_me_exposes_additive_permission_contract(async_client, test_
 async def test_inferior_admin_view_and_edit_enforcement(async_client, test_db_session):
     await _seed_employee(
         test_db_session,
-        user_id=9702,
         employee_id=9702,
         role=EmployeeRole.inferior_admin,
         grants={"users": (True, False)},
@@ -262,7 +256,6 @@ async def test_task_override_allows_directory_but_denies_profile_edit(
 ):
     await _seed_employee(
         test_db_session,
-        user_id=9720,
         employee_id=9720,
         role=EmployeeRole.inferior_admin,
         grants={"users": (True, True)},
@@ -294,7 +287,6 @@ async def test_task_override_allows_directory_but_denies_profile_edit(
 async def test_permission_is_checked_before_resource_lookup(async_client, test_db_session):
     await _seed_employee(
         test_db_session,
-        user_id=9703,
         employee_id=9703,
         role=EmployeeRole.inferior_admin,
     )
@@ -310,7 +302,7 @@ async def test_admin_temp_rejects_ordinary_authenticated_user(async_client, test
     )
     await test_db_session.commit()
     response = await async_client.post(
-        "/admin-temp/sync-questionnaire-seed", headers=_headers(9704)
+        "/admin-temp/sync-questionnaire-seed", headers=user_auth_header(9704)
     )
     assert response.status_code == 403
     assert response.json()["error_code"] == "FORBIDDEN"
@@ -320,13 +312,11 @@ async def test_admin_temp_rejects_ordinary_authenticated_user(async_client, test
 async def test_permission_api_rejects_stale_version(async_client, test_db_session):
     await _seed_employee(
         test_db_session,
-        user_id=9705,
         employee_id=9705,
         role=EmployeeRole.admin,
     )
     await _seed_employee(
         test_db_session,
-        user_id=9706,
         employee_id=9706,
         role=EmployeeRole.inferior_admin,
     )
@@ -343,7 +333,6 @@ async def test_permission_api_rejects_stale_version(async_client, test_db_sessio
 async def test_only_full_admin_can_read_permission_catalog(async_client, test_db_session):
     await _seed_employee(
         test_db_session,
-        user_id=9707,
         employee_id=9707,
         role=EmployeeRole.inferior_admin,
         grants={"employees": (True, True)},
@@ -359,7 +348,6 @@ async def test_only_full_admin_can_read_permission_catalog(async_client, test_db
 async def test_backup_requires_system_monitoring_edit(async_client, test_db_session):
     await _seed_employee(
         test_db_session,
-        user_id=9708,
         employee_id=9708,
         role=EmployeeRole.inferior_admin,
         grants={"system_monitoring": (True, False)},
@@ -380,7 +368,6 @@ async def test_backup_requires_system_monitoring_edit(async_client, test_db_sess
 async def test_admin_creates_role_and_grants_atomically(async_client, test_db_session):
     await _seed_employee(
         test_db_session,
-        user_id=9709,
         employee_id=9709,
         role=EmployeeRole.admin,
     )
@@ -394,16 +381,15 @@ async def test_admin_creates_role_and_grants_atomically(async_client, test_db_se
                 is_active=True,
             )
         )
-    test_db_session.add(
-        User(user_id=9710, phone="7000097100", age=30, status="active")
-    )
     await test_db_session.commit()
 
     response = await async_client.post(
         "/employees",
         headers=_headers(9709),
         json={
-            "user_id": 9710,
+            "name": "Inferior New",
+            "phone": "7000097100",
+            "email": "inf9710@test.example",
             "role": "inferior_admin",
             "permissions": [
                 {
@@ -441,7 +427,6 @@ async def test_admin_creates_role_and_grants_atomically(async_client, test_db_se
 async def test_self_permission_escalation_is_protected(async_client, test_db_session):
     await _seed_employee(
         test_db_session,
-        user_id=9711,
         employee_id=9711,
         role=EmployeeRole.admin,
     )

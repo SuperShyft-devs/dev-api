@@ -16,11 +16,9 @@ from modules.users.models import User
 TEST_NOTIFICATION_API_KEY = "test-notif-dispatch-key"
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token(
-        {"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY
-    )
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 def _api_key_header() -> dict[str, str]:
@@ -30,7 +28,7 @@ def _api_key_header() -> dict[str, str]:
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=employee_id, name=f"Employee {employee_id}", phone=str(employee_id).zfill(10)[:15], email=f"employee{employee_id}@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
 
@@ -151,7 +149,7 @@ async def test_dispatch_succeeds_when_bio_ai_report_url_present(
 
     response = await async_client.post(
         "/notifications/dispatch",
-        headers=_auth_header(9501),
+        headers=_auth_header(951),
         json={
             "service_key": service_key,
             "user_ids": [9502],
@@ -240,7 +238,7 @@ async def test_dispatch_fetches_bio_ai_report_when_cache_missing(
 
     response = await async_client.post(
         "/notifications/dispatch",
-        headers=_auth_header(9561),
+        headers=_auth_header(961),
         json={
             "service_key": service_key,
             "user_ids": [9562],
@@ -345,7 +343,7 @@ async def test_dispatch_validates_bio_ai_report_url_for_correct_engagement(
 
     response = await async_client.post(
         "/notifications/dispatch",
-        headers=_auth_header(9521),
+        headers=_auth_header(971),
         json={
             "service_key": service_key,
             "user_ids": [9523],
@@ -460,7 +458,7 @@ async def test_dispatch_without_bio_ai_report_url_returns_400_when_required(asyn
 
     response = await async_client.post(
         "/notifications/dispatch",
-        headers=_auth_header(9511),
+        headers=_auth_header(961),
         json={
             "service_key": missing_service_key,
             "user_ids": [9512],
@@ -952,7 +950,7 @@ async def test_dispatch_rejects_bioai_service_for_fitprint_without_report_url(
 
     response = await async_client.post(
         "/notifications/dispatch",
-        headers=_auth_header(9701),
+        headers=_auth_header(971),
         json={
             "service_key": service_key,
             "user_ids": [9702],
@@ -1038,7 +1036,7 @@ async def test_dispatch_uses_assessment_instance_id_for_metsights_pro(
 
     response = await async_client.post(
         "/notifications/dispatch",
-        headers=_auth_header(9705),
+        headers=_auth_header(972),
         json={
             "service_key": service_key,
             "user_ids": [9706],
@@ -1091,7 +1089,7 @@ async def test_dispatch_rejects_assessment_instance_id_for_wrong_user(
 
     response = await async_client.post(
         "/notifications/dispatch",
-        headers=_auth_header(9711),
+        headers=_auth_header(981),
         json={
             "service_key": service_key,
             "user_ids": [9712],
@@ -1344,7 +1342,7 @@ async def test_dispatch_fetches_blood_report_when_cache_missing(
 
     response = await async_client.post(
         "/notifications/dispatch",
-        headers=_auth_header(9751),
+        headers=_auth_header(991),
         json={
             "service_key": service_key,
             "user_ids": [9752],
@@ -1408,7 +1406,7 @@ async def test_prepare_reports_refreshes_journey_instances(
 
     response = await async_client.post(
         "/notifications/prepare-reports",
-        headers=_auth_header(9761),
+        headers=_auth_header(992),
         json={
             "user_id": 9762,
             "require_blood_report_url": False,
@@ -1523,7 +1521,7 @@ async def test_prepare_reports_dual_report_uses_single_ihr_row(
 
     response = await async_client.post(
         "/notifications/prepare-reports",
-        headers=_auth_header(9771),
+        headers=_auth_header(993),
         json={
             "user_id": 9772,
             "require_blood_report_url": True,
@@ -1752,7 +1750,7 @@ async def test_dispatch_vifc_with_pre_stored_report_url_succeeds(
 
     response = await async_client.post(
         "/notifications/dispatch",
-        headers=_auth_header(9801),
+        headers=_auth_header(981),
         json={
             "service_key": service_key,
             "user_ids": [9802],
@@ -1806,7 +1804,7 @@ async def test_dispatch_vifc_without_report_url_returns_400(
 
     response = await async_client.post(
         "/notifications/dispatch",
-        headers=_auth_header(9811),
+        headers=_auth_header(982),
         json={
             "service_key": service_key,
             "user_ids": [9812],

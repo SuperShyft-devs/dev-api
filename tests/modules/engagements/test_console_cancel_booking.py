@@ -2,23 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import date, time, timedelta
+from datetime import date, time
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from core.config import settings
-from core.security import create_jwt_token
 from modules.assessments.models import AssessmentPackage
 from modules.diagnostics.models import DiagnosticPackage
-from modules.employee.models import Employee
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, seed_employee
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
 @pytest.mark.asyncio
@@ -49,9 +46,7 @@ async def test_console_cancel_booking_success(async_client, test_db_session):
     else:
         existing_diag.diagnostic_provider = "healthians"
         existing_diag.external_package_id = 1001
-    test_db_session.add(User(user_id=93001, age=30, phone="9300100000", status="active", first_name="Admin", last_name="User"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=501, user_id=93001, role="admin", status="active"))
+    await seed_employee(test_db_session, employee_id=501, role="admin", commit=False)
 
     existing_eng = await test_db_session.get(Engagement, 7001)
     if existing_eng is None:
@@ -123,7 +118,7 @@ async def test_console_cancel_booking_success(async_client, test_db_session):
             response = await async_client.delete(
                 "/engagements/7001/console/participants/93002/book",
                 params={"remarks": "Testing cancel"},
-                headers=_auth_header(93001),
+                headers=_auth_header(501),
             )
 
     assert response.status_code == 200
@@ -152,9 +147,7 @@ async def test_console_cancel_booking_requires_remarks(async_client, test_db_ses
                 status="active",
             )
         )
-    test_db_session.add(User(user_id=93011, age=30, phone="9301100000", status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=511, user_id=93011, role="admin", status="active"))
+    await seed_employee(test_db_session, employee_id=511, role="admin", commit=False)
     test_db_session.add(
         Engagement(
             engagement_id=7002,
@@ -173,6 +166,6 @@ async def test_console_cancel_booking_requires_remarks(async_client, test_db_ses
     response = await async_client.delete(
         "/engagements/7002/console/participants/1/book",
         params={"remarks": "  "},
-        headers=_auth_header(93011),
+        headers=_auth_header(511),
     )
     assert response.status_code == 400

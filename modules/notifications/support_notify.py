@@ -1,4 +1,4 @@
-"""Dispatch support-query notifications to default onboarding assistants."""
+"""Dispatch support-query notifications to default onboarding assistants (phlebo partners)."""
 
 from __future__ import annotations
 
@@ -7,10 +7,9 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.employee.models import Employee
 from modules.notifications.repository import NotificationsRepository
-from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
+from modules.partners.models import Partner
 from modules.platform_settings.repository import PlatformSettingsRepository
 from modules.support.models import SupportTicket
 
@@ -40,29 +39,32 @@ def participant_details_from_support_ticket(
     }
 
 
-async def _resolve_default_assistant_user_ids(
+async def _resolve_default_assistant_contacts(
     db: AsyncSession,
     *,
     platform_settings_repository: PlatformSettingsRepository,
-) -> list[int]:
-    employee_ids = await platform_settings_repository.resolve_default_onboarding_assistant_employee_ids(db)
-    if not employee_ids:
+) -> list[dict]:
+    """Default assistant IDs are partner_ids after migration 0133."""
+    partner_ids = await platform_settings_repository.resolve_default_onboarding_assistant_employee_ids(db)
+    if not partner_ids:
         return []
 
     result = await db.execute(
-        select(Employee.user_id)
-        .where(Employee.employee_id.in_(employee_ids))
-        .where(Employee.status == "active")
+        select(Partner)
+        .where(Partner.partner_id.in_(partner_ids))
+        .where(Partner.status == "active")
     )
-    seen: set[int] = set()
-    user_ids: list[int] = []
-    for uid in result.scalars().all():
-        user_id = int(uid)
-        if user_id in seen:
-            continue
-        seen.add(user_id)
-        user_ids.append(user_id)
-    return user_ids
+    contacts: list[dict] = []
+    for partner in result.scalars().all():
+        contacts.append(
+            {
+                "first_name": partner.name or "",
+                "last_name": "",
+                "phone": partner.phone or "",
+                "email": partner.email or "",
+            }
+        )
+    return contacts
 
 
 async def notify_default_onboarding_assistants_on_support_query(
@@ -74,7 +76,7 @@ async def notify_default_onboarding_assistants_on_support_query(
     ticket: SupportTicket,
     user,
 ) -> None:
-    """Dispatch each configured support notification service to default onboarding assistants."""
+    """Dispatch each configured support notification service to default phlebo partners."""
     settings_row = await platform_settings_repository.get_by_id(db)
     service_keys = _parse_service_keys(
         getattr(settings_row, "default_support_query_notification", None) if settings_row else None
@@ -82,10 +84,10 @@ async def notify_default_onboarding_assistants_on_support_query(
     if not service_keys:
         return
 
-    assistant_user_ids = await _resolve_default_assistant_user_ids(
+    contacts = await _resolve_default_assistant_contacts(
         db, platform_settings_repository=platform_settings_repository
     )
-    if not assistant_user_ids:
+    if not contacts:
         return
 
     details = participant_details_from_support_ticket(user, ticket=ticket)
@@ -118,15 +120,11 @@ async def notify_default_onboarding_assistants_on_support_query(
                 )
                 continue
 
-            dispatch_payload = DispatchRequest(
-                service_key=service_key,
-                user_ids=assistant_user_ids,
-                participant_details=details,
-            )
-            await notifications_service.dispatch(
+            await notifications_service.dispatch_to_contacts(
                 db,
-                payload=dispatch_payload,
-                triggered_by_user_id=None,
+                service_key=service_key,
+                contacts=contacts,
+                participant_details=details,
             )
         except Exception as exc:
             logger.warning(

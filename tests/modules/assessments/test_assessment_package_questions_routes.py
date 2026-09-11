@@ -22,15 +22,15 @@ from modules.questionnaire.models import QuestionnaireCategory
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=employee_id, name=f"Employee {employee_id}", phone=str(employee_id).zfill(10)[:15], email=f"employee{employee_id}@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
 
@@ -83,7 +83,7 @@ async def test_list_package_categories_allows_employee(async_client, test_db_ses
     test_db_session.add(AssessmentPackageCategory(package_id=6105, category_id=7105))
     await test_db_session.commit()
 
-    response = await async_client.get("/assessment-packages/6105/categories", headers=_auth_header(8105))
+    response = await async_client.get("/assessment-packages/6105/categories", headers=_auth_header(55))
     assert response.status_code == 200
     assert response.json()["data"][0]["category_id"] == 7105
 
@@ -186,17 +186,17 @@ async def test_add_and_list_and_remove_package_categories(async_client, test_db_
 
     add_resp = await async_client.post(
         "/assessment-packages/6001/categories",
-        headers=_auth_header(8102),
+        headers=_auth_header(51),
         json={"category_ids": [7001]},
     )
     assert add_resp.status_code == 201
     assert add_resp.json()["data"]["added_category_ids"] == [7001]
 
-    list_resp = await async_client.get("/assessment-packages/6001/categories", headers=_auth_header(8102))
+    list_resp = await async_client.get("/assessment-packages/6001/categories", headers=_auth_header(51))
     assert list_resp.status_code == 200
     assert list_resp.json()["data"][0]["category_id"] == 7001
 
-    remove_resp = await async_client.delete("/assessment-packages/6001/categories/7001", headers=_auth_header(8102))
+    remove_resp = await async_client.delete("/assessment-packages/6001/categories/7001", headers=_auth_header(51))
     assert remove_resp.status_code == 200
     assert remove_resp.json()["data"] == {"package_id": 6001, "removed_category_id": 7001}
 
@@ -236,13 +236,13 @@ async def test_reorder_package_categories_persists_order(async_client, test_db_s
 
     reorder_resp = await async_client.patch(
         "/assessment-packages/6110/categories/order",
-        headers=_auth_header(8110),
+        headers=_auth_header(60),
         json={"category_ids": [7111, 7110]},
     )
     assert reorder_resp.status_code == 200
     assert reorder_resp.json()["data"]["category_ids"] == [7111, 7110]
 
-    list_resp = await async_client.get("/assessment-packages/6110/categories", headers=_auth_header(8110))
+    list_resp = await async_client.get("/assessment-packages/6110/categories", headers=_auth_header(60))
     assert list_resp.status_code == 200
     assert [row["category_id"] for row in list_resp.json()["data"]] == [7111, 7110]
 
@@ -268,7 +268,7 @@ async def test_reorder_package_categories_rejects_invalid_ids(async_client, test
 
     duplicate_resp = await async_client.patch(
         "/assessment-packages/6111/categories/order",
-        headers=_auth_header(8111),
+        headers=_auth_header(61),
         json={"category_ids": [7120, 7120]},
     )
     assert duplicate_resp.status_code == 400
@@ -276,7 +276,7 @@ async def test_reorder_package_categories_rejects_invalid_ids(async_client, test
 
     missing_resp = await async_client.patch(
         "/assessment-packages/6111/categories/order",
-        headers=_auth_header(8111),
+        headers=_auth_header(61),
         json={"category_ids": [7120]},
     )
     assert missing_resp.status_code == 400

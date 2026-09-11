@@ -1,4 +1,4 @@
-"""Dispatch booking guide notifications to onboarding assistants day before blood collection."""
+"""Dispatch booking guide notifications to assigned phlebo partners day before blood collection."""
 
 from __future__ import annotations
 
@@ -9,17 +9,15 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.employee.models import EmployeeRole
 from modules.engagements.repository import EngagementsRepository
-from modules.notifications.dedup import should_skip_notification
 from modules.notifications.pretest_reminders import tomorrow_in_ist
-from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
+from modules.partners.models import PartnerRole
 
 logger = logging.getLogger(__name__)
 
 _IST = ZoneInfo("Asia/Kolkata")
-_BOOKING_GUIDE_OA_ROLES = frozenset({EmployeeRole.admin, EmployeeRole.onboarding_assistant})
+_BOOKING_GUIDE_PARTNER_ROLES = frozenset({PartnerRole.phlebo.value})
 
 
 async def dispatch_booking_guide_reminders(
@@ -30,7 +28,7 @@ async def dispatch_booking_guide_reminders(
     as_of: date | None = None,
     dry_run: bool = False,
 ) -> dict[str, int | str | bool | list[dict[str, Any]]]:
-    """Find engagements with blood collection tomorrow and notify assigned onboarding assistants."""
+    """Find engagements with blood collection tomorrow and notify assigned phlebo partners."""
     collection_date = tomorrow_in_ist(as_of=as_of)
     engagements = await engagements_repository.list_engagements_for_booking_guide_reminder(
         db,
@@ -45,16 +43,16 @@ async def dispatch_booking_guide_reminders(
 
     if dry_run:
         for engagement_id, service_configs in engagements:
-            assistant_user_ids = await engagements_repository.list_onboarding_assistant_user_ids(
+            contacts = await engagements_repository.list_onboarding_assistant_partner_contacts(
                 db,
                 engagement_id=engagement_id,
-                roles=_BOOKING_GUIDE_OA_ROLES,
+                roles=_BOOKING_GUIDE_PARTNER_ROLES,
             )
             service_keys = [cfg.service_key for cfg in service_configs]
-            for user_id in assistant_user_ids:
+            for contact in contacts:
                 matched += 1
                 details.append({
-                    "user_id": user_id,
+                    "partner_id": contact.get("partner_id"),
                     "engagement_id": engagement_id,
                     "service_key": ",".join(service_keys) if service_keys else None,
                     "action": "dry_run",
@@ -72,64 +70,45 @@ async def dispatch_booking_guide_reminders(
         }
 
     for engagement_id, service_configs in engagements:
-        assistant_user_ids = await engagements_repository.list_onboarding_assistant_user_ids(
+        contacts = await engagements_repository.list_onboarding_assistant_partner_contacts(
             db,
             engagement_id=engagement_id,
-            roles=_BOOKING_GUIDE_OA_ROLES,
+            roles=_BOOKING_GUIDE_PARTNER_ROLES,
         )
-        if not assistant_user_ids:
+        if not contacts:
             continue
 
         service_keys = [cfg.service_key for cfg in service_configs]
         if not service_configs:
-            for user_id in assistant_user_ids:
+            for contact in contacts:
                 matched += 1
                 skipped += 1
                 details.append({
-                    "user_id": user_id,
+                    "partner_id": contact.get("partner_id"),
                     "engagement_id": engagement_id,
                     "action": "skipped",
                     "reason": "no notification keys configured",
                 })
             continue
 
-        for user_id in assistant_user_ids:
+        for contact in contacts:
             matched += 1
+            partner_id = contact.get("partner_id")
             try:
                 dispatched_any = False
                 skipped_all = True
                 for cfg in service_configs:
                     sk = cfg.service_key
-                    skip_reason = await should_skip_notification(
+                    skipped_all = False
+                    await notifications_service.dispatch_to_contacts(
                         db,
                         service_key=sk,
-                        user_id=user_id,
+                        contacts=[contact],
                         engagement_id=engagement_id,
-                    )
-                    if skip_reason:
-                        details.append({
-                            "user_id": user_id,
-                            "engagement_id": engagement_id,
-                            "service_key": sk,
-                            "action": "skipped",
-                            "reason": f"notification '{sk}' {skip_reason}",
-                        })
-                        continue
-
-                    skipped_all = False
-                    await notifications_service.dispatch(
-                        db,
-                        payload=DispatchRequest(
-                            service_key=sk,
-                            user_ids=[user_id],
-                            engagement_id=engagement_id,
-                            external_link=cfg.external_link,
-                        ),
-                        triggered_by_user_id=None,
                     )
                     dispatched_any = True
                     details.append({
-                        "user_id": user_id,
+                        "partner_id": partner_id,
                         "engagement_id": engagement_id,
                         "service_key": sk,
                         "action": "sent",
@@ -143,16 +122,16 @@ async def dispatch_booking_guide_reminders(
             except Exception as exc:
                 failed += 1
                 details.append({
-                    "user_id": user_id,
+                    "partner_id": partner_id,
                     "engagement_id": engagement_id,
                     "service_key": ",".join(service_keys),
                     "action": "failed",
                     "reason": str(exc),
                 })
                 logger.warning(
-                    "Booking guide reminder dispatch failed: service_keys=%s user_id=%s engagement_id=%s: %s",
+                    "Booking guide reminder dispatch failed: service_keys=%s partner_id=%s engagement_id=%s: %s",
                     ",".join(service_keys),
-                    user_id,
+                    partner_id,
                     engagement_id,
                     str(exc),
                 )

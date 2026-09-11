@@ -393,6 +393,146 @@ class NotificationsService:
             "message": webhook_message,
         }
 
+    async def dispatch_to_contacts(
+        self,
+        db: AsyncSession,
+        *,
+        service_key: str,
+        contacts: list[dict],
+        otp: str | None = None,
+        engagement_id: int | None = None,
+        participant_details: dict | None = None,
+        session_details: SessionDetails | None = None,
+    ) -> dict:
+        """Dispatch a notification to raw contacts (no users table lookup).
+
+        Used for partner/employee OTP and partner-based onboarding alerts.
+        Each contact dict may include: first_name, last_name, phone, email.
+        """
+        if not contacts:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="At least one contact is required",
+            )
+
+        svc = await self._repo.get_service_by_key(db, service_key=service_key)
+        if svc is None or not svc.is_active:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"Notification service '{service_key}' not found or inactive",
+            )
+
+        otp_value = (otp or "").strip()
+        if svc.require_otp and not otp_value:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="This service requires otp but none was provided",
+            )
+        if svc.require_participant_detail and not participant_details:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="This service requires participant_details but none were provided",
+            )
+        if svc.require_session_details and session_details is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="This service requires session_details but none were provided",
+            )
+
+        members: list[dict] = []
+        for contact in contacts:
+            member: dict = {
+                "first_name": str(contact.get("first_name") or ""),
+                "last_name": str(contact.get("last_name") or ""),
+                "phone": str(contact.get("phone") or ""),
+                "email": str(contact.get("email") or ""),
+            }
+            if otp_value:
+                member["otp"] = otp_value
+            if session_details is not None:
+                member["session_details"] = session_details.model_dump(mode="json", exclude_none=True)
+            members.append(member)
+
+        notification = Notification(
+            service_key=svc.service_key,
+            status="pending",
+            channel=svc.channel,
+            user={"contacts": [{"phone": m.get("phone"), "email": m.get("email")} for m in members]},
+            engagement_id=engagement_id,
+            assessment_instance_id=None,
+            message="Notification dispatch initiated",
+            triggered_by_user_id=None,
+        )
+        notification = await self._repo.create_notification(db, notification)
+
+        webhook_url = settings.NOTIFICATION_SERVICE_BASE_URL.rstrip("/") + "/" + svc.webhook_path.lstrip("/")
+        webhook_payload: dict = {
+            "notification_id": notification.notification_id,
+            "members": members,
+        }
+        if engagement_id is not None:
+            webhook_payload["engagement_id"] = engagement_id
+        if participant_details:
+            webhook_payload["participant_details"] = participant_details
+
+        sync_log_id = await persist_integration_sync_log_isolated(
+            provider="n8n",
+            api_url=webhook_url,
+            engagement_id=engagement_id,
+            user_id=None,
+            request_payload=webhook_payload,
+        )
+
+        webhook_failed = False
+        try:
+            async with httpx.AsyncClient(timeout=settings.NOTIFICATION_SERVICE_TIMEOUT_SECONDS) as client:
+                resp = await client.post(webhook_url, json=webhook_payload)
+                resp.raise_for_status()
+                try:
+                    resp_data = resp.json()
+                except Exception:
+                    resp_data = {"status_code": resp.status_code, "body": resp.text}
+                webhook_message = (
+                    resp_data.get("message", "Webhook called successfully")
+                    if isinstance(resp_data, dict)
+                    else "Webhook called successfully"
+                )
+                await finalize_integration_sync_log_isolated(
+                    sync_log_id=sync_log_id,
+                    status="success",
+                    response_payload=resp_data if isinstance(resp_data, dict) else {"body": resp_data},
+                )
+        except Exception as exc:
+            logger.error("Notification webhook call failed: %s", exc)
+            webhook_message = f"Webhook call failed: {exc}"
+            webhook_failed = True
+            await finalize_integration_sync_log_isolated(
+                sync_log_id=sync_log_id,
+                status="failed",
+                error_message=str(exc),
+            )
+
+        notification_status = "failed" if webhook_failed else notification.status
+        await self._repo.update_notification(
+            db,
+            notification_id=notification.notification_id,
+            values={
+                "status": notification_status,
+                "message": webhook_message,
+                "dispatched_at": datetime.now(timezone.utc),
+            },
+        )
+        return {
+            "notification_id": notification.notification_id,
+            "status": notification_status,
+            "message": webhook_message,
+        }
+
     # ── Callback ────────────────────────────────────────────────────────
 
     async def callback(self, db: AsyncSession, *, payload: CallbackRequest) -> dict:

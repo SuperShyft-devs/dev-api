@@ -86,13 +86,17 @@ async def upsert_employees(
             session.add(
                 Employee(
                     employee_id=seed.employee_id,
-                    user_id=seed.user_id,
+                    name=seed.name,
+                    phone=seed.phone,
+                    email=seed.email,
                     role=seed.role,
                     status=seed.status,
                 )
             )
         else:
-            existing.user_id = seed.user_id
+            existing.name = seed.name
+            existing.phone = seed.phone
+            existing.email = seed.email
             existing.role = seed.role
             existing.status = seed.status
 

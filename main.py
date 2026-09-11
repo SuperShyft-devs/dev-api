@@ -20,6 +20,7 @@ from modules.checklists.router import router as checklists_router
 from modules.organizations.router import router as organizations_router
 from modules.users.router import router as users_router
 from modules.employee.router import router as employees_router
+from modules.partners.router import router as partners_router
 from modules.assessments.router import router as assessments_router
 from modules.assessments.packages_router import router as assessment_packages_router
 from modules.questionnaire.router import router as questionnaire_router
@@ -111,6 +112,7 @@ app.include_router(engagement_console_router)
 app.include_router(engagement_assessment_packages_router)
 app.include_router(checklists_router)
 app.include_router(employees_router)
+app.include_router(partners_router)
 app.include_router(assessments_router)
 app.include_router(assessment_packages_router)
 app.include_router(questionnaire_router)

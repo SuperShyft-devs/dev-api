@@ -19,15 +19,15 @@ from modules.questionnaire.models import (
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1, role: str = "admin"):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role=role, status="active"))
+    test_db_session.add(Employee(employee_id=employee_id, name=f"Employee {employee_id}", phone=str(employee_id).zfill(10)[:15], email=f"employee{employee_id}@test.example", role=role, status="active"))
     await test_db_session.commit()
 
 
@@ -43,7 +43,7 @@ async def test_reload_blood_parameters_creates_haemoglobin_scale_question(async_
 
     response = await async_client.post(
         "/questionnaire/blood-parameters/reload",
-        headers=_auth_header(9101),
+        headers=_auth_header(101),
     )
     assert response.status_code == 200
     data = response.json()["data"]
@@ -75,7 +75,7 @@ async def test_reload_blood_parameters_is_idempotent(async_client, test_db_sessi
 
     first = await async_client.post(
         "/questionnaire/blood-parameters/reload",
-        headers=_auth_header(9102),
+        headers=_auth_header(102),
     )
     assert first.status_code == 200
     first_id = (
@@ -88,7 +88,7 @@ async def test_reload_blood_parameters_is_idempotent(async_client, test_db_sessi
 
     second = await async_client.post(
         "/questionnaire/blood-parameters/reload",
-        headers=_auth_header(9102),
+        headers=_auth_header(102),
     )
     assert second.status_code == 200
     second_data = second.json()["data"]
@@ -141,7 +141,7 @@ async def test_reload_blood_parameters_deletes_existing_responses(async_client, 
 
     response = await async_client.post(
         "/questionnaire/blood-parameters/reload",
-        headers=_auth_header(9103),
+        headers=_auth_header(103),
     )
     assert response.status_code == 200
     assert response.json()["data"]["responses_deleted"] >= 1
@@ -158,7 +158,7 @@ async def test_reload_blood_parameters_creates_metsights_categories(async_client
 
     response = await async_client.post(
         "/questionnaire/blood-parameters/reload",
-        headers=_auth_header(9104),
+        headers=_auth_header(104),
     )
     assert response.status_code == 200
 

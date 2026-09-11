@@ -10,6 +10,7 @@ from common.responses import success_response
 from core.exceptions import AppError
 from db.session import get_db
 from modules.employee.dependencies import get_current_employee
+from modules.organizations.actor import OrgScopedActor, get_org_scoped_actor
 from modules.employee.service import EmployeeContext
 from modules.employee.models import EmployeeRole
 from modules.reports.camp_reports_service import CampReportsService
@@ -37,10 +38,10 @@ def _client_ip(request: Request) -> str:
 async def get_camp_report_meta(
     camp_no: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
-    result = await service.get_camp_report_meta(db, employee=employee, camp_no=camp_no)
+    result = await service.get_camp_report_meta(db, employee=actor.employee, partner=actor.partner, camp_no=camp_no)
     return success_response(result)
 
 
@@ -49,12 +50,12 @@ async def get_department_camp_report_meta(
     camp_no: int,
     slug: str,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.get_camp_report_meta(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         department=slug,
     )
@@ -65,10 +66,10 @@ async def get_department_camp_report_meta(
 async def list_camp_report_sections(
     camp_no: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
-    result = await service.list_camp_report_section_keys(db, employee=employee, camp_no=camp_no)
+    result = await service.list_camp_report_section_keys(db, employee=actor.employee, partner=actor.partner, camp_no=camp_no)
     return success_response(result)
 
 
@@ -77,12 +78,12 @@ async def list_department_camp_report_sections(
     camp_no: int,
     slug: str,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.list_camp_report_section_keys(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         department=slug,
     )
@@ -94,12 +95,12 @@ async def get_camp_report_dashboard(
     camp_no: int,
     section: str,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.get_camp_report_dashboard(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=section,
     )
@@ -112,12 +113,12 @@ async def get_department_camp_report_dashboard(
     slug: str,
     section: str,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.get_camp_report_dashboard(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=section,
         department=slug,
@@ -131,12 +132,12 @@ async def update_camp_report_dashboard_section(
     payload: CampReportSectionPayloadUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.update_camp_report_section_payload(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=payload.section,
         payload=payload.payload,
@@ -155,12 +156,12 @@ async def update_department_camp_report_dashboard_section(
     payload: CampReportSectionPayloadUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.update_camp_report_section_payload(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=payload.section,
         payload=payload.payload,
@@ -180,12 +181,12 @@ async def update_city_camp_report_dashboard_section(
     payload: CampReportSectionPayloadUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.update_camp_report_section_payload(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=payload.section,
         payload=payload.payload,
@@ -206,12 +207,12 @@ async def update_city_department_camp_report_dashboard_section(
     payload: CampReportSectionPayloadUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.update_camp_report_section_payload(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=payload.section,
         payload=payload.payload,
@@ -231,12 +232,12 @@ async def get_city_camp_report_dashboard(
     city: str,
     section: str,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.get_camp_report_dashboard(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=section,
         city=city,
@@ -251,12 +252,12 @@ async def get_city_department_camp_report_dashboard(
     slug: str,
     section: str,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.get_camp_report_dashboard(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=section,
         department=slug,
@@ -271,7 +272,7 @@ async def list_camp_participants(
     page: int = 1,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     if page < 1 or limit < 1 or limit > 100:
@@ -279,7 +280,7 @@ async def list_camp_participants(
 
     participants, total = await service.list_camp_participants(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         page=page,
         limit=limit,
@@ -294,7 +295,7 @@ async def list_department_camp_participants(
     page: int = 1,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     if page < 1 or limit < 1 or limit > 100:
@@ -302,7 +303,7 @@ async def list_department_camp_participants(
 
     participants, total = await service.list_camp_participants(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         page=page,
         limit=limit,
@@ -318,7 +319,7 @@ async def list_city_camp_participants(
     page: int = 1,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     if page < 1 or limit < 1 or limit > 100:
@@ -326,7 +327,7 @@ async def list_city_camp_participants(
 
     participants, total = await service.list_camp_participants(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         page=page,
         limit=limit,
@@ -343,7 +344,7 @@ async def list_city_department_camp_participants(
     page: int = 1,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     if page < 1 or limit < 1 or limit > 100:
@@ -351,7 +352,7 @@ async def list_city_department_camp_participants(
 
     participants, total = await service.list_camp_participants(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         page=page,
         limit=limit,
@@ -365,10 +366,10 @@ async def list_city_department_camp_participants(
 async def list_camp_reports(
     camp_no: int,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
-    rows = await service.list_camp_reports(db, employee=employee, camp_no=camp_no)
+    rows = await service.list_camp_reports(db, employee=actor.employee, partner=actor.partner, camp_no=camp_no)
     return success_response(rows)
 
 
@@ -377,12 +378,12 @@ async def estimate_camp_report_operations(
     camp_no: int,
     payload: CampReportEstimateRequest,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.estimate_camp_report_operations(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         operations=[op.model_dump() for op in payload.operations],
     )
@@ -396,13 +397,13 @@ async def refresh_camp_report(
     request: Request,
     async_refresh: bool = Query(default=True, alias="async"),
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     if async_refresh:
         job_id = enqueue_camp_refresh_job(
             service=service,
-            employee=employee,
+            employee=actor.employee, partner=actor.partner,
             camp_no=camp_no,
             section=payload.section,
             department=None,
@@ -418,7 +419,7 @@ async def refresh_camp_report(
 
     result = await service.refresh_camp_report_section(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=payload.section,
         ip_address=_client_ip(request),
@@ -432,7 +433,7 @@ async def refresh_camp_report(
 @router.get("/refresh-jobs/{job_id}")
 async def get_camp_refresh_job_status(
     job_id: str,
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
 ):
     job = get_camp_refresh_job(job_id)
     if job is None:
@@ -472,12 +473,12 @@ async def refresh_department_camp_report(
     payload: CampReportRefreshRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.refresh_camp_report_section(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=payload.section,
         department=slug,
@@ -496,12 +497,12 @@ async def refresh_city_camp_report(
     payload: CampReportRefreshRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.refresh_camp_report_section(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=payload.section,
         city=city,
@@ -521,12 +522,12 @@ async def refresh_city_department_camp_report(
     payload: CampReportRefreshRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.refresh_camp_report_section(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         section=payload.section,
         department=slug,
@@ -544,12 +545,12 @@ async def init_camp_report(
     camp_no: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     created = await service.init_camp_report(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
@@ -564,12 +565,12 @@ async def init_all_camp_reports(
     camp_no: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     result = await service.init_all_camp_reports(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
@@ -585,12 +586,12 @@ async def init_department_camp_report(
     slug: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     created = await service.init_department_camp_report(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         slug=slug,
         ip_address=_client_ip(request),
@@ -607,12 +608,12 @@ async def init_city_camp_report(
     city: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     created = await service.init_city_camp_report(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         city=city,
         ip_address=_client_ip(request),
@@ -630,12 +631,12 @@ async def init_city_department_camp_report(
     slug: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     created = await service.init_city_department_camp_report(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         city=city,
         slug=slug,
@@ -652,12 +653,12 @@ async def delete_camp_report(
     camp_no: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     await service.delete_camp_report(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
@@ -673,12 +674,12 @@ async def delete_department_camp_report(
     slug: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
+    actor: OrgScopedActor = Depends(get_org_scoped_actor),
     service: CampReportsService = Depends(get_camp_reports_service),
 ):
     await service.delete_department_camp_report(
         db,
-        employee=employee,
+        employee=actor.employee, partner=actor.partner,
         camp_no=camp_no,
         slug=slug,
         ip_address=_client_ip(request),

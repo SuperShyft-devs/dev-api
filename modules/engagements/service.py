@@ -25,18 +25,17 @@ from modules.assessments.service import AssessmentsService
 from modules.audit.service import AuditService
 from modules.checklists.schemas import ChecklistReadiness
 from modules.employee.access_control import (
-    ONBOARDING_ASSISTANT_ASSIGNEE_ROLES,
     ensure_admin,
-    ensure_org_manager_assignable_to_engagement,
 )
 from modules.employee.models import EmployeeRole
-from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.consultation_booking_validation import (
     effective_consultation_mode,
 )
 from modules.engagements.models import BloodCollectionType, ConsultationMode, Engagement, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
+from modules.partners.models import PartnerRole
+from modules.partners.repository import PartnersRepository
 from modules.engagements.participant_list_filters import (
     ParticipantListFilters,
     filters_are_active,
@@ -299,7 +298,7 @@ class EngagementsService:
         self._notifications_repository = notifications_repository or NotificationsRepository()
         self._notifications_service = notifications_service
         self._platform_settings_repository = PlatformSettingsRepository()
-        self._employee_repository = EmployeeRepository()
+        self._partners_repository = PartnersRepository()
         self._assessments_repository = AssessmentsRepository()
         self._questionnaire_repository = QuestionnaireRepository()
         self._reports_repository = ReportsRepository()
@@ -609,7 +608,7 @@ class EngagementsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1102,7 +1101,7 @@ class EngagementsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1139,7 +1138,7 @@ class EngagementsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1339,6 +1338,7 @@ class EngagementsService:
         )
 
     async def _resolve_default_onboarding_assistant_employee_ids(self, db: AsyncSession) -> list[int]:
+        # Stored setting still named employee_ids historically; values are phlebo partner_ids.
         return await self._platform_settings_repository.resolve_default_onboarding_assistant_employee_ids(db)
 
     async def _assign_default_onboarding_assistants(
@@ -1348,56 +1348,35 @@ class EngagementsService:
         engagement_id: int,
         organization_id: int | None,
     ) -> None:
-        employee_ids = await self._resolve_default_onboarding_assistant_employee_ids(db)
-        if not employee_ids:
+        _ = organization_id
+        partner_ids = await self._resolve_default_onboarding_assistant_employee_ids(db)
+        if not partner_ids:
             return
 
-        for emp_id in employee_ids:
-            row = await self._employee_repository.get_by_id(db, emp_id)
+        for partner_id in partner_ids:
+            row = await self._partners_repository.get_by_id(db, partner_id)
             if row is None:
-                logger.warning("Skipping default onboarding assistant %s: employee not found", emp_id)
+                logger.warning("Skipping default onboarding assistant %s: partner not found", partner_id)
                 continue
             if (row.status or "").lower() != "active":
-                logger.warning("Skipping default onboarding assistant %s: employee not active", emp_id)
+                logger.warning("Skipping default onboarding assistant %s: partner not active", partner_id)
                 continue
-            if row.role not in ONBOARDING_ASSISTANT_ASSIGNEE_ROLES:
-                logger.warning("Skipping default onboarding assistant %s: invalid role", emp_id)
-                continue
-            if organization_id is None and row.role == EmployeeRole.organization_manager:
-                logger.info(
-                    "Skipping default onboarding assistant %s: organization_manager on B2C engagement",
-                    emp_id,
-                )
-                continue
-
-            try:
-                await ensure_org_manager_assignable_to_engagement(
-                    db,
-                    assignee_user_id=row.user_id,
-                    assignee_role=row.role,
-                    engagement_id=engagement_id,
-                    repository=self._repository,
-                    organizations_repository=self._organizations_repository,
-                )
-            except AppError as exc:
-                logger.info(
-                    "Skipping default onboarding assistant %s: %s",
-                    emp_id,
-                    exc.message,
-                )
+            role = row.role.value if isinstance(row.role, PartnerRole) else str(row.role or "")
+            if role != PartnerRole.phlebo.value:
+                logger.warning("Skipping default onboarding assistant %s: invalid role", partner_id)
                 continue
 
             existing = await self._repository.get_onboarding_assistant_assignment(
                 db,
                 engagement_id=engagement_id,
-                employee_id=emp_id,
+                partner_id=partner_id,
             )
             if existing is not None:
                 continue
 
             assignment = OnboardingAssistantAssignment(
                 engagement_id=engagement_id,
-                employee_id=emp_id,
+                partner_id=partner_id,
             )
             await self._repository.create_onboarding_assistant_assignment(db, assignment)
 
@@ -1407,9 +1386,20 @@ class EngagementsService:
         *,
         engagement_id: int,
     ) -> list[int]:
-        """Return user_ids of all onboarding assistants for an engagement."""
+        """Deprecated: assistants are partners. Prefer list_onboarding_assistant_partner_contacts."""
         return await self._repository.list_onboarding_assistant_user_ids(
             db, engagement_id=engagement_id
+        )
+
+    async def list_onboarding_assistant_partner_contacts(
+        self,
+        db: AsyncSession,
+        *,
+        engagement_id: int,
+        roles: frozenset[str] | None = None,
+    ) -> list[dict]:
+        return await self._repository.list_onboarding_assistant_partner_contacts(
+            db, engagement_id=engagement_id, roles=roles
         )
 
     async def notify_onboarding_assistants_after_enrollment(
@@ -1665,7 +1655,7 @@ class EngagementsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -2473,7 +2463,7 @@ class EngagementsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -2523,7 +2513,7 @@ class EngagementsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -2711,7 +2701,7 @@ class EngagementsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -2806,7 +2796,7 @@ class EngagementsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 

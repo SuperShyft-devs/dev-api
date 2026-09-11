@@ -997,7 +997,7 @@ async def list_onboarding_assistants_for_engagement(
     employee: EmployeeContext = Depends(get_current_employee),
     service: OnboardingAssistantsService = Depends(get_onboarding_assistants_service),
 ):
-    """Returns all employees assigned to a specific engagement as onboarding assistants."""
+    """Returns all partners assigned to a specific engagement as onboarding assistants."""
     data = await service.list_onboarding_assistants_for_engagement(
         db,
         employee=employee,
@@ -1015,11 +1015,12 @@ async def assign_onboarding_assistants_to_engagement(
     employee: EmployeeContext = Depends(get_current_employee),
     service: OnboardingAssistantsService = Depends(get_onboarding_assistants_service),
 ):
-    """Assigns one or more employees to an engagement as onboarding assistants."""
+    """Assigns phlebo/expert partners and/or admin/inferior_admin employees."""
     data = await service.assign_onboarding_assistants_to_engagement(
         db,
         employee=employee,
         engagement_id=engagement_id,
+        partner_ids=payload.partner_ids,
         employee_ids=payload.employee_ids,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
@@ -1038,7 +1039,7 @@ async def create_phlebo_onboarding_assistant(
     employee: EmployeeContext = Depends(get_current_employee),
     service: OnboardingAssistantsService = Depends(get_onboarding_assistants_service),
 ):
-    """Creates (or reuses) a phlebo user/employee and assigns them to an engagement."""
+    """Creates (or reuses) a phlebo partner and assigns them to an engagement."""
     data = await service.create_and_assign_phlebo(
         db,
         employee=employee,
@@ -1054,8 +1055,31 @@ async def create_phlebo_onboarding_assistant(
     return success_response(data)
 
 
-@router.delete("/{engagement_id}/onboarding-assistants/{employee_id}")
-async def remove_onboarding_assistant_from_engagement(
+@router.delete("/{engagement_id}/onboarding-assistants/partners/{partner_id}")
+async def remove_partner_onboarding_assistant_from_engagement(
+    engagement_id: int,
+    partner_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: OnboardingAssistantsService = Depends(get_onboarding_assistants_service),
+):
+    """Removes a partner assignment from an engagement."""
+    data = await service.remove_onboarding_assistant_from_engagement(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        partner_id=partner_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.delete("/{engagement_id}/onboarding-assistants/employees/{employee_id}")
+async def remove_employee_onboarding_assistant_from_engagement(
     engagement_id: int,
     employee_id: int,
     request: Request,
@@ -1063,12 +1087,35 @@ async def remove_onboarding_assistant_from_engagement(
     employee: EmployeeContext = Depends(get_current_employee),
     service: OnboardingAssistantsService = Depends(get_onboarding_assistants_service),
 ):
-    """Removes an employee's assignment from an engagement."""
+    """Removes a staff-employee assignment from an engagement."""
     data = await service.remove_onboarding_assistant_from_engagement(
         db,
         employee=employee,
         engagement_id=engagement_id,
         employee_id=employee_id,
+        ip_address=_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response(data)
+
+
+@router.delete("/{engagement_id}/onboarding-assistants/{partner_id}")
+async def remove_onboarding_assistant_from_engagement(
+    engagement_id: int,
+    partner_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: OnboardingAssistantsService = Depends(get_onboarding_assistants_service),
+):
+    """Legacy remove path — partner assignment only."""
+    data = await service.remove_onboarding_assistant_from_engagement(
+        db,
+        employee=employee,
+        engagement_id=engagement_id,
+        partner_id=partner_id,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from core.exceptions import AppError
+from modules.employee.models import EmployeeRole
 from modules.employee.service import EmployeeContext
 from modules.organizations.models import Organization
 from modules.organizations.repository import OrganizationsRepository
@@ -23,7 +24,7 @@ async def test_create_organization_rejects_duplicates(test_db_session):
     with pytest.raises(AppError) as exc:
         await service.create_organization_for_employee(
             test_db_session,
-            employee=EmployeeContext(employee_id=1, user_id=1, role="admin"),
+            employee=EmployeeContext(employee_id=1, role=EmployeeRole.admin),
             payload=OrganizationCreateRequest(name="Acme"),
             ip_address="1.1.1.1",
             user_agent="pytest",

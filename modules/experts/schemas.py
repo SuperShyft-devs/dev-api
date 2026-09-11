@@ -34,7 +34,7 @@ ConsultationModeLiteral = Literal["video", "voice", "chat"]
 
 
 class ExpertCreateRequest(BaseModel):
-    user_id: PositiveIntId
+    partner_id: PositiveIntId
     expert_type: SlugKey
     specialization: SafeDisplayName
     profile_photo: Optional[str] = Field(default=None, max_length=500)
@@ -62,7 +62,7 @@ class ExpertCreateRequest(BaseModel):
 
 
 class ExpertUpdateRequest(BaseModel):
-    user_id: PositiveIntId
+    partner_id: PositiveIntId
     expert_type: SlugKey
     specialization: SafeDisplayName
     profile_photo: Optional[str] = Field(default=None, max_length=500)

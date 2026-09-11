@@ -1,4 +1,4 @@
-"""Dispatch onboarding notifications to admin-role assistants when a user enrolls."""
+"""Dispatch onboarding notifications to assigned partners when a user enrolls."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from modules.engagement_notifications.repository import EngagementNotificationsRepository
 from modules.engagements.repository import EngagementsRepository
 from modules.notifications.repository import NotificationsRepository
-from modules.notifications.schemas import DispatchRequest
 from modules.notifications.service import NotificationsService
 
 logger = logging.getLogger(__name__)
@@ -76,7 +75,7 @@ async def notify_onboarding_assistants_on_enrollment(
     participant_user_id: int,
     participant_details: dict[str, str] | None,
 ) -> None:
-    """Dispatch each configured onboarding notification service to admin-role assistants."""
+    """Dispatch each configured onboarding notification service to assigned partners."""
     en_repo = EngagementNotificationsRepository()
     service_keys = await en_repo.get_services_for_engagement_event(
         db, engagement_id=int(engagement.engagement_id), event_code="onboarding"
@@ -84,10 +83,10 @@ async def notify_onboarding_assistants_on_enrollment(
     if not service_keys:
         return
 
-    assistant_user_ids = await engagements_repository.list_onboarding_assistant_user_ids(
-        db, engagement_id=int(engagement.engagement_id)
+    contacts = await engagements_repository.list_onboarding_assistant_notify_contacts(
+        db, engagement_id=int(engagement.engagement_id), include_employees=True
     )
-    if not assistant_user_ids:
+    if not contacts:
         return
 
     details = _with_participant_user_id(participant_details, participant_user_id)
@@ -120,16 +119,12 @@ async def notify_onboarding_assistants_on_enrollment(
                 )
                 continue
 
-            dispatch_payload = DispatchRequest(
+            await notifications_service.dispatch_to_contacts(
+                db,
                 service_key=service_key,
-                user_ids=assistant_user_ids,
+                contacts=contacts,
                 engagement_id=engagement_id,
                 participant_details=details,
-            )
-            await notifications_service.dispatch(
-                db,
-                payload=dispatch_payload,
-                triggered_by_user_id=None,
             )
         except Exception as exc:
             logger.warning(

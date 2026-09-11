@@ -10,10 +10,11 @@ from typing import Any
 from common.masking import mask_email, mask_phone
 from core.exceptions import AppError
 from modules.audit.service import AuditService
-from modules.employee.access_control import ensure_expert_portal_access, ensure_not_expert_employee
-from modules.employee.models import Employee, EmployeeRole
-from modules.employee.repository import EmployeeRepository
+from modules.employee.access_control import ensure_expert_portal_access, ensure_not_expert_employee, has_route_admin_scope
+from modules.employee.models import EmployeeRole
 from modules.employee.service import EmployeeContext
+from modules.partners.models import Partner, PartnerRole
+from modules.partners.repository import PartnersRepository
 from modules.engagements.enums import ConsultationMode
 from modules.engagements.consultation_booking_validation import (
     effective_consultation_mode,
@@ -121,13 +122,12 @@ class ExpertsService:
         repository: ExpertsRepository,
         audit_service: AuditService | None = None,
         expert_types_service: ExpertTypesService | None = None,
-        employee_repository: EmployeeRepository | None = None,
-    ):
+            ):
         self._repository = repository
         self._audit_service = audit_service
         self._users_repository = UsersRepository()
         self._expert_types_service = expert_types_service
-        self._employee_repository = employee_repository or EmployeeRepository()
+        self._partners_repository = PartnersRepository()
 
     def _require_audit(self) -> AuditService:
         if self._audit_service is None:
@@ -144,21 +144,16 @@ class ExpertsService:
             if m not in _ALLOWED_MODES:
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-    async def _ensure_user_exists(self, db, user_id: int) -> None:
-        user = await self._users_repository.get_user_by_id(db, user_id)
-        if user is None:
+    async def _ensure_expert_partner(self, db, partner_id: int) -> Partner:
+        partner = await self._partners_repository.get_by_id(db, partner_id)
+        if partner is None:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
-
-    async def _ensure_expert_employee(self, db, user_id: int) -> None:
-        existing = await self._employee_repository.get_by_user_id(db, user_id)
-        if existing is not None:
-            return
-        row = Employee(
-            user_id=user_id,
-            role=EmployeeRole.expert,
-            status="active",
-        )
-        await self._employee_repository.create(db, row)
+        if (partner.status or "").lower() != "active":
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        role = partner.role.value if isinstance(partner.role, PartnerRole) else str(partner.role or "")
+        if role != PartnerRole.expert.value:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        return partner
 
     def _expert_visible_to_public(self, expert: Expert, employee: EmployeeContext | None) -> bool:
         if employee is not None:
@@ -235,13 +230,13 @@ class ExpertsService:
         endpoint: str,
     ) -> Expert:
         ensure_not_expert_employee(employee)
-        await self._ensure_user_exists(db, payload.user_id)
+        await self._ensure_expert_partner(db, payload.partner_id)
         self._validate_modes(list(payload.consultation_modes) if payload.consultation_modes else None)
         if self._expert_types_service:
             await self._expert_types_service.validate_type_key(db, payload.expert_type)
 
         expert = Expert(
-            user_id=payload.user_id,
+            partner_id=payload.partner_id,
             expert_type=payload.expert_type,
             specialization=payload.specialization.strip(),
             profile_photo=payload.profile_photo,
@@ -259,7 +254,6 @@ class ExpertsService:
             status="active",
         )
         expert = await self._repository.create(db, expert)
-        await self._ensure_expert_employee(db, payload.user_id)
         audit = self._require_audit()
         await audit.log_event(
             db,
@@ -267,7 +261,7 @@ class ExpertsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
         )
         return expert
 
@@ -287,12 +281,12 @@ class ExpertsService:
         if expert is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Expert does not exist")
 
-        await self._ensure_user_exists(db, payload.user_id)
+        await self._ensure_expert_partner(db, payload.partner_id)
         self._validate_modes(list(payload.consultation_modes) if payload.consultation_modes else None)
         if self._expert_types_service:
             await self._expert_types_service.validate_type_key(db, payload.expert_type)
 
-        expert.user_id = payload.user_id
+        expert.partner_id = payload.partner_id
         expert.expert_type = payload.expert_type
         expert.specialization = payload.specialization.strip()
         expert.profile_photo = payload.profile_photo
@@ -310,7 +304,6 @@ class ExpertsService:
             expert.patient_count = payload.patient_count
 
         expert = await self._repository.update(db, expert)
-        await self._ensure_expert_employee(db, payload.user_id)
         audit = self._require_audit()
         await audit.log_event(
             db,
@@ -318,7 +311,7 @@ class ExpertsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
         )
         return expert
 
@@ -351,7 +344,7 @@ class ExpertsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
         )
         return expert
 
@@ -384,7 +377,7 @@ class ExpertsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
         )
         return tag
 
@@ -412,21 +405,57 @@ class ExpertsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
         )
 
     async def get_portal_me(
         self,
         db,
         *,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
+    ) -> tuple[Expert, list[ExpertExpertiseTag]]:
+        ensure_expert_portal_access(employee, partner=partner)
+        if partner is not None:
+            expert = await self._repository.get_by_partner_id(db, partner.partner_id)
+            if expert is None:
+                raise AppError(status_code=404, error_code="NOT_FOUND", message="Expert does not exist")
+            tags = await self._repository.list_tags(db, expert.expert_id)
+            return expert, tags
+        # Admin employee path: no linked expert profile required for listing; own lookup N/A
+        raise AppError(status_code=404, error_code="NOT_FOUND", message="Expert does not exist")
+
+    async def get_portal_me_for_partner(
+        self,
+        db,
+        *,
+        partner: Partner,
+    ) -> tuple[Expert, list[ExpertExpertiseTag]]:
+        return await self.get_portal_me(db, partner=partner)
+
+    async def get_portal_me_for_employee(
+        self,
+        db,
+        *,
         employee: EmployeeContext,
     ) -> tuple[Expert, list[ExpertExpertiseTag]]:
-        ensure_expert_portal_access(employee)
-        expert = await self._repository.get_by_user_id(db, employee.user_id)
-        if expert is None:
-            raise AppError(status_code=404, error_code="NOT_FOUND", message="Expert does not exist")
-        tags = await self._repository.list_tags(db, expert.expert_id)
-        return expert, tags
+        return await self.get_portal_me(db, employee=employee)
+
+    async def _resolve_portal_actor_expert(
+        self,
+        db,
+        *,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
+        expert_id: int | None = None,
+    ) -> Expert | None:
+        """Resolve the acting expert for portal ops (partner own profile, or admin expert_id)."""
+        ensure_expert_portal_access(employee, partner=partner)
+        if partner is not None:
+            return await self._repository.get_by_partner_id(db, partner.partner_id)
+        if employee is not None and has_route_admin_scope(employee) and expert_id is not None:
+            return await self._repository.get_by_id(db, expert_id)
+        return None
 
     async def list_reviews(
         self,
@@ -488,6 +517,23 @@ class ExpertAvailabilityService:
         self._availability = availability_repository
         self._overrides = override_repository
         self._consultation_bookings = consultation_bookings_repository or ConsultationBookingsRepository()
+        self._partners_repository = PartnersRepository()
+
+    async def _resolve_portal_actor_expert(
+        self,
+        db,
+        *,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
+        expert_id: int | None = None,
+    ) -> Expert | None:
+        """Resolve the acting expert for portal ops (partner own profile, or admin expert_id)."""
+        ensure_expert_portal_access(employee, partner=partner)
+        if partner is not None:
+            return await self._experts.get_by_partner_id(db, partner.partner_id)
+        if employee is not None and has_route_admin_scope(employee) and expert_id is not None:
+            return await self._experts.get_by_id(db, expert_id)
+        return None
 
     async def _get_expert_or_404(self, db, expert_id: int) -> Expert:
         expert = await self._experts.get_by_id(db, expert_id)
@@ -994,8 +1040,8 @@ class ExpertAvailabilityService:
         """Engagements eligible for expert portal request flow."""
         return Engagement.consultation_mode == ConsultationMode.online
 
-    async def list_consultation_requests(self, db, *, employee: EmployeeContext) -> list[dict[str, Any]]:
-        ensure_expert_portal_access(employee)
+    async def list_consultation_requests(self, db, *, employee: EmployeeContext | None = None, partner: Partner | None = None) -> list[dict[str, Any]]:
+        ensure_expert_portal_access(employee, partner=partner)
         result = await db.execute(
             select(ConsultationBooking, EngagementParticipant, Engagement, User)
             .join(
@@ -1036,15 +1082,16 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         payload: ConsultationConfirmRequest,
     ) -> dict[str, Any]:
-        ensure_expert_portal_access(employee)
+        ensure_expert_portal_access(employee, partner=partner)
         slot_hhmm = normalize_hhmm(payload.slot)
 
         confirming_expert_id = payload.expert_id
         if confirming_expert_id is None:
-            expert = await self._experts.get_by_user_id(db, employee.user_id)
+            expert = await self._resolve_portal_actor_expert(db, employee=employee, partner=partner)
             if expert is None:
                 raise AppError(
                     status_code=400,
@@ -1062,8 +1109,8 @@ class ExpertAvailabilityService:
             )
 
         # Experts may only confirm as themselves
-        if employee.role == EmployeeRole.expert:
-            own = await self._experts.get_by_user_id(db, employee.user_id)
+        if partner is not None:
+            own = await self._resolve_portal_actor_expert(db, employee=employee, partner=partner)
             if own is None or own.expert_id != confirming_expert_id:
                 raise AppError(status_code=403, error_code="FORBIDDEN", message="Cannot confirm for another expert")
 
@@ -1154,9 +1201,9 @@ class ExpertAvailabilityService:
             "slot": slot_hhmm,
         }
 
-    async def list_upcoming_consultations(self, db, *, employee: EmployeeContext) -> list[dict[str, Any]]:
-        ensure_expert_portal_access(employee)
-        expert = await self._experts.get_by_user_id(db, employee.user_id)
+    async def list_upcoming_consultations(self, db, *, employee: EmployeeContext | None = None, partner: Partner | None = None) -> list[dict[str, Any]]:
+        ensure_expert_portal_access(employee, partner=partner)
+        expert = await self._resolve_portal_actor_expert(db, employee=employee, partner=partner)
         if expert is None:
             raise AppError(
                 status_code=400,
@@ -1209,12 +1256,13 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         payload: ConsultationDoneRequest,
     ) -> dict[str, Any]:
-        ensure_expert_portal_access(employee)
+        ensure_expert_portal_access(employee, partner=partner)
 
-        actor_expert = await self._experts.get_by_user_id(db, employee.user_id)
+        actor_expert = await self._resolve_portal_actor_expert(db, employee=employee, partner=partner)
         acting_expert_id = payload.expert_id
         if acting_expert_id is None:
             if actor_expert is None:
@@ -1225,7 +1273,7 @@ class ExpertAvailabilityService:
                 )
             acting_expert_id = actor_expert.expert_id
 
-        if employee.role == EmployeeRole.expert:
+        if partner is not None:
             if actor_expert is None or actor_expert.expert_id != acting_expert_id:
                 raise AppError(
                     status_code=403,
@@ -1343,7 +1391,8 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         booking: ConsultationBooking,
         engagement: Engagement,
         actor_expert: Expert | None,
@@ -1360,9 +1409,9 @@ class ExpertAvailabilityService:
                 error_code="INVALID_INPUT",
                 message="Participant did not request this consultation",
             )
-        if employee.role == EmployeeRole.admin:
+        if employee is not None and (employee.role == EmployeeRole.admin or has_route_admin_scope(employee)):
             return
-        if employee.role != EmployeeRole.expert:
+        if partner is None:
             raise AppError(
                 status_code=403,
                 error_code="FORBIDDEN",
@@ -1375,7 +1424,7 @@ class ExpertAvailabilityService:
         assignment = await repo.get_onboarding_assistant_assignment(
             db,
             engagement_id=engagement.engagement_id,
-            employee_id=employee.employee_id,
+            partner_id=partner.partner_id,
         )
         if assignment is None:
             raise AppError(
@@ -1400,7 +1449,8 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         engagement: Engagement,
         actor_expert: Expert | None,
     ) -> str | None:
@@ -1411,9 +1461,9 @@ class ExpertAvailabilityService:
                 error_code="INVALID_INPUT",
                 message="Engagement is not an offline camp consultation",
             )
-        if employee.role == EmployeeRole.admin:
+        if employee is not None and (employee.role == EmployeeRole.admin or has_route_admin_scope(employee)):
             return None
-        if employee.role != EmployeeRole.expert:
+        if partner is None:
             raise AppError(
                 status_code=403,
                 error_code="FORBIDDEN",
@@ -1432,7 +1482,7 @@ class ExpertAvailabilityService:
         assignment = await repo.get_onboarding_assistant_assignment(
             db,
             engagement_id=engagement.engagement_id,
-            employee_id=employee.employee_id,
+            partner_id=partner.partner_id,
         )
         if assignment is None:
             raise AppError(
@@ -1470,16 +1520,17 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
     ) -> list[dict[str, Any]]:
-        ensure_expert_portal_access(employee)
+        ensure_expert_portal_access(employee, partner=partner)
         from modules.engagements.repository import EngagementsRepository
 
         repo = EngagementsRepository()
-        actor_expert = await self._experts.get_by_user_id(db, employee.user_id)
+        actor_expert = await self._resolve_portal_actor_expert(db, employee=employee, partner=partner)
         expert_type_filter: str | None = None
 
-        if employee.role == EmployeeRole.expert:
+        if partner is not None:
             if actor_expert is None:
                 raise AppError(
                     status_code=400,
@@ -1487,11 +1538,11 @@ class ExpertAvailabilityService:
                     message="Current user is not linked to an expert profile",
                 )
             expert_type_filter = actor_expert.expert_type
-            engagements = await repo.list_running_engagements_for_assigned_employee(
+            engagements = await repo.list_running_engagements_for_assigned_partner(
                 db,
-                employee_id=employee.employee_id,
+                partner_id=partner.partner_id,
             )
-        elif employee.role == EmployeeRole.admin:
+        elif employee is not None and (employee.role == EmployeeRole.admin or has_route_admin_scope(employee)):
             engagements = await repo.list_running_engagements(db)
         else:
             raise AppError(
@@ -1527,18 +1578,20 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         engagement_id: int,
     ) -> list[dict[str, Any]]:
-        ensure_expert_portal_access(employee)
+        ensure_expert_portal_access(employee, partner=partner)
         engagement = await db.get(Engagement, engagement_id)
         if engagement is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Engagement not found")
 
-        actor_expert = await self._experts.get_by_user_id(db, employee.user_id)
+        actor_expert = await self._resolve_portal_actor_expert(db, employee=employee, partner=partner)
         expert_type_filter = await self._ensure_camp_engagement_list_access(
             db,
             employee=employee,
+            partner=partner,
             engagement=engagement,
             actor_expert=actor_expert,
         )
@@ -1587,10 +1640,11 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         consultation_id: int,
     ) -> tuple[ConsultationBooking, EngagementParticipant, Engagement, User]:
-        ensure_expert_portal_access(employee)
+        ensure_expert_portal_access(employee, partner=partner)
         booking = await self._consultation_bookings.get_by_id(db, consultation_id)
         if booking is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="Consultation not found")
@@ -1607,9 +1661,9 @@ class ExpertAvailabilityService:
         if user is None:
             raise AppError(status_code=404, error_code="NOT_FOUND", message="User not found")
 
-        actor_expert = await self._experts.get_by_user_id(db, employee.user_id)
+        actor_expert = await self._resolve_portal_actor_expert(db, employee=employee, partner=partner)
         if booking.expert_id is not None:
-            if employee.role == EmployeeRole.expert:
+            if partner is not None:
                 if actor_expert is None or booking.expert_id != actor_expert.expert_id:
                     raise AppError(
                         status_code=403,
@@ -1622,13 +1676,14 @@ class ExpertAvailabilityService:
             await self._ensure_camp_consultation_access(
                 db,
                 employee=employee,
+                partner=partner,
                 booking=booking,
                 engagement=engagement,
                 actor_expert=actor_expert,
             )
             return booking, participant, engagement, user
 
-        if employee.role == EmployeeRole.expert:
+        if partner is not None:
             raise AppError(
                 status_code=403,
                 error_code="FORBIDDEN",
@@ -1644,11 +1699,12 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         consultation_id: int,
     ) -> dict[str, Any]:
         booking, participant, engagement, user = await self._load_assigned_consultation_context(
-            db, employee=employee, consultation_id=consultation_id
+            db, employee=employee, partner=partner, consultation_id=consultation_id
         )
         pref = booking_to_api_preference(booking)
         consent = normalize_consent(booking.consent)
@@ -1737,12 +1793,13 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         consultation_id: int,
         payload: ConsultationManageUpdateRequest,
     ) -> dict[str, Any]:
         booking, _participant, _engagement, _user = await self._load_assigned_consultation_context(
-            db, employee=employee, consultation_id=consultation_id
+            db, employee=employee, partner=partner, consultation_id=consultation_id
         )
         data = payload.model_dump(exclude_unset=True)
         if "consultation_summary" in data:
@@ -1755,17 +1812,20 @@ class ExpertAvailabilityService:
             booking.meet_link = (meet_link or "").strip() or None
         db.add(booking)
         await db.flush()
-        return await self.get_consultation_manage_detail(db, employee=employee, consultation_id=consultation_id)
+        return await self.get_consultation_manage_detail(
+            db, employee=employee, partner=partner, consultation_id=consultation_id
+        )
 
     async def mark_consultation_done_by_id(
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         consultation_id: int,
     ) -> dict[str, Any]:
         booking, participant, engagement, user = await self._load_assigned_consultation_context(
-            db, employee=employee, consultation_id=consultation_id
+            db, employee=employee, partner=partner, consultation_id=consultation_id
         )
         if booking.done:
             raise AppError(
@@ -1791,12 +1851,13 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         consultation_id: int,
         kind: str,
     ) -> str:
         booking, participant, engagement, user = await self._load_assigned_consultation_context(
-            db, employee=employee, consultation_id=consultation_id
+            db, employee=employee, partner=partner, consultation_id=consultation_id
         )
         consent = normalize_consent(booking.consent)
         if kind == "bio_ai":
@@ -1848,12 +1909,13 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         consultation_id: int,
         kind: str,
     ) -> bytes:
         url = await self._resolve_report_url_for_consultation(
-            db, employee=employee, consultation_id=consultation_id, kind=kind
+            db, employee=employee, partner=partner, consultation_id=consultation_id, kind=kind
         )
         return await self._fetch_pdf_bytes(url)
 
@@ -1913,11 +1975,12 @@ class ExpertAvailabilityService:
         self,
         db,
         *,
-        employee: EmployeeContext,
+        employee: EmployeeContext | None = None,
+        partner: Partner | None = None,
         consultation_id: int,
     ) -> dict[str, Any]:
         booking, participant, engagement, user = await self._load_assigned_consultation_context(
-            db, employee=employee, consultation_id=consultation_id
+            db, employee=employee, partner=partner, consultation_id=consultation_id
         )
         consent = normalize_consent(booking.consent)
         if not consent.get("questionnaire"):

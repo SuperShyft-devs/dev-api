@@ -21,11 +21,12 @@ from modules.reports.models import IndividualHealthReport, ReportsUserSyncState
 from modules.support.models import SupportTicket
 from modules.users import service as users_service_module
 from modules.users.models import User, UserPreference
+from tests.helpers.auth import user_auth_header
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 async def _seed_notification_service(test_db_session, service_key: str = "booking-alert-whatsapp") -> None:
@@ -60,7 +61,8 @@ async def test_create_user_does_not_require_employee(async_client, test_db_sessi
     await test_db_session.commit()
 
     payload = {"phone": "1234567891", "first_name": "Public", "age": 28}
-    response = await async_client.post("/users", headers=_auth_header(9001), json=payload)
+    from tests.helpers.auth import user_auth_header
+    response = await async_client.post("/users", headers=useruser_auth_header(9001), json=payload)
     assert response.status_code == 200
     user_id = response.json()["data"]["user_id"]
     created = await test_db_session.get(User, user_id)
@@ -72,11 +74,11 @@ async def test_create_user_does_not_require_employee(async_client, test_db_sessi
 async def test_employee_create_user_creates_user(async_client, test_db_session):
     test_db_session.add(User(age=30, user_id=9002, phone="9002000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10001, user_id=9002, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10001, name="Employee 10001", phone="0000010001", email="employee10001@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     payload = {"phone": "5550000998", "first_name": "A", "status": "active", "age": 22}
-    response = await async_client.post("/users", headers=_auth_header(9002), json=payload)
+    response = await async_client.post("/users", headers=_auth_header(10001), json=payload)
 
     assert response.status_code == 200
     user_id = response.json()["data"]["user_id"]
@@ -91,11 +93,11 @@ async def test_employee_create_user_creates_user(async_client, test_db_session):
 async def test_employee_create_user_without_age(async_client, test_db_session):
     test_db_session.add(User(age=30, user_id=9002, phone="9002000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10001, user_id=9002, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10001, name="Employee 10001", phone="0000010001", email="employee10001@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     payload = {"phone": "5550000999", "first_name": "A", "status": "active"}
-    response = await async_client.post("/users", headers=_auth_header(9002), json=payload)
+    response = await async_client.post("/users", headers=_auth_header(10001), json=payload)
 
     assert response.status_code == 200
     user_id = response.json()["data"]["user_id"]
@@ -111,11 +113,11 @@ async def test_employee_create_user_without_age(async_client, test_db_session):
 async def test_employee_create_user_treats_zero_age_as_missing(async_client, test_db_session):
     test_db_session.add(User(age=30, user_id=9002, phone="9002000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10001, user_id=9002, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10001, name="Employee 10001", phone="0000010001", email="employee10001@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     payload = {"phone": "5550000888", "first_name": "B", "status": "active", "age": 0}
-    response = await async_client.post("/users", headers=_auth_header(9002), json=payload)
+    response = await async_client.post("/users", headers=_auth_header(10001), json=payload)
 
     assert response.status_code == 200
     user_id = response.json()["data"]["user_id"]
@@ -128,13 +130,13 @@ async def test_employee_create_user_treats_zero_age_as_missing(async_client, tes
 async def test_employee_list_users_paginates_and_filters(async_client, test_db_session):
     test_db_session.add(User(age=30, user_id=9003, phone="9003000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10002, user_id=9003, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10002, name="Employee 10002", phone="0000010002", email="employee10002@test.example", role="admin", status="active"))
 
     test_db_session.add(User(age=30, user_id=9101, phone="9101000000", status="active", city="Pune"))
     test_db_session.add(User(age=30, user_id=9102, phone="9102000000", status="inactive", city="Pune"))
     await test_db_session.commit()
 
-    response = await async_client.get("/users?page=1&limit=10&status=active", headers=_auth_header(9003))
+    response = await async_client.get("/users?page=1&limit=10&status=active", headers=_auth_header(10002))
     assert response.status_code == 200
 
     body = response.json()
@@ -150,12 +152,12 @@ async def test_employee_list_users_paginates_and_filters(async_client, test_db_s
 async def test_employee_get_user_returns_details(async_client, test_db_session):
     test_db_session.add(User(age=30, user_id=9004, phone="9004000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10003, user_id=9004, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10003, name="Employee 10003", phone="0000010003", email="employee10003@test.example", role="admin", status="active"))
 
     test_db_session.add(User(age=30, user_id=9201, phone="9201000000", status="active", first_name="X"))
     await test_db_session.commit()
 
-    response = await async_client.get("/users/9201", headers=_auth_header(9004))
+    response = await async_client.get("/users/9201", headers=_auth_header(10003))
     assert response.status_code == 200
     assert response.json()["data"]["user_id"] == 9201
     assert response.json()["data"]["first_name"] == "X"
@@ -165,13 +167,13 @@ async def test_employee_get_user_returns_details(async_client, test_db_session):
 async def test_employee_update_user_updates_fields(async_client, test_db_session):
     test_db_session.add(User(age=30, user_id=9005, phone="9005000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10004, user_id=9005, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10004, name="Employee 10004", phone="0000010004", email="employee10004@test.example", role="admin", status="active"))
 
     test_db_session.add(User(age=30, user_id=9301, phone="9301000000", status="active", first_name="Old"))
     await test_db_session.commit()
 
     payload = {"phone": "9301000000", "first_name": "New", "status": "active", "age": 30}
-    response = await async_client.put("/users/9301", headers=_auth_header(9005), json=payload)
+    response = await async_client.put("/users/9301", headers=_auth_header(10004), json=payload)
     assert response.status_code == 200
 
     updated = await test_db_session.get(User, 9301)
@@ -183,7 +185,7 @@ async def test_employee_update_user_updates_fields(async_client, test_db_session
 async def test_employee_update_metsights_profile_id(async_client, test_db_session):
     test_db_session.add(User(age=30, user_id=9005, phone="9005000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10004, user_id=9005, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10004, name="Employee 10004", phone="0000010004", email="employee10004@test.example", role="admin", status="active"))
 
     test_db_session.add(
         User(age=30, user_id=9302, phone="9302000000", status="active", metsights_profile_id=None)
@@ -192,7 +194,7 @@ async def test_employee_update_metsights_profile_id(async_client, test_db_sessio
 
     response = await async_client.put(
         "/users/9302/metsights-profile-id",
-        headers=_auth_header(9005),
+        headers=_auth_header(10004),
         json={"metsights_profile_id": "ms-profile-9302"},
     )
     assert response.status_code == 200
@@ -202,7 +204,7 @@ async def test_employee_update_metsights_profile_id(async_client, test_db_sessio
 
     clear = await async_client.put(
         "/users/9302/metsights-profile-id",
-        headers=_auth_header(9005),
+        headers=_auth_header(10004),
         json={"metsights_profile_id": ""},
     )
     assert clear.status_code == 200
@@ -217,7 +219,7 @@ async def test_employee_update_metsights_profile_id(async_client, test_db_sessio
 async def test_employee_update_metsights_profile_id_rejects_duplicate(async_client, test_db_session):
     test_db_session.add(User(age=30, user_id=9005, phone="9005000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10004, user_id=9005, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10004, name="Employee 10004", phone="0000010004", email="employee10004@test.example", role="admin", status="active"))
 
     test_db_session.add(
         User(age=30, user_id=9303, phone="9303000000", status="active", metsights_profile_id="taken-ms-id")
@@ -229,7 +231,7 @@ async def test_employee_update_metsights_profile_id_rejects_duplicate(async_clie
 
     response = await async_client.put(
         "/users/9304/metsights-profile-id",
-        headers=_auth_header(9005),
+        headers=_auth_header(10004),
         json={"metsights_profile_id": "taken-ms-id"},
     )
     assert response.status_code == 409
@@ -239,12 +241,12 @@ async def test_employee_update_metsights_profile_id_rejects_duplicate(async_clie
 async def test_employee_deactivate_user_sets_inactive(async_client, test_db_session):
     test_db_session.add(User(age=30, user_id=9006, phone="9006000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10005, user_id=9006, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10005, name="Employee 10005", phone="0000010005", email="employee10005@test.example", role="admin", status="active"))
 
     test_db_session.add(User(age=30, user_id=9401, phone="9401000000", status="active"))
     await test_db_session.commit()
 
-    response = await async_client.patch("/users/9401/deactivate", headers=_auth_header(9006))
+    response = await async_client.patch("/users/9401/deactivate", headers=_auth_header(10005))
     assert response.status_code == 200
 
     updated = await test_db_session.get(User, 9401)
@@ -257,15 +259,15 @@ async def test_employee_update_user_rejects_inactive_for_employee_one_user(async
     monkeypatch.setattr(users_service_module, "_ALWAYS_ACTIVE_EMPLOYEE_ID", 10007)
     test_db_session.add(User(age=30, user_id=9007, phone="9007000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10006, user_id=9007, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10006, name="Employee 10006", phone="0000010006", email="employee10006@test.example", role="admin", status="active"))
 
     test_db_session.add(User(age=30, user_id=9411, phone="9411000000", status="active", first_name="Rishi"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10007, user_id=9411, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10007, name="Employee 10007", phone="0000010007", email="employee10007@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     payload = {"phone": "9411000000", "first_name": "Rishi", "status": "inactive"}
-    response = await async_client.put("/users/9411", headers=_auth_header(9007), json=payload)
+    response = await async_client.put("/users/9411", headers=_auth_header(10006), json=payload)
     assert response.status_code == 400
 
     protected_user = await test_db_session.get(User, 9411)
@@ -278,14 +280,14 @@ async def test_employee_deactivate_user_rejects_employee_one_user(async_client, 
     monkeypatch.setattr(users_service_module, "_ALWAYS_ACTIVE_EMPLOYEE_ID", 10009)
     test_db_session.add(User(age=30, user_id=9008, phone="9008000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10008, user_id=9008, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10008, name="Employee 10008", phone="0000010008", email="employee10008@test.example", role="admin", status="active"))
 
     test_db_session.add(User(age=30, user_id=9412, phone="9412000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=10009, user_id=9412, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=10009, name="Employee 10009", phone="0000010009", email="employee10009@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
-    response = await async_client.patch("/users/9412/deactivate", headers=_auth_header(9008))
+    response = await async_client.patch("/users/9412/deactivate", headers=_auth_header(10008))
     assert response.status_code == 400
 
     protected_user = await test_db_session.get(User, 9412)
@@ -301,7 +303,7 @@ async def test_employee_delete_user_cascades_related_data(async_client, test_db_
 
     test_db_session.add(User(age=30, user_id=actor_user_id, phone="9901000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=19010, user_id=actor_user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=19010, name="Employee 19010", phone="0000019010", email="employee19010@test.example", role="admin", status="active"))
 
     target = User(age=31, user_id=target_user_id, phone="9905100000", status="active")
     test_db_session.add(target)
@@ -480,7 +482,7 @@ async def test_employee_delete_user_clears_notification_assessment_refs(async_cl
 
     test_db_session.add(User(age=30, user_id=actor_user_id, phone="9901300000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=19013, user_id=actor_user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=19013, name="Employee 19013", phone="0000019013", email="employee19013@test.example", role="admin", status="active"))
     test_db_session.add(User(age=31, user_id=target_user_id, phone="9905400000", status="active"))
     test_db_session.add(
         Engagement(
@@ -547,7 +549,7 @@ async def test_employee_delete_user_impact_lists_engagements_fully_owned(async_c
 
     test_db_session.add(User(age=30, user_id=actor_user_id, phone="9901100000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=19011, user_id=actor_user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=19011, name="Employee 19011", phone="0000019011", email="employee19011@test.example", role="admin", status="active"))
     test_db_session.add(User(age=31, user_id=target_user_id, phone="9905200000", status="active"))
     test_db_session.add(
         Engagement(
@@ -589,7 +591,7 @@ async def test_employee_delete_user_deletes_orphan_engagement_when_requested(asy
 
     test_db_session.add(User(age=30, user_id=actor_user_id, phone="9901200000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=19012, user_id=actor_user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=19012, name="Employee 19012", phone="0000019012", email="employee19012@test.example", role="admin", status="active"))
     test_db_session.add(User(age=31, user_id=target_user_id, phone="9905300000", status="active"))
     test_db_session.add(
         Engagement(
@@ -632,11 +634,11 @@ async def test_employee_delete_user_removes_employee_row_org_refs_and_onboarding
 
     test_db_session.add(User(age=30, user_id=actor_user_id, phone="9902000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=19120, user_id=actor_user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=19120, name="Employee 19120", phone="0000019120", email="employee19120@test.example", role="admin", status="active"))
 
     test_db_session.add(User(age=30, user_id=target_user_id, phone="9907100000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=target_employee_id, user_id=target_user_id, role="ops", status="active"))
+    test_db_session.add(Employee(employee_id=target_employee_id, name=f"Employee {target_employee_id}", phone=str(target_employee_id).zfill(10)[:15], email=f"employee{target_employee_id}@test.example", role="admin", status="active"))
 
     test_db_session.add(
         Engagement(
@@ -692,7 +694,7 @@ async def test_employee_delete_user_rejects_self_delete(async_client, test_db_se
     uid = 99202
     test_db_session.add(User(age=30, user_id=uid, phone="9920200000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=19202, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=19202, name="Employee 19202", phone="0000019202", email="employee19202@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     response = await async_client.delete(f"/users/{uid}", headers=_auth_header(uid))
@@ -709,7 +711,7 @@ async def test_employee_delete_user_rejects_when_actor_in_deleted_subtree(async_
         User(age=30, user_id=child_id, phone="9923100000", status="active", parent_id=parent_id, relationship="child")
     )
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=19231, user_id=child_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=19231, name="Employee 19231", phone="0000019231", email="employee19231@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     response = await async_client.delete(f"/users/{parent_id}", headers=_auth_header(child_id))

@@ -85,10 +85,9 @@ async def _engagement_counts(db: AsyncSession, user_ids: list[int]) -> dict[int,
 
 
 async def _employee_user_ids(db: AsyncSession, user_ids: list[int]) -> set[int]:
-    if not user_ids:
-        return set()
-    result = await db.execute(select(Employee.user_id).where(Employee.user_id.in_(user_ids)))
-    return {int(row[0]) for row in result.all()}
+    # Employees are no longer linked to users.
+    _ = db, user_ids
+    return set()
 
 
 async def _reparent_children(db: AsyncSession, *, from_parent_ids: list[int], to_parent_id: int) -> int:

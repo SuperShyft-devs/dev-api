@@ -141,7 +141,7 @@ async def test_link_keeps_employee_as_main(test_db_session):
     member = _user(user_id=88012, phone="7000008802", email="link88002-member@example.com")
     test_db_session.add_all([staff, member])
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=88011, user_id=88011, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=88011, name="Employee 88011", phone="0000088011", email="employee88011@test.example", role="admin", status="active"))
     await _enroll(test_db_session, engagement_id=88002, user_id=88012, slot="09:00")
     await _enroll(test_db_session, engagement_id=88012, user_id=88012, slot="09:20")
     await test_db_session.commit()

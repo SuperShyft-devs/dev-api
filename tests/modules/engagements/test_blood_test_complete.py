@@ -8,17 +8,14 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import text
 
-from modules.employee.models import Employee
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.engagements.service import EngagementsService
 from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, make_employee, seed_employee, user_auth_header
 
 
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int):
-    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id:010d}", status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
-    await test_db_session.commit()
+async def _seed_employee(test_db_session, *, employee_id: int, role: str = "admin"):
+    await seed_employee(test_db_session, employee_id=employee_id, role=role)
 
 
 async def _engagement_type_id(test_db_session, code: str) -> int:
@@ -129,7 +126,7 @@ async def test_participant_stats_calls_healthians_live(
 
     engagement_id = 988151
     user_id = 988151
-    await _seed_employee(test_db_session, user_id=988152, employee_id=988152)
+    await _seed_employee(test_db_session, employee_id=988152)
     await _seed_engagement(test_db_session, engagement_id=engagement_id, type_code="blood_complete_stats")
     test_db_session.add(
         User(
@@ -157,7 +154,7 @@ async def test_participant_stats_calls_healthians_live(
     ).EngagementsRepository())
     from modules.employee.service import EmployeeContext
 
-    employee = EmployeeContext(employee_id=988152, user_id=988152, role="admin")
+    employee = EmployeeContext(employee_id=988152, role="admin")
     stats = await service.participant_stats_for_engagement_id(
         test_db_session,
         employee=employee,

@@ -25,7 +25,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from core.exceptions import AppError
-from core.security import create_jwt_token, generate_secure_token
+from core.security import generate_secure_token
+from core.subject_auth import create_access_token
 
 from common.phone import phone_lookup_candidates
 from modules.audit.service import AuditService
@@ -96,10 +97,7 @@ class AuthService:
         return secret
 
     def _issue_access_token(self, user_id: int) -> str:
-        return create_jwt_token(
-            {"sub": str(user_id)},
-            timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES),
-        )
+        return create_access_token(user_id, "user")
 
     def _build_refresh_token(self, token_id: int) -> str:
         raw = generate_secure_token(32)

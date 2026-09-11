@@ -78,7 +78,7 @@ async def test_support_notify_dispatches_to_default_assistants(test_db_session, 
     test_db_session.add(oa_user)
     await test_db_session.flush()
     test_db_session.add(
-        Employee(employee_id=9402, user_id=9402, role="onboarding_assistant", status="active")
+        Employee(employee_id=9402, name="Employee 9402", phone="0000009402", email="employee9402@test.example", role="onboarding_assistant", status="active")
     )
 
     await test_db_session.execute(text("DELETE FROM platform_settings"))

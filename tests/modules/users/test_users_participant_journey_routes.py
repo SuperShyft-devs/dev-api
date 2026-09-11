@@ -24,9 +24,9 @@ from modules.reports.models import IndividualHealthReport
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 async def _has_package_category(session, *, package_id: int, category_id: int) -> bool:
@@ -62,7 +62,7 @@ async def test_participant_journey_requires_employee(async_client, test_db_sessi
 async def test_participant_journey_summary_user_not_found(async_client, test_db_session):
     test_db_session.add(User(user_id=9601, phone="96010000000", status="active", age=30))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9601, user_id=9601, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9601, name="Employee 9601", phone="0000009601", email="employee9601@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     response = await async_client.get("/users/999999/participant-journey", headers=_auth_header(9601))
@@ -73,7 +73,7 @@ async def test_participant_journey_summary_user_not_found(async_client, test_db_
 async def test_participant_journey_summary_invalid_pagination(async_client, test_db_session):
     test_db_session.add(User(user_id=9602, phone="96020000000", status="active", age=30))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9602, user_id=9602, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9602, name="Employee 9602", phone="0000009602", email="employee9602@test.example", role="admin", status="active"))
     test_db_session.add(User(user_id=9603, phone="96030000000", status="active", age=30))
     await test_db_session.commit()
 
@@ -85,7 +85,7 @@ async def test_participant_journey_summary_invalid_pagination(async_client, test
 async def test_participant_journey_summary_returns_instance_and_counts(async_client, test_db_session):
     test_db_session.add(User(user_id=9610, phone="96100000000", status="active", age=30))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9610, user_id=9610, role="ops", status="active"))
+    test_db_session.add(Employee(employee_id=9610, name="Employee 9610", phone="0000009610", email="employee9610@test.example", role="admin", status="active"))
 
     if await test_db_session.get(DiagnosticPackage, 9699) is None:
         test_db_session.add(
@@ -231,7 +231,7 @@ async def test_participant_journey_summary_returns_instance_and_counts(async_cli
 async def test_participant_journey_detail_not_found_for_wrong_user(async_client, test_db_session):
     test_db_session.add(User(user_id=9620, phone="96200000000", status="active", age=30))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9620, user_id=9620, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9620, name="Employee 9620", phone="0000009620", email="employee9620@test.example", role="admin", status="active"))
     test_db_session.add(User(user_id=9621, phone="96210000000", status="active", age=30))
     test_db_session.add(User(user_id=9622, phone="96220000000", status="active", age=30))
     # Flush so FK parent rows exist before inserting AssessmentInstance.
@@ -298,7 +298,7 @@ async def test_participant_journey_detail_not_found_for_wrong_user(async_client,
 async def test_participant_journey_detail_returns_categories_and_answer_state(async_client, test_db_session):
     test_db_session.add(User(user_id=9630, phone="96300000000", status="active", age=30))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9630, user_id=9630, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9630, name="Employee 9630", phone="0000009630", email="employee9630@test.example", role="admin", status="active"))
     test_db_session.add(User(user_id=9631, phone="96310000000", status="active", age=30))
     # Flush so `users` row exists before inserting AssessmentInstance.
     await test_db_session.flush()
@@ -412,7 +412,7 @@ async def test_participant_journey_summary_includes_imported_answers_without_pro
     """
     test_db_session.add(User(user_id=9640, phone="96400000000", status="active", age=30))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9640, user_id=9640, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9640, name="Employee 9640", phone="0000009640", email="employee9640@test.example", role="admin", status="active"))
     test_db_session.add(User(user_id=9641, phone="96410000000", status="active", age=25))
     await test_db_session.flush()
 

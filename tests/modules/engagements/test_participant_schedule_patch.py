@@ -2,27 +2,24 @@
 
 from __future__ import annotations
 
-from datetime import date, time, timedelta
+from datetime import date, time
 
 import pytest
 from sqlalchemy import text
 
-from core.config import settings
-from core.security import create_jwt_token
 from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant
 from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, seed_employee
 from tests.modules.users.test_users_onboard_slot_routes import (
     _create_slot_engagement,
     _engagement_type_id,
     _onboard_payload,
-    _seed_employee,
     _seed_organization,
 )
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
 async def _seed_packages_for_engagement(test_db_session, *, package_id: int):
@@ -65,7 +62,7 @@ async def test_patch_participant_schedule_updates_fields(async_client, test_db_s
 
     response = await async_client.patch(
         f"/engagements/{engagement_id}/participants/{user_id}",
-        headers=_auth_header(79811),
+        headers=_auth_header(811),
         json={
             "engagement_date": "2026-08-20",
             "slot_start_time": "09:30",
@@ -99,7 +96,7 @@ async def test_patch_participant_schedule_allows_same_slot_when_at_capacity(asyn
 
     response = await async_client.patch(
         f"/engagements/{engagement_id}/participants/{user_id}",
-        headers=_auth_header(79812),
+        headers=_auth_header(812),
         json={
             "engagement_date": "2026-08-20",
             "slot_start_time": "09:00",
@@ -143,7 +140,7 @@ async def test_patch_participant_schedule_rejects_full_slot(async_client, test_d
 
     response = await async_client.patch(
         f"/engagements/{engagement_id}/participants/{user_b}",
-        headers=_auth_header(79813),
+        headers=_auth_header(813),
         json={
             "engagement_date": "2026-08-20",
             "slot_start_time": "09:00",
@@ -173,7 +170,7 @@ async def test_patch_participant_schedule_rejects_invalid_slot(async_client, tes
 
     response = await async_client.patch(
         f"/engagements/{engagement_id}/participants/{user_id}",
-        headers=_auth_header(79814),
+        headers=_auth_header(814),
         json={
             "engagement_date": "2026-08-21",
             "slot_start_time": "09:00",
@@ -186,7 +183,7 @@ async def test_patch_participant_schedule_rejects_invalid_slot(async_client, tes
 
 @pytest.mark.asyncio
 async def test_patch_participant_schedule_rejects_home_collection(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=79815, employee_id=815)
+    await seed_employee(test_db_session, employee_id=815)
     await _seed_organization(test_db_session, organization_id=9815, name="Home Org")
     await _seed_packages_for_engagement(test_db_session, package_id=9815)
     type_id = await _engagement_type_id(test_db_session, "bio_ai")
@@ -225,7 +222,7 @@ async def test_patch_participant_schedule_rejects_home_collection(async_client, 
 
     response = await async_client.patch(
         "/engagements/9815/participants/98151",
-        headers=_auth_header(79815),
+        headers=_auth_header(815),
         json={
             "engagement_date": "2026-08-20",
             "slot_start_time": "09:30",
@@ -249,7 +246,7 @@ async def test_get_engagement_includes_public_slot_detail(async_client, test_db_
 
     response = await async_client.get(
         f"/engagements/{engagement_id}",
-        headers=_auth_header(79816),
+        headers=_auth_header(816),
     )
     assert response.status_code == 200, response.text
     data = response.json()["data"]

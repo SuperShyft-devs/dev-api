@@ -185,27 +185,28 @@ def _city_keys_match(stored_key: str, engagement_city: str | None) -> bool:
     return stored_key.casefold() == city.casefold()
 
 
-def resolve_org_manager_scope(raw: Any, user_id: int) -> OrgManagerScope | None:
+def resolve_org_manager_scope(raw: Any, contact_id: int) -> OrgManagerScope | None:
+    """Resolve scope for a contact id stored in contact_person_user_ids JSON (partner_id)."""
     parsed = try_parse_contact_person_user_ids(raw)
     if parsed is None:
         return None
 
     scope = OrgManagerScope()
     org_managers = parsed.get(ORG_MANAGERS_KEY, [])
-    if isinstance(org_managers, list) and user_id in org_managers:
+    if isinstance(org_managers, list) and contact_id in org_managers:
         scope.is_org_manager = True
 
     for city_key, city_val in parsed.items():
         if city_key == ORG_MANAGERS_KEY or not isinstance(city_val, dict):
             continue
         managers = city_val.get(CITY_MANAGERS_KEY, [])
-        if isinstance(managers, list) and user_id in managers:
+        if isinstance(managers, list) and contact_id in managers:
             scope.city_manager_cities.add(city_key)
         dept_slugs: set[str] = set()
         for dept_key, dept_ids in city_val.items():
             if dept_key == CITY_MANAGERS_KEY:
                 continue
-            if isinstance(dept_ids, list) and user_id in dept_ids:
+            if isinstance(dept_ids, list) and contact_id in dept_ids:
                 dept_slugs.add(dept_key)
         if dept_slugs:
             scope.dept_slugs_by_city[city_key] = dept_slugs
@@ -215,8 +216,14 @@ def resolve_org_manager_scope(raw: Any, user_id: int) -> OrgManagerScope | None:
     return scope
 
 
-def user_has_any_org_contact_role(raw: Any, user_id: int) -> bool:
-    return resolve_org_manager_scope(raw, user_id) is not None
+def resolve_org_manager_scope_for_employee_id(raw: Any, employee_id: int) -> OrgManagerScope | None:
+    """Alias for resolve_org_manager_scope (IDs in JSON are partner_ids for org managers)."""
+    return resolve_org_manager_scope(raw, employee_id)
+
+
+def user_has_any_org_contact_role(raw: Any, contact_id: int) -> bool:
+    """True if contact_id appears anywhere in contact_person_user_ids JSON."""
+    return resolve_org_manager_scope(raw, contact_id) is not None
 
 
 def remove_user_from_contact_person_user_ids(raw: Any, user_id: int) -> dict[str, Any] | None:
@@ -268,7 +275,7 @@ def validate_contact_person_department_slugs(
 
 def build_camp_report_access(
     raw: Any,
-    user_id: int,
+    contact_id: int,
     *,
     camp_cities: list[str],
     reported_dept_slugs: list[str],
@@ -283,7 +290,7 @@ def build_camp_report_access(
             access[city] = city_access
         return access
 
-    scope = resolve_org_manager_scope(raw, user_id)
+    scope = resolve_org_manager_scope(raw, contact_id)
     access = {"organization_manager": bool(scope and scope.is_org_manager)}
 
     for city in camp_cities:

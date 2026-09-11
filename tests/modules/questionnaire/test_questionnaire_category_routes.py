@@ -14,15 +14,15 @@ from modules.questionnaire.models import QuestionnaireCategory
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1, role: str = "admin"):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role=role, status="active"))
+    test_db_session.add(Employee(employee_id=employee_id, name=f"Employee {employee_id}", phone=str(employee_id).zfill(10)[:15], email=f"employee{employee_id}@test.example", role=role, status="active"))
     await test_db_session.commit()
 
 
@@ -32,7 +32,7 @@ async def test_create_category_rejects_duplicate_key_across_category_of(async_cl
 
     first = await async_client.post(
         "/questionnaire/categories",
-        headers=_auth_header(9201),
+        headers=_auth_header(201),
         json={
             "category_key": "duplicate-key-test",
             "display_name": "Metsights Category",
@@ -43,7 +43,7 @@ async def test_create_category_rejects_duplicate_key_across_category_of(async_cl
 
     second = await async_client.post(
         "/questionnaire/categories",
-        headers=_auth_header(9201),
+        headers=_auth_header(201),
         json={
             "category_key": "duplicate-key-test",
             "display_name": "Supershyft Category",
@@ -60,7 +60,7 @@ async def test_reset_metsights_sync_creates_vitals_category(async_client, test_d
 
     response = await async_client.post(
         "/questionnaire/metsights-sync/reset",
-        headers=_auth_header(9202),
+        headers=_auth_header(202),
     )
     assert response.status_code == 200
     data = response.json()["data"]

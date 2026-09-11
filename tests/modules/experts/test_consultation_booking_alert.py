@@ -56,7 +56,7 @@ async def test_book_consultation_slot_triggers_booking_alert(test_db_session, mo
             engagement_id=engagement_id,
             engagement_name="Book Alert",
             engagement_code="BK78601",
-            engagement_type="consultation",
+            engagement_type=1,
             consultations={"doctor": True},
             consultation_mode=ConsultationMode.online,
             assessment_package_id=1,

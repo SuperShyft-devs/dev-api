@@ -13,10 +13,8 @@ from common.responses import success_response
 from core.dependencies import get_current_user, get_optional_user
 from core.exceptions import AppError
 from db.session import get_db
-from modules.employee.dependencies import get_current_employee, get_employee_service
-from modules.employee.service import EmployeeContext, EmployeeService
-from modules.employee.models import EmployeeRole
-from modules.employee.permissions import PermissionAction, context_task_allows
+from modules.employee.dependencies import get_current_employee
+from modules.employee.service import EmployeeContext
 from modules.payments.services import PaymentsService
 
 # Prefix /payments (not /api/payments): dev-admin Vite proxy strips /api from the request path.
@@ -201,22 +199,9 @@ async def booking_status(
     db: AsyncSession = Depends(get_db),
     service: PaymentsService = Depends(get_payments_service),
     user=Depends(get_current_user),
-    employee_service: EmployeeService = Depends(get_employee_service),
 ):
+    # User JWT only (typ=user). Staff use employee-authenticated admin booking views.
     is_employee = False
-    try:
-        employee = await employee_service.get_active_employee_by_user_id(db, user.user_id)
-        is_employee = (
-            employee.role != EmployeeRole.inferior_admin
-            or context_task_allows(
-                employee,
-                "payments_bookings",
-                "bookings",
-                PermissionAction.view,
-            )
-        )
-    except AppError:
-        pass
 
     try:
         data = await service.get_booking_status(

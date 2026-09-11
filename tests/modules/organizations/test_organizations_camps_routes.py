@@ -2,29 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
 import pytest
 
-from core.config import settings
-from core.security import create_jwt_token
-from modules.employee.models import Employee
 from modules.engagements.camp_no import compute_camp_no
 from modules.engagements.models import Engagement
 from modules.organizations.models import Organization
-from modules.users.models import User
+from tests.helpers.auth import employee_auth_header, seed_employee
+from tests.helpers.engagement_types import engagement_type_id
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
-
-
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
-    test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
-    await test_db_session.commit()
+async def _seed_employee(test_db_session, *, employee_id: int, role: str = "admin"):
+    await seed_employee(test_db_session, employee_id=employee_id, role=role)
 
 
 @pytest.mark.asyncio
@@ -35,18 +25,18 @@ async def test_list_camps_requires_auth(async_client):
 
 @pytest.mark.asyncio
 async def test_list_camps_onboarding_assistant_403(async_client, test_db_session):
-    test_db_session.add(User(user_id=7202, age=30, phone="7202000000000", status="active"))
-    await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=32, user_id=7202, role="onboarding_assistant", status="active"))
-    await test_db_session.commit()
+    await seed_employee(test_db_session, employee_id=32, role="onboarding_assistant")
 
-    response = await async_client.get("/organizations/camps", headers=_auth_header(7202))
+    response = await async_client.get(
+        "/organizations/camps",
+        headers=employee_auth_header(32),
+    )
     assert response.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_list_camps_aggregates_engagements(async_client, test_db_session):
-    await _seed_employee(test_db_session, user_id=7201, employee_id=31)
+    await _seed_employee(test_db_session, employee_id=31)
 
     test_db_session.add(
         Organization(
@@ -64,6 +54,7 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
     start = date(2026, 6, 23)
     camp_no = compute_camp_no(8001, start)
     assert camp_no == 8001230626
+    bio_ai_type_id = await engagement_type_id(test_db_session, "bio_ai")
 
     for engagement_id, code in ((8201, "CAMP1"), (8202, "CAMP2")):
         test_db_session.add(
@@ -73,7 +64,7 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
                 organization_id=8001,
                 camp_no=camp_no,
                 engagement_code=code,
-                engagement_type="bio_ai",
+                engagement_type=bio_ai_type_id,
                 assessment_package_id=None,
                 diagnostic_package_id=None,
                 city="BLR",
@@ -91,7 +82,7 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
             organization_id=None,
             camp_no=None,
             engagement_code="B2CCAMP",
-            engagement_type="bio_ai",
+            engagement_type=bio_ai_type_id,
             assessment_package_id=None,
             diagnostic_package_id=None,
             city="BLR",
@@ -106,7 +97,7 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
     # Default: only camps with initialized camp reports
     default_response = await async_client.get(
         "/organizations/camps?page=1&limit=10",
-        headers=_auth_header(7201),
+        headers=employee_auth_header(31),
     )
     assert default_response.status_code == 200
     assert all(row["camp_no"] != camp_no for row in default_response.json()["data"])
@@ -114,7 +105,7 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
     # Admin can still list uninitialized camps
     response = await async_client.get(
         "/organizations/camps?page=1&limit=10&initialized_only=false",
-        headers=_auth_header(7201),
+        headers=employee_auth_header(31),
     )
     assert response.status_code == 200
 
@@ -138,7 +129,7 @@ async def test_list_camps_aggregates_engagements(async_client, test_db_session):
 async def test_list_camps_initialized_only_returns_camps_with_reports(async_client, test_db_session):
     from modules.reports.models import CampReport
 
-    await _seed_employee(test_db_session, user_id=7210, employee_id=33)
+    await _seed_employee(test_db_session, employee_id=33)
 
     test_db_session.add(
         Organization(
@@ -153,6 +144,7 @@ async def test_list_camps_initialized_only_returns_camps_with_reports(async_clie
     start = date(2026, 6, 23)
     camp_no = compute_camp_no(8010, start)
     other_camp_no = compute_camp_no(8010, date(2026, 7, 1))
+    bio_ai_type_id = await engagement_type_id(test_db_session, "bio_ai")
 
     test_db_session.add(
         Engagement(
@@ -161,7 +153,7 @@ async def test_list_camps_initialized_only_returns_camps_with_reports(async_clie
             organization_id=8010,
             camp_no=camp_no,
             engagement_code="INIT1",
-            engagement_type="bio_ai",
+            engagement_type=bio_ai_type_id,
             assessment_package_id=None,
             diagnostic_package_id=None,
             city="BLR",
@@ -178,7 +170,7 @@ async def test_list_camps_initialized_only_returns_camps_with_reports(async_clie
             organization_id=8010,
             camp_no=other_camp_no,
             engagement_code="INIT2",
-            engagement_type="bio_ai",
+            engagement_type=bio_ai_type_id,
             assessment_package_id=None,
             diagnostic_package_id=None,
             city="BLR",
@@ -210,7 +202,7 @@ async def test_list_camps_initialized_only_returns_camps_with_reports(async_clie
 
     response = await async_client.get(
         "/organizations/camps?page=1&limit=10",
-        headers=_auth_header(7210),
+        headers=employee_auth_header(33),
     )
     assert response.status_code == 200
     camp_nos = {row["camp_no"] for row in response.json()["data"]}

@@ -14,15 +14,15 @@ from modules.employee.models import Employee
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=employee_id, name=f"Employee {employee_id}", phone=str(employee_id).zfill(10)[:15], email=f"employee{employee_id}@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
 
@@ -200,7 +200,7 @@ async def test_onboard_without_slot_detail_still_succeeds(async_client, test_db_
     type_id = await _engagement_type_id(test_db_session, "bio_ai")
     created = await async_client.post(
         "/engagements",
-        headers=_auth_header(7420),
+        headers=_auth_header(420),
         json={
             "engagement_name": "Legacy Camp",
             "organization_id": 9201,
@@ -438,7 +438,7 @@ async def test_onboard_accepts_slug_cabin_key_with_underscores(async_client, tes
     }
     created = await async_client.post(
         "/engagements",
-        headers=_auth_header(7427),
+        headers=_auth_header(427),
         json={
             "engagement_name": "Room Camp",
             "organization_id": 9208,

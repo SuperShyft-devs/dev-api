@@ -15,9 +15,9 @@ from modules.engagements.models import EngagementKind
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 def _type_defaults(**overrides) -> dict:
@@ -79,7 +79,7 @@ async def test_get_b2c_defaults_fallback_when_no_row(async_client, test_db_sessi
     uid = 9101
     test_db_session.add(User(user_id=uid, age=30, phone="91010000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9101, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9101, name="Employee 9101", phone="0000009101", email="employee9101@test.example", role="admin", status="active"))
     await test_db_session.execute(text("DELETE FROM platform_settings"))
     await test_db_session.commit()
     test_db_session.expire_all()
@@ -104,7 +104,7 @@ async def test_patch_b2c_defaults_persists_and_get_returns(async_client, test_db
     uid = 9102
     test_db_session.add(User(user_id=uid, age=30, phone="91020000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9102, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9102, name="Employee 9102", phone="0000009102", email="employee9102@test.example", role="admin", status="active"))
 
     await test_db_session.execute(
         text(
@@ -159,7 +159,7 @@ async def test_patch_b2c_defaults_rejects_inactive_package(async_client, test_db
     uid = 9103
     test_db_session.add(User(user_id=uid, age=30, phone="91030000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9103, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9103, name="Employee 9103", phone="0000009103", email="employee9103@test.example", role="admin", status="active"))
 
     await test_db_session.execute(
         text(
@@ -198,7 +198,7 @@ async def test_patch_b2c_defaults_rejects_fitprint_without_profile_creation(asyn
     uid = 9108
     test_db_session.add(User(user_id=uid, age=30, phone="91080000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9108, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9108, name="Employee 9108", phone="0000009108", email="employee9108@test.example", role="admin", status="active"))
     await test_db_session.execute(
         text(
             "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
@@ -239,7 +239,7 @@ async def test_patch_default_onboarding_assistants_persists(async_client, test_d
     uid = 9105
     test_db_session.add(User(user_id=uid, age=30, phone="91050000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9105, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9105, name="Employee 9105", phone="0000009105", email="employee9105@test.example", role="admin", status="active"))
 
     aid = 9201
     oid = 9202
@@ -247,8 +247,8 @@ async def test_patch_default_onboarding_assistants_persists(async_client, test_d
     await test_db_session.flush()
     test_db_session.add(User(user_id=oid, age=30, phone="92020000001", status="active", first_name="Omar", last_name="OA"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9201, user_id=aid, role="admin", status="active"))
-    test_db_session.add(Employee(employee_id=9202, user_id=oid, role="onboarding_assistant", status="active"))
+    test_db_session.add(Employee(employee_id=9201, name="Employee 9201", phone="0000009201", email="employee9201@test.example", role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9202, name="Employee 9202", phone="0000009202", email="employee9202@test.example", role="onboarding_assistant", status="active"))
 
     await test_db_session.execute(
         text(
@@ -287,7 +287,7 @@ async def test_patch_default_onboarding_assistants_rejects_unknown_employee(asyn
     uid = 9106
     test_db_session.add(User(user_id=uid, age=30, phone="91060000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9106, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9106, name="Employee 9106", phone="0000009106", email="employee9106@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     response = await async_client.patch(
@@ -303,13 +303,13 @@ async def test_patch_default_onboarding_assistants_rejects_inactive_employee(asy
     uid = 9107
     test_db_session.add(User(user_id=uid, age=30, phone="91070000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9107, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9107, name="Employee 9107", phone="0000009107", email="employee9107@test.example", role="admin", status="active"))
 
     inactive_uid = 9301
     test_db_session.add(User(user_id=inactive_uid, age=30, phone="93010000001", status="active"))
     await test_db_session.flush()
     test_db_session.add(
-        Employee(employee_id=9301, user_id=inactive_uid, role="onboarding_assistant", status="inactive")
+        Employee(employee_id=9301, name="Employee 9301", phone="0000009301", email="employee9301@test.example", role="onboarding_assistant", status="inactive")
     )
     await test_db_session.commit()
 
@@ -332,7 +332,7 @@ async def test_patch_support_query_notification_persists(async_client, test_db_s
     uid = 9108
     test_db_session.add(User(user_id=uid, age=30, phone="91080000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9108, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9108, name="Employee 9108", phone="0000009108", email="employee9108@test.example", role="admin", status="active"))
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
@@ -378,7 +378,7 @@ async def test_patch_support_query_notification_rejects_unknown_service(async_cl
     uid = 9109
     test_db_session.add(User(user_id=uid, age=30, phone="91090000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9109, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9109, name="Employee 9109", phone="0000009109", email="employee9109@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
     response = await async_client.patch(
@@ -394,7 +394,7 @@ async def test_patch_support_query_notification_rejects_inactive_service(async_c
     uid = 9110
     test_db_session.add(User(user_id=uid, age=30, phone="91100000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9110, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9110, name="Employee 9110", phone="0000009110", email="employee9110@test.example", role="admin", status="active"))
     await test_db_session.execute(
         text(
             "INSERT INTO notification_services "
@@ -418,7 +418,7 @@ async def test_b2c_defaults_include_custom_engagement_type(async_client, test_db
     uid = 9111
     test_db_session.add(User(user_id=uid, age=30, phone="91110000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9111, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9111, name="Employee 9111", phone="0000009111", email="employee9111@test.example", role="admin", status="active"))
     await test_db_session.execute(
         text(
             "INSERT INTO engagement_types (code, display_name, is_active) "
@@ -470,7 +470,7 @@ async def test_b2c_defaults_allow_null_diagnostic_package(async_client, test_db_
     uid = 9112
     test_db_session.add(User(user_id=uid, age=30, phone="91120000001", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=9112, user_id=uid, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=9112, name="Employee 9112", phone="0000009112", email="employee9112@test.example", role="admin", status="active"))
     await test_db_session.execute(
         text(
             "INSERT INTO assessment_packages (package_id, package_code, display_name, status) VALUES "

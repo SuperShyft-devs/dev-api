@@ -22,9 +22,9 @@ from modules.engagements.models import Engagement
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 class _FakeBioReportService:
@@ -96,7 +96,7 @@ async def _seed_assessment(test_db_session, *, assessment_id: int, user_id: int)
 async def _seed_admin_employee(test_db_session, *, user_id: int, employee_id: int):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=employee_id, name=f"Employee {employee_id}", phone=str(employee_id).zfill(10)[:15], email=f"employee{employee_id}@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
 
@@ -114,13 +114,13 @@ async def test_get_bioreport_onboarding_assistant_allowed(async_client, fastapi_
     test_db_session.add(User(user_id=89512, age=30, phone="8951200000", status="active"))
     await test_db_session.flush()
     test_db_session.add(
-        Employee(employee_id=99512, user_id=89512, role="onboarding_assistant", status="active")
+        Employee(employee_id=99512, name="Employee 99512", phone="0000099512", email="employee99512@test.example", role="onboarding_assistant", status="active")
     )
     await test_db_session.commit()
 
     fastapi_app.dependency_overrides[get_bioreport_service] = lambda: _FakeBioReportService()
 
-    response = await async_client.get("/bioai-report/99502", headers=_auth_header(89512))
+    response = await async_client.get("/bioai-report/99502", headers=_auth_header(99512))
     assert response.status_code == 200
     body = response.json()
     assert body["patient"]["name"] == "Test User"

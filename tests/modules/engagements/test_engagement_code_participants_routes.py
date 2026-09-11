@@ -2,33 +2,23 @@
 
 from __future__ import annotations
 
-from datetime import date, time, timedelta
+from datetime import date, time
 
 import pytest
 
-from core.config import settings
-from core.security import create_jwt_token
-from modules.employee.models import Employee
 from modules.users.models import User
 from modules.engagements.models import Engagement, EngagementParticipant
 from modules.assessments.models import AssessmentPackage
+from tests.helpers.auth import employee_auth_header, make_employee, seed_employee, user_auth_header
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    """Create authentication header for testing."""
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    return employee_auth_header(employee_id)
 
 
-async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
+async def _seed_employee(test_db_session, *, employee_id: int, role: str = "admin"):
     """Seed a test employee."""
-    user = User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active")
-    test_db_session.add(user)
-    await test_db_session.flush()
-    
-    employee = Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active")
-    test_db_session.add(employee)
-    await test_db_session.commit()
+    await seed_employee(test_db_session, employee_id=employee_id, role=role)
 
 
 @pytest.mark.asyncio
@@ -44,16 +34,16 @@ async def test_get_engagement_code_participants_requires_employee(async_client, 
     test_db_session.add(User(user_id=7001, age=30, phone="7001000000", status="active"))
     await test_db_session.commit()
 
-    response = await async_client.get("/engagements/code/ENG001/participants", headers=_auth_header(7001))
+    response = await async_client.get("/engagements/code/ENG001/participants", headers=user_auth_header(7001))
     assert response.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_get_engagement_code_participants_returns_404_for_nonexistent_engagement(async_client, test_db_session):
     """Test that the endpoint returns 404 for non-existent engagement."""
-    await _seed_employee(test_db_session, user_id=7002, employee_id=201)
+    await _seed_employee(test_db_session, employee_id=201)
 
-    response = await async_client.get("/engagements/code/NONEXISTENT/participants", headers=_auth_header(7002))
+    response = await async_client.get("/engagements/code/NONEXISTENT/participants", headers=_auth_header(201))
     assert response.status_code == 404
     assert response.json()["error_code"] == "ENGAGEMENT_NOT_FOUND"
 
@@ -61,7 +51,7 @@ async def test_get_engagement_code_participants_returns_404_for_nonexistent_enga
 @pytest.mark.asyncio
 async def test_get_engagement_code_participants_returns_empty_list_when_no_participants(async_client, test_db_session):
     """Test that the endpoint returns empty list when engagement has no participants."""
-    await _seed_employee(test_db_session, user_id=7003, employee_id=202)
+    await _seed_employee(test_db_session, employee_id=202)
 
     # Create assessment package
     test_db_session.add(
@@ -90,7 +80,7 @@ async def test_get_engagement_code_participants_returns_empty_list_when_no_parti
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/engagements/code/ENG3001/participants", headers=_auth_header(7003))
+    response = await async_client.get("/engagements/code/ENG3001/participants", headers=_auth_header(202))
     assert response.status_code == 200
     body = response.json()
     assert body["data"] == []
@@ -104,7 +94,7 @@ async def test_get_engagement_code_participants_returns_participants_from_engage
     async_client, test_db_session
 ):
     """Test that the endpoint returns participants from a specific engagement."""
-    await _seed_employee(test_db_session, user_id=7004, employee_id=203)
+    await _seed_employee(test_db_session, employee_id=203)
 
     # Create assessment package
     test_db_session.add(
@@ -181,7 +171,7 @@ async def test_get_engagement_code_participants_returns_participants_from_engage
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/engagements/code/ENG3002/participants", headers=_auth_header(7004))
+    response = await async_client.get("/engagements/code/ENG3002/participants", headers=_auth_header(203))
     assert response.status_code == 200
     body = response.json()
     assert body["meta"]["total"] == 2
@@ -204,7 +194,7 @@ async def test_get_engagement_code_participants_returns_participants_from_engage
 @pytest.mark.asyncio
 async def test_get_engagement_code_participants_returns_distinct_users(async_client, test_db_session):
     """Test that the endpoint returns distinct users even if enrolled in multiple slots."""
-    await _seed_employee(test_db_session, user_id=7005, employee_id=204)
+    await _seed_employee(test_db_session, employee_id=204)
 
     # Create assessment package
     test_db_session.add(
@@ -269,7 +259,7 @@ async def test_get_engagement_code_participants_returns_distinct_users(async_cli
     )
     await test_db_session.commit()
 
-    response = await async_client.get("/engagements/code/ENG3003/participants", headers=_auth_header(7005))
+    response = await async_client.get("/engagements/code/ENG3003/participants", headers=_auth_header(204))
     assert response.status_code == 200
     body = response.json()
     
@@ -283,7 +273,7 @@ async def test_get_engagement_code_participants_returns_distinct_users(async_cli
 @pytest.mark.asyncio
 async def test_get_engagement_code_participants_validates_pagination_params(async_client, test_db_session):
     """Test that the endpoint validates pagination parameters."""
-    await _seed_employee(test_db_session, user_id=7006, employee_id=205)
+    await _seed_employee(test_db_session, employee_id=205)
 
     # Create assessment package and engagement
     test_db_session.add(
@@ -312,22 +302,22 @@ async def test_get_engagement_code_participants_validates_pagination_params(asyn
     await test_db_session.commit()
 
     # Test invalid page
-    response = await async_client.get("/engagements/code/ENG3004/participants?page=0", headers=_auth_header(7006))
+    response = await async_client.get("/engagements/code/ENG3004/participants?page=0", headers=_auth_header(205))
     assert response.status_code == 400
 
     # Test invalid limit (too small)
-    response = await async_client.get("/engagements/code/ENG3004/participants?limit=0", headers=_auth_header(7006))
+    response = await async_client.get("/engagements/code/ENG3004/participants?limit=0", headers=_auth_header(205))
     assert response.status_code == 400
 
     # Test invalid limit (too large)
-    response = await async_client.get("/engagements/code/ENG3004/participants?limit=101", headers=_auth_header(7006))
+    response = await async_client.get("/engagements/code/ENG3004/participants?limit=101", headers=_auth_header(205))
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_get_engagement_code_participants_paginates_results(async_client, test_db_session):
     """Test that the endpoint paginates results correctly."""
-    await _seed_employee(test_db_session, user_id=7007, employee_id=206)
+    await _seed_employee(test_db_session, employee_id=206)
 
     # Create assessment package
     test_db_session.add(
@@ -388,7 +378,7 @@ async def test_get_engagement_code_participants_paginates_results(async_client, 
 
     # Get page 1 with limit 2
     response = await async_client.get(
-        "/engagements/code/ENG3005/participants?page=1&limit=2", headers=_auth_header(7007)
+        "/engagements/code/ENG3005/participants?page=1&limit=2", headers=_auth_header(206)
     )
     assert response.status_code == 200
     body = response.json()
@@ -399,7 +389,7 @@ async def test_get_engagement_code_participants_paginates_results(async_client, 
 
     # Get page 2 with limit 2
     response = await async_client.get(
-        "/engagements/code/ENG3005/participants?page=2&limit=2", headers=_auth_header(7007)
+        "/engagements/code/ENG3005/participants?page=2&limit=2", headers=_auth_header(206)
     )
     assert response.status_code == 200
     body = response.json()
@@ -410,7 +400,7 @@ async def test_get_engagement_code_participants_paginates_results(async_client, 
 
     # Get page 3 with limit 2 (should have 1 item)
     response = await async_client.get(
-        "/engagements/code/ENG3005/participants?page=3&limit=2", headers=_auth_header(7007)
+        "/engagements/code/ENG3005/participants?page=3&limit=2", headers=_auth_header(206)
     )
     assert response.status_code == 200
     body = response.json()
@@ -423,7 +413,7 @@ async def test_get_engagement_code_participants_paginates_results(async_client, 
 @pytest.mark.asyncio
 async def test_get_engagement_code_participants_excludes_other_engagements(async_client, test_db_session):
     """Test that the endpoint only returns participants from the specified engagement."""
-    await _seed_employee(test_db_session, user_id=7008, employee_id=207)
+    await _seed_employee(test_db_session, employee_id=207)
 
     # Create assessment package
     test_db_session.add(
@@ -510,7 +500,7 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
     await test_db_session.commit()
 
     # Get participants for ENG3006 (should only get user 8201)
-    response = await async_client.get("/engagements/code/ENG3006/participants", headers=_auth_header(7008))
+    response = await async_client.get("/engagements/code/ENG3006/participants", headers=_auth_header(207))
     assert response.status_code == 200
     body = response.json()
     assert body["meta"]["total"] == 1
@@ -519,7 +509,7 @@ async def test_get_engagement_code_participants_excludes_other_engagements(async
     assert body["data"][0]["first_name"] == "EngA_User"
 
     # Get participants for ENG3007 (should only get user 8202)
-    response = await async_client.get("/engagements/code/ENG3007/participants", headers=_auth_header(7008))
+    response = await async_client.get("/engagements/code/ENG3007/participants", headers=_auth_header(207))
     assert response.status_code == 200
     body = response.json()
     assert body["meta"]["total"] == 1

@@ -36,10 +36,15 @@ class Employee(Base):
     """SQLAlchemy model for `employee` table."""
 
     __tablename__ = "employee"
-    __table_args__ = (Index("ix_employee_user_id", "user_id"),)
+    __table_args__ = (
+        Index("ix_employee_phone", "phone", unique=True),
+        Index("ix_employee_email", "email", unique=True),
+    )
 
     employee_id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False, unique=True)
+    name = Column(String, nullable=False)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
     role = Column(_employee_role, nullable=False)
     status = Column(String, nullable=False)
     permissions_version = Column(Integer, nullable=False, default=1, server_default="1")
@@ -50,6 +55,29 @@ class Employee(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+class EmployeeAuthOtpSession(Base):
+    __tablename__ = "employee_auth_otp_sessions"
+    __table_args__ = (Index("ix_employee_auth_otp_sessions_employee_id", "employee_id"),)
+
+    session_id = Column(Integer, primary_key=True, autoincrement=True)
+    employee_id = Column(Integer, ForeignKey("employee.employee_id", ondelete="CASCADE"), nullable=False)
+    otp_hash = Column(String, nullable=False)
+    otp_expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    failed_attempts = Column(Integer, nullable=False, server_default="0", default=0)
+
+
+class EmployeeAuthToken(Base):
+    __tablename__ = "employee_auth_tokens"
+    __table_args__ = (Index("ix_employee_auth_tokens_employee_id", "employee_id"),)
+
+    token_id = Column(Integer, primary_key=True, autoincrement=True)
+    employee_id = Column(Integer, ForeignKey("employee.employee_id", ondelete="CASCADE"), nullable=False)
+    refresh_token_hash = Column(String, nullable=False)
+    issued_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
 
 
 class PermissionCategory(Base):

@@ -6,8 +6,6 @@ from modules.assessments.dependencies import get_assessments_service
 from modules.assessments.repository import AssessmentsRepository
 from modules.audit.repository import AuditRepository
 from modules.audit.service import AuditService
-from modules.employee.repository import EmployeeRepository
-from modules.employee.service import EmployeeService
 from modules.engagements.assessment_packages_service import (
     EngagementAssessmentPackagesService,
 )
@@ -47,16 +45,16 @@ def get_engagements_service() -> EngagementsService:
 
 
 def get_onboarding_assistants_service() -> OnboardingAssistantsService:
-    from modules.users.dependencies import get_users_service
+    from modules.employee.repository import EmployeeRepository
+    from modules.partners.dependencies import get_partners_service
+    from modules.partners.repository import PartnersRepository
 
     audit_service = AuditService(AuditRepository())
-    employee_repository = EmployeeRepository()
-    employee_service = EmployeeService(employee_repository, audit_service=audit_service)
     return OnboardingAssistantsService(
         repository=EngagementsRepository(),
-        employee_service=employee_service,
-        employee_repository=employee_repository,
-        users_service=get_users_service(),
+        partners_repository=PartnersRepository(),
+        employee_repository=EmployeeRepository(),
+        partners_service=get_partners_service(),
         audit_service=audit_service,
     )
 

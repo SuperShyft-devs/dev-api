@@ -18,19 +18,26 @@ from modules.reports.models import CampReport, CampReportSection
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
+
+
+def _partner_auth_header(partner_id: int) -> dict[str, str]:
+    from tests.helpers.auth import partner_auth_header
+    return partner_auth_header(partner_id)
 
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=employee_id, name=f"Employee {employee_id}", phone=str(employee_id).zfill(10)[:15], email=f"employee{employee_id}@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
 
 async def _seed_camp(test_db_session, *, organization_id: int = 9101, engagement_id: int = 9101):
+    from tests.helpers.engagement_types import engagement_type_id
+
     test_db_session.add(
         Organization(
             organization_id=organization_id,
@@ -48,6 +55,7 @@ async def _seed_camp(test_db_session, *, organization_id: int = 9101, engagement
     start = date(2026, 6, 23)
     end = date(2026, 6, 25)
     camp_no = compute_camp_no(organization_id, start)
+    type_id = await engagement_type_id(test_db_session, "bio_ai")
     test_db_session.add(
         Engagement(
             engagement_id=engagement_id,
@@ -55,7 +63,7 @@ async def _seed_camp(test_db_session, *, organization_id: int = 9101, engagement
             organization_id=organization_id,
             camp_no=camp_no,
             engagement_code="CAMPREP1",
-            engagement_type="bio_ai",
+            engagement_type=type_id,
             assessment_package_id=None,
             diagnostic_package_id=None,
             city="BLR",
@@ -192,7 +200,7 @@ async def test_init_camp_report_requires_auth(async_client):
 async def test_init_camp_report_creates_row(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7401, employee_id=51)
     camp_no, _ = await _seed_camp(test_db_session)
-    headers = _auth_header(7401)
+    headers = _auth_header(51)
 
     response = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert response.status_code == 201
@@ -219,7 +227,7 @@ async def test_init_camp_report_creates_row(async_client, test_db_session):
 async def test_init_department_camp_report(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7402, employee_id=52)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9102, engagement_id=9102)
-    headers = _auth_header(7402)
+    headers = _auth_header(52)
 
     response = await async_client.post(
         f"/reports/camps/{camp_no}/department/sales/init",
@@ -240,7 +248,7 @@ async def test_init_department_camp_report(async_client, test_db_session):
 async def test_init_camp_report_conflict(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7403, employee_id=53)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9103, engagement_id=9103)
-    headers = _auth_header(7403)
+    headers = _auth_header(53)
 
     first = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert first.status_code == 201
@@ -253,7 +261,7 @@ async def test_init_camp_report_conflict(async_client, test_db_session):
 @pytest.mark.asyncio
 async def test_init_camp_report_not_found(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7404, employee_id=54)
-    headers = _auth_header(7404)
+    headers = _auth_header(54)
 
     response = await async_client.post("/reports/camps/999999999/init", headers=headers)
     assert response.status_code == 404
@@ -286,7 +294,7 @@ async def test_init_all_camp_reports_creates_overall_departments_cities_and_comb
         )
     )
     await test_db_session.commit()
-    headers = _auth_header(7480)
+    headers = _auth_header(80)
 
     response = await async_client.post(f"/reports/camps/{camp_no}/init-all", headers=headers)
     assert response.status_code == 200
@@ -350,7 +358,7 @@ async def test_init_all_camp_reports_requires_auth(async_client):
 @pytest.mark.asyncio
 async def test_init_all_camp_reports_not_found(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7481, employee_id=81)
-    headers = _auth_header(7481)
+    headers = _auth_header(81)
 
     response = await async_client.post("/reports/camps/999999998/init-all", headers=headers)
     assert response.status_code == 404
@@ -361,7 +369,7 @@ async def test_init_all_camp_reports_not_found(async_client, test_db_session):
 async def test_init_department_invalid_slug(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7405, employee_id=55)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9105, engagement_id=9105)
-    headers = _auth_header(7405)
+    headers = _auth_header(55)
 
     response = await async_client.post(
         f"/reports/camps/{camp_no}/department/unknown/init",
@@ -375,7 +383,7 @@ async def test_init_department_invalid_slug(async_client, test_db_session):
 async def test_delete_camp_reports(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7406, employee_id=56)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9106, engagement_id=9106)
-    headers = _auth_header(7406)
+    headers = _auth_header(56)
 
     init_overall = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init_overall.status_code == 201
@@ -415,7 +423,7 @@ async def test_delete_camp_reports(async_client, test_db_session):
 async def test_delete_department_camp_report(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7407, employee_id=57)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9107, engagement_id=9107)
-    headers = _auth_header(7407)
+    headers = _auth_header(57)
 
     init_overall = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init_overall.status_code == 201
@@ -448,7 +456,7 @@ async def test_list_camp_reports_requires_auth(async_client):
 async def test_list_camp_reports(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7501, employee_id=61)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9111, engagement_id=9111)
-    headers = _auth_header(7501)
+    headers = _auth_header(61)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -484,7 +492,7 @@ async def test_refresh_camp_report_not_found(async_client, test_db_session):
         organization_id=9202,
         engagement_id=9202,
     )
-    headers = _auth_header(7502)
+    headers = _auth_header(62)
 
     response = await async_client.put(
         f"/reports/camps/{camp_no}/refresh",
@@ -503,7 +511,7 @@ async def test_refresh_camp_report_invalid_section(async_client, test_db_session
         organization_id=9203,
         engagement_id=9203,
     )
-    headers = _auth_header(7503)
+    headers = _auth_header(63)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -526,7 +534,7 @@ async def test_refresh_camp_report_participation_by_age(async_client, test_db_se
         organization_id=9204,
         engagement_id=9204,
     )
-    headers = _auth_header(7504)
+    headers = _auth_header(64)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -565,7 +573,7 @@ async def test_refresh_department_camp_report_participation_by_age(async_client,
         organization_id=9205,
         engagement_id=9205,
     )
-    headers = _auth_header(7505)
+    headers = _auth_header(65)
 
     init = await async_client.post(
         f"/reports/camps/{camp_no}/department/sales/init",
@@ -593,7 +601,7 @@ async def test_refresh_city_camp_report_persists_participation_by_age(async_clie
         organization_id=9610,
         engagement_id=9610,
     )
-    headers = _auth_header(7620)
+    headers = _auth_header(920)
 
     init_overall = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init_overall.status_code == 201
@@ -645,7 +653,7 @@ async def test_refresh_city_department_camp_report_persists_participation_by_age
         organization_id=9611,
         engagement_id=9611,
     )
-    headers = _auth_header(7621)
+    headers = _auth_header(921)
 
     init_dept = await async_client.post(
         f"/reports/camps/{camp_no}/department/sales/init",
@@ -692,7 +700,7 @@ async def test_refresh_camp_report_replaces_existing_section(async_client, test_
         organization_id=9206,
         engagement_id=9206,
     )
-    headers = _auth_header(7506)
+    headers = _auth_header(66)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -722,19 +730,19 @@ async def test_refresh_camp_report_replaces_existing_section(async_client, test_
 async def _seed_organization_manager_for_camp(
     test_db_session,
     *,
-    manager_user_id: int = 7601,
-    employee_id: int = 71,
+    partner_id: int = 7601,
     organization_id: int = 9301,
     engagement_id: int = 9301,
 ):
+    from modules.partners.models import Partner
+    from tests.helpers.engagement_types import engagement_type_id
+
     test_db_session.add(
-        User(user_id=manager_user_id, age=30, phone=f"{manager_user_id}000000000", status="active")
-    )
-    await test_db_session.flush()
-    test_db_session.add(
-        Employee(
-            employee_id=employee_id,
-            user_id=manager_user_id,
+        Partner(
+            partner_id=partner_id,
+            name=f"Org Manager {partner_id}",
+            phone=f"9{partner_id:09d}"[:15],
+            email=f"orgmgr{partner_id}@test.example",
             role="organization_manager",
             status="active",
         )
@@ -745,7 +753,7 @@ async def _seed_organization_manager_for_camp(
             name="Managed Camp Org",
             organization_type="corporate",
             status="active",
-            contact_person_user_ids={"organization_managers": [manager_user_id]},
+            contact_person_user_ids={"organization_managers": [partner_id]},
             departments=[
                 {"department": "Sales", "slug": "sales"},
                 {"department": "Engineering", "slug": "engineering"},
@@ -757,6 +765,7 @@ async def _seed_organization_manager_for_camp(
     start = date(2026, 6, 23)
     end = date(2026, 6, 25)
     camp_no = compute_camp_no(organization_id, start)
+    type_id = await engagement_type_id(test_db_session, "bio_ai")
     test_db_session.add(
         Engagement(
             engagement_id=engagement_id,
@@ -764,7 +773,7 @@ async def _seed_organization_manager_for_camp(
             organization_id=organization_id,
             camp_no=camp_no,
             engagement_code="MGDCAMP1",
-            engagement_type="bio_ai",
+            engagement_type=type_id,
             assessment_package_id=None,
             diagnostic_package_id=None,
             city="BLR",
@@ -782,7 +791,7 @@ async def _seed_organization_manager_for_camp(
 async def test_get_camp_report_meta(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7602, employee_id=72)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9302, engagement_id=9302)
-    headers = _auth_header(7602)
+    headers = _auth_header(702)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -803,7 +812,7 @@ async def test_get_camp_report_dashboard_after_refresh(async_client, test_db_ses
         organization_id=9303,
         engagement_id=9303,
     )
-    headers = _auth_header(7603)
+    headers = _auth_header(703)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -835,7 +844,7 @@ async def test_update_camp_report_dashboard_section_payload(async_client, test_d
         organization_id=9310,
         engagement_id=9310,
     )
-    headers = _auth_header(7610)
+    headers = _auth_header(80)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -883,7 +892,7 @@ async def test_get_camp_report_dashboard_section_not_found(async_client, test_db
     await _seed_employee(test_db_session, user_id=7604, employee_id=74)
     await _seed_participation_section(test_db_session, report_sections=22)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9304, engagement_id=9304)
-    headers = _auth_header(7604)
+    headers = _auth_header(704)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -901,7 +910,7 @@ async def test_get_camp_report_dashboard_section_not_found(async_client, test_db
 async def test_get_department_camp_report_meta(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7605, employee_id=75)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9305, engagement_id=9305)
-    headers = _auth_header(7605)
+    headers = _auth_header(75)
 
     init = await async_client.post(
         f"/reports/camps/{camp_no}/department/sales/init",
@@ -920,13 +929,13 @@ async def test_get_department_camp_report_meta(async_client, test_db_session):
 @pytest.mark.asyncio
 async def test_organization_manager_can_access_own_camp_meta(async_client, test_db_session):
     camp_no, _ = await _seed_organization_manager_for_camp(test_db_session)
-    headers = _auth_header(7601)
+    headers = _partner_auth_header(7601)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 403
 
     await _seed_employee(test_db_session, user_id=7606, employee_id=76)
-    admin_headers = _auth_header(7606)
+    admin_headers = _auth_header(76)
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=admin_headers)
     assert init.status_code == 201
 
@@ -938,21 +947,21 @@ async def test_organization_manager_can_access_own_camp_meta(async_client, test_
 @pytest.mark.asyncio
 async def test_organization_manager_cannot_access_other_camp_meta(async_client, test_db_session):
     await _seed_organization_manager_for_camp(
+
         test_db_session,
-        manager_user_id=7607,
-        employee_id=77,
+        partner_id=7607,
         organization_id=9306,
         engagement_id=9306,
     )
     await _seed_employee(test_db_session, user_id=7608, employee_id=78)
     other_camp_no, _ = await _seed_camp(test_db_session, organization_id=9307, engagement_id=9307)
-    admin_headers = _auth_header(7608)
+    admin_headers = _auth_header(78)
     init = await async_client.post(f"/reports/camps/{other_camp_no}/init", headers=admin_headers)
     assert init.status_code == 201
 
     response = await async_client.get(
         f"/reports/camps/{other_camp_no}/meta",
-        headers=_auth_header(7607),
+        headers=_partner_auth_header(7607),
     )
     assert response.status_code == 403
 
@@ -966,7 +975,7 @@ async def test_list_camp_report_sections_returns_keys(async_client, test_db_sess
         organization_id=9310,
         engagement_id=9310,
     )
-    headers = _auth_header(7610)
+    headers = _auth_header(80)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -988,7 +997,7 @@ async def test_list_camp_report_sections_returns_keys(async_client, test_db_sess
 async def test_list_department_camp_report_sections(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7611, employee_id=81)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9311, engagement_id=9311)
-    headers = _auth_header(7611)
+    headers = _auth_header(81)
 
     init = await async_client.post(
         f"/reports/camps/{camp_no}/department/sales/init",
@@ -1009,19 +1018,19 @@ async def test_list_camp_report_sections_onboarding_assistant_403(async_client, 
     test_db_session.add(User(user_id=7612, age=30, phone="7612000000", status="active"))
     await test_db_session.flush()
     test_db_session.add(
-        Employee(employee_id=82, user_id=7612, role="onboarding_assistant", status="active")
+        Employee(employee_id=82, name="Employee 82", phone="0000000082", email="employee82@test.example", role="onboarding_assistant", status="active")
     )
     await test_db_session.commit()
 
     await _seed_employee(test_db_session, user_id=7613, employee_id=83)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9312, engagement_id=9312)
-    admin_headers = _auth_header(7613)
+    admin_headers = _auth_header(83)
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=admin_headers)
     assert init.status_code == 201
 
     response = await async_client.get(
         f"/reports/camps/{camp_no}/sections",
-        headers=_auth_header(7612),
+        headers=_auth_header(82),
     )
     assert response.status_code == 403
 
@@ -1029,20 +1038,20 @@ async def test_list_camp_report_sections_onboarding_assistant_403(async_client, 
 @pytest.mark.asyncio
 async def test_organization_manager_can_list_own_camp_sections(async_client, test_db_session):
     camp_no, _ = await _seed_organization_manager_for_camp(
+
         test_db_session,
-        manager_user_id=7614,
-        employee_id=84,
+        partner_id=7614,
         organization_id=9313,
         engagement_id=9313,
     )
     await _seed_employee(test_db_session, user_id=7615, employee_id=85)
-    admin_headers = _auth_header(7615)
+    admin_headers = _auth_header(85)
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=admin_headers)
     assert init.status_code == 201
 
     response = await async_client.get(
         f"/reports/camps/{camp_no}/sections",
-        headers=_auth_header(7614),
+        headers=_partner_auth_header(7614),
     )
     assert response.status_code == 200
     assert response.json()["data"] == ["meta"]
@@ -1308,7 +1317,7 @@ async def test_refresh_camp_report_kpis(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7701, employee_id=91)
     await _seed_kpis_section(test_db_session, report_sections=101)
     camp_no = await _seed_kpis_camp_data(test_db_session, organization_id=9401, engagement_id=9401)
-    headers = _auth_header(7701)
+    headers = _auth_header(91)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -1368,7 +1377,7 @@ async def test_refresh_department_camp_report_kpis(async_client, test_db_session
     await _seed_employee(test_db_session, user_id=7702, employee_id=92)
     await _seed_kpis_section(test_db_session, report_sections=102)
     camp_no = await _seed_kpis_camp_data(test_db_session, organization_id=9402, engagement_id=9402)
-    headers = _auth_header(7702)
+    headers = _auth_header(92)
 
     init = await async_client.post(
         f"/reports/camps/{camp_no}/department/sales/init",
@@ -1406,7 +1415,7 @@ async def test_refresh_camp_report_kpis_replaces_without_touching_other_sections
     await _seed_participation_section(test_db_session, report_sections=103)
     await _seed_kpis_section(test_db_session, report_sections=104)
     camp_no = await _seed_kpis_camp_data(test_db_session, organization_id=9403, engagement_id=9403)
-    headers = _auth_header(7703)
+    headers = _auth_header(93)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -1677,7 +1686,7 @@ async def test_refresh_camp_report_overall_risk_score(async_client, test_db_sess
     camp_no = await _seed_overall_risk_score_camp_data(
         test_db_session, organization_id=9501, engagement_id=9501
     )
-    headers = _auth_header(7801)
+    headers = _auth_header(801)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -1719,7 +1728,7 @@ async def test_refresh_department_camp_report_overall_risk_score(async_client, t
     camp_no = await _seed_overall_risk_score_camp_data(
         test_db_session, organization_id=9502, engagement_id=9502
     )
-    headers = _auth_header(7802)
+    headers = _auth_header(802)
 
     init = await async_client.post(
         f"/reports/camps/{camp_no}/department/sales/init",
@@ -1747,7 +1756,7 @@ async def test_refresh_overall_risk_score_updates_existing(async_client, test_db
     camp_no = await _seed_overall_risk_score_camp_data(
         test_db_session, organization_id=9503, engagement_id=9503
     )
-    headers = _auth_header(7803)
+    headers = _auth_header(803)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -2043,7 +2052,7 @@ async def test_refresh_camp_report_distribution_by_oxidative_stress(async_client
     camp_no = await _seed_oxidative_stress_camp_data(
         test_db_session, organization_id=9601, engagement_id=9601
     )
-    headers = _auth_header(7901)
+    headers = _auth_header(901)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -2091,7 +2100,7 @@ async def test_refresh_department_camp_report_distribution_by_oxidative_stress(a
     camp_no = await _seed_oxidative_stress_camp_data(
         test_db_session, organization_id=9602, engagement_id=9602
     )
-    headers = _auth_header(7902)
+    headers = _auth_header(902)
 
     init = await async_client.post(
         f"/reports/camps/{camp_no}/department/sales/init",
@@ -2119,7 +2128,7 @@ async def test_refresh_oxidative_stress_updates_existing(async_client, test_db_s
     camp_no = await _seed_oxidative_stress_camp_data(
         test_db_session, organization_id=9603, engagement_id=9603
     )
-    headers = _auth_header(7903)
+    headers = _auth_header(903)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -2203,7 +2212,7 @@ async def test_list_camp_participants_returns_all_enrollments(async_client, test
         organization_id=9602,
         engagement_id=9602,
     )
-    headers = _auth_header(7901)
+    headers = _auth_header(901)
 
     response = await async_client.get(f"/reports/camps/{camp_no}/participants", headers=headers)
     assert response.status_code == 200
@@ -2223,7 +2232,7 @@ async def test_list_camp_participants_pagination(async_client, test_db_session):
         organization_id=9603,
         engagement_id=9603,
     )
-    headers = _auth_header(7902)
+    headers = _auth_header(902)
 
     page1 = await async_client.get(
         f"/reports/camps/{camp_no}/participants?page=1&limit=2",
@@ -2245,7 +2254,7 @@ async def test_list_camp_participants_pagination(async_client, test_db_session):
 async def test_list_camp_participants_includes_profile_fields(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7903, employee_id=212)
     camp_no = await _seed_camp_participants_with_profile_fields(test_db_session)
-    headers = _auth_header(7903)
+    headers = _auth_header(903)
 
     response = await async_client.get(f"/reports/camps/{camp_no}/participants", headers=headers)
     assert response.status_code == 200
@@ -2521,7 +2530,7 @@ async def _seed_camp_participants_enriched(test_db_session, *, organization_id: 
 async def test_list_camp_participants_enriched_fields(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7906, employee_id=215)
     camp_no, user_id = await _seed_camp_participants_enriched(test_db_session)
-    headers = _auth_header(7906)
+    headers = _auth_header(906)
 
     response = await async_client.get(f"/reports/camps/{camp_no}/participants", headers=headers)
     assert response.status_code == 200
@@ -2576,7 +2585,7 @@ async def test_list_camp_participants_organization_manager_own_camp(async_client
 
     response = await async_client.get(
         f"/reports/camps/{camp_no}/participants",
-        headers=_auth_header(7601),
+        headers=_partner_auth_header(7601),
     )
     assert response.status_code == 200
     assert response.json()["meta"]["total"] == 1
@@ -2586,9 +2595,9 @@ async def test_list_camp_participants_organization_manager_own_camp(async_client
 @pytest.mark.asyncio
 async def test_list_camp_participants_organization_manager_other_camp_403(async_client, test_db_session):
     await _seed_organization_manager_for_camp(
+
         test_db_session,
-        manager_user_id=7904,
-        employee_id=213,
+        partner_id=7904,
         organization_id=9604,
         engagement_id=9604,
     )
@@ -2597,7 +2606,7 @@ async def test_list_camp_participants_organization_manager_other_camp_403(async_
 
     response = await async_client.get(
         f"/reports/camps/{other_camp_no}/participants",
-        headers=_auth_header(7904),
+        headers=_partner_auth_header(7904),
     )
     assert response.status_code == 403
 
@@ -2607,7 +2616,7 @@ async def test_list_camp_participants_onboarding_assistant(async_client, test_db
     test_db_session.add(User(user_id=7906, age=30, phone="7906000000", status="active"))
     await test_db_session.flush()
     test_db_session.add(
-        Employee(employee_id=215, user_id=7906, role="onboarding_assistant", status="active")
+        Employee(employee_id=215, name="Employee 215", phone="0000000215", email="employee215@test.example", role="onboarding_assistant", status="active")
     )
     await test_db_session.commit()
 
@@ -2619,7 +2628,7 @@ async def test_list_camp_participants_onboarding_assistant(async_client, test_db
 
     response = await async_client.get(
         f"/reports/camps/{camp_no}/participants",
-        headers=_auth_header(7906),
+        headers=_auth_header(906),
     )
     assert response.status_code == 200
     assert response.json()["meta"]["total"] == 1
@@ -2631,7 +2640,7 @@ async def test_list_camp_participants_camp_not_found(async_client, test_db_sessi
 
     response = await async_client.get(
         "/reports/camps/99999999999/participants",
-        headers=_auth_header(7907),
+        headers=_auth_header(216),
     )
     assert response.status_code == 404
     assert response.json()["error_code"] == "CAMP_NOT_FOUND"
@@ -2735,7 +2744,7 @@ async def test_list_department_camp_participants_filters_by_slug(async_client, t
         organization_id=9702,
         engagement_id=9702,
     )
-    headers = _auth_header(7910)
+    headers = _auth_header(910)
 
     response = await async_client.get(
         f"/reports/camps/{camp_no}/department/sales/participants",
@@ -2760,7 +2769,7 @@ async def test_list_department_camp_participants_unknown_slug_404(async_client, 
 
     response = await async_client.get(
         f"/reports/camps/{camp_no}/department/marketing/participants",
-        headers=_auth_header(7911),
+        headers=_auth_header(911),
     )
     assert response.status_code == 404
     assert response.json()["error_code"] == "DEPARTMENT_NOT_FOUND"
@@ -2774,7 +2783,7 @@ async def test_list_city_camp_participants_filters_by_city(async_client, test_db
         organization_id=9704,
         engagement_id=9704,
     )
-    headers = _auth_header(7912)
+    headers = _auth_header(912)
 
     response = await async_client.get(
         f"/reports/camps/{camp_no}/MUM/participants",
@@ -2797,7 +2806,7 @@ async def test_list_city_camp_participants_unknown_city_404(async_client, test_d
 
     response = await async_client.get(
         f"/reports/camps/{camp_no}/DEL/participants",
-        headers=_auth_header(7913),
+        headers=_auth_header(913),
     )
     assert response.status_code == 404
     assert response.json()["error_code"] == "CITY_NOT_FOUND"
@@ -2811,7 +2820,7 @@ async def test_list_city_department_camp_participants(async_client, test_db_sess
         organization_id=9706,
         engagement_id=9706,
     )
-    headers = _auth_header(7914)
+    headers = _auth_header(224)
 
     response = await async_client.get(
         f"/reports/camps/{camp_no}/BLR/department/sales/participants",
@@ -2851,7 +2860,7 @@ async def test_list_city_department_camp_participants_zero_matches(async_client,
 
     response = await async_client.get(
         f"/reports/camps/{camp_no}/BLR/department/engineering/participants",
-        headers=_auth_header(7915),
+        headers=_auth_header(225),
     )
     assert response.status_code == 200
     body = response.json()
@@ -3043,7 +3052,7 @@ async def test_refresh_camp_report_physical_activity_distribution(async_client, 
     camp_no = await _seed_physical_activity_camp_data(
         test_db_session, organization_id=9701, engagement_id=9701
     )
-    headers = _auth_header(8001)
+    headers = _auth_header(301)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -3089,7 +3098,7 @@ async def test_refresh_department_camp_report_physical_activity_distribution(asy
     camp_no = await _seed_physical_activity_camp_data(
         test_db_session, organization_id=9702, engagement_id=9702
     )
-    headers = _auth_header(8002)
+    headers = _auth_header(302)
 
     init = await async_client.post(
         f"/reports/camps/{camp_no}/department/sales/init",
@@ -3119,7 +3128,7 @@ async def test_refresh_physical_activity_distribution_updates_existing(async_cli
     camp_no = await _seed_physical_activity_camp_data(
         test_db_session, organization_id=9703, engagement_id=9703
     )
-    headers = _auth_header(8003)
+    headers = _auth_header(303)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -3428,7 +3437,7 @@ async def test_refresh_camp_report_distribution_by_gender_by_metabolic_syndrome(
     camp_no = await _seed_gender_metabolic_syndrome_camp_data(
         test_db_session, organization_id=9801, engagement_id=9801
     )
-    headers = _auth_header(8101)
+    headers = _auth_header(401)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -3482,7 +3491,7 @@ async def test_refresh_department_camp_report_distribution_by_gender_by_metaboli
     camp_no = await _seed_gender_metabolic_syndrome_camp_data(
         test_db_session, organization_id=9802, engagement_id=9802
     )
-    headers = _auth_header(8102)
+    headers = _auth_header(402)
 
     init = await async_client.post(
         f"/reports/camps/{camp_no}/department/sales/init",
@@ -3511,7 +3520,7 @@ async def test_refresh_gender_metabolic_syndrome_updates_existing(async_client, 
     camp_no = await _seed_gender_metabolic_syndrome_camp_data(
         test_db_session, organization_id=9803, engagement_id=9803
     )
-    headers = _auth_header(8103)
+    headers = _auth_header(403)
 
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
@@ -3911,7 +3920,7 @@ async def test_refresh_camp_report_positive_wins(async_client, fastapi_app, test
     await _seed_employee(test_db_session, user_id=7601, employee_id=701)
     await _seed_positive_wins_section(test_db_session, report_sections=101)
     camp_no = await _seed_positive_wins_camp_with_assessments(test_db_session, organization_id=9301)
-    headers = _auth_header(7601)
+    headers = _auth_header(701)
 
     fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_positive_wins(
         diagnostics_service=_diag_multi_group_factory(),
@@ -4009,7 +4018,7 @@ async def test_refresh_department_camp_report_positive_wins(async_client, fastap
     await _seed_employee(test_db_session, user_id=7602, employee_id=702)
     await _seed_positive_wins_section(test_db_session, report_sections=102)
     camp_no = await _seed_positive_wins_camp_with_assessments(test_db_session, organization_id=9302)
-    headers = _auth_header(7602)
+    headers = _auth_header(702)
 
     fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_positive_wins(
         diagnostics_service=_DiagSalesOnly(),
@@ -4043,7 +4052,7 @@ async def test_refresh_camp_report_positive_wins_empty_camp(async_client, fastap
     await _seed_employee(test_db_session, user_id=7603, employee_id=703)
     await _seed_positive_wins_section(test_db_session, report_sections=103)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9303, engagement_id=9303)
-    headers = _auth_header(7603)
+    headers = _auth_header(703)
 
     fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_positive_wins(
         diagnostics_service=_FakeDiagnosticsService(),
@@ -4077,7 +4086,7 @@ async def test_refresh_camp_report_positive_wins_preserves_other_sections(
     await _seed_participation_section(test_db_session, report_sections=104)
     await _seed_positive_wins_section(test_db_session, report_sections=105)
     camp_no = await _seed_positive_wins_camp_with_assessments(test_db_session, organization_id=9304)
-    headers = _auth_header(7604)
+    headers = _auth_header(704)
 
     fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_positive_wins(
         diagnostics_service=_FakeDiagnosticsService(),
@@ -4255,7 +4264,7 @@ async def test_refresh_camp_report_company_average_scores(async_client, fastapi_
     await _seed_employee(test_db_session, user_id=7801, employee_id=801)
     await _seed_company_average_scores_section(test_db_session, report_sections=200)
     camp_no = await _seed_company_average_scores_camp(test_db_session, organization_id=9401)
-    headers = _auth_header(7801)
+    headers = _auth_header(801)
 
     fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_company_average_scores(
         nutrition_score=64.0,
@@ -4302,7 +4311,7 @@ async def test_refresh_department_camp_report_company_average_scores(async_clien
     await _seed_employee(test_db_session, user_id=7802, employee_id=802)
     await _seed_company_average_scores_section(test_db_session, report_sections=201)
     camp_no = await _seed_company_average_scores_camp(test_db_session, organization_id=9402)
-    headers = _auth_header(7802)
+    headers = _auth_header(802)
 
     fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_company_average_scores(
         nutrition_score=70.0,
@@ -4335,7 +4344,7 @@ async def test_refresh_camp_report_company_average_scores_empty_camp(async_clien
     await _seed_employee(test_db_session, user_id=7803, employee_id=803)
     await _seed_company_average_scores_section(test_db_session, report_sections=202)
     camp_no, _ = await _seed_camp(test_db_session, organization_id=9403, engagement_id=9403)
-    headers = _auth_header(7803)
+    headers = _auth_header(803)
 
     fastapi_app.dependency_overrides[get_reports_service] = lambda: _reports_service_for_company_average_scores()
 
@@ -4373,7 +4382,7 @@ async def test_estimate_camp_report_fast_section_under_timeout(async_client, tes
         organization_id=9501,
         engagement_id=9501,
     )
-    headers = _auth_header(7901)
+    headers = _auth_header(901)
 
     response = await async_client.post(
         f"/reports/camps/{camp_no}/estimate",
@@ -4404,7 +4413,7 @@ async def test_estimate_validate_matches_refresh_cost(async_client, test_db_sess
         organization_id=9510,
         engagement_id=9510,
     )
-    headers = _auth_header(7910)
+    headers = _auth_header(910)
 
     response = await async_client.post(
         f"/reports/camps/{camp_no}/estimate",
@@ -4425,7 +4434,7 @@ async def test_estimate_validate_matches_refresh_cost(async_client, test_db_sess
 @pytest.mark.asyncio
 async def test_validate_routes_removed(async_client, test_db_session):
     await _seed_employee(test_db_session, user_id=7911, employee_id=911)
-    headers = _auth_header(7911)
+    headers = _auth_header(911)
     response = await async_client.get(
         "/reports/camps/123/validate/company-average-scores",
         headers=headers,
@@ -4442,7 +4451,7 @@ async def test_refresh_participation_by_age_writes_real_bts(async_client, test_d
         organization_id=9512,
         engagement_id=9512,
     )
-    headers = _auth_header(7912)
+    headers = _auth_header(912)
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
     report_id = init.json()["data"]["report_id"]
@@ -4482,7 +4491,7 @@ async def test_refresh_overall_risk_score_writes_bts(async_client, test_db_sessi
         organization_id=9513,
         engagement_id=9513,
     )
-    headers = _auth_header(7913)
+    headers = _auth_header(913)
     init = await async_client.post(f"/reports/camps/{camp_no}/init", headers=headers)
     assert init.status_code == 201
     report_id = init.json()["data"]["report_id"]
@@ -4522,7 +4531,7 @@ async def test_estimate_camp_report_department_scope(async_client, test_db_sessi
         organization_id=9502,
         engagement_id=9502,
     )
-    headers = _auth_header(7902)
+    headers = _auth_header(902)
 
     response = await async_client.post(
         f"/reports/camps/{camp_no}/estimate",
@@ -4545,7 +4554,7 @@ async def test_estimate_camp_report_city_scope(async_client, test_db_session):
         organization_id=9508,
         engagement_id=9508,
     )
-    headers = _auth_header(7908)
+    headers = _auth_header(908)
 
     response = await async_client.post(
         f"/reports/camps/{camp_no}/estimate",
@@ -4577,7 +4586,7 @@ async def test_estimate_camp_report_blocks_when_over_timeout(
         organization_id=9503,
         engagement_id=9503,
     )
-    headers = _auth_header(7903)
+    headers = _auth_header(903)
     monkeypatch.setattr(settings, "CAMP_REPORT_CLIENT_TIMEOUT_SECONDS", 2)
 
     response = await async_client.post(
@@ -4604,7 +4613,7 @@ async def test_estimate_camp_report_bulk_all_allowed_false(
         organization_id=9504,
         engagement_id=9504,
     )
-    headers = _auth_header(7904)
+    headers = _auth_header(904)
     # company_average_scores with 0 fitprint contexts => ceil(5)=5; timeout 4 blocks it
     monkeypatch.setattr(settings, "CAMP_REPORT_CLIENT_TIMEOUT_SECONDS", 4)
 
@@ -4644,7 +4653,7 @@ async def test_estimate_positive_wins_uses_health_assessment_count(
         organization_id=9506,
         engagement_id=9506,
     )
-    headers = _auth_header(7906)
+    headers = _auth_header(906)
 
     from modules.reports.camp_reports_repository import CampReportsRepository
 
@@ -4679,7 +4688,7 @@ async def test_estimate_camp_report_invalid_action(async_client, test_db_session
         organization_id=9505,
         engagement_id=9505,
     )
-    headers = _auth_header(7905)
+    headers = _auth_header(905)
 
     response = await async_client.post(
         f"/reports/camps/{camp_no}/estimate",

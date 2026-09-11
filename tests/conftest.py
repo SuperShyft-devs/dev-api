@@ -50,6 +50,7 @@ from modules.audit import models as _audit_models  # noqa: F401
 from modules.auth import models as _auth_models  # noqa: F401
 from modules.users import models as _users_models  # noqa: F401
 from modules.employee import models as _employee_models  # noqa: F401
+from modules.partners import models as _partners_models  # noqa: F401
 from modules.engagements import models as _engagements_models  # noqa: F401
 from modules.organizations import models as _organizations_models  # noqa: F401
 from modules.assessments import models as _assessments_models  # noqa: F401
@@ -80,6 +81,7 @@ from modules.checklists.router import router as checklists_router
 from modules.organizations.router import router as organizations_router
 from modules.users.router import router as users_router
 from modules.employee.router import router as employees_router
+from modules.partners.router import router as partners_router
 from modules.assessments.router import router as assessments_router
 from modules.assessments.packages_router import router as assessment_packages_router
 from modules.questionnaire.router import router as questionnaire_router
@@ -365,6 +367,7 @@ async def fastapi_app(
     app.include_router(engagement_assessment_packages_router)
     app.include_router(checklists_router)
     app.include_router(employees_router)
+    app.include_router(partners_router)
     app.include_router(assessments_router)
     app.include_router(assessment_packages_router)
     app.include_router(questionnaire_router)
@@ -433,6 +436,10 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     await test_db_session.execute(text("DELETE FROM integration_sync_logs"))
     await test_db_session.execute(text(f"DELETE FROM auth_otp_sessions WHERE {_non_seed_users}"))
     await test_db_session.execute(text(f"DELETE FROM auth_tokens WHERE {_non_seed_users}"))
+    await test_db_session.execute(text("DELETE FROM employee_auth_otp_sessions"))
+    await test_db_session.execute(text("DELETE FROM employee_auth_tokens"))
+    await test_db_session.execute(text("DELETE FROM partner_auth_otp_sessions"))
+    await test_db_session.execute(text("DELETE FROM partner_auth_tokens"))
     await test_db_session.execute(text("DELETE FROM questionnaire_responses"))
     await test_db_session.execute(text("DELETE FROM questionnaire_healthy_habit_rules"))
     await test_db_session.execute(text("DELETE FROM assessment_category_progress"))
@@ -483,9 +490,18 @@ async def _cleanup_auth_test_rows(test_db_session: AsyncSession):
     await test_db_session.execute(text("DELETE FROM expert_reviews"))
     await test_db_session.execute(text("DELETE FROM expert_expertise_tags"))
     await test_db_session.execute(text("DELETE FROM experts"))
+    await test_db_session.execute(text("DELETE FROM partners"))
+    await test_db_session.execute(
+        text(
+            "SELECT setval("
+            "pg_get_serial_sequence('partners', 'partner_id'), "
+            "COALESCE((SELECT MAX(partner_id) FROM partners), 1), true"
+            ")"
+        )
+    )
 
     if _use_isolated_test_db:
-        await test_db_session.execute(text("DELETE FROM employee WHERE user_id NOT IN (1, 2)"))
+        await test_db_session.execute(text("DELETE FROM employee WHERE employee_id NOT IN (1, 2)"))
         await test_db_session.execute(
             text(
                 "SELECT setval("

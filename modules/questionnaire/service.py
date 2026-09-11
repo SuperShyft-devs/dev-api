@@ -831,7 +831,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -953,7 +953,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return stats
@@ -977,7 +977,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return stats
@@ -1068,7 +1068,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1103,7 +1103,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return row
@@ -1178,7 +1178,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return row
@@ -1207,7 +1207,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return row
@@ -1283,7 +1283,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1318,7 +1318,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return {"category_id": category_id, "question_id": question_id}
@@ -1356,7 +1356,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return {"category_id": category_id, "question_ids": ordered_ids}
@@ -1385,7 +1385,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return row
@@ -1421,7 +1421,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -2343,7 +2343,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._serialize_healthy_habit_rule(row)
@@ -2394,7 +2394,7 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
         return self._serialize_healthy_habit_rule(row)
@@ -2424,6 +2424,6 @@ class QuestionnaireService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )

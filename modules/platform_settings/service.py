@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.assessments.models import AssessmentPackage
 from modules.diagnostics.models import DiagnosticPackage
-from modules.employee.access_control import ONBOARDING_ASSISTANT_ASSIGNEE_ROLES
+from modules.partners.models import PartnerRole
+from modules.partners.repository import PartnersRepository
 from modules.employee.models import EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
@@ -296,7 +297,7 @@ class PlatformSettingsService:
             blood_collection_type=bio_ai.blood_collection_type,
             create_profile_on_metsights=bio_ai.create_profile_on_metsights,
             enroll_for_fitprint_full=bio_ai.enroll_for_fitprint_full,
-            updated_by_user_id=employee.user_id,
+            updated_by_user_id=None,
         )
 
         if self._audit_service is not None:
@@ -306,7 +307,7 @@ class PlatformSettingsService:
                 endpoint=endpoint,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                user_id=employee.user_id,
+                user_id=None,
                 session_id=None,
             )
 
@@ -354,31 +355,33 @@ class PlatformSettingsService:
         db: AsyncSession,
         employee_ids: list[int],
     ) -> list[int]:
+        """Validate IDs as active phlebo partners (setting column name is historical)."""
+        partners_repo = PartnersRepository()
         normalized: list[int] = []
         seen: set[int] = set()
         for raw in employee_ids:
             if not isinstance(raw, int) or raw <= 0 or raw in seen:
                 continue
             seen.add(raw)
-            row = await self._employee_repository.get_by_id_with_user_names(db, raw)
-            if row is None:
+            partner = await partners_repo.get_by_id(db, raw)
+            if partner is None:
                 raise AppError(
                     status_code=404,
-                    error_code="EMPLOYEE_NOT_FOUND",
-                    message=f"Employee with ID {raw} does not exist",
+                    error_code="PARTNER_NOT_FOUND",
+                    message=f"Partner with ID {raw} does not exist",
                 )
-            emp, _first_name, _last_name = row
-            if (emp.status or "").lower() != "active":
+            if (partner.status or "").lower() != "active":
                 raise AppError(
                     status_code=422,
                     error_code="INVALID_ONBOARDING_ASSISTANT",
-                    message=f"Employee {raw} is not active",
+                    message=f"Partner {raw} is not active",
                 )
-            if emp.role not in ONBOARDING_ASSISTANT_ASSIGNEE_ROLES:
+            role = partner.role.value if isinstance(partner.role, PartnerRole) else str(partner.role or "")
+            if role != PartnerRole.phlebo.value:
                 raise AppError(
                     status_code=422,
                     error_code="INVALID_ONBOARDING_ASSISTANT",
-                    message=f"Employee {raw} cannot be assigned as an onboarding assistant",
+                    message=f"Partner {raw} cannot be assigned as an onboarding assistant",
                 )
             normalized.append(raw)
         return normalized
@@ -388,20 +391,22 @@ class PlatformSettingsService:
         db: AsyncSession,
         employee_ids: list[int],
     ) -> DefaultOnboardingAssistantsRead:
+        partners_repo = PartnersRepository()
         assistants: list[DefaultOnboardingAssistantItem] = []
-        for emp_id in employee_ids:
-            row = await self._employee_repository.get_by_id_with_user_names(db, emp_id)
-            if row is None:
+        for partner_id in employee_ids:
+            partner = await partners_repo.get_by_id(db, partner_id)
+            if partner is None:
                 continue
-            emp, first_name, last_name = row
+            name = (partner.name or "").strip()
+            parts = name.split(None, 1)
             assistants.append(
                 DefaultOnboardingAssistantItem(
-                    employee_id=emp.employee_id,
-                    user_id=emp.user_id,
-                    role=emp.role.value if isinstance(emp.role, EmployeeRole) else str(emp.role),
-                    status=emp.status,
-                    first_name=first_name,
-                    last_name=last_name,
+                    employee_id=partner.partner_id,
+                    user_id=partner.partner_id,
+                    role=partner.role.value if isinstance(partner.role, PartnerRole) else str(partner.role),
+                    status=partner.status,
+                    first_name=parts[0] if parts else "",
+                    last_name=parts[1] if len(parts) > 1 else "",
                 )
             )
         return DefaultOnboardingAssistantsRead(employee_ids=employee_ids, assistants=assistants)
@@ -429,7 +434,7 @@ class PlatformSettingsService:
         await self._repository.upsert_default_onboarding_assistants(
             db,
             default_onboarding_assistant_employee_ids=serialized,
-            updated_by_user_id=employee.user_id,
+            updated_by_user_id=None,
             assessment_package_id=a_id,
             diagnostic_package_id=d_id,
         )
@@ -441,7 +446,7 @@ class PlatformSettingsService:
                 endpoint=endpoint,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                user_id=employee.user_id,
+                user_id=None,
                 session_id=None,
             )
 
@@ -472,7 +477,7 @@ class PlatformSettingsService:
         await self._repository.upsert_support_query_notification(
             db,
             default_support_query_notification=keys,
-            updated_by_user_id=employee.user_id,
+            updated_by_user_id=None,
             assessment_package_id=a_id,
             diagnostic_package_id=d_id,
         )
@@ -484,7 +489,7 @@ class PlatformSettingsService:
                 endpoint=endpoint,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                user_id=employee.user_id,
+                user_id=None,
                 session_id=None,
             )
 

@@ -21,11 +21,11 @@ class Expert(Base):
     __tablename__ = "experts"
     __table_args__ = (
         Index("ix_experts_status_type", "status", "expert_type"),
-        Index("ix_experts_user_id", "user_id"),
+        Index("ix_experts_partner_id", "partner_id"),
     )
 
     expert_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    partner_id = Column(Integer, ForeignKey("partners.partner_id", ondelete="SET NULL"), nullable=True)
     expert_type = Column(String, nullable=False)
     specialization = Column(String, nullable=False)
     profile_photo = Column(String, nullable=True)

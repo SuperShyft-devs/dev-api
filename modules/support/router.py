@@ -137,7 +137,7 @@ async def update_ticket_status(
         db,
         ticket_id=ticket_id,
         status=payload.status,
-        actor_user_id=employee.user_id,
+        actor_user_id=None,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),

@@ -202,7 +202,7 @@ async def test_get_data_completeness_tracks_pdf_json_and_values_separately(test_
     service = EngagementsService(EngagementsRepository())
     data = await service.get_data_completeness_for_engagement(
         test_db_session,
-        employee=EmployeeContext(employee_id=1, user_id=1, role="admin"),
+        employee=EmployeeContext(employee_id=1, role="admin"),
         engagement_id=9010,
     )
 
@@ -291,7 +291,7 @@ async def test_list_engagements_data_completeness_summary_rollup(test_db_session
     service = EngagementsService(EngagementsRepository())
     data = await service.list_engagements_data_completeness_summary(
         test_db_session,
-        employee=EmployeeContext(employee_id=1, user_id=1, role="admin"),
+        employee=EmployeeContext(employee_id=1, role="admin"),
         organization_id=None,
         camp_no=None,
         status="running",

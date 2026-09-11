@@ -13,15 +13,15 @@ from modules.employee.models import Employee
 from modules.users.models import User
 
 
-def _auth_header(user_id: int) -> dict[str, str]:
-    token = create_jwt_token({"sub": str(user_id)}, timedelta(minutes=5), secret_key=settings.JWT_SECRET_KEY)
-    return {"Authorization": f"Bearer {token}"}
+def _auth_header(employee_id: int) -> dict[str, str]:
+    from tests.helpers.auth import employee_auth_header
+    return employee_auth_header(employee_id)
 
 
 async def _seed_employee(test_db_session, *, user_id: int, employee_id: int = 1):
     test_db_session.add(User(user_id=user_id, age=30, phone=f"{user_id}000000000", status="active"))
     await test_db_session.flush()  # Ensure user is inserted before employee
-    test_db_session.add(Employee(employee_id=employee_id, user_id=user_id, role="admin", status="active"))
+    test_db_session.add(Employee(employee_id=employee_id, name=f"Employee {employee_id}", phone=str(employee_id).zfill(10)[:15], email=f"employee{employee_id}@test.example", role="admin", status="active"))
     await test_db_session.commit()
 
 
@@ -53,7 +53,7 @@ async def test_create_package_creates_row(async_client, test_db_session):
 
     response = await async_client.post(
         "/assessment-packages",
-        headers=_auth_header(8002),
+        headers=_auth_header(31),
         json={"package_code": "BASIC", "display_name": "Basic", "status": "active"},
     )
     assert response.status_code == 201
@@ -77,7 +77,7 @@ async def test_create_package_rejects_duplicate_code(async_client, test_db_sessi
 
     response = await async_client.post(
         "/assessment-packages",
-        headers=_auth_header(8003),
+        headers=_auth_header(32),
         json={"package_code": "DUP", "display_name": "Dup2", "status": "active"},
     )
     assert response.status_code == 409
@@ -94,7 +94,7 @@ async def test_list_packages_paginates_and_filters(async_client, test_db_session
 
     response = await async_client.get(
         "/assessment-packages?page=1&limit=10&status=active",
-        headers=_auth_header(8004),
+        headers=_auth_header(33),
     )
     assert response.status_code == 200
 
@@ -114,7 +114,7 @@ async def test_get_package_details_returns_details(async_client, test_db_session
     test_db_session.add(AssessmentPackage(package_id=5201, package_code="P2", display_name="P2", status="active"))
     await test_db_session.commit()
 
-    response = await async_client.get("/assessment-packages/5201", headers=_auth_header(8005))
+    response = await async_client.get("/assessment-packages/5201", headers=_auth_header(34))
     assert response.status_code == 200
 
     data = response.json()["data"]
@@ -131,7 +131,7 @@ async def test_update_package_updates_fields(async_client, test_db_session):
 
     response = await async_client.put(
         "/assessment-packages/5301",
-        headers=_auth_header(8006),
+        headers=_auth_header(35),
         json={"package_code": "NEW", "display_name": "New"},
     )
     assert response.status_code == 200
@@ -152,7 +152,7 @@ async def test_update_package_rejects_duplicate_code(async_client, test_db_sessi
 
     response = await async_client.put(
         "/assessment-packages/5402",
-        headers=_auth_header(8007),
+        headers=_auth_header(36),
         json={"package_code": "CODE1", "display_name": "Two"},
     )
     assert response.status_code == 409

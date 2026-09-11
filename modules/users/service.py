@@ -165,9 +165,8 @@ class UsersService:
         return f"+{digits}" if digits else None
 
     async def _is_protected_employee_user(self, db: AsyncSession, user_id: int) -> bool:
-        result = await db.execute(select(Employee.employee_id).where(Employee.user_id == user_id).limit(1))
-        employee_id = result.scalar_one_or_none()
-        return employee_id == _ALWAYS_ACTIVE_EMPLOYEE_ID
+        # Employees are no longer linked to users; retention of this hook is a no-op.
+        return False
 
     """Users service layer."""
 
@@ -1352,7 +1351,7 @@ class UsersService:
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
 
-        actor_user_id = employee.user_id if employee is not None else None
+        actor_user_id = None
         action = "EMPLOYEE_CREATE_USER" if employee is not None else "PUBLIC_CREATE_USER"
         await self._audit_service.log_event(
             db,
@@ -1472,7 +1471,7 @@ class UsersService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1522,7 +1521,7 @@ class UsersService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1558,7 +1557,7 @@ class UsersService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
@@ -1578,18 +1577,6 @@ class UsersService:
             raise AppError(status_code=404, error_code="USER_NOT_FOUND", message="User does not exist")
 
         user_ids_to_delete = await self._repository.list_descendant_user_ids(db, user_id)
-        if employee.user_id in user_ids_to_delete:
-            if employee.user_id == user_id:
-                raise AppError(
-                    status_code=400,
-                    error_code="INVALID_INPUT",
-                    message="You cannot delete your own account",
-                )
-            raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message="You cannot delete this user: your account is in the same family tree and would be removed.",
-            )
 
         for candidate_user_id in user_ids_to_delete:
             if await self._is_protected_employee_user(db, candidate_user_id):
@@ -1652,7 +1639,7 @@ class UsersService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 

@@ -1,4 +1,4 @@
-"""Engagement onboarding assistant assignment service."""
+"""Engagement onboarding assistant assignment (partners + staff employees)."""
 
 from __future__ import annotations
 
@@ -7,20 +7,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import AppError
 from modules.audit.service import AuditService
 from modules.employee.access_control import (
-    ONBOARDING_ASSISTANT_ASSIGNEE_ROLES,
     ensure_admin,
-    ensure_org_manager_assignable_to_engagement,
+    ensure_valid_onboarding_assistant_assignee_employee_role,
     ensure_valid_onboarding_assistant_assignee_role,
 )
 from modules.employee.models import Employee, EmployeeRole
 from modules.employee.repository import EmployeeRepository
-from modules.employee.schemas import EmployeeCreateRequest
-from modules.employee.service import EmployeeContext, EmployeeService
+from modules.employee.service import EmployeeContext
 from modules.engagements.models import OnboardingAssistantAssignment
 from modules.engagements.repository import EngagementsRepository
-from modules.users.models import User
-from modules.users.schemas import EmployeeCreateUserRequest
-from modules.users.service import UsersService
+from modules.partners.models import Partner, PartnerRole
+from modules.partners.repository import PartnersRepository
+from modules.partners.schemas import PartnerCreateRequest
+from modules.partners.service import PartnersService
 
 
 def _normalize_int(value: int) -> int:
@@ -30,45 +29,63 @@ def _normalize_int(value: int) -> int:
     return value
 
 
-def _existing_user_payload(user: User, employee: Employee | None) -> dict:
-    payload: dict = {
-        "user_id": user.user_id,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "phone": user.phone,
-        "employee": None,
+def _partner_payload(partner: Partner) -> dict:
+    return {
+        "kind": "partner",
+        "partner_id": partner.partner_id,
+        "employee_id": None,
+        "name": partner.name,
+        "phone": partner.phone,
+        "email": partner.email,
+        "role": partner.role.value if isinstance(partner.role, PartnerRole) else partner.role,
+        "status": partner.status,
     }
-    if employee is not None:
-        payload["employee"] = {
-            "employee_id": employee.employee_id,
-            "role": employee.role.value if isinstance(employee.role, EmployeeRole) else employee.role,
-            "status": employee.status,
-        }
-    return payload
+
+
+def _employee_payload(employee: Employee) -> dict:
+    role = employee.role.value if isinstance(employee.role, EmployeeRole) else str(employee.role)
+    return {
+        "kind": "employee",
+        "partner_id": None,
+        "employee_id": employee.employee_id,
+        "name": employee.name,
+        "phone": employee.phone,
+        "email": employee.email,
+        "role": role,
+        "status": employee.status,
+    }
+
+
+def _existing_partner_payload(partner: Partner) -> dict:
+    return {"status": "confirmation_required", "existing_partner": _partner_payload(partner)}
 
 
 class OnboardingAssistantsService:
-    """Business logic for onboarding assistant assignment to engagements."""
+    """Assign phlebo/expert partners and admin/inferior_admin employees to engagements."""
 
     def __init__(
         self,
         repository: EngagementsRepository,
-        employee_service: EmployeeService,
-        employee_repository: EmployeeRepository,
-        users_service: UsersService,
+        partners_repository: PartnersRepository,
+        employee_repository: EmployeeRepository | None = None,
+        partners_service: PartnersService | None = None,
         audit_service: AuditService | None = None,
     ):
         self._repository = repository
-        self._employee_service = employee_service
-        self._employee_repository = employee_repository
-        self._users_service = users_service
+        self._partners_repository = partners_repository
+        self._employee_repository = employee_repository or EmployeeRepository()
+        self._partners_service = partners_service
         self._audit_service = audit_service
 
     def _require_audit_service(self) -> AuditService:
-        """Ensure audit service is available."""
         if self._audit_service is None:
             raise RuntimeError("Audit service is required")
         return self._audit_service
+
+    def _require_partners_service(self) -> PartnersService:
+        if self._partners_service is None:
+            raise RuntimeError("Partners service is required")
+        return self._partners_service
 
     async def list_onboarding_assistants_for_engagement(
         self,
@@ -77,12 +94,11 @@ class OnboardingAssistantsService:
         employee: EmployeeContext,
         engagement_id: int,
     ) -> list[dict]:
-        """List all employees assigned as onboarding assistants to an engagement."""
+        """List partners and employees assigned as onboarding assistants."""
         ensure_admin(employee)
 
         engagement_id = _normalize_int(engagement_id)
 
-        # Verify engagement exists
         engagement = await self._repository.get_engagement_by_id(db, engagement_id=engagement_id)
         if engagement is None:
             raise AppError(
@@ -91,38 +107,9 @@ class OnboardingAssistantsService:
                 message="Engagement does not exist",
             )
 
-        # Get all assignments for this engagement
-        assignments = await self._repository.list_onboarding_assistant_assignments(db, engagement_id=engagement_id)
-        employee_ids = [assignment.employee_id for assignment in assignments]
-
-        # Get employee details via employee service
-        # This keeps module boundaries strict
-        employees: list[dict] = []
-        for employee_id in employee_ids:
-            try:
-                emp, first_name, last_name = await self._employee_service.get_employee_details(
-                    db,
-                    employee=employee,
-                    employee_id=employee_id,
-                )
-            except AppError as exc:
-                # If an employee was removed, we skip it
-                if exc.status_code == 404:
-                    continue
-                raise
-
-            employees.append(
-                {
-                    "employee_id": emp.employee_id,
-                    "user_id": emp.user_id,
-                    "role": emp.role,
-                    "status": emp.status,
-                    "first_name": first_name,
-                    "last_name": last_name,
-                }
-            )
-
-        return employees
+        return await self._repository.list_onboarding_assistant_assignee_rows(
+            db, engagement_id=engagement_id
+        )
 
     async def assign_onboarding_assistants_to_engagement(
         self,
@@ -130,17 +117,17 @@ class OnboardingAssistantsService:
         *,
         employee: EmployeeContext,
         engagement_id: int,
-        employee_ids: list[int],
+        partner_ids: list[int] | None = None,
+        employee_ids: list[int] | None = None,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> dict:
-        """Assign one or more employees as onboarding assistants to an engagement."""
+        """Assign partners and/or staff employees as onboarding assistants."""
         ensure_admin(employee)
 
         engagement_id = _normalize_int(engagement_id)
 
-        # Verify engagement exists
         engagement = await self._repository.get_engagement_by_id(db, engagement_id=engagement_id)
         if engagement is None:
             raise AppError(
@@ -149,53 +136,100 @@ class OnboardingAssistantsService:
                 message="Engagement does not exist",
             )
 
-        if not isinstance(employee_ids, list) or len(employee_ids) == 0:
+        partner_ids = partner_ids or []
+        employee_ids = employee_ids or []
+        if not partner_ids and not employee_ids:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-        # Normalize and deduplicate employee IDs
-        normalized_ids: list[int] = []
-        seen: set[int] = set()
-        for raw in employee_ids:
-            emp_id = _normalize_int(raw)
-            if emp_id in seen:
+        added_partner_ids: list[int] = []
+        skipped_partner_ids: list[int] = []
+        added_employee_ids: list[int] = []
+        skipped_employee_ids: list[int] = []
+
+        normalized_partner_ids: list[int] = []
+        seen_partners: set[int] = set()
+        for raw in partner_ids:
+            partner_id = _normalize_int(raw)
+            if partner_id in seen_partners:
                 continue
-            seen.add(emp_id)
-            normalized_ids.append(emp_id)
+            seen_partners.add(partner_id)
+            normalized_partner_ids.append(partner_id)
 
-        added: list[int] = []
-        skipped: list[int] = []
+        for partner_id in normalized_partner_ids:
+            partner = await self._partners_repository.get_by_id(db, partner_id)
+            if partner is None:
+                raise AppError(
+                    status_code=404,
+                    error_code="PARTNER_NOT_FOUND",
+                    message="Partner does not exist",
+                )
+            if (partner.status or "").lower() != "active":
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Partner is not active",
+                )
+            ensure_valid_onboarding_assistant_assignee_role(partner.role)
 
-        for emp_id in normalized_ids:
-            emp, _first_name, _last_name = await self._employee_service.get_employee_details(
-                db,
-                employee=employee,
-                employee_id=emp_id,
-            )
-            ensure_valid_onboarding_assistant_assignee_role(emp.role)
-            await ensure_org_manager_assignable_to_engagement(
-                db,
-                assignee_user_id=emp.user_id,
-                assignee_role=emp.role,
-                engagement_id=engagement_id,
-                repository=self._repository,
-            )
-
-            # Check if already assigned
             existing = await self._repository.get_onboarding_assistant_assignment(
                 db,
                 engagement_id=engagement_id,
-                employee_id=emp_id,
+                partner_id=partner_id,
             )
             if existing is not None:
-                skipped.append(emp_id)
+                skipped_partner_ids.append(partner_id)
                 continue
 
-            # Create assignment
-            assignment = OnboardingAssistantAssignment(engagement_id=engagement_id, employee_id=emp_id)
+            assignment = OnboardingAssistantAssignment(
+                engagement_id=engagement_id,
+                partner_id=partner_id,
+                employee_id=None,
+            )
             await self._repository.create_onboarding_assistant_assignment(db, assignment)
-            added.append(emp_id)
+            added_partner_ids.append(partner_id)
 
-        # Audit logging
+        normalized_employee_ids: list[int] = []
+        seen_employees: set[int] = set()
+        for raw in employee_ids:
+            eid = _normalize_int(raw)
+            if eid in seen_employees:
+                continue
+            seen_employees.add(eid)
+            normalized_employee_ids.append(eid)
+
+        for eid in normalized_employee_ids:
+            emp = await self._employee_repository.get_by_id(db, eid)
+            if emp is None:
+                raise AppError(
+                    status_code=404,
+                    error_code="EMPLOYEE_NOT_FOUND",
+                    message="Employee does not exist",
+                )
+            if (emp.status or "").lower() != "active":
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Employee is not active",
+                )
+            ensure_valid_onboarding_assistant_assignee_employee_role(emp.role)
+
+            existing = await self._repository.get_onboarding_assistant_assignment(
+                db,
+                engagement_id=engagement_id,
+                employee_id=eid,
+            )
+            if existing is not None:
+                skipped_employee_ids.append(eid)
+                continue
+
+            assignment = OnboardingAssistantAssignment(
+                engagement_id=engagement_id,
+                partner_id=None,
+                employee_id=eid,
+            )
+            await self._repository.create_onboarding_assistant_assignment(db, assignment)
+            added_employee_ids.append(eid)
+
         audit = self._require_audit_service()
         await audit.log_event(
             db,
@@ -203,14 +237,16 @@ class OnboardingAssistantsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
         return {
             "engagement_id": engagement_id,
-            "added_employee_ids": added,
-            "skipped_employee_ids": skipped,
+            "added_partner_ids": added_partner_ids,
+            "skipped_partner_ids": skipped_partner_ids,
+            "added_employee_ids": added_employee_ids,
+            "skipped_employee_ids": skipped_employee_ids,
         }
 
     async def create_and_assign_phlebo(
@@ -226,7 +262,7 @@ class OnboardingAssistantsService:
         user_agent: str,
         endpoint: str,
     ) -> dict:
-        """Create or reuse a phlebo (onboarding assistant) and assign them to an engagement."""
+        """Create or reuse a phlebo partner and assign them to an engagement."""
         ensure_admin(employee)
 
         engagement_id = _normalize_int(engagement_id)
@@ -239,78 +275,53 @@ class OnboardingAssistantsService:
                 message="Engagement does not exist",
             )
 
-        existing_user = await self._users_service.resolve_user_by_phone(db, phone)
-        if existing_user is not None and not confirm_existing:
-            existing_employee = await self._employee_repository.get_by_user_id(db, existing_user.user_id)
-            return {
-                "status": "confirmation_required",
-                "existing_user": _existing_user_payload(existing_user, existing_employee),
-            }
+        existing_partner = await self._partners_repository.get_by_phone(db, phone)
+        if existing_partner is not None and not confirm_existing:
+            return _existing_partner_payload(existing_partner)
 
-        user_created = False
-        employee_created = False
+        partner_created = False
+        partners_service = self._require_partners_service()
 
-        if existing_user is not None:
-            user = existing_user
-            emp_row = await self._employee_repository.get_by_user_id(db, user.user_id)
-            if emp_row is None:
-                emp_row = await self._employee_service.create_employee(
-                    db,
-                    employee=employee,
-                    payload=EmployeeCreateRequest(
-                        user_id=user.user_id,
-                        role=EmployeeRole.onboarding_assistant,
-                        status="active",
-                    ),
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    endpoint=endpoint,
+        if existing_partner is not None:
+            partner = existing_partner
+            role_value = (
+                partner.role.value if isinstance(partner.role, PartnerRole) else str(partner.role or "")
+            )
+            if role_value != PartnerRole.phlebo.value:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="Partner role cannot be assigned as an onboarding assistant",
                 )
-                employee_created = True
-            else:
-                role = emp_row.role if isinstance(emp_row.role, EmployeeRole) else EmployeeRole(emp_row.role)
-                if role not in ONBOARDING_ASSISTANT_ASSIGNEE_ROLES:
-                    raise AppError(
-                        status_code=422,
-                        error_code="INVALID_STATE",
-                        message="Employee role cannot be assigned as an onboarding assistant",
-                    )
+            if (partner.status or "").lower() != "active":
+                raise AppError(
+                    status_code=422,
+                    error_code="INVALID_STATE",
+                    message="Partner is not active",
+                )
             result_status = "assigned"
         else:
-            first_name = name.strip() or None
-            user = await self._users_service.create_user_by_employee(
+            partner = await partners_service.create_partner(
                 db,
                 employee=employee,
-                payload=EmployeeCreateUserRequest(
-                    first_name=first_name,
+                payload=PartnerCreateRequest(
+                    name=name.strip(),
                     phone=phone,
+                    role=PartnerRole.phlebo,
                     status="active",
                 ),
                 ip_address=ip_address,
                 user_agent=user_agent,
                 endpoint=endpoint,
             )
-            user_created = True
-            emp_row = await self._employee_service.create_employee(
-                db,
-                employee=employee,
-                payload=EmployeeCreateRequest(
-                    user_id=user.user_id,
-                    role=EmployeeRole.onboarding_assistant,
-                    status="active",
-                ),
-                ip_address=ip_address,
-                user_agent=user_agent,
-                endpoint=endpoint,
-            )
-            employee_created = True
+            partner_created = True
             result_status = "created"
 
         assign_result = await self.assign_onboarding_assistants_to_engagement(
             db,
             employee=employee,
             engagement_id=engagement_id,
-            employee_ids=[emp_row.employee_id],
+            partner_ids=[partner.partner_id],
             ip_address=ip_address,
             user_agent=user_agent,
             endpoint=endpoint,
@@ -318,13 +329,12 @@ class OnboardingAssistantsService:
 
         return {
             "status": result_status,
-            "user_id": user.user_id,
-            "employee_id": emp_row.employee_id,
-            "user_created": user_created,
-            "employee_created": employee_created,
+            "partner_id": partner.partner_id,
+            "partner_created": partner_created,
             "engagement_id": engagement_id,
-            "added_employee_ids": assign_result["added_employee_ids"],
-            "skipped_employee_ids": assign_result["skipped_employee_ids"],
+            "added_partner_ids": assign_result["added_partner_ids"],
+            "skipped_partner_ids": assign_result["skipped_partner_ids"],
+            **{k: v for k, v in _partner_payload(partner).items() if k != "kind"},
         }
 
     async def remove_onboarding_assistant_from_engagement(
@@ -333,18 +343,23 @@ class OnboardingAssistantsService:
         *,
         employee: EmployeeContext,
         engagement_id: int,
-        employee_id: int,
+        partner_id: int | None = None,
+        employee_id: int | None = None,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> dict:
-        """Remove an employee's assignment from an engagement."""
+        """Remove a partner or employee assignment from an engagement."""
         ensure_admin(employee)
 
         engagement_id = _normalize_int(engagement_id)
-        employee_id = _normalize_int(employee_id)
+        if (partner_id is None) == (employee_id is None):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Exactly one of partner_id or employee_id is required",
+            )
 
-        # Verify engagement exists
         engagement = await self._repository.get_engagement_by_id(db, engagement_id=engagement_id)
         if engagement is None:
             raise AppError(
@@ -353,20 +368,35 @@ class OnboardingAssistantsService:
                 message="Engagement does not exist",
             )
 
-        # Delete the assignment
-        deleted = await self._repository.delete_onboarding_assistant_assignment(
-            db,
-            engagement_id=engagement_id,
-            employee_id=employee_id,
-        )
-        if deleted == 0:
-            raise AppError(
-                status_code=404,
-                error_code="ONBOARDING_ASSISTANT_ASSIGNMENT_NOT_FOUND",
-                message="Employee is not assigned to this engagement",
+        if partner_id is not None:
+            partner_id = _normalize_int(partner_id)
+            deleted = await self._repository.delete_onboarding_assistant_assignment(
+                db,
+                engagement_id=engagement_id,
+                partner_id=partner_id,
             )
+            if deleted == 0:
+                raise AppError(
+                    status_code=404,
+                    error_code="ONBOARDING_ASSISTANT_ASSIGNMENT_NOT_FOUND",
+                    message="Partner is not assigned to this engagement",
+                )
+            removed = {"removed_partner_id": partner_id, "removed_employee_id": None}
+        else:
+            employee_id = _normalize_int(employee_id)  # type: ignore[arg-type]
+            deleted = await self._repository.delete_onboarding_assistant_assignment(
+                db,
+                engagement_id=engagement_id,
+                employee_id=employee_id,
+            )
+            if deleted == 0:
+                raise AppError(
+                    status_code=404,
+                    error_code="ONBOARDING_ASSISTANT_ASSIGNMENT_NOT_FOUND",
+                    message="Employee is not assigned to this engagement",
+                )
+            removed = {"removed_partner_id": None, "removed_employee_id": employee_id}
 
-        # Audit logging
         audit = self._require_audit_service()
         await audit.log_event(
             db,
@@ -374,8 +404,8 @@ class OnboardingAssistantsService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=employee.user_id,
+            user_id=None,
             session_id=None,
         )
 
-        return {"engagement_id": engagement_id, "removed_employee_id": employee_id}
+        return {"engagement_id": engagement_id, **removed}
