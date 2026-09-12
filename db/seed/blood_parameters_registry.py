@@ -90,12 +90,18 @@ def _build_registries() -> tuple[
     for field in blood_raw:
         override = advanced_by_key.get(field.question_key)
         if override is not None:
+            # Hormones are required only on advanced-blood-parameters (Pro), not basic blood.
+            merge_required = (
+                field.required or override.required
+                if field.question_key not in _ADVANCED_OVERRIDE_KEYS
+                else field.required
+            )
             blood_fields.append(
                 BloodParameterField(
                     question_key=field.question_key,
                     label=override.label,
                     help_text=override.help_text or field.help_text,
-                    required=field.required or override.required,
+                    required=merge_required,
                     units=field.units or override.units,
                     unitless=field.unitless,
                 )
@@ -149,9 +155,20 @@ BLOOD_PARAMETER_INTERNAL_FALLBACKS: dict[str, tuple[float, str]] = {
     "ast_value": (20.0, "0"),  # U/L
     "uric_acid": (5.0, "0"),  # mg/dL
     "ggt_value": (20.0, "0"),  # U/L
-    "lh_value": (5.0, "0"),  # mIU/L
-    "fsh_value": (5.0, "0"),  # mIU/L
-    "testosterone": (400.0, "0"),  # ng/dl
+}
+
+# Pro female-only hormone placeholders when Healthians values are missing.
+# Units follow Metsights guidance (IU/L for LH/FSH, ng/mL for testosterone).
+PRO_FEMALE_HORMONE_PLACEHOLDERS: dict[str, tuple[float, str]] = {
+    "lh_value": (5.0, "1"),  # IU/L
+    "fsh_value": (5.0, "1"),  # IU/L
+    "testosterone": (0.5, "2"),  # ng/mL
+}
+
+# Package category matrix for admin visualization
+METSIGHTS_PACKAGE_BLOOD_CATEGORIES: dict[str, tuple[str, ...]] = {
+    "METSIGHTS_BASIC": (BLOOD_PARAMETER_CATEGORY_KEY,),
+    "METSIGHTS_PRO": (BLOOD_PARAMETER_CATEGORY_KEY, ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY),
 }
 
 

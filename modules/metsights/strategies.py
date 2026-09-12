@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from common.blood_unit_normalizer import normalize_blood_unit_code_for_push
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -41,14 +43,16 @@ _UNIT_LABEL_TO_CODE: dict[str, str] = {
 
 
 def normalize_metsights_unit_code(unit: str | None) -> str | None:
-    """Map stored unit labels (``kg``, ``ft/in``, ``in``) to Metsights codes (``0``/``1``/``2``)."""
+    """Map stored unit labels (``kg``, ``ft/in``, ``mg/dL``, …) to Metsights codes."""
     if unit is None:
         return None
     raw = str(unit).strip()
     if not raw:
         return None
     mapped = _UNIT_LABEL_TO_CODE.get(raw) or _UNIT_LABEL_TO_CODE.get(raw.lower())
-    return mapped if mapped is not None else raw
+    if mapped is not None:
+        return mapped
+    return normalize_blood_unit_code_for_push(raw)
 
 
 def push_scale_emit(key: str, answer: Any, params: dict) -> dict[str, Any]:

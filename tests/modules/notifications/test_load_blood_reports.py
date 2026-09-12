@@ -1828,6 +1828,7 @@ def test_blood_parameter_internal_fallbacks_map_known_keys():
     from db.seed.blood_parameters_registry import (
         BLOOD_PARAMETER_INTERNAL_FALLBACKS,
         FIELD_BY_KEY,
+        PRO_FEMALE_HORMONE_PLACEHOLDERS,
     )
 
     expected = {
@@ -1848,14 +1849,14 @@ def test_blood_parameter_internal_fallbacks_map_known_keys():
         "ast_value": 20.0,
         "uric_acid": 5.0,
         "ggt_value": 20.0,
-        "lh_value": 5.0,
-        "fsh_value": 5.0,
-        "testosterone": 400.0,
     }
     assert set(BLOOD_PARAMETER_INTERNAL_FALLBACKS) == set(expected)
     for key, value in expected.items():
         assert key in FIELD_BY_KEY
         assert BLOOD_PARAMETER_INTERNAL_FALLBACKS[key][0] == value
+
+    assert PRO_FEMALE_HORMONE_PLACEHOLDERS["testosterone"] == (0.5, "2")
+    assert PRO_FEMALE_HORMONE_PLACEHOLDERS["lh_value"][1] == "1"
 
 
 @pytest.mark.asyncio

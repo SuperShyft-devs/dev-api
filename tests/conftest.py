@@ -107,6 +107,7 @@ from modules.notification_events.router import router as notification_events_rou
 from modules.engagement_notifications.router import router as engagement_notifications_router
 from modules.experts.router import expert_types_router
 from modules.diagnostics.healthians.router import router as healthians_router
+from modules.integrations.router import router as integrations_router
 from modules.employee.permissions import authorize_inferior_admin_request
 
 
@@ -383,6 +384,7 @@ async def fastapi_app(
     app.include_router(uploads_router)
     app.include_router(notifications_router)
     app.include_router(webhooks_router)
+    app.include_router(integrations_router)
     app.include_router(server_health_router)
     app.include_router(diagnostics_router)
     app.include_router(support_router)

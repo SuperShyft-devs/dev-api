@@ -10,11 +10,13 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.blood_unit_normalizer import map_unit_to_metsights_option_value
 from core.exceptions import AppError
 from db.seed.blood_parameters_registry import (
     ADVANCED_BLOOD_PARAMETER_CATEGORY_KEY,
     BLOOD_PARAMETER_CATEGORY_KEY,
     BLOOD_PARAMETER_INTERNAL_FALLBACKS,
+    PRO_FEMALE_HORMONE_PLACEHOLDERS,
     UNITLESS_BLOOD_PARAMETER_KEYS,
 )
 from modules.audit.service import AuditService
@@ -27,6 +29,7 @@ from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.blood_parameters_read_service import build_parameter_value_map
 from modules.reports.blood_parameters_schemas import has_usable_provider_blood_parameters
 from modules.reports.repository import ReportsRepository
+from modules.users.models import User
 
 
 _ALLOWED_USER_ASSESSMENT_STATUSES = {"active", "completed"}
@@ -52,24 +55,14 @@ def _normalize_status(value: str | None) -> str:
     return (value or "").strip().lower()
 
 
-def _normalize_label(value: str | None) -> str:
-    return (value or "").strip().lower()
-
-
 def _map_unit_to_option_value(unit: str | None, options: list[QuestionnaireOption]) -> str | None:
     """Map an IHR unit (display name or option code) to questionnaire option_value."""
-    if unit is None:
-        return None
-    candidate = unit.strip()
-    if not candidate:
-        return None
-    normalized = _normalize_label(candidate)
-    for option in options:
-        option_value = str(option.option_value or "").strip()
-        display_name = str(option.display_name or "").strip()
-        if _normalize_label(option_value) == normalized or _normalize_label(display_name) == normalized:
-            return option_value
-    return None
+    return map_unit_to_metsights_option_value(unit, options)
+
+
+def _is_female_gender(gender: str | None) -> bool:
+    normalized = (gender or "").strip().lower()
+    return normalized in {"female", "f", "2", "woman", "women"}
 
 
 class AssessmentsService:
@@ -786,6 +779,11 @@ class AssessmentsService:
         else:
             keys = [str(k).strip() for k in category_keys if str(k).strip()]
 
+        user_row = await db.get(User, int(user_id))
+        is_pro_female = package_code == "METSIGHTS_PRO" and _is_female_gender(
+            getattr(user_row, "gender", None) if user_row is not None else None
+        )
+
         total_drafted = 0
         drafted_keys: list[str] = []
 
@@ -804,9 +802,19 @@ class AssessmentsService:
             )
             for question in questions:
                 question_key = (question.question_key or "").strip()
-                if not question_key or question_key not in BLOOD_PARAMETER_INTERNAL_FALLBACKS:
+                if not question_key:
                     continue
                 if (question.status or "").strip().lower() != "active":
+                    continue
+
+                fallback_entry: tuple[float, str] | None = None
+                if question_key in PRO_FEMALE_HORMONE_PLACEHOLDERS:
+                    if not is_pro_female:
+                        continue
+                    fallback_entry = PRO_FEMALE_HORMONE_PLACEHOLDERS[question_key]
+                elif question_key in BLOOD_PARAMETER_INTERNAL_FALLBACKS:
+                    fallback_entry = BLOOD_PARAMETER_INTERNAL_FALLBACKS[question_key]
+                else:
                     continue
 
                 existing = await self._questionnaire.get_response_by_instance_and_question_id(
@@ -819,7 +827,7 @@ class AssessmentsService:
                     if existing_answer.get("value") is not None:
                         continue
 
-                value, unit_code = BLOOD_PARAMETER_INTERNAL_FALLBACKS[question_key]
+                value, unit_code = fallback_entry
                 if question_key in UNITLESS_BLOOD_PARAMETER_KEYS:
                     answer: dict[str, Any] = {"value": value, "unit": "0"}
                 else:

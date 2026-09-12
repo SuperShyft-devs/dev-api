@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.diagnostics.service import DiagnosticsService
+from db.seed.blood_parameter_key_aliases import resolve_metsights_parameter_key
 from modules.reports.blood_parameters_normalizer import read_canonical_parameters
 from modules.reports.blood_parameters_questionnaire_reader import BloodParametersQuestionnaireReader
 from modules.reports.blood_parameters_schemas import (
@@ -41,6 +42,19 @@ def _parameter_type_value(parameter_type: Any) -> str:
 _METSIGHTS_FLAT_METADATA_KEYS = frozenset({"id", "is_complete", "created_at", "updated_at"})
 
 
+def _store_parameter_value(
+    result: dict[str, tuple[float, str | None]],
+    *,
+    parameter_key: str,
+    value: float,
+    unit: str | None,
+) -> None:
+    mets_key = resolve_metsights_parameter_key(parameter_key)
+    if not mets_key:
+        return
+    result[mets_key] = (value, unit)
+
+
 def build_parameter_value_map(blood_parameters: Any) -> dict[str, tuple[float, str | None]]:
     """Build ``parameter_key -> (value, unit)`` from any supported IHR blood_parameters format."""
     result: dict[str, tuple[float, str | None]] = {}
@@ -63,7 +77,7 @@ def build_parameter_value_map(blood_parameters: Any) -> dict[str, tuple[float, s
                     continue
                 raw_unit = test.get("unit")
                 unit = str(raw_unit).strip() if raw_unit is not None and str(raw_unit).strip() else None
-                result[key] = (value, unit)
+                _store_parameter_value(result, parameter_key=key, value=value, unit=unit)
         return result
 
     if is_canonical_blood_parameters(blood_parameters):
@@ -76,7 +90,7 @@ def build_parameter_value_map(blood_parameters: Any) -> dict[str, tuple[float, s
                 continue
             raw_unit = entry.get("unit")
             unit = str(raw_unit).strip() if raw_unit is not None and str(raw_unit).strip() else None
-            result[str(key)] = (value, unit)
+            _store_parameter_value(result, parameter_key=str(key), value=value, unit=unit)
         return result
 
     if is_legacy_metsights_flat_format(blood_parameters):
@@ -89,7 +103,7 @@ def build_parameter_value_map(blood_parameters: Any) -> dict[str, tuple[float, s
                 continue
             raw_unit = blood_parameters.get(f"{key_str}_unit")
             unit = str(raw_unit).strip() if raw_unit is not None and str(raw_unit).strip() else None
-            result[key_str] = (value, unit)
+            _store_parameter_value(result, parameter_key=key_str, value=value, unit=unit)
         return result
 
     return result
