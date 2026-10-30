@@ -951,6 +951,33 @@ async def get_diagnostic_test_group(
     return success_response(data.model_dump())
 
 
+@router.get("/diagnostic-test-groups/{group_id}/packages")
+async def list_test_group_packages(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.list_packages_for_test_group(db, group_id=group_id)
+    return success_response([item.model_dump() for item in data])
+
+
+@router.get("/diagnostic-test-groups/{group_id}/provider-test-diff")
+async def get_diagnostic_test_group_provider_test_diff(
+    group_id: int,
+    preview_external_test_group_code: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service),
+):
+    data = await diagnostics_service.get_test_group_provider_test_diff(
+        db,
+        group_id=group_id,
+        preview_external_test_group_code=preview_external_test_group_code,
+    )
+    return success_response(data.model_dump())
+
+
 @router.get("/diagnostic-test-groups/{group_id}/tests")
 async def list_group_tests(
     group_id: int,

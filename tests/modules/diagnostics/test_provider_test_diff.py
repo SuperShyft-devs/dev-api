@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from sqlalchemy import select
 
 from modules.diagnostics.models import (
     DiagnosticPackage,
@@ -223,3 +224,44 @@ async def test_provider_test_diff_non_healthians_provider(async_client, test_db_
     assert response.status_code == 400
     assert response.json()["error_code"] == "PROVIDER_NOT_SUPPORTED"
     mock_healthians_api.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_test_group_provider_test_diff_preview(async_client, test_db_session, mock_healthians_api):
+    await seed_employee(test_db_session, employee_id=1006, role="admin")
+    group = DiagnosticTestGroup(
+        group_name="Lipid Group",
+        group_key="lipid_group_diff",
+        diagnostic_provider=None,
+    )
+    test_db_session.add(group)
+    test_db_session.add(
+        HealthParameter(test_name="Cholesterol", parameter_type="test", healthians_parameter_key="625")
+    )
+    await test_db_session.flush()
+    test = await test_db_session.scalar(
+        select(HealthParameter).where(HealthParameter.test_name == "Cholesterol")
+    )
+    test_db_session.add(
+        DiagnosticTestGroupTest(group_id=group.group_id, test_id=test.test_id, display_order=0)
+    )
+    await test_db_session.commit()
+    await test_db_session.refresh(group)
+
+    mock_healthians_api.return_value = _mock_healthians_product(
+        [{"id": "625", "name": "Cholesterol-Total, Serum"}, {"id": "999", "name": "Extra"}],
+        name="Lipid Profile Advance",
+    )
+
+    response = await async_client.get(
+        f"/diagnostic-test-groups/{group.group_id}/provider-test-diff",
+        params={"preview_external_test_group_code": "1"},
+        headers=employee_auth_header(1006),
+    )
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["counts"]["matched"] == 1
+    assert body["counts"]["only_at_provider"] == 1
+    assert body["external_package_code"] == "1"
+    mock_healthians_api.assert_called_once()
+    assert mock_healthians_api.call_args.kwargs.get("deal_type") == "profile"

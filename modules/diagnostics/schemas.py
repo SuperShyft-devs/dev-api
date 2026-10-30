@@ -402,6 +402,13 @@ class TestGroupProfileGroupListItem(BaseModel):
     profile_group: dict[str, int] = Field(default_factory=dict)
 
 
+class TestGroupPackageListItem(BaseModel):
+    diagnostic_package_id: int
+    package_name: str
+    diagnostic_provider: Optional[str] = None
+    status: Optional[str] = None
+
+
 class AssignTestsToGroupRequest(BaseModel):
     test_ids: list[int] = Field(min_length=1)
 

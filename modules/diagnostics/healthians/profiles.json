@@ -1,0 +1,390 @@
+[
+{
+"id": "1",
+"name": "Lipid Profile Advance"
+},
+{
+"id": "2",
+"name": "Liver Function Test"
+},
+{
+"id": "3",
+"name": "Complete Hemogram"
+},
+{
+"id": "4",
+"name": "Thyroid Profile-Total (T3, T4 & TSH Ultra-sensitive)"
+},
+{
+"id": "5",
+"name": "Iron Studies"
+},
+{
+"id": "6",
+"name": "Kidney Function Test Advance"
+},
+{
+"id": "8",
+"name": "Thyroid Profile-Free (FT3, FT4 & TSH)"
+},
+{
+"id": "9",
+"name": "HbA1c"
+},
+{
+"id": "10",
+"name": "Lipid Profile-Extended"
+},
+{
+"id": "12",
+"name": "Electrolytes Profile"
+},
+{
+"id": "15",
+"name": "Stool Routine And Microscopic Examination"
+},
+{
+"id": "16",
+"name": "Abnormal Haemoglobin Studies(Hb Variant), Blood"
+},
+{
+"id": "17",
+"name": "Iron Studies With Ferritin"
+},
+{
+"id": "18",
+"name": "Torch-4 IgG"
+},
+{
+"id": "20",
+"name": "Torch-8"
+},
+{
+"id": "21",
+"name": "Dengue IgG And IgM (Rapid Card)"
+},
+{
+"id": "22",
+"name": "Blood Group Profile ABO & Rh Typing (manual), Blood"
+},
+{
+"id": "23",
+"name": "Widal Profile"
+},
+{
+"id": "29",
+"name": "Urine Routine & Microscopy Extended"
+},
+{
+"id": "30",
+"name": "COMPLETE BLOOD COUNT"
+},
+{
+"id": "36",
+"name": "Allergy Screening Panel - Grass Pollen"
+},
+{
+"id": "37",
+"name": "Allergy Screening Panel - House Dust, Dust Mite, Cockroach"
+},
+{
+"id": "45",
+"name": "KFT With K"
+},
+{
+"id": "46",
+"name": "Allergy Veg & Non-Veg Panel By Elisa Method"
+},
+{
+"id": "47",
+"name": "Allergy Drugs Profile By Elisa Method"
+},
+{
+"id": "49",
+"name": "Allergy Pet Profile By Elisa Method"
+},
+{
+"id": "50",
+"name": "Allergy Dust Mites Profile By Elisa Method"
+},
+{
+"id": "51",
+"name": "Allergy Insects Profile By Elisa Method"
+},
+{
+"id": "52",
+"name": "Allergy Grass Mix Profile By Elisa Method"
+},
+{
+"id": "53",
+"name": "Allergy Moulds & Yeast Profile By Elisa Method"
+},
+{
+"id": "54",
+"name": "Allergy Weed & Tree Profile By Elisa Method"
+},
+{
+"id": "58",
+"name": "Torch 10"
+},
+{
+"id": "59",
+"name": "Kidney Function Test (KFT)"
+},
+{
+"id": "63",
+"name": "Allergy Screening Panel By Immunocap (Gold Standard)"
+},
+{
+"id": "70",
+"name": "TORCH-4 IgM"
+},
+{
+"id": "71",
+"name": "TORCH-5 IgG"
+},
+{
+"id": "72",
+"name": "TORCH-5 IgM"
+},
+{
+"id": "75",
+"name": "Allergy NON VEG Food Profile By ELISA Method"
+},
+{
+"id": "76",
+"name": "Allergy Veg-Food & Fruit Allergy By Elisa Method"
+},
+{
+"id": "79",
+"name": "Allergy Ocupational By Elisa Method"
+},
+{
+"id": "80",
+"name": "Allergy Parasites By Elisa Method"
+},
+{
+"id": "81",
+"name": "Allergy Seed/Nuts/Legumes By Elisa Method"
+},
+{
+"id": "82",
+"name": "Allergy Dairy Products By Elisa Method"
+},
+{
+"id": "83",
+"name": "Allergy Spices By Elisa Method"
+},
+{
+"id": "84",
+"name": "Genetics Nutritional Profile"
+},
+{
+"id": "86",
+"name": "Genetics Eating Behaviour Profile"
+},
+{
+"id": "87",
+"name": "Genetics Weight Management Profile"
+},
+{
+"id": "88",
+"name": "Response To Exercise Genetic Profile"
+},
+{
+"id": "89",
+"name": "Genetic Aerobic Capacity Profile"
+},
+{
+"id": "90",
+"name": "Genetics Micronutrients Profile"
+},
+{
+"id": "91",
+"name": "Genetic Immunognic Profile"
+},
+{
+"id": "92",
+"name": "Genetics Detoxification Profile"
+},
+{
+"id": "93",
+"name": "Genetic Skin Altering Conditions Profile"
+},
+{
+"id": "94",
+"name": "Genetic Lipid Profile"
+},
+{
+"id": "95",
+"name": "Genetics Injury And Recovery Risk Profile"
+},
+{
+"id": "102",
+"name": "Autoimmune Encephalitis Panel-1"
+},
+{
+"id": "103",
+"name": "Autoimmune Encephalitis Panel-2"
+},
+{
+"id": "104",
+"name": "H1N1 Panel"
+},
+{
+"id": "107",
+"name": "Phospholipid Antibodies (IGM & IGG) Serum Profile"
+},
+{
+"id": "108",
+"name": "Immunoglobulin Profile Serum"
+},
+{
+"id": "109",
+"name": "Myositis Profile-IgG"
+},
+{
+"id": "110",
+"name": "Lipid Profile"
+},
+{
+"id": "112",
+"name": "APRI (AST To Platelet Ratio Index)"
+},
+{
+"id": "113",
+"name": "FIB - 4"
+},
+{
+"id": "114",
+"name": "Lipid Profile (Non Fasting)"
+},
+{
+"id": "116",
+"name": "2A Drug Panel"
+},
+{
+"id": "117",
+"name": "Prothrombin Time (PT) INR"
+},
+{
+"id": "118",
+"name": "LFT HLM"
+},
+{
+"id": "119",
+"name": "RENAL FUNCTION TEST(RFT) HLM"
+},
+{
+"id": "120",
+"name": "Kidney Function Test"
+},
+{
+"id": "122",
+"name": "Blood Group RH Typing CMP"
+},
+{
+"id": "123",
+"name": "Apolipoproteins Profile (A1,B,B/A1 Ratio)"
+},
+{
+"id": "124",
+"name": "Complete Blood Count Advance"
+},
+{
+"id": "125",
+"name": "FBS Reflex TO HBA1C"
+},
+{
+"id": "126",
+"name": "Anti Thyroid Antibodies Panel ( Anti TG And Anti TPO)"
+},
+{
+"id": "127",
+"name": "SGOT/SGPT Ratio Profile  (SGOT,SGPT,SGOT/SGPT Ratio)"
+},
+{
+"id": "139",
+"name": "LH/FSH Ratio"
+},
+{
+"id": "140",
+"name": "HOMA Index Insulin Test"
+},
+{
+"id": "142",
+"name": "Lipid Profile (Basic) For Children"
+},
+{
+"id": "143",
+"name": "Scrub Typhus IgG & IgM"
+},
+{
+"id": "144",
+"name": "HE4 With ROMA Index (Ovarian Cancer Advance Marker Test)"
+},
+{
+"id": "146",
+"name": "HOMA Index With Beta Cell Function"
+},
+{
+"id": "147",
+"name": "CD3/CD4/CD8 PANEL (Flow Cytometry)"
+},
+{
+"id": "148",
+"name": "CD4 PANEL (Flow Cytometry)"
+},
+{
+"id": "149",
+"name": "Lymphocyte Subset (TBNK) Panel (Flow Cytometry)"
+},
+{
+"id": "150",
+"name": "PSA Profile (Free, Total, Ratio)"
+},
+{
+"id": "151",
+"name": "CD19 LEUKEMIA CELL MARKER"
+},
+{
+"id": "152",
+"name": "CD20 (PAN B CELL MARKER)"
+},
+{
+"id": "153",
+"name": "Kappa And Lambda Free Lite Serum"
+},
+{
+"id": "193",
+"name": "ENHANCED LIVER FIBROSIS (ELF) SCORE"
+},
+{
+"id": "194",
+"name": "Vitamin B Complex Profile (Vitamin B1,B2,B3,B5,B6,B7,B9,B12)"
+},
+{
+"id": "195",
+"name": "NATURAL KILLER CELLS (NKC)"
+},
+{
+"id": "196",
+"name": "Healthians MyGenome Wellness Vitamins Profile"
+},
+{
+"id": "197",
+"name": "Prostate Health Profile"
+},
+{
+"id": "200",
+"name": "Electrolytes Spot Urine"
+},
+{
+"id": "201",
+"name": "Electrolytes Urine 24H"
+},
+{
+"id": "202",
+"name": "Flu - RSV Panel"
+}
+]

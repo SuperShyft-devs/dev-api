@@ -18,6 +18,13 @@ def healthians_product_deal_type_id(external_package_code: str | None) -> int:
     return int(raw)
 
 
+def healthians_profile_deal_type_id(external_test_group_code: str | None) -> int:
+    raw = (external_test_group_code or "").strip()
+    if not raw:
+        return 0
+    return int(raw)
+
+
 def _normalized_provider(diagnostic_provider: str | None) -> str:
     return (diagnostic_provider or "").strip().lower()
 

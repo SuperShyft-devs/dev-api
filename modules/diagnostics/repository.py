@@ -646,6 +646,23 @@ class DiagnosticsRepository:
         )
         return list(result.scalars().all())
 
+    async def list_packages_for_test_group(
+        self,
+        db: AsyncSession,
+        *,
+        group_id: int,
+    ) -> list[DiagnosticPackage]:
+        result = await db.execute(
+            select(DiagnosticPackage)
+            .join(
+                DiagnosticPackageTestGroup,
+                DiagnosticPackageTestGroup.diagnostic_package_id == DiagnosticPackage.diagnostic_package_id,
+            )
+            .where(DiagnosticPackageTestGroup.group_id == group_id)
+            .order_by(DiagnosticPackage.package_name.asc(), DiagnosticPackage.diagnostic_package_id.asc())
+        )
+        return list(result.scalars().unique().all())
+
     async def group_has_default(self, db: AsyncSession, *, group_id: int) -> bool:
         result = await db.execute(
             select(func.count())

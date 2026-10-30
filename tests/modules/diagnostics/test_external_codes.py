@@ -22,6 +22,12 @@ def test_healthians_product_deal_type_id():
     assert healthians_product_deal_type_id("42") == 42
 
 
+def test_healthians_profile_deal_type_id():
+    from modules.diagnostics.external_codes import healthians_profile_deal_type_id
+
+    assert healthians_profile_deal_type_id("7") == 7
+
+
 def test_provider_parameter_key_healthians():
     param = SimpleNamespace(healthians_parameter_key="135", orangehealth_parameter_key="oh-1")
     assert provider_parameter_key(param, "Healthians") == "135"

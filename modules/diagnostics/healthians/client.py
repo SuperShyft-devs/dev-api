@@ -144,13 +144,13 @@ async def get_booking_report(access_token: str, booking_id: str) -> dict:
     return data
 
 
-async def get_product_details(access_token: str, deal_type_id: int) -> dict:
-    """Fetch product (package) details including constituents."""
+async def get_product_details(access_token: str, deal_type_id: int, *, deal_type: str = "package") -> dict:
+    """Fetch product details including constituents."""
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.post(
             f"{settings.HEALTHIANS_BASE_URL}/toast4health/getProductDetails",
             headers={"Authorization": f"Bearer {access_token}"},
-            json={"deal_type": "package", "deal_type_id": deal_type_id},
+            json={"deal_type": deal_type, "deal_type_id": deal_type_id},
         )
         resp.raise_for_status()
         data = resp.json()

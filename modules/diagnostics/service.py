@@ -30,6 +30,7 @@ from modules.diagnostics.models import (
 )
 from modules.diagnostics.external_codes import (
     healthians_product_deal_type_id,
+    healthians_profile_deal_type_id,
     is_healthians_diagnostic_provider,
     provider_parameter_key,
 )
@@ -79,6 +80,7 @@ from modules.diagnostics.schemas import (
     TagResponse,
     TestGroupCreate,
     TestGroupPeerResponse,
+    TestGroupPackageListItem,
     TestGroupProfileGroupListItem,
     TestGroupResponse,
     TestGroupUpdate,
@@ -276,6 +278,45 @@ class DiagnosticsService:
             for member in members
             if member.group_id != group.group_id
         ]
+
+    async def _ensure_test_group_provider_matches_assigned_packages(
+        self,
+        db,
+        *,
+        group_id: int,
+        diagnostic_provider: str | None,
+    ) -> None:
+        incoming_key = self._provider_key(diagnostic_provider)
+        if incoming_key is None:
+            return
+        packages = await self._repository.list_packages_for_test_group(db, group_id=group_id)
+        mismatched: list[dict[str, object]] = []
+        for pkg in packages:
+            package_key = self._provider_key(pkg.diagnostic_provider)
+            if package_key is None:
+                continue
+            if package_key != incoming_key:
+                mismatched.append(
+                    {
+                        "diagnostic_package_id": int(pkg.diagnostic_package_id),
+                        "package_name": pkg.package_name,
+                        "diagnostic_provider": self._provider_enum_key(pkg.diagnostic_provider),
+                    }
+                )
+        if not mismatched:
+            return
+        names = ", ".join(
+            f"{item['package_name']} ({item['diagnostic_package_id']})" for item in mismatched
+        )
+        raise AppError(
+            status_code=400,
+            error_code="DIAGNOSTIC_TEST_GROUP_PACKAGE_PROVIDER_MISMATCH",
+            message=(
+                f"This test group is assigned to packages with a different lab provider ({names}). "
+                "Remove this test group from those packages before setting the provider."
+            ),
+            details={"packages": mismatched},
+        )
 
     def _build_package_warnings(
         self,
@@ -954,32 +995,22 @@ class DiagnosticsService:
         groups = [self._to_group_response(group_row, tests=tests) for group_row, tests in group_rows]
         return PackageTestsResponse(diagnostic_package_id=package_id, groups=groups)
 
-    async def get_provider_test_diff(self, db, *, package_id: int) -> ProviderTestDiffResponse:
-        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
-        if package is None:
-            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
-
-        if not is_healthians_diagnostic_provider(package.diagnostic_provider):
-            raise AppError(
-                status_code=400,
-                error_code="PROVIDER_NOT_SUPPORTED",
-                message="Provider test comparison is only available for Healthians packages.",
-            )
-
-        external_code = (package.external_package_code or "").strip()
-        if not external_code:
-            raise AppError(
-                status_code=400,
-                error_code="EXTERNAL_PACKAGE_CODE_REQUIRED",
-                message="Set the Healthians package code on this package before comparing tests.",
-            )
-
+    async def _fetch_healthians_product(
+        self,
+        *,
+        deal_type: str,
+        external_code: str,
+        log_context: str,
+    ) -> dict:
         try:
             token = await healthians_client.get_access_token()
-            deal_type_id = healthians_product_deal_type_id(external_code)
-            product = await healthians_client.get_product_details(token, deal_type_id)
+            if deal_type == "profile":
+                deal_type_id = healthians_profile_deal_type_id(external_code)
+            else:
+                deal_type_id = healthians_product_deal_type_id(external_code)
+            return await healthians_client.get_product_details(token, deal_type_id, deal_type=deal_type)
         except Exception as exc:
-            logger.exception("Healthians API error during provider test diff")
+            logger.exception("Healthians API error during %s", log_context)
             is_blocked = "403" in str(exc) or "blocked" in str(exc).lower()
             raise AppError(
                 status_code=502,
@@ -990,23 +1021,22 @@ class DiagnosticsService:
                     if is_blocked
                     else f"Failed to fetch data from Healthians: {exc}"
                 ),
-            )
+            ) from exc
 
+    async def _build_provider_test_diff(
+        self,
+        db,
+        *,
+        diagnostic_provider: str | None,
+        external_code: str,
+        product: dict,
+        tests_by_id: dict[int, tuple[HealthParameter, list[str]]],
+    ) -> ProviderTestDiffResponse:
         constituent_by_id: dict[str, str] = {}
         for raw in product.get("constituents", []):
             cid = str(raw.get("id", "")).strip()
             if cid:
                 constituent_by_id[cid] = str(raw.get("name", "")).strip()
-
-        group_rows = await self._repository.get_package_test_groups(db, package_id=package_id)
-        tests_by_id: dict[int, tuple[HealthParameter, list[str]]] = {}
-        for group_row, tests in group_rows:
-            for test in tests:
-                if test.test_id not in tests_by_id:
-                    tests_by_id[test.test_id] = (test, [])
-                group_names = tests_by_id[test.test_id][1]
-                if group_row.group_name not in group_names:
-                    group_names.append(group_row.group_name)
 
         matched: list[ProviderTestDiffMatchedItem] = []
         only_in_package: list[ProviderTestDiffOnlyInPackageItem] = []
@@ -1016,8 +1046,8 @@ class DiagnosticsService:
         for test_id in sorted(tests_by_id.keys(), key=lambda tid: tests_by_id[tid][0].test_name or ""):
             test, group_names = tests_by_id[test_id]
             sorted_groups = sorted(group_names)
-            provider_key = provider_parameter_key(test, package.diagnostic_provider)
-            if provider_key is None:
+            mapped_key = provider_parameter_key(test, diagnostic_provider)
+            if mapped_key is None:
                 not_linked.append(
                     ProviderTestDiffNotLinkedItem(
                         test_id=test_id,
@@ -1027,15 +1057,15 @@ class DiagnosticsService:
                 )
                 continue
 
-            package_provider_ids.add(provider_key)
-            if provider_key in constituent_by_id:
+            package_provider_ids.add(mapped_key)
+            if mapped_key in constituent_by_id:
                 matched.append(
                     ProviderTestDiffMatchedItem(
                         test_id=test_id,
                         test_name=test.test_name,
                         group_names=sorted_groups,
-                        provider_id=provider_key,
-                        provider_name=constituent_by_id[provider_key],
+                        provider_id=mapped_key,
+                        provider_name=constituent_by_id[mapped_key],
                     )
                 )
             else:
@@ -1044,7 +1074,7 @@ class DiagnosticsService:
                         test_id=test_id,
                         test_name=test.test_name,
                         group_names=sorted_groups,
-                        provider_id=provider_key,
+                        provider_id=mapped_key,
                     )
                 )
 
@@ -1087,6 +1117,92 @@ class DiagnosticsService:
             only_in_package=only_in_package,
             not_linked=not_linked,
             only_at_provider=only_at_provider,
+        )
+
+    async def get_provider_test_diff(self, db, *, package_id: int) -> ProviderTestDiffResponse:
+        package = await self._repository.get_package_by_id_basic(db, package_id=package_id)
+        if package is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_PACKAGE_NOT_FOUND", message="Package does not exist")
+
+        if not is_healthians_diagnostic_provider(package.diagnostic_provider):
+            raise AppError(
+                status_code=400,
+                error_code="PROVIDER_NOT_SUPPORTED",
+                message="Provider test comparison is only available for Healthians packages.",
+            )
+
+        external_code = (package.external_package_code or "").strip()
+        if not external_code:
+            raise AppError(
+                status_code=400,
+                error_code="EXTERNAL_PACKAGE_CODE_REQUIRED",
+                message="Set the Healthians package code on this package before comparing tests.",
+            )
+
+        product = await self._fetch_healthians_product(
+            deal_type="package",
+            external_code=external_code,
+            log_context="provider test diff",
+        )
+
+        group_rows = await self._repository.get_package_test_groups(db, package_id=package_id)
+        tests_by_id: dict[int, tuple[HealthParameter, list[str]]] = {}
+        for group_row, tests in group_rows:
+            for test in tests:
+                if test.test_id not in tests_by_id:
+                    tests_by_id[test.test_id] = (test, [])
+                group_names = tests_by_id[test.test_id][1]
+                if group_row.group_name not in group_names:
+                    group_names.append(group_row.group_name)
+
+        return await self._build_provider_test_diff(
+            db,
+            diagnostic_provider=package.diagnostic_provider,
+            external_code=external_code,
+            product=product,
+            tests_by_id=tests_by_id,
+        )
+
+    async def get_test_group_provider_test_diff(
+        self,
+        db,
+        *,
+        group_id: int,
+        preview_external_test_group_code: str | None = None,
+    ) -> ProviderTestDiffResponse:
+        group = await self._repository.get_group_by_id(db, group_id=group_id)
+        if group is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+
+        if not is_healthians_diagnostic_provider(group.diagnostic_provider) and not preview_external_test_group_code:
+            raise AppError(
+                status_code=400,
+                error_code="PROVIDER_NOT_SUPPORTED",
+                message="Provider test comparison is only available for Healthians test groups.",
+            )
+
+        external_code = (preview_external_test_group_code or group.external_test_group_code or "").strip()
+        if not external_code:
+            raise AppError(
+                status_code=400,
+                error_code="EXTERNAL_TEST_GROUP_CODE_REQUIRED",
+                message="Set the Healthians test group code before comparing tests.",
+            )
+
+        product = await self._fetch_healthians_product(
+            deal_type="profile",
+            external_code=external_code,
+            log_context="test group provider test diff",
+        )
+        tests = await self._repository.get_parameters_for_group(db, group_id=group_id)
+        tests_by_id = {int(test.test_id): (test, [group.group_name]) for test in tests}
+        provider = group.diagnostic_provider if not preview_external_test_group_code else "healthians"
+        return await self._build_provider_test_diff(
+            db,
+            diagnostic_provider=provider,
+            external_code=external_code,
+            product=product,
+            tests_by_id=tests_by_id,
         )
 
     async def create_package(
@@ -1738,6 +1854,21 @@ class DiagnosticsService:
             same_test_groups=same_test_groups,
         )
 
+    async def list_packages_for_test_group(self, db, *, group_id: int) -> list[TestGroupPackageListItem]:
+        group = await self._repository.get_group_by_id(db, group_id=group_id)
+        if group is None:
+            raise AppError(status_code=404, error_code="DIAGNOSTIC_TEST_GROUP_NOT_FOUND", message="Group does not exist")
+        packages = await self._repository.list_packages_for_test_group(db, group_id=group_id)
+        return [
+            TestGroupPackageListItem(
+                diagnostic_package_id=int(pkg.diagnostic_package_id),
+                package_name=pkg.package_name,
+                diagnostic_provider=self._provider_enum_key(pkg.diagnostic_provider),
+                status=pkg.status,
+            )
+            for pkg in packages
+        ]
+
     async def create_group(
         self,
         db,
@@ -1920,6 +2051,15 @@ class DiagnosticsService:
             payload["external_test_group_code"] = self._normalize(data.external_test_group_code)
 
         if "diagnostic_provider" in payload and "same_as_group_id" not in fields_set:
+            incoming_provider = payload.get("diagnostic_provider")
+            incoming_key = self._provider_key(incoming_provider)
+            existing_key = self._provider_key(existing.diagnostic_provider)
+            if incoming_key is not None and incoming_key != existing_key:
+                await self._ensure_test_group_provider_matches_assigned_packages(
+                    db,
+                    group_id=group_id,
+                    diagnostic_provider=incoming_provider,
+                )
             if existing.profile_group_id is not None:
                 provider_key = self._provider_key(payload.get("diagnostic_provider"))
                 members = await self._repository.list_test_groups_in_profile_group(
