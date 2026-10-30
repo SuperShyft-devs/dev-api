@@ -226,6 +226,7 @@ async def test_public_camp_onboarding(async_client, test_db_session):
     public_res = await async_client.get(f"/engagements/camps/code/{camp_code}/onboarding")
     assert public_res.status_code == 200
     body = public_res.json()["data"]
+    assert body["organization_name"] == "Org 14"
     assert isinstance(body["onboarding_payload"], dict)
     assert len(body["engagements"]) == 1
     assert body["engagements"][0]["city"] == "BLR"

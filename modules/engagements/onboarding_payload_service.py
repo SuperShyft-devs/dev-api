@@ -430,12 +430,14 @@ class CampOnboardingPayloadService:
         *,
         camp_no: int,
         engagements: list[tuple[str, str | None]],
+        organization_name: str = "",
     ) -> dict[str, Any]:
         row = await self._camp_repository.get_by_camp_no(db, camp_no=camp_no)
         onboarding_payload = row.onboarding_payload if row is not None else {}
         if onboarding_payload is None:
             onboarding_payload = {}
         return {
+            "organization_name": organization_name or "",
             "engagements": [
                 {"code": code, "city": city}
                 for code, city in engagements

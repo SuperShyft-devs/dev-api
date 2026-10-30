@@ -1973,3 +1973,19 @@ class EngagementsRepository:
                 continue
             rows.append((str(code), city))
         return rows
+
+    async def get_organization_name_by_camp_no(
+        self,
+        db: AsyncSession,
+        *,
+        camp_no: int,
+    ) -> str:
+        result = await db.execute(
+            select(Organization.name)
+            .select_from(Engagement)
+            .outerjoin(Organization, Organization.organization_id == Engagement.organization_id)
+            .where(Engagement.camp_no == camp_no)
+            .limit(1)
+        )
+        name = result.scalar_one_or_none()
+        return name or ""
