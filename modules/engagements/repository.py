@@ -1974,18 +1974,26 @@ class EngagementsRepository:
             rows.append((str(code), city))
         return rows
 
-    async def get_organization_name_by_camp_no(
+    async def get_public_camp_onboarding_metadata_by_camp_no(
         self,
         db: AsyncSession,
         *,
         camp_no: int,
-    ) -> str:
+    ) -> tuple[str, int]:
         result = await db.execute(
-            select(Organization.name)
+            select(
+                Organization.name,
+                func.min(Engagement.start_date).label("camp_start_date"),
+            )
             .select_from(Engagement)
             .outerjoin(Organization, Organization.organization_id == Engagement.organization_id)
             .where(Engagement.camp_no == camp_no)
+            .group_by(Engagement.organization_id, Organization.name)
             .limit(1)
         )
-        name = result.scalar_one_or_none()
-        return name or ""
+        row = result.one_or_none()
+        if row is None:
+            return "", 0
+        name, start_date = row
+        year = int(start_date.year) if start_date is not None else 0
+        return (name or ""), year

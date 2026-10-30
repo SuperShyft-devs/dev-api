@@ -1170,7 +1170,7 @@ class EngagementsService:
                 error_code="CAMP_NOT_FOUND",
                 message="Camp does not exist",
             )
-        organization_name = await self._repository.get_organization_name_by_camp_no(
+        organization_name, year = await self._repository.get_public_camp_onboarding_metadata_by_camp_no(
             db,
             camp_no=camp_no,
         )
@@ -1179,6 +1179,7 @@ class EngagementsService:
             camp_no=camp_no,
             engagements=engagements,
             organization_name=organization_name,
+            year=year,
         )
 
     async def public_slot_detail_for_engagement(self, db: AsyncSession, engagement: Engagement):
