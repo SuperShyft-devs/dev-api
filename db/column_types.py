@@ -218,6 +218,7 @@ class DiagnosticProvider(str, enum.Enum):
     healthians_legacy = "Healthians"  # exact casing stored on some rows
     health_labs = "HealthLabs"  # sample seed / legacy label
     orange_health = "orange_health"
+    redcliffe = "redcliffe"
 
 
 class BloodBookingProviderStatus(str, enum.Enum):
@@ -256,6 +257,7 @@ class IntegrationProvider(str, enum.Enum):
     google_maps = "google_maps"
     nominatim = "nominatim"
     orange_health = "orange_health"
+    redcliffe = "redcliffe"
 
 
 class UserGender(str, enum.Enum):

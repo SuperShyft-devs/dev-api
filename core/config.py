@@ -161,6 +161,14 @@ class Settings:
     ORANGE_HEALTH_API_KEY: str = os.getenv("ORANGE_HEALTH_API_KEY", "")
     ORANGE_HEALTH_WEBHOOK_SECRET: str = os.getenv("ORANGE_HEALTH_WEBHOOK_SECRET", "")
 
+    # Redcliffe Labs Partner API (home collection)
+    REDCLIFFE_BASE_URL: str = os.getenv(
+        "REDCLIFFE_BASE_URL",
+        "https://apiqa.redcliffelabs.com",
+    )
+    REDCLIFFE_API_KEY: str = os.getenv("REDCLIFFE_API_KEY", "")
+    REDCLIFFE_TIMEOUT_SECONDS: int = int(os.getenv("REDCLIFFE_TIMEOUT_SECONDS", "15"))
+
     # Aurae Face Scan (VIFC) partner API
     AURAE_BASE_URL: str = os.getenv("AURAE_BASE_URL", "")
     AURAE_API_KEY: str = os.getenv("AURAE_API_KEY", "")

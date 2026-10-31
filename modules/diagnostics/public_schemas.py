@@ -15,6 +15,7 @@ from common.validation import (
 )
 
 _SUPPORTED_SLOT_PROVIDERS = frozenset({"healthians", "orange_health"})
+_SUPPORTED_ADDRESS_SERVICEABILITY_PROVIDERS = frozenset({"healthians", "orange_health", "redcliffe"})
 
 
 def _normalize_provider_key(provider: str | None) -> str | None:
@@ -49,7 +50,7 @@ class PublicServiceabilityRequest(BaseModel):
     @model_validator(mode="after")
     def validate_provider_when_set(self) -> PublicServiceabilityRequest:
         key = _normalize_provider_key(self.provider)
-        if key is not None and key not in _SUPPORTED_SLOT_PROVIDERS:
+        if key is not None and key not in _SUPPORTED_ADDRESS_SERVICEABILITY_PROVIDERS:
             raise ValueError("Unsupported diagnostic provider")
         return self
 

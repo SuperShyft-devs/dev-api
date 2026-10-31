@@ -22,13 +22,16 @@ from modules.diagnostics.healthians import client as healthians_client
 from modules.diagnostics.orange_health import client as orange_health_client
 from modules.diagnostics.orange_health.booking_helpers import is_orange_health
 from modules.diagnostics.orange_health.client import OrangeHealthApiError
+from modules.diagnostics.redcliffe import service as redcliffe_service
+from modules.diagnostics.redcliffe.client import RedcliffeApiError, is_serviceable_response
 from modules.diagnostics.models import DiagnosticPackage
 from modules.geocoding.client import enrich_location_fields
 from modules.platform_settings.repository import PlatformSettingsRepository
 
 logger = logging.getLogger(__name__)
 
-_ALL_PUBLIC_PROVIDERS = ("healthians", "orange_health")
+_ALL_PUBLIC_PROVIDERS = ("healthians", "orange_health", "redcliffe")
+_PINCODE_PUBLIC_PROVIDERS = ("healthians", "orange_health")
 
 
 def _normalize_provider(provider: str | None) -> str | None:
@@ -45,6 +48,15 @@ def _provider_targets(provider: str | None) -> list[str]:
             raise AppError(status_code=422, error_code="INVALID_PROVIDER", message="Unsupported diagnostic provider")
         return [prov]
     return list(_ALL_PUBLIC_PROVIDERS)
+
+
+def _pincode_provider_targets(provider: str | None) -> list[str]:
+    prov = _normalize_provider(provider)
+    if prov is not None:
+        if prov not in _PINCODE_PUBLIC_PROVIDERS:
+            raise AppError(status_code=422, error_code="INVALID_PROVIDER", message="Unsupported diagnostic provider")
+        return [prov]
+    return list(_PINCODE_PUBLIC_PROVIDERS)
 
 
 async def _resolve_coordinates(
@@ -118,6 +130,64 @@ async def _check_orange_health_serviceability(
             "provider": "orange_health",
             "serviceable": False,
             "message": str(exc),
+            "data": None,
+        }
+
+
+async def _check_redcliffe_serviceability(
+    *,
+    latitude: float,
+    longitude: float,
+    pkg: DiagnosticPackage | None,
+    single_provider: bool,
+) -> dict[str, Any]:
+    if pkg is not None:
+        actual = (pkg.diagnostic_provider or "").strip().lower()
+        if actual != "redcliffe":
+            message = _package_mismatch_message(pkg, "redcliffe")
+            if single_provider:
+                raise AppError(status_code=422, error_code="INVALID_PROVIDER", message=message)
+            return {
+                "provider": "redcliffe",
+                "serviceable": False,
+                "message": message,
+                "data": None,
+            }
+    try:
+        resp = await redcliffe_service.check_location_serviceable(
+            latitude=latitude,
+            longitude=longitude,
+        )
+        serviceable = is_serviceable_response(resp)
+        message = resp.get("message") if isinstance(resp.get("message"), str) else None
+        return {
+            "provider": "redcliffe",
+            "serviceable": serviceable,
+            "message": message or (
+                "Location is serviceable" if serviceable else "Location is non-serviceable"
+            ),
+            "latitude": latitude,
+            "longitude": longitude,
+            "data": resp,
+        }
+    except RedcliffeApiError as exc:
+        body = exc.body if isinstance(exc.body, dict) else None
+        return {
+            "provider": "redcliffe",
+            "serviceable": False,
+            "message": str(exc),
+            "latitude": latitude,
+            "longitude": longitude,
+            "data": body,
+        }
+    except Exception as exc:
+        logger.exception("Public Redcliffe serviceability failed")
+        return {
+            "provider": "redcliffe",
+            "serviceable": False,
+            "message": str(exc),
+            "latitude": latitude,
+            "longitude": longitude,
             "data": None,
         }
 
@@ -228,6 +298,15 @@ async def public_check_serviceability(
                     single_provider=single_provider,
                 )
             )
+        elif prov == "redcliffe":
+            providers_out.append(
+                await _check_redcliffe_serviceability(
+                    latitude=lat,
+                    longitude=lng,
+                    pkg=pkg,
+                    single_provider=single_provider,
+                )
+            )
 
     return {"providers": providers_out}
 
@@ -333,7 +412,7 @@ async def public_check_pincode_serviceability(
     pincode: str,
 ) -> dict[str, Any]:
     _ = db
-    targets = _provider_targets(provider)
+    targets = _pincode_provider_targets(provider)
     providers_out: list[dict[str, Any]] = []
     for prov in targets:
         if prov == "healthians":
