@@ -1,9 +1,10 @@
-"""Copy home-collection location onto engagement_participants."""
+"""Home vs camp collection address on engagement_participants and engagements."""
 
 from __future__ import annotations
 
 from typing import Any, Protocol
 
+from modules.engagements.enums import BloodCollectionType
 from modules.engagements.models import Engagement, EngagementParticipant
 
 
@@ -13,6 +14,23 @@ class _OnboardAddressPayload(Protocol):
     city: str | None
     state: str | None
     country: str | None
+
+
+def _blood_collection_value(engagement: Engagement) -> str:
+    bct = engagement.blood_collection_type
+    if bct is None:
+        return ""
+    if hasattr(bct, "value"):
+        return str(bct.value).strip().lower()
+    return str(bct or "").strip().lower()
+
+
+def is_home_blood_collection(engagement: Engagement) -> bool:
+    return _blood_collection_value(engagement) == BloodCollectionType.home_collection.value
+
+
+def is_camp_blood_collection(engagement: Engagement) -> bool:
+    return _blood_collection_value(engagement) == BloodCollectionType.camp_collection.value
 
 
 def participant_has_home_location(participant: EngagementParticipant) -> bool:
@@ -25,7 +43,7 @@ def copy_engagement_location_to_participant(
     participant: EngagementParticipant,
     engagement: Engagement,
 ) -> None:
-    """Mirror geocoded B2C engagement location onto the participant row."""
+    """Mirror engagement location onto participant (camp / legacy flows)."""
     participant.address = engagement.address
     participant.sub_locality = engagement.sub_locality
     participant.landmark = engagement.landmark
@@ -90,10 +108,8 @@ def use_participant_home_for_booking(
     engagement: Engagement,
     participant: EngagementParticipant,
 ) -> bool:
-    """Shared (B2B) engagements use participant home address when present."""
-    if engagement.organization_id is None:
-        return False
-    return participant_has_home_location(participant)
+    """Home collection bookings use participant address and persist geo on participant."""
+    return is_home_blood_collection(engagement)
 
 
 def booking_location_field(
@@ -101,10 +117,8 @@ def booking_location_field(
     engagement: Engagement,
     field: str,
 ) -> Any:
-    """Resolve a home-collection field for partner booking and slot APIs."""
-    if engagement.organization_id is None:
-        return getattr(engagement, field, None)
-    if participant_has_home_location(participant):
+    """Resolve location for partner booking and slot APIs by blood collection type."""
+    if is_home_blood_collection(engagement):
         return getattr(participant, field, None)
     return getattr(engagement, field, None)
 
@@ -115,13 +129,14 @@ def overlay_console_display_address(
     participant: EngagementParticipant | None,
     engagement: Engagement,
 ) -> None:
-    """Prefill console home-collection forms: participant, then engagement, then user row."""
-    if participant is not None and participant_has_home_location(participant):
-        payload["address"] = participant.address
-        payload["pin_code"] = participant.pincode
-        payload["city"] = participant.city
-        payload["state"] = participant.state
-        payload["landmark"] = participant.landmark
+    """Prefill console home-collection forms from participant (home) or engagement (camp)."""
+    if is_home_blood_collection(engagement):
+        if participant is not None and participant_has_home_location(participant):
+            payload["address"] = participant.address
+            payload["pin_code"] = participant.pincode
+            payload["city"] = participant.city
+            payload["state"] = participant.state
+            payload["landmark"] = participant.landmark
         return
 
     engagement_address = (engagement.address or "").strip()

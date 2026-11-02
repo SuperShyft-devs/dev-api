@@ -437,8 +437,10 @@ async def _ensure_healthians_zone_for_slots(
     loc: dict[str, str],
     user_id: int,
 ) -> tuple[dict[str, str], str | None]:
-    """Fill lat/long/zone for Healthians slot fetch. B2C onboard never stores zone_id."""
-    from modules.engagements.participant_location import use_participant_home_for_booking
+    """Fill lat/long/zone for Healthians slot fetch; persist on participant (home) or engagement (camp)."""
+    from modules.engagements.participant_location import (
+        use_participant_home_for_booking,
+    )
 
     participant_home = use_participant_home_for_booking(engagement, participant)
     if loc["zone_id"] and loc["lat"] and loc["long"] and loc["zipcode"]:
@@ -478,16 +480,12 @@ async def _ensure_healthians_zone_for_slots(
                     if geocoded.get("country"):
                         participant.country = geocoded.get("country")
                     db.add(participant)
+                    await db.flush()
                 else:
                     engagement.latitude = float(loc["lat"])
                     engagement.longitude = float(loc["long"])
-                    if participant.latitude is None:
-                        participant.latitude = float(loc["lat"])
-                    if participant.longitude is None:
-                        participant.longitude = float(loc["long"])
-                    db.add(participant)
-                db.add(engagement)
-                await db.flush()
+                    db.add(engagement)
+                    await db.flush()
 
     missing = [key for key in ("lat", "long", "zipcode") if not loc[key]]
     if missing:
@@ -1601,6 +1599,24 @@ async def create_healthians_booking_after_payment(
             })
             continue
 
+        loc = _healthians_location_for_slots(engagement, participant)
+        loc, loc_error = await _ensure_healthians_zone_for_slots(
+            db,
+            engagement=engagement,
+            participant=participant,
+            loc=loc,
+            user_id=user_id,
+        )
+        if loc_error:
+            results.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "status": "error",
+                "message": loc_error,
+            })
+            continue
+
+        user_email = (user.email or "").strip()
         booking_payload = {
             "customer": [{
                 "customer_id": str(user_id),
@@ -1609,6 +1625,8 @@ async def create_healthians_booking_after_payment(
                 "age": age,
                 "dob": dob,
                 "gender": gender_code,
+                "contact_number": phone,
+                "email": user_email,
             }],
             "slot": {"slot_id": slot_id},
             "package": [{"deal_id": [deal_id]}],
@@ -1616,22 +1634,28 @@ async def create_healthians_booking_after_payment(
             "billing_cust_name": full_name.upper(),
             "gender": gender_code,
             "mobile": phone,
-            "email": user.email or "",
+            "email": user_email,
             "sub_locality": _booking_location_field(participant, engagement, "sub_locality") or "",
-            "latitude": str(_booking_location_field(participant, engagement, "latitude") or ""),
-            "longitude": str(_booking_location_field(participant, engagement, "longitude") or ""),
+            "latitude": loc["lat"],
+            "longitude": loc["long"],
             "address": _booking_location_field(participant, engagement, "address") or "",
-            "zipcode": _booking_location_field(participant, engagement, "pincode") or "",
+            "zipcode": loc["zipcode"] or _booking_location_field(participant, engagement, "pincode") or "",
             "landmark": _booking_location_field(participant, engagement, "landmark") or "",
             "hard_copy": 0,
             "vendor_billing_user_id": vendor_billing_user_id,
             "payment_option": "prepaid",
             "discounted_price": 0,
-            "zone_id": int(
-                _booking_location_field(participant, engagement, "healthians_zone_id") or 0
-            ),
+            "zone_id": int(loc["zone_id"] or 0),
             "is_ppmc_booking": 0,
         }
+        if not booking_payload["zone_id"]:
+            results.append({
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "status": "error",
+                "message": "Healthians zone could not be resolved for this address",
+            })
+            continue
 
         try:
             access_token = await _freeze_healthians_slot_for_participant(

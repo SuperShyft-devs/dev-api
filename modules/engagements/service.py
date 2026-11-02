@@ -1770,19 +1770,37 @@ class EngagementsService:
         name_part = (user_first_name or "user").strip() or "user"
         engagement_name = f"{name_part}-{engagement_date.isoformat()}"
 
-        primary = await PlatformSettingsRepository().resolve_geocoding_provider(db)
-        location = await enrich_location_fields(
-            address=address,
-            sub_locality=sub_locality,
-            landmark=landmark,
-            city=city,
-            pincode=pincode,
-            state=state,
-            country=country,
-            latitude=latitude,
-            longitude=longitude,
-            primary=primary,
+        bct_val = (
+            blood_collection_type.value
+            if isinstance(blood_collection_type, BloodCollectionType)
+            else str(blood_collection_type or "").strip().lower()
         )
+        if bct_val == BloodCollectionType.home_collection.value:
+            location = {
+                "city": city,
+                "address": None,
+                "sub_locality": None,
+                "landmark": None,
+                "pincode": None,
+                "state": None,
+                "country": None,
+                "latitude": None,
+                "longitude": None,
+            }
+        else:
+            primary = await PlatformSettingsRepository().resolve_geocoding_provider(db)
+            location = await enrich_location_fields(
+                address=address,
+                sub_locality=sub_locality,
+                landmark=landmark,
+                city=city,
+                pincode=pincode,
+                state=state,
+                country=country,
+                latitude=latitude,
+                longitude=longitude,
+                primary=primary,
+            )
 
         engagement = Engagement(
             engagement_name=engagement_name,

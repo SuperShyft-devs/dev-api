@@ -2683,18 +2683,42 @@ class UsersService:
             db, diagnostic_package_id, engagement_type_code,
         )
 
+        from modules.engagements.enums import BloodCollectionType
+        from modules.engagements.participant_location import (
+            copy_engagement_location_to_participant,
+            copy_onboard_payload_location_to_participant,
+            is_home_blood_collection,
+            onboard_payload_has_address,
+        )
+
+        bct = onboarding_defaults.blood_collection_type
+        bct_val = (bct.value if hasattr(bct, "value") else str(bct or "")).strip().lower()
+        onboard_home = bct_val == BloodCollectionType.home_collection.value
+
         if onboarded_by_user_id:
             engagement_city = payload.city if payload.city is not None else user.city
-            engagement_address = payload.address if payload.address is not None else user.address
-            engagement_pincode = payload.pincode if payload.pincode is not None else user.pin_code
-            engagement_state = payload.state if payload.state is not None else user.state
-            engagement_country = payload.country if payload.country is not None else user.country
+            if onboard_home:
+                engagement_address = None
+                engagement_pincode = None
+                engagement_state = None
+                engagement_country = None
+            else:
+                engagement_address = payload.address if payload.address is not None else user.address
+                engagement_pincode = payload.pincode if payload.pincode is not None else user.pin_code
+                engagement_state = payload.state if payload.state is not None else user.state
+                engagement_country = payload.country if payload.country is not None else user.country
         else:
             engagement_city = payload.city or user.city
-            engagement_address = payload.address
-            engagement_pincode = payload.pincode
-            engagement_state = getattr(payload, "state", None)
-            engagement_country = getattr(payload, "country", None)
+            if onboard_home:
+                engagement_address = None
+                engagement_pincode = None
+                engagement_state = None
+                engagement_country = None
+            else:
+                engagement_address = payload.address
+                engagement_pincode = payload.pincode
+                engagement_state = getattr(payload, "state", None)
+                engagement_country = getattr(payload, "country", None)
 
         engagement = await self._engagements_service.create_b2c_engagement(
             db,
@@ -2707,13 +2731,13 @@ class UsersService:
             blood_collection_type=onboarding_defaults.blood_collection_type,
             consultations=resolved_consultations,
             address=engagement_address,
-            sub_locality=getattr(payload, "sub_locality", None),
-            landmark=getattr(payload, "landmark", None),
+            sub_locality=getattr(payload, "sub_locality", None) if not onboard_home else None,
+            landmark=getattr(payload, "landmark", None) if not onboard_home else None,
             pincode=engagement_pincode,
             state=engagement_state,
             country=engagement_country,
-            latitude=getattr(payload, "latitude", None),
-            longitude=getattr(payload, "longitude", None),
+            latitude=getattr(payload, "latitude", None) if not onboard_home else None,
+            longitude=getattr(payload, "longitude", None) if not onboard_home else None,
             create_profile_on_metsights=onboarding_defaults.create_profile_on_metsights,
             enroll_for_fitprint_full=onboarding_defaults.enroll_for_fitprint_full,
             **b2c_engagement_create_kwargs_from_defaults(
@@ -2742,9 +2766,11 @@ class UsersService:
             participant_blood_group=payload.participant_blood_group,
             consultations=consultations
         )
-        from modules.engagements.participant_location import copy_engagement_location_to_participant
-
-        copy_engagement_location_to_participant(time_slot, engagement)
+        if is_home_blood_collection(engagement):
+            if onboard_payload_has_address(payload):
+                copy_onboard_payload_location_to_participant(time_slot, payload)
+        else:
+            copy_engagement_location_to_participant(time_slot, engagement)
         db.add(time_slot)
         await db.flush()
 
@@ -3185,10 +3211,11 @@ class UsersService:
         )
         from modules.engagements.participant_location import (
             copy_onboard_payload_location_to_participant,
+            is_home_blood_collection,
             onboard_payload_has_address,
         )
 
-        if onboard_payload_has_address(payload):
+        if is_home_blood_collection(engagement) and onboard_payload_has_address(payload):
             copy_onboard_payload_location_to_participant(time_slot, payload)
             db.add(time_slot)
             await db.flush()

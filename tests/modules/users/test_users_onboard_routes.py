@@ -560,11 +560,24 @@ async def test_engagement_onboard_overwrites_existing_address_fields(async_clien
             "VALUES (1, 'REF1', 'Diag Package', 1) ON CONFLICT (diagnostic_package_id) DO NOTHING"
         )
     )
-    await test_db_session.execute(
-        text(
-            "INSERT INTO engagements (engagement_id, engagement_name, engagement_code, engagement_type, "
-            "assessment_package_id, diagnostic_package_id, city, slot_duration, start_date, end_date, status, participant_count) "
-            "VALUES (3301, 'Camp-Addr', 'ENGADDR', 'bio_ai', 1, 1, 'BLR', 20, '2026-02-01', '2026-02-01', 'running')"
+    from datetime import date
+
+    from modules.engagements.models import BloodCollectionType, Engagement
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=3301,
+            engagement_name="Camp-Addr",
+            engagement_code="ENGADDR",
+            engagement_type=1,
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 1),
+            status="running",
+            blood_collection_type=BloodCollectionType.home_collection,
         )
     )
     await test_db_session.execute(
@@ -648,6 +661,16 @@ async def test_public_onboard_persists_address_on_user_engagement_and_participan
             "VALUES (1, 'REF1', 'Diag Package', 1) ON CONFLICT (diagnostic_package_id) DO NOTHING"
         )
     )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO platform_settings "
+            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
+            "b2c_default_engagement_type, b2c_default_blood_collection_type) "
+            "VALUES (1, 1, 1, 'bio_ai', 'home_collection') "
+            "ON CONFLICT (settings_id) DO UPDATE SET "
+            "b2c_default_blood_collection_type = EXCLUDED.b2c_default_blood_collection_type"
+        )
+    )
     await test_db_session.commit()
 
     payload = {
@@ -691,8 +714,8 @@ async def test_public_onboard_persists_address_on_user_engagement_and_participan
         )
     ).first()
     assert engagement_row.organization_id is None
-    assert engagement_row.address == "221B Baker Street"
-    assert engagement_row.pincode == "411001"
+    assert engagement_row.address is None
+    assert engagement_row.pincode is None
     assert engagement_row.city == "Pune"
 
     participant_row = (

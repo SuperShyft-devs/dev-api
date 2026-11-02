@@ -9,7 +9,7 @@ from datetime import date, time, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from core.config import settings
 from core.security import create_jwt_token
@@ -199,6 +199,16 @@ async def _seed_draft_engagement(
         user_id=user_id,
         booked_by_user_id=booked_by_user_id,
     )
+    test_db_session.add(participant)
+    await test_db_session.flush()
+    engagement_row = (
+        await test_db_session.execute(
+            select(Engagement).where(Engagement.engagement_id == engagement_id)
+        )
+    ).scalar_one()
+    from modules.engagements.participant_location import copy_engagement_location_to_participant
+
+    copy_engagement_location_to_participant(participant, engagement_row)
     test_db_session.add(participant)
     await test_db_session.flush()
     if locked:
