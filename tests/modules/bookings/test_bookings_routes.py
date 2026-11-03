@@ -1277,9 +1277,112 @@ async def test_book_bio_ai_applies_defaults_assigns_assistants_and_notifies(
     assert notify_kwargs["participant_details"]["collection_date"] == "2026-07-15"
     assert notify_kwargs["participant_details"]["collection_time"] == "06:00:00"
 
+    eng_clinical = (
+        await test_db_session.execute(
+            text(
+                "SELECT assessment_package_id, create_profile_on_metsights, enroll_for_fitprint_full "
+                "FROM engagements WHERE engagement_id = 940123"
+            )
+        )
+    ).one()
+    assert eng_clinical.assessment_package_id == 1
+    assert eng_clinical.create_profile_on_metsights is True
+    assert eng_clinical.enroll_for_fitprint_full is False
+
+    instance_count = (
+        await test_db_session.execute(
+            text(
+                "SELECT COUNT(*) FROM assessment_instances "
+                "WHERE user_id = 940023 AND engagement_id = 940123"
+            )
+        )
+    ).scalar_one()
+    assert int(instance_count) >= 1
+
 
 @pytest.mark.asyncio
-async def test_book_blood_test_sets_engagement_type_blood_test(async_client, test_db_session, monkeypatch):
+async def test_book_bio_ai_finalize_attempts_metsights_and_survives_failure(
+    async_client, test_db_session, monkeypatch
+):
+    monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
+    monkeypatch.setattr(settings, "HEALTHIANS_CHECKSUM_KEY", "test-checksum")
+    await _seed_healthians_diagnostic_package(test_db_session)
+    await _seed_book_finalize_platform_defaults(test_db_session)
+
+    u = User(
+        user_id=940024,
+        age=30,
+        phone="9400240000",
+        status="active",
+        first_name="Mets",
+        last_name="Fail",
+        gender="male",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=940124,
+        user_id=940024,
+        booked_by_user_id=940024,
+        locked=True,
+    )
+
+    with patch(
+        "modules.payments.services._create_razorpay_order_sync",
+        side_effect=_mock_razorpay_order,
+    ):
+        pay_resp = await async_client.post(
+            "/book/pay",
+            headers=_auth_header(940024),
+            json={"members": [{"user_id": 940024, "engagement_id": 940124}]},
+        )
+    razorpay_order_id = pay_resp.json()["data"]["razorpay_order_id"]
+    payment_id = "pay_test_940024"
+    signature = _razorpay_signature(order_id=razorpay_order_id, payment_id=payment_id)
+
+    metsights_mock = AsyncMock(side_effect=RuntimeError("metsights down"))
+    with patch(
+        "modules.bookings.service.healthians_client.get_access_token",
+        new_callable=AsyncMock,
+        return_value="tok",
+    ), patch(
+        "modules.bookings.service.healthians_client.freeze_slot_v1",
+        new_callable=AsyncMock,
+        return_value={"status": True, "resCode": "RES0001", "message": "ok", "data": {"slot_id": "slot-123"}},
+    ), patch(
+        "modules.bookings.service.healthians_client.create_booking_v3",
+        new_callable=AsyncMock,
+        return_value={"status": True, "booking_id": "HI940024", "message": "OK"},
+    ), patch(
+        "modules.metsights.service.MetsightsService.get_or_create_profile_id",
+        metsights_mock,
+    ):
+        response = await async_client.post(
+            "/book/bio-ai",
+            headers=_auth_header(940024),
+            json={
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": payment_id,
+                "razorpay_signature": signature,
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["members"][0]["status"] == "success"
+    metsights_mock.assert_awaited()
+
+    instance_count = (
+        await test_db_session.execute(
+            text(
+                "SELECT COUNT(*) FROM assessment_instances "
+                "WHERE user_id = 940024 AND engagement_id = 940124"
+            )
+        )
+    ).scalar_one()
+    assert int(instance_count) >= 1
     monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "test_razorpay_secret")
     monkeypatch.setattr(settings, "HEALTHIANS_CHECKSUM_KEY", "test-checksum")
     await _seed_healthians_diagnostic_package(test_db_session)

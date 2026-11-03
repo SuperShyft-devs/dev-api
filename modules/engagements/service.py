@@ -28,6 +28,7 @@ from common.schedule_cutoff import (
 )
 from core.config import settings
 from core.exceptions import AppError
+from db.transaction import release_request_transaction
 from modules.assessments.essentials_vitals import (
     category_optional_for_essentials_completion,
     is_metsights_essentials,
@@ -52,7 +53,15 @@ from modules.engagements.consultation_booking_validation import (
     effective_consultation_mode,
 )
 from modules.engagements.enums import EngagementPaymentType
-from modules.engagements.models import BloodCollectionType, ConsultationMode, Engagement, EngagementParticipant, EngagementStatus, OnboardingAssistantAssignment
+from modules.engagements.models import (
+    BloodCollectionType,
+    ConsultationMode,
+    Engagement,
+    EngagementParticipant,
+    EngagementStatus,
+    EngagementType,
+    OnboardingAssistantAssignment,
+)
 from modules.partners.models import PartnerRole
 from modules.partners.role_utils import partner_role_value
 from modules.partners.repository import PartnersRepository
@@ -96,12 +105,13 @@ from modules.engagements.schemas import (
 from modules.experts.repository import ExpertTypesRepository
 from modules.experts.service import ExpertTypesService
 from modules.notifications.repository import NotificationsRepository
+from modules.metsights.integration_logging import MetsightsSyncContext
+from modules.metsights.service import outbound_last_name
 from modules.organizations.repository import OrganizationsRepository
 from modules.platform_settings.repository import PlatformSettingsRepository
 from modules.organizations.service import validate_participant_department_for_organization
 from modules.questionnaire.repository import QuestionnaireRepository
 from modules.reports.repository import ReportsRepository
-from modules.metsights.service import outbound_last_name
 from modules.users.models import User
 from modules.users.repository import UsersRepository
 
@@ -1862,6 +1872,235 @@ class EngagementsService:
 
         return engagement
 
+    async def _engagement_type_code(self, db: AsyncSession, engagement_type_id: int | None) -> str:
+        if engagement_type_id is None:
+            return "bio_ai"
+        result = await db.execute(
+            select(EngagementType.code).where(EngagementType.id == engagement_type_id).limit(1)
+        )
+        code = result.scalar_one_or_none()
+        normalized = (code or "bio_ai").strip()
+        return normalized or "bio_ai"
+
+    async def _apply_book_finalize_b2c_package_defaults(
+        self,
+        db: AsyncSession,
+        *,
+        engagement: Engagement,
+    ) -> None:
+        """Backfill assessment/Metsights flags from platform B2C defaults for draft /book engagements."""
+        if engagement.assessment_package_id is not None:
+            return
+
+        from modules.platform_settings.b2c_onboard_apply import b2c_engagement_create_kwargs_from_defaults
+        from modules.platform_settings.service import PlatformSettingsService
+
+        type_code = await self._engagement_type_code(db, engagement.engagement_type)
+        settings_service = PlatformSettingsService(self._platform_settings_repository)
+        defaults = await settings_service.resolve_b2c_onboarding_defaults(db, type_code)
+        await settings_service.ensure_active_b2c_packages(
+            db,
+            defaults.assessment_package_id,
+            engagement.diagnostic_package_id,
+        )
+
+        engagement.assessment_package_id = defaults.assessment_package_id
+        engagement.create_profile_on_metsights = bool(defaults.create_profile_on_metsights)
+        engagement.enroll_for_fitprint_full = bool(defaults.enroll_for_fitprint_full)
+        extra = b2c_engagement_create_kwargs_from_defaults(defaults, engagement.consultations)
+        engagement.load_prev_assessment_questionnaires = bool(extra["load_prev_assessment_questionnaires"])
+        engagement.load_prev_questionnaire_category_keys = extra["load_prev_questionnaire_category_keys"]
+        engagement.slot_duration = int(extra["slot_duration"])
+        if extra.get("consultation_mode") is not None:
+            engagement.consultation_mode = extra["consultation_mode"]
+        if extra.get("payment_type") is not None:
+            engagement.payment_type = extra["payment_type"]
+        engagement.auto_booking = bool(extra.get("auto_booking", engagement.auto_booking))
+
+    async def _create_metsights_profile_for_book_finalize(
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        engagement: Engagement,
+        sync_context: MetsightsSyncContext | None = None,
+    ) -> str | None:
+        if self._metsights_service is None:
+            return (user.metsights_profile_id or "").strip() or None
+        if not bool(engagement.create_profile_on_metsights):
+            return (user.metsights_profile_id or "").strip() or None
+
+        existing = (user.metsights_profile_id or "").strip()
+        if existing:
+            return existing
+
+        first_name = (user.first_name or "").strip()
+        last_name = outbound_last_name(user.last_name)
+        phone = _normalize_phone_for_metsights(user.phone)
+        gender = _to_metsights_gender(user.gender)
+        if not first_name or not phone or gender is None:
+            logger.warning(
+                "Metsights profile creation skipped for user_id=%s engagement_id=%s: missing required user fields",
+                user.user_id,
+                engagement.engagement_id,
+            )
+            return None
+
+        dob = user.date_of_birth.isoformat() if user.date_of_birth is not None else None
+        email = (user.email or "").strip() if user.email else None
+        engagement_metsights_id = (engagement.metsights_engagement_id or "").strip()
+
+        if engagement_metsights_id:
+            profile_id = await self._metsights_service.create_profile_for_engagement(
+                engagement_id=engagement_metsights_id,
+                first_name=first_name,
+                last_name=last_name,
+                phone=phone,
+                email=email,
+                gender=gender,
+                date_of_birth=dob,
+                age=user.age,
+                sync_context=sync_context,
+            )
+        else:
+            profile_id = await self._metsights_service.get_or_create_profile_id(
+                first_name=first_name,
+                last_name=last_name,
+                phone=phone,
+                email=email,
+                gender=gender,
+                date_of_birth=dob,
+                age=user.age,
+                sync_context=sync_context,
+            )
+
+        await self._users_repository.update_user_partial(
+            db, user.user_id, {"metsights_profile_id": profile_id}
+        )
+        user.metsights_profile_id = profile_id
+        return profile_id
+
+    async def _bootstrap_assessments_and_metsights_after_book_finalize(
+        self,
+        db: AsyncSession,
+        *,
+        engagement: Engagement,
+        user: User,
+    ) -> None:
+        if self._assessments_service is None:
+            return
+
+        ip_address = "system"
+        user_agent = "book-finalize"
+        endpoint = "/book/finalize"
+
+        if engagement.assessment_package_id is not None:
+            await self.ensure_assessment_instances_for_participant(
+                db,
+                engagement=engagement,
+                user_id=int(user.user_id),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                endpoint=endpoint,
+            )
+
+        if self._metsights_service is None:
+            return
+
+        sync_context = MetsightsSyncContext(
+            db=db,
+            engagement_id=int(engagement.engagement_id),
+            user_id=int(user.user_id),
+        )
+        profile_id: str | None = None
+        try:
+            await release_request_transaction(db)
+            profile_id = await self._create_metsights_profile_for_book_finalize(
+                db,
+                user=user,
+                engagement=engagement,
+                sync_context=sync_context,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Post-book Metsights profile sync failed for user_id=%s engagement_id=%s: %s",
+                user.user_id,
+                engagement.engagement_id,
+                str(exc),
+            )
+
+        if not profile_id:
+            profile_id = (user.metsights_profile_id or "").strip() or None
+
+        if profile_id and bool(engagement.enroll_for_fitprint_full):
+            try:
+                await release_request_transaction(db)
+                fitprint_package = await self._assessments_service.get_package_by_assessment_type_code(
+                    db,
+                    assessment_type_code="7",
+                )
+                fitprint_sub = (
+                    (getattr(fitprint_package, "subscription_id", None) or "").strip()
+                    if fitprint_package is not None
+                    else ""
+                )
+                if fitprint_sub:
+                    fitprint_record_id = await self._metsights_service.create_record_for_profile(
+                        profile_id=profile_id,
+                        subscription_id=fitprint_sub,
+                        sync_context=sync_context,
+                    )
+                    if fitprint_package is not None and fitprint_record_id:
+                        await self._assessments_service.ensure_instance_assigned(
+                            db,
+                            user_id=int(user.user_id),
+                            engagement_id=int(engagement.engagement_id),
+                            package_id=int(fitprint_package.package_id),
+                            ip_address=ip_address,
+                            user_agent=user_agent,
+                            endpoint=endpoint,
+                            metsights_record_id=fitprint_record_id,
+                        )
+            except Exception as exc:
+                logger.warning(
+                    "Post-book Metsights FitPrint record failed for user_id=%s engagement_id=%s: %s",
+                    user.user_id,
+                    engagement.engagement_id,
+                    str(exc),
+                )
+
+        ap_id = engagement.assessment_package_id
+        if profile_id and ap_id is not None:
+            try:
+                package = await self._assessments_service.get_package_by_id(db, int(ap_id))
+                subscription_id = (
+                    (getattr(package, "subscription_id", None) or "").strip() if package else ""
+                )
+                if subscription_id:
+                    await release_request_transaction(db)
+                    metsights_record_id = await self._metsights_service.create_record_for_profile(
+                        profile_id=profile_id,
+                        subscription_id=subscription_id,
+                        sync_context=sync_context,
+                    )
+                    await self._assessments_service.ensure_instance_assigned(
+                        db,
+                        user_id=int(user.user_id),
+                        engagement_id=int(engagement.engagement_id),
+                        package_id=int(ap_id),
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        endpoint=endpoint,
+                        metsights_record_id=metsights_record_id,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Post-book Metsights primary record failed for user_id=%s engagement_id=%s: %s",
+                    user.user_id,
+                    engagement.engagement_id,
+                    str(exc),
+                )
+
     async def apply_b2c_defaults_and_notify_after_booking(
         self,
         db: AsyncSession,
@@ -1871,9 +2110,12 @@ class EngagementsService:
         collection_date: date | None,
         collection_time: time | None = None,
     ) -> None:
-        """After Healthians /book finalize: dates, platform notification defaults, default OAs, notify.
+        """After Healthians /book finalize: dates, B2C clinical bootstrap, notification defaults, OAs, notify.
 
         start_date = blood collection date; end_date = start_date + 3 days.
+
+        Legacy engagements created before this bootstrap may still have null assessment_package_id;
+        repair via admin (set package + Metsights profile + ensure assessment instances).
         """
         if collection_date is not None:
             engagement.start_date = collection_date
@@ -1882,6 +2124,16 @@ class EngagementsService:
             current_name = (engagement.engagement_name or "").strip()
             if current_name.endswith("-draft"):
                 engagement.engagement_name = f"{name_part}-{collection_date.isoformat()}"
+
+        await self._apply_book_finalize_b2c_package_defaults(db, engagement=engagement)
+        db.add(engagement)
+        await db.flush()
+
+        await self._bootstrap_assessments_and_metsights_after_book_finalize(
+            db,
+            engagement=engagement,
+            user=user,
+        )
 
         from modules.engagement_notifications.repository import EngagementNotificationsRepository
         en_repo = EngagementNotificationsRepository()
