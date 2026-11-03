@@ -39,6 +39,71 @@ def participant_has_home_location(participant: EngagementParticipant) -> bool:
     return bool(address or pincode)
 
 
+def is_b2c_engagement(engagement: Engagement) -> bool:
+    return engagement.organization_id is None
+
+
+def can_seed_participant_address_from_engagement(
+    engagement: Engagement,
+    *,
+    participant_count: int,
+) -> bool:
+    """Allow copying engagement text address onto a home participant (legacy repair)."""
+    if participant_count != 1:
+        return False
+    if not is_home_blood_collection(engagement):
+        return False
+    return is_b2c_engagement(engagement)
+
+
+def copy_engagement_text_address_to_participant(
+    participant: EngagementParticipant,
+    engagement: Engagement,
+) -> None:
+    """Copy textual address fields only (no lat/long/zone)."""
+    participant.address = engagement.address
+    participant.sub_locality = engagement.sub_locality
+    participant.landmark = engagement.landmark
+    participant.pincode = engagement.pincode
+    participant.city = engagement.city
+    participant.state = engagement.state
+    participant.country = engagement.country
+
+
+def apply_geocoded_home_location_to_participant(
+    participant: EngagementParticipant,
+    *,
+    geocoded: dict[str, Any],
+    address_line: str | None = None,
+    landmark: str | None = None,
+    city: str | None = None,
+    pincode_fallback: str | None = None,
+) -> None:
+    """Persist home-collection address and geocode result on the participant."""
+    if address_line is not None:
+        stripped = address_line.strip()
+        participant.address = stripped or None
+        participant.sub_locality = stripped or None
+    if landmark is not None:
+        participant.landmark = landmark.strip() or None
+    if city is not None:
+        participant.city = city.strip() or None
+    if pincode_fallback is not None:
+        participant.pincode = pincode_fallback.strip() or None
+    lat = geocoded.get("latitude")
+    lng = geocoded.get("longitude")
+    if lat is not None:
+        participant.latitude = float(lat)
+    if lng is not None:
+        participant.longitude = float(lng)
+    if geocoded.get("pincode") and not (participant.pincode or "").strip():
+        participant.pincode = str(geocoded["pincode"]).strip() or None
+    if geocoded.get("state"):
+        participant.state = geocoded.get("state")
+    if geocoded.get("country"):
+        participant.country = geocoded.get("country")
+
+
 def copy_engagement_location_to_participant(
     participant: EngagementParticipant,
     engagement: Engagement,

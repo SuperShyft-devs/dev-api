@@ -2129,6 +2129,35 @@ class EngagementsService:
         db.add(engagement)
         await db.flush()
 
+        from modules.engagements.models import EngagementParticipant
+        from modules.engagements.participant_location import is_home_blood_collection
+
+        if is_home_blood_collection(engagement):
+            participant_result = await db.execute(
+                select(EngagementParticipant)
+                .where(EngagementParticipant.engagement_id == engagement.engagement_id)
+                .where(EngagementParticipant.user_id == user.user_id)
+                .order_by(EngagementParticipant.engagement_participant_id.desc())
+                .limit(1)
+            )
+            participant = participant_result.scalar_one_or_none()
+            if participant is not None:
+                from modules.bookings.healthians_location import ensure_participant_home_healthians_location
+
+                loc_error = await ensure_participant_home_healthians_location(
+                    db,
+                    engagement=engagement,
+                    participant=participant,
+                    user_id=int(user.user_id),
+                )
+                if loc_error:
+                    logger.warning(
+                        "Post-book participant home location sync failed engagement_id=%s user_id=%s: %s",
+                        engagement.engagement_id,
+                        user.user_id,
+                        loc_error,
+                    )
+
         await self._bootstrap_assessments_and_metsights_after_book_finalize(
             db,
             engagement=engagement,

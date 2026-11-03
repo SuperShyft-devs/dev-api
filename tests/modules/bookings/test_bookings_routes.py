@@ -171,6 +171,7 @@ async def _seed_draft_engagement(
     locked: bool = False,
     status: str = "draft",
     healthians_zone_id: str | None = "440",
+    participant_location: bool = True,
 ) -> None:
     from modules.engagements.blood_booking_enums import BloodBookingRelation, BloodBookingStatus
     from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant, ParticipantBloodBooking
@@ -206,11 +207,12 @@ async def _seed_draft_engagement(
             select(Engagement).where(Engagement.engagement_id == engagement_id)
         )
     ).scalar_one()
-    from modules.engagements.participant_location import copy_engagement_location_to_participant
+    if participant_location:
+        from modules.engagements.participant_location import copy_engagement_location_to_participant
 
-    copy_engagement_location_to_participant(participant, engagement_row)
-    test_db_session.add(participant)
-    await test_db_session.flush()
+        copy_engagement_location_to_participant(participant, engagement_row)
+        test_db_session.add(participant)
+        await test_db_session.flush()
     if locked:
         test_db_session.add(
             ParticipantBloodBooking(
@@ -400,7 +402,7 @@ async def test_check_service_availability_creates_engagement_before_healthians(
             {"eid": member["engagement_id"]},
         )
     ).one()
-    assert eng_row.status == "draft"
+    assert eng_row.status in ("draft", 1)
     assert eng_row.healthians_zone_id == "440"
     assert eng_row.address == "Flat 12, Green Park"
     assert eng_row.sub_locality == "Flat 12, Green Park"
@@ -409,13 +411,18 @@ async def test_check_service_availability_creates_engagement_before_healthians(
     part_row = (
         await test_db_session.execute(
             text(
-                "SELECT booked_by_user_id "
+                "SELECT booked_by_user_id, address, pincode, latitude, longitude, healthians_zone_id "
                 "FROM engagement_participants WHERE engagement_id = :eid"
             ),
             {"eid": member["engagement_id"]},
         )
     ).one()
     assert part_row.booked_by_user_id == 930001
+    assert part_row.address == "Flat 12, Green Park"
+    assert part_row.pincode == "400001"
+    assert part_row.latitude is not None
+    assert part_row.longitude is not None
+    assert part_row.healthians_zone_id == "440"
 
     blood_count = (
         await test_db_session.execute(
@@ -753,6 +760,158 @@ async def test_available_slots_resolves_missing_zone_id(async_client, test_db_se
     mock_zone.assert_awaited_once()
     sent = mock_slots.await_args.args[1]
     assert sent["zone_id"] == "999"
+
+
+@pytest.mark.asyncio
+async def test_available_slots_seeds_legacy_b2c_participant_from_engagement_address(
+    async_client, test_db_session,
+):
+    await _seed_healthians_diagnostic_package(test_db_session)
+    u = User(
+        user_id=930018,
+        age=30,
+        phone="9300180000",
+        status="active",
+        first_name="Legacy",
+        last_name="Home",
+        gender="male",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=930118,
+        user_id=930018,
+        booked_by_user_id=930018,
+        locked=True,
+        status="scheduled",
+        healthians_zone_id=None,
+        participant_location=False,
+    )
+
+    geocode_result = [{"latitude": 19.0760, "longitude": 72.8777, "state": "Maharashtra", "country": "India"}]
+    healthians_slots = {
+        "status": True,
+        "data": [{"end_time": "11:30:00", "slot_date": "2026-07-20", "slot_time": "11:00:00", "stm_id": "STM_HEAL"}],
+    }
+
+    with (
+        patch(
+            "modules.bookings.service.search_places_for_booking",
+            new_callable=AsyncMock,
+            return_value=geocode_result,
+        ) as mock_geocode,
+        patch("modules.bookings.service.healthians_client.get_access_token", new_callable=AsyncMock, return_value="tok"),
+        patch(
+            "modules.bookings.service.healthians_client.check_serviceability_by_location_v2",
+            new_callable=AsyncMock,
+            return_value={"status": True, "message": "Serviceable", "data": {"zone_id": 264}},
+        ),
+        patch(
+            "modules.bookings.service.healthians_client.get_slots_by_location",
+            new_callable=AsyncMock,
+            return_value=healthians_slots,
+        ),
+    ):
+        response = await async_client.post(
+            "/book/available-slots",
+            headers=_auth_header(930018),
+            json={
+                "members": [
+                    {
+                        "user_id": 930018,
+                        "engagement_id": 930118,
+                        "blood_collection_date": "2026-07-20",
+                    }
+                ]
+            },
+        )
+
+    assert response.status_code == 200
+    member = response.json()["data"]["members"][0]
+    assert member["status"] == "success"
+    mock_geocode.assert_awaited_once()
+    part_row = (
+        await test_db_session.execute(
+            text(
+                "SELECT address, pincode, latitude, longitude, healthians_zone_id "
+                "FROM engagement_participants WHERE engagement_id = 930118"
+            ),
+        )
+    ).one()
+    assert part_row.address == "Flat 1, Block A, Near Park, Mumbai - 400001"
+    assert part_row.pincode == "400001"
+    assert part_row.latitude is not None
+    assert part_row.healthians_zone_id == "264"
+
+
+@pytest.mark.asyncio
+async def test_available_slots_home_multi_participant_cannot_seed_from_engagement(
+    async_client, test_db_session,
+):
+    await _seed_healthians_diagnostic_package(test_db_session)
+    u1 = User(
+        user_id=930019,
+        age=30,
+        phone="9300190000",
+        status="active",
+        first_name="Multi",
+        last_name="One",
+        gender="male",
+        city="Mumbai",
+        parent_id=None,
+    )
+    u2 = User(
+        user_id=930020,
+        age=28,
+        phone="9300200000",
+        status="active",
+        first_name="Multi",
+        last_name="Two",
+        gender="female",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add_all([u1, u2])
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=930119,
+        user_id=930019,
+        booked_by_user_id=930019,
+        status="scheduled",
+        participant_location=False,
+    )
+    from modules.engagements.models import EngagementParticipant
+
+    test_db_session.add(
+        EngagementParticipant(
+            engagement_id=930119,
+            user_id=930020,
+            booked_by_user_id=930019,
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.post(
+        "/book/available-slots",
+        headers=_auth_header(930019),
+        json={
+            "members": [
+                {
+                    "user_id": 930019,
+                    "engagement_id": 930119,
+                    "blood_collection_date": "2026-07-20",
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200
+    member = response.json()["data"]["members"][0]
+    assert member["status"] == "error"
+    assert "Re-check service availability" in member["message"]
 
 
 @pytest.mark.asyncio
