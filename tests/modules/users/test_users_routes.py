@@ -8,7 +8,9 @@ import pytest
 
 from core.config import settings
 from core.security import create_jwt_token
-from modules.engagements.models import Engagement, EngagementParticipant, EngagementSlotInfo
+from modules.engagements.enums import BloodCollectionType
+from modules.engagements.models import Engagement, EngagementParticipant, EngagementSlotInfo, ParticipantBloodBooking
+from modules.engagements.blood_booking_enums import BloodBookingRelation, BloodBookingStatus
 from modules.organizations.models import Organization
 from modules.users.models import User
 
@@ -360,6 +362,29 @@ def _blood_collection_slot_detail(slot_date: str) -> dict:
     }
 
 
+async def _seed_upcoming_slot_pbb(
+    test_db_session,
+    *,
+    participant_id: int,
+    slot_date: date,
+    slot_time: time,
+    cabin: str | None = None,
+    booking_id: str | None = None,
+) -> None:
+    test_db_session.add(
+        ParticipantBloodBooking(
+            engagement_participant_id=participant_id,
+            collection_date=slot_date,
+            collection_time=slot_time,
+            collection_cabin=cabin,
+            booking_id=booking_id,
+            relation=BloodBookingRelation.primary.value,
+            status=BloodBookingStatus.active.value,
+        )
+    )
+    await test_db_session.commit()
+
+
 @pytest.mark.asyncio
 async def test_upcoming_slot_empty(async_client, test_db_session):
     user = User(user_id=99001, age=30, phone="990010000000", status="active", first_name="Empty")
@@ -393,6 +418,7 @@ async def test_upcoming_slot_uses_cabin_duration(async_client, test_db_session):
         city="BLR",
         slot_duration=60,
         slot_detail_id=99002,
+        blood_collection_type=BloodCollectionType.camp_collection,
         start_date=date.fromisoformat(slot_date),
         end_date=date.fromisoformat(slot_date),
         status="running",
@@ -402,9 +428,6 @@ async def test_upcoming_slot_uses_cabin_duration(async_client, test_db_session):
         engagement_id=99002,
         user_id=99002,
         booked_by_user_id=99002,
-        engagement_date=date.fromisoformat(slot_date),
-        slot_start_time=time(13, 40),
-        blood_collection_cabin="blood_test_cabin_1",
     )
     test_db_session.add(user)
     await test_db_session.flush()
@@ -415,7 +438,14 @@ async def test_upcoming_slot_uses_cabin_duration(async_client, test_db_session):
     test_db_session.add(engagement)
     await test_db_session.flush()
     test_db_session.add(participant)
-    await test_db_session.commit()
+    await test_db_session.flush()
+    await _seed_upcoming_slot_pbb(
+        test_db_session,
+        participant_id=99002,
+        slot_date=date.fromisoformat(slot_date),
+        slot_time=time(13, 40),
+        cabin="blood_test_cabin_1",
+    )
 
     response = await async_client.get("/users/me/upcoming-slot", headers=_auth_header(99002))
 
@@ -435,7 +465,7 @@ async def test_upcoming_slot_uses_cabin_duration(async_client, test_db_session):
 @pytest.mark.asyncio
 async def test_upcoming_slot_home_collection_fallback(async_client, test_db_session):
     slot_date = (date.today() + timedelta(days=31)).isoformat()
-    user = User(user_id=99003, age=30, phone="990030000000", status="active", first_name="Home")
+    user = User(user_id=99003, age=30, phone="990030000000", status="active", first_name="Home", address="User Home Addr")
     engagement = Engagement(
         engagement_id=99003,
         engagement_name="Home Collection Test",
@@ -443,6 +473,7 @@ async def test_upcoming_slot_home_collection_fallback(async_client, test_db_sess
         engagement_code="UPCOMING-HOME-99003",
         city="BLR",
         slot_duration=60,
+        blood_collection_type=BloodCollectionType.home_collection,
         start_date=date.fromisoformat(slot_date),
         end_date=date.fromisoformat(slot_date),
         status="running",
@@ -452,16 +483,19 @@ async def test_upcoming_slot_home_collection_fallback(async_client, test_db_sess
         engagement_id=99003,
         user_id=99003,
         booked_by_user_id=99003,
-        engagement_date=date.fromisoformat(slot_date),
-        slot_start_time=time(10, 0),
-        blood_collection_cabin=None,
     )
     test_db_session.add(user)
     await test_db_session.flush()
     test_db_session.add(engagement)
     await test_db_session.flush()
     test_db_session.add(participant)
-    await test_db_session.commit()
+    await test_db_session.flush()
+    await _seed_upcoming_slot_pbb(
+        test_db_session,
+        participant_id=99003,
+        slot_date=date.fromisoformat(slot_date),
+        slot_time=time(10, 0),
+    )
 
     response = await async_client.get("/users/me/upcoming-slot", headers=_auth_header(99003))
 
@@ -473,3 +507,252 @@ async def test_upcoming_slot_home_collection_fallback(async_client, test_db_sess
     assert slot["slot_end_time"] == "11:00 AM"
     assert slot["cabin"] is None
     assert data["slots"][0]["engagement"]["engagement_type"] == "b2c"
+    assert data["slots"][0]["location"]["type"] == "home_collection"
+    assert data["slots"][0]["location"]["display"] == "User Home Addr"
+
+
+@pytest.mark.asyncio
+async def test_upcoming_slot_home_collection_participant_address_wins(async_client, test_db_session):
+    slot_date = (date.today() + timedelta(days=32)).isoformat()
+    user = User(
+        user_id=99004,
+        age=30,
+        phone="990040000000",
+        status="active",
+        first_name="HomeP",
+        address="User Addr",
+    )
+    engagement = Engagement(
+        engagement_id=99004,
+        engagement_name="Home Participant Addr",
+        organization_id=None,
+        engagement_code="UPCOMING-HOME-99004",
+        city="BLR",
+        address="Engagement Venue Should Not Show",
+        slot_duration=60,
+        blood_collection_type=BloodCollectionType.home_collection,
+        start_date=date.fromisoformat(slot_date),
+        end_date=date.fromisoformat(slot_date),
+        status="running",
+    )
+    participant = EngagementParticipant(
+        engagement_participant_id=99004,
+        engagement_id=99004,
+        user_id=99004,
+        booked_by_user_id=99004,
+        address="Participant Home Addr",
+    )
+    test_db_session.add(user)
+    await test_db_session.flush()
+    test_db_session.add(engagement)
+    await test_db_session.flush()
+    test_db_session.add(participant)
+    await test_db_session.flush()
+    await _seed_upcoming_slot_pbb(
+        test_db_session,
+        participant_id=99004,
+        slot_date=date.fromisoformat(slot_date),
+        slot_time=time(11, 0),
+    )
+
+    response = await async_client.get("/users/me/upcoming-slot", headers=_auth_header(99004))
+    data = response.json()["data"]
+    assert data["slots"][0]["location"]["display"] == "Participant Home Addr"
+    assert data["slots"][0]["location"]["type"] == "home_collection"
+
+
+@pytest.mark.asyncio
+async def test_upcoming_slot_home_collection_b2c_single_participant_seeds_engagement(async_client, test_db_session):
+    slot_date = (date.today() + timedelta(days=33)).isoformat()
+    user = User(user_id=99005, age=30, phone="990050000000", status="active", first_name="Seed")
+    engagement = Engagement(
+        engagement_id=99005,
+        engagement_name="Home Seed Eng",
+        organization_id=None,
+        engagement_code="UPCOMING-HOME-99005",
+        city="BLR",
+        address="Seeded Engagement Addr",
+        slot_duration=60,
+        blood_collection_type=BloodCollectionType.home_collection,
+        start_date=date.fromisoformat(slot_date),
+        end_date=date.fromisoformat(slot_date),
+        status="running",
+    )
+    participant = EngagementParticipant(
+        engagement_participant_id=99005,
+        engagement_id=99005,
+        user_id=99005,
+        booked_by_user_id=99005,
+    )
+    test_db_session.add(user)
+    await test_db_session.flush()
+    test_db_session.add(engagement)
+    await test_db_session.flush()
+    test_db_session.add(participant)
+    await test_db_session.flush()
+    await _seed_upcoming_slot_pbb(
+        test_db_session,
+        participant_id=99005,
+        slot_date=date.fromisoformat(slot_date),
+        slot_time=time(9, 30),
+    )
+
+    response = await async_client.get("/users/me/upcoming-slot", headers=_auth_header(99005))
+    loc = response.json()["data"]["slots"][0]["location"]
+    assert loc["display"] == "Seeded Engagement Addr"
+
+
+@pytest.mark.asyncio
+async def test_upcoming_slot_home_collection_two_participants_uses_user_not_engagement(
+    async_client, test_db_session
+):
+    slot_date = (date.today() + timedelta(days=34)).isoformat()
+    user = User(
+        user_id=99006,
+        age=30,
+        phone="990060000000",
+        status="active",
+        first_name="Multi",
+        address="User Addr Multi",
+    )
+    other = User(user_id=99007, age=28, phone="990070000000", status="active", first_name="Other")
+    engagement = Engagement(
+        engagement_id=99006,
+        engagement_name="Home Multi",
+        organization_id=None,
+        engagement_code="UPCOMING-HOME-99006",
+        city="BLR",
+        address="Eng Addr Multi",
+        slot_duration=60,
+        blood_collection_type=BloodCollectionType.home_collection,
+        start_date=date.fromisoformat(slot_date),
+        end_date=date.fromisoformat(slot_date),
+        status="running",
+    )
+    participant = EngagementParticipant(
+        engagement_participant_id=99006,
+        engagement_id=99006,
+        user_id=99006,
+        booked_by_user_id=99006,
+    )
+    other_participant = EngagementParticipant(
+        engagement_participant_id=99007,
+        engagement_id=99006,
+        user_id=99007,
+        booked_by_user_id=99007,
+    )
+    test_db_session.add_all([user, other])
+    await test_db_session.flush()
+    test_db_session.add(engagement)
+    await test_db_session.flush()
+    test_db_session.add_all([participant, other_participant])
+    await test_db_session.flush()
+    await _seed_upcoming_slot_pbb(
+        test_db_session,
+        participant_id=99006,
+        slot_date=date.fromisoformat(slot_date),
+        slot_time=time(8, 0),
+    )
+
+    response = await async_client.get("/users/me/upcoming-slot", headers=_auth_header(99006))
+    assert response.json()["data"]["slots"][0]["location"]["display"] == "User Addr Multi"
+
+
+@pytest.mark.asyncio
+async def test_upcoming_slot_home_collection_b2b_does_not_seed_engagement(async_client, test_db_session):
+    slot_date = (date.today() + timedelta(days=35)).isoformat()
+    org = Organization(
+        organization_id=99008,
+        name="Corp",
+        organization_type="corporate",
+        status="active",
+    )
+    user = User(
+        user_id=99008,
+        age=30,
+        phone="990080000000",
+        status="active",
+        first_name="B2BHome",
+        address="B2B User Addr",
+    )
+    engagement = Engagement(
+        engagement_id=99008,
+        engagement_name="B2B Home",
+        organization_id=99008,
+        engagement_code="UPCOMING-HOME-99008",
+        city="BLR",
+        address="B2B Eng Addr",
+        slot_duration=60,
+        blood_collection_type=BloodCollectionType.home_collection,
+        start_date=date.fromisoformat(slot_date),
+        end_date=date.fromisoformat(slot_date),
+        status="running",
+    )
+    participant = EngagementParticipant(
+        engagement_participant_id=99008,
+        engagement_id=99008,
+        user_id=99008,
+        booked_by_user_id=99008,
+    )
+    test_db_session.add(user)
+    await test_db_session.flush()
+    test_db_session.add(org)
+    await test_db_session.flush()
+    test_db_session.add(engagement)
+    await test_db_session.flush()
+    test_db_session.add(participant)
+    await test_db_session.flush()
+    await _seed_upcoming_slot_pbb(
+        test_db_session,
+        participant_id=99008,
+        slot_date=date.fromisoformat(slot_date),
+        slot_time=time(14, 0),
+    )
+
+    response = await async_client.get("/users/me/upcoming-slot", headers=_auth_header(99008))
+    loc = response.json()["data"]["slots"][0]["location"]
+    assert loc["type"] == "home_collection"
+    assert loc["display"] == "B2B User Addr"
+
+
+@pytest.mark.asyncio
+async def test_upcoming_slot_camp_collection_uses_engagement_address(async_client, test_db_session):
+    slot_date = (date.today() + timedelta(days=36)).isoformat()
+    user = User(user_id=99009, age=30, phone="990090000000", status="active", first_name="CampLoc")
+    engagement = Engagement(
+        engagement_id=99009,
+        engagement_name="Camp Loc",
+        organization_id=None,
+        engagement_code="UPCOMING-CAMP-99009",
+        city="BLR",
+        address="Camp Venue Address",
+        slot_duration=60,
+        blood_collection_type=BloodCollectionType.camp_collection,
+        start_date=date.fromisoformat(slot_date),
+        end_date=date.fromisoformat(slot_date),
+        status="running",
+    )
+    participant = EngagementParticipant(
+        engagement_participant_id=99009,
+        engagement_id=99009,
+        user_id=99009,
+        booked_by_user_id=99009,
+        address="Participant Home Ignored",
+    )
+    test_db_session.add(user)
+    await test_db_session.flush()
+    test_db_session.add(engagement)
+    await test_db_session.flush()
+    test_db_session.add(participant)
+    await test_db_session.flush()
+    await _seed_upcoming_slot_pbb(
+        test_db_session,
+        participant_id=99009,
+        slot_date=date.fromisoformat(slot_date),
+        slot_time=time(12, 0),
+    )
+
+    response = await async_client.get("/users/me/upcoming-slot", headers=_auth_header(99009))
+    loc = response.json()["data"]["slots"][0]["location"]
+    assert loc["type"] == "venue"
+    assert loc["display"] == "Camp Venue Address"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from modules.engagements.enums import BloodCollectionType
 from modules.engagements.models import Engagement, EngagementParticipant
@@ -23,6 +23,15 @@ def _blood_collection_value(engagement: Engagement) -> str:
     if hasattr(bct, "value"):
         return str(bct.value).strip().lower()
     return str(bct or "").strip().lower()
+
+
+def blood_collection_type_value(blood_collection_type: Any) -> str:
+    """Normalize blood_collection_type from ORM row or enum."""
+    if blood_collection_type is None:
+        return ""
+    if hasattr(blood_collection_type, "value"):
+        return str(blood_collection_type.value).strip().lower()
+    return str(blood_collection_type or "").strip().lower()
 
 
 def is_home_blood_collection(engagement: Engagement) -> bool:
@@ -186,6 +195,75 @@ def booking_location_field(
     if is_home_blood_collection(engagement):
         return getattr(participant, field, None)
     return getattr(engagement, field, None)
+
+
+def _strip_text(value: str | None) -> str:
+    return (value or "").strip()
+
+
+def resolve_upcoming_slot_location_type(
+    *,
+    blood_collection_type: Any,
+    organization_id: int | None,
+) -> Literal["venue", "home_collection"]:
+    """Map collection mode to upcoming-slot location.type."""
+    bct = blood_collection_type_value(blood_collection_type)
+    if bct == BloodCollectionType.home_collection.value:
+        return "home_collection"
+    if bct == BloodCollectionType.camp_collection.value:
+        return "venue"
+    return "venue" if organization_id is not None else "home_collection"
+
+
+def resolve_upcoming_slot_location_display(
+    *,
+    blood_collection_type: Any,
+    participant_address: str | None,
+    engagement_address: str | None,
+    engagement_city: str | None,
+    user_address: str | None,
+    user_city: str | None,
+    organization_id: int | None,
+    participant_count: int,
+) -> str:
+    """Resolve location.display for GET /users/me/upcoming-slot."""
+    bct = blood_collection_type_value(blood_collection_type)
+    engagement = Engagement(
+        blood_collection_type=blood_collection_type,  # type: ignore[arg-type]
+        organization_id=organization_id,
+    )
+
+    if bct == BloodCollectionType.camp_collection.value:
+        eng_addr = _strip_text(engagement_address)
+        if eng_addr:
+            return eng_addr
+        return _strip_text(engagement_city)
+
+    if bct == BloodCollectionType.home_collection.value:
+        participant_addr = _strip_text(participant_address)
+        if participant_addr:
+            return participant_addr
+        if can_seed_participant_address_from_engagement(
+            engagement,
+            participant_count=participant_count,
+        ):
+            seeded = _strip_text(engagement_address)
+            if seeded:
+                return seeded
+        user_addr = _strip_text(user_address)
+        if user_addr:
+            return user_addr
+        return _strip_text(user_city)
+
+    eng_addr = _strip_text(engagement_address)
+    if eng_addr:
+        return eng_addr
+    if organization_id is not None:
+        return _strip_text(engagement_city)
+    user_addr = _strip_text(user_address)
+    if user_addr:
+        return user_addr
+    return _strip_text(user_city)
 
 
 def overlay_console_display_address(

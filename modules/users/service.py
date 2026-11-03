@@ -542,13 +542,26 @@ class UsersService:
             slot_start_dt = datetime.combine(row.engagement_date, row.slot_start_time)
             slot_end_dt = slot_start_dt + timedelta(minutes=slot_duration_minutes)
 
-            eng_addr = (getattr(row, "engagement_address", None) or "").strip()
-            if eng_addr:
-                location_display = eng_addr
-            elif is_b2b:
-                location_display = (row.engagement_city or "") or ""
-            else:
-                location_display = (row.user_address or row.user_city or "") or ""
+            from modules.engagements.participant_location import (
+                resolve_upcoming_slot_location_display,
+                resolve_upcoming_slot_location_type,
+            )
+
+            participant_count = int(getattr(row, "participant_count", 0) or 0)
+            location_display = resolve_upcoming_slot_location_display(
+                blood_collection_type=getattr(row, "blood_collection_type", None),
+                participant_address=getattr(row, "participant_address", None),
+                engagement_address=getattr(row, "engagement_address", None),
+                engagement_city=getattr(row, "engagement_city", None),
+                user_address=getattr(row, "user_address", None),
+                user_city=getattr(row, "user_city", None),
+                organization_id=row.organization_id,
+                participant_count=participant_count,
+            )
+            location_type = resolve_upcoming_slot_location_type(
+                blood_collection_type=getattr(row, "blood_collection_type", None),
+                organization_id=row.organization_id,
+            )
 
             slots.append(
                 {
@@ -564,7 +577,7 @@ class UsersService:
                         "cabin": cabin_key,
                     },
                     "location": {
-                        "type": "venue" if is_b2b else "home_collection",
+                        "type": location_type,
                         "display": location_display,
                     },
                 }

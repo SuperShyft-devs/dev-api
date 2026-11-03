@@ -9,6 +9,8 @@ from modules.engagements.participant_location import (
     copy_engagement_text_address_to_participant,
     is_b2c_engagement,
     is_home_blood_collection,
+    resolve_upcoming_slot_location_display,
+    resolve_upcoming_slot_location_type,
     use_participant_home_for_booking,
 )
 
@@ -115,3 +117,70 @@ def test_is_home_blood_collection():
 def test_is_b2c_engagement():
     assert is_b2c_engagement(Engagement(organization_id=None))
     assert not is_b2c_engagement(Engagement(organization_id=1))
+
+
+def test_resolve_upcoming_slot_location_display_home_chain():
+    bct = BloodCollectionType.home_collection
+    assert (
+        resolve_upcoming_slot_location_display(
+            blood_collection_type=bct,
+            participant_address="P Addr",
+            engagement_address="E Addr",
+            engagement_city="City",
+            user_address="U Addr",
+            user_city="UCity",
+            organization_id=None,
+            participant_count=1,
+        )
+        == "P Addr"
+    )
+    assert (
+        resolve_upcoming_slot_location_display(
+            blood_collection_type=bct,
+            participant_address=None,
+            engagement_address="E Addr",
+            engagement_city="City",
+            user_address="U Addr",
+            user_city="UCity",
+            organization_id=None,
+            participant_count=1,
+        )
+        == "E Addr"
+    )
+    assert (
+        resolve_upcoming_slot_location_display(
+            blood_collection_type=bct,
+            participant_address=None,
+            engagement_address="E Addr",
+            engagement_city="City",
+            user_address="U Addr",
+            user_city="UCity",
+            organization_id=None,
+            participant_count=2,
+        )
+        == "U Addr"
+    )
+
+
+def test_resolve_upcoming_slot_location_type():
+    assert (
+        resolve_upcoming_slot_location_type(
+            blood_collection_type=BloodCollectionType.home_collection,
+            organization_id=1,
+        )
+        == "home_collection"
+    )
+    assert (
+        resolve_upcoming_slot_location_type(
+            blood_collection_type=BloodCollectionType.camp_collection,
+            organization_id=None,
+        )
+        == "venue"
+    )
+    assert (
+        resolve_upcoming_slot_location_type(
+            blood_collection_type=None,
+            organization_id=5,
+        )
+        == "venue"
+    )

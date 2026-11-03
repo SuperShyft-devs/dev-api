@@ -394,13 +394,22 @@ class UsersRepository:
 
         today = date.today()
         curr_pbb = current_blood_booking_subquery()
+        participant_count = (
+            select(func.count())
+            .select_from(EngagementParticipant)
+            .where(EngagementParticipant.engagement_id == Engagement.engagement_id)
+            .correlate(Engagement)
+            .scalar_subquery()
+        )
         query = (
             select(
                 curr_pbb.c.collection_time.label("slot_start_time"),
                 curr_pbb.c.collection_date.label("engagement_date"),
                 curr_pbb.c.booking_id.label("booking_id"),
                 curr_pbb.c.collection_cabin.label("blood_collection_cabin"),
+                Engagement.engagement_id.label("engagement_id"),
                 Engagement.engagement_type.label("engagement_type"),
+                Engagement.blood_collection_type.label("blood_collection_type"),
                 Engagement.slot_duration.label("slot_duration"),
                 Engagement.slot_detail_id.label("slot_detail_id"),
                 EngagementSlotInfo.slot_detail.label("slot_detail"),
@@ -409,6 +418,8 @@ class UsersRepository:
                 Engagement.pincode.label("engagement_pincode"),
                 Engagement.organization_id.label("organization_id"),
                 Organization.name.label("organization_name"),
+                EngagementParticipant.address.label("participant_address"),
+                participant_count.label("participant_count"),
                 User.address.label("user_address"),
                 User.city.label("user_city"),
             )
