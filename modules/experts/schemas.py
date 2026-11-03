@@ -30,7 +30,7 @@ class ExpertTypeUpdateRequest(BaseModel):
     type: OptionalSafeDisplayName = None
 
 
-ConsultationModeLiteral = Literal["video", "voice", "chat"]
+ConsultationModeLiteral = Literal["offline", "online"]
 
 
 class ExpertCreateRequest(BaseModel):

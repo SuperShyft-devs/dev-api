@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import String, asc, cast, desc, exists, func, nulls_last, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.listing import apply_sort, ilike_pattern, normalize_sort_dir
@@ -67,7 +68,7 @@ class ExpertsRepository:
         ]
         if require_active_partner:
             conditions.append(Partner.status == "active")
-        return exists(select(1).where(*conditions))
+        return exists(select(1).where(*conditions).correlate(Expert))
 
     def _apply_expert_list_filters(
         self,
@@ -77,19 +78,24 @@ class ExpertsRepository:
         status: str | None,
         search: str | None = None,
         require_active_partner: bool = False,
+        consultation_mode: str | None = None,
     ):
         query = query.where(self._partner_role_expert_exists(require_active_partner=require_active_partner))
         if expert_type is not None:
             query = query.where(Expert.expert_type == expert_type)
         if status is not None:
             query = query.where(Expert.status == status)
+        if consultation_mode is not None:
+            query = query.where(
+                cast(Expert.consultation_modes, JSONB).contains([consultation_mode])
+            )
         if search is not None and search.strip():
             pattern = ilike_pattern(search)
             partner_name_match = exists(
                 select(1).where(
                     Partner.partner_id == Expert.partner_id,
                     Partner.name.ilike(pattern),
-                )
+                ).correlate(Expert)
             )
             query = query.where(
                 or_(
@@ -124,6 +130,7 @@ class ExpertsRepository:
         status: str | None,
         search: str | None = None,
         require_active_partner: bool = False,
+        consultation_mode: str | None = None,
     ) -> int:
         query = select(func.count()).select_from(Expert)
         query = self._apply_expert_list_filters(
@@ -132,6 +139,7 @@ class ExpertsRepository:
             status=status,
             search=search,
             require_active_partner=require_active_partner,
+            consultation_mode=consultation_mode,
         )
         result = await db.execute(query)
         return int(result.scalar_one())
@@ -148,6 +156,7 @@ class ExpertsRepository:
         sort_by: str | None = None,
         sort_dir: str | None = None,
         require_active_partner: bool = False,
+        consultation_mode: str | None = None,
     ) -> list[Expert]:
         offset = (page - 1) * limit
         query = select(Expert)
@@ -157,6 +166,7 @@ class ExpertsRepository:
             status=status,
             search=search,
             require_active_partner=require_active_partner,
+            consultation_mode=consultation_mode,
         )
         sort_key = (sort_by or "").strip()
         if sort_key == "name":

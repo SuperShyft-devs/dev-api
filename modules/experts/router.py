@@ -184,6 +184,7 @@ async def list_experts(
     search: str | None = None,
     sort_by: str | None = None,
     sort_dir: str | None = None,
+    consultation_mode: str | None = None,
     db: AsyncSession = Depends(get_db),
     employee: EmployeeContext | None = Depends(get_optional_employee_if_authenticated),
     experts_service: ExpertsService = Depends(get_experts_service),
@@ -205,6 +206,7 @@ async def list_experts(
         search=search,
         sort_by=sort_by,
         sort_dir=sort_dir,
+        consultation_mode_query=consultation_mode,
     )
     expert_types = await expert_types_service.list_expert_types(db)
     type_meta = [

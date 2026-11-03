@@ -26,6 +26,7 @@ async def _seed_expert(
     partner_id: int,
     expert_type: str = "doctor",
     specialization: str = "General medicine",
+    consultation_modes: list[str] | None = None,
 ) -> tuple[Partner, Expert]:
     partner = await seed_partner(
         test_db_session,
@@ -40,6 +41,7 @@ async def _seed_expert(
         expert_type=expert_type,
         specialization=specialization,
         status="active",
+        consultation_modes=consultation_modes if consultation_modes is not None else ["online"],
     )
     test_db_session.add(expert)
     await test_db_session.commit()
@@ -89,6 +91,7 @@ async def test_list_experts_public_includes_card_fields(async_client, test_db_se
         original_fee_paise=89800,
         experience_years=12,
         session_duration_mins=20,
+        consultation_modes=["online"],
     )
     test_db_session.add(expert)
     await test_db_session.flush()
@@ -334,7 +337,7 @@ async def test_list_experts_excludes_non_expert_partner_role(async_client, test_
     response = await async_client.get(
         "/experts",
         headers=employee_auth_header(402),
-        params={"page": 1, "limit": 100},
+        params={"page": 1, "limit": 100, "consultation_mode": "all"},
     )
     assert response.status_code == 200
     ids = {row["expert_id"] for row in response.json()["data"]}
@@ -849,3 +852,82 @@ async def test_upload_consultation_attachments(async_client, test_db_session, tm
     urls = response.json()["data"]["urls"]
     assert len(urls) == 2
     assert all("/consultation-attachments/" in url for url in urls)
+
+
+@pytest.mark.asyncio
+async def test_list_experts_defaults_to_online_consultation_mode(async_client, test_db_session):
+    _, online_expert = await _seed_expert(
+        test_db_session,
+        partner_id=78570,
+        specialization="Online only",
+        consultation_modes=["online"],
+    )
+    _, offline_expert = await _seed_expert(
+        test_db_session,
+        partner_id=78571,
+        specialization="Offline only",
+        consultation_modes=["offline"],
+    )
+
+    response = await async_client.get("/experts?page=1&limit=100")
+    assert response.status_code == 200
+    ids = {row["expert_id"] for row in response.json()["data"]}
+    assert online_expert.expert_id in ids
+    assert offline_expert.expert_id not in ids
+
+
+@pytest.mark.asyncio
+async def test_list_experts_consultation_mode_offline_and_all(async_client, test_db_session):
+    _, online_expert = await _seed_expert(
+        test_db_session,
+        partner_id=78572,
+        specialization="Online doc",
+        consultation_modes=["online"],
+    )
+    _, offline_expert = await _seed_expert(
+        test_db_session,
+        partner_id=78573,
+        specialization="Offline doc",
+        consultation_modes=["offline"],
+    )
+
+    offline_response = await async_client.get(
+        "/experts",
+        params={"page": 1, "limit": 100, "consultation_mode": "offline"},
+    )
+    assert offline_response.status_code == 200
+    offline_ids = {row["expert_id"] for row in offline_response.json()["data"]}
+    assert offline_expert.expert_id in offline_ids
+    assert online_expert.expert_id not in offline_ids
+
+    all_response = await async_client.get(
+        "/experts",
+        params={"page": 1, "limit": 100, "consultation_mode": "all"},
+    )
+    assert all_response.status_code == 200
+    all_ids = {row["expert_id"] for row in all_response.json()["data"]}
+    assert online_expert.expert_id in all_ids
+    assert offline_expert.expert_id in all_ids
+
+
+@pytest.mark.asyncio
+async def test_create_expert_rejects_legacy_consultation_modes(async_client, test_db_session):
+    await seed_employee(test_db_session, employee_id=404, role="admin")
+    await seed_partner(
+        test_db_session,
+        partner_id=78574,
+        role="expert",
+        phone="785740000000",
+        email="expert78574@test.example",
+    )
+    response = await async_client.post(
+        "/experts",
+        headers=employee_auth_header(404),
+        json={
+            "partner_id": 78574,
+            "expert_type": "doctor",
+            "specialization": "General medicine",
+            "consultation_modes": ["video"],
+        },
+    )
+    assert response.status_code == 400

@@ -92,7 +92,8 @@ from sqlalchemy import func, select
 
 
 _ALLOWED_STATUS = {"active", "inactive"}
-_ALLOWED_MODES = {"video", "voice", "chat"}
+_ALLOWED_MODES = {"offline", "online"}
+_ALLOWED_CONSULTATION_MODE_FILTERS = {"online", "offline", "all"}
 
 
 class ExpertTypesService:
@@ -163,6 +164,16 @@ class ExpertsService:
             if m not in _ALLOWED_MODES:
                 raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
+    def _resolve_list_consultation_mode_filter(self, consultation_mode_query: str | None) -> str | None:
+        raw = (consultation_mode_query or "").strip().lower()
+        if not raw:
+            return "online"
+        if raw not in _ALLOWED_CONSULTATION_MODE_FILTERS:
+            raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
+        if raw == "all":
+            return None
+        return raw
+
     async def _ensure_expert_partner(self, db, partner_id: int) -> Partner:
         partner = await self._partners_repository.get_by_id(db, partner_id)
         if partner is None:
@@ -219,6 +230,7 @@ class ExpertsService:
         search: str | None = None,
         sort_by: str | None = None,
         sort_dir: str | None = None,
+        consultation_mode_query: str | None = None,
     ) -> tuple[list[Expert], int]:
         expert_type_filter = None
         if expert_type is not None:
@@ -233,6 +245,8 @@ class ExpertsService:
         elif employee is not None and status_query is None:
             status_filter = None
 
+        consultation_mode_filter = self._resolve_list_consultation_mode_filter(consultation_mode_query)
+
         require_active_partner = employee is None
         experts = await self._repository.list_experts(
             db,
@@ -244,6 +258,7 @@ class ExpertsService:
             sort_by=sort_by,
             sort_dir=sort_dir,
             require_active_partner=require_active_partner,
+            consultation_mode=consultation_mode_filter,
         )
         total = await self._repository.count_experts(
             db,
@@ -251,6 +266,7 @@ class ExpertsService:
             status=status_filter,
             search=search,
             require_active_partner=require_active_partner,
+            consultation_mode=consultation_mode_filter,
         )
         return experts, total
 
