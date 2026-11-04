@@ -14,6 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from modules.diagnostics.models import DiagnosticPackage
 from modules.discounts import abuse
 from modules.discounts.engine import DiscountEngine, PUBLIC_INVALID
+from modules.discounts.price_breakdown import (
+    build_price_breakdown,
+    discounts_from_evaluate,
+    preview_response_from_breakdown,
+    resolved_lines_by_index,
+)
 from modules.discounts.models import DiscountCode, DiscountCodeInstance, DiscountUsage
 from modules.discounts.repository import DiscountRepository
 from modules.discounts.schemas import (
@@ -245,6 +251,99 @@ class DiscountService:
             "eligible_line_indexes": result.eligible_line_indexes,
             "line_discounts_paise": result.line_discounts_paise,
         }
+
+    async def preview_checkout_price(
+        self,
+        db: AsyncSession,
+        *,
+        code: str | None,
+        user_id: int,
+        items: list[CartLine],
+        context: CheckoutContext,
+        client_ip: str | None,
+        endpoint: str = "/book/price-preview",
+    ) -> dict[str, Any]:
+        resolved = await self.engine._resolve_lines(db, items)
+        if not resolved:
+            return {"_error": (400, "No eligible items for checkout preview")}
+
+        by_index = resolved_lines_by_index(resolved)
+        sanitized = abuse.sanitize_code(code) if code else None
+
+        if not sanitized:
+            breakdown = build_price_breakdown(
+                items,
+                by_index,
+                discounts_by_index={},
+                promo_code=None,
+                promo_applied=False,
+            )
+            return preview_response_from_breakdown(
+                breakdown,
+                ok=True,
+                code=None,
+                discount_code_id=None,
+            )
+
+        try:
+            await abuse.assert_not_locked(db, user_id=user_id, client_ip=client_ip)
+            await abuse.assert_validate_hourly_cap(db, user_id=user_id)
+        except abuse.AbuseError as exc:
+            await abuse.record_attempt(
+                db,
+                user_id=user_id,
+                client_ip=client_ip,
+                code_submitted=sanitized,
+                outcome=exc.outcome,
+                endpoint=endpoint,
+                detail=exc.message,
+            )
+            return {"_error": (exc.status_code, exc.message)}
+
+        result = await self.engine.evaluate(
+            db,
+            code=sanitized,
+            user_id=user_id,
+            items=items,
+            context=context,
+            for_support=False,
+        )
+        outcome = abuse.map_engine_outcome(result.ok, result.reason)
+        await abuse.record_attempt(
+            db,
+            user_id=user_id,
+            client_ip=client_ip,
+            code_submitted=sanitized,
+            outcome=outcome,
+            endpoint=endpoint,
+            detail=result.reason,
+        )
+
+        discounts = discounts_from_evaluate(result)
+        breakdown = build_price_breakdown(
+            items,
+            by_index,
+            discounts_by_index=discounts,
+            promo_code=result.code if result.ok else sanitized,
+            promo_applied=bool(result.ok),
+        )
+
+        if not result.ok:
+            return preview_response_from_breakdown(
+                breakdown,
+                ok=False,
+                message=result.public_message or PUBLIC_INVALID,
+                reason=result.reason,
+                code=None,
+                discount_code_id=None,
+            )
+
+        return preview_response_from_breakdown(
+            breakdown,
+            ok=True,
+            code=result.code,
+            discount_code_id=result.discount_code_id,
+        )
 
     async def auto_apply(
         self,

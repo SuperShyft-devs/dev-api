@@ -49,6 +49,22 @@ class DiscountValidateRequest(BaseModel):
         return normalize_code(v)
 
 
+class PricePreviewRequest(BaseModel):
+    """Checkout cart preview with optional promo code."""
+
+    code: Optional[str] = Field(default=None, max_length=64)
+    items: list[CartLine] = Field(..., min_length=1, max_length=20)
+    context: CheckoutContext = Field(default_factory=CheckoutContext)
+
+    @field_validator("code")
+    @classmethod
+    def _norm_code(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        normalized = normalize_code(v)
+        return normalized if normalized else None
+
+
 class DiscountAutoApplyRequest(BaseModel):
     items: list[CartLine] = Field(..., min_length=1, max_length=20)
     context: CheckoutContext = Field(default_factory=CheckoutContext)

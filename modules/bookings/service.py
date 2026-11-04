@@ -20,6 +20,7 @@ from modules.diagnostics.external_codes import healthians_package_deal_id
 from modules.diagnostics.healthians import client as healthians_client
 from modules.diagnostics.healthians.sync_log import log_healthians_call
 from modules.diagnostics.models import DiagnosticPackage
+from modules.discounts.schemas import CartLine, CheckoutContext
 from modules.diagnostics.orange_health.booking_helpers import is_orange_health
 from modules.engagements.blood_bookings_access import (
     apply_schedule,
@@ -817,6 +818,33 @@ async def _validate_locked_draft_for_pay(
         raise AppError(status_code=422, error_code="PACKAGE_INACTIVE", message="Diagnostic package is not active")
 
     return engagement, participant, pkg
+
+
+async def preview_checkout_price(
+    db: AsyncSession,
+    *,
+    payer_user_id: int,
+    items: list[CartLine],
+    context: CheckoutContext,
+    discount_code: str | None = None,
+    client_ip: str | None = None,
+) -> dict[str, Any]:
+    from modules.discounts.service import DiscountService
+
+    service = DiscountService()
+    result = await service.preview_checkout_price(
+        db,
+        code=discount_code,
+        user_id=payer_user_id,
+        items=items,
+        context=context,
+        client_ip=client_ip,
+    )
+    err = result.get("_error")
+    if err:
+        status_code, message = err
+        raise AppError(status_code=status_code, error_code="CHECKOUT_PREVIEW_ERROR", message=message)
+    return result
 
 
 async def create_pay_order_for_draft_engagements(

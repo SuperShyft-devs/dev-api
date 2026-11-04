@@ -15,6 +15,7 @@ from modules.bookings.schemas import (
     CancelBookingRequest,
     CheckServiceabilityRequest,
     LockSlotRequest,
+    PricePreviewRequest,
     RescheduleBloodTestRequest,
     VerifyAndBookRequest,
     ConsultationPayRequest,
@@ -26,6 +27,28 @@ from modules.engagements.service import EngagementsService
 
 
 router = APIRouter(prefix="/book", tags=["bookings"])
+
+
+@router.post("/price-preview")
+@limiter.limit("30/minute")
+async def book_price_preview(
+    payload: PricePreviewRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    from core.network import get_client_ip
+
+    result = await booking_service.preview_checkout_price(
+        db,
+        payer_user_id=current_user.user_id,
+        items=payload.items,
+        context=payload.context,
+        discount_code=payload.code,
+        client_ip=get_client_ip(request),
+    )
+    await db.commit()
+    return success_response(result)
 
 
 @router.post("/pay")

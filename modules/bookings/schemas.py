@@ -6,6 +6,8 @@ from datetime import date
 
 from pydantic import BaseModel, Field, model_validator
 
+from modules.discounts.schemas import CartLine, CheckoutContext, PricePreviewRequest
+
 from common.validation import (
     AddressText,
     CityStateCountry,
