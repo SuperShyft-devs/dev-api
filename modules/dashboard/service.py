@@ -224,7 +224,7 @@ async def ticket_status_counts(db: AsyncSession) -> dict[str, int]:
             .group_by(SupportTicket.status)
         )
     ).all()
-    out = {status: 0 for status in ("open", "resolved", "closed")}
+    out = {status: 0 for status in ("open", "resolved")}
     for status, count in rows:
         if isinstance(status, int):
             label = code_to_label.get(status)

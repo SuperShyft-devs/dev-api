@@ -100,7 +100,6 @@ STATUS_REPORTS_SYNC: dict[str, int] = {
 STATUS_SUPPORT_TICKET: dict[str, int] = {
     "open": 1,
     "resolved": 2,
-    "closed": 3,
 }
 
 STATUS_ASSESSMENT_INSTANCE: dict[str, int] = {

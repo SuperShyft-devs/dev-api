@@ -20,6 +20,7 @@ from modules.support.schemas import SupportTicketCreate, SupportTicketStatusUpda
 from modules.dashboard.service import ticket_status_counts
 from modules.support.service import SupportService
 from modules.support.repository import SupportRepository
+from modules.support.serialization import ticket_to_dict
 
 
 router = APIRouter(prefix="/support", tags=["support"])
@@ -66,16 +67,7 @@ async def submit_ticket(
     )
     await db.commit()
 
-    return success_response(
-        {
-            "ticket_id": ticket.ticket_id,
-            "user_id": ticket.user_id,
-            "contact_input": ticket.contact_input,
-            "query_text": ticket.query_text,
-            "status": ticket.status,
-            "created_at": ticket.created_at,
-        }
-    )
+    return success_response(ticket_to_dict(ticket))
 
 
 @router.get("/tickets")
@@ -88,21 +80,9 @@ async def list_tickets(
     _ = employee
     tickets = await support_service.list_tickets(db, status_filter=status)
     status_counts = await ticket_status_counts(db)
+    payload = await support_service.tickets_to_responses(db, tickets)
 
-    return success_response(
-        [
-            {
-                "ticket_id": ticket.ticket_id,
-                "user_id": ticket.user_id,
-                "contact_input": ticket.contact_input,
-                "query_text": ticket.query_text,
-                "status": ticket.status,
-                "created_at": ticket.created_at,
-            }
-            for ticket in tickets
-        ],
-        meta={"status_counts": status_counts},
-    )
+    return success_response(payload, meta={"status_counts": status_counts})
 
 
 @router.get("/tickets/{ticket_id}")
@@ -114,17 +94,9 @@ async def get_ticket(
 ):
     _ = employee
     ticket = await support_service.get_ticket(db, ticket_id)
+    payload = await support_service.ticket_to_response(db, ticket)
 
-    return success_response(
-        {
-            "ticket_id": ticket.ticket_id,
-            "user_id": ticket.user_id,
-            "contact_input": ticket.contact_input,
-            "query_text": ticket.query_text,
-            "status": ticket.status,
-            "created_at": ticket.created_at,
-        }
-    )
+    return success_response(payload)
 
 
 @router.patch("/tickets/{ticket_id}/status")
@@ -140,11 +112,13 @@ async def update_ticket_status(
         db,
         ticket_id=ticket_id,
         status=payload.status,
-        actor_user_id=None,
+        actor_employee_id=employee.employee_id,
+        resolution_notes=payload.resolution_notes,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("User-Agent", "unknown"),
         endpoint=str(request.url.path),
     )
     await db.commit()
 
-    return success_response({"ticket_id": ticket.ticket_id, "status": ticket.status})
+    response = await support_service.ticket_to_response(db, ticket)
+    return success_response(response)

@@ -27,3 +27,10 @@ class SupportTicket(Base):
         server_default=status_server_default("open", STATUS_SUPPORT_TICKET),
     )
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    resolved_by_employee_id = Column(
+        Integer,
+        ForeignKey("employee.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolution_notes = Column(Text, nullable=True)

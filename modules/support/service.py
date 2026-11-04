@@ -5,20 +5,25 @@ This module owns support business rules.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.audit.service import AuditService
+from modules.employee.models import Employee
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.service import NotificationsService
 from modules.platform_settings.repository import PlatformSettingsRepository
 from modules.support.models import SupportTicket
 from modules.support.repository import SupportRepository
 from modules.support.schemas import SupportTicketCreate
+from modules.support.serialization import ticket_to_dict
 from modules.users.repository import UsersRepository
 
 
-_ALLOWED_STATUS = {"open", "resolved", "closed"}
+_ALLOWED_STATUS = {"open", "resolved"}
 
 
 class SupportService:
@@ -51,6 +56,12 @@ class SupportService:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
         return normalized
 
+    def _normalize_resolution_notes(self, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
     def _contact_input_from_user(self, user, user_id: int) -> str:
         for value in (user.phone, user.email):
             normalized = str(value or "").strip()
@@ -58,6 +69,39 @@ class SupportService:
                 return normalized[:255]
 
         return str(user_id)
+
+    async def _employee_names(self, db: AsyncSession, employee_ids: set[int]) -> dict[int, str]:
+        if not employee_ids:
+            return {}
+        result = await db.execute(select(Employee).where(Employee.employee_id.in_(employee_ids)))
+        return {row.employee_id: row.name for row in result.scalars().all()}
+
+    async def tickets_to_responses(
+        self,
+        db: AsyncSession,
+        tickets: list[SupportTicket],
+    ) -> list[dict]:
+        employee_ids = {
+            int(ticket.resolved_by_employee_id)
+            for ticket in tickets
+            if ticket.resolved_by_employee_id is not None
+        }
+        names = await self._employee_names(db, employee_ids)
+        return [
+            ticket_to_dict(
+                ticket,
+                resolved_by_employee_name=(
+                    names.get(int(ticket.resolved_by_employee_id))
+                    if ticket.resolved_by_employee_id is not None
+                    else None
+                ),
+            )
+            for ticket in tickets
+        ]
+
+    async def ticket_to_response(self, db: AsyncSession, ticket: SupportTicket) -> dict:
+        responses = await self.tickets_to_responses(db, [ticket])
+        return responses[0]
 
     async def submit_ticket(
         self,
@@ -133,13 +177,34 @@ class SupportService:
         *,
         ticket_id: int,
         status: str,
-        actor_user_id: int,
+        actor_employee_id: int,
+        resolution_notes: str | None = None,
         ip_address: str,
         user_agent: str,
         endpoint: str,
     ) -> SupportTicket:
         normalized_status = self._normalize_status(status)
-        ticket = await self._repository.update_ticket_status(db, ticket_id, normalized_status)
+        now = datetime.now(timezone.utc)
+
+        if normalized_status == "open":
+            ticket = await self._repository.update_ticket_status(
+                db,
+                ticket_id,
+                normalized_status,
+                clear_resolution=True,
+            )
+        else:
+            notes = self._normalize_resolution_notes(resolution_notes)
+            ticket = await self._repository.update_ticket_status(
+                db,
+                ticket_id,
+                normalized_status,
+                resolved_by_employee_id=actor_employee_id,
+                resolved_at=now,
+                resolution_notes=notes,
+                update_resolution_notes=True,
+            )
+
         if ticket is None:
             raise AppError(status_code=404, error_code="SUPPORT_TICKET_NOT_FOUND", message="Ticket does not exist")
 
@@ -150,7 +215,7 @@ class SupportService:
             endpoint=endpoint,
             ip_address=ip_address,
             user_agent=user_agent,
-            user_id=actor_user_id,
+            user_id=None,
             session_id=None,
         )
         return ticket
