@@ -409,6 +409,7 @@ class UsersRepository:
                 curr_pbb.c.collection_cabin.label("blood_collection_cabin"),
                 Engagement.engagement_id.label("engagement_id"),
                 Engagement.engagement_type.label("engagement_type"),
+                Engagement.engagement_code.label("engagement_code"),
                 Engagement.blood_collection_type.label("blood_collection_type"),
                 Engagement.slot_duration.label("slot_duration"),
                 Engagement.slot_detail_id.label("slot_detail_id"),

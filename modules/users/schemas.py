@@ -173,6 +173,7 @@ class UserPreferencesUpdate(BaseModel):
 
 class UpcomingSlotEngagement(BaseModel):
     engagement_type: Literal["b2b", "b2c"]
+    engagement_code: str
     organization_name: str | None = None
 
 

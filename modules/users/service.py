@@ -567,6 +567,7 @@ class UsersService:
                 {
                     "engagement": {
                         "engagement_type": engagement_type,
+                        "engagement_code": row.engagement_code,
                         "organization_name": row.organization_name if is_b2b else None,
                     },
                     "slot": {
