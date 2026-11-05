@@ -70,7 +70,7 @@ async def test_ensure_metsights_pro_rejects_missing_hormones(test_db_session):
             diagnostic_package_id_female=None,
         )
     assert exc.value.status_code == 400
-    assert "Missing" in exc.value.message
+    assert "missing" in exc.value.message.lower()
 
 
 @pytest.mark.asyncio

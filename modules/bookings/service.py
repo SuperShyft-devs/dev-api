@@ -865,12 +865,20 @@ async def create_pay_order_for_draft_engagements(
     for member in members:
         user_id = member["user_id"]
         engagement_id = member["engagement_id"]
-        engagement, _participant, pkg = await _validate_locked_draft_for_pay(
+        engagement, participant, pkg = await _validate_locked_draft_for_pay(
             db,
             user_id=user_id,
             engagement_id=engagement_id,
             caller_user_id=payer_user_id,
         )
+        user_result = await db.execute(select(User).where(User.user_id == user_id))
+        user = user_result.scalar_one_or_none()
+        if user is not None:
+            from modules.engagements.metsights_pro_validation import (
+                ensure_metsights_pro_allowed_before_b2c_draft_pay,
+            )
+
+            await ensure_metsights_pro_allowed_before_b2c_draft_pay(db, engagement=engagement)
         package_id = int(engagement.diagnostic_package_id)
         validated_items.append((user_id, "diagnostic_package", package_id))
         metadata_by_user[user_id] = {"engagement_id": engagement_id}

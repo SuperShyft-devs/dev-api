@@ -19,7 +19,7 @@ from modules.employee.models import EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.enums import ConsultationMode, EngagementPaymentType
-from modules.engagements.metsights_pro_validation import ensure_metsights_pro_allowed_for_b2c_type_defaults
+from modules.engagements.metsights_pro_validation import metsights_pro_b2c_defaults_violation
 from modules.engagements.models import BloodCollectionType, EngagementKind
 from modules.engagements.service import DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
 from modules.audit.service import AuditService
@@ -339,7 +339,10 @@ class PlatformSettingsService:
 
         for code, entry in complete.items():
             await self.ensure_active_b2c_packages(db, entry.assessment_package_id, entry.diagnostic_package_id)
-            await ensure_metsights_pro_allowed_for_b2c_type_defaults(
+
+        pro_violations: list[str] = []
+        for code, entry in complete.items():
+            violation = await metsights_pro_b2c_defaults_violation(
                 db,
                 engagement_type_code=code,
                 assessment_package_id=entry.assessment_package_id,
@@ -347,6 +350,16 @@ class PlatformSettingsService:
                 diagnostic_package_id_male=entry.diagnostic_package_id_male,
                 diagnostic_package_id_female=entry.diagnostic_package_id_female,
             )
+            if violation:
+                pro_violations.append(violation)
+        if pro_violations:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=" ".join(pro_violations),
+            )
+
+        for code, entry in complete.items():
             if entry.enroll_for_fitprint_full and not entry.create_profile_on_metsights:
                 raise AppError(
                     status_code=422,

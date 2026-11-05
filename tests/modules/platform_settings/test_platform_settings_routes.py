@@ -232,6 +232,49 @@ async def test_patch_b2c_defaults_rejects_fitprint_without_profile_creation(asyn
 
 
 @pytest.mark.asyncio
+async def test_patch_b2c_defaults_rejects_metsights_pro_missing_hormones(async_client, test_db_session):
+    uid = 9110
+    test_db_session.add(User(user_id=uid, age=30, phone="91100000001", status="active"))
+    await test_db_session.flush()
+    test_db_session.add(
+        Employee(employee_id=9110, name="Employee 9110", phone="0000009110", email="employee9110@test.example", role="admin", status="active")
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (1, 'P1', 'One', 1), (902, 'METSIGHTS_PRO', 'Pro', 1) "
+            "ON CONFLICT (package_id) DO UPDATE SET package_code = EXCLUDED.package_code, status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, diagnostic_provider, status) "
+            "VALUES (6, 'R6', 'Core', 'healthians', 1), (7, 'R7', 'Core Plus', 'healthians', 1) "
+            "ON CONFLICT (diagnostic_package_id) DO UPDATE SET package_name = EXCLUDED.package_name, status = EXCLUDED.status"
+        )
+    )
+    await test_db_session.commit()
+
+    response = await async_client.patch(
+        "/platform-settings/b2c-onboarding",
+        headers=_auth_header(uid),
+        json={
+            "defaults_by_engagement_type": {
+                kind.value: _type_defaults(
+                    assessment_package_id=902 if kind.value in {"bio_ai", "bio_ai_with_consultation"} else 1,
+                    diagnostic_package_id=7 if kind.value == "bio_ai" else (6 if kind.value == "bio_ai_with_consultation" else 1),
+                )
+                for kind in EngagementKind
+            }
+        },
+    )
+    assert response.status_code == 400
+    message = response.json()["message"]
+    assert "Metsights Pro" in message or "missing" in message.lower()
+    assert "bio_ai" in message.lower() or "Bio" in message
+
+
+@pytest.mark.asyncio
 async def test_get_default_onboarding_assistants_requires_auth(async_client):
     response = await async_client.get("/platform-settings/default-onboarding-assistants")
     assert response.status_code == 401

@@ -172,6 +172,7 @@ async def _seed_draft_engagement(
     status: str = "draft",
     healthians_zone_id: str | None = "440",
     participant_location: bool = True,
+    enforce_metsights_pro_gate: bool = False,
 ) -> None:
     from modules.engagements.blood_booking_enums import BloodBookingRelation, BloodBookingStatus
     from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant, ParticipantBloodBooking
@@ -193,6 +194,7 @@ async def _seed_draft_engagement(
             slot_duration=20,
             status=status,
             blood_collection_type=BloodCollectionType.home_collection,
+            enforce_metsights_pro_gate=enforce_metsights_pro_gate,
         )
     )
     participant = EngagementParticipant(
@@ -1226,6 +1228,71 @@ async def test_book_pay_rejects_unlocked_draft(async_client, test_db_session):
         json={"members": [{"user_id": 940011, "engagement_id": 940111}]},
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_book_pay_rejects_metsights_pro_without_hormones(async_client, test_db_session):
+    await _seed_healthians_diagnostic_package(test_db_session, package_id=1)
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (902, 'METSIGHTS_PRO', 'Metsights Pro', 1) "
+            "ON CONFLICT (package_id) DO UPDATE SET package_code = EXCLUDED.package_code, status = EXCLUDED.status"
+        )
+    )
+    by_type = {
+        "bio_ai": {
+            "assessment_package_id": 902,
+            "diagnostic_package_id": 1,
+            "blood_collection_type": "home_collection",
+            "create_profile_on_metsights": True,
+            "enroll_for_fitprint_full": False,
+            "auto_booking": False,
+            "slot_duration": 20,
+            "payment_type": "paid_by_patient",
+        }
+    }
+    await test_db_session.execute(text("DELETE FROM platform_settings"))
+    await test_db_session.execute(
+        text(
+            "INSERT INTO platform_settings ("
+            "settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
+            "b2c_default_engagement_type, b2c_onboarding_by_engagement_type"
+            ") VALUES (1, 902, 1, 'bio_ai', CAST(:by_type AS jsonb))"
+        ),
+        {"by_type": json.dumps(by_type)},
+    )
+    u = User(
+        user_id=940012,
+        age=30,
+        phone="9400120000",
+        status="active",
+        first_name="Pro",
+        last_name="Gate",
+        gender="female",
+        city="Mumbai",
+        parent_id=None,
+    )
+    test_db_session.add(u)
+    await test_db_session.commit()
+    await _seed_draft_engagement(
+        test_db_session,
+        engagement_id=940112,
+        user_id=940012,
+        booked_by_user_id=940012,
+        locked=True,
+        enforce_metsights_pro_gate=True,
+    )
+
+    response = await async_client.post(
+        "/book/pay",
+        headers=_auth_header(940012),
+        json={"members": [{"user_id": 940012, "engagement_id": 940112}]},
+    )
+    assert response.status_code == 400
+    body = response.json()
+    assert body["error_code"] == "INVALID_INPUT"
+    assert "Metsights Pro" in body["message"] or "missing" in body["message"].lower()
 
 
 @pytest.mark.asyncio

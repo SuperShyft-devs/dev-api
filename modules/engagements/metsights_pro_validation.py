@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
@@ -19,6 +22,19 @@ _METSIGHTS_PRO_HORMONE_GROUPS: tuple[tuple[str, str], ...] = (
     (("fsh", "fsh_value"), "FSH"),
     (("total_testosterone", "testosterone"), "total testosterone"),
 )
+
+
+def format_metsights_pro_hormone_violation(
+    *,
+    engagement_type_label: str,
+    diagnostic_package_name: str,
+    missing: list[str],
+) -> str:
+    joined = ", ".join(missing)
+    return (
+        f"{engagement_type_label} uses {diagnostic_package_name}, "
+        f"which is missing {joined} required by Metsights Pro."
+    )
 
 
 def missing_metsights_pro_hormone_labels(parameter_keys: set[str]) -> list[str]:
@@ -73,6 +89,8 @@ async def ensure_metsights_pro_allowed_for_engagement(
     if type_code not in BIO_AI_ENGAGEMENT_TYPE_CODES:
         return
 
+    type_label = (engagement_type.display_name or engagement_type.code or type_code).strip()
+
     diag_id = resolve_diagnostic_package_id_for_pro_gate(
         diagnostic_package_id=diagnostic_package_id,
         diagnostic_package_id_female=diagnostic_package_id_female,
@@ -82,24 +100,64 @@ async def ensure_metsights_pro_allowed_for_engagement(
             status_code=400,
             error_code="INVALID_INPUT",
             message=(
-                "Metsights Pro requires a diagnostic package that includes LH, FSH, and total testosterone. "
-                "Select a diagnostic package first."
+                f"{type_label}: Metsights Pro requires a diagnostic package that includes "
+                "LH, FSH, and total testosterone. Select a diagnostic package first."
             ),
         )
 
     diagnostics_repo = diagnostics_repository or DiagnosticsRepository()
+    diag_row = await diagnostics_repo.get_package_by_id_basic(db, package_id=int(diag_id))
+    diag_name = (diag_row.package_name if diag_row else None) or f"diagnostic package #{diag_id}"
+
     keys = await diagnostics_repo.list_distinct_parameter_keys_for_package(db, package_id=diag_id)
     missing = missing_metsights_pro_hormone_labels(keys)
     if missing:
-        joined = ", ".join(missing)
         raise AppError(
             status_code=400,
             error_code="INVALID_INPUT",
-            message=(
-                f"Metsights Pro requires LH, FSH, and total testosterone on the diagnostic package "
-                f"used for women. Missing: {joined}."
+            message=format_metsights_pro_hormone_violation(
+                engagement_type_label=type_label,
+                diagnostic_package_name=diag_name,
+                missing=missing,
             ),
         )
+
+
+async def metsights_pro_b2c_defaults_violation(
+    db: AsyncSession,
+    *,
+    engagement_type_code: str,
+    assessment_package_id: int,
+    diagnostic_package_id: int | None,
+    diagnostic_package_id_male: int | None,
+    diagnostic_package_id_female: int | None,
+    engagement_types_repository: EngagementTypesRepository | None = None,
+) -> str | None:
+    """Return a user-facing violation message, or None when defaults are valid."""
+    code = (engagement_type_code or "").strip().lower()
+    if code not in BIO_AI_ENGAGEMENT_TYPE_CODES:
+        return None
+
+    types_repo = engagement_types_repository or EngagementTypesRepository()
+    engagement_type = await types_repo.get_by_code(db, code)
+    if engagement_type is None:
+        return None
+
+    try:
+        await ensure_metsights_pro_allowed_for_engagement(
+            db,
+            engagement_type_id=int(engagement_type.id),
+            assessment_package_id=assessment_package_id,
+            diagnostic_package_id=diagnostic_package_id,
+            diagnostic_package_id_male=diagnostic_package_id_male,
+            diagnostic_package_id_female=diagnostic_package_id_female,
+            engagement_types_repository=types_repo,
+        )
+    except AppError as exc:
+        if exc.error_code == "INVALID_INPUT":
+            return str(exc.message)
+        raise
+    return None
 
 
 async def ensure_metsights_pro_allowed_for_b2c_type_defaults(
@@ -113,21 +171,57 @@ async def ensure_metsights_pro_allowed_for_b2c_type_defaults(
     engagement_types_repository: EngagementTypesRepository | None = None,
 ) -> None:
     """Validate Metsights Pro against diagnostic defaults for a B2C onboarding type."""
-    code = (engagement_type_code or "").strip().lower()
-    if code not in BIO_AI_ENGAGEMENT_TYPE_CODES:
-        return
-
-    types_repo = engagement_types_repository or EngagementTypesRepository()
-    engagement_type = await types_repo.get_by_code(db, code)
-    if engagement_type is None:
-        return
-
-    await ensure_metsights_pro_allowed_for_engagement(
+    message = await metsights_pro_b2c_defaults_violation(
         db,
-        engagement_type_id=int(engagement_type.id),
+        engagement_type_code=engagement_type_code,
         assessment_package_id=assessment_package_id,
         diagnostic_package_id=diagnostic_package_id,
         diagnostic_package_id_male=diagnostic_package_id_male,
         diagnostic_package_id_female=diagnostic_package_id_female,
-        engagement_types_repository=types_repo,
+        engagement_types_repository=engagement_types_repository,
+    )
+    if message:
+        raise AppError(status_code=400, error_code="INVALID_INPUT", message=message)
+
+
+async def ensure_metsights_pro_allowed_before_b2c_draft_pay(
+    db: AsyncSession,
+    *,
+    engagement: Any,
+) -> None:
+    """Block Razorpay checkout when post-payment defaults would fail the Pro hormone gate."""
+    if not getattr(engagement, "enforce_metsights_pro_gate", False):
+        return
+
+    types_repo = EngagementTypesRepository()
+    engagement_type_id = getattr(engagement, "engagement_type", None)
+    type_code = "bio_ai"
+    if engagement_type_id is None:
+        bio_ai_row = await types_repo.get_by_code(db, "bio_ai")
+        if bio_ai_row is None:
+            return
+        engagement_type_id = int(bio_ai_row.id)
+    else:
+        from modules.engagement_types.models import EngagementType
+
+        type_row = await db.execute(
+            select(EngagementType.code).where(EngagementType.id == int(engagement_type_id)).limit(1)
+        )
+        type_code = (type_row.scalar_one_or_none() or "bio_ai").strip() or "bio_ai"
+
+    resolved_assessment = getattr(engagement, "assessment_package_id", None)
+    if resolved_assessment is None:
+        from modules.platform_settings.service import PlatformSettingsService
+
+        settings_service = PlatformSettingsService()
+        defaults = await settings_service.resolve_b2c_onboarding_defaults(db, type_code)
+        resolved_assessment = defaults.assessment_package_id
+
+    await ensure_metsights_pro_allowed_for_engagement(
+        db,
+        engagement_type_id=int(engagement_type_id),
+        assessment_package_id=int(resolved_assessment),
+        diagnostic_package_id=getattr(engagement, "diagnostic_package_id", None),
+        diagnostic_package_id_male=getattr(engagement, "diagnostic_package_id_male", None),
+        diagnostic_package_id_female=getattr(engagement, "diagnostic_package_id_female", None),
     )
