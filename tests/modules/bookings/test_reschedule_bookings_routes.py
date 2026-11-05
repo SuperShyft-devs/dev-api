@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import text
 
+from core.config import settings
 from modules.diagnostics.models import DiagnosticPackage
 from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant
 from modules.users.models import User
@@ -168,6 +169,7 @@ async def test_reschedule_blood_test_success(async_client, test_db_session):
     assert member["status"] == "success"
     assert member["booking_id"] == "NEW8101"
     mock_reschedule.assert_awaited_once()
+    assert mock_reschedule.await_args.kwargs["checksum_key"] == settings.HEALTHIANS_CHECKSUM_KEY
 
 
 @pytest.mark.asyncio

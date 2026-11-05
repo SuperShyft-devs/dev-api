@@ -1883,6 +1883,7 @@ async def reschedule_healthians_participant_booking(
         resp = await healthians_client.reschedule_booking_by_customer_v1(
             access_token,
             reschedule_payload,
+            checksum_key=settings.HEALTHIANS_CHECKSUM_KEY,
         )
     except Exception as exc:
         logger.exception(

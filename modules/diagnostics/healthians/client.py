@@ -276,14 +276,22 @@ async def cancel_booking(
 async def reschedule_booking_by_customer_v1(
     access_token: str,
     payload: dict,
+    *,
+    checksum_key: str,
 ) -> dict:
     """Reschedule a Healthians booking to a new slot (customer-initiated)."""
+    body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+    checksum = generate_checksum(body, checksum_key)
     url = f"{settings.HEALTHIANS_BASE_URL}/toast4health/rescheduleBookingByCustomer_v1"
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(
             url,
-            headers={"Authorization": f"Bearer {access_token}"},
-            json=payload,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "X-Checksum": checksum,
+                "Content-Type": "application/json",
+            },
+            content=body.encode("utf-8"),
         )
         resp.raise_for_status()
         return resp.json()
