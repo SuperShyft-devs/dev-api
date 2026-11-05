@@ -102,6 +102,9 @@ STATUS_SUPPORT_TICKET: dict[str, int] = {
     "resolved": 2,
 }
 
+# Pre-0185 rows used status code 3 for "closed"; map to resolved on read.
+_SUPPORT_TICKET_LEGACY_CLOSED_CODE = 3
+
 STATUS_ASSESSMENT_INSTANCE: dict[str, int] = {
     "active": 1,
     "complete": 2,  # legacy prod rows; stored as same code as completed
@@ -177,6 +180,16 @@ def status_server_default(label: str, mapping: Mapping[str, int]) -> expression.
     return text(str(mapping[label]))
 
 
+class SupportTicketStatusLabel(StatusLabel):
+    def process_result_value(self, value: int | None, dialect: Any) -> str | None:
+        if value == _SUPPORT_TICKET_LEGACY_CLOSED_CODE:
+            return "resolved"
+        return super().process_result_value(value, dialect)
+
+    def copy(self, **kwargs: Any) -> SupportTicketStatusLabel:
+        return SupportTicketStatusLabel(self._label_to_code)
+
+
 # Pre-built status column types
 ActiveInactiveStatus = StatusLabel(STATUS_ACTIVE_INACTIVE)
 ActiveInactiveArchivedStatus = StatusLabel(STATUS_ACTIVE_INACTIVE_ARCHIVED)
@@ -192,7 +205,7 @@ BookingStatusColumn = StatusLabel(STATUS_BOOKING)
 OrderStatusColumn = StatusLabel(STATUS_ORDER)
 PaymentStatusColumn = StatusLabel(STATUS_PAYMENT)
 ReportsSyncStatusColumn = StatusLabel(STATUS_REPORTS_SYNC)
-SupportTicketStatusColumn = StatusLabel(STATUS_SUPPORT_TICKET)
+SupportTicketStatusColumn = SupportTicketStatusLabel(STATUS_SUPPORT_TICKET)
 AssessmentInstanceStatusColumn = StatusLabel(STATUS_ASSESSMENT_INSTANCE)
 AssessmentCategoryProgressStatusColumn = StatusLabel(STATUS_ASSESSMENT_CATEGORY_PROGRESS)
 BloodBookingStatusColumn = StatusLabel(STATUS_BLOOD_BOOKING)

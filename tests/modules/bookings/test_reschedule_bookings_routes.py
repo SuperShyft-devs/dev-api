@@ -6,11 +6,13 @@ from datetime import date, time, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from core.config import settings
 from modules.diagnostics.models import DiagnosticPackage
-from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant
+from modules.engagements.blood_booking_enums import BloodBookingRelation, BloodBookingStatus
+from modules.engagements.blood_bookings_access import get_current_row, read_schedule_from_row
+from modules.engagements.models import BloodCollectionType, Engagement, EngagementParticipant, ParticipantBloodBooking
 from modules.users.models import User
 from tests.helpers.auth import user_auth_header
 
@@ -40,7 +42,7 @@ async def _seed_reschedule_fixture(
                 reference_id="REF61",
                 package_name="Healthians Home",
                 diagnostic_provider="healthians",
-                external_package_code=1002,
+                external_package_code="1002",
                 status="active",
                 bookings_count=0,
             )
@@ -94,9 +96,6 @@ async def _seed_reschedule_fixture(
         )
     await test_db_session.flush()
     slot_date = date.today() + timedelta(days=3)
-    from modules.engagements.blood_booking_enums import BloodBookingRelation, BloodBookingStatus
-    from modules.engagements.models import ParticipantBloodBooking
-
     participant = EngagementParticipant(
         engagement_id=engagement_id,
         user_id=participant_user_id,
@@ -170,6 +169,36 @@ async def test_reschedule_blood_test_success(async_client, test_db_session):
     assert member["booking_id"] == "NEW8101"
     mock_reschedule.assert_awaited_once()
     assert mock_reschedule.await_args.kwargs["checksum_key"] == settings.HEALTHIANS_CHECKSUM_KEY
+
+    participant = (
+        await test_db_session.execute(
+            select(EngagementParticipant).where(
+                EngagementParticipant.engagement_id == 8101,
+                EngagementParticipant.user_id == 95001,
+            )
+        )
+    ).scalar_one()
+    sched = read_schedule_from_row(await get_current_row(test_db_session, participant))
+    assert sched["booking_id"] == "NEW8101"
+    assert sched["engagement_date"] == slot_date
+    assert sched["slot_start_time"] == time(11, 30)
+    assert sched["blood_collection_time_slot_id"] == "STM_BATCH"
+
+    rows = (
+        await test_db_session.execute(
+            select(ParticipantBloodBooking).where(
+                ParticipantBloodBooking.engagement_participant_id == participant.engagement_participant_id
+            )
+        )
+    ).scalars().all()
+    assert len(rows) == 2
+    active = [r for r in rows if r.status == BloodBookingStatus.active.value]
+    superseded = [r for r in rows if r.status == BloodBookingStatus.superseded.value]
+    assert len(active) == 1
+    assert len(superseded) == 1
+    assert active[0].relation == BloodBookingRelation.reschedule.value
+    assert active[0].parent_booking_id == f"BK8101"
+    assert superseded[0].booking_id == "BK8101"
 
 
 @pytest.mark.asyncio
