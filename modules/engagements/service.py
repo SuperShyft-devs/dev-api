@@ -1494,14 +1494,36 @@ class EngagementsService:
         if payload.start_date > payload.end_date:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
+        update_fields = payload.model_dump(exclude_unset=True)
+
         if engagement.enforce_metsights_pro_gate is True:
+            assessment_package_id = (
+                payload.assessment_package_id
+                if "assessment_package_id" in update_fields
+                else engagement.assessment_package_id
+            )
+            diagnostic_package_id = (
+                payload.diagnostic_package_id
+                if "diagnostic_package_id" in update_fields
+                else engagement.diagnostic_package_id
+            )
+            diagnostic_package_id_male = (
+                payload.diagnostic_package_id_male
+                if "diagnostic_package_id_male" in update_fields
+                else engagement.diagnostic_package_id_male
+            )
+            diagnostic_package_id_female = (
+                payload.diagnostic_package_id_female
+                if "diagnostic_package_id_female" in update_fields
+                else engagement.diagnostic_package_id_female
+            )
             await ensure_metsights_pro_allowed_for_engagement(
                 db,
                 engagement_type_id=int(payload.engagement_type),
-                assessment_package_id=payload.assessment_package_id,
-                diagnostic_package_id=payload.diagnostic_package_id,
-                diagnostic_package_id_male=payload.diagnostic_package_id_male,
-                diagnostic_package_id_female=payload.diagnostic_package_id_female,
+                assessment_package_id=assessment_package_id,
+                diagnostic_package_id=diagnostic_package_id,
+                diagnostic_package_id_male=diagnostic_package_id_male,
+                diagnostic_package_id_female=diagnostic_package_id_female,
             )
 
         # Validate that the organization exists when one is provided (B2C engagements have no org).
@@ -1525,11 +1547,11 @@ class EngagementsService:
                 message="Engagement code already exists",
             )
 
-        update_fields = payload.model_dump(exclude_unset=True)
-
-        engagement.engagement_name = payload.engagement_name
+        if "engagement_name" in update_fields:
+            engagement.engagement_name = payload.engagement_name
         engagement.engagement_code = code
-        engagement.organization_id = payload.organization_id
+        if "organization_id" in update_fields:
+            engagement.organization_id = payload.organization_id
         engagement.engagement_type = payload.engagement_type
         # Callers that never send the key keep whatever is already configured.
         if "consultations" in update_fields:
@@ -1540,6 +1562,12 @@ class EngagementsService:
         elif "consultations" in update_fields and _consultations_enabled(payload.consultations):
             engagement.consultation_mode = consultation_mode
         effective_mode = engagement.consultation_mode
+        org_for_slots = (
+            payload.organization_id
+            if "organization_id" in update_fields
+            else engagement.organization_id
+        )
+        city_for_slots = payload.city if "city" in update_fields else engagement.city
         if "slot_detail" in update_fields:
             prepared_slot_detail = _prepare_slot_detail_for_consultation_mode(
                 payload.slot_detail,
@@ -1551,8 +1579,8 @@ class EngagementsService:
             else:
                 engagement.slot_detail_id = await self._persist_slot_detail(
                     db,
-                    organization_id=payload.organization_id,
-                    city=payload.city,
+                    organization_id=org_for_slots,
+                    city=city_for_slots,
                     start_date=payload.start_date,
                     end_date=payload.end_date,
                     slot_detail=prepared_slot_detail,
@@ -1570,53 +1598,81 @@ class EngagementsService:
                     prepared = SlotDetail.model_validate(slot_detail_data)
                     engagement.slot_detail_id = await self._persist_slot_detail(
                         db,
-                        organization_id=payload.organization_id,
-                        city=payload.city,
+                        organization_id=org_for_slots,
+                        city=city_for_slots,
                         start_date=payload.start_date,
                         end_date=payload.end_date,
                         slot_detail=prepared,
                         existing_slot_detail_id=engagement.slot_detail_id,
                         exclude_engagement_id=int(engagement.engagement_id),
                     )
-        engagement.assessment_package_id = payload.assessment_package_id
-        engagement.diagnostic_package_id = payload.diagnostic_package_id
-        engagement.diagnostic_package_id_male = payload.diagnostic_package_id_male
-        engagement.diagnostic_package_id_female = payload.diagnostic_package_id_female
-        engagement.city = payload.city
-        engagement.address = payload.address
-        engagement.sub_locality = payload.sub_locality
-        engagement.landmark = payload.landmark
-        engagement.pincode = payload.pincode
-        engagement.state = payload.state
-        engagement.country = payload.country
-        engagement.latitude = payload.latitude
-        engagement.longitude = payload.longitude
+        if "assessment_package_id" in update_fields:
+            engagement.assessment_package_id = payload.assessment_package_id
+        if "diagnostic_package_id" in update_fields:
+            engagement.diagnostic_package_id = payload.diagnostic_package_id
+        if "diagnostic_package_id_male" in update_fields:
+            engagement.diagnostic_package_id_male = payload.diagnostic_package_id_male
+        if "diagnostic_package_id_female" in update_fields:
+            engagement.diagnostic_package_id_female = payload.diagnostic_package_id_female
+        if "city" in update_fields:
+            engagement.city = payload.city
+        if "address" in update_fields:
+            engagement.address = payload.address
+        if "sub_locality" in update_fields:
+            engagement.sub_locality = payload.sub_locality
+        if "landmark" in update_fields:
+            engagement.landmark = payload.landmark
+        if "pincode" in update_fields:
+            engagement.pincode = payload.pincode
+        if "state" in update_fields:
+            engagement.state = payload.state
+        if "country" in update_fields:
+            engagement.country = payload.country
+        if "latitude" in update_fields:
+            engagement.latitude = payload.latitude
+        if "longitude" in update_fields:
+            engagement.longitude = payload.longitude
         engagement.slot_duration = payload.slot_duration
         engagement.start_date = payload.start_date
         engagement.end_date = payload.end_date
         if "camp_no" in update_fields:
             engagement.camp_no = update_fields["camp_no"]
-        else:
+        elif "organization_id" in update_fields or "start_date" in update_fields:
             engagement.camp_no = compute_camp_no(payload.organization_id, payload.start_date)
-        engagement.healthians_zone_id = payload.healthians_zone_id
-        engagement.external_camp_id = payload.external_camp_id
-        engagement.blood_collection_type = payload.blood_collection_type
-        engagement.metsights_engagement_id = payload.metsights_engagement_id
-        engagement.create_profile_on_metsights = payload.create_profile_on_metsights
-        engagement.enroll_for_fitprint_full = payload.enroll_for_fitprint_full
-        engagement.load_prev_assessment_questionnaires = payload.load_prev_assessment_questionnaires
-        engagement.load_prev_questionnaire_category_keys = _normalize_load_prev_category_keys(
-            payload.load_prev_questionnaire_category_keys
-        )
-        engagement.payment_type = payload.payment_type
-        engagement.auto_booking = _resolve_auto_booking(
-            auto_booking=payload.auto_booking,
-            blood_collection_type=payload.blood_collection_type,
-        )
+        if "healthians_zone_id" in update_fields:
+            engagement.healthians_zone_id = payload.healthians_zone_id
+        if "external_camp_id" in update_fields:
+            engagement.external_camp_id = payload.external_camp_id
+        if "blood_collection_type" in update_fields:
+            engagement.blood_collection_type = payload.blood_collection_type
+        if "metsights_engagement_id" in update_fields:
+            engagement.metsights_engagement_id = payload.metsights_engagement_id
+        if "create_profile_on_metsights" in update_fields:
+            engagement.create_profile_on_metsights = payload.create_profile_on_metsights
+        if "enroll_for_fitprint_full" in update_fields:
+            engagement.enroll_for_fitprint_full = payload.enroll_for_fitprint_full
+        if "load_prev_assessment_questionnaires" in update_fields:
+            engagement.load_prev_assessment_questionnaires = payload.load_prev_assessment_questionnaires
+        if "load_prev_questionnaire_category_keys" in update_fields:
+            engagement.load_prev_questionnaire_category_keys = _normalize_load_prev_category_keys(
+                payload.load_prev_questionnaire_category_keys
+            )
+        if "payment_type" in update_fields:
+            engagement.payment_type = payload.payment_type
+        if "auto_booking" in update_fields:
+            blood_for_auto = (
+                payload.blood_collection_type
+                if "blood_collection_type" in update_fields
+                else engagement.blood_collection_type
+            )
+            engagement.auto_booking = _resolve_auto_booking(
+                auto_booking=payload.auto_booking,
+                blood_collection_type=blood_for_auto,
+            )
 
         engagement = await self._repository.update_engagement(db, engagement)
 
-        if payload.notifications is not None:
+        if "notifications" in update_fields and payload.notifications is not None:
             from modules.engagement_notifications.repository import EngagementNotificationsRepository
             from modules.engagement_notifications.service_config import serialize_for_db
             en_repo = EngagementNotificationsRepository()

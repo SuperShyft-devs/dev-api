@@ -3509,7 +3509,11 @@ class UsersService:
                 preserve_engagement_status=True,
             )
 
-        mid = (assessment_instance.metsights_record_id or "").strip() or None
+        mid = (
+            (assessment_instance.metsights_record_id or "").strip() or None
+            if assessment_instance is not None
+            else None
+        )
         return UserOnboardResponse(
             user_id=user.user_id,
             created=created,

@@ -1148,6 +1148,59 @@ async def test_update_engagement_updates_fields(async_client, test_db_session):
 
 
 @pytest.mark.asyncio
+async def test_update_engagement_partial_basics_preserves_offerings(async_client, test_db_session):
+    """Wizard basics save must not clear packages or Metsights flags omitted from the body."""
+    await _seed_employee(test_db_session, employee_id=13)
+    await _seed_organization(test_db_session, organization_id=1, name="Test Organization")
+    await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
+    await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+
+    from modules.engagements.models import Engagement
+
+    test_db_session.add(
+        Engagement(
+            engagement_id=8302,
+            engagement_name="Camp",
+            metsights_engagement_id=None,
+            organization_id=1,
+            engagement_code="PARTIAL1",
+            engagement_type=1,
+            assessment_package_id=1,
+            diagnostic_package_id=1,
+            city="BLR",
+            slot_duration=20,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 1),
+            status="running",
+            create_profile_on_metsights=True,
+            enroll_for_fitprint_full=True,
+        )
+    )
+    await test_db_session.commit()
+
+    partial = {
+        "engagement_name": "Camp renamed",
+        "engagement_code": "PARTIAL1",
+        "organization_id": 1,
+        "engagement_type": 1,
+        "start_date": "2026-02-01",
+        "end_date": "2026-02-01",
+        "slot_duration": 20,
+    }
+
+    response = await async_client.put("/engagements/8302", headers=_auth_header(13), json=partial)
+    assert response.status_code == 200
+
+    updated = await test_db_session.get(Engagement, 8302)
+    assert updated is not None
+    assert updated.engagement_name == "Camp renamed"
+    assert updated.assessment_package_id == 1
+    assert updated.diagnostic_package_id == 1
+    assert updated.create_profile_on_metsights is True
+    assert updated.enroll_for_fitprint_full is True
+
+
+@pytest.mark.asyncio
 async def test_update_b2c_engagement_without_organization(async_client, test_db_session):
     await _seed_employee(test_db_session, employee_id=13)
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
