@@ -809,6 +809,7 @@ class EngagementsService:
                 auto_booking=payload.auto_booking,
                 blood_collection_type=payload.blood_collection_type,
             ),
+            enforce_metsights_pro_gate=True,
         )
 
         engagement = await self._repository.create_engagement(db, engagement)
@@ -1493,14 +1494,15 @@ class EngagementsService:
         if payload.start_date > payload.end_date:
             raise AppError(status_code=400, error_code="INVALID_INPUT", message="Invalid request")
 
-        await ensure_metsights_pro_allowed_for_engagement(
-            db,
-            engagement_type_id=int(payload.engagement_type),
-            assessment_package_id=payload.assessment_package_id,
-            diagnostic_package_id=payload.diagnostic_package_id,
-            diagnostic_package_id_male=payload.diagnostic_package_id_male,
-            diagnostic_package_id_female=payload.diagnostic_package_id_female,
-        )
+        if engagement.enforce_metsights_pro_gate is True:
+            await ensure_metsights_pro_allowed_for_engagement(
+                db,
+                engagement_type_id=int(payload.engagement_type),
+                assessment_package_id=payload.assessment_package_id,
+                diagnostic_package_id=payload.diagnostic_package_id,
+                diagnostic_package_id_male=payload.diagnostic_package_id_male,
+                diagnostic_package_id_female=payload.diagnostic_package_id_female,
+            )
 
         # Validate that the organization exists when one is provided (B2C engagements have no org).
         if payload.organization_id is not None and self._organizations_repository is not None:
@@ -1812,6 +1814,16 @@ class EngagementsService:
                 primary=primary,
             )
 
+        if assessment_package_id is not None and engagement_type is not None:
+            await ensure_metsights_pro_allowed_for_engagement(
+                db,
+                engagement_type_id=int(engagement_type),
+                assessment_package_id=assessment_package_id,
+                diagnostic_package_id=diagnostic_package_id,
+                diagnostic_package_id_male=None,
+                diagnostic_package_id_female=None,
+            )
+
         engagement = Engagement(
             engagement_name=engagement_name,
             metsights_engagement_id=None,
@@ -1854,6 +1866,7 @@ class EngagementsService:
                 auto_booking=auto_booking,
                 blood_collection_type=blood_collection_type,
             ),
+            enforce_metsights_pro_gate=True,
         )
         engagement = await self._repository.create_engagement(db, engagement)
 
@@ -1903,6 +1916,16 @@ class EngagementsService:
             defaults.assessment_package_id,
             engagement.diagnostic_package_id,
         )
+
+        if engagement.enforce_metsights_pro_gate is True and engagement.engagement_type is not None:
+            await ensure_metsights_pro_allowed_for_engagement(
+                db,
+                engagement_type_id=int(engagement.engagement_type),
+                assessment_package_id=defaults.assessment_package_id,
+                diagnostic_package_id=engagement.diagnostic_package_id,
+                diagnostic_package_id_male=engagement.diagnostic_package_id_male,
+                diagnostic_package_id_female=engagement.diagnostic_package_id_female,
+            )
 
         engagement.assessment_package_id = defaults.assessment_package_id
         engagement.create_profile_on_metsights = bool(defaults.create_profile_on_metsights)

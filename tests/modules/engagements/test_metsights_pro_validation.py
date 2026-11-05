@@ -7,6 +7,7 @@ from core.exceptions import AppError
 from modules.engagements.metsights_pro_validation import (
     missing_metsights_pro_hormone_labels,
     ensure_metsights_pro_allowed_for_engagement,
+    ensure_metsights_pro_allowed_for_b2c_type_defaults,
     resolve_diagnostic_package_id_for_pro_gate,
 )
 
@@ -103,3 +104,33 @@ async def test_ensure_metsights_pro_allows_basic_without_hormones(test_db_sessio
         diagnostic_package_id_male=None,
         diagnostic_package_id_female=None,
     )
+
+
+@pytest.mark.asyncio
+async def test_ensure_metsights_pro_b2c_defaults_rejects_pro_without_hormones(test_db_session):
+    await test_db_session.execute(
+        text(
+            "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
+            "VALUES (922, 'METSIGHTS_PRO', 'Metsights Pro', 1) ON CONFLICT (package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, "
+            "diagnostic_provider, status, bookings_count) "
+            "VALUES (923, 'REF923', 'No hormones', 'healthians', 1, 0) "
+            "ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.commit()
+
+    with pytest.raises(AppError) as exc:
+        await ensure_metsights_pro_allowed_for_b2c_type_defaults(
+            test_db_session,
+            engagement_type_code="bio_ai",
+            assessment_package_id=922,
+            diagnostic_package_id=923,
+            diagnostic_package_id_male=None,
+            diagnostic_package_id_female=None,
+        )
+    assert exc.value.status_code == 400

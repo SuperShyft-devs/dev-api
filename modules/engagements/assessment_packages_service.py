@@ -242,7 +242,7 @@ class EngagementAssessmentPackagesService:
                 message="Assessment package is not active",
             )
 
-        if code == METSIGHTS_PRO_PACKAGE_CODE:
+        if code == METSIGHTS_PRO_PACKAGE_CODE and engagement.enforce_metsights_pro_gate is True:
             await ensure_metsights_pro_allowed_for_engagement(
                 db,
                 engagement_type_id=int(engagement.engagement_type),

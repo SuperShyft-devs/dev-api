@@ -177,6 +177,7 @@ def _engagement_to_dict(
         "load_prev_assessment_questionnaires": engagement.load_prev_assessment_questionnaires,
         "load_prev_questionnaire_category_keys": list(engagement.load_prev_questionnaire_category_keys or [])
         or None,
+        "enforce_metsights_pro_gate": bool(engagement.enforce_metsights_pro_gate),
         "notifications": notifications or [],
         **_engagement_payment_fields(engagement),
     }

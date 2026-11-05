@@ -19,6 +19,7 @@ from modules.employee.models import EmployeeRole
 from modules.employee.repository import EmployeeRepository
 from modules.employee.service import EmployeeContext
 from modules.engagements.enums import ConsultationMode, EngagementPaymentType
+from modules.engagements.metsights_pro_validation import ensure_metsights_pro_allowed_for_b2c_type_defaults
 from modules.engagements.models import BloodCollectionType, EngagementKind
 from modules.engagements.service import DEFAULT_B2C_DIAGNOSTIC_PACKAGE_ID
 from modules.audit.service import AuditService
@@ -338,6 +339,14 @@ class PlatformSettingsService:
 
         for code, entry in complete.items():
             await self.ensure_active_b2c_packages(db, entry.assessment_package_id, entry.diagnostic_package_id)
+            await ensure_metsights_pro_allowed_for_b2c_type_defaults(
+                db,
+                engagement_type_code=code,
+                assessment_package_id=entry.assessment_package_id,
+                diagnostic_package_id=entry.diagnostic_package_id,
+                diagnostic_package_id_male=entry.diagnostic_package_id_male,
+                diagnostic_package_id_female=entry.diagnostic_package_id_female,
+            )
             if entry.enroll_for_fitprint_full and not entry.create_profile_on_metsights:
                 raise AppError(
                     status_code=422,

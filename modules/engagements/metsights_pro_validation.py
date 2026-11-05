@@ -100,3 +100,34 @@ async def ensure_metsights_pro_allowed_for_engagement(
                 f"used for women. Missing: {joined}."
             ),
         )
+
+
+async def ensure_metsights_pro_allowed_for_b2c_type_defaults(
+    db: AsyncSession,
+    *,
+    engagement_type_code: str,
+    assessment_package_id: int,
+    diagnostic_package_id: int | None,
+    diagnostic_package_id_male: int | None,
+    diagnostic_package_id_female: int | None,
+    engagement_types_repository: EngagementTypesRepository | None = None,
+) -> None:
+    """Validate Metsights Pro against diagnostic defaults for a B2C onboarding type."""
+    code = (engagement_type_code or "").strip().lower()
+    if code not in BIO_AI_ENGAGEMENT_TYPE_CODES:
+        return
+
+    types_repo = engagement_types_repository or EngagementTypesRepository()
+    engagement_type = await types_repo.get_by_code(db, code)
+    if engagement_type is None:
+        return
+
+    await ensure_metsights_pro_allowed_for_engagement(
+        db,
+        engagement_type_id=int(engagement_type.id),
+        assessment_package_id=assessment_package_id,
+        diagnostic_package_id=diagnostic_package_id,
+        diagnostic_package_id_male=diagnostic_package_id_male,
+        diagnostic_package_id_female=diagnostic_package_id_female,
+        engagement_types_repository=types_repo,
+    )

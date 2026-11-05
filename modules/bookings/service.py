@@ -310,6 +310,7 @@ async def check_service_availability(
             enroll_for_fitprint_full=False,
             payment_type=EngagementPaymentType.paid_by_patient,
             auto_booking=False,
+            enforce_metsights_pro_gate=True,
         )
         db.add(engagement)
         await db.flush()
@@ -2346,6 +2347,7 @@ async def _prepare_consultation_draft_for_member(
         status="draft",
         create_profile_on_metsights=False,
         enroll_for_fitprint_full=False,
+        enforce_metsights_pro_gate=True,
     )
     db.add(engagement)
     await db.flush()

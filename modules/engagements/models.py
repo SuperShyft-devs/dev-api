@@ -168,6 +168,9 @@ class Engagement(Base):
         server_default=EngagementPaymentType.paid_by_group.value,
     )
     auto_booking = Column(Boolean, nullable=True, default=False, server_default="false")
+    enforce_metsights_pro_gate = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
 
 class OnboardingAssistantAssignment(Base):

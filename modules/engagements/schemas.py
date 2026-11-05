@@ -461,6 +461,7 @@ class EngagementListItem(BaseModel):
     enroll_for_fitprint_full: bool = False
     load_prev_assessment_questionnaires: bool = False
     load_prev_questionnaire_category_keys: list[str] | None = None
+    enforce_metsights_pro_gate: bool = False
     notifications: list[EngagementNotificationOutput] = Field(default_factory=list)
     readiness: ChecklistReadiness
 
