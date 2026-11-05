@@ -19,25 +19,34 @@ def _blood_collection_section(slot_detail: dict[str, Any] | None) -> dict[str, A
     return blood
 
 
+def enabled_blood_collection_dates(slot_detail: dict[str, Any] | None) -> list[date]:
+    """Sorted on-site blood dates from an enabled blood_collection section.
+
+    Skips non-date keys and dates whose own ``is_enable`` is false. A disabled
+    section yields no dates.
+    """
+    blood = _blood_collection_section(slot_detail)
+    if blood is None:
+        return []
+
+    found: list[date] = []
+    for date_key, cfg in blood.items():
+        key = str(date_key)
+        if not is_slot_detail_date_key(key):
+            continue
+        if isinstance(cfg, dict) and cfg.get("is_enable") is False:
+            continue
+        found.append(date.fromisoformat(key))
+    found.sort()
+    return found
+
+
 def blood_collection_dates_include(
     slot_detail: dict[str, Any] | None,
     target: date,
 ) -> bool:
     """Return True when an enabled blood_collection date key equals target."""
-    blood = _blood_collection_section(slot_detail)
-    if blood is None:
-        return False
-
-    target_str = target.isoformat()
-    for date_key, cfg in blood.items():
-        if not is_slot_detail_date_key(str(date_key)):
-            continue
-        if date_key != target_str:
-            continue
-        if isinstance(cfg, dict) and cfg.get("is_enable") is False:
-            continue
-        return True
-    return False
+    return target in enabled_blood_collection_dates(slot_detail)
 
 
 def engagement_collection_date_matches(

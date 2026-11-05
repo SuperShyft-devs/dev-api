@@ -1415,6 +1415,31 @@ async def get_engagement_data_completeness(
     return success_response(data)
 
 
+@router.get("/{engagement_id}/camp-overview")
+async def get_engagement_camp_overview(
+    engagement_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    engagements_service: EngagementsService = Depends(get_engagements_service),
+):
+    """B2B camp progress + day-wise summary (org engagements only)."""
+    from core.exceptions import AppError
+    from modules.engagements.camp_overview import build_camp_overview
+
+    engagement = await engagements_service.get_engagement_details_for_employee(
+        db, employee=employee, engagement_id=engagement_id
+    )
+    if engagement.organization_id is None:
+        raise AppError(
+            status_code=400,
+            error_code="INVALID_INPUT",
+            message="Camp overview is only available for B2B (organization) engagements",
+        )
+    slot_detail = await engagements_service.resolve_slot_detail(db, engagement)
+    data = await build_camp_overview(db, engagement=engagement, slot_detail=slot_detail)
+    return success_response(data)
+
+
 @router.get("/{engagement_id}/onboarding-assistants")
 async def list_onboarding_assistants_for_engagement(
     engagement_id: int,
